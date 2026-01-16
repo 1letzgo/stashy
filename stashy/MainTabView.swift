@@ -43,14 +43,12 @@ struct MainTabView: View {
                 }
             }
         )) {
-            // Dynamic Configurable Tabs
+            // Dynamic Configurable Tabs using new Tab API
             ForEach(tabManager.visibleTabs) { tab in
-                view(for: tab)
-                    .tint(appearanceManager.tintColor)
-                    .tabItem {
-                        Label(tab.title, systemImage: tab.icon)
-                    }
-                    .tag(tab)
+                Tab(tab.title, systemImage: tab.icon, value: tab) {
+                    view(for: tab)
+                        .tint(appearanceManager.tintColor)
+                }
             }
         }
         .tint(appearanceManager.tintColor)

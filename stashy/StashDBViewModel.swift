@@ -1613,19 +1613,21 @@ class StashDBViewModel: ObservableObject {
             }
         }
         
-        // Add search query to the filter
+        // Variables for GraphQL - search query goes in FindFilterType, not StudioFilterType
+        var filterParams: [String: Any] = [
+            "page": page,
+            "per_page": studiosPerPage,
+            "sort": sortBy.sortField,
+            "direction": sortBy.direction
+        ]
+        
+        // Add search query to FindFilterType (not studio_filter)
         if !searchQuery.isEmpty {
-            studioFilter["q"] = searchQuery
+            filterParams["q"] = searchQuery
         }
         
-        // Variables for GraphQL
         let variables: [String: Any] = [
-            "filter": [
-                "page": page,
-                "per_page": studiosPerPage,
-                "sort": sortBy.sortField,
-                "direction": sortBy.direction
-            ],
+            "filter": filterParams,
             "studio_filter": studioFilter
         ]
         
@@ -1896,19 +1898,21 @@ class StashDBViewModel: ObservableObject {
             }
         }
         
-        // Add search query to the filter
+        // Variables for GraphQL - search query goes in FindFilterType, not GalleryFilterType
+        var filterParams: [String: Any] = [
+            "page": page,
+            "per_page": 20,
+            "sort": sortBy.sortField,
+            "direction": sortBy.direction
+        ]
+        
+        // Add search query to FindFilterType (not gallery_filter)
         if !searchQuery.isEmpty {
-            galleryFilter["q"] = searchQuery
+            filterParams["q"] = searchQuery
         }
         
-        // Variables for GraphQL
         let variables: [String: Any] = [
-            "filter": [
-                "page": page,
-                "per_page": 20,
-                "sort": sortBy.sortField,
-                "direction": sortBy.direction
-            ],
+            "filter": filterParams,
             "gallery_filter": galleryFilter
         ]
         

@@ -118,7 +118,7 @@ import SwiftUI
 
 extension View {
     /// Applies the .searchable modifier conditionally.
-    /// This allows completely hiding the search bar when not needed.
+    /// Search field is only visible when isSearchVisible is true.
     @ViewBuilder
     func conditionalSearchable(isVisible: Bool, text: Binding<String>, prompt: String = "Search") -> some View {
         if isVisible {

@@ -67,7 +67,7 @@ struct StarRatingView: View {
         ForEach(range, id: \.self) { index in
             Image(systemName: index <= stars ? "star.fill" : "star")
                 .font(.system(size: size))
-                .foregroundColor(index <= stars ? appearanceManager.tintColor : Color.gray.opacity(0.3))
+                .foregroundColor(index <= stars ? appearanceManager.tintColor : Color.gray.opacity(0.5))
                 .contentShape(Rectangle())
                 .onTapGesture {
                     guard isInteractive else { return }

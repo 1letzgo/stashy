@@ -123,7 +123,7 @@ struct GalleriesView: View {
                             .foregroundColor(.appAccent)
                     }
                     .padding(.trailing, 8)
- 
+
                     Menu {
                         Section {
                             let galleryFilters = viewModel.savedFilters.values

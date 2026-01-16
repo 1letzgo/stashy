@@ -436,22 +436,7 @@ struct ReelItemView: View {
                 Spacer()
                 
                 VStack(alignment: .leading, spacing: 6) {
-                    // Stars Row - above everything else
-                    HStack {
-                        Spacer()
-                        StarRatingView(
-                            rating100: scene.rating100,
-                            isInteractive: true,
-                            size: 24,
-                            spacing: 6,
-                            isVertical: false
-                        ) { newRating in
-                            onRatingChanged(newRating)
-                        }
-                        .padding(.trailing, 2)
-                    }
-                    
-                    // Row 1: Performer and Date
+                    // Row 1: Performer and Rating
                     HStack(alignment: .center) {
                         if let performer = scene.performers.first {
                             Button(action: { onPerformerTap(performer) }) {
@@ -466,11 +451,14 @@ struct ReelItemView: View {
                         
                         Spacer()
                         
-                        if let date = scene.date {
-                            Text(date)
-                                .font(.caption)
-                                .foregroundColor(.white.opacity(0.7))
-                                .shadow(radius: 2)
+                        StarRatingView(
+                            rating100: scene.rating100,
+                            isInteractive: true,
+                            size: 20,
+                            spacing: 4,
+                            isVertical: false
+                        ) { newRating in
+                            onRatingChanged(newRating)
                         }
                     }
 
