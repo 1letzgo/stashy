@@ -82,7 +82,7 @@ struct ServerFormViewNew: View {
                     }
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: connectionType) { _ in resetTestState() }
+                .onChange(of: connectionType) { _, _ in resetTestState() }
                 
                 if connectionType == .ipAddress {
                     HStack {
@@ -92,7 +92,7 @@ struct ServerFormViewNew: View {
                             .keyboardType(.numbersAndPunctuation)
                             .autocapitalization(.none)
                             .multilineTextAlignment(.trailing)
-                            .onChange(of: ipAddress) { _ in resetTestState() }
+                            .onChange(of: ipAddress) { _, _ in resetTestState() }
                     }
                     
                     HStack {
@@ -102,7 +102,7 @@ struct ServerFormViewNew: View {
                             .keyboardType(.numberPad)
                             .multilineTextAlignment(.trailing)
                             .foregroundColor(isValidPort || port.isEmpty ? .primary : .red)
-                            .onChange(of: port) { _ in resetTestState() }
+                            .onChange(of: port) { _, _ in resetTestState() }
                     }
                 } else {
                     HStack {
@@ -112,11 +112,11 @@ struct ServerFormViewNew: View {
                             .keyboardType(.URL)
                             .autocapitalization(.none)
                             .multilineTextAlignment(.trailing)
-                            .onChange(of: domain) { _ in resetTestState() }
+                            .onChange(of: domain) { _, _ in resetTestState() }
                     }
                     
                     Toggle("Use HTTPS", isOn: $useHTTPS)
-                        .onChange(of: useHTTPS) { _ in resetTestState() }
+                        .onChange(of: useHTTPS) { _, _ in resetTestState() }
                 }
             } header: {
                 Text("Server Details")
@@ -276,7 +276,7 @@ struct ServerFormViewNew: View {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 10
+        request.timeoutInterval = 15 // Consistent with GraphQLClient
         
         if !apiKey.isEmpty {
             request.setValue(apiKey, forHTTPHeaderField: "ApiKey")

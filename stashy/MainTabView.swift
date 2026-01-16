@@ -157,11 +157,10 @@ extension MainTabView {
             .id(coordinator.reelsTabID)
             
         case .settings:
-            NavigationView {
+            NavigationStack {
                 ServerConfigView()
                     .applyAppBackground()
             }
-            .navigationViewStyle(StackNavigationViewStyle())
             .id(coordinator.settingsTabID)
             
         default:

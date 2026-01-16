@@ -227,12 +227,33 @@ struct SceneDetailView: View {
 
     private var infoCard: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Title
-            Text(activeScene.title ?? "Unbekannter Titel")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(.primary)
-                .frame(maxWidth: .infinity, alignment: .leading)
+            // Title and Rating in same row
+            HStack(alignment: .top) {
+                Text(activeScene.title ?? "Unbekannter Titel")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+                
+                Spacer()
+                
+                StarRatingView(
+                    rating100: activeScene.rating100,
+                    isInteractive: true,
+                    size: 16,
+                    spacing: 2
+                ) { newRating in
+                    viewModel.updateSceneRating(sceneId: activeScene.id, rating100: newRating) { success in
+                        if success {
+                            DispatchQueue.main.async {
+                                var updatedScene = self.activeScene
+                                updatedScene = updatedScene.withRating(newRating)
+                                self.activeScene = updatedScene
+                            }
+                        }
+                    }
+                }
+            }
             
             // Metadata Line
             HStack(spacing: 16) {

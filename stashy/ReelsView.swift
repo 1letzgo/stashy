@@ -294,6 +294,18 @@ struct ReelsView: View {
                                 newTags.append(tag)
                             }
                             applySettings(sortBy: selectedSortOption, filter: selectedFilter, performer: selectedPerformer, tags: newTags)
+                        },
+                        onRatingChanged: { newRating in
+                            viewModel.updateSceneRating(sceneId: scene.id, rating100: newRating) { success in
+                                if success {
+                                    // Update scene in list
+                                    if let sceneIndex = viewModel.scenes.firstIndex(where: { $0.id == scene.id }) {
+                                        DispatchQueue.main.async {
+                                            viewModel.scenes[sceneIndex] = viewModel.scenes[sceneIndex].withRating(newRating)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     )
                     .containerRelativeFrame(.vertical)
@@ -383,6 +395,7 @@ struct ReelItemView: View {
     @Binding var isMuted: Bool
     var onPerformerTap: (ScenePerformer) -> Void
     var onTagTap: (Tag) -> Void
+    var onRatingChanged: (Int?) -> Void
     @State private var isPlaying = true
     @State private var currentTime: Double = 0.0
     @State private var duration: Double = 1.0
@@ -423,6 +436,21 @@ struct ReelItemView: View {
                 Spacer()
                 
                 VStack(alignment: .leading, spacing: 6) {
+                    // Stars Row - above everything else
+                    HStack {
+                        Spacer()
+                        StarRatingView(
+                            rating100: scene.rating100,
+                            isInteractive: true,
+                            size: 24,
+                            spacing: 6,
+                            isVertical: false
+                        ) { newRating in
+                            onRatingChanged(newRating)
+                        }
+                        .padding(.trailing, 2)
+                    }
+                    
                     // Row 1: Performer and Date
                     HStack(alignment: .center) {
                         if let performer = scene.performers.first {
@@ -439,10 +467,10 @@ struct ReelItemView: View {
                         Spacer()
                         
                         if let date = scene.date {
-                             Text(date)
-                                 .font(.caption)
-                                 .foregroundColor(.white.opacity(0.7))
-                                 .shadow(radius: 2)
+                            Text(date)
+                                .font(.caption)
+                                .foregroundColor(.white.opacity(0.7))
+                                .shadow(radius: 2)
                         }
                     }
 

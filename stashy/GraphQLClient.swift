@@ -8,6 +8,66 @@
 import Foundation
 import Combine
 
+// MARK: - URLSession Delegate for SSL Handling
+
+class GraphQLURLSessionDelegate: NSObject, URLSessionDelegate {
+    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        
+        // Allow self-signed certificates for local development
+        // This is common for local Stash servers
+        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust {
+            let host = challenge.protectionSpace.host
+            
+            #if DEBUG
+            print("📱 SSL Challenge for host: \(host)")
+            #endif
+            
+            // For local/private IP addresses, accept self-signed certificates
+            if isLocalOrPrivateIP(host) {
+                if let serverTrust = challenge.protectionSpace.serverTrust {
+                    let credential = URLCredential(trust: serverTrust)
+                    completionHandler(.useCredential, credential)
+                    return
+                }
+            }
+        }
+        
+        // For all other cases, use default handling
+        completionHandler(.performDefaultHandling, nil)
+    }
+    
+    private func isLocalOrPrivateIP(_ host: String) -> Bool {
+        // Check for localhost
+        if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+            return true
+        }
+        
+        // Check for private IP ranges
+        let privateRanges = [
+            "10.",           // 10.0.0.0/8
+            "172.16.",       // 172.16.0.0/12
+            "172.17.",
+            "172.18.",
+            "172.19.",
+            "172.20.",
+            "172.21.",
+            "172.22.",
+            "172.23.",
+            "172.24.",
+            "172.25.",
+            "172.26.",
+            "172.27.",
+            "172.28.",
+            "172.29.",
+            "172.30.",
+            "172.31.",
+            "192.168."       // 192.168.0.0/16
+        ]
+        
+        return privateRanges.contains { host.hasPrefix($0) }
+    }
+}
+
 // MARK: - Network Errors
 
 enum GraphQLNetworkError: LocalizedError {
@@ -63,9 +123,28 @@ class GraphQLClient {
     private let timeout: TimeInterval
     private var cancellables = Set<AnyCancellable>()
     
-    init(session: URLSession = .shared, timeout: TimeInterval = 10.0) {
-        self.session = session
+    init(session: URLSession? = nil, timeout: TimeInterval = 15.0) {
         self.timeout = timeout
+        
+        // Create custom URLSession configuration for better local server connectivity
+        if let customSession = session {
+            self.session = customSession
+        } else {
+            let config = URLSessionConfiguration.default
+            config.timeoutIntervalForRequest = timeout
+            config.timeoutIntervalForResource = timeout * 2
+            config.waitsForConnectivity = false
+            config.allowsCellularAccess = true
+            config.allowsConstrainedNetworkAccess = true
+            config.allowsExpensiveNetworkAccess = true
+            
+            // Create session with custom delegate for SSL handling
+            self.session = URLSession(
+                configuration: config,
+                delegate: GraphQLURLSessionDelegate(),
+                delegateQueue: nil
+            )
+        }
     }
     
     // MARK: - Async/Await API (Preferred)

@@ -689,7 +689,7 @@ class StashDBViewModel: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 5 // 5 Seconds Timeout
+        request.timeoutInterval = 15 // 15 Seconds Timeout - consistent with GraphQLClient
         
         // Add API Key if available
         if let apiKey = customConfig.apiKey, !apiKey.isEmpty {
@@ -815,7 +815,14 @@ class StashDBViewModel: ObservableObject {
                 print("🔍 Scene Filter sanitized: \(sanitized)")
                 variables["scene_filter"] = sanitized
             } else if let obj = savedFilter.object_filter {
-                variables["scene_filter"] = obj.value
+                // Also sanitize object_filter content to handle boolean flags and nested structures
+                if let objDict = obj.value as? [String: Any] {
+                    let sanitized = sanitizeFilter(objDict)
+                    print("🔍 Object Filter sanitized: \(sanitized)")
+                    variables["scene_filter"] = sanitized
+                } else {
+                    variables["scene_filter"] = obj.value
+                }
             }
         }
         
@@ -983,13 +990,45 @@ class StashDBViewModel: ObservableObject {
                 // Perform Recursive call first on sub-elements
                 subDict = sanitizeFilter(subDict)
                 
-                // 3. Special handling for specific Boolean Criterion keys that should be a simple Bool
+                // 3. Special handling for has_markers - Stash expects string "true"/"false", not boolean
+                if key == "has_markers" {
+                    var finalString: String? = nil
+                    if let val = subDict["value"] as? Bool {
+                        finalString = val ? "true" : "false"
+                    } else if let valStr = subDict["value"] as? String {
+                        finalString = valStr
+                    }
+                    if let strVal = finalString {
+                        newDict[key] = strVal
+                        continue
+                    }
+                }
+                
+                
+                // 4. Special handling for duplicated - convert to PHashDuplicationCriterionInput
+                // UI format: {"duplicated": {"modifier": "EQUALS", "value": "true"}}
+                // API format: {"duplicated": {"duplicated": true}}
+                if key == "duplicated" {
+                    var duplicatedBool: Bool? = nil
+                    if let val = subDict["value"] as? Bool {
+                        duplicatedBool = val
+                    } else if let valStr = subDict["value"] as? String {
+                        duplicatedBool = (valStr == "true")
+                    }
+                    
+                    if let isDuplicated = duplicatedBool {
+                        // API expects: {"duplicated": true/false} (not value/modifier)
+                        newDict[key] = ["duplicated": isDuplicated]
+                        continue
+                    }
+                }
+                
+                // 5. Special handling for specific Boolean Criterion keys that should be a simple Bool
                 let booleanFlags = [
-                    "duplicated", "organized", "performer_favorite", "studio_favorite", // Scenes
+                    "organized", "performer_favorite", "studio_favorite", // Scenes (removed duplicated, has_markers)
                     "filter_favorites", "is_favorite", "ignore_auto_tag", "favorite",   // Performers & Tags & Studios
                     "has_birthdate", "has_height_cm", "has_weight", "has_measurements",
-                    "has_career_length", "has_tattoos", "has_piercings", "has_alias_list",
-                    "has_markers"
+                    "has_career_length", "has_tattoos", "has_piercings", "has_alias_list"
                 ]
                 if booleanFlags.contains(key) {
                     var finalBool: Bool? = nil
@@ -1000,8 +1039,8 @@ class StashDBViewModel: ObservableObject {
                         else if valStr == "false" { finalBool = false }
                     }
                     if let val = finalBool {
-                        // Stash API expects boolean filters as strings "true"/"false"
-                        newDict[key] = val ? "true" : "false"
+                        // Stash API expects boolean filters as actual boolean values
+                        newDict[key] = val
                         continue
                     }
                 }
@@ -2252,6 +2291,43 @@ struct GenerateData: Codable {
         }
     }
     
+    func updateSceneRating(sceneId: String, rating100: Int?, completion: @escaping (Bool) -> Void) {
+        let mutation = """
+        mutation SceneUpdate($input: SceneUpdateInput!) {
+            sceneUpdate(input: $input) { id rating100 }
+        }
+        """
+        
+        let variables: [String: Any] = [
+            "input": [
+                "id": sceneId,
+                "rating100": rating100 as Any
+            ]
+        ]
+        
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false)
+            return
+        }
+        
+        performGraphQLQuery(query: bodyString) { (response: SceneUpdateResponse?) in
+            if let _ = response?.data?.sceneUpdate {
+                // Notify observers that the rating changed
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("SceneRatingUpdated"),
+                        object: nil,
+                        userInfo: ["sceneId": sceneId, "rating100": rating100 as Any]
+                    )
+                }
+                completion(true)
+            } else {
+                completion(false)
+            }
+        }
+    }
+    
     func togglePerformerFavorite(performerId: String, favorite: Bool, completion: @escaping (Bool) -> Void) {
         let mutation = """
         mutation PerformerUpdate($input: PerformerUpdateInput!) {
@@ -2519,6 +2595,29 @@ struct Scene: Codable, Identifiable {
             resumeTime: newResumeTime,
             playCount: playCount,
             rating100: rating100,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            paths: paths
+        )
+    }
+    
+    /// Creates a copy with updated rating
+    func withRating(_ newRating: Int?) -> Scene {
+        return Scene(
+            id: id,
+            title: title,
+            details: details,
+            date: date,
+            duration: duration,
+            studio: studio,
+            performers: performers,
+            files: files,
+            tags: tags,
+            galleries: galleries,
+            organized: organized,
+            resumeTime: resumeTime,
+            playCount: playCount,
+            rating100: newRating,
             createdAt: createdAt,
             updatedAt: updatedAt,
             paths: paths

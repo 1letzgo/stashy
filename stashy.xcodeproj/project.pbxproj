@@ -28,6 +28,7 @@
 		DF22BB342F1831C7007C2090 /* AppearanceSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */; };
 		DF22BB362F1832AD007C2090 /* NavigationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */; };
 		DF22BB3A2F1832E8007C2090 /* PerformersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB392F1832E8007C2090 /* PerformersView.swift */; };
+		DF90B75E2F1A5ECF003ED852 /* StarRatingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */; };
 		DFC9B20C2F14C9B200B796A5 /* Stashy.storekit in Resources */ = {isa = PBXBuildFile; fileRef = DFC9B20B2F14C9B200B796A5 /* Stashy.storekit */; };
 		DFE5045C2E8A8C0100323FF0 /* ServerConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045B2E8A8C0100323FF0 /* ServerConfigView.swift */; };
 		DFE5045E2E8A8C2000323FF0 /* ScenesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045D2E8A8C2000323FF0 /* ScenesView.swift */; };
@@ -67,6 +68,7 @@
 		DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsView.swift; sourceTree = "<group>"; };
 		DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationCoordinator.swift; sourceTree = "<group>"; };
 		DF22BB392F1832E8007C2090 /* PerformersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformersView.swift; sourceTree = "<group>"; };
+		DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarRatingView.swift; sourceTree = "<group>"; };
 		DFC9B20B2F14C9B200B796A5 /* Stashy.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Stashy.storekit; sourceTree = "<group>"; };
 		DFE5045B2E8A8C0100323FF0 /* ServerConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConfigView.swift; sourceTree = "<group>"; };
 		DFE5045D2E8A8C2000323FF0 /* ScenesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenesView.swift; sourceTree = "<group>"; };
@@ -77,13 +79,13 @@
 		DFE504612E8A8C4000323FF0 /* StudiosView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudiosView.swift; sourceTree = "<group>"; };
 		DFE504632E8A8C5000323FF0 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		DFF7EE402F0D3D2800344A8B /* TabManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabManager.swift; sourceTree = "<group>"; };
-		E69F93D1B9EB47B88F9597C3 /* FilterModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterModels.swift; sourceTree = "<group>"; };
 		DFGQ000022F28A0000000002 /* GraphQLClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphQLClient.swift; sourceTree = "<group>"; };
 		DFGQ000042F28A0000000004 /* GraphQLQueries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphQLQueries.swift; sourceTree = "<group>"; };
 		DFGQGRAPHQLREF001 /* graphql */ = {isa = PBXFileReference; lastKnownFileType = folder; path = graphql; sourceTree = "<group>"; };
 		DFSM000022F2NEWFILE002 /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
 		DFSM000042F2NEWFILE004 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		DFSM000062F2NEWFILE006 /* ServerFormViewNew.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerFormViewNew.swift; sourceTree = "<group>"; };
+		E69F93D1B9EB47B88F9597C3 /* FilterModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterModels.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -125,6 +127,7 @@
 				DF22BB262F167CDC007C2090 /* ImageCacheManager.swift */,
 				DFSM000022F2NEWFILE002 /* KeychainManager.swift */,
 				08FB7798FE84155DC02AAC07 /* MainTabView.swift */,
+				DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */,
 				DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */,
 				DFE5045D2E8A8C2000323FF2 /* PerformerDetailView.swift */,
 				DF22BB392F1832E8007C2090 /* PerformersView.swift */,
@@ -253,6 +256,7 @@
 				DF22BB3A2F1832E8007C2090 /* PerformersView.swift in Sources */,
 				DF22BB152F167223007C2090 /* CatalogsView.swift in Sources */,
 				DF22BB1E2F16743C007C2090 /* TagsView.swift in Sources */,
+				DF90B75E2F1A5ECF003ED852 /* StarRatingView.swift in Sources */,
 				DF22BB1F2F16743C007C2090 /* DownloadsView.swift in Sources */,
 				DF22BB202F16743C007C2090 /* GalleriesView.swift in Sources */,
 				DF22BB222F16743C007C2090 /* ReelsView.swift in Sources */,
