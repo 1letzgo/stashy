@@ -1,0 +1,92 @@
+query FindGallery($id: ID!) {
+  findGallery(id: $id) {
+    id
+    title
+    code
+    urls
+    date
+    details
+    photographer
+    rating100
+    organized
+    created_at
+    updated_at
+    image_count
+    studio {
+      id
+      name
+      aliases
+      details
+      favorite
+      rating100
+      url
+      parent_studio {
+        id
+        name
+      }
+      tags {
+        id
+        name
+      }
+    }
+    performers {
+      id
+      name
+      alias_list
+      birthdate
+      career_length
+      circumcised
+      country
+      death_date
+      details
+      disambiguation
+      ethnicity
+      eye_color
+      fake_tits
+      favorite
+      gender
+      hair_color
+      height_cm
+      measurements
+      penis_length
+      piercings
+      rating100
+      tattoos
+      tags {
+        id
+        name
+      }
+    }
+    tags {
+      id
+      name
+      aliases
+      description
+      favorite
+      ignore_auto_tag
+      image_path
+      parent_count
+      child_count
+    }
+    scenes {
+      id
+      title
+    }
+    chapters {
+      id
+      title
+      image_index
+    }
+    files {
+      basename
+      path
+      size
+      created_at
+      updated_at
+    }
+    paths {
+      cover
+      preview
+    }
+  }
+}

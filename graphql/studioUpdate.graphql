@@ -1,0 +1,59 @@
+mutation studioUpdate($input: StudioUpdateInput!) {
+  studioUpdate(input: $input) {
+    aliases
+    child_studios {
+      id
+      name
+    }
+    created_at
+    details
+    favorite
+    gallery_count
+    group_count
+    groups {
+      id
+      name
+    }
+    id
+    ignore_auto_tag
+    image_count
+    image_path
+    movie_count
+    movies {
+      id
+      name
+    }
+    name
+    parent_studio {
+      aliases
+      created_at
+      details
+      favorite
+      id
+      image_count
+      image_path
+      gallery_count
+      movie_count
+      name
+      performer_count
+      rating100
+      scene_count
+      updated_at
+      url
+    }
+    performer_count
+    rating100
+    scene_count
+    stash_ids {
+      endpoint
+      stash_id
+    }
+    tags {
+      description
+      id
+      name
+    }
+    updated_at
+    url
+  }
+}

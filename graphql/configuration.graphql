@@ -1,0 +1,11 @@
+query Configuration {
+  configuration {
+    general {
+      stashes {
+        path
+        excludeVideo
+        excludeImage
+      }
+    }
+  }
+}

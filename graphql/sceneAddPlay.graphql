@@ -1,0 +1,6 @@
+mutation SceneAddPlay($id: ID!, $times: [Timestamp!]) {
+  sceneAddPlay(id: $id, times: $times) {
+    count
+    history
+  }
+}

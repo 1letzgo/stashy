@@ -1,0 +1,47 @@
+{
+  "": {
+    "swift-dependencies": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/master.swiftdeps"
+  },
+  "/Users/danielgoletz/Nextcloud/code/stashy/stashy/DashboardView.swift": {
+    "dependencies": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/DashboardView.d",
+    "object": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/DashboardView.swift.o",
+    "swiftmodule": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/DashboardView~partial.swiftmodule",
+    "swift-dependencies": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/DashboardView.swiftdeps",
+    "diagnostics": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/DashboardView.dia"
+  },
+  "/Users/danielgoletz/Nextcloud/code/stashy/stashy/MainTabView.swift": {
+    "dependencies": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/MainTabView.d",
+    "object": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/MainTabView.swift.o",
+    "swiftmodule": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/MainTabView~partial.swiftmodule",
+    "swift-dependencies": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/MainTabView.swiftdeps",
+    "diagnostics": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/MainTabView.dia"
+  },
+  "/Users/danielgoletz/Nextcloud/code/stashy/stashy/ServerConfig.swift": {
+    "dependencies": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/ServerConfig.d",
+    "object": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/ServerConfig.swift.o",
+    "swiftmodule": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/ServerConfig~partial.swiftmodule",
+    "swift-dependencies": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/ServerConfig.swiftdeps",
+    "diagnostics": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/ServerConfig.dia"
+  },
+  "/Users/danielgoletz/Nextcloud/code/stashy/stashy/ServerConfigView.swift": {
+    "dependencies": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/ServerConfigView.d",
+    "object": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/ServerConfigView.swift.o",
+    "swiftmodule": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/ServerConfigView~partial.swiftmodule",
+    "swift-dependencies": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/ServerConfigView.swiftdeps",
+    "diagnostics": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/ServerConfigView.dia"
+  },
+  "/Users/danielgoletz/Nextcloud/code/stashy/stashy/StashDBViewModel.swift": {
+    "dependencies": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/StashDBViewModel.d",
+    "object": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/StashDBViewModel.swift.o",
+    "swiftmodule": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/StashDBViewModel~partial.swiftmodule",
+    "swift-dependencies": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/StashDBViewModel.swiftdeps",
+    "diagnostics": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/StashDBViewModel.dia"
+  },
+  "/Users/danielgoletz/Nextcloud/code/stashy/stashy/stashyApp.swift": {
+    "dependencies": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/stashyApp.d",
+    "object": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/stashyApp.swift.o",
+    "swiftmodule": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/stashyApp~partial.swiftmodule",
+    "swift-dependencies": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/stashyApp.swiftdeps",
+    "diagnostics": "/Users/danielgoletz/Nextcloud/code/stashy/.build/arm64-apple-macosx/debug/stashy.build/stashyApp.dia"
+  }
+}

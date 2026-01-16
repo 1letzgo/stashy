@@ -1,0 +1,107 @@
+query FindScenesCompact(
+  $filter: FindFilterType
+  $ids: [ID!]
+  $scene_filter: SceneFilterType
+  $scene_ids: [Int!]
+) {
+  findScenes(
+    filter: $filter
+    ids: $ids
+    scene_filter: $scene_filter
+    scene_ids: $scene_ids
+  ) {
+    count
+    duration
+    filesize
+    scenes {
+      created_at
+      code
+      date
+      details
+      director
+      id
+      o_counter
+      organized
+      play_count
+      play_duration
+      rating100
+      resume_time
+      title
+      updated_at
+      urls
+      studio {
+        id
+        name
+        tags {
+          id
+          name
+          image_path
+          favorite
+        }
+      }
+      performers {
+        id
+        name
+        image_path
+        gender
+        tags {
+          id
+          name
+          image_path
+          favorite
+        }
+      }
+      tags {
+        id
+        name
+        image_path
+        favorite
+      }
+      files {
+        audio_codec
+        basename
+        bit_rate
+        created_at
+        duration
+        format
+        frame_rate
+        height
+        path
+        size
+        updated_at
+        video_codec
+        width
+      }
+      paths {
+        preview
+        screenshot
+        sprite
+        vtt
+        webp
+        caption
+      }
+      sceneStreams {
+        url
+        mime_type
+        label
+      }
+      captions {
+        language_code
+        caption_type
+      }
+      galleries {
+        id
+        title
+      }
+      groups {
+        group {
+          id
+          name
+        }
+        scene_index
+      }
+      created_at
+      updated_at
+    }
+  }
+}

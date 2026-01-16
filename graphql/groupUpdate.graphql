@@ -1,0 +1,25 @@
+mutation groupUpdate($input: GroupUpdateInput!) {
+  groupUpdate(input: $input) {
+    id
+    name
+    aliases
+    duration
+    date
+    rating100
+    director
+    synopsis
+    urls
+    created_at
+    updated_at
+    studio {
+      id
+      name
+    }
+    tags {
+      id
+      name
+    }
+    front_image_path
+    back_image_path
+  }
+}

@@ -1,0 +1,5 @@
+query FindScene($id: ID!) {
+  findScene(id: $id) {
+    ...SceneFields
+  }
+}

@@ -1,0 +1,14 @@
+fragment GalleryFields on Gallery {
+  id title details url date rating100 organized image_count created_at updated_at
+  studio { id name image_path }
+  performers { id name image_path }
+  tags { id name }
+  cover {
+    id
+    paths {
+      thumbnail
+      preview
+      image
+    }
+  }
+}

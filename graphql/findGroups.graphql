@@ -1,0 +1,35 @@
+query FindGroups(
+  $filter: FindFilterType
+  $ids: [ID!]
+  $group_filter: GroupFilterType
+) {
+  findGroups(filter: $filter, ids: $ids, group_filter: $group_filter) {
+    count
+    groups {
+      id
+      name
+      aliases
+      duration
+      date
+      rating100
+      studio {
+        id
+        name
+      }
+      director
+      synopsis
+      urls
+      tags {
+        id
+        name
+      }
+      created_at
+      updated_at
+      front_image_path
+      back_image_path
+      scene_count
+      performer_count
+      sub_group_count
+    }
+  }
+}

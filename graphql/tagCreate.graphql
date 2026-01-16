@@ -1,0 +1,26 @@
+mutation tagCreate($input: TagCreateInput!) {
+  tagCreate(input: $input) {
+    aliases
+    created_at
+    description
+    favorite
+    gallery_count
+    group_count
+    id
+    image_count
+    image_path
+    movie_count
+    name
+    parent_count
+    parents {
+      id
+      name
+    }
+    performer_count
+    scene_count
+    scene_marker_count
+    sort_name
+    studio_count
+    updated_at
+  }
+}

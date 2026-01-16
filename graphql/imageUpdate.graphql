@@ -1,0 +1,32 @@
+mutation imageUpdate($input: ImageUpdateInput!) {
+  imageUpdate(input: $input) {
+    id
+    title
+    code
+    rating100
+    urls
+    date
+    details
+    photographer
+    o_counter
+    organized
+    created_at
+    updated_at
+    studio {
+      id
+      name
+    }
+    performers {
+      id
+      name
+    }
+    tags {
+      id
+      name
+    }
+    galleries {
+      id
+      title
+    }
+  }
+}

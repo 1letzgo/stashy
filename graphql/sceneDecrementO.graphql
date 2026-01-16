@@ -1,0 +1,3 @@
+mutation SceneDecrementO($id: ID!) {
+  sceneDecrementO(id: $id)
+}

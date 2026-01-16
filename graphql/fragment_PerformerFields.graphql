@@ -1,0 +1,3 @@
+fragment PerformerFields on Performer {
+  id name disambiguation birthdate country image_path scene_count gallery_count gender ethnicity height_cm weight measurements fake_tits career_length tattoos piercings alias_list favorite rating100 created_at updated_at
+}

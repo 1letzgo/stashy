@@ -1,0 +1,45 @@
+fragment SceneFields on Scene {
+  id title details date organized resume_time play_count rating100 created_at updated_at
+  studio { ...StudioFields }
+  performers { ...PerformerFields }
+  files { id path width height duration video_codec audio_codec bit_rate frame_rate }
+  tags { ...TagFields }
+  galleries { id title date image_count }
+  paths { screenshot preview stream webp vtt sprite funscript interactive_heatmap caption }
+}
+
+fragment PerformerFields on Performer {
+  id name disambiguation birthdate country image_path scene_count gallery_count gender ethnicity height_cm weight measurements fake_tits career_length tattoos piercings alias_list favorite rating100 created_at updated_at
+}
+
+fragment StudioFields on Studio {
+  id name url details image_path scene_count performer_count gallery_count favorite rating100 created_at updated_at
+}
+
+fragment TagFields on Tag {
+  id name image_path scene_count favorite created_at updated_at
+}
+
+fragment GalleryFields on Gallery {
+  id title details url date rating100 organized image_count created_at updated_at
+  studio { id name image_path }
+  performers { id name image_path }
+  tags { id name }
+  cover {
+    id
+    paths {
+      thumbnail
+      preview
+      image
+    }
+  }
+}
+
+fragment ImageFields on Image {
+  id title rating100 organized created_at updated_at
+  paths { thumbnail preview image }
+  galleries { id title }
+  performers { id name }
+  studio { id name }
+  tags { id name }
+}

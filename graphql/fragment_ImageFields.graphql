@@ -1,0 +1,8 @@
+fragment ImageFields on Image {
+  id title rating100 organized created_at updated_at
+  paths { thumbnail preview image }
+  galleries { id title }
+  performers { id name }
+  studio { id name }
+  tags { id name }
+}

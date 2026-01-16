@@ -1,0 +1,5 @@
+query FindStudio($id: ID!) {
+  findStudio(id: $id) {
+    ...StudioFields
+  }
+}

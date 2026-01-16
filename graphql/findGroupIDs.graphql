@@ -1,0 +1,11 @@
+query FindGroupIDs(
+  $filter: FindFilterType
+  $group_filter: GroupFilterType
+) {
+  findGroups(filter: $filter, group_filter: $group_filter) {
+    count
+    groups {
+      id
+    }
+  }
+}

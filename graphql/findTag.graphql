@@ -1,0 +1,5 @@
+query FindTag($id: ID!) {
+  findTag(id: $id) {
+    ...TagFields
+  }
+}

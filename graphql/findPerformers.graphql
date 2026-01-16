@@ -1,0 +1,8 @@
+query FindPerformers($performer_filter: PerformerFilterType, $filter: FindFilterType, $ids: [ID!]) {
+    findPerformers(performer_filter: $performer_filter, filter: $filter, ids: $ids) {
+        count
+        performers {
+            ...PerformerFields
+        }
+    }
+}

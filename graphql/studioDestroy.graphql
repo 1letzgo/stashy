@@ -1,0 +1,3 @@
+mutation studioDestroy($input: StudioDestroyInput!) {
+  studioDestroy(input: $input)
+}

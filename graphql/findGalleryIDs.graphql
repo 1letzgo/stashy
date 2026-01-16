@@ -1,0 +1,11 @@
+query FindGalleryIDs(
+  $filter: FindFilterType
+  $gallery_filter: GalleryFilterType
+) {
+  findGalleries(filter: $filter, gallery_filter: $gallery_filter) {
+    count
+    galleries {
+      id
+    }
+  }
+}
