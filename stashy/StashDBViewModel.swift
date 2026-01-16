@@ -3492,12 +3492,12 @@ struct PaywallView: View {
                     VStack(spacing: 16) {
                         ZStack {
                             Circle()
-                                .fill(appearanceManager.tintColor.opacity(0.1))
+                                .fill(Color.appAccent.opacity(0.1))
                                 .frame(width: 100, height: 100)
                             
-                            Image(systemName: "square.and.arrow.down.fill")
+                            Image(systemName: "play.square.stack.fill")
                                 .font(.system(size: 44))
-                                .foregroundColor(appearanceManager.tintColor)
+                                .foregroundColor(.appAccent)
                         }
                         
                         Text("Become stashy VIP")
@@ -3525,7 +3525,7 @@ struct PaywallView: View {
                                     Task { await store.fetchProducts() }
                                 }
                                 .buttonStyle(.bordered)
-                                .tint(appearanceManager.tintColor)
+                                .tint(Color.appAccent)
                                 
                                 #if DEBUG
                                 Button("Debug Unlock (Dev Only)") {
@@ -3568,14 +3568,14 @@ struct PaywallView: View {
                                         Text(product.displayPrice)
                                             .font(.title3)
                                             .fontWeight(.bold)
-                                            .foregroundColor(appearanceManager.tintColor)
+                                            .foregroundColor(.appAccent)
                                     }
                                     .padding()
                                     .background(Color(UIColor.secondarySystemBackground))
                                     .clipShape(RoundedRectangle(cornerRadius: 16))
                                     .overlay(
                                         RoundedRectangle(cornerRadius: 16)
-                                            .stroke(appearanceManager.tintColor.opacity(0.2), lineWidth: 1)
+                                            .stroke(Color.appAccent.opacity(0.2), lineWidth: 1)
                                     )
                                 }
                                 .disabled(isPurchasing)
@@ -3621,13 +3621,14 @@ struct PaywallView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
             }
+            .navigationTitle("StashTok")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Close") {
                         dismiss()
                     }
-                    .foregroundColor(appearanceManager.tintColor)
+                    .foregroundColor(.appAccent)
                 }
             }
             .alert("Purchase Failed", isPresented: $showError) {

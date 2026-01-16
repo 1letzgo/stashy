@@ -10,6 +10,7 @@ import WebKit
 
 struct StudiosView: View {
     @StateObject private var viewModel = StashDBViewModel()
+    @ObservedObject var configManager = ServerConfigManager.shared
     @State private var selectedSortOption: StashDBViewModel.StudioSortOption = StashDBViewModel.StudioSortOption(rawValue: TabManager.shared.getSortOption(for: .studios) ?? "") ?? .nameAsc
     @State private var isChangingSort = false
     @State private var searchText = ""
@@ -37,7 +38,9 @@ struct StudiosView: View {
 
     var body: some View {
         Group {
-            if viewModel.isLoading && viewModel.studios.isEmpty {
+            if configManager.activeConfig == nil {
+                ConnectionErrorView { performSearch() }
+            } else if viewModel.isLoading && viewModel.studios.isEmpty {
                 VStack {
                     Spacer()
                     ProgressView("Loading studios...")
@@ -60,6 +63,9 @@ struct StudiosView: View {
         }
         .onAppear {
             onAppearAction()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+            performSearch()
         }
         .onChange(of: searchText) { oldValue, newValue in
             onSearchTextChange(newValue)

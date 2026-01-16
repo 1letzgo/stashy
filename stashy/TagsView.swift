@@ -9,6 +9,7 @@ import SwiftUI
 
 struct TagsView: View {
     @StateObject private var viewModel = StashDBViewModel()
+    @ObservedObject var configManager = ServerConfigManager.shared
     @State private var selectedSortOption: StashDBViewModel.TagSortOption = StashDBViewModel.TagSortOption(rawValue: TabManager.shared.getSortOption(for: .tags) ?? "") ?? .sceneCountDesc
     @State private var selectedFilter: StashDBViewModel.SavedFilter? = nil
     @State private var isChangingSort = false
@@ -28,7 +29,9 @@ struct TagsView: View {
 
     var body: some View {
         Group {
-            if (viewModel.isLoading && viewModel.tags.isEmpty) || (viewModel.isLoadingSavedFilters && viewModel.savedFilters.isEmpty) {
+            if configManager.activeConfig == nil {
+                ConnectionErrorView { performSearch() }
+            } else if (viewModel.isLoading && viewModel.tags.isEmpty) || (viewModel.isLoadingSavedFilters && viewModel.savedFilters.isEmpty) {
                 VStack {
                     Spacer()
                     ProgressView("Loading tags...")
@@ -138,6 +141,9 @@ struct TagsView: View {
                 }
             }
             viewModel.fetchSavedFilters()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+            performSearch()
         }
         .onChange(of: viewModel.savedFilters) { oldValue, newValue in
             // Apply default filter if set and none selected yet

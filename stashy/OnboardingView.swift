@@ -99,14 +99,11 @@ struct OnboardingView: View {
                 .padding(.bottom, 32)
             }
             .sheet(isPresented: $showingAddServer) {
-                NavigationView {
-                    ServerFormView(configToEdit: nil) { newConfig in
-                        ServerConfigManager.shared.addOrUpdateServer(newConfig)
-                        ServerConfigManager.shared.saveConfig(newConfig)
-                        isPresented = false
-                    }
+                ServerSetupWizardView { newConfig in
+                    ServerConfigManager.shared.addOrUpdateServer(newConfig)
+                    ServerConfigManager.shared.saveConfig(newConfig)
+                    isPresented = false
                 }
-                .presentationDetents([.medium, .large])
             }
         }
     }

@@ -14,6 +14,7 @@ struct MainTabView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @State private var hasValidConfig = false
     @State private var showConfigWarning = false
+    @State private var showOnboarding = false
     @State private var warningType: ConfigWarningType = .none
 
     enum ConfigWarningType {
@@ -61,6 +62,14 @@ struct MainTabView: View {
             warningType = .authExpired
             showConfigWarning = true
         }
+        .sheet(isPresented: $showOnboarding) {
+            ServerSetupWizardView { newConfig in
+                ServerConfigManager.shared.addOrUpdateServer(newConfig)
+                ServerConfigManager.shared.saveConfig(newConfig)
+                showOnboarding = false
+            }
+            .interactiveDismissDisabled()
+        }
         .alert(isPresented: $showConfigWarning) {
             switch warningType {
             case .noServer:
@@ -100,13 +109,13 @@ struct MainTabView: View {
                 warningType = .invalidConfig
                 showConfigWarning = true
             }
-        } else {
-            print("❌ NO SERVER CONFIGURATION FOUND")
+        } else if ServerConfigManager.shared.savedServers.isEmpty {
+            print("❌ NO SERVER CONFIGURATION FOUND - SHOWING WIZARD")
             hasValidConfig = false
-            // Direct navigation instead of alert
+            showOnboarding = true
+        } else {
+            hasValidConfig = false
             coordinator.selectedTab = .settings
-            // warningType = .noServer // Suppress alert
-            // showConfigWarning = true // Suppress alert
         }
     }
 }

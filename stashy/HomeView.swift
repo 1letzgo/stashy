@@ -11,11 +11,14 @@ import AVKit
 struct HomeView: View {
     @StateObject private var viewModel = StashDBViewModel()
     @ObservedObject var tabManager = TabManager.shared
+    @ObservedObject var configManager = ServerConfigManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
     
     var body: some View {
         ZStack {
-            if viewModel.isLoading && viewModel.statistics == nil {
+            if configManager.activeConfig == nil {
+                ConnectionErrorView { viewModel.fetchStatistics() }
+            } else if viewModel.isLoading && viewModel.statistics == nil {
                 VStack {
                     Spacer()
                     ProgressView("Loading Dashboard...")
@@ -48,6 +51,12 @@ struct HomeView: View {
         .navigationTitle("Dashboard")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
+            if configManager.activeConfig != nil {
+                viewModel.fetchStatistics()
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+            // Reload data when server config changes (e.g., after wizard setup)
             viewModel.fetchStatistics()
         }
         // Scene Update Listeners - update home row scenes in place

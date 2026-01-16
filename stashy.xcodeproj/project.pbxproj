@@ -29,6 +29,7 @@
 		DF22BB362F1832AD007C2090 /* NavigationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */; };
 		DF22BB3A2F1832E8007C2090 /* PerformersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB392F1832E8007C2090 /* PerformersView.swift */; };
 		DF90B75E2F1A5ECF003ED852 /* StarRatingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */; };
+		DF90B7642F1ACEA3003ED852 /* ServerSetupWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B7632F1ACEA3003ED852 /* ServerSetupWizardView.swift */; };
 		DFC9B20C2F14C9B200B796A5 /* Stashy.storekit in Resources */ = {isa = PBXBuildFile; fileRef = DFC9B20B2F14C9B200B796A5 /* Stashy.storekit */; };
 		DFE5045C2E8A8C0100323FF0 /* ServerConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045B2E8A8C0100323FF0 /* ServerConfigView.swift */; };
 		DFE5045E2E8A8C2000323FF0 /* ScenesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045D2E8A8C2000323FF0 /* ScenesView.swift */; };
@@ -69,6 +70,7 @@
 		DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationCoordinator.swift; sourceTree = "<group>"; };
 		DF22BB392F1832E8007C2090 /* PerformersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformersView.swift; sourceTree = "<group>"; };
 		DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarRatingView.swift; sourceTree = "<group>"; };
+		DF90B7632F1ACEA3003ED852 /* ServerSetupWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSetupWizardView.swift; sourceTree = "<group>"; };
 		DFC9B20B2F14C9B200B796A5 /* Stashy.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Stashy.storekit; sourceTree = "<group>"; };
 		DFE5045B2E8A8C0100323FF0 /* ServerConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConfigView.swift; sourceTree = "<group>"; };
 		DFE5045D2E8A8C2000323FF0 /* ScenesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenesView.swift; sourceTree = "<group>"; };
@@ -130,6 +132,7 @@
 				DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */,
 				DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */,
 				DFE5045D2E8A8C2000323FF2 /* PerformerDetailView.swift */,
+				DF90B7632F1ACEA3003ED852 /* ServerSetupWizardView.swift */,
 				DF22BB392F1832E8007C2090 /* PerformersView.swift */,
 				DFSM000042F2NEWFILE004 /* OnboardingView.swift */,
 				DF22BB1B2F16743C007C2090 /* ReelsView.swift */,
@@ -268,6 +271,7 @@
 				DFE504622E8A8C4000323FF0 /* StudiosView.swift in Sources */,
 				DF22BB342F1831C7007C2090 /* AppearanceSettingsView.swift in Sources */,
 				7D31598FEE244A419EEDF8A3 /* StudioFiltersView.swift in Sources */,
+				DF90B7642F1ACEA3003ED852 /* ServerSetupWizardView.swift in Sources */,
 				DFGQ000012F28A0000000001 /* GraphQLClient.swift in Sources */,
 				DFGQ000032F28A0000000003 /* GraphQLQueries.swift in Sources */,
 				DFSM000012F2NEWFILE001 /* KeychainManager.swift in Sources */,

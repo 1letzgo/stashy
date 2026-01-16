@@ -100,8 +100,6 @@ struct ReelsView: View {
 
     @ViewBuilder
     private var paywallView: some View {
-
-        
         VStack(spacing: 24) {
             Spacer()
             
@@ -150,6 +148,10 @@ struct ReelsView: View {
             
             Spacer()
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.appBackground)
+        .navigationTitle("StashTok")
+        .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingPaywall) {
             PaywallView()
         }
@@ -271,10 +273,15 @@ struct ReelsView: View {
 
     @ViewBuilder
     private var errorStateView: some View {
-        ConnectionErrorView(onRetry: {
-            applySettings(sortBy: selectedSortOption, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags)
-        }, isDark: true)
-        .background(Color.black) // Ensure error view also has black background in Reels
+        VStack {
+            Spacer()
+            ConnectionErrorView(onRetry: {
+                applySettings(sortBy: selectedSortOption, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags)
+            }, isDark: true)
+            Spacer()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.black)
     }
 
     @ViewBuilder

@@ -9,6 +9,7 @@ import SwiftUI
 
 struct GalleriesView: View {
     @StateObject private var viewModel = StashDBViewModel()
+    @ObservedObject var configManager = ServerConfigManager.shared
     @State private var selectedSortOption: StashDBViewModel.GallerySortOption = StashDBViewModel.GallerySortOption(rawValue: TabManager.shared.getSortOption(for: .galleries) ?? "") ?? .dateDesc
     @State private var selectedFilter: StashDBViewModel.SavedFilter? = nil
     @State private var searchText = ""
@@ -53,7 +54,9 @@ struct GalleriesView: View {
 
     var body: some View {
         Group {
-            if viewModel.isLoadingGalleries && viewModel.galleries.isEmpty {
+            if configManager.activeConfig == nil {
+                ConnectionErrorView { performSearch() }
+            } else if viewModel.isLoadingGalleries && viewModel.galleries.isEmpty {
                 VStack {
                     Spacer()
                     ProgressView("Loading galleries...")
@@ -189,6 +192,9 @@ struct GalleriesView: View {
                 }
             }
             viewModel.fetchSavedFilters()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+            performSearch()
         }
         .onChange(of: viewModel.savedFilters) { oldValue, newValue in
             // Apply default filter if set and none selected yet

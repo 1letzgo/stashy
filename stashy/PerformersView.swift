@@ -10,6 +10,7 @@ import SwiftUI
 
 struct PerformersView: View {
     @StateObject private var viewModel = StashDBViewModel()
+    @ObservedObject var configManager = ServerConfigManager.shared
     @State private var scrollPosition: String? = nil
     @State private var shouldRestoreScroll = false
     @State private var selectedSortOption: StashDBViewModel.PerformerSortOption = StashDBViewModel.PerformerSortOption(rawValue: TabManager.shared.getSortOption(for: .performers) ?? "") ?? .sceneCountDesc
@@ -56,7 +57,9 @@ struct PerformersView: View {
 
     var body: some View {
         Group {
-            if viewModel.isLoading && viewModel.performers.isEmpty {
+            if configManager.activeConfig == nil {
+                ConnectionErrorView { performSearch() }
+            } else if viewModel.isLoading && viewModel.performers.isEmpty {
                 VStack {
                     Spacer()
                     ProgressView("Loading performers...")
@@ -165,6 +168,9 @@ struct PerformersView: View {
                 performSearch()
             }
             viewModel.fetchSavedFilters()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+            performSearch()
         }
         .onChange(of: viewModel.savedFilters) { oldValue, newValue in
             // Apply default filter if set and none selected yet

@@ -10,6 +10,7 @@ import SwiftUI
 
 struct ScenesView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject var configManager = ServerConfigManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
     @StateObject private var viewModel = StashDBViewModel()
     @State private var selectedSortOption: StashDBViewModel.SceneSortOption = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .scenes) ?? "") ?? .dateDesc
@@ -48,7 +49,9 @@ struct ScenesView: View {
         ZStack(alignment: .bottom) {
             // Main Content
             Group {
-                if viewModel.isLoading && viewModel.scenes.isEmpty {
+                if configManager.activeConfig == nil {
+                    ConnectionErrorView { performSearch() }
+                } else if viewModel.isLoading && viewModel.scenes.isEmpty {
                     VStack {
                         Spacer()
                         ProgressView("Loading scenes...")
@@ -182,6 +185,9 @@ struct ScenesView: View {
                 }
             }
             viewModel.fetchSavedFilters()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+            performSearch()
         }
         .onChange(of: viewModel.savedFilters) { oldValue, newValue in
             // Apply default filter if set and none selected yet

@@ -33,16 +33,16 @@ struct DownloadsView: View {
                     
                     ZStack {
                         Circle()
-                            .fill(appearanceManager.tintColor.opacity(0.1))
+                            .fill(Color.appAccent.opacity(0.1))
                             .frame(width: 120, height: 120)
                         
-                        Image(systemName: "square.and.arrow.down.fill")
+                        Image(systemName: "play.square.stack.fill")
                             .font(.system(size: 60))
-                            .foregroundColor(appearanceManager.tintColor)
+                            .foregroundColor(.appAccent)
                     }
                     
                     VStack(spacing: 8) {
-                        Text("stashy VIP Feature")
+                        Text("Stashtok VIP Feature")
                             .font(.title2)
                             .fontWeight(.bold)
                         
@@ -60,7 +60,7 @@ struct DownloadsView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 32)
                             .padding(.vertical, 14)
-                            .background(appearanceManager.tintColor)
+                            .background(Color.appAccent)
                             .clipShape(Capsule())
                     }
                     
@@ -76,6 +76,8 @@ struct DownloadsView: View {
                     
                     Spacer()
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.appBackground)
                 .sheet(isPresented: $showingPaywall) {
                     PaywallView()
                 }
