@@ -1,0 +1,1 @@
+/Users/danielgoletz/Nextcloud/code/stashy/stashy/Assets.xcassets
