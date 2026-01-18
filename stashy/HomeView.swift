@@ -247,9 +247,7 @@ struct HomeRowView: View {
     
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Button(action: {
-                navigateToFilteredView()
-            }) {
+            NavigationLink(destination: ScenesView(sort: getSortOption())) {
                 HStack(spacing: 4) {
                     Text(config.title)
                         .font(.headline)
@@ -309,20 +307,20 @@ struct HomeRowView: View {
         }
     }
 
-    private func navigateToFilteredView() {
+    private func getSortOption() -> StashDBViewModel.SceneSortOption? {
         switch config.type {
         case .lastPlayed:
-            coordinator.navigateToScenes(sort: .lastPlayedAtDesc)
+            return .lastPlayedAtDesc
         case .lastAdded3Min:
-            coordinator.navigateToScenes(sort: .createdAtDesc)
+            return .createdAtDesc
         case .newest3Min:
-            coordinator.navigateToScenes(sort: .dateDesc)
+            return .dateDesc
         case .mostViewed3Min:
-            coordinator.navigateToScenes(sort: .playCountDesc)
+            return .playCountDesc
         case .random:
-            coordinator.navigateToScenes(sort: .random)
+            return .random
         case .statistics:
-            break
+            return nil
         }
     }
 }

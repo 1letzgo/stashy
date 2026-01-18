@@ -51,6 +51,12 @@ struct MainTabView: View {
                         .tint(appearanceManager.tintColor)
                 }
             }
+            
+            // iOS 18+ Search tab with dedicated role
+            Tab("Search", systemImage: "magnifyingglass", value: AppTab.search, role: .search) {
+                UniversalSearchView()
+                    .applyAppBackground()
+            }
         }
         .tint(appearanceManager.tintColor)
         .onAppear {

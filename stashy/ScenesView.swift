@@ -12,7 +12,7 @@ struct ScenesView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
-    @StateObject private var viewModel = StashDBViewModel()
+    @StateObject private var viewModel = ScenesViewModel()
     @State private var selectedSortOption: StashDBViewModel.SceneSortOption = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .scenes) ?? "") ?? .dateDesc
     @State private var isChangingSort = false
     @State private var searchText = ""
@@ -20,7 +20,18 @@ struct ScenesView: View {
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
     @State private var scrollPosition: String? = nil
     @State private var shouldRestoreScroll = false
+    @State private var hasInjectedSort = false  // Flag to preserve coordinator sort
     var hideTitle: Bool = false
+    
+    // Optional init for direct sort/filter passing (cleaner than coordinator timing)
+    init(sort: StashDBViewModel.SceneSortOption? = nil, filter: StashDBViewModel.SavedFilter? = nil, hideTitle: Bool = false) {
+        self.hideTitle = hideTitle
+        let defaultSort = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .scenes) ?? "") ?? .dateDesc
+        _selectedSortOption = State(initialValue: sort ?? defaultSort)
+        _selectedFilter = State(initialValue: filter)
+        _hasInjectedSort = State(initialValue: sort != nil)
+    }
+
 
     // Dynamische Spalten basierend auf adaptivem Grid
     private var columns: [GridItem] {
@@ -36,8 +47,10 @@ struct ScenesView: View {
         // Save to TabManager
         TabManager.shared.setSortOption(for: .scenes, option: newOption.rawValue)
 
-        // Fetch new data immediately
-        viewModel.fetchScenes(sortBy: newOption, searchQuery: searchText, filter: selectedFilter)
+        // Update the ViewModel with new sort option
+        viewModel.updateSortOption(newOption)
+        viewModel.updateSearchQuery(searchText)
+        viewModel.updateFilter(selectedFilter)
     }
     
     // Search function with debouncing
@@ -71,7 +84,7 @@ struct ScenesView: View {
 
         .navigationTitle("Scenes")
         .navigationBarTitleDisplayMode(.inline)
-        .conditionalSearchable(isVisible: isSearchVisible, text: $searchText, prompt: "Search scenes...")
+
         .onChange(of: searchText) { oldValue, newValue in
             // Debounce: Nur suchen wenn Nutzer aufhört zu tippen (0.5s Delay)
             NSObject.cancelPreviousPerformRequests(withTarget: self)
@@ -82,20 +95,32 @@ struct ScenesView: View {
             }
         }
         .toolbar {
+            // Search pill in title area when active
+            if !searchText.isEmpty {
+                ToolbarItem(placement: .principal) {
+                    Button(action: {
+                        searchText = ""
+                        performSearch()
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 10, weight: .bold))
+                            Text(searchText)
+                                .font(.system(size: 12, weight: .bold))
+                                .lineLimit(1)
+                        }
+                        .foregroundColor(.white.opacity(0.9))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(Capsule())
+                    }
+                }
+            }
+            
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: 0) {
-                    Button(action: {
-                        withAnimation {
-                            isSearchVisible.toggle()
-                            if !isSearchVisible {
-                                searchText = ""
-                            }
-                        }
-                    }) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(appearanceManager.tintColor)
-                    }
-                    .padding(.trailing, 8)
+
 
                     Menu {
                         // --- FILTER SECTION ---
@@ -153,51 +178,67 @@ struct ScenesView: View {
             }
         }
         .onAppear {
-            var needsFetch = viewModel.scenes.isEmpty
-            
-            // Check for injected state from deep links
+            // Check for injected sort from coordinator FIRST (before filters load)
             if let injectedSortStr = coordinator.activeSortOption,
                let injectedSort = StashDBViewModel.SceneSortOption(rawValue: injectedSortStr) {
                 selectedSortOption = injectedSort
                 coordinator.activeSortOption = nil
-                needsFetch = true
+                hasInjectedSort = true  // Mark that we have an injected sort
             }
             
             if let injectedFilter = coordinator.activeFilter {
                 selectedFilter = injectedFilter
                 coordinator.activeFilter = nil
-                needsFetch = true
             }
             
             if !coordinator.activeSearchText.isEmpty {
                 searchText = coordinator.activeSearchText
                 isSearchVisible = true
                 coordinator.activeSearchText = ""
-                needsFetch = true
             }
             
-            if needsFetch {
-                viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: selectedFilter)
-            } else if viewModel.scenes.isEmpty {
-                // Only search if we don't have a default filter to wait for, or if filters are already loaded
-                if TabManager.shared.getDefaultFilterId(for: .scenes) == nil || !viewModel.savedFilters.isEmpty {
-                    performSearch()
-                }
-            }
+            // Fetch filters - onChange will handle loading scenes with correct sort
             viewModel.fetchSavedFilters()
+            
+            // If no default filter is set, fetch immediately
+            if TabManager.shared.getDefaultFilterId(for: .scenes) == nil {
+                viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: selectedFilter)
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
             performSearch()
         }
         .onChange(of: viewModel.savedFilters) { oldValue, newValue in
+            // CRITICAL: Check coordinator FIRST - filters may load before onAppear runs!
+            if let injectedSortStr = coordinator.activeSortOption,
+               let injectedSort = StashDBViewModel.SceneSortOption(rawValue: injectedSortStr) {
+                selectedSortOption = injectedSort
+                coordinator.activeSortOption = nil
+                hasInjectedSort = true
+            }
+            
+            // Check if we should skip default filter (e.g., from universal search)
+            if coordinator.noDefaultFilter {
+                coordinator.noDefaultFilter = false
+                // Fetch with current state, no default filter
+                viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: nil)
+                return
+            }
+            
             // Apply default filter if set and none selected yet
+            // Uses selectedSortOption which may have just been set from coordinator above
             if selectedFilter == nil, let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes) {
                 if let filter = newValue[defaultId] {
                     selectedFilter = filter
                     viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: filter)
+                    // Reset flag after using injected sort with default filter
+                    if hasInjectedSort {
+                        hasInjectedSort = false
+                    }
                 }
             }
         }
+
         // Scene Update Listeners - update in place without full reload
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneResumeTimeUpdated"))) { notification in
             if let sceneId = notification.userInfo?["sceneId"] as? String,

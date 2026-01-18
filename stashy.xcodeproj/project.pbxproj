@@ -30,6 +30,7 @@
 		DF22BB3A2F1832E8007C2090 /* PerformersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB392F1832E8007C2090 /* PerformersView.swift */; };
 		DF90B75E2F1A5ECF003ED852 /* StarRatingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */; };
 		DF90B7642F1ACEA3003ED852 /* ServerSetupWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B7632F1ACEA3003ED852 /* ServerSetupWizardView.swift */; };
+		DF90B7662F1B72E5003ED852 /* UniversalSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B7652F1B72E5003ED852 /* UniversalSearchView.swift */; };
 		DFC9B20C2F14C9B200B796A5 /* Stashy.storekit in Resources */ = {isa = PBXBuildFile; fileRef = DFC9B20B2F14C9B200B796A5 /* Stashy.storekit */; };
 		DFE5045C2E8A8C0100323FF0 /* ServerConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045B2E8A8C0100323FF0 /* ServerConfigView.swift */; };
 		DFE5045E2E8A8C2000323FF0 /* ScenesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045D2E8A8C2000323FF0 /* ScenesView.swift */; };
@@ -71,6 +72,7 @@
 		DF22BB392F1832E8007C2090 /* PerformersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformersView.swift; sourceTree = "<group>"; };
 		DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarRatingView.swift; sourceTree = "<group>"; };
 		DF90B7632F1ACEA3003ED852 /* ServerSetupWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSetupWizardView.swift; sourceTree = "<group>"; };
+		DF90B7652F1B72E5003ED852 /* UniversalSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UniversalSearchView.swift; sourceTree = "<group>"; };
 		DFC9B20B2F14C9B200B796A5 /* Stashy.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Stashy.storekit; sourceTree = "<group>"; };
 		DFE5045B2E8A8C0100323FF0 /* ServerConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConfigView.swift; sourceTree = "<group>"; };
 		DFE5045D2E8A8C2000323FF0 /* ScenesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenesView.swift; sourceTree = "<group>"; };
@@ -129,12 +131,10 @@
 				DF22BB262F167CDC007C2090 /* ImageCacheManager.swift */,
 				DFSM000022F2NEWFILE002 /* KeychainManager.swift */,
 				08FB7798FE84155DC02AAC07 /* MainTabView.swift */,
-				DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */,
 				DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */,
-				DFE5045D2E8A8C2000323FF2 /* PerformerDetailView.swift */,
-				DF90B7632F1ACEA3003ED852 /* ServerSetupWizardView.swift */,
-				DF22BB392F1832E8007C2090 /* PerformersView.swift */,
 				DFSM000042F2NEWFILE004 /* OnboardingView.swift */,
+				DFE5045D2E8A8C2000323FF2 /* PerformerDetailView.swift */,
+				DF22BB392F1832E8007C2090 /* PerformersView.swift */,
 				DF22BB1B2F16743C007C2090 /* ReelsView.swift */,
 				DF06EF252F18EC1100299105 /* SceneCardView.swift */,
 				DFE504632E8A8C5000323FF0 /* SceneDelegate.swift */,
@@ -143,7 +143,9 @@
 				08FB779EFE84155DC02AAC07 /* ServerConfig.swift */,
 				DFE5045B2E8A8C0100323FF0 /* ServerConfigView.swift */,
 				DFSM000062F2NEWFILE006 /* ServerFormViewNew.swift */,
+				DF90B7632F1ACEA3003ED852 /* ServerSetupWizardView.swift */,
 				DF22BB1C2F16743C007C2090 /* SharedUtilities.swift */,
+				DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */,
 				08FB77A2FE84155DC02AAC07 /* StashDBViewModel.swift */,
 				DFC9B20B2F14C9B200B796A5 /* Stashy.storekit */,
 				DFE5045D2E8A8C2000323FF4 /* StudioDetailView.swift */,
@@ -151,6 +153,7 @@
 				DFE504612E8A8C4000323FF0 /* StudiosView.swift */,
 				DFF7EE402F0D3D2800344A8B /* TabManager.swift */,
 				DF22BB1D2F16743C007C2090 /* TagsView.swift */,
+				DF90B7652F1B72E5003ED852 /* UniversalSearchView.swift */,
 			);
 			path = stashy;
 			sourceTree = "<group>";
@@ -256,6 +259,7 @@
 				DF22BB272F167CDC007C2090 /* ImageCacheManager.swift in Sources */,
 				08FB77A1FE84155DC02AAC07 /* StashDBViewModel.swift in Sources */,
 				7793DEC6F2A641D4923DF2E5 /* FilterModels.swift in Sources */,
+				DF90B7662F1B72E5003ED852 /* UniversalSearchView.swift in Sources */,
 				DF22BB3A2F1832E8007C2090 /* PerformersView.swift in Sources */,
 				DF22BB152F167223007C2090 /* CatalogsView.swift in Sources */,
 				DF22BB1E2F16743C007C2090 /* TagsView.swift in Sources */,

@@ -16,7 +16,7 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
     case catalogue
     case downloads
     case reels
-
+    case search
     case settings
     
     var id: String { rawValue }
@@ -33,7 +33,7 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
         case .catalogue: return "Home"
         case .downloads: return "Downloads"
         case .reels: return "StashTok"
-
+        case .search: return "Search"
         case .settings: return "Settings"
         }
     }
@@ -50,7 +50,7 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
         case .catalogue: return "square.grid.2x2.fill"
         case .downloads: return "square.and.arrow.down"
         case .reels: return "play.rectangle.on.rectangle"
-
+        case .search: return "magnifyingglass"
         case .settings: return "gear"
         }
     }
@@ -180,7 +180,6 @@ class TabManager: ObservableObject {
         if tabs.first(where: { $0.id == .downloads })?.isVisible ?? true {
             result.append(.downloads)
         }
-        
         
         if tabs.first(where: { $0.id == .settings })?.isVisible ?? true {
             result.append(.settings)

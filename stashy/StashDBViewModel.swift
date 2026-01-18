@@ -3350,6 +3350,157 @@ struct VideoPlayerView: UIViewControllerRepresentable {
 }
 
 
+// MARK: - Universal Search Async Methods
+
+extension StashDBViewModel {
+    
+    func searchPerformersAsync(query: String, limit: Int = 5) async -> [Performer] {
+        await withCheckedContinuation { continuation in
+            let graphqlQuery = GraphQLQueries.queryWithFragments("findPerformers")
+            
+            let body: [String: Any] = [
+                "query": graphqlQuery,
+                "variables": [
+                    "filter": [
+                        "q": query,
+                        "per_page": limit,
+                        "page": 1,
+                        "sort": "name",
+                        "direction": "ASC"
+                    ]
+                ]
+            ]
+            
+            guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
+                  let bodyString = String(data: bodyData, encoding: .utf8) else {
+                continuation.resume(returning: [])
+                return
+            }
+            
+            performGraphQLQuery(query: bodyString) { (response: PerformersResponse?) in
+                continuation.resume(returning: response?.data?.findPerformers.performers ?? [])
+            }
+        }
+    }
+    
+    func searchStudiosAsync(query: String, limit: Int = 5) async -> [Studio] {
+        await withCheckedContinuation { continuation in
+            let graphqlQuery = GraphQLQueries.queryWithFragments("findStudios")
+            
+            let body: [String: Any] = [
+                "query": graphqlQuery,
+                "variables": [
+                    "filter": [
+                        "q": query,
+                        "per_page": limit,
+                        "page": 1,
+                        "sort": "name",
+                        "direction": "ASC"
+                    ]
+                ]
+            ]
+            
+            guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
+                  let bodyString = String(data: bodyData, encoding: .utf8) else {
+                continuation.resume(returning: [])
+                return
+            }
+            
+            performGraphQLQuery(query: bodyString) { (response: StudiosResponse?) in
+                continuation.resume(returning: response?.data?.findStudios.studios ?? [])
+            }
+        }
+    }
+    
+    func searchTagsAsync(query: String, limit: Int = 5) async -> [Tag] {
+        await withCheckedContinuation { continuation in
+            let graphqlQuery = GraphQLQueries.queryWithFragments("findTags")
+            
+            let body: [String: Any] = [
+                "query": graphqlQuery,
+                "variables": [
+                    "filter": [
+                        "q": query,
+                        "per_page": limit,
+                        "page": 1,
+                        "sort": "name",
+                        "direction": "ASC"
+                    ]
+                ]
+            ]
+            
+            guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
+                  let bodyString = String(data: bodyData, encoding: .utf8) else {
+                continuation.resume(returning: [])
+                return
+            }
+            
+            performGraphQLQuery(query: bodyString) { (response: TagsResponse?) in
+                continuation.resume(returning: response?.data?.findTags.tags ?? [])
+            }
+        }
+    }
+    
+    func searchScenesAsync(query: String, limit: Int = 5) async -> [Scene] {
+        await withCheckedContinuation { continuation in
+            let graphqlQuery = GraphQLQueries.queryWithFragments("findScenes")
+            
+            let body: [String: Any] = [
+                "query": graphqlQuery,
+                "variables": [
+                    "filter": [
+                        "q": query,
+                        "per_page": limit,
+                        "page": 1,
+                        "sort": "date",
+                        "direction": "DESC"
+                    ]
+                ]
+            ]
+            
+            guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
+                  let bodyString = String(data: bodyData, encoding: .utf8) else {
+                continuation.resume(returning: [])
+                return
+            }
+            
+            performGraphQLQuery(query: bodyString) { (response: AltScenesResponse?) in
+                continuation.resume(returning: response?.data?.findScenes?.scenes ?? [])
+            }
+        }
+    }
+    
+    func searchGalleriesAsync(query: String, limit: Int = 5) async -> [Gallery] {
+        await withCheckedContinuation { continuation in
+            let graphqlQuery = GraphQLQueries.queryWithFragments("findGalleries")
+            
+            let body: [String: Any] = [
+                "query": graphqlQuery,
+                "variables": [
+                    "filter": [
+                        "q": query,
+                        "per_page": limit,
+                        "page": 1,
+                        "sort": "date",
+                        "direction": "DESC"
+                    ]
+                ]
+            ]
+            
+            guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
+                  let bodyString = String(data: bodyData, encoding: .utf8) else {
+                continuation.resume(returning: [])
+                return
+            }
+            
+            performGraphQLQuery(query: bodyString) { (response: GalleriesResponse?) in
+                continuation.resume(returning: response?.data?.findGalleries.galleries ?? [])
+            }
+        }
+    }
+}
+
+
 
 @MainActor
 class SubscriptionManager: ObservableObject {

@@ -34,6 +34,7 @@ class NavigationCoordinator: ObservableObject {
     @Published var activeSortOption: String?
     @Published var activeFilter: StashDBViewModel.SavedFilter?
     @Published var activeSearchText: String = ""
+    @Published var noDefaultFilter: Bool = false  // Prevent default filter application
     
     // Tap timing for "Double Tap" detection
     var lastHomeTapTime: Date?
@@ -76,35 +77,40 @@ class NavigationCoordinator: ObservableObject {
     
     // MARK: - Deep Links
     
-    func navigateToScenes(sort: StashDBViewModel.SceneSortOption? = nil, filter: StashDBViewModel.SavedFilter? = nil, search: String = "") {
+    func navigateToScenes(sort: StashDBViewModel.SceneSortOption? = nil, filter: StashDBViewModel.SavedFilter? = nil, search: String = "", noDefaultFilter: Bool = false) {
         self.activeSortOption = sort?.rawValue
         self.activeFilter = filter
         self.activeSearchText = search
+        self.noDefaultFilter = noDefaultFilter
         
         self.catalogueTabID = UUID() // Force reset stack
         self.catalogueSubTab = "Scenes"
         self.selectedTab = .catalogue
     }
     
-    func navigateToPerformers() {
+    func navigateToPerformers(search: String = "") {
+        self.activeSearchText = search
         self.catalogueTabID = UUID()
         self.catalogueSubTab = "Performers"
         self.selectedTab = .catalogue
     }
     
-    func navigateToStudios() {
+    func navigateToStudios(search: String = "") {
+        self.activeSearchText = search
         self.catalogueTabID = UUID()
         self.catalogueSubTab = "Studios"
         self.selectedTab = .catalogue
     }
     
-    func navigateToTags() {
+    func navigateToTags(search: String = "") {
+        self.activeSearchText = search
         self.catalogueTabID = UUID()
         self.catalogueSubTab = "Tags"
         self.selectedTab = .catalogue
     }
     
-    func navigateToGalleries() {
+    func navigateToGalleries(search: String = "") {
+        self.activeSearchText = search
         self.catalogueTabID = UUID()
         self.catalogueSubTab = "Galleries"
         self.selectedTab = .catalogue

@@ -10,6 +10,7 @@ import SwiftUI
 struct TagsView: View {
     @StateObject private var viewModel = StashDBViewModel()
     @ObservedObject var configManager = ServerConfigManager.shared
+    @EnvironmentObject var coordinator: NavigationCoordinator
     @State private var selectedSortOption: StashDBViewModel.TagSortOption = StashDBViewModel.TagSortOption(rawValue: TabManager.shared.getSortOption(for: .tags) ?? "") ?? .sceneCountDesc
     @State private var selectedFilter: StashDBViewModel.SavedFilter? = nil
     @State private var isChangingSort = false
@@ -59,20 +60,31 @@ struct TagsView: View {
             }
         }
         .toolbar {
+            if !searchText.isEmpty {
+                ToolbarItem(placement: .principal) {
+                    Button(action: {
+                        searchText = ""
+                        performSearch()
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 10, weight: .bold))
+                            Text(searchText)
+                                .font(.system(size: 12, weight: .bold))
+                                .lineLimit(1)
+                        }
+                        .foregroundColor(.white.opacity(0.9))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(Capsule())
+                    }
+                }
+            }
+            
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: 0) {
-                    Button(action: {
-                        withAnimation {
-                            isSearchVisible.toggle()
-                            if !isSearchVisible {
-                                searchText = ""
-                            }
-                        }
-                    }) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(.appAccent)
-                    }
-                    .padding(.trailing, 8)
+
 
                     Menu {
                         Section {
@@ -135,6 +147,16 @@ struct TagsView: View {
             }
         }
         .onAppear {
+            // Check for search text from navigation
+            if !coordinator.activeSearchText.isEmpty {
+                searchText = coordinator.activeSearchText
+                isSearchVisible = true
+                coordinator.activeSearchText = ""
+                performSearch()
+                viewModel.fetchSavedFilters()
+                return
+            }
+            
             if TabManager.shared.getDefaultFilterId(for: .tags) == nil || !viewModel.savedFilters.isEmpty {
                 if viewModel.tags.isEmpty {
                     performSearch()

@@ -76,7 +76,7 @@ struct PerformersView: View {
         }
         .navigationTitle("Performers")
         .navigationBarTitleDisplayMode(.inline)
-        .conditionalSearchable(isVisible: isSearchVisible, text: $searchText, prompt: "Search performers...")
+
         .onChange(of: searchText) { oldValue, newValue in
             // Debounce: Nur suchen wenn Nutzer aufhört zu tippen (0.5s Delay)
             NSObject.cancelPreviousPerformRequests(withTarget: self)
@@ -87,20 +87,31 @@ struct PerformersView: View {
             }
         }
         .toolbar {
+            if !searchText.isEmpty {
+                ToolbarItem(placement: .principal) {
+                    Button(action: {
+                        searchText = ""
+                        performSearch()
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 10, weight: .bold))
+                            Text(searchText)
+                                .font(.system(size: 12, weight: .bold))
+                                .lineLimit(1)
+                        }
+                        .foregroundColor(.white.opacity(0.9))
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(Capsule())
+                    }
+                }
+            }
+            
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: 0) {
-                    Button(action: {
-                        withAnimation {
-                            isSearchVisible.toggle()
-                            if !isSearchVisible {
-                                searchText = ""
-                            }
-                        }
-                    }) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(.appAccent)
-                    }
-                    .padding(.trailing, 8)
+
 
                     Menu {
                         // Saved Filters Section
@@ -163,6 +174,16 @@ struct PerformersView: View {
             }
         }
         .onAppear {
+            // Check for search text from navigation
+            if !coordinator.activeSearchText.isEmpty {
+                searchText = coordinator.activeSearchText
+                isSearchVisible = true
+                coordinator.activeSearchText = ""
+                viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: selectedFilter)
+                viewModel.fetchSavedFilters()
+                return
+            }
+            
             // Only search if we don't have a default filter to wait for, or if filters are already loaded
             if TabManager.shared.getDefaultFilterId(for: .performers) == nil || !viewModel.savedFilters.isEmpty {
                 performSearch()

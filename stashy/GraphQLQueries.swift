@@ -9,18 +9,49 @@ import Foundation
 
 class GraphQLQueries {
     
+    // MARK: - Thread Safety
+    
+    /// Serial queue for thread-safe cache access
+    private static let cacheQueue = DispatchQueue(label: "com.stashy.graphql.cache", attributes: .concurrent)
+    
     // MARK: - Cache
     
     /// In-memory cache to avoid repeated disk reads
-    private static var queryCache: [String: String] = [:]
-    private static var composedQueryCache: [String: String] = [:]
+    private static var _queryCache: [String: String] = [:]
+    private static var _composedQueryCache: [String: String] = [:]
+    private static var __sceneRelatedFragments: String?
+    
+    // Thread-safe accessors
+    private static func getCachedQuery(_ key: String) -> String? {
+        cacheQueue.sync { _queryCache[key] }
+    }
+    
+    private static func setCachedQuery(_ key: String, value: String) {
+        cacheQueue.async(flags: .barrier) { _queryCache[key] = value }
+    }
+    
+    private static func getComposedQuery(_ key: String) -> String? {
+        cacheQueue.sync { _composedQueryCache[key] }
+    }
+    
+    private static func setComposedQuery(_ key: String, value: String) {
+        cacheQueue.async(flags: .barrier) { _composedQueryCache[key] = value }
+    }
+    
+    private static func getSceneRelatedFragments() -> String? {
+        cacheQueue.sync { __sceneRelatedFragments }
+    }
+    
+    private static func setSceneRelatedFragments(_ value: String) {
+        cacheQueue.async(flags: .barrier) { __sceneRelatedFragments = value }
+    }
     
     // MARK: - Generic Loading (with caching)
     
     /// Loads a GraphQL query from cache or App Bundle
     private static func loadQuery(named fileName: String) -> String {
-        // Check cache first
-        if let cached = queryCache[fileName] {
+        // Check cache first (thread-safe)
+        if let cached = getCachedQuery(fileName) {
             return cached
         }
         
@@ -45,17 +76,16 @@ class GraphQLQueries {
         }
         
         // Cache the result (even if empty, to avoid repeated lookups)
-        queryCache[fileName] = content
+        setCachedQuery(fileName, value: content)
         return content
     }
     
     // MARK: - Cached Fragment Composition
     
-    private static var _sceneRelatedFragments: String?
     static var sceneRelatedFragments: String {
-        if let cached = _sceneRelatedFragments { return cached }
+        if let cached = getSceneRelatedFragments() { return cached }
         let result = "\(loadQuery(named: "fragment_SceneFields"))\n\(loadQuery(named: "fragment_PerformerFields"))\n\(loadQuery(named: "fragment_StudioFields"))\n\(loadQuery(named: "fragment_TagFields"))"
-        _sceneRelatedFragments = result
+        setSceneRelatedFragments(result)
         return result
     }
     
@@ -63,8 +93,8 @@ class GraphQLQueries {
     
     /// Helper to combine a main query with ONLY the necessary fragments (cached)
     static func queryWithFragments(_ queryName: String) -> String {
-        // Check composed query cache
-        if let cached = composedQueryCache[queryName] {
+        // Check composed query cache (thread-safe)
+        if let cached = getComposedQuery(queryName) {
             return cached
         }
         
@@ -96,7 +126,8 @@ class GraphQLQueries {
         }
         
         let composed = "\(query)\n\(fragments)"
-        composedQueryCache[queryName] = composed
+        setComposedQuery(queryName, value: composed)
         return composed
     }
 }
+
