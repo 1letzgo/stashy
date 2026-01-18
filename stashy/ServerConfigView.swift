@@ -149,7 +149,7 @@ struct ServerConfigView: View {
                         server: server,
                         viewModel: viewModel,
                         isActive: configManager.activeConfig?.id == server.id,
-                        isConnected: configManager.activeConfig?.id == server.id && viewModel.serverStatus.contains("Verbunden"),
+                        isConnected: configManager.activeConfig?.id == server.id && viewModel.serverStatus.contains("Connected"),
                         isScanning: isScanningLibrary,
                         onConnect: {
                             configManager.saveConfig(server)

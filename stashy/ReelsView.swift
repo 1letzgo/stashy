@@ -313,7 +313,8 @@ struct ReelsView: View {
                                     }
                                 }
                             }
-                        }
+                        },
+                        viewModel: viewModel
                     )
                     .containerRelativeFrame(.vertical)
                     .id(scene.id)
@@ -403,11 +404,13 @@ struct ReelItemView: View {
     var onPerformerTap: (ScenePerformer) -> Void
     var onTagTap: (Tag) -> Void
     var onRatingChanged: (Int?) -> Void
+    @ObservedObject var viewModel: StashDBViewModel
     @State private var isPlaying = true
     @State private var currentTime: Double = 0.0
     @State private var duration: Double = 1.0
     @State private var isSeeking = false
     @State private var timeObserver: Any?
+    @State private var showRatingOverlay = false
     
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -438,6 +441,85 @@ struct ReelItemView: View {
                 CenterPlayIcon()
             }
             
+            // Sidebar layer (Right side)
+            VStack(alignment: .trailing, spacing: 12) {
+                Spacer()
+                
+                // Rating Button (TikTok style)
+                SidebarButton(
+                    icon: "star.fill",
+                    label: "Rating",
+                    count: (scene.rating100 ?? 0) > 0 ? (scene.rating100! / 20) : 0,
+                    color: .white.opacity(0.8)
+                ) {
+                    withAnimation(.spring()) {
+                        showRatingOverlay.toggle()
+                    }
+                }
+                .overlay(alignment: .top) {
+                    if showRatingOverlay {
+                        VStack {
+                            StarRatingView(
+                                rating100: scene.rating100,
+                                isInteractive: true,
+                                size: 25,
+                                spacing: 8,
+                                isVertical: true
+                            ) { newRating in
+                                onRatingChanged(newRating)
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                                    withAnimation(.spring()) {
+                                        showRatingOverlay = false
+                                    }
+                                }
+                            }
+                        }
+                        .padding(.vertical, 12)
+                        .padding(.horizontal, 8)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(Capsule())
+                        .offset(y: -220) // Moved even higher
+                        .transition(.scale(scale: 0, anchor: .top).combined(with: .opacity))
+                    }
+                }
+                .zIndex(10)
+
+                // O-Counter (Manual)
+                SidebarButton(
+                    icon: "heart.fill",
+                    label: "Counter",
+                    count: scene.oCounter ?? 0,
+                    color: .white.opacity(0.8)
+                ) {
+                    viewModel.incrementOCounter(sceneId: scene.id) { newCount in
+                        if let count = newCount {
+                            if let index = viewModel.scenes.firstIndex(where: { $0.id == scene.id }) {
+                                DispatchQueue.main.async {
+                                    viewModel.scenes[index] = viewModel.scenes[index].withOCounter(count)
+                                }
+                            }
+                        }
+                    }
+                }
+                
+                // View Counter
+                SidebarButton(
+                    icon: "play.fill",
+                    label: "Views",
+                    count: scene.playCount ?? 0,
+                    color: .white.opacity(0.8)
+                ) {
+                    // Views are automatic
+                }
+                .disabled(true)
+                
+                Spacer()
+                    .frame(height: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .bottomTrailing)
+            .padding(.trailing, 20)
+            .padding(.bottom, 200)
+            
             // Interaction overlay (Labels + Scrubber)
             VStack(alignment: .leading, spacing: 4) {
                 Spacer()
@@ -457,16 +539,6 @@ struct ReelItemView: View {
                         }
                         
                         Spacer()
-                        
-                        StarRatingView(
-                            rating100: scene.rating100,
-                            isInteractive: true,
-                            size: 20,
-                            spacing: 4,
-                            isVertical: false
-                        ) { newRating in
-                            onRatingChanged(newRating)
-                        }
                     }
 
                     // Row 2: Title and Studio
@@ -591,6 +663,7 @@ struct ReelItemView: View {
             NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { _ in
                 player.seek(to: .zero)
                 player.play()
+                incrementPlayCount()
             }
             
             // Time Observer
@@ -605,11 +678,59 @@ struct ReelItemView: View {
                     self.duration = d
                 }
             }
+            
+            // Increment play count when playback starts
+            incrementPlayCount()
+        }
+    }
+    
+    private func incrementPlayCount() {
+        viewModel.addScenePlay(sceneId: scene.id) { newCount in
+            if let count = newCount {
+                // Update scene in viewModel.scenes array
+                if let index = viewModel.scenes.firstIndex(where: { $0.id == scene.id }) {
+                    DispatchQueue.main.async {
+                        viewModel.scenes[index] = viewModel.scenes[index].withPlayCount(count)
+                    }
+                }
+            }
         }
     }
     
     func seek(to time: Double) {
         let cmTime = CMTime(seconds: time, preferredTimescale: 600)
         player?.seek(to: cmTime)
+    }
+}
+
+struct SidebarButton: View {
+    let icon: String
+    let label: String
+    let count: Int
+    let color: Color
+    var action: () -> Void
+    
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Circle()
+                    .fill(Color.black.opacity(0.4))
+                    .frame(width: 45, height: 45)
+                
+                VStack(spacing: 2) {
+                    Image(systemName: icon)
+                        .font(.system(size: 18, weight: .bold)) // Slightly larger when alone?
+                        .foregroundColor(color)
+                    
+                    if count > 0 {
+                        Text("\(count)")
+                            .font(.system(size: 10, weight: .heavy))
+                            .foregroundColor(.white)
+                    }
+                }
+            }
+            .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+        }
+        .buttonStyle(.plain)
     }
 }

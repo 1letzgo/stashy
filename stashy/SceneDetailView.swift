@@ -237,21 +237,49 @@ struct SceneDetailView: View {
                 
                 Spacer()
                 
-                StarRatingView(
-                    rating100: activeScene.rating100,
-                    isInteractive: true,
-                    size: 16,
-                    spacing: 2
-                ) { newRating in
-                    viewModel.updateSceneRating(sceneId: activeScene.id, rating100: newRating) { success in
-                        if success {
-                            DispatchQueue.main.async {
-                                var updatedScene = self.activeScene
-                                updatedScene = updatedScene.withRating(newRating)
-                                self.activeScene = updatedScene
+                VStack(alignment: .trailing, spacing: 12) {
+                    StarRatingView(
+                        rating100: activeScene.rating100,
+                        isInteractive: true,
+                        size: 16,
+                        spacing: 2
+                    ) { newRating in
+                        viewModel.updateSceneRating(sceneId: activeScene.id, rating100: newRating) { success in
+                            if success {
+                                DispatchQueue.main.async {
+                                    var updatedScene = self.activeScene
+                                    updatedScene = updatedScene.withRating(newRating)
+                                    self.activeScene = updatedScene
+                                }
                             }
                         }
                     }
+                    
+                    // O-Counter (Manual)
+                    Button(action: {
+                        viewModel.incrementOCounter(sceneId: activeScene.id) { newCount in
+                            if let count = newCount {
+                                DispatchQueue.main.async {
+                                    self.activeScene = self.activeScene.withOCounter(count)
+                                }
+                            }
+                        }
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: "heart.fill")
+                                .font(.caption)
+                                .foregroundColor(.red)
+                            Text("\(activeScene.oCounter ?? 0)")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(.primary)
+                        }
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.red.opacity(0.1))
+                        .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
                 }
             }
             

@@ -35,7 +35,7 @@ struct ServerConfig: Codable, Identifiable, Equatable {
             let scheme = useHTTPS ? "https" : "http"
             url = "\(scheme)://\(domain)"
         }
-        print("🌐 SERVER CONFIG: Verwende URL: \(url)")
+        print("🌐 SERVER CONFIG: Using URL: \(url)")
         return url
     }
 

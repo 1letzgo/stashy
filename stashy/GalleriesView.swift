@@ -405,9 +405,8 @@ struct GalleryDetailView: View {
             } else {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(viewModel.galleryImages.indices, id: \.self) { index in
-                            let image = viewModel.galleryImages[index]
-                            NavigationLink(destination: FullScreenImageView(images: viewModel.galleryImages, currentIndex: index)) {
+                        ForEach(Array(viewModel.galleryImages.enumerated()), id: \.element.id) { index, image in
+                            NavigationLink(destination: FullScreenImageView(images: $viewModel.galleryImages, currentIndex: index)) {
                                 GalleryImageCard(image: image)
                             }
                             .buttonStyle(.plain)
@@ -489,7 +488,7 @@ struct GalleryImageCard: View {
 }
 
 struct FullScreenImageView: View {
-    @State var images: [StashImage]
+    @Binding var images: [StashImage]
     @State var currentIndex: Int
     @StateObject private var viewModel = StashDBViewModel()
     @Environment(\.dismiss) var dismiss
@@ -545,7 +544,7 @@ struct FullScreenImageView: View {
                 deleteCurrentImage()
             }
         } message: {
-            Text("The image '\(images[currentIndex].title ?? "Unknown")' will be permanently deleted. This action cannot be undone.")
+            Text("This image will be permanently deleted. This action cannot be undone.")
         }
     }
     
@@ -555,8 +554,11 @@ struct FullScreenImageView: View {
         
         viewModel.deleteImage(imageId: imageToDelete.id) { success in
             if success {
-                withAnimation {
+                DispatchQueue.main.async {
+                    // Remove from binding - will update parent view automatically
                     images.remove(at: currentIndex)
+                    
+                    // Navigate back or adjust index
                     if images.isEmpty {
                         dismiss()
                     } else if currentIndex >= images.count {

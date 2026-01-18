@@ -59,11 +59,11 @@ struct ServerSetupWizardView: View {
                     .padding(.horizontal, 24)
                     .padding(.bottom, 32)
             }
-            .navigationTitle("Server-Einrichtung")
+            .navigationTitle("Server Setup")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Abbrechen") {
+                    Button("Cancel") {
                         dismiss()
                     }
                 }
@@ -94,10 +94,10 @@ struct ServerSetupWizardView: View {
                     .font(.system(size: 60))
                     .foregroundColor(appearanceManager.tintColor)
                 
-                Text("Wie verbindest du dich?")
+                Text("How do you connect?")
                     .font(.title2.bold())
                 
-                Text("Wähle wie du auf deinen Stash-Server zugreifst")
+                Text("Choose how you access your Stash server")
                     .font(.body)
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
@@ -110,15 +110,15 @@ struct ServerSetupWizardView: View {
                 connectionTypeButton(
                     type: .ipAddress,
                     icon: "number",
-                    title: "IP-Adresse",
-                    description: "Lokales Netzwerk (z.B. 192.168.1.100)"
+                    title: "IP Address",
+                    description: "Local network (e.g. 192.168.1.100)"
                 )
                 
                 connectionTypeButton(
                     type: .domain,
                     icon: "globe",
                     title: "Domain",
-                    description: "Externe Adresse (z.B. stash.example.com)"
+                    description: "External address (e.g. stash.example.com)"
                 )
             }
             .padding(.horizontal, 24)
@@ -183,7 +183,7 @@ struct ServerSetupWizardView: View {
                         .font(.system(size: 50))
                         .foregroundColor(appearanceManager.tintColor)
                     
-                    Text("Server-Details")
+                    Text("Server Details")
                         .font(.title2.bold())
                 }
                 .padding(.top, 32)
@@ -191,7 +191,7 @@ struct ServerSetupWizardView: View {
                 VStack(spacing: 16) {
                     // Server Name
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("Server-Name")
+                        Text("Server Name")
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
@@ -203,7 +203,7 @@ struct ServerSetupWizardView: View {
                     
                     if connectionType == .ipAddress {
                         VStack(alignment: .leading, spacing: 8) {
-                            Text("IP-Adresse")
+                            Text("IP Address")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
                             
@@ -243,7 +243,7 @@ struct ServerSetupWizardView: View {
                         Toggle(isOn: $useHTTPS) {
                             HStack {
                                 Image(systemName: "lock.shield")
-                                Text("HTTPS verwenden")
+                                Text("Use HTTPS")
                             }
                         }
                         .padding()
@@ -262,7 +262,7 @@ struct ServerSetupWizardView: View {
                                 .foregroundColor(.secondary.opacity(0.7))
                         }
                         
-                        SecureField("Falls Server geschützt", text: $apiKey)
+                        SecureField("If server is protected", text: $apiKey)
                             .autocapitalization(.none)
                             .autocorrectionDisabled()
                             .padding()
@@ -296,10 +296,10 @@ struct ServerSetupWizardView: View {
                             .foregroundColor(appearanceManager.tintColor)
                     }
                     
-                    Text(connectionTestResult == .testing ? "Verbinde..." : "Verbindung testen")
+                    Text(connectionTestResult == .testing ? "Connecting..." : "Test Connection")
                         .font(.title2.bold())
                     
-                    Text("Wir prüfen ob dein Server erreichbar ist")
+                    Text("We're checking if your server is reachable")
                         .font(.body)
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
@@ -312,10 +312,10 @@ struct ServerSetupWizardView: View {
                         .font(.system(size: 80))
                         .foregroundColor(.green)
                     
-                    Text("Verbindung erfolgreich!")
+                    Text("Connection successful!")
                         .font(.title2.bold())
                     
-                    Text("Dein Stash-Server wurde gefunden")
+                    Text("Your Stash server was found")
                         .font(.body)
                         .foregroundColor(.secondary)
                 }
@@ -326,7 +326,7 @@ struct ServerSetupWizardView: View {
                         .font(.system(size: 80))
                         .foregroundColor(.red)
                     
-                    Text("Verbindung fehlgeschlagen")
+                    Text("Connection failed")
                         .font(.title2.bold())
                     
                     Text(message)
@@ -335,7 +335,7 @@ struct ServerSetupWizardView: View {
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 32)
                     
-                    Button("Erneut testen") {
+                    Button("Test again") {
                         testConnection()
                     }
                     .buttonStyle(.bordered)
@@ -365,7 +365,7 @@ struct ServerSetupWizardView: View {
                 }) {
                     HStack {
                         Image(systemName: "chevron.left")
-                        Text("Zurück")
+                        Text("Back")
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
@@ -383,7 +383,7 @@ struct ServerSetupWizardView: View {
                 }
             }) {
                 HStack {
-                    Text(currentStep == totalSteps ? "Fertig" : "Weiter")
+                    Text(currentStep == totalSteps ? "Finish" : "Next")
                     if currentStep < totalSteps {
                         Image(systemName: "chevron.right")
                     } else {
@@ -429,7 +429,7 @@ struct ServerSetupWizardView: View {
         
         let config = buildConfig()
         guard let url = URL(string: config.baseURL + "/graphql") else {
-            connectionTestResult = .failure("Ungültige URL")
+            connectionTestResult = .failure("Invalid URL")
             return
         }
         
@@ -445,12 +445,12 @@ struct ServerSetupWizardView: View {
         URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 if let error = error {
-                    connectionTestResult = .failure("Fehler: \(error.localizedDescription)")
+                    connectionTestResult = .failure("Error: \(error.localizedDescription)")
                     return
                 }
                 
                 guard let httpResponse = response as? HTTPURLResponse else {
-                    connectionTestResult = .failure("Keine Antwort vom Server")
+                    connectionTestResult = .failure("No response from server")
                     return
                 }
                 
@@ -460,7 +460,7 @@ struct ServerSetupWizardView: View {
                     // Needs API key but server is reachable
                     connectionTestResult = .success
                 } else {
-                    connectionTestResult = .failure("HTTP Fehler: \(httpResponse.statusCode)")
+                    connectionTestResult = .failure("HTTP Error: \(httpResponse.statusCode)")
                 }
             }
         }.resume()

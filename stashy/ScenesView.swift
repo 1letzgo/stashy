@@ -12,7 +12,7 @@ struct ScenesView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
-    @StateObject private var viewModel = ScenesViewModel()
+    @StateObject private var viewModel = StashDBViewModel()
     @State private var selectedSortOption: StashDBViewModel.SceneSortOption = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .scenes) ?? "") ?? .dateDesc
     @State private var isChangingSort = false
     @State private var searchText = ""
@@ -47,10 +47,8 @@ struct ScenesView: View {
         // Save to TabManager
         TabManager.shared.setSortOption(for: .scenes, option: newOption.rawValue)
 
-        // Update the ViewModel with new sort option
-        viewModel.updateSortOption(newOption)
-        viewModel.updateSearchQuery(searchText)
-        viewModel.updateFilter(selectedFilter)
+        // Fetch new data immediately
+        viewModel.fetchScenes(sortBy: newOption, searchQuery: searchText, filter: selectedFilter)
     }
     
     // Search function with debouncing

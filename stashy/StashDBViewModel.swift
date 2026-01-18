@@ -721,7 +721,7 @@ class StashDBViewModel: ObservableObject {
                 case .failure(let error):
                     // Handle Timeout specifically
                     if let urlError = error as? URLError, urlError.code == .timedOut {
-                         self?.serverStatus = "Nicht verbunden (Timeout)"
+                         self?.serverStatus = "Not connected (Timeout)"
                          self?.errorMessage = "Connection timed out after 5 seconds."
                     } else {
                         self?.handleError(error)
@@ -729,9 +729,9 @@ class StashDBViewModel: ObservableObject {
                 }
             } receiveValue: { [weak self] response in
                 self?.isLoading = false
-                let version = response.data?.version.version ?? "Unbekannt"
+                let version = response.data?.version.version ?? "Unknown"
                 print("📱 Version erhalten: \(version)")
-                self?.serverStatus = "Verbunden - Version: \(version)"
+                self?.serverStatus = "Connected - Version: \(version)"
                 self?.errorMessage = nil // Clear error on success
             }
             .store(in: &cancellables)
@@ -2035,15 +2035,20 @@ class StashDBViewModel: ObservableObject {
         }
         """
         
-        performGraphQLQuery(query: mutation) { (response: GenericMutationResponse?) in
-            if let _ = response?.data?["imageDestroy"] {
+        print("🗑️ IMAGE DELETE: Deleting image \(imageId)")
+        performGraphQLMutationSilent(query: mutation) { result in
+            if let result = result,
+               let data = result["data"]?.value as? [String: Any],
+               let destroyed = data["imageDestroy"] {
+                print("✅ IMAGE DELETE: Success for image \(imageId). Response: \(destroyed)")
                 completion(true)
             } else {
+                print("❌ IMAGE DELETE: Failed for image \(imageId)")
                 completion(false)
             }
         }
     }
-    func addScenePlay(sceneId: String) {
+    func addScenePlay(sceneId: String, completion: ((Int?) -> Void)? = nil) {
         let mutation = """
         {
           "query": "mutation SceneAddPlay($id: ID!) { sceneAddPlay(id: $id) { count } }",
@@ -2053,10 +2058,45 @@ class StashDBViewModel: ObservableObject {
         
         print("🎬 SCENE PLAY: Sending mutation for scene \(sceneId)")
         performGraphQLMutationSilent(query: mutation) { result in
-            if let result = result {
-                print("✅ SCENE PLAY: Success for scene \(sceneId). Response: \(result)")
+            if let result = result,
+               let data = result["data"]?.value as? [String: Any],
+               let sceneAddPlay = data["sceneAddPlay"] as? [String: Any],
+               let count = sceneAddPlay["count"] as? Int {
+                print("✅ SCENE PLAY: Success for scene \(sceneId). New count: \(count)")
+                DispatchQueue.main.async {
+                    completion?(count)
+                }
             } else {
                 print("❌ SCENE PLAY: Failed for scene \(sceneId)")
+                DispatchQueue.main.async {
+                    completion?(nil)
+                }
+            }
+        }
+    }
+    
+    func incrementOCounter(sceneId: String, completion: ((Int?) -> Void)? = nil) {
+        let mutation = """
+        {
+          "query": "mutation SceneIncrementO($id: ID!) { sceneIncrementO(id: $id) }",
+          "variables": { "id": "\(sceneId)" }
+        }
+        """
+        
+        print("🎬 SCENE O: Sending increment mutation for scene \(sceneId)")
+        performGraphQLMutationSilent(query: mutation) { result in
+            if let result = result,
+               let data = result["data"]?.value as? [String: Any],
+               let count = data["sceneIncrementO"] as? Int {
+                print("✅ SCENE O: Success for scene \(sceneId). New count: \(count)")
+                DispatchQueue.main.async {
+                    completion?(count)
+                }
+            } else {
+                print("❌ SCENE O: Failed for scene \(sceneId)")
+                DispatchQueue.main.async {
+                    completion?(nil)
+                }
             }
         }
     }
@@ -2519,6 +2559,7 @@ struct Scene: Codable, Identifiable {
     let organized: Bool?
     let resumeTime: Double?
     let playCount: Int?
+    let oCounter: Int?
     let rating100: Int?
     let createdAt: String?
     let updatedAt: String?
@@ -2528,6 +2569,7 @@ struct Scene: Codable, Identifiable {
         case id, title, details, date, duration, studio, performers, files, tags, galleries, organized, rating100, paths
         case resumeTime = "resume_time"
         case playCount = "play_count"
+        case oCounter = "o_counter"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }
@@ -2598,6 +2640,7 @@ struct Scene: Codable, Identifiable {
             organized: organized,
             resumeTime: newResumeTime,
             playCount: playCount,
+            oCounter: oCounter,
             rating100: rating100,
             createdAt: createdAt,
             updatedAt: updatedAt,
@@ -2621,7 +2664,56 @@ struct Scene: Codable, Identifiable {
             organized: organized,
             resumeTime: resumeTime,
             playCount: playCount,
+            oCounter: oCounter,
             rating100: newRating,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            paths: paths
+        )
+    }
+    
+    /// Creates a copy with updated play count
+    func withPlayCount(_ newPlayCount: Int?) -> Scene {
+        return Scene(
+            id: id,
+            title: title,
+            details: details,
+            date: date,
+            duration: duration,
+            studio: studio,
+            performers: performers,
+            files: files,
+            tags: tags,
+            galleries: galleries,
+            organized: organized,
+            resumeTime: resumeTime,
+            playCount: newPlayCount,
+            oCounter: oCounter,
+            rating100: rating100,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            paths: paths
+        )
+    }
+    
+    /// Creates a copy with updated o count
+    func withOCounter(_ newOCounter: Int?) -> Scene {
+        return Scene(
+            id: id,
+            title: title,
+            details: details,
+            date: date,
+            duration: duration,
+            studio: studio,
+            performers: performers,
+            files: files,
+            tags: tags,
+            galleries: galleries,
+            organized: organized,
+            resumeTime: resumeTime,
+            playCount: playCount,
+            oCounter: newOCounter,
+            rating100: rating100,
             createdAt: createdAt,
             updatedAt: updatedAt,
             paths: paths
@@ -3024,6 +3116,19 @@ struct StashImage: Codable, Identifiable {
         } else {
             return URL(string: config.baseURL + imagePath)
         }
+    }
+    
+    var displayFilename: String {
+        // Try title first
+        if let title = title, !title.isEmpty {
+            return title
+        }
+        // Fallback to filename from image path
+        if let imagePath = paths?.image {
+            return URL(fileURLWithPath: imagePath).lastPathComponent
+        }
+        // Last resort: use ID
+        return "Image \(id.prefix(8))"
     }
 }
 
