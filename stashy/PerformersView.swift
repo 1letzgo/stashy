@@ -110,61 +110,168 @@ struct PerformersView: View {
             }
             
             ToolbarItem(placement: .navigationBarTrailing) {
-                HStack(spacing: 0) {
-
-
+                HStack(spacing: 12) {
+                    // Sort Menu with grouped options
                     Menu {
-                        // Saved Filters Section
-                        Section {
-                            let performerFilters = viewModel.savedFilters.values
-                                .filter { $0.mode == .performers }
-                                .sorted { $0.name < $1.name }
-                            
+                        // Random (standalone)
+                        Button(action: { changeSortOption(to: .random) }) {
+                            HStack {
+                                Text("Random")
+                                if selectedSortOption == .random { Image(systemName: "checkmark") }
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        // Name
+                        Menu {
+                            Button(action: { changeSortOption(to: .nameAsc) }) {
+                                HStack {
+                                    Text("A → Z")
+                                    if selectedSortOption == .nameAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: { changeSortOption(to: .nameDesc) }) {
+                                HStack {
+                                    Text("Z → A")
+                                    if selectedSortOption == .nameDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Name")
+                                if selectedSortOption == .nameAsc || selectedSortOption == .nameDesc {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                        
+                        // Scene Count
+                        Menu {
+                            Button(action: { changeSortOption(to: .sceneCountDesc) }) {
+                                HStack {
+                                    Text("High → Low")
+                                    if selectedSortOption == .sceneCountDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: { changeSortOption(to: .sceneCountAsc) }) {
+                                HStack {
+                                    Text("Low → High")
+                                    if selectedSortOption == .sceneCountAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Scene Count")
+                                if selectedSortOption == .sceneCountAsc || selectedSortOption == .sceneCountDesc {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                        
+                        // Birthday
+                        Menu {
+                            Button(action: { changeSortOption(to: .birthdateDesc) }) {
+                                HStack {
+                                    Text("Youngest First")
+                                    if selectedSortOption == .birthdateDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: { changeSortOption(to: .birthdateAsc) }) {
+                                HStack {
+                                    Text("Oldest First")
+                                    if selectedSortOption == .birthdateAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Birthday")
+                                if selectedSortOption == .birthdateAsc || selectedSortOption == .birthdateDesc {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                        
+                        // Updated
+                        Menu {
+                            Button(action: { changeSortOption(to: .updatedAtDesc) }) {
+                                HStack {
+                                    Text("Newest First")
+                                    if selectedSortOption == .updatedAtDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: { changeSortOption(to: .updatedAtAsc) }) {
+                                HStack {
+                                    Text("Oldest First")
+                                    if selectedSortOption == .updatedAtAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Updated")
+                                if selectedSortOption == .updatedAtAsc || selectedSortOption == .updatedAtDesc {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                        
+                        // Created
+                        Menu {
+                            Button(action: { changeSortOption(to: .createdAtDesc) }) {
+                                HStack {
+                                    Text("Newest First")
+                                    if selectedSortOption == .createdAtDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: { changeSortOption(to: .createdAtAsc) }) {
+                                HStack {
+                                    Text("Oldest First")
+                                    if selectedSortOption == .createdAtAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Created")
+                                if selectedSortOption == .createdAtAsc || selectedSortOption == .createdAtDesc {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down.circle")
+                            .foregroundColor(.appAccent)
+                    }
+
+                    // Filter Menu
+                    Menu {
+                        Button(action: {
+                            selectedFilter = nil
+                            performSearch()
+                        }) {
+                            HStack {
+                                Text("No Filter")
+                                if selectedFilter == nil {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                        
+                        let performerFilters = viewModel.savedFilters.values
+                            .filter { $0.mode == .performers }
+                            .sorted { $0.name < $1.name }
+                        
+                        ForEach(performerFilters) { filter in
                             Button(action: {
-                                selectedFilter = nil
+                                selectedFilter = filter
                                 performSearch()
                             }) {
                                 HStack {
-                                    Text("No Filter")
-                                    if selectedFilter == nil {
+                                    Text(filter.name)
+                                    if selectedFilter?.id == filter.id {
                                         Image(systemName: "checkmark")
                                     }
                                 }
                             }
-                            
-                            ForEach(performerFilters) { filter in
-                                Button(action: {
-                                    selectedFilter = filter
-                                    performSearch()
-                                }) {
-                                    HStack {
-                                        Text(filter.name)
-                                        if selectedFilter?.id == filter.id {
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
-                            }
-                        } header: {
-                            Text("Saved Filters")
-                        }
-                        
-                        // Sort Options Section
-                        Section {
-                            ForEach(StashDBViewModel.PerformerSortOption.allCases, id: \.self) { option in
-                                Button(action: {
-                                    changeSortOption(to: option)
-                                }) {
-                                    HStack {
-                                        Text(option.displayName)
-                                        if option == selectedSortOption {
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
-                            }
-                        } header: {
-                            Text("Sort By")
                         }
                     } label: {
                         Image(systemName: selectedFilter != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")

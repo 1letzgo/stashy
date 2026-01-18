@@ -117,56 +117,217 @@ struct ScenesView: View {
             }
             
             ToolbarItem(placement: .navigationBarTrailing) {
-                HStack(spacing: 0) {
-
-
+                HStack(spacing: 12) {
+                    // Sort Menu with grouped options
                     Menu {
-                        // --- FILTER SECTION ---
-                        Section {
-                            // "None" option
-                            Button(action: {
-                                selectedFilter = nil
-                                viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: nil)
-                            }) {
+                        // Random
+                        Button(action: { changeSortOption(to: .random) }) {
+                            HStack {
+                                Text("Random")
+                                if selectedSortOption == .random { Image(systemName: "checkmark") }
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        // Date
+                        Menu {
+                            Button(action: { changeSortOption(to: .dateDesc) }) {
                                 HStack {
-                                    Text("No Filter")
-                                    if selectedFilter == nil { Image(systemName: "checkmark") }
+                                    Text("Newest First")
+                                    if selectedSortOption == .dateDesc { Image(systemName: "checkmark") }
                                 }
                             }
+                            Button(action: { changeSortOption(to: .dateAsc) }) {
+                                HStack {
+                                    Text("Oldest First")
+                                    if selectedSortOption == .dateAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Date")
+                                if selectedSortOption == .dateAsc || selectedSortOption == .dateDesc { Image(systemName: "checkmark") }
+                            }
+                        }
+                        
+                        // Title
+                        Menu {
+                            Button(action: { changeSortOption(to: .titleAsc) }) {
+                                HStack {
+                                    Text("A → Z")
+                                    if selectedSortOption == .titleAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: { changeSortOption(to: .titleDesc) }) {
+                                HStack {
+                                    Text("Z → A")
+                                    if selectedSortOption == .titleDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Title")
+                                if selectedSortOption == .titleAsc || selectedSortOption == .titleDesc { Image(systemName: "checkmark") }
+                            }
+                        }
+                        
+                        // Duration
+                        Menu {
+                            Button(action: { changeSortOption(to: .durationDesc) }) {
+                                HStack {
+                                    Text("Longest First")
+                                    if selectedSortOption == .durationDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: { changeSortOption(to: .durationAsc) }) {
+                                HStack {
+                                    Text("Shortest First")
+                                    if selectedSortOption == .durationAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Duration")
+                                if selectedSortOption == .durationAsc || selectedSortOption == .durationDesc { Image(systemName: "checkmark") }
+                            }
+                        }
+                        
+                        // Play Count
+                        Menu {
+                            Button(action: { changeSortOption(to: .playCountDesc) }) {
+                                HStack {
+                                    Text("Most Viewed")
+                                    if selectedSortOption == .playCountDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: { changeSortOption(to: .playCountAsc) }) {
+                                HStack {
+                                    Text("Least Viewed")
+                                    if selectedSortOption == .playCountAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Views")
+                                if selectedSortOption == .playCountAsc || selectedSortOption == .playCountDesc { Image(systemName: "checkmark") }
+                            }
+                        }
+                        
+                        // Last Played
+                        Menu {
+                            Button(action: { changeSortOption(to: .lastPlayedAtDesc) }) {
+                                HStack {
+                                    Text("Recently Played")
+                                    if selectedSortOption == .lastPlayedAtDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: { changeSortOption(to: .lastPlayedAtAsc) }) {
+                                HStack {
+                                    Text("Least Recently")
+                                    if selectedSortOption == .lastPlayedAtAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Last Played")
+                                if selectedSortOption == .lastPlayedAtAsc || selectedSortOption == .lastPlayedAtDesc { Image(systemName: "checkmark") }
+                            }
+                        }
+                        
+                        // Created
+                        Menu {
+                            Button(action: { changeSortOption(to: .createdAtDesc) }) {
+                                HStack {
+                                    Text("Newest First")
+                                    if selectedSortOption == .createdAtDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: { changeSortOption(to: .createdAtAsc) }) {
+                                HStack {
+                                    Text("Oldest First")
+                                    if selectedSortOption == .createdAtAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Created")
+                                if selectedSortOption == .createdAtAsc || selectedSortOption == .createdAtDesc { Image(systemName: "checkmark") }
+                            }
+                        }
+                        
+                        // Counter (O-Counter)
+                        Menu {
+                            Button(action: { changeSortOption(to: .oCounterDesc) }) {
+                                HStack {
+                                    Text("High → Low")
+                                    if selectedSortOption == .oCounterDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: { changeSortOption(to: .oCounterAsc) }) {
+                                HStack {
+                                    Text("Low → High")
+                                    if selectedSortOption == .oCounterAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Counter")
+                                if selectedSortOption == .oCounterAsc || selectedSortOption == .oCounterDesc { Image(systemName: "checkmark") }
+                            }
+                        }
+                        
+                        // Rating
+                        Menu {
+                            Button(action: { changeSortOption(to: .ratingDesc) }) {
+                                HStack {
+                                    Text("High → Low")
+                                    if selectedSortOption == .ratingDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: { changeSortOption(to: .ratingAsc) }) {
+                                HStack {
+                                    Text("Low → High")
+                                    if selectedSortOption == .ratingAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Rating")
+                                if selectedSortOption == .ratingAsc || selectedSortOption == .ratingDesc { Image(systemName: "checkmark") }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down.circle")
+                            .foregroundColor(appearanceManager.tintColor)
+                    }
 
-                            let activeFilters = viewModel.savedFilters.values
-                                .filter { $0.mode == .scenes }
-                                .sorted { $0.name < $1.name }
-                            
-                            ForEach(activeFilters) { filter in
-                                Button(action: {
-                                    selectedFilter = filter
-                                    viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: filter)
-                                }) {
-                                    HStack {
-                                        Text(filter.name)
-                                        if selectedFilter?.id == filter.id { Image(systemName: "checkmark") }
-                                    }
-                                }
+                    // Filter Menu
+                    Menu {
+                        Button(action: {
+                            selectedFilter = nil
+                            viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: nil)
+                        }) {
+                            HStack {
+                                Text("No Filter")
+                                if selectedFilter == nil { Image(systemName: "checkmark") }
                             }
-                        } header: {
-                            Text("Saved Filters")
                         }
 
-                        // --- SORT SECTION ---
-                        Section {
-                            ForEach(StashDBViewModel.SceneSortOption.allCases, id: \.self) { option in
-                                Button(action: {
-                                    changeSortOption(to: option)
-                                }) {
-                                    HStack {
-                                        Text(option.displayName)
-                                        if option == selectedSortOption { Image(systemName: "checkmark") }
-                                    }
+                        let activeFilters = viewModel.savedFilters.values
+                            .filter { $0.mode == .scenes }
+                            .sorted { $0.name < $1.name }
+                        
+                        ForEach(activeFilters) { filter in
+                            Button(action: {
+                                selectedFilter = filter
+                                viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: filter)
+                            }) {
+                                HStack {
+                                    Text(filter.name)
+                                    if selectedFilter?.id == filter.id { Image(systemName: "checkmark") }
                                 }
                             }
-                        } header: {
-                            Text("Sort By")
                         }
                     } label: {
                         Image(systemName: selectedFilter != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")

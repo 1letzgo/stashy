@@ -83,61 +83,173 @@ struct TagsView: View {
             }
             
             ToolbarItem(placement: .navigationBarTrailing) {
-                HStack(spacing: 0) {
-
-
+                HStack(spacing: 12) {
+                    // Sort Menu with grouped options
                     Menu {
-                        Section {
-                            let tagFilters = viewModel.savedFilters.values
-                                .filter { $0.mode == .tags }
-                                .sorted { $0.name < $1.name }
-                            
+                        // Random
+                        Button(action: {
+                            selectedSortOption = .random
+                            TabManager.shared.setSortOption(for: .tags, option: StashDBViewModel.TagSortOption.random.rawValue)
+                            performSearch()
+                        }) {
+                            HStack {
+                                Text("Random")
+                                if selectedSortOption == .random { Image(systemName: "checkmark") }
+                            }
+                        }
+                        
+                        Divider()
+                        
+                        // Name
+                        Menu {
                             Button(action: {
-                                selectedFilter = nil
+                                selectedSortOption = .nameAsc
+                                TabManager.shared.setSortOption(for: .tags, option: StashDBViewModel.TagSortOption.nameAsc.rawValue)
                                 performSearch()
                             }) {
                                 HStack {
-                                    Text("No Filter")
-                                    if selectedFilter == nil {
+                                    Text("A → Z")
+                                    if selectedSortOption == .nameAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: {
+                                selectedSortOption = .nameDesc
+                                TabManager.shared.setSortOption(for: .tags, option: StashDBViewModel.TagSortOption.nameDesc.rawValue)
+                                performSearch()
+                            }) {
+                                HStack {
+                                    Text("Z → A")
+                                    if selectedSortOption == .nameDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Name")
+                                if selectedSortOption == .nameAsc || selectedSortOption == .nameDesc { Image(systemName: "checkmark") }
+                            }
+                        }
+                        
+                        // Scene Count
+                        Menu {
+                            Button(action: {
+                                selectedSortOption = .sceneCountDesc
+                                TabManager.shared.setSortOption(for: .tags, option: StashDBViewModel.TagSortOption.sceneCountDesc.rawValue)
+                                performSearch()
+                            }) {
+                                HStack {
+                                    Text("High → Low")
+                                    if selectedSortOption == .sceneCountDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: {
+                                selectedSortOption = .sceneCountAsc
+                                TabManager.shared.setSortOption(for: .tags, option: StashDBViewModel.TagSortOption.sceneCountAsc.rawValue)
+                                performSearch()
+                            }) {
+                                HStack {
+                                    Text("Low → High")
+                                    if selectedSortOption == .sceneCountAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Scene Count")
+                                if selectedSortOption == .sceneCountAsc || selectedSortOption == .sceneCountDesc { Image(systemName: "checkmark") }
+                            }
+                        }
+                        
+                        // Updated
+                        Menu {
+                            Button(action: {
+                                selectedSortOption = .updatedAtDesc
+                                TabManager.shared.setSortOption(for: .tags, option: StashDBViewModel.TagSortOption.updatedAtDesc.rawValue)
+                                performSearch()
+                            }) {
+                                HStack {
+                                    Text("Newest First")
+                                    if selectedSortOption == .updatedAtDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: {
+                                selectedSortOption = .updatedAtAsc
+                                TabManager.shared.setSortOption(for: .tags, option: StashDBViewModel.TagSortOption.updatedAtAsc.rawValue)
+                                performSearch()
+                            }) {
+                                HStack {
+                                    Text("Oldest First")
+                                    if selectedSortOption == .updatedAtAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Updated")
+                                if selectedSortOption == .updatedAtAsc || selectedSortOption == .updatedAtDesc { Image(systemName: "checkmark") }
+                            }
+                        }
+                        
+                        // Created
+                        Menu {
+                            Button(action: {
+                                selectedSortOption = .createdAtDesc
+                                TabManager.shared.setSortOption(for: .tags, option: StashDBViewModel.TagSortOption.createdAtDesc.rawValue)
+                                performSearch()
+                            }) {
+                                HStack {
+                                    Text("Newest First")
+                                    if selectedSortOption == .createdAtDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: {
+                                selectedSortOption = .createdAtAsc
+                                TabManager.shared.setSortOption(for: .tags, option: StashDBViewModel.TagSortOption.createdAtAsc.rawValue)
+                                performSearch()
+                            }) {
+                                HStack {
+                                    Text("Oldest First")
+                                    if selectedSortOption == .createdAtAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Created")
+                                if selectedSortOption == .createdAtAsc || selectedSortOption == .createdAtDesc { Image(systemName: "checkmark") }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down.circle")
+                            .foregroundColor(.appAccent)
+                    }
+
+                    // Filter Menu
+                    Menu {
+                        Button(action: {
+                            selectedFilter = nil
+                            performSearch()
+                        }) {
+                            HStack {
+                                Text("No Filter")
+                                if selectedFilter == nil {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                        
+                        let tagFilters = viewModel.savedFilters.values
+                            .filter { $0.mode == .tags }
+                            .sorted { $0.name < $1.name }
+                        
+                        ForEach(tagFilters) { filter in
+                            Button(action: {
+                                selectedFilter = filter
+                                performSearch()
+                            }) {
+                                HStack {
+                                    Text(filter.name)
+                                    if selectedFilter?.id == filter.id {
                                         Image(systemName: "checkmark")
                                     }
                                 }
                             }
-                            
-                            ForEach(tagFilters) { filter in
-                                Button(action: {
-                                    selectedFilter = filter
-                                    performSearch()
-                                }) {
-                                    HStack {
-                                        Text(filter.name)
-                                        if selectedFilter?.id == filter.id {
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
-                            }
-                        } header: {
-                            Text("Saved Filters")
-                        }
-
-                        Section {
-                            ForEach(StashDBViewModel.TagSortOption.allCases, id: \.self) { option in
-                                Button(action: {
-                                    selectedSortOption = option
-                                    TabManager.shared.setSortOption(for: .tags, option: option.rawValue)
-                                    performSearch()
-                                }) {
-                                    HStack {
-                                        Text(option.displayName)
-                                        if option == selectedSortOption {
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
-                            }
-                        } header: {
-                            Text("Sort By")
                         }
                     } label: {
                         Image(systemName: selectedFilter != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")

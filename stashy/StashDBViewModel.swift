@@ -361,6 +361,10 @@ class StashDBViewModel: ObservableObject {
         case lastPlayedAtAsc
         case playCountDesc
         case playCountAsc
+        case oCounterDesc
+        case oCounterAsc
+        case ratingDesc
+        case ratingAsc
 
         var displayName: String {
             switch self {
@@ -376,14 +380,18 @@ class StashDBViewModel: ObservableObject {
             case .lastPlayedAtAsc: return "Last Played (Oldest First)"
             case .playCountDesc: return "Most Viewed"
             case .playCountAsc: return "Least Viewed"
+            case .oCounterDesc: return "Counter (High-Low)"
+            case .oCounterAsc: return "Counter (Low-High)"
+            case .ratingDesc: return "Rating (High-Low)"
+            case .ratingAsc: return "Rating (Low-High)"
             case .random: return "Random"
             }
         }
 
         var direction: String {
             switch self {
-            case .dateDesc, .createdAtDesc, .durationDesc, .lastPlayedAtDesc, .playCountDesc, .random: return "DESC"
-            case .dateAsc, .createdAtAsc, .titleAsc, .durationAsc, .lastPlayedAtAsc, .playCountAsc: return "ASC"
+            case .dateDesc, .createdAtDesc, .durationDesc, .lastPlayedAtDesc, .playCountDesc, .oCounterDesc, .ratingDesc, .random: return "DESC"
+            case .dateAsc, .createdAtAsc, .titleAsc, .durationAsc, .lastPlayedAtAsc, .playCountAsc, .oCounterAsc, .ratingAsc: return "ASC"
             case .titleDesc: return "DESC"
             }
         }
@@ -396,6 +404,8 @@ class StashDBViewModel: ObservableObject {
             case .durationDesc, .durationAsc: return "duration"
             case .lastPlayedAtDesc, .lastPlayedAtAsc: return "last_played_at"
             case .playCountDesc, .playCountAsc: return "play_count"
+            case .oCounterDesc, .oCounterAsc: return "o_counter"
+            case .ratingDesc, .ratingAsc: return "rating"
             case .random: return "random"
             }
         }
@@ -915,6 +925,12 @@ class StashDBViewModel: ObservableObject {
             sceneFilter["duration"] = ["value": 180, "modifier": "GREATER_THAN"]
         case .mostViewed3Min:
             setSort(.playCountDesc)
+            sceneFilter["duration"] = ["value": 180, "modifier": "GREATER_THAN"]
+        case .topCounter3Min:
+            setSort(.oCounterDesc)
+            sceneFilter["duration"] = ["value": 180, "modifier": "GREATER_THAN"]
+        case .topRating3Min:
+            setSort(.ratingDesc)
             sceneFilter["duration"] = ["value": 180, "modifier": "GREATER_THAN"]
         case .random:
             setSort(.random)

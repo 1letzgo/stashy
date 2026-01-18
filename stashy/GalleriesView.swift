@@ -136,15 +136,57 @@ struct GalleriesView: View {
             }
             
             ToolbarItem(placement: .navigationBarTrailing) {
-                HStack(spacing: 0) {
-
-
+                HStack(spacing: 12) {
+                    // Sort Menu with grouped options
                     Menu {
-                        Section {
-                            let galleryFilters = viewModel.savedFilters.values
-                            .filter { $0.mode == .galleries }
-                            .sorted { $0.name < $1.name }
+                        // Title/Name
+                        Menu {
+                            Button(action: { changeSortOption(to: .titleAsc) }) {
+                                HStack {
+                                    Text("A → Z")
+                                    if selectedSortOption == .titleAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: { changeSortOption(to: .titleDesc) }) {
+                                HStack {
+                                    Text("Z → A")
+                                    if selectedSortOption == .titleDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Name")
+                                if selectedSortOption == .titleAsc || selectedSortOption == .titleDesc { Image(systemName: "checkmark") }
+                            }
+                        }
                         
+                        // Date
+                        Menu {
+                            Button(action: { changeSortOption(to: .dateDesc) }) {
+                                HStack {
+                                    Text("Newest First")
+                                    if selectedSortOption == .dateDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: { changeSortOption(to: .dateAsc) }) {
+                                HStack {
+                                    Text("Oldest First")
+                                    if selectedSortOption == .dateAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Date")
+                                if selectedSortOption == .dateAsc || selectedSortOption == .dateDesc { Image(systemName: "checkmark") }
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "arrow.up.arrow.down.circle")
+                            .foregroundColor(.appAccent)
+                    }
+
+                    // Filter Menu
+                    Menu {
                         Button(action: {
                             selectedFilter = nil
                             performSearch()
@@ -156,6 +198,10 @@ struct GalleriesView: View {
                                 }
                             }
                         }
+                        
+                        let galleryFilters = viewModel.savedFilters.values
+                            .filter { $0.mode == .galleries }
+                            .sorted { $0.name < $1.name }
                         
                         ForEach(galleryFilters) { filter in
                             Button(action: {
@@ -170,26 +216,6 @@ struct GalleriesView: View {
                                 }
                             }
                         }
-                    } header: {
-                        Text("Saved Filters")
-                    }
-
-                    Section {
-                        ForEach(StashDBViewModel.GallerySortOption.allCases, id: \.self) { option in
-                            Button(action: {
-                                changeSortOption(to: option)
-                            }) {
-                                HStack {
-                                    Text(option.displayName)
-                                    if option == selectedSortOption {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    } header: {
-                        Text("Sort By")
-                    }
                     } label: {
                         Image(systemName: selectedFilter != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
                             .foregroundColor(selectedFilter != nil ? .appAccent : .primary)

@@ -130,6 +130,8 @@ enum HomeRowType: String, Codable {
     case lastAdded3Min
     case newest3Min
     case mostViewed3Min
+    case topCounter3Min
+    case topRating3Min
     case random
     case statistics
     
@@ -139,6 +141,8 @@ enum HomeRowType: String, Codable {
         case .lastAdded3Min: return "Recently Added"
         case .newest3Min: return "Newest Scenes"
         case .mostViewed3Min: return "Most Viewed"
+        case .topCounter3Min: return "Top Counter"
+        case .topRating3Min: return "Top Rated"
         case .random: return "Random Scenes"
         case .statistics: return "Statistics"
         }
@@ -204,6 +208,21 @@ class TabManager: ObservableObject {
             // Ensure the decoded tabs are sorted
             var decodedTabs = decoded.sorted { $0.sortOrder < $1.sortOrder }
             
+            // Migration: Fix legacy sort option values that don't match enum rawValues
+            var needsSave = false
+            let sortOptionMigrations: [String: String] = [
+                "scenes_count": "sceneCountDesc",
+                "name": "nameAsc",
+                "date": "dateDesc"
+            ]
+            for i in 0..<decodedTabs.count {
+                if let currentOption = decodedTabs[i].defaultSortOption,
+                   let newOption = sortOptionMigrations[currentOption] {
+                    decodedTabs[i].defaultSortOption = newOption
+                    needsSave = true
+                }
+            }
+            
             // Ensure dashboard is always at index 0 and visible
             if let dashIdx = decodedTabs.firstIndex(where: { $0.id == .dashboard }) {
                 decodedTabs[dashIdx].sortOrder = 0
@@ -221,11 +240,11 @@ class TabManager: ObservableObject {
             // Migration: Check if new tabs are missing and add them
             let allTabs = [
                 TabConfig(id: .dashboard, isVisible: true, sortOrder: 0, defaultSortOption: nil),
-                TabConfig(id: .studios, isVisible: true, sortOrder: 1, defaultSortOption: "scenes_count"),
-                TabConfig(id: .performers, isVisible: true, sortOrder: 2, defaultSortOption: "scenes_count", defaultFilterId: nil, defaultFilterName: nil),
+                TabConfig(id: .studios, isVisible: true, sortOrder: 1, defaultSortOption: "sceneCountDesc"),
+                TabConfig(id: .performers, isVisible: true, sortOrder: 2, defaultSortOption: "sceneCountDesc", defaultFilterId: nil, defaultFilterName: nil),
                 TabConfig(id: .scenes, isVisible: true, sortOrder: 3, defaultSortOption: "dateDesc", defaultFilterId: nil, defaultFilterName: nil),
                 TabConfig(id: .galleries, isVisible: true, sortOrder: 4, defaultSortOption: "dateDesc"),
-                TabConfig(id: .tags, isVisible: true, sortOrder: 5, defaultSortOption: "scenes_count"),
+                TabConfig(id: .tags, isVisible: true, sortOrder: 5, defaultSortOption: "sceneCountDesc"),
                 TabConfig(id: .media, isVisible: true, sortOrder: 6, defaultSortOption: nil),
                 TabConfig(id: .catalogue, isVisible: true, sortOrder: 7, defaultSortOption: nil),
                 TabConfig(id: .downloads, isVisible: true, sortOrder: 8, defaultSortOption: nil),
@@ -235,27 +254,26 @@ class TabManager: ObservableObject {
             
             var hasChanges = false
             for tab in allTabs {
-                if !decoded.contains(where: { $0.id == tab.id }) {
-                    decoded.append(tab)
+                if !decodedTabs.contains(where: { $0.id == tab.id }) {
+                    decodedTabs.append(tab)
                     hasChanges = true
                 }
             }
             
-            if hasChanges {
-                self.tabs = decoded
+            // Save config if migrations were applied or tabs were added
+            self.tabs = decodedTabs
+            if hasChanges || needsSave {
                 saveConfig()
-            } else {
-                self.tabs = decoded
             }
         } else {
             // Default config
             self.tabs = [
                 TabConfig(id: .dashboard, isVisible: true, sortOrder: 0, defaultSortOption: nil),
-                TabConfig(id: .studios, isVisible: true, sortOrder: 1, defaultSortOption: "scenes_count"),
-                TabConfig(id: .performers, isVisible: true, sortOrder: 2, defaultSortOption: "scenes_count", defaultFilterId: nil, defaultFilterName: nil),
+                TabConfig(id: .studios, isVisible: true, sortOrder: 1, defaultSortOption: "sceneCountDesc"),
+                TabConfig(id: .performers, isVisible: true, sortOrder: 2, defaultSortOption: "sceneCountDesc", defaultFilterId: nil, defaultFilterName: nil),
                 TabConfig(id: .scenes, isVisible: true, sortOrder: 3, defaultSortOption: "dateDesc", defaultFilterId: nil, defaultFilterName: nil),
                 TabConfig(id: .galleries, isVisible: true, sortOrder: 4, defaultSortOption: "dateDesc"),
-                TabConfig(id: .tags, isVisible: true, sortOrder: 5, defaultSortOption: "scenes_count"),
+                TabConfig(id: .tags, isVisible: true, sortOrder: 5, defaultSortOption: "sceneCountDesc"),
                 TabConfig(id: .media, isVisible: true, sortOrder: 6, defaultSortOption: nil),
                 TabConfig(id: .catalogue, isVisible: true, sortOrder: 7, defaultSortOption: nil),
                 TabConfig(id: .downloads, isVisible: true, sortOrder: 8, defaultSortOption: nil),
@@ -279,6 +297,8 @@ class TabManager: ObservableObject {
             ensureStatisticsRow()
             ensureMostViewedRow()
             ensureRandomRow()
+            ensureTopCounterRow()
+            ensureTopRatingRow()
         } else {
             // Default Home Rows
             self.homeRows = [
@@ -287,7 +307,9 @@ class TabManager: ObservableObject {
                 HomeRowConfig(id: UUID(), title: HomeRowType.lastAdded3Min.defaultTitle, isEnabled: true, sortOrder: 2, type: .lastAdded3Min),
                 HomeRowConfig(id: UUID(), title: HomeRowType.newest3Min.defaultTitle, isEnabled: true, sortOrder: 3, type: .newest3Min),
                 HomeRowConfig(id: UUID(), title: HomeRowType.mostViewed3Min.defaultTitle, isEnabled: true, sortOrder: 4, type: .mostViewed3Min),
-                HomeRowConfig(id: UUID(), title: HomeRowType.random.defaultTitle, isEnabled: true, sortOrder: 5, type: .random)
+                HomeRowConfig(id: UUID(), title: HomeRowType.random.defaultTitle, isEnabled: true, sortOrder: 5, type: .random),
+                HomeRowConfig(id: UUID(), title: HomeRowType.topCounter3Min.defaultTitle, isEnabled: false, sortOrder: 6, type: .topCounter3Min),
+                HomeRowConfig(id: UUID(), title: HomeRowType.topRating3Min.defaultTitle, isEnabled: false, sortOrder: 7, type: .topRating3Min)
             ]
             saveHomeRows()
         }
@@ -322,6 +344,22 @@ class TabManager: ObservableObject {
     private func ensureMostViewedRow() {
          if !homeRows.contains(where: { $0.type == .mostViewed3Min }) {
              let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.mostViewed3Min.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .mostViewed3Min)
+             homeRows.append(newRow)
+             saveHomeRows()
+         }
+    }
+    
+    private func ensureTopCounterRow() {
+         if !homeRows.contains(where: { $0.type == .topCounter3Min }) {
+             let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.topCounter3Min.defaultTitle, isEnabled: false, sortOrder: homeRows.count, type: .topCounter3Min)
+             homeRows.append(newRow)
+             saveHomeRows()
+         }
+    }
+    
+    private func ensureTopRatingRow() {
+         if !homeRows.contains(where: { $0.type == .topRating3Min }) {
+             let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.topRating3Min.defaultTitle, isEnabled: false, sortOrder: homeRows.count, type: .topRating3Min)
              homeRows.append(newRow)
              saveHomeRows()
          }

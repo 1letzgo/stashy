@@ -317,6 +317,10 @@ struct HomeRowView: View {
             return .dateDesc
         case .mostViewed3Min:
             return .playCountDesc
+        case .topCounter3Min:
+            return .oCounterDesc
+        case .topRating3Min:
+            return .ratingDesc
         case .random:
             return .random
         case .statistics:

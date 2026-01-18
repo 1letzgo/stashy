@@ -240,7 +240,10 @@ struct ReelsView: View {
             }
             
             ToolbarItem(placement: .navigationBarTrailing) {
-                filterMenu
+                HStack(spacing: 12) {
+                    sortMenu
+                    filterMenu
+                }
             }
         }
         .onAppear {
@@ -338,53 +341,216 @@ struct ReelsView: View {
     }
 
     @ViewBuilder
+    private var sortMenu: some View {
+        Menu {
+            // Random
+            Button(action: { applySettings(sortBy: .random, filter: selectedFilter, performer: selectedPerformer) }) {
+                HStack {
+                    Text("Random")
+                    if selectedSortOption == .random { Image(systemName: "checkmark") }
+                }
+            }
+            
+            Divider()
+            
+            // Date
+            Menu {
+                Button(action: { applySettings(sortBy: .dateDesc, filter: selectedFilter, performer: selectedPerformer) }) {
+                    HStack {
+                        Text("Newest First")
+                        if selectedSortOption == .dateDesc { Image(systemName: "checkmark") }
+                    }
+                }
+                Button(action: { applySettings(sortBy: .dateAsc, filter: selectedFilter, performer: selectedPerformer) }) {
+                    HStack {
+                        Text("Oldest First")
+                        if selectedSortOption == .dateAsc { Image(systemName: "checkmark") }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text("Date")
+                    if selectedSortOption == .dateAsc || selectedSortOption == .dateDesc { Image(systemName: "checkmark") }
+                }
+            }
+            
+            // Title
+            Menu {
+                Button(action: { applySettings(sortBy: .titleAsc, filter: selectedFilter, performer: selectedPerformer) }) {
+                    HStack {
+                        Text("A → Z")
+                        if selectedSortOption == .titleAsc { Image(systemName: "checkmark") }
+                    }
+                }
+                Button(action: { applySettings(sortBy: .titleDesc, filter: selectedFilter, performer: selectedPerformer) }) {
+                    HStack {
+                        Text("Z → A")
+                        if selectedSortOption == .titleDesc { Image(systemName: "checkmark") }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text("Title")
+                    if selectedSortOption == .titleAsc || selectedSortOption == .titleDesc { Image(systemName: "checkmark") }
+                }
+            }
+            
+            // Duration
+            Menu {
+                Button(action: { applySettings(sortBy: .durationDesc, filter: selectedFilter, performer: selectedPerformer) }) {
+                    HStack {
+                        Text("Longest First")
+                        if selectedSortOption == .durationDesc { Image(systemName: "checkmark") }
+                    }
+                }
+                Button(action: { applySettings(sortBy: .durationAsc, filter: selectedFilter, performer: selectedPerformer) }) {
+                    HStack {
+                        Text("Shortest First")
+                        if selectedSortOption == .durationAsc { Image(systemName: "checkmark") }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text("Duration")
+                    if selectedSortOption == .durationAsc || selectedSortOption == .durationDesc { Image(systemName: "checkmark") }
+                }
+            }
+            
+            // Play Count
+            Menu {
+                Button(action: { applySettings(sortBy: .playCountDesc, filter: selectedFilter, performer: selectedPerformer) }) {
+                    HStack {
+                        Text("Most Viewed")
+                        if selectedSortOption == .playCountDesc { Image(systemName: "checkmark") }
+                    }
+                }
+                Button(action: { applySettings(sortBy: .playCountAsc, filter: selectedFilter, performer: selectedPerformer) }) {
+                    HStack {
+                        Text("Least Viewed")
+                        if selectedSortOption == .playCountAsc { Image(systemName: "checkmark") }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text("Views")
+                    if selectedSortOption == .playCountAsc || selectedSortOption == .playCountDesc { Image(systemName: "checkmark") }
+                }
+            }
+            
+            // Last Played
+            Menu {
+                Button(action: { applySettings(sortBy: .lastPlayedAtDesc, filter: selectedFilter, performer: selectedPerformer) }) {
+                    HStack {
+                        Text("Recently Played")
+                        if selectedSortOption == .lastPlayedAtDesc { Image(systemName: "checkmark") }
+                    }
+                }
+                Button(action: { applySettings(sortBy: .lastPlayedAtAsc, filter: selectedFilter, performer: selectedPerformer) }) {
+                    HStack {
+                        Text("Least Recently")
+                        if selectedSortOption == .lastPlayedAtAsc { Image(systemName: "checkmark") }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text("Last Played")
+                    if selectedSortOption == .lastPlayedAtAsc || selectedSortOption == .lastPlayedAtDesc { Image(systemName: "checkmark") }
+                }
+            }
+            
+            // Created
+            Menu {
+                Button(action: { applySettings(sortBy: .createdAtDesc, filter: selectedFilter, performer: selectedPerformer) }) {
+                    HStack {
+                        Text("Newest First")
+                        if selectedSortOption == .createdAtDesc { Image(systemName: "checkmark") }
+                    }
+                }
+                Button(action: { applySettings(sortBy: .createdAtAsc, filter: selectedFilter, performer: selectedPerformer) }) {
+                    HStack {
+                        Text("Oldest First")
+                        if selectedSortOption == .createdAtAsc { Image(systemName: "checkmark") }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text("Created")
+                    if selectedSortOption == .createdAtAsc || selectedSortOption == .createdAtDesc { Image(systemName: "checkmark") }
+                }
+            }
+            
+            // Counter (O-Counter)
+            Menu {
+                Button(action: { applySettings(sortBy: .oCounterDesc, filter: selectedFilter, performer: selectedPerformer) }) {
+                    HStack {
+                        Text("High → Low")
+                        if selectedSortOption == .oCounterDesc { Image(systemName: "checkmark") }
+                    }
+                }
+                Button(action: { applySettings(sortBy: .oCounterAsc, filter: selectedFilter, performer: selectedPerformer) }) {
+                    HStack {
+                        Text("Low → High")
+                        if selectedSortOption == .oCounterAsc { Image(systemName: "checkmark") }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text("Counter")
+                    if selectedSortOption == .oCounterAsc || selectedSortOption == .oCounterDesc { Image(systemName: "checkmark") }
+                }
+            }
+            
+            // Rating
+            Menu {
+                Button(action: { applySettings(sortBy: .ratingDesc, filter: selectedFilter, performer: selectedPerformer) }) {
+                    HStack {
+                        Text("High → Low")
+                        if selectedSortOption == .ratingDesc { Image(systemName: "checkmark") }
+                    }
+                }
+                Button(action: { applySettings(sortBy: .ratingAsc, filter: selectedFilter, performer: selectedPerformer) }) {
+                    HStack {
+                        Text("Low → High")
+                        if selectedSortOption == .ratingAsc { Image(systemName: "checkmark") }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text("Rating")
+                    if selectedSortOption == .ratingAsc || selectedSortOption == .ratingDesc { Image(systemName: "checkmark") }
+                }
+            }
+        } label: {
+            Image(systemName: "arrow.up.arrow.down.circle")
+                .foregroundColor(.white)
+        }
+    }
+
+    @ViewBuilder
     private var filterMenu: some View {
         Menu {
-            // --- FILTER SECTION ---
-            Section {
-                Button(action: {
-                    applySettings(sortBy: selectedSortOption, filter: nil, performer: selectedPerformer)
-                }) {
-                    HStack {
-                        Text("No Filter")
-                        if selectedFilter == nil { Image(systemName: "checkmark") }
-                    }
+            Button(action: {
+                applySettings(sortBy: selectedSortOption, filter: nil, performer: selectedPerformer)
+            }) {
+                HStack {
+                    Text("No Filter")
+                    if selectedFilter == nil { Image(systemName: "checkmark") }
                 }
-
-                let activeFilters = viewModel.savedFilters.values
-                    .filter { $0.mode == .scenes && $0.id != "reels_temp" && $0.id != "reels_merged" }
-                    .sorted { $0.name < $1.name }
-
-                ForEach(activeFilters) { filter in
-                    Button(action: {
-                        applySettings(sortBy: selectedSortOption, filter: filter, performer: selectedPerformer)
-                    }) {
-                        HStack {
-                            Text(filter.name)
-                            if selectedFilter?.id == filter.id { Image(systemName: "checkmark") }
-                        }
-                    }
-                }
-            } header: {
-                Text("Saved Filters")
             }
 
-            // --- SORT SECTION ---
-            Section {
-                ForEach(StashDBViewModel.SceneSortOption.allCases, id: \.self) { option in
-                    Button(action: {
-                        applySettings(sortBy: option, filter: selectedFilter, performer: selectedPerformer)
-                    }) {
-                        HStack {
-                            Text(option.displayName)
-                            if option == selectedSortOption {
-                                Image(systemName: "checkmark")
-                            }
-                        }
+            let activeFilters = viewModel.savedFilters.values
+                .filter { $0.mode == .scenes && $0.id != "reels_temp" && $0.id != "reels_merged" }
+                .sorted { $0.name < $1.name }
+
+            ForEach(activeFilters) { filter in
+                Button(action: {
+                    applySettings(sortBy: selectedSortOption, filter: filter, performer: selectedPerformer)
+                }) {
+                    HStack {
+                        Text(filter.name)
+                        if selectedFilter?.id == filter.id { Image(systemName: "checkmark") }
                     }
                 }
-            } header: {
-                Text("Sort By")
             }
         } label: {
             Image(systemName: selectedFilter != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
@@ -679,8 +845,10 @@ struct ReelItemView: View {
                 }
             }
             
-            // Increment play count when playback starts
-            incrementPlayCount()
+            // Increment play count after 3 seconds of viewing
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                incrementPlayCount()
+            }
         }
     }
     
