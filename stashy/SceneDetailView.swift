@@ -366,6 +366,77 @@ struct SceneDetailView: View {
         )
     }
 
+    private var markersCard: some View {
+        Group {
+            if let markers = activeScene.sceneMarkers, !markers.isEmpty {
+                VStack(alignment: .leading, spacing: 0) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(markers.sorted { $0.seconds < $1.seconds }) { marker in
+                                Button(action: {
+                                    seekTo(marker.seconds)
+                                }) {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        // Marker Image
+                                        ZStack(alignment: .bottomTrailing) {
+                                            if let url = marker.thumbnailURL {
+                                                CustomAsyncImage(url: url) { loader in
+                                                    if let image = loader.image {
+                                                        image
+                                                             .resizable()
+                                                            .scaledToFill()
+                                                            .frame(width: 80, height: 45)
+                                                            .clipped()
+                                                    } else {
+                                                        Rectangle()
+                                                            .fill(Color.gray.opacity(0.1))
+                                                            .frame(width: 80, height: 45)
+                                                            .skeleton()
+                                                    }
+                                                }
+                                            } else {
+                                                Rectangle()
+                                                    .fill(Color.gray.opacity(0.2))
+                                                    .frame(width: 80, height: 45)
+                                                    .overlay(Image(systemName: "bookmark").foregroundColor(.secondary))
+                                            }
+                                            
+                                            // Timestamp label
+                                            Text(formatTime(marker.seconds))
+                                                .font(.system(size: 8))
+                                                .fontWeight(.bold)
+                                                .padding(.horizontal, 4)
+                                                .padding(.vertical, 1)
+                                                .background(Color.black.opacity(0.6))
+                                                .foregroundColor(.white)
+                                                .clipShape(RoundedRectangle(cornerRadius: 3))
+                                                .padding(2)
+                                        }
+                                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                                        
+                                        // Marker Title
+                                        Text(marker.title ?? "Marker at \(formatTime(marker.seconds))")
+                                            .font(.system(size: 10))
+                                            .fontWeight(.medium)
+                                            .lineLimit(2)
+                                            .frame(width: 80, alignment: .leading)
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.bottom, 12)
+                        .padding(.top, 12)
+                    }
+                }
+                .background(Color(UIColor.systemBackground))
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+            }
+        }
+    }
+
     private var performersCard: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text("Performers")
@@ -627,6 +698,8 @@ struct SceneDetailView: View {
         ScrollView {
             VStack(spacing: 12) {
                 videoPlayerCard
+                
+                markersCard
                 
                 infoCard
 
@@ -988,6 +1061,15 @@ struct SceneDetailView: View {
         }
         previewPlayer?.pause()
         previewPlayer?.seek(to: .zero)
+    }
+    
+    private func seekTo(_ seconds: Double) {
+        if !isPlaybackStarted {
+            startPlayback(resume: false)
+        }
+        
+        player?.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
+        player?.play()
     }
 }
 

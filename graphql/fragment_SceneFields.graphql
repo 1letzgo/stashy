@@ -6,4 +6,14 @@ fragment SceneFields on Scene {
   tags { ...TagFields }
   galleries { id title date image_count }
   paths { screenshot preview stream webp vtt sprite funscript interactive_heatmap caption }
+  scene_markers {
+    id
+    title
+    seconds
+    primary_tag { id name }
+    tags { id name }
+    screenshot
+    preview
+    stream
+  }
 }

@@ -2580,6 +2580,7 @@ struct Scene: Codable, Identifiable {
     let createdAt: String?
     let updatedAt: String?
     let paths: ScenePaths?
+    let sceneMarkers: [SceneMarker]?
     
     enum CodingKeys: String, CodingKey {
         case id, title, details, date, duration, studio, performers, files, tags, galleries, organized, rating100, paths
@@ -2588,6 +2589,7 @@ struct Scene: Codable, Identifiable {
         case oCounter = "o_counter"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
+        case sceneMarkers = "scene_markers"
     }
     
     // Compat for older views
@@ -2660,7 +2662,8 @@ struct Scene: Codable, Identifiable {
             rating100: rating100,
             createdAt: createdAt,
             updatedAt: updatedAt,
-            paths: paths
+            paths: paths,
+            sceneMarkers: sceneMarkers
         )
     }
     
@@ -2684,7 +2687,8 @@ struct Scene: Codable, Identifiable {
             rating100: newRating,
             createdAt: createdAt,
             updatedAt: updatedAt,
-            paths: paths
+            paths: paths,
+            sceneMarkers: sceneMarkers
         )
     }
     
@@ -2708,7 +2712,8 @@ struct Scene: Codable, Identifiable {
             rating100: rating100,
             createdAt: createdAt,
             updatedAt: updatedAt,
-            paths: paths
+            paths: paths,
+            sceneMarkers: sceneMarkers
         )
     }
     
@@ -2732,7 +2737,8 @@ struct Scene: Codable, Identifiable {
             rating100: rating100,
             createdAt: createdAt,
             updatedAt: updatedAt,
-            paths: paths
+            paths: paths,
+            sceneMarkers: sceneMarkers
         )
     }
 }
@@ -2747,6 +2753,40 @@ struct ScenePaths: Codable {
     let funscript: String?
     let interactive_heatmap: String?
     let caption: String?
+}
+
+struct SceneMarker: Codable, Identifiable {
+    let id: String
+    let title: String?
+    let seconds: Double
+    let primaryTag: Tag?
+    let tags: [Tag]?
+    let screenshot: String?
+    let preview: String?
+    let stream: String?
+    
+    enum CodingKeys: String, CodingKey {
+        case id, title, seconds, tags, screenshot, preview, stream
+        case primaryTag = "primary_tag"
+    }
+    
+    // Computed property for thumbnail URL
+    var thumbnailURL: URL? {
+        // Use path from API if available
+        if let screenshotPath = screenshot, let url = URL(string: screenshotPath) {
+             // If URL(string:) succeeds, check if it's absolute or if we need to prepend baseURL
+             if screenshotPath.hasPrefix("http") {
+                 return url
+             } else if let config = ServerConfigManager.shared.loadConfig() {
+                 let path = screenshotPath.hasPrefix("/") ? String(screenshotPath.dropFirst()) : screenshotPath
+                 return URL(string: "\(config.baseURL)/\(path)")
+             }
+        }
+        
+        // Fallback to manual construction
+        guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
+        return URL(string: "\(config.baseURL)/scenemarker/\(id)/screenshot")
+    }
 }
 
 struct SceneFile: Codable, Identifiable {
