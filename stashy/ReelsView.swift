@@ -306,12 +306,16 @@ struct ReelsView: View {
                             applySettings(sortBy: selectedSortOption, filter: selectedFilter, performer: selectedPerformer, tags: newTags)
                         },
                         onRatingChanged: { newRating in
-                            viewModel.updateSceneRating(sceneId: scene.id, rating100: newRating) { success in
-                                if success {
-                                    // Update scene in list
-                                    if let sceneIndex = viewModel.scenes.firstIndex(where: { $0.id == scene.id }) {
+                            // Optimistic Update
+                            if let sceneIndex = viewModel.scenes.firstIndex(where: { $0.id == scene.id }) {
+                                let originalRating = viewModel.scenes[sceneIndex].rating100
+                                viewModel.scenes[sceneIndex] = viewModel.scenes[sceneIndex].withRating(newRating)
+                                
+                                viewModel.updateSceneRating(sceneId: scene.id, rating100: newRating) { success in
+                                    if !success {
+                                        // Rollback on failure
                                         DispatchQueue.main.async {
-                                            viewModel.scenes[sceneIndex] = viewModel.scenes[sceneIndex].withRating(newRating)
+                                            viewModel.scenes[sceneIndex] = viewModel.scenes[sceneIndex].withRating(originalRating)
                                         }
                                     }
                                 }
@@ -618,7 +622,7 @@ struct ReelItemView: View {
                     count: (scene.rating100 ?? 0) > 0 ? (scene.rating100! / 20) : 0,
                     color: .white.opacity(0.8)
                 ) {
-                    withAnimation(.spring()) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         showRatingOverlay.toggle()
                     }
                 }
@@ -633,8 +637,8 @@ struct ReelItemView: View {
                                 isVertical: true
                             ) { newRating in
                                 onRatingChanged(newRating)
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-                                    withAnimation(.spring()) {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                         showRatingOverlay = false
                                     }
                                 }
@@ -657,11 +661,20 @@ struct ReelItemView: View {
                     count: scene.oCounter ?? 0,
                     color: .white.opacity(0.8)
                 ) {
-                    viewModel.incrementOCounter(sceneId: scene.id) { newCount in
-                        if let count = newCount {
-                            if let index = viewModel.scenes.firstIndex(where: { $0.id == scene.id }) {
+                    // Optimistic update
+                    if let index = viewModel.scenes.firstIndex(where: { $0.id == scene.id }) {
+                        let originalCount = viewModel.scenes[index].oCounter ?? 0
+                        viewModel.scenes[index] = viewModel.scenes[index].withOCounter(originalCount + 1)
+                        
+                        viewModel.incrementOCounter(sceneId: scene.id) { newCount in
+                            if let count = newCount {
                                 DispatchQueue.main.async {
                                     viewModel.scenes[index] = viewModel.scenes[index].withOCounter(count)
+                                }
+                            } else {
+                                // Rollback on failure
+                                DispatchQueue.main.async {
+                                    viewModel.scenes[index] = viewModel.scenes[index].withOCounter(originalCount)
                                 }
                             }
                         }

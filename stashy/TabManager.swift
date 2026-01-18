@@ -197,7 +197,7 @@ class TabManager: ObservableObject {
     
     func loadConfig() {
         if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
-           var decoded = try? JSONDecoder().decode([TabConfig].self, from: data) {
+           let decoded = try? JSONDecoder().decode([TabConfig].self, from: data) {
             
             // Migration: rename home to dashboard if needed
             // This is harder in Swift with enums, but we'll try to handle it during decoding or just rely on defaults if rawValue changes
