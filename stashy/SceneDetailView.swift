@@ -865,7 +865,7 @@ struct SceneDetailView: View {
 
         guard let url = URL(string: "\(config.baseURL)/graphql"),
               let sceneJsonData = try? JSONSerialization.data(withJSONObject: sceneRequestBody) else {
-            print("❌ Fehler beim Erstellen der Scene-Delete-Anfrage")
+            print("❌ Error creating Scene deletion request")
             return
         }
 
@@ -876,12 +876,12 @@ struct SceneDetailView: View {
         // API Key hinzufügen, falls vorhanden
         if let apiKey = config.secureApiKey, !apiKey.isEmpty {
             request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
-            print("🗑️ DELETE SCENE: API Key wird verwendet")
+            print("🗑️ DELETE SCENE: API Key is being used")
         }
         
         request.httpBody = sceneJsonData
 
-        print("🌐 Sende Request an: \(url.absoluteString)")
+        print("🌐 Sending request to: \(url.absoluteString)")
 
         URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
@@ -916,25 +916,25 @@ struct SceneDetailView: View {
                                             self.dismiss()
                                         }
                                     } else if let errors = jsonResponse["errors"] as? [[String: Any]] {
-                                        print("❌ GraphQL Fehler:")
+                                        print("❌ GraphQL Error:")
                                         for error in errors {
                                             if let message = error["message"] as? String {
                                                 print("   \(message)")
                                             }
                                         }
                                     } else {
-                                        print("❌ Unerwartete GraphQL-Response: \(jsonResponse)")
+                                        print("❌ Unexpected GraphQL response: \(jsonResponse)")
                                     }
                                 }
                             } catch {
-                                print("❌ Fehler beim Parsen der JSON-Response: \(error)")
+                                print("❌ Error parsing JSON response: \(error)")
                             }
                         }
                     } else {
                         print("❌ HTTP error \(httpResponse.statusCode) during scene deletion")
                     }
                 } else {
-                    print("❌ Keine HTTP Response erhalten")
+                    print("❌ No HTTP Response received")
                 }
             }
         }.resume()
@@ -961,7 +961,7 @@ struct SceneDetailView: View {
 
         guard let url = URL(string: "\(config.baseURL)/graphql"),
               let jsonData = try? JSONSerialization.data(withJSONObject: requestBody) else {
-            print("❌ Fehler beim Erstellen der Files-Delete-Anfrage")
+            print("❌ Error creating files deletion request")
             return
         }
 
@@ -972,17 +972,17 @@ struct SceneDetailView: View {
         // API Key hinzufügen, falls vorhanden
         if let apiKey = config.secureApiKey, !apiKey.isEmpty {
             request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
-            print("🗑️ DELETE FILES: API Key wird verwendet")
+            print("🗑️ DELETE FILES: API Key is being used")
         }
         
         request.httpBody = jsonData
 
-        print("🌐 Sende Files-Delete-Request an: \(url.absoluteString)")
+        print("🌐 Sending Files-Delete request to: \(url.absoluteString)")
 
         URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 if let error = error {
-                    print("❌ Netzwerkfehler beim Löschen der Dateien: \(error.localizedDescription)")
+                    print("❌ Network error while deleting files: \(error.localizedDescription)")
                     return
                 }
 
@@ -1001,30 +1001,30 @@ struct SceneDetailView: View {
                                 if let jsonResponse = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
                                     if let dataDict = jsonResponse["data"] as? [String: Any],
                                        dataDict["deleteFiles"] != nil {
-                                        print("✅ Dateien erfolgreich gelöscht!")
-                                        print("🎉 Szene und alle Dateien wurden vollständig entfernt!")
+                                        print("✅ Files successfully deleted!")
+                                        print("🎉 Scene and all files have been completely removed!")
                                         NotificationCenter.default.post(name: NSNotification.Name("SceneDeleted"), object: nil, userInfo: ["sceneId": self.scene.id])
                                         self.dismiss()
                                     } else if let errors = jsonResponse["errors"] as? [[String: Any]] {
-                                        print("❌ Fehler beim Löschen der Dateien:")
+                                        print("❌ Error while deleting files:")
                                         for error in errors {
                                             if let message = error["message"] as? String {
                                                 print("   \(message)")
                                             }
                                         }
                                     } else {
-                                        print("❌ Unerwartete GraphQL-Response für deleteFiles: \(jsonResponse)")
+                                        print("❌ Unexpected GraphQL response for deleteFiles: \(jsonResponse)")
                                     }
                                 }
                             } catch {
-                                print("❌ Fehler beim Parsen der JSON-Response für deleteFiles: \(error)")
+                                print("❌ Error parsing JSON response for deleteFiles: \(error)")
                             }
                         }
                     } else {
-                        print("❌ HTTP Fehler \(httpResponse.statusCode) beim Löschen der Dateien")
+                        print("❌ HTTP Error \(httpResponse.statusCode) while deleting files")
                     }
                 } else {
-                    print("❌ Keine HTTP Response für Files-Delete erhalten")
+                    print("❌ No HTTP Response for Files-Delete received")
                 }
             }
         }.resume()

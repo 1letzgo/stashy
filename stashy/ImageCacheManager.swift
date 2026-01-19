@@ -96,19 +96,27 @@ class ImageCache {
         return nil
     }
     
-    func setObject(_ image: UIImage, forKey key: NSURL) {
+    func setData(_ data: Data, forKey key: NSURL) {
         let stableKey = stableMemoryCacheKey(for: key)
         
-        // 1. Save to Memory with stable key
-        memoryCache.setObject(image, forKey: stableKey)
-        
-        // 2. Save to Disk (Async to avoid blocking UI)
-        Task.detached(priority: .background) {
-            if let data = image.jpegData(compressionQuality: 0.8) {
-                let fileURL = self.cacheFileURL(for: key)
-                try? data.write(to: fileURL)
-            }
+        // 1. Save to Memory if possible (as Image)
+        if let image = UIImage(data: data) {
+            memoryCache.setObject(image, forKey: stableKey)
         }
+        
+        // 2. Save raw Data to Disk
+        Task.detached(priority: .background) {
+            let fileURL = self.cacheFileURL(for: key)
+            try? data.write(to: fileURL)
+        }
+    }
+    
+    func data(forKey key: NSURL) -> Data? {
+        let fileURL = cacheFileURL(for: key)
+        if fileManager.fileExists(atPath: fileURL.path) {
+            return try? Data(contentsOf: fileURL)
+        }
+        return nil
     }
     
     func clearCache() {
@@ -122,6 +130,7 @@ class ImageCache {
 
 class ImageLoader: ObservableObject {
     @Published var image: Image?
+    @Published var imageData: Data?
     @Published var isLoading = true
     @Published var error: Error?
 
@@ -140,9 +149,12 @@ class ImageLoader: ObservableObject {
         }
 
         // Check cache first
-        if let cachedImage = ImageCache.shared.object(forKey: url as NSURL) {
-            print("🖼️ CACHE HIT: \(url.path)")
-            self.image = Image(uiImage: cachedImage)
+        if let cachedData = ImageCache.shared.data(forKey: url as NSURL) {
+            print("🖼️ CACHE HIT (Data): \(url.path)")
+            self.imageData = cachedData
+            if let uiImage = UIImage(data: cachedData) {
+                self.image = Image(uiImage: uiImage)
+            }
             self.isLoading = false
             return
         }
@@ -152,19 +164,16 @@ class ImageLoader: ObservableObject {
         Task {
             do {
                 let data = try await loadImage(from: url)
-                if let uiImage = UIImage(data: data) {
-                    // Save to cache
-                    ImageCache.shared.setObject(uiImage, forKey: url as NSURL)
-                    
-                    await MainActor.run {
+                await MainActor.run {
+                    self.imageData = data
+                    if let uiImage = UIImage(data: data) {
+                        // Save to cache
+                        ImageCache.shared.setData(data, forKey: url as NSURL)
                         self.image = Image(uiImage: uiImage)
-                        self.isLoading = false
-                    }
-                } else {
-                    await MainActor.run {
+                    } else {
                         self.error = CustomAsyncImageError.invalidImageData
-                        self.isLoading = false
                     }
+                    self.isLoading = false
                 }
             } catch {
                 await MainActor.run {

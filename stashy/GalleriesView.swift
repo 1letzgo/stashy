@@ -525,11 +525,13 @@ struct FullScreenImageView: View {
             Color.black.edgesIgnoringSafeArea(.all)
             
             TabView(selection: $currentIndex) {
-                ForEach(images.indices, id: \.self) { (index: Int) in
-                    ZStack {
+                ForEach(images.indices, id: \.self) { index in
+                    ZoomableScrollView {
                         if let url = images[index].imageURL {
                             CustomAsyncImage(url: url) { loader in
-                                if let img = loader.image {
+                                if let data = loader.imageData, isGIF(data) {
+                                    GIFView(data: data)
+                                } else if let img = loader.image {
                                     img
                                         .resizable()
                                         .scaledToFit()

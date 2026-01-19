@@ -8,6 +8,7 @@
 import Foundation
 import AVKit
 import AVFoundation
+import WebKit
 
 // MARK: - Global Helper Functions
 
@@ -142,6 +143,113 @@ extension View {
     func skeleton() -> some View {
         self.modifier(SkeletonModifier())
     }
+}
+
+// MARK: - GIF / Zoom Components
+
+/// A view that plays animated GIFs using WKWebView for reliability and simple looping.
+struct GIFView: UIViewRepresentable {
+    let data: Data
+    
+    func makeUIView(context: Context) -> WKWebView {
+        let webView = WKWebView()
+        webView.isOpaque = false
+        webView.backgroundColor = .clear
+        webView.scrollView.isScrollEnabled = false
+        webView.scrollView.contentInsetAdjustmentBehavior = .never
+        return webView
+    }
+    
+    func updateUIView(_ uiView: WKWebView, context: Context) {
+        uiView.load(data, mimeType: "image/gif", characterEncodingName: "UTF-8", baseURL: URL(string: "about:blank")!)
+    }
+}
+
+/// A wrapper around UIScrollView that provides pinch-to-zoom and panning for any SwiftUI view.
+struct ZoomableScrollView<Content: View>: UIViewRepresentable {
+    private var content: Content
+    
+    init(@ViewBuilder content: () -> Content) {
+        self.content = content()
+    }
+    
+    func makeUIView(context: Context) -> UIScrollView {
+        let scrollView = UIScrollView()
+        scrollView.delegate = context.coordinator
+        scrollView.maximumZoomScale = 5.0
+        scrollView.minimumZoomScale = 1.0
+        scrollView.bouncesZoom = true
+        scrollView.showsHorizontalScrollIndicator = false
+        scrollView.showsVerticalScrollIndicator = false
+        scrollView.contentInsetAdjustmentBehavior = .never
+        
+        let hostedView = context.coordinator.hostingController.view!
+        hostedView.translatesAutoresizingMaskIntoConstraints = false
+        hostedView.backgroundColor = .clear
+        scrollView.addSubview(hostedView)
+        
+        NSLayoutConstraint.activate([
+            hostedView.leadingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.leadingAnchor),
+            hostedView.trailingAnchor.constraint(equalTo: scrollView.contentLayoutGuide.trailingAnchor),
+            hostedView.topAnchor.constraint(equalTo: scrollView.contentLayoutGuide.topAnchor),
+            hostedView.bottomAnchor.constraint(equalTo: scrollView.contentLayoutGuide.bottomAnchor),
+            
+            hostedView.widthAnchor.constraint(equalTo: scrollView.frameLayoutGuide.widthAnchor),
+            hostedView.heightAnchor.constraint(equalTo: scrollView.frameLayoutGuide.heightAnchor)
+        ])
+        
+        // Add double tap to reset
+        let doubleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleDoubleTap(_:)))
+        doubleTap.numberOfTapsRequired = 2
+        scrollView.addGestureRecognizer(doubleTap)
+        
+        return scrollView
+    }
+    
+    func updateUIView(_ uiView: UIScrollView, context: Context) {
+        context.coordinator.hostingController.rootView = content
+    }
+    
+    func makeCoordinator() -> Coordinator {
+        Coordinator(hostingController: UIHostingController(rootView: content))
+    }
+    
+    class Coordinator: NSObject, UIScrollViewDelegate {
+        var hostingController: UIHostingController<Content>
+        
+        init(hostingController: UIHostingController<Content>) {
+            self.hostingController = hostingController
+        }
+        
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? {
+            return hostingController.view
+        }
+        
+        @objc func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
+            guard let scrollView = gesture.view as? UIScrollView else { return }
+            
+            if scrollView.zoomScale > scrollView.minimumZoomScale {
+                scrollView.setZoomScale(scrollView.minimumZoomScale, animated: true)
+            } else {
+                // Zoom to localized point
+                let pointInView = gesture.location(in: hostingController.view)
+                let zoomRect = calculateRectFor(scale: 2.5, center: pointInView, in: scrollView)
+                scrollView.zoom(to: zoomRect, animated: true)
+            }
+        }
+        
+        private func calculateRectFor(scale: CGFloat, center: CGPoint, in scrollView: UIScrollView) -> CGRect {
+            let width = scrollView.frame.size.width / scale
+            let height = scrollView.frame.size.height / scale
+            let x = center.x - (width / 2.0)
+            let y = center.y - (height / 2.0)
+            return CGRect(x: x, y: y, width: width, height: height)
+        }
+    }
+}
+
+func isGIF(_ data: Data) -> Bool {
+    return data.count >= 3 && data[0] == 0x47 && data[1] == 0x49 && data[2] == 0x46
 }
 
 struct ShimmerModifier: ViewModifier {

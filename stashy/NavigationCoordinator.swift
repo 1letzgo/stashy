@@ -154,14 +154,18 @@ struct ConnectionErrorView: View {
 // MARK: - Video Player Components
 struct FullScreenVideoPlayer: UIViewRepresentable {
     let player: AVPlayer
+    var videoGravity: AVLayerVideoGravity = .resizeAspectFill
     
     func makeUIView(context: Context) -> PlayerView {
-        return PlayerView(player: player)
+        return PlayerView(player: player, gravity: videoGravity)
     }
     
     func updateUIView(_ uiView: PlayerView, context: Context) {
         if uiView.player != player {
             uiView.player = player
+        }
+        if uiView.playerLayer.videoGravity != videoGravity {
+            uiView.playerLayer.videoGravity = videoGravity
         }
     }
 }
@@ -180,10 +184,10 @@ class PlayerView: UIView {
         return AVPlayerLayer.self
     }
     
-    init(player: AVPlayer) {
+    init(player: AVPlayer, gravity: AVLayerVideoGravity = .resizeAspectFill) {
         super.init(frame: .zero)
         self.player = player
-        self.playerLayer.videoGravity = .resizeAspectFill
+        self.playerLayer.videoGravity = gravity
     }
     
     required init?(coder: NSCoder) {

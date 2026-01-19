@@ -55,7 +55,7 @@ struct DownloadsView: View {
                     Button {
                         showingPaywall = true
                     } label: {
-                        Text("Upgrade for 0,99€ / Month")
+                        Text(store.vipPriceDisplay)
                             .fontWeight(.bold)
                             .foregroundColor(.white)
                             .padding(.horizontal, 32)

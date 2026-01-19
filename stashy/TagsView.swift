@@ -48,7 +48,9 @@ struct TagsView: View {
             }
         }
         .navigationTitle(hideTitle ? "" : "Tags")
+#if !os(tvOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .conditionalSearchable(isVisible: isSearchVisible, text: $searchText, prompt: "Search tags...")
         .onChange(of: searchText) { oldValue, newValue in
             // Debounce
@@ -373,7 +375,7 @@ struct TagCardView: View {
         } // Closing HStack
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: 48) // Optimized height for two lines of subheadline
-        .background(Color(UIColor.systemBackground))
+        .background(Color.appBackground)
         .clipShape(RoundedRectangle(cornerRadius: 10))
         .shadow(color: Color.black.opacity(0.06), radius: 3, x: 0, y: 1)
     }
@@ -482,7 +484,7 @@ struct TagDetailView: View {
                             }
                             .padding(12)
                         }
-                        .background(Color(UIColor.systemBackground))
+                        .background(Color.appBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
                         
@@ -514,7 +516,9 @@ struct TagDetailView: View {
             }
         }
         .navigationTitle(selectedTag.name)
+#if !os(tvOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack {

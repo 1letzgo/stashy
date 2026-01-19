@@ -48,7 +48,9 @@ struct UniversalSearchView: View {
                 }
             }
             .navigationTitle("Search")
-            .navigationBarTitleDisplayMode(.inline)
+#if !os(tvOS)
+        .navigationBarTitleDisplayMode(.inline)
+        #endif
             .searchable(text: $searchText, prompt: "Search everything...")
             .onChange(of: searchText) { oldValue, newValue in
                 performSearch()
@@ -251,7 +253,7 @@ struct UniversalSearchView: View {
                     }
                 }
             }
-            .background(Color(.secondarySystemGroupedBackground))
+            .background(Color(UIColor.secondarySystemBackground))
             .cornerRadius(12)
             .padding(.horizontal, 12)
         }

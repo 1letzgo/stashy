@@ -133,7 +133,9 @@ struct PerformerDetailView: View {
             loadPerformerMetadata()
         }
         .navigationTitle("")
+#if !os(tvOS)
         .navigationBarTitleDisplayMode(.inline)
+        #endif
         .toolbar {
             ToolbarItem(placement: .principal) {
                 if showTabSwitcher {
@@ -337,7 +339,7 @@ struct PerformerDetailView: View {
             .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, minHeight: collapsedHeight, alignment: .topLeading)
         }
-        .background(Color(UIColor.systemBackground))
+        .background(Color.appBackground)
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
         .overlay(

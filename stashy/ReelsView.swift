@@ -27,66 +27,11 @@ struct ReelsView: View {
         selectedPerformer = performer
         selectedTags = tags
         
-        let mergedFilter = portraitMergedFilter(from: filter, performer: performer, tags: tags)
+        // Merge performer and tags into filter if needed
+        let mergedFilter = viewModel.mergeFilterWithCriteria(filter: filter, performer: performer, tags: tags)
         viewModel.fetchScenes(sortBy: sortBy, filter: mergedFilter)
     }
 
-    private func portraitMergedFilter(from filter: StashDBViewModel.SavedFilter?, performer: ScenePerformer? = nil, tags: [Tag] = []) -> StashDBViewModel.SavedFilter {
-        var baseDict: [String: Any] = [:]
-        
-        // 1. Recover filter data
-        if let filter = filter, let dict = filter.filterDict {
-            baseDict = dict
-        }
-        
-        // 2. Force Portrait
-        var criteria = baseDict["c"] as? [[String: Any]] ?? []
-        criteria.removeAll { ($0["id"] as? String) == "orientation" }
-        criteria.append([
-            "id": "orientation",
-            "value": ["PORTRAIT"],
-            "modifier": "EQUALS"
-        ])
-        
-        // 3. Force Performer if selected
-        criteria.removeAll { ($0["id"] as? String) == "performers" }
-        if let performer = performer {
-            criteria.append([
-                "id": "performers",
-                "value": [performer.id],
-                "modifier": "INCLUDES_ALL"
-            ])
-        }
-
-        // 4. Force Tags if selected
-        criteria.removeAll { ($0["id"] as? String) == "tags" }
-        if !tags.isEmpty {
-            criteria.append([
-                "id": "tags",
-                "value": tags.map { $0.id },
-                "modifier": "INCLUDES_ALL"
-            ])
-        }
-        
-        baseDict["c"] = criteria
-        
-        // 3. Serialize back to StashJSONValue
-        let jsonValue: StashJSONValue? = {
-            if let data = try? JSONSerialization.data(withJSONObject: baseDict),
-               let decoded = try? JSONDecoder().decode(StashJSONValue.self, from: data) {
-                return decoded
-            }
-            return nil
-        }()
-    
-        return StashDBViewModel.SavedFilter(
-            id: filter?.id ?? "reels_merged",
-            name: filter?.name ?? "StashTok",
-            mode: .scenes,
-            filter: nil,
-            object_filter: jsonValue
-        )
-    }
 
     var body: some View {
         Group {
@@ -127,7 +72,7 @@ struct ReelsView: View {
             Button {
                 showingPaywall = true
             } label: {
-                Text("Upgrade for 0,99€ / Month")
+                Text(store.vipPriceDisplay)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
                     .padding(.horizontal, 32)
@@ -581,21 +526,31 @@ struct ReelItemView: View {
     @State private var isSeeking = false
     @State private var timeObserver: Any?
     @State private var showRatingOverlay = false
+    @State private var showTags = false
+    @State private var showUI = true
+    @State private var uiHideTask: Task<Void, Never>? = nil
     
     var body: some View {
         ZStack(alignment: .bottomLeading) {
             // Video / Thumbnail layer
             Group {
                 if let player = player {
-                    FullScreenVideoPlayer(player: player)
+                    FullScreenVideoPlayer(player: player, videoGravity: scene.isPortrait ? .resizeAspectFill : .resizeAspect)
                         .onTapGesture {
-                            isPlaying.toggle()
-                            if isPlaying { player.play() } else { player.pause() }
+                            if !showUI {
+                                resetUITimer()
+                            } else {
+                                isPlaying.toggle()
+                                if isPlaying { player.play() } else { player.pause() }
+                                resetUITimer()
+                            }
                         }
                 } else {
                      if let url = scene.thumbnailURL {
                          AsyncImage(url: url) { image in
-                             image.resizable().aspectRatio(contentMode: .fill)
+                             image
+                                 .resizable()
+                                 .aspectRatio(contentMode: scene.isPortrait ? .fill : .fit)
                          } placeholder: {
                              ProgressView()
                          }
@@ -612,19 +567,20 @@ struct ReelItemView: View {
             }
             
             // Sidebar layer (Right side)
-            VStack(alignment: .trailing, spacing: 12) {
+            VStack(alignment: .trailing, spacing: 20) {
                 Spacer()
                 
                 // Rating Button (TikTok style)
                 SidebarButton(
-                    icon: "star.fill",
+                    icon: (scene.rating100 ?? 0) > 0 ? "star" : "star", // Outlined
                     label: "Rating",
                     count: (scene.rating100 ?? 0) > 0 ? (scene.rating100! / 20) : 0,
-                    color: .white.opacity(0.8)
+                    color: .white
                 ) {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         showRatingOverlay.toggle()
                     }
+                    resetUITimer()
                 }
                 .overlay(alignment: .top) {
                     if showRatingOverlay {
@@ -637,6 +593,7 @@ struct ReelItemView: View {
                                 isVertical: true
                             ) { newRating in
                                 onRatingChanged(newRating)
+                                resetUITimer()
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                         showRatingOverlay = false
@@ -656,10 +613,10 @@ struct ReelItemView: View {
 
                 // O-Counter (Manual)
                 SidebarButton(
-                    icon: "heart.fill",
+                    icon: "heart", // Outlined
                     label: "Counter",
                     count: scene.oCounter ?? 0,
-                    color: .white.opacity(0.8)
+                    color: .white
                 ) {
                     // Optimistic update
                     if let index = viewModel.scenes.firstIndex(where: { $0.id == scene.id }) {
@@ -679,33 +636,51 @@ struct ReelItemView: View {
                             }
                         }
                     }
+                    resetUITimer()
                 }
                 
                 // View Counter
                 SidebarButton(
-                    icon: "play.fill",
+                    icon: "stopwatch",
                     label: "Views",
                     count: scene.playCount ?? 0,
-                    color: .white.opacity(0.8)
+                    color: .white
                 ) {
                     // Views are automatic
                 }
-                .disabled(true)
+
+                // Tag Toggle
+                SidebarButton(
+                    icon: "number",
+                    label: "Tags",
+                    count: scene.tags?.count ?? 0,
+                    color: (scene.tags?.count ?? 0) > 0 ? .white : .white.opacity(0.3)
+                ) {
+                    if (scene.tags?.count ?? 0) > 0 {
+                        withAnimation(.spring()) {
+                            showTags.toggle()
+                        }
+                        resetUITimer()
+                    }
+                }
+                .disabled((scene.tags?.count ?? 0) == 0)
                 
                 Spacer()
                     .frame(height: 0)
             }
             .frame(maxWidth: .infinity, alignment: .bottomTrailing)
-            .padding(.trailing, 20)
-            .padding(.bottom, 200)
+            .padding(.trailing, 12)
+            .padding(.bottom, 145)
+            .opacity(showUI ? 1 : 0)
+            .animation(.easeInOut(duration: 0.3), value: showUI)
             
             // Interaction overlay (Labels + Scrubber)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 12) {
                 Spacer()
                 
                 VStack(alignment: .leading, spacing: 6) {
-                    // Row 1: Performer and Rating
-                    HStack(alignment: .center) {
+                    // Row 1: Performer - Title (Combined)
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
                         if let performer = scene.performers.first {
                             Button(action: { onPerformerTap(performer) }) {
                                 Text(performer.name)
@@ -715,34 +690,23 @@ struct ReelItemView: View {
                                     .shadow(radius: 2)
                             }
                             .buttonStyle(.plain)
+                            
+                            Text("-")
+                                .font(.headline)
+                                .foregroundColor(.white)
+                                .shadow(radius: 2)
                         }
                         
-                        Spacer()
-                    }
-
-                    // Row 2: Title and Studio
-                    HStack(alignment: .bottom) {
                         Text(scene.title ?? "")
                             .font(.body)
                             .fontWeight(.semibold)
                             .foregroundColor(.white)
                             .shadow(radius: 2)
                             .lineLimit(1)
-                        
-                        Spacer()
-                        
-                        if let studio = scene.studio?.name {
-                            Text(studio)
-                                .font(.callout)
-                                .fontWeight(.medium)
-                                .foregroundColor(.white.opacity(0.9))
-                                .shadow(radius: 2)
-                                .lineLimit(1)
-                        }
                     }
                     
-                    // Row 3: Tags (Scrollable) in Dark Pills
-                    if let tags = scene.tags, !tags.isEmpty {
+                    // Row 2: Tags (Scrollable) in Dark Pills - Toggleable
+                    if showTags, let tags = scene.tags, !tags.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
                                 ForEach(tags) { tag in
@@ -767,7 +731,6 @@ struct ReelItemView: View {
                 }
                 .padding(.horizontal)
                 
-                // Scrubber (Full Width)
                 Slider(value: Binding(get: { currentTime }, set: { val in
                     currentTime = val
                     seek(to: val)
@@ -777,19 +740,23 @@ struct ReelItemView: View {
                         player?.pause()
                     } else {
                         if isPlaying { player?.play() }
+                        resetUITimer()
                     }
                 })
-                .accentColor(.white)
-                .onAppear {
-                     UISlider.appearance().thumbTintColor = .white
-                     UISlider.appearance().maximumTrackTintColor = .white.withAlphaComponent(0.4)
-                }
+            .accentColor(.white)
+            .onAppear {
+                 UISlider.appearance().thumbTintColor = .white
+                 UISlider.appearance().maximumTrackTintColor = .white.withAlphaComponent(0.4)
             }
-            .padding(.bottom, 85)
+        }
+        .padding(.bottom, 85)
+        .opacity(showUI ? 1 : 0)
+        .animation(.easeInOut(duration: 0.3), value: showUI)
         }
         .background(Color.black)
         .onAppear {
             setupPlayer()
+            resetUITimer()
         }
         .onDisappear {
             player?.pause()
@@ -821,6 +788,7 @@ struct ReelItemView: View {
         .onTapGesture {
             isPlaying = true
             player?.play()
+            resetUITimer()
         }
     }
     
@@ -878,6 +846,31 @@ struct ReelItemView: View {
         }
     }
     
+    private func resetUITimer() {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            showUI = true
+        }
+        
+        uiHideTask?.cancel()
+        uiHideTask = Task {
+            try? await Task.sleep(nanoseconds: 5 * 1_000_000_000)
+            guard !Task.isCancelled else { return }
+            
+            // Don't hide if specific overlays are visible
+            if !showRatingOverlay && !isSeeking {
+                withAnimation(.easeInOut(duration: 0.8)) {
+                    showUI = false
+                }
+            } else if !Task.isCancelled {
+                // If we can't hide now, try again in 2 seconds
+                try? await Task.sleep(nanoseconds: 2 * 1_000_000_000)
+                if !Task.isCancelled {
+                    resetUITimer()
+                }
+            }
+        }
+    }
+    
     func seek(to time: Double) {
         let cmTime = CMTime(seconds: time, preferredTimescale: 600)
         player?.seek(to: cmTime)
@@ -893,24 +886,24 @@ struct SidebarButton: View {
     
     var body: some View {
         Button(action: action) {
-            ZStack {
-                Circle()
-                    .fill(Color.black.opacity(0.4))
-                    .frame(width: 45, height: 45)
+            VStack(spacing: 2) {
+                Image(systemName: icon)
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(color)
+                    .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
                 
-                VStack(spacing: 2) {
-                    Image(systemName: icon)
-                        .font(.system(size: 18, weight: .bold)) // Slightly larger when alone?
-                        .foregroundColor(color)
-                    
+                // Fixed height container for the count to prevent shifting
+                ZStack {
                     if count > 0 {
                         Text("\(count)")
                             .font(.system(size: 10, weight: .heavy))
                             .foregroundColor(.white)
+                            .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
                     }
                 }
+                .frame(height: 12)
             }
-            .shadow(color: .black.opacity(0.3), radius: 4, x: 0, y: 2)
+            .frame(width: 45, height: 45) // Fixed total height for the button
         }
         .buttonStyle(.plain)
     }

@@ -22,7 +22,6 @@
 		DF22BB222F16743C007C2090 /* ReelsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1B2F16743C007C2090 /* ReelsView.swift */; };
 		DF22BB232F16743C007C2090 /* SharedUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1C2F16743C007C2090 /* SharedUtilities.swift */; };
 		DF22BB242F16743C007C2090 /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB192F16743C007C2090 /* HomeView.swift */; };
-		DF22BB252F16743C007C2090 /* ColorExtensions.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB162F16743C007C2090 /* ColorExtensions.swift */; };
 		DF22BB272F167CDC007C2090 /* ImageCacheManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB262F167CDC007C2090 /* ImageCacheManager.swift */; };
 		DF22BB322F1831C7007C2090 /* AppearanceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB312F1831C7007C2090 /* AppearanceManager.swift */; };
 		DF22BB342F1831C7007C2090 /* AppearanceSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */; };
@@ -58,7 +57,6 @@
 		AA0000022E8A9C0000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		DF06EF252F18EC1100299105 /* SceneCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCardView.swift; sourceTree = "<group>"; };
 		DF22BB142F167223007C2090 /* CatalogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogsView.swift; sourceTree = "<group>"; };
-		DF22BB162F16743C007C2090 /* ColorExtensions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ColorExtensions.swift; sourceTree = "<group>"; };
 		DF22BB172F16743C007C2090 /* DownloadsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadsView.swift; sourceTree = "<group>"; };
 		DF22BB182F16743C007C2090 /* GalleriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleriesView.swift; sourceTree = "<group>"; };
 		DF22BB192F16743C007C2090 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -121,7 +119,6 @@
 				DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */,
 				AA0000022E8A9C0000000001 /* Assets.xcassets */,
 				DF22BB142F167223007C2090 /* CatalogsView.swift */,
-				DF22BB162F16743C007C2090 /* ColorExtensions.swift */,
 				DF22BB172F16743C007C2090 /* DownloadsView.swift */,
 				E69F93D1B9EB47B88F9597C3 /* FilterModels.swift */,
 				DF22BB182F16743C007C2090 /* GalleriesView.swift */,
@@ -270,7 +267,6 @@
 				DF22BB232F16743C007C2090 /* SharedUtilities.swift in Sources */,
 				DF06EF262F18EC1300299105 /* SceneCardView.swift in Sources */,
 				DF22BB242F16743C007C2090 /* HomeView.swift in Sources */,
-				DF22BB252F16743C007C2090 /* ColorExtensions.swift in Sources */,
 				DFF7EE412F0D3D2800344A8B /* TabManager.swift in Sources */,
 				DFE504622E8A8C4000323FF0 /* StudiosView.swift in Sources */,
 				DF22BB342F1831C7007C2090 /* AppearanceSettingsView.swift in Sources */,
@@ -419,7 +415,7 @@
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = stashy;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -447,7 +443,7 @@
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = stashy;
-				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.video";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
 				IPHONEOS_DEPLOYMENT_TARGET = 18.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",

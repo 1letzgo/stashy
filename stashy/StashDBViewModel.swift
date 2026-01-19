@@ -979,6 +979,57 @@ class StashDBViewModel: ObservableObject {
         }
     }
     
+    func mergeFilterWithCriteria(filter: SavedFilter?, performer: ScenePerformer? = nil, tags: [Tag] = []) -> SavedFilter {
+        var baseDict: [String: Any] = [:]
+        
+        // 1. Recover filter data
+        if let filter = filter, let dict = filter.filterDict {
+            baseDict = dict
+        }
+        
+        // 2. Extract or create criteria array
+        var criteria = baseDict["c"] as? [[String: Any]] ?? []
+        
+        // 3. Force Performer if selected
+        if let performer = performer {
+            criteria.removeAll { ($0["id"] as? String) == "performers" }
+            criteria.append([
+                "id": "performers",
+                "value": [performer.id],
+                "modifier": "INCLUDES_ALL"
+            ])
+        }
+
+        // 4. Force Tags if selected
+        if !tags.isEmpty {
+            criteria.removeAll { ($0["id"] as? String) == "tags" }
+            criteria.append([
+                "id": "tags",
+                "value": tags.map { $0.id },
+                "modifier": "INCLUDES_ALL"
+            ])
+        }
+        
+        baseDict["c"] = criteria
+        
+        // 5. Serialize back to StashJSONValue
+        let jsonValue: StashJSONValue? = {
+            if let data = try? JSONSerialization.data(withJSONObject: baseDict),
+               let decoded = try? JSONDecoder().decode(StashJSONValue.self, from: data) {
+                return decoded
+            }
+            return nil
+        }()
+    
+        return SavedFilter(
+            id: filter?.id ?? "merged_temp",
+            name: filter?.name ?? "Merged Filter",
+            mode: .scenes,
+            filter: nil,
+            object_filter: jsonValue
+        )
+    }
+
     private func sanitizeFilter(_ dict: [String: Any]) -> [String: Any] {
         var newDict = dict
         
@@ -2229,7 +2280,7 @@ class StashDBViewModel: ObservableObject {
     
     private func handleNetworkError(_ error: GraphQLNetworkError) {
         errorMessage = error.errorDescription
-        serverStatus = "Verbindung fehlgeschlagen"
+        serverStatus = "Connection failed"
         
         // Keep legacy error notification for auth errors
         if case .unauthorized = error {
@@ -2239,27 +2290,27 @@ class StashDBViewModel: ObservableObject {
 
     
     private func handleError(_ error: Error) {
-        print("📱 StashDB Fehler: \(error)")
+        print("📱 StashDB Error: \(error)")
         
         if let urlError = error as? URLError {
             let urlContext = ServerConfigManager.shared.loadConfig()?.baseURL ?? "Unknown URL"
             switch urlError.code {
             case .notConnectedToInternet:
-                errorMessage = "Keine Internetverbindung"
+                errorMessage = "No internet connection"
             case .cannotConnectToHost:
                 errorMessage = "Server not reachable (\(urlContext)) - check IP/Port/SSL"
             case .timedOut:
                 errorMessage = "Connection timed out (\(urlContext)) - is server running?"
             default:
-                errorMessage = "Netzwerk-Fehler: \(urlError.localizedDescription) (\(urlContext))"
+                errorMessage = "Network Error: \(urlError.localizedDescription) (\(urlContext))"
             }
         } else if let decodingError = error as? DecodingError {
-            print("📱 Decoding Fehler: \(decodingError)")
-            errorMessage = "Server-Antwort konnte nicht verarbeitet werden"
+            print("📱 Decoding Error: \(decodingError)")
+            errorMessage = "Could not process server response"
         } else {
-            errorMessage = "Fehler: \(error.localizedDescription)"
+            errorMessage = "Error: \(error.localizedDescription)"
         }
-        serverStatus = "Verbindung fehlgeschlagen"
+        serverStatus = "Connection failed"
     }
     
     // MARK: - Library Actions
@@ -2596,6 +2647,15 @@ struct Scene: Codable, Identifiable {
     struct SceneTag: Codable, Identifiable {
         let id: String
         let name: String
+    }
+    
+    // Computed property to determine if the scene is portrait
+    var isPortrait: Bool {
+        guard let firstFile = files?.first else { return false }
+        if let width = firstFile.width, let height = firstFile.height {
+            return height > width
+        }
+        return false
     }
     
     // Total duration from files if not at top level
@@ -3670,6 +3730,13 @@ class SubscriptionManager: ObservableObject {
     @Published var isPremium: Bool = false
     @Published var products: [Product] = []
     @Published var hasError: Bool = false
+    
+    var vipPriceDisplay: String {
+        if let vipProduct = products.first(where: { $0.id == subscriptionId }) {
+            return "Upgrade for \(vipProduct.displayPrice) / Month"
+        }
+        return "Upgrade to VIP"
+    }
     
     private let subscriptionId = "de.letzgo.stashy.premium.sub"
     private let lifetimeId = "de.letzgo.stashy.premium.lifetime"
