@@ -161,7 +161,22 @@ struct GIFView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: WKWebView, context: Context) {
-        uiView.load(data, mimeType: "image/gif", characterEncodingName: "UTF-8", baseURL: URL(string: "about:blank")!)
+        let base64 = data.base64EncodedString()
+        let html = """
+        <html>
+        <head>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <style>
+        body { margin: 0; padding: 0; background: transparent; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
+        img { width: 100%; height: auto; max-height: 100%; object-fit: contain; }
+        </style>
+        </head>
+        <body>
+        <img src="data:image/gif;base64,\(base64)">
+        </body>
+        </html>
+        """
+        uiView.loadHTMLString(html, baseURL: nil)
     }
 }
 

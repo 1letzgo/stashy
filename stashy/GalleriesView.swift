@@ -260,122 +260,98 @@ struct GalleryCardView: View {
     let gallery: Gallery
     
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            // Image
+        ZStack {
             GeometryReader { geometry in
-                ZStack {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
+                ZStack(alignment: .bottomLeading) {
+                    // Image (Strictly filling the square)
+                    ZStack {
+                        Color.gray.opacity(0.2)
 
-                    if let url = gallery.coverURL {
-                        CustomAsyncImage(url: url) { loader in
-                            if loader.isLoading {
-                                ProgressView()
-                            } else if let image = loader.image {
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: geometry.size.width, height: geometry.size.height)
-                                    .clipped()
-                            } else {
-                                Image(systemName: "photo.on.rectangle")
-                                    .font(.system(size: 40))
-                                    .foregroundColor(.secondary)
+                        if let url = gallery.coverURL {
+                            CustomAsyncImage(url: url) { loader in
+                                if loader.isLoading {
+                                    ProgressView()
+                                } else if let image = loader.image {
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                } else {
+                                    Image(systemName: "photo.on.rectangle")
+                                        .font(.system(size: 40))
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                        } else {
+                            Image(systemName: "photo.on.rectangle")
+                                .font(.system(size: 40))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .frame(width: geometry.size.width, height: geometry.size.width)
+                    .clipped()
+                    
+                    // Gradient Overlay
+                    LinearGradient(
+                        gradient: Gradient(colors: [.clear, .black.opacity(0.8)]),
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                    .frame(height: geometry.size.width * 0.4)
+                    
+                    // Badges Overlay Layer
+                    VStack {
+                        HStack(alignment: .top) {
+                            // Studio Badge (Top Left)
+                            if let studio = gallery.studio {
+                                Text(studio.name)
+                                    .font(.system(size: 9, weight: .bold))
+                                    .lineLimit(1)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 3)
+                                    .background(Color.black.opacity(0.6))
+                                    .clipShape(Capsule())
+                            }
+                            
+                            Spacer()
+                        }
+                        .padding(6)
+                        
+                        Spacer()
+                        
+                        HStack(alignment: .bottom) {
+                            Spacer()
+                            
+                            // Image Count Badge (Bottom Right)
+                            if let count = gallery.imageCount {
+                                HStack(spacing: 3) {
+                                    Image(systemName: "photo")
+                                        .font(.system(size: 10, weight: .bold))
+                                    Text("\(count)")
+                                        .font(.system(size: 10, weight: .bold))
+                                }
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.black.opacity(0.6))
+                                .clipShape(Capsule())
                             }
                         }
-                    } else {
-                        Image(systemName: "photo.on.rectangle")
-                            .font(.system(size: 40))
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
-            .aspectRatio(1, contentMode: .fit) 
-            
-            // Gradient Overlay
-            LinearGradient(
-                gradient: Gradient(colors: [.clear, .black.opacity(0.8)]),
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: 80)
-            
-            // Top Badges
-            VStack {
-                HStack {
-                    // Studio Badge (Top Left)
-                    if let studio = gallery.studio {
-                        HStack(spacing: 3) {
-                            Image(systemName: "building.2")
-                                .font(.system(size: 10, weight: .bold))
-                            Text(studio.name)
-                                .font(.system(size: 10, weight: .bold))
-                                .lineLimit(1)
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.black.opacity(0.6))
-                        .clipShape(Capsule())
-                        .shadow(color: .black.opacity(0.2), radius: 2)
+                        .padding(6)
                     }
                     
-                    Spacer()
-                    
-                    // Count Badge (Top Right)
-                    if let count = gallery.imageCount {
-                        HStack(spacing: 3) {
-                            Image(systemName: "photo")
-                                .font(.system(size: 10, weight: .bold))
-                            Text("\(count)")
-                                .font(.system(size: 11, weight: .bold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.black.opacity(0.6))
-                        .clipShape(Capsule())
-                        .shadow(color: .black.opacity(0.2), radius: 2)
+                    // Info Section (Bottom Title)
+                    VStack(alignment: .leading, spacing: 2) {
+                         Text(gallery.displayName)
+                            .font(.system(size: geometry.size.width * 0.08, weight: .bold)) // Scaled font
+                            .foregroundColor(.white)
+                            .lineLimit(1)
+                            .shadow(radius: 2)
                     }
-                }
-                .padding(8)
-                
-                Spacer()
-                
-                HStack {
-                    Spacer()
-                    
-                    // Performer Count Badge (Bottom Right)
-                    if let performers = gallery.performers, !performers.isEmpty {
-                        HStack(spacing: 3) {
-                            Image(systemName: "person.2.fill")
-                                .font(.system(size: 10, weight: .bold))
-                            Text("\(performers.count)")
-                                .font(.system(size: 11, weight: .bold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.black.opacity(0.6))
-                        .clipShape(Capsule())
-                        .shadow(color: .black.opacity(0.2), radius: 2)
-                        .padding(8)
-                    }
+                    .padding(8)
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            
-            // Info Section (Bottom Title)
-            VStack(alignment: .leading, spacing: 4) {
-                 Text(gallery.displayName)
-                    .font(.subheadline)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                    .lineLimit(2)
-                    .multilineTextAlignment(.leading)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
-            .padding(12)
+            .aspectRatio(1, contentMode: .fit)
         }
         .background(Color(UIColor.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
@@ -505,6 +481,25 @@ struct GalleryImageCard: View {
                 }
                 .frame(width: geometry.size.width, height: geometry.size.width) // Square
                 .clipped()
+                
+                // Date Badge (Top Right)
+                VStack {
+                    HStack {
+                        Spacer()
+                        if !image.formattedDate.isEmpty {
+                            Text(image.formattedDate)
+                                .font(.system(size: 9, weight: .bold))
+                                .lineLimit(1)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 6)
+                                .padding(.vertical, 3)
+                                .background(Color.black.opacity(0.6))
+                                .clipShape(Capsule())
+                        }
+                    }
+                    Spacer()
+                }
+                .padding(6)
             }
             .aspectRatio(1, contentMode: .fit)
         }
@@ -531,6 +526,7 @@ struct FullScreenImageView: View {
                             CustomAsyncImage(url: url) { loader in
                                 if let data = loader.imageData, isGIF(data) {
                                     GIFView(data: data)
+                                        .frame(maxWidth: .infinity)
                                 } else if let img = loader.image {
                                     img
                                         .resizable()
@@ -555,8 +551,15 @@ struct FullScreenImageView: View {
             }
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
         }
+        .navigationTitle(currentIndex < images.count ? images[currentIndex].displayFilename : "")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            ToolbarItem(placement: .principal) {
+                Text(currentIndex < images.count ? images[currentIndex].displayFilename : "")
+                    .font(.headline)
+                    .foregroundColor(.white)
+            }
+            
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(role: .destructive) {
                     showingDeleteConfirmation = true

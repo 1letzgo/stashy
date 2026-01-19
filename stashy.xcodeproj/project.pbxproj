@@ -27,6 +27,7 @@
 		DF22BB342F1831C7007C2090 /* AppearanceSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */; };
 		DF22BB362F1832AD007C2090 /* NavigationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */; };
 		DF22BB3A2F1832E8007C2090 /* PerformersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB392F1832E8007C2090 /* PerformersView.swift */; };
+		DF4A022C2F1E8B6900E5EAFB /* ImagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF4A022B2F1E8B6800E5EAFB /* ImagesView.swift */; };
 		DF90B75E2F1A5ECF003ED852 /* StarRatingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */; };
 		DF90B7642F1ACEA3003ED852 /* ServerSetupWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B7632F1ACEA3003ED852 /* ServerSetupWizardView.swift */; };
 		DF90B7662F1B72E5003ED852 /* UniversalSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B7652F1B72E5003ED852 /* UniversalSearchView.swift */; };
@@ -68,6 +69,7 @@
 		DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsView.swift; sourceTree = "<group>"; };
 		DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NavigationCoordinator.swift; sourceTree = "<group>"; };
 		DF22BB392F1832E8007C2090 /* PerformersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformersView.swift; sourceTree = "<group>"; };
+		DF4A022B2F1E8B6800E5EAFB /* ImagesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImagesView.swift; sourceTree = "<group>"; };
 		DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarRatingView.swift; sourceTree = "<group>"; };
 		DF90B7632F1ACEA3003ED852 /* ServerSetupWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSetupWizardView.swift; sourceTree = "<group>"; };
 		DF90B7652F1B72E5003ED852 /* UniversalSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UniversalSearchView.swift; sourceTree = "<group>"; };
@@ -129,6 +131,7 @@
 				DFSM000022F2NEWFILE002 /* KeychainManager.swift */,
 				08FB7798FE84155DC02AAC07 /* MainTabView.swift */,
 				DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */,
+				DF4A022B2F1E8B6800E5EAFB /* ImagesView.swift */,
 				DFSM000042F2NEWFILE004 /* OnboardingView.swift */,
 				DFE5045D2E8A8C2000323FF2 /* PerformerDetailView.swift */,
 				DF22BB392F1832E8007C2090 /* PerformersView.swift */,
@@ -262,6 +265,7 @@
 				DF22BB1E2F16743C007C2090 /* TagsView.swift in Sources */,
 				DF90B75E2F1A5ECF003ED852 /* StarRatingView.swift in Sources */,
 				DF22BB1F2F16743C007C2090 /* DownloadsView.swift in Sources */,
+				DF4A022C2F1E8B6900E5EAFB /* ImagesView.swift in Sources */,
 				DF22BB202F16743C007C2090 /* GalleriesView.swift in Sources */,
 				DF22BB222F16743C007C2090 /* ReelsView.swift in Sources */,
 				DF22BB232F16743C007C2090 /* SharedUtilities.swift in Sources */,

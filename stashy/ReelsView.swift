@@ -19,6 +19,9 @@ struct ReelsView: View {
     @State private var selectedPerformer: ScenePerformer?
     @State private var selectedTags: [Tag] = []
     @State private var isMuted = !isHeadphonesConnected() // Shared mute state for Reels
+    @State private var currentVisibleSceneId: String?
+    @State private var showDeleteConfirmation = false
+    @State private var sceneToDelete: Scene?
 
     private func applySettings(sortBy: StashDBViewModel.SceneSortOption, filter: StashDBViewModel.SavedFilter?, performer: ScenePerformer? = nil, tags: [Tag] = []) {
         selectedSortOption = sortBy
@@ -129,10 +132,15 @@ struct ReelsView: View {
         )
         .toolbarColorScheme(.dark, for: .navigationBar, .tabBar)
         .toolbar {
-            ToolbarItem(placement: .navigationBarLeading) {
-                Button(action: { isMuted.toggle() }) {
-                    Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                        .foregroundColor(.white)
+            if let currentId = currentVisibleSceneId, let scene = viewModel.scenes.first(where: { $0.id == currentId }) {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button(role: .destructive) {
+                        sceneToDelete = scene
+                        showDeleteConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .foregroundColor(.red)
+                    }
                 }
             }
             
@@ -203,6 +211,23 @@ struct ReelsView: View {
                 if let filter = newValue[defaultId] {
                     applySettings(sortBy: selectedSortOption, filter: filter, performer: selectedPerformer, tags: selectedTags)
                 }
+            }
+        }
+        .alert("Really delete scene and files?", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete All", role: .destructive) {
+                if let scene = sceneToDelete {
+                    viewModel.deleteSceneWithFiles(scene: scene) { success in
+                        if success {
+                            // Scene is removed from viewModel.scenes via notification or manual filter
+                            viewModel.scenes.removeAll { $0.id == scene.id }
+                        }
+                    }
+                }
+            }
+        } message: {
+            if let scene = sceneToDelete {
+                Text("The scene '\(scene.title ?? "Unknown Title")' and all associated files will be permanently deleted. This action cannot be undone.")
             }
         }
     }
@@ -280,7 +305,22 @@ struct ReelsView: View {
             .scrollTargetLayout()
         }
         .scrollTargetBehavior(.paging)
-        .background(Color.black)
+        .onScrollGeometryChange(for: String?.self) { geo in
+            // Find the ID of the scene that is closest to the center or top of the visible area
+            let offsetY = geo.contentOffset.y
+            let height = geo.containerSize.height
+            if height > 0 {
+                let index = Int(round(offsetY / height))
+                if index >= 0 && index < viewModel.scenes.count {
+                    return viewModel.scenes[index].id
+                }
+            }
+            return nil
+        } action: { old, new in
+            if let newId = new {
+                currentVisibleSceneId = newId
+            }
+        }
         .background(Color.black)
         .ignoresSafeArea()
     }
@@ -609,7 +649,18 @@ struct ReelItemView: View {
                         .transition(.scale(scale: 0, anchor: .top).combined(with: .opacity))
                     }
                 }
-                .zIndex(10)
+                
+                // Mute Button
+                SidebarButton(
+                    icon: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                    label: isMuted ? "Muted" : "Mute",
+                    count: 0,
+                    hideCount: true,
+                    color: .white
+                ) {
+                    isMuted.toggle()
+                    resetUITimer()
+                }
 
                 // O-Counter (Manual)
                 SidebarButton(
@@ -881,6 +932,7 @@ struct SidebarButton: View {
     let icon: String
     let label: String
     let count: Int
+    var hideCount: Bool = false
     let color: Color
     var action: () -> Void
     
@@ -894,7 +946,7 @@ struct SidebarButton: View {
                 
                 // Fixed height container for the count to prevent shifting
                 ZStack {
-                    if count > 0 {
+                    if !hideCount && count > 0 {
                         Text("\(count)")
                             .font(.system(size: 10, weight: .heavy))
                             .foregroundColor(.white)

@@ -221,6 +221,14 @@ class StashDBViewModel: ObservableObject {
     @Published var currentGalleryImagePage: Int = 1
     var currentGalleryImageSortOption: ImageSortOption = .dateDesc
 
+    // Global Images
+    @Published var allImages: [StashImage] = []
+    @Published var totalImages: Int = 0
+    @Published var isLoadingImages: Bool = false
+    @Published var hasMoreImages: Bool = false
+    @Published var currentImagePage: Int = 1
+    var currentImageSortOption: ImageSortOption = .dateDesc
+
     // Image Sort Options
     enum ImageSortOption: String, CaseIterable {
         case titleAsc
@@ -2095,6 +2103,65 @@ class StashDBViewModel: ObservableObject {
         }
     }
     
+    func fetchImages(sortBy: ImageSortOption = .dateDesc, isInitialLoad: Bool = true) {
+        print("🖼️ fetchImages called, sortBy: \(sortBy.rawValue), isInitialLoad: \(isInitialLoad)")
+        
+        if isInitialLoad {
+            currentImagePage = 1
+            allImages = []
+            totalImages = 0
+            isLoadingImages = true
+        } else {
+            isLoadingImages = true
+        }
+        
+        currentImageSortOption = sortBy
+        let page = isInitialLoad ? 1 : currentImagePage + 1
+        
+        let query = GraphQLQueries.queryWithFragments("findImages")
+        
+        let variables: [String: Any] = [
+            "filter": [
+                "page": page,
+                "per_page": 40,
+                "sort": sortBy.sortField,
+                "direction": sortBy.direction
+            ]
+        ]
+        
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            return
+        }
+        
+        performGraphQLQuery(query: bodyString) { (response: GalleryImagesResponse?) in
+            if let result = response?.data?.findImages {
+                DispatchQueue.main.async {
+                    if isInitialLoad {
+                        self.allImages = result.images
+                        self.totalImages = result.count
+                    } else {
+                        self.allImages.append(contentsOf: result.images)
+                    }
+                    
+                    self.hasMoreImages = result.images.count == 40
+                    self.currentImagePage = page
+                    self.isLoadingImages = false
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.isLoadingImages = false
+                }
+            }
+        }
+    }
+    
+    func loadMoreImages() {
+        if !isLoadingImages && hasMoreImages {
+            fetchImages(sortBy: currentImageSortOption, isInitialLoad: false)
+        }
+    }
+    
     func deleteImage(imageId: String, completion: @escaping (Bool) -> Void) {
         let mutation = """
         {
@@ -2495,6 +2562,124 @@ struct GenerateData: Codable {
                 completion(false)
             }
         }
+    }
+}
+
+// MARK: - Scene Deletion
+extension StashDBViewModel {
+    func deleteSceneWithFiles(scene: Scene, completion: @escaping (Bool) -> Void) {
+        guard let config = ServerConfigManager.shared.loadConfig(),
+              config.hasValidConfig else {
+            completion(false)
+            return
+        }
+
+        let fileIds = scene.files?.compactMap { $0.id } ?? []
+        let sceneMutation = """
+        mutation {
+            sceneDestroy(input: { id: "\(scene.id)" })
+        }
+        """
+
+        let sceneRequestBody: [String: Any] = ["query": sceneMutation]
+
+        guard let url = URL(string: "\(config.baseURL)/graphql"),
+              let sceneJsonData = try? JSONSerialization.data(withJSONObject: sceneRequestBody) else {
+            completion(false)
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        if let apiKey = config.secureApiKey, !apiKey.isEmpty {
+            request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
+        }
+        
+        request.httpBody = sceneJsonData
+
+        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+            if let error = error {
+                print("❌ Network error during deletion: \(error.localizedDescription)")
+                DispatchQueue.main.async { completion(false) }
+                return
+            }
+
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                if let data = data {
+                    do {
+                        if let jsonResponse = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
+                            if let dataDict = jsonResponse["data"] as? [String: Any],
+                               dataDict["sceneDestroy"] != nil {
+                                
+                                if !fileIds.isEmpty {
+                                    self?.deleteSceneFiles(fileIds: fileIds, config: config) { success in
+                                        DispatchQueue.main.async {
+                                            if success {
+                                                NotificationCenter.default.post(name: NSNotification.Name("SceneDeleted"), object: nil, userInfo: ["sceneId": scene.id])
+                                            }
+                                            completion(success)
+                                        }
+                                    }
+                                } else {
+                                    DispatchQueue.main.async {
+                                        NotificationCenter.default.post(name: NSNotification.Name("SceneDeleted"), object: nil, userInfo: ["sceneId": scene.id])
+                                        completion(true)
+                                    }
+                                }
+                            } else {
+                                DispatchQueue.main.async { completion(false) }
+                            }
+                        }
+                    } catch {
+                        DispatchQueue.main.async { completion(false) }
+                    }
+                }
+            } else {
+                DispatchQueue.main.async { completion(false) }
+            }
+        }.resume()
+    }
+
+    private func deleteSceneFiles(fileIds: [String], config: ServerConfig, completion: @escaping (Bool) -> Void) {
+        let filesMutation = """
+        mutation DeleteFiles($ids: [ID!]!) {
+            deleteFiles(ids: $ids)
+        }
+        """
+
+        let variables: [String: Any] = ["ids": fileIds]
+        let requestBody: [String: Any] = ["query": filesMutation, "variables": variables]
+
+        guard let url = URL(string: "\(config.baseURL)/graphql"),
+              let jsonData = try? JSONSerialization.data(withJSONObject: requestBody) else {
+            completion(false)
+            return
+        }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        if let apiKey = config.secureApiKey, !apiKey.isEmpty {
+            request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
+        }
+        
+        request.httpBody = jsonData
+
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let _ = error {
+                DispatchQueue.main.async { completion(false) }
+                return
+            }
+
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
+                completion(true)
+            } else {
+                completion(false)
+            }
+        }.resume()
     }
 }
 
@@ -3199,7 +3384,17 @@ struct FindImagesResult: Codable {
 struct StashImage: Codable, Identifiable {
     let id: String
     let title: String?
+    // Add date property (ensure it exists in GraphQL fragment)
+    let date: String?
     let paths: ImagePaths?
+    let performers: [GalleryPerformer]?
+    let studio: GalleryStudio?
+    
+    var formattedDate: String {
+        guard let dateString = date else { return "" }
+        // Basic formatting: YYYY-MM-DD is usually standard from Stash
+        return dateString
+    }
     
     var thumbnailURL: URL? {
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
@@ -3241,10 +3436,20 @@ struct StashImage: Codable, Identifiable {
         }
         // Fallback to filename from image path
         if let imagePath = paths?.image {
-            return URL(fileURLWithPath: imagePath).lastPathComponent
+            // Strip query parameters for display (e.g. image?t=timestamp -> image)
+            let cleanPath = imagePath.components(separatedBy: "?").first ?? imagePath
+            return URL(fileURLWithPath: cleanPath).lastPathComponent
         }
         // Last resort: use ID
         return "Image \(id.prefix(8))"
+    }
+    
+    var fileExtension: String {
+        guard let path = paths?.image else { return "IMG" }
+        // Strip query params
+        let cleanPath = path.components(separatedBy: "?").first ?? path
+        let ext = URL(fileURLWithPath: cleanPath).pathExtension.uppercased()
+        return ext.isEmpty ? "IMG" : ext
     }
 }
 

@@ -14,6 +14,7 @@ struct CatalogsView: View {
     enum CatalogsTab: String, CaseIterable {
         case dashboard = "Dashboard"
         case scenes = "Scenes"
+        case images = "Images"
         case galleries = "Galleries"
         case performers = "Performers"
         case studios = "Studios"
@@ -23,6 +24,7 @@ struct CatalogsView: View {
             switch self {
             case .dashboard: return "chart.bar.fill"
             case .scenes: return "film"
+            case .images: return "photo"
             case .galleries: return "photo.stack"
             case .performers: return "person.3"
             case .studios: return "building.2"
@@ -35,7 +37,7 @@ struct CatalogsView: View {
         tabManager.tabs
             .filter { ($0.id == .dashboard || $0.id == .performers || $0.id == .studios || $0.id == .tags || $0.id == .scenes || $0.id == .galleries) && $0.isVisible }
             .sorted { $0.sortOrder < $1.sortOrder }
-            .compactMap { config in
+            .compactMap { (config: TabConfig) -> CatalogsTab? in
                 switch config.id {
                 case .dashboard: return .dashboard
                 case .scenes: return .scenes
@@ -45,6 +47,12 @@ struct CatalogsView: View {
                 case .tags: return .tags
                 default: return nil
                 }
+            }
+            .flatMap { (tab: CatalogsTab) -> [CatalogsTab] in
+                if tab == .galleries {
+                    return [.galleries, .images]
+                }
+                return [tab]
             }
     }
     
@@ -83,6 +91,8 @@ struct CatalogsView: View {
                     HomeView()
                 case .scenes:
                     ScenesView()
+                case .images:
+                    ImagesView()
                 case .galleries:
                     GalleriesView()
                 case .performers:

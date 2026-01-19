@@ -115,6 +115,13 @@ class NavigationCoordinator: ObservableObject {
         self.catalogueSubTab = "Galleries"
         self.selectedTab = .catalogue
     }
+    
+    func navigateToImages(search: String = "") {
+        self.activeSearchText = search
+        self.catalogueTabID = UUID()
+        self.catalogueSubTab = "Images"
+        self.selectedTab = .catalogue
+    }
 }
 
 // MARK: - SHARED UI COMPONENTS (Extracted for decluttering)

@@ -148,20 +148,22 @@ class ImageLoader: ObservableObject {
             return
         }
 
-        // Check cache first
-        if let cachedData = ImageCache.shared.data(forKey: url as NSURL) {
-            print("🖼️ CACHE HIT (Data): \(url.path)")
-            self.imageData = cachedData
-            if let uiImage = UIImage(data: cachedData) {
-                self.image = Image(uiImage: uiImage)
-            }
-            self.isLoading = false
-            return
-        }
-        
-        print("🖼️ CACHE MISS: \(url.path)")
-
         Task {
+            // Check cache on background thread
+            if let cachedData = ImageCache.shared.data(forKey: url as NSURL) {
+                // print("🖼️ CACHE HIT (Data): \(url.path)")
+                await MainActor.run {
+                    self.imageData = cachedData
+                    if let uiImage = UIImage(data: cachedData) {
+                        self.image = Image(uiImage: uiImage)
+                    }
+                    self.isLoading = false
+                }
+                return
+            }
+            
+            // print("🖼️ CACHE MISS: \(url.path)")
+
             do {
                 let data = try await loadImage(from: url)
                 await MainActor.run {

@@ -113,7 +113,7 @@ struct HomeStatisticsRowView: View {
                                         .onTapGesture { coordinator.navigateToGalleries() }
                                     // Binde images immer hinter galleries
                                     StatCard(title: "Images", value: formatCount(stats.imageCount), icon: "photo", color: .teal)
-                                        .onTapGesture { coordinator.navigateToGalleries() }
+                                        .onTapGesture { coordinator.navigateToImages() }
                                 case .performers:
                                     StatCard(title: "Performers", value: formatCount(stats.performerCount), icon: "person.2", color: .purple)
                                         .onTapGesture { coordinator.navigateToPerformers() }
