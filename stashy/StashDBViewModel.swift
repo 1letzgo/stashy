@@ -131,6 +131,9 @@ class StashDBViewModel: ObservableObject {
     @Published var homeRowScenes: [HomeRowType: [Scene]] = [:]
     @Published var homeRowLoadingState: [HomeRowType: Bool] = [:]
 
+    // Connection Status
+    @Published var isServerConnected: Bool = false
+
     // Data properties
     @Published var statistics: Statistics?
     @Published var scenes: [Scene] = []
@@ -504,9 +507,11 @@ class StashDBViewModel: ObservableObject {
         scenes = []
         performers = []
         studios = []
-        statistics = nil
-        performerScenes = []
-        studioScenes = []
+        galleries = []
+        homeRowScenes = [:]
+        isServerConnected = false
+        
+        // Reset PaginationScenes = []
         performerGalleries = []
         studioGalleries = []
         tags = []
@@ -710,7 +715,7 @@ class StashDBViewModel: ObservableObject {
         request.timeoutInterval = 15 // 15 Seconds Timeout - consistent with GraphQLClient
         
         // Add API Key if available
-        if let apiKey = customConfig.apiKey, !apiKey.isEmpty {
+        if let apiKey = customConfig.secureApiKey, !apiKey.isEmpty {
             request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
             print("📱 API Key wird verwendet (erste 8 Zeichen): \(String(apiKey.prefix(8)))...")
         }
@@ -740,8 +745,11 @@ class StashDBViewModel: ObservableObject {
                     // Handle Timeout specifically
                     if let urlError = error as? URLError, urlError.code == .timedOut {
                          self?.serverStatus = "Not connected (Timeout)"
+                         self?.isServerConnected = false
                          self?.errorMessage = "Connection timed out after 5 seconds."
                     } else {
+                        print("❌ Connection Error: \(error.localizedDescription)")
+                        self?.isServerConnected = false
                         self?.handleError(error)
                     }
                 }
@@ -750,6 +758,7 @@ class StashDBViewModel: ObservableObject {
                 let version = response.data?.version.version ?? "Unknown"
                 print("📱 Version erhalten: \(version)")
                 self?.serverStatus = "Connected - Version: \(version)"
+                self?.isServerConnected = true
                 self?.errorMessage = nil // Clear error on success
             }
             .store(in: &cancellables)
@@ -921,28 +930,41 @@ class StashDBViewModel: ObservableObject {
             sortDirection = option.direction
         }
         
+        // Check for Default Dashboard Filter
+        // Check for Default Dashboard Filter
+        if let filterId = TabManager.shared.getDefaultFilterId(for: .dashboard),
+           let savedFilter = savedFilters[filterId] {
+            // Apply saved filter criteria
+            if let criteria = savedFilter.filterDict {
+                 // Clean up criteria to ensure we don't have conflicting sorts? 
+                 // We use sanitizeFilter to handle compatibility (e.g. orientation without modifier)
+                 let sanitized = sanitizeFilter(criteria)
+                 
+                 for (key, value) in sanitized {
+                     if key == "sort" || key == "direction" { continue } // Skip sort from filter, use row logic
+                     sceneFilter[key] = value
+                 }
+            }
+        } else {
+            // Fallback debugging log (optional, remove later)
+             // print("ℹ️ No default dashboard filter set")
+        }
+        
         switch config.type {
         case .lastPlayed:
             setSort(.lastPlayedAtDesc)
-            sceneFilter["duration"] = ["value": 180, "modifier": "GREATER_THAN"]
         case .lastAdded3Min:
             setSort(.createdAtDesc)
-            sceneFilter["duration"] = ["value": 180, "modifier": "GREATER_THAN"]
         case .newest3Min:
             setSort(.dateDesc)
-            sceneFilter["duration"] = ["value": 180, "modifier": "GREATER_THAN"]
         case .mostViewed3Min:
             setSort(.playCountDesc)
-            sceneFilter["duration"] = ["value": 180, "modifier": "GREATER_THAN"]
         case .topCounter3Min:
             setSort(.oCounterDesc)
-            sceneFilter["duration"] = ["value": 180, "modifier": "GREATER_THAN"]
         case .topRating3Min:
             setSort(.ratingDesc)
-            sceneFilter["duration"] = ["value": 180, "modifier": "GREATER_THAN"]
         case .random:
             setSort(.random)
-            sceneFilter["duration"] = ["value": 180, "modifier": "GREATER_THAN"]
         case .statistics:
             homeRowLoadingState[rowType] = false
             completion([])

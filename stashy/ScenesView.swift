@@ -367,6 +367,18 @@ struct ScenesView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
             performSearch()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
+            if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.scenes.rawValue {
+                // Determine new filter
+                if let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes),
+                   let newFilter = viewModel.savedFilters[defaultId] {
+                    selectedFilter = newFilter
+                } else {
+                    selectedFilter = nil
+                }
+                performSearch()
+            }
+        }
         .onChange(of: viewModel.savedFilters) { oldValue, newValue in
             // CRITICAL: Check coordinator FIRST - filters may load before onAppear runs!
             if let injectedSortStr = coordinator.activeSortOption,

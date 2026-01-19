@@ -454,6 +454,13 @@ class TabManager: ObservableObject {
             tabs[index].defaultFilterId = filterId
             tabs[index].defaultFilterName = filterName
             saveConfig()
+            
+            // Notify listeners that the default filter has changed
+            NotificationCenter.default.post(
+                name: NSNotification.Name("DefaultFilterChanged"),
+                object: nil,
+                userInfo: ["tab": tab.id]
+            )
         }
     }
     

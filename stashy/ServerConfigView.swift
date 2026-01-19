@@ -149,7 +149,7 @@ struct ServerConfigView: View {
                         server: server,
                         viewModel: viewModel,
                         isActive: configManager.activeConfig?.id == server.id,
-                        isConnected: configManager.activeConfig?.id == server.id && viewModel.serverStatus.contains("Connected"),
+                        isConnected: configManager.activeConfig?.id == server.id && viewModel.isServerConnected,
                         isScanning: isScanningLibrary,
                         onConnect: {
                             configManager.saveConfig(server)
@@ -264,6 +264,7 @@ struct ServerListRow: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                             .lineLimit(1)
+                            .minimumScaleFactor(0.8)
                             .truncationMode(.middle)
                     }
                     Spacer()
@@ -339,6 +340,7 @@ struct ServerFormView: View {
                     }
                 }
                 .pickerStyle(.segmented)
+                .disabled(configToEdit != nil) // Prevent changing type for existing server
                 
                 if connectionType == .ipAddress {
                     HStack {
@@ -741,6 +743,7 @@ struct TabDefaultFilterView: View {
     var body: some View {
         List {
             Section {
+                filterPicker(for: .dashboard, title: "Dashboard", icon: "chart.bar.fill")
                 filterPicker(for: .scenes, title: "Scenes", icon: "film")
                 filterPicker(for: .reels, title: "StashTok", icon: "play.rectangle.on.rectangle")
                 filterPicker(for: .galleries, title: "Galleries", icon: "photo.stack")
@@ -772,7 +775,7 @@ struct TabDefaultFilterView: View {
     private func filterPicker(for tab: AppTab, title: String, icon: String) -> some View {
         let mode: StashDBViewModel.FilterMode? = {
             switch tab {
-            case .scenes, .reels: return .scenes
+            case .scenes, .reels, .dashboard: return .scenes
             case .performers: return .performers
             case .studios: return .studios
             case .galleries: return .galleries
@@ -938,7 +941,7 @@ struct ServerDetailView: View {
                         Text("Status")
                         Spacer()
                         Text(viewModel.serverStatus)
-                            .foregroundColor(viewModel.serverStatus.contains("Verbunden") ? .green : .red)
+                            .foregroundColor(viewModel.isServerConnected ? .green : .red)
                     }
                 }
             }
@@ -996,7 +999,7 @@ struct ServerDetailView: View {
             .presentationDetents([.medium, .large])
         }
         .toolbar {
-            if isActive && viewModel.serverStatus.contains("Verbunden") {
+            if isActive && viewModel.isServerConnected {
                 ToolbarItem(placement: .navigationBarTrailing) {
                     Image(systemName: "circle.fill")
                         .foregroundColor(.green)

@@ -53,11 +53,13 @@ struct HomeView: View {
         .onAppear {
             if configManager.activeConfig != nil {
                 viewModel.fetchStatistics()
+                viewModel.fetchSavedFilters() // Fetch filters so dashboard rows can use them
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
             // Reload data when server config changes (e.g., after wizard setup)
             viewModel.fetchStatistics()
+            viewModel.fetchSavedFilters()
         }
         // Scene Update Listeners - update home row scenes in place
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneResumeTimeUpdated"))) { notification in
@@ -69,6 +71,15 @@ struct HomeView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneDeleted"))) { notification in
             if let sceneId = notification.userInfo?["sceneId"] as? String {
                 viewModel.removeScene(id: sceneId)
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
+            if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.dashboard.rawValue {
+                // Reload dashboard if its filter changed
+                viewModel.fetchStatistics()
+                viewModel.fetchSavedFilters() // Ensure filter dict is up to date
+                // We might need to force reload cached rows too
+                // For now, fetching stats should be enough if rows are reactive
             }
         }
     }
@@ -149,7 +160,7 @@ struct HomeStatisticsRowView: View {
                     // Error state
                     HStack {
                         Image(systemName: "exclamationmark.triangle")
-                            .foregroundColor(.secondary)
+                        .foregroundColor(.secondary)
                         Text("Stats unavailable")
                             .font(.caption)
                             .foregroundColor(.secondary)
@@ -296,6 +307,37 @@ struct HomeRowView: View {
             }
         }
         .onAppear {
+            checkAndLoadScenes()
+        }
+        .onChange(of: viewModel.savedFilters) { _, newValue in
+            // If we were waiting for a dashboard filter, and it just arrived, load now
+            if let filterId = TabManager.shared.getDefaultFilterId(for: .dashboard) {
+                if newValue[filterId] != nil {
+                    // Filter loaded!
+                    loadScenes()
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
+            if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.dashboard.rawValue {
+                // Force reload this row by clearing cache first
+                viewModel.homeRowScenes[config.type] = nil
+                checkAndLoadScenes()
+            }
+        }
+    }
+    
+    private func checkAndLoadScenes() {
+        // If a default filter is set but not loaded yet, wait.
+        if let filterId = TabManager.shared.getDefaultFilterId(for: .dashboard) {
+            if viewModel.savedFilters[filterId] != nil {
+                loadScenes()
+            } else {
+                // Filter set but not loaded. Do nothing, wait for onChange.
+                print("⏳ HomeRowView: Waiting for dashboard filter \(filterId) to load...")
+            }
+        } else {
+            // No filter set based on ID, load immediately (standard logic)
             loadScenes()
         }
     }
