@@ -2550,6 +2550,64 @@ struct GenerateData: Codable {
         }
     }
     
+    func createSceneMarker(sceneId: String, title: String, seconds: Double, primaryTagId: String, completion: @escaping (Bool) -> Void) {
+        let mutation = """
+        mutation SceneMarkerCreate($input: SceneMarkerCreateInput!) {
+            sceneMarkerCreate(input: $input) {
+                id
+                title
+                seconds
+            }
+        }
+        """
+        
+        let variables: [String: Any] = [
+            "input": [
+                "scene_id": sceneId,
+                "title": title,
+                "seconds": seconds,
+                "primary_tag_id": primaryTagId
+            ]
+        ]
+        
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false)
+            return
+        }
+        
+        performGraphQLQuery(query: bodyString) { (response: SceneMarkerCreateResponse?) in
+            if response?.data?.sceneMarkerCreate != nil {
+                completion(true)
+            } else {
+                completion(false)
+            }
+        }
+    }
+    
+    func fetchAllTags(completion: @escaping ([Tag]) -> Void) {
+        let query = GraphQLQueries.queryWithFragments("findTags")
+        
+        let variables: [String: Any] = [
+            "filter": [
+                "per_page": 1000,
+                "sort": "scenes_count",
+                "direction": "DESC"
+            ],
+            "tag_filter": [:]
+        ]
+        
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion([])
+            return
+        }
+        
+        performGraphQLQuery(query: bodyString) { (response: TagsResponse?) in
+            completion(response?.data?.findTags.tags ?? [])
+        }
+    }
+    
     func togglePerformerFavorite(performerId: String, favorite: Bool, completion: @escaping (Bool) -> Void) {
         let mutation = """
         mutation PerformerUpdate($input: PerformerUpdateInput!) {
@@ -2741,6 +2799,13 @@ struct ImageDestroyResponse: Codable {
 
 struct ImageDestroyData: Codable {
     let imageDestroy: Bool
+}
+
+struct SceneMarkerCreateResponse: Codable {
+    let data: SceneMarkerCreateData?
+}
+struct SceneMarkerCreateData: Codable {
+    let sceneMarkerCreate: SceneMarker?
 }
 
 struct SceneUpdateResponse: Codable {

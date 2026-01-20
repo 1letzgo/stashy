@@ -32,6 +32,8 @@ struct SceneDetailView: View {
     @State private var showingPaywall = false
     @State private var isMuted = !isHeadphonesConnected()
     @State private var hasAddedPlay = false
+    @State private var showingAddMarkerSheet = false
+    @State private var capturedMarkerTime: Double = 0
     private let timer = Timer.publish(every: 10, on: .main, in: .common).autoconnect()
     
     // Preview Video State
@@ -238,50 +240,73 @@ struct SceneDetailView: View {
                 
                 Spacer()
                 
-                VStack(alignment: .trailing, spacing: 12) {
-                    StarRatingView(
-                        rating100: activeScene.rating100,
-                        isInteractive: true,
-                        size: 16,
-                        spacing: 2
-                    ) { newRating in
-                        viewModel.updateSceneRating(sceneId: activeScene.id, rating100: newRating) { success in
-                            if success {
-                                DispatchQueue.main.async {
-                                    var updatedScene = self.activeScene
-                                    updatedScene = updatedScene.withRating(newRating)
-                                    self.activeScene = updatedScene
+                    VStack(alignment: .trailing, spacing: 12) {
+                        StarRatingView(
+                            rating100: activeScene.rating100,
+                            isInteractive: true,
+                            size: 16,
+                            spacing: 2
+                        ) { newRating in
+                            viewModel.updateSceneRating(sceneId: activeScene.id, rating100: newRating) { success in
+                                if success {
+                                    DispatchQueue.main.async {
+                                        var updatedScene = self.activeScene
+                                        updatedScene = updatedScene.withRating(newRating)
+                                        self.activeScene = updatedScene
+                                    }
                                 }
                             }
                         }
-                    }
-                    
-                    // O-Counter (Manual)
-                    Button(action: {
-                        viewModel.incrementOCounter(sceneId: activeScene.id) { newCount in
-                            if let count = newCount {
-                                DispatchQueue.main.async {
-                                    self.activeScene = self.activeScene.withOCounter(count)
+                        
+                        HStack(spacing: 8) {
+                            // Add Marker Button
+                            Button(action: {
+                                capturedMarkerTime = player?.currentTime().seconds ?? 0
+                                showingAddMarkerSheet = true
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "plus.square.fill.on.square.fill")
+                                        .font(.caption)
+                                        .foregroundColor(appearanceManager.tintColor)
+                                    Text("Marker")
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.primary)
                                 }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(appearanceManager.tintColor.opacity(0.1))
+                                .clipShape(Capsule())
                             }
+                            .buttonStyle(.plain)
+                            
+                            // O-Counter (Manual)
+                            Button(action: {
+                                viewModel.incrementOCounter(sceneId: activeScene.id) { newCount in
+                                    if let count = newCount {
+                                        DispatchQueue.main.async {
+                                            self.activeScene = self.activeScene.withOCounter(count)
+                                        }
+                                    }
+                                }
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "heart.fill")
+                                        .font(.caption)
+                                        .foregroundColor(.red)
+                                    Text("\(activeScene.oCounter ?? 0)")
+                                        .font(.caption)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.primary)
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.red.opacity(0.1))
+                                .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
                         }
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "heart.fill")
-                                .font(.caption)
-                                .foregroundColor(.red)
-                            Text("\(activeScene.oCounter ?? 0)")
-                                .font(.caption)
-                                .fontWeight(.bold)
-                                .foregroundColor(.primary)
-                        }
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.red.opacity(0.1))
-                        .clipShape(Capsule())
                     }
-                    .buttonStyle(.plain)
-                }
             }
             
             // Metadata Line
@@ -747,6 +772,18 @@ struct SceneDetailView: View {
         } message: {
             Text("The scene '\(activeScene.title ?? "Unknown Title")' and all associated files will be permanently deleted. This action cannot be undone.")
         }
+        .sheet(isPresented: $showingAddMarkerSheet) {
+            AddMarkerSheet(sceneId: activeScene.id, seconds: capturedMarkerTime, viewModel: viewModel) {
+                // Refresh scene details to show the new marker
+                viewModel.fetchSceneDetails(sceneId: activeScene.id) { updatedScene in
+                    if let updated = updatedScene {
+                        DispatchQueue.main.async {
+                            self.activeScene = updated
+                        }
+                    }
+                }
+            }
+        }
         .onAppear {
             // Ensure state is reset when view appears
             print("🔍 Scene Data (Initial): ID=\(activeScene.id), PlayCount=\(activeScene.playCount ?? -1), ResumeTime=\(activeScene.resumeTime ?? -1)")
@@ -1018,3 +1055,131 @@ struct WrappedHStack<Data: RandomAccessCollection, Content: View>: View where Da
     }
 }
 
+
+struct AddMarkerSheet: View {
+    let sceneId: String
+    let seconds: Double
+    @ObservedObject var viewModel: StashDBViewModel
+    var onComplete: () -> Void
+    @Environment(\.dismiss) var dismiss
+    @ObservedObject var appearanceManager = AppearanceManager.shared
+    
+    @State private var title: String = ""
+    @State private var primaryTagId: String = ""
+    @State private var tags: [Tag] = []
+    @State private var searchText: String = ""
+    @State private var isCreating = false
+    @State private var isLoadingTags = false
+    
+    var filteredTags: [Tag] {
+        if searchText.isEmpty {
+            return tags
+        } else {
+            return tags.filter { $0.name.lowercased().contains(searchText.lowercased()) }
+        }
+    }
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Marker Details")) {
+                    TextField("Name", text: $title)
+                    Text("Time: \(formatTime(seconds))")
+                        .foregroundColor(.secondary)
+                }
+                
+                Section(header: Text("Primary Tag")) {
+                    TextField("Search Tags...", text: $searchText)
+                    
+                    if isLoadingTags {
+                        HStack {
+                            Spacer()
+                            ProgressView("Loading tags...")
+                            Spacer()
+                        }
+                        .padding()
+                    } else if tags.isEmpty {
+                        Text("No tags found on server")
+                            .foregroundColor(.secondary)
+                            .padding()
+                    } else {
+                        ForEach(filteredTags.prefix(20), id: \.id) { tag in
+                            HStack {
+                                Text(tag.name)
+                                if let count = tag.sceneCount {
+                                    Spacer()
+                                    Text("\(count)")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                
+                                if primaryTagId == tag.id {
+                                    Image(systemName: "checkmark")
+                                        .foregroundColor(appearanceManager.tintColor)
+                                }
+                            }
+                            .contentShape(Rectangle())
+                            .onTapGesture {
+                                primaryTagId = tag.id
+                            }
+                        }
+                        
+                        if filteredTags.count > 20 {
+                            Text("Type more to refine search...")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else if !searchText.isEmpty && filteredTags.isEmpty {
+                            Text("No tags match '\(searchText)'")
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+            .navigationTitle("Add Marker")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") {
+                        dismiss()
+                    }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Add") {
+                        createMarker()
+                    }
+                    .disabled(title.isEmpty || primaryTagId.isEmpty || isCreating)
+                }
+            }
+            .onAppear {
+                isLoadingTags = true
+                viewModel.fetchAllTags { fetchedTags in
+                    DispatchQueue.main.async {
+                        self.tags = fetchedTags
+                        self.isLoadingTags = false
+                    }
+                }
+            }
+        }
+    }
+    
+    private func createMarker() {
+        isCreating = true
+        viewModel.createSceneMarker(sceneId: sceneId, title: title, seconds: seconds, primaryTagId: primaryTagId) { success in
+            DispatchQueue.main.async {
+                isCreating = false
+                if success {
+                    onComplete()
+                    dismiss()
+                }
+            }
+        }
+    }
+    
+    private func formatTime(_ seconds: Double) -> String {
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.hour, .minute, .second]
+        formatter.unitsStyle = .positional
+        formatter.zeroFormattingBehavior = .pad
+        return formatter.string(from: seconds) ?? "00:00"
+    }
+}

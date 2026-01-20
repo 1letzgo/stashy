@@ -101,9 +101,6 @@ struct ImagesView: View {
     
     @ViewBuilder
     private func imageCell(_ image: StashImage) -> some View {
-        // Calculate index safely
-        let index = displayedImages.firstIndex(where: { $0.id == image.id }) ?? 0
-        
         NavigationLink(destination: FullScreenImageView(images: Binding(
             get: { displayedImages },
             set: { _ in } // images are generally read-only from this view

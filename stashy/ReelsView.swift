@@ -138,17 +138,38 @@ struct ReelsView: View {
         .onAppear {
             viewModel.fetchSavedFilters()
             
-            // Check for pre-selected filters from coordinator
+            // 1. High Priority: Coordinator Pre-selection
             if let performer = coordinator.reelsPerformer {
                 let tags = coordinator.reelsTags
                 coordinator.reelsPerformer = nil
                 coordinator.reelsTags = []
                 applySettings(sortBy: selectedSortOption, filter: nil, performer: performer, tags: tags)
-            } else if !coordinator.reelsTags.isEmpty {
+                return
+            } 
+            
+            if !coordinator.reelsTags.isEmpty {
                 let tags = coordinator.reelsTags
                 coordinator.reelsTags = []
                 applySettings(sortBy: selectedSortOption, filter: nil, performer: nil, tags: tags)
-            } else if viewModel.scenes.isEmpty {
+                return
+            }
+            
+            // 2. Middle Priority: Default Filter
+            if let defaultId = TabManager.shared.getDefaultFilterId(for: .reels) {
+                if let filter = viewModel.savedFilters[defaultId] {
+                    // Already loaded, apply if no filter is currently active
+                    if selectedFilter == nil {
+                        applySettings(sortBy: selectedSortOption, filter: filter, performer: nil, tags: [])
+                    }
+                    return
+                }
+                // Not yet loaded, wait for onChange(of: viewModel.savedFilters)
+                return
+            }
+            
+            // 3. Low Priority: Fallback generic load
+            // Only if we have no scenes and no special configuration
+            if viewModel.scenes.isEmpty {
                 let savedSort = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
                 applySettings(sortBy: savedSort, filter: nil, performer: nil, tags: []) 
             }
@@ -583,7 +604,6 @@ struct ReelItemView: View {
     @State private var isSeeking = false
     @State private var timeObserver: Any?
     @State private var showRatingOverlay = false
-    @State private var showTags = false
     @State private var showUI = true
     @State private var uiHideTask: Task<Void, Never>? = nil
     
@@ -717,28 +737,13 @@ struct ReelItemView: View {
                     // Views are automatic
                 }
 
-                // Tag Toggle
-                SidebarButton(
-                    icon: "number",
-                    label: "Tags",
-                    count: scene.tags?.count ?? 0,
-                    color: (scene.tags?.count ?? 0) > 0 ? .white : .white.opacity(0.3)
-                ) {
-                    if (scene.tags?.count ?? 0) > 0 {
-                        withAnimation(.spring()) {
-                            showTags.toggle()
-                        }
-                        resetUITimer()
-                    }
-                }
-                .disabled((scene.tags?.count ?? 0) == 0)
                 
                 Spacer()
                     .frame(height: 0)
             }
             .frame(maxWidth: .infinity, alignment: .bottomTrailing)
             .padding(.trailing, 12)
-            .padding(.bottom, 145)
+            .padding(.bottom, 125) // Moved 5px higher
             .opacity(showUI ? 1 : 0)
             .animation(.easeInOut(duration: 0.3), value: showUI)
             
@@ -773,8 +778,8 @@ struct ReelItemView: View {
                             .lineLimit(1)
                     }
                     
-                    // Row 2: Tags (Scrollable) in Dark Pills - Toggleable
-                    if showTags, let tags = scene.tags, !tags.isEmpty {
+                    // Row 2: Tags (Scrollable) in Dark Pills
+                    if let tags = scene.tags, !tags.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
                                 ForEach(tags) { tag in
@@ -798,6 +803,8 @@ struct ReelItemView: View {
                     }
                 }
                 .padding(.horizontal)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .offset(y: 10) // Move name and hashtags 10px lower
                 
                 Slider(value: Binding(get: { currentTime }, set: { val in
                     currentTime = val
@@ -812,8 +819,11 @@ struct ReelItemView: View {
                     }
                 })
             .accentColor(.white)
+            .offset(y: 5)
             .onAppear {
-                 UISlider.appearance().thumbTintColor = .white
+                 let emptyImage = UIImage()
+                 UISlider.appearance().setThumbImage(emptyImage, for: .normal)
+                 UISlider.appearance().setThumbImage(emptyImage, for: .highlighted)
                  UISlider.appearance().maximumTrackTintColor = .white.withAlphaComponent(0.4)
             }
         }
