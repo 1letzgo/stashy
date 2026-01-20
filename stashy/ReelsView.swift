@@ -13,6 +13,7 @@ struct ReelsView: View {
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @ObservedObject private var store = SubscriptionManager.shared
+    @EnvironmentObject var coordinator: NavigationCoordinator
     @State private var showingPaywall = false
     @State private var selectedSortOption: StashDBViewModel.SceneSortOption = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
@@ -132,76 +133,22 @@ struct ReelsView: View {
         )
         .toolbarColorScheme(.dark, for: .navigationBar, .tabBar)
         .toolbar {
-            if let currentId = currentVisibleSceneId, let scene = viewModel.scenes.first(where: { $0.id == currentId }) {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button(role: .destructive) {
-                        sceneToDelete = scene
-                        showDeleteConfirmation = true
-                    } label: {
-                        Image(systemName: "trash")
-                            .foregroundColor(.red)
-                    }
-                }
-            }
-            
-            if !(viewModel.scenes.isEmpty && viewModel.errorMessage != nil) {
-                ToolbarItem(placement: .principal) {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            if let performer = selectedPerformer {
-                                Button(action: {
-                                    applySettings(sortBy: selectedSortOption, filter: selectedFilter, performer: nil, tags: selectedTags)
-                                }) {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "xmark")
-                                            .font(.system(size: 10, weight: .bold))
-                                        Text(performer.name)
-                                            .font(.system(size: 12, weight: .bold))
-                                            .lineLimit(1)
-                                    }
-                                    .foregroundColor(.white.opacity(0.9))
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 8)
-                                    .background(Color.black.opacity(0.6))
-                                    .clipShape(Capsule())
-                                }
-                            }
-                            
-                            ForEach(selectedTags) { tag in
-                                Button(action: {
-                                    var newTags = selectedTags
-                                    newTags.removeAll { $0.id == tag.id }
-                                    applySettings(sortBy: selectedSortOption, filter: selectedFilter, performer: selectedPerformer, tags: newTags)
-                                }) {
-                                    HStack(spacing: 4) {
-                                        Image(systemName: "xmark")
-                                            .font(.system(size: 10, weight: .bold))
-                                        Text("#\(tag.name)")
-                                            .font(.system(size: 12, weight: .bold))
-                                            .lineLimit(1)
-                                    }
-                                    .foregroundColor(.white.opacity(0.9))
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 8)
-                                    .background(Color.black.opacity(0.6))
-                                    .clipShape(Capsule())
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            
-            ToolbarItem(placement: .navigationBarTrailing) {
-                HStack(spacing: 12) {
-                    sortMenu
-                    filterMenu
-                }
-            }
+            reelsToolbar
         }
         .onAppear {
             viewModel.fetchSavedFilters()
-            if viewModel.scenes.isEmpty {
+            
+            // Check for pre-selected filters from coordinator
+            if let performer = coordinator.reelsPerformer {
+                let tags = coordinator.reelsTags
+                coordinator.reelsPerformer = nil
+                coordinator.reelsTags = []
+                applySettings(sortBy: selectedSortOption, filter: nil, performer: performer, tags: tags)
+            } else if !coordinator.reelsTags.isEmpty {
+                let tags = coordinator.reelsTags
+                coordinator.reelsTags = []
+                applySettings(sortBy: selectedSortOption, filter: nil, performer: nil, tags: tags)
+            } else if viewModel.scenes.isEmpty {
                 let savedSort = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
                 applySettings(sortBy: savedSort, filter: nil, performer: nil, tags: []) 
             }
@@ -323,6 +270,76 @@ struct ReelsView: View {
         }
         .background(Color.black)
         .ignoresSafeArea()
+    }
+
+    @ToolbarContentBuilder
+    private var reelsToolbar: some ToolbarContent {
+        if let currentId = currentVisibleSceneId, let scene = viewModel.scenes.first(where: { $0.id == currentId }) {
+            ToolbarItem(placement: .navigationBarLeading) {
+                Button(role: .destructive) {
+                    sceneToDelete = scene
+                    showDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                        .foregroundColor(.red)
+                }
+            }
+        }
+        
+        if !(viewModel.scenes.isEmpty && viewModel.errorMessage != nil) {
+            ToolbarItem(placement: .principal) {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        if let performer = selectedPerformer {
+                            Button(action: {
+                                applySettings(sortBy: selectedSortOption, filter: selectedFilter, performer: nil, tags: selectedTags)
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 10, weight: .bold))
+                                    Text(performer.name)
+                                        .font(.system(size: 12, weight: .bold))
+                                        .lineLimit(1)
+                                }
+                                .foregroundColor(.white.opacity(0.9))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(Color.black.opacity(0.6))
+                                .clipShape(Capsule())
+                            }
+                        }
+                        
+                        ForEach(selectedTags) { tag in
+                            Button(action: {
+                                var newTags = selectedTags
+                                newTags.removeAll { $0.id == tag.id }
+                                applySettings(sortBy: selectedSortOption, filter: selectedFilter, performer: selectedPerformer, tags: newTags)
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 10, weight: .bold))
+                                    Text("#\(tag.name)")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .lineLimit(1)
+                                }
+                                .foregroundColor(.white.opacity(0.9))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(Color.black.opacity(0.6))
+                                .clipShape(Capsule())
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        
+        ToolbarItem(placement: .navigationBarTrailing) {
+            HStack(spacing: 12) {
+                sortMenu
+                filterMenu
+            }
+        }
     }
 
     private var filterColor: Color {

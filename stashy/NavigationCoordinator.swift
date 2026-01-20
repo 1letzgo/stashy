@@ -18,6 +18,10 @@ class NavigationCoordinator: ObservableObject {
     var performerToOpen: Performer?
     @Published var studioToOpen: Studio?
     
+    // Reels Selection
+    @Published var reelsPerformer: ScenePerformer?
+    @Published var reelsTags: [Tag] = []
+    
     // IDs to force reset of navigation stacks
     @Published var homeTabID = UUID()
     @Published var performersTabID = UUID()
@@ -121,6 +125,14 @@ class NavigationCoordinator: ObservableObject {
         self.catalogueTabID = UUID()
         self.catalogueSubTab = "Images"
         self.selectedTab = .catalogue
+    }
+    
+    func navigateToReels(performer: ScenePerformer? = nil, tags: [Tag] = []) {
+        self.reelsPerformer = performer
+        self.reelsTags = tags
+        
+        self.reelsTabID = UUID() // Force reset stack if needed
+        self.selectedTab = .reels
     }
 }
 

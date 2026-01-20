@@ -9,6 +9,7 @@ import SwiftUI
 
 struct TagsView: View {
     @StateObject private var viewModel = StashDBViewModel()
+    @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
     @State private var selectedSortOption: StashDBViewModel.TagSortOption = StashDBViewModel.TagSortOption(rawValue: TabManager.shared.getSortOption(for: .tags) ?? "") ?? .sceneCountDesc
@@ -219,7 +220,7 @@ struct TagsView: View {
                         }
                     } label: {
                         Image(systemName: "arrow.up.arrow.down.circle")
-                            .foregroundColor(.appAccent)
+                            .foregroundColor(appearanceManager.tintColor)
                     }
 
                     // Filter Menu
@@ -255,7 +256,7 @@ struct TagsView: View {
                         }
                     } label: {
                         Image(systemName: selectedFilter != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                            .foregroundColor(selectedFilter != nil ? .appAccent : .primary)
+                            .foregroundColor(selectedFilter != nil ? appearanceManager.tintColor : .primary)
                     }
                 }
             }
@@ -342,13 +343,14 @@ struct TagsView: View {
 // Simple Card View for a Tag
 struct TagCardView: View {
     let tag: Tag
+    @ObservedObject var appearanceManager = AppearanceManager.shared
     
     var body: some View {
         HStack(spacing: 12) {
             // Count Box (Square, flush left, top, bottom)
             if let count = tag.sceneCount {
                  ZStack {
-                     Color.appAccent
+                     appearanceManager.tintColor
                      
                      Text("\(count)")
                         .font(.system(size: 12, weight: .bold))
@@ -383,7 +385,10 @@ struct TagCardView: View {
 
 struct TagDetailView: View {
     let selectedTag: Tag
+    @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject var configManager = ServerConfigManager.shared
     @StateObject private var viewModel = StashDBViewModel()
+    @EnvironmentObject var coordinator: NavigationCoordinator
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedSortOption: StashDBViewModel.SceneSortOption = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getDetailSortOption(for: "tag_detail") ?? "") ?? .dateDesc
     @State private var isChangingSort = false
@@ -443,7 +448,7 @@ struct TagDetailView: View {
                             .fontWeight(.semibold)
                     }
                     .buttonStyle(.borderedProminent)
-                    .tint(.appAccent)
+                    .tint(appearanceManager.tintColor)
                 }
             } else {
                 ScrollView {
@@ -453,7 +458,7 @@ struct TagDetailView: View {
                             HStack(alignment: .top, spacing: 16) {
                                 // Brown square with #
                                 Rectangle()
-                                    .fill(Color.appAccent)
+                                    .fill(appearanceManager.tintColor)
                                     .frame(width: 80, height: 80)
                                     .clipShape(RoundedRectangle(cornerRadius: 12))
                                     .overlay(
@@ -463,17 +468,38 @@ struct TagDetailView: View {
                                     )
                                 
                                 VStack(alignment: .leading, spacing: 6) {
-                                    Text(selectedTag.name)
-                                        .font(.title2)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.primary)
-                                        .lineLimit(2)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                    HStack(alignment: .top, spacing: 8) {
+                                        Text(selectedTag.name)
+                                            .font(.title2)
+                                            .fontWeight(.bold)
+                                            .foregroundColor(.primary)
+                                            .lineLimit(2)
+                                        
+                                        Spacer()
+                                        
+                                        // StashTok Button (Top Right)
+                                        Button(action: {
+                                            coordinator.navigateToReels(tags: [selectedTag])
+                                        }) {
+                                            HStack(spacing: 4) {
+                                                Image(systemName: "play.square.stack")
+                                                    .font(.system(size: 10, weight: .bold))
+                                                Text("StashTok")
+                                                    .font(.system(size: 8, weight: .bold))
+                                            }
+                                            .foregroundColor(configManager.activeConfig != nil ? appearanceManager.tintColor : .white)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 3)
+                                            .background(appearanceManager.tintColor.opacity(0.1))
+                                            .clipShape(Capsule())
+                                        }
+                                    }
+                                    .frame(maxWidth: .infinity, alignment: .topLeading)
                                     
                                     HStack(spacing: 6) {
                                         Image(systemName: "film")
                                             .font(.subheadline)
-                                            .foregroundColor(.appAccent)
+                                            .foregroundColor(appearanceManager.tintColor)
                                         
                                         Text("\(selectedTag.sceneCount ?? viewModel.tagScenes.count) Scenes")
                                             .font(.subheadline)
@@ -538,7 +564,7 @@ struct TagDetailView: View {
                         }
                     } label: {
                         Image(systemName: isFavorite ? "heart.fill" : "heart")
-                            .foregroundColor(isFavorite ? .red : .appAccent)
+                            .foregroundColor(isFavorite ? .red : appearanceManager.tintColor)
                     }
 
                     Menu {
@@ -556,7 +582,7 @@ struct TagDetailView: View {
                         }
                     } label: {
                         Image(systemName: "arrow.up.arrow.down")
-                            .foregroundColor(.appAccent)
+                            .foregroundColor(appearanceManager.tintColor)
                     }
                 }
             }

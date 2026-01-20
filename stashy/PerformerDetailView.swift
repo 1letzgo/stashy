@@ -12,6 +12,7 @@ struct PerformerDetailView: View {
     let performer: Performer
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @StateObject private var viewModel = StashDBViewModel()
+    @EnvironmentObject var coordinator: NavigationCoordinator
     @State private var refreshTrigger = UUID()
     @State private var isHeaderExpanded = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -311,6 +312,24 @@ struct PerformerDetailView: View {
                             cardBadge(icon: "photo.stack", text: "\(galleryCount)")
                         }
                         cardBadge(icon: "film", text: "\(displayPerformer.sceneCount)")
+                        
+                        // StashTok Button
+                        Button(action: {
+                            let sp = ScenePerformer(id: displayPerformer.id, name: displayPerformer.name, sceneCount: displayPerformer.sceneCount, galleryCount: displayPerformer.galleryCount)
+                            coordinator.navigateToReels(performer: sp)
+                        }) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "play.square.stack")
+                                    .font(.system(size: 10, weight: .bold))
+                                Text("StashTok")
+                                    .font(.system(size: 8, weight: .bold))
+                            }
+                            .foregroundColor(appearanceManager.tintColor)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 3)
+                            .background(appearanceManager.tintColor.opacity(0.1))
+                            .clipShape(Capsule())
+                        }
                     }
                 }
                 
