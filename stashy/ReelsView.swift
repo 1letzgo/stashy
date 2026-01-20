@@ -215,7 +215,7 @@ struct ReelsView: View {
         }
         .alert("Really delete scene and files?", isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
-            Button("Delete All", role: .destructive) {
+            Button("Delete", role: .destructive) {
                 if let scene = sceneToDelete {
                     viewModel.deleteSceneWithFiles(scene: scene) { success in
                         if success {

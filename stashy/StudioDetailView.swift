@@ -320,7 +320,7 @@ struct StudioDetailView: View {
     private var galleryGrid: some View {
         LazyVGrid(columns: galleryColumns, spacing: 12) {
             ForEach(viewModel.studioGalleries) { gallery in
-                NavigationLink(destination: GalleryDetailView(gallery: gallery)) {
+                NavigationLink(destination: ImagesView(gallery: gallery)) {
                     GalleryCardView(gallery: gallery)
                 }
                 .buttonStyle(.plain)

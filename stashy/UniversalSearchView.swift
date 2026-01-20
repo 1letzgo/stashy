@@ -326,7 +326,7 @@ struct UniversalSearchView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(galleries) { gallery in
-                        NavigationLink(destination: GalleryDetailView(gallery: gallery)) {
+                        NavigationLink(destination: ImagesView(gallery: gallery)) {
                             galleryCard(gallery)
                         }
                         .buttonStyle(.plain)

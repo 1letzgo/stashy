@@ -77,7 +77,7 @@ struct GalleriesView: View {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 12) {
                         ForEach(viewModel.galleries) { gallery in
-                            NavigationLink(destination: GalleryDetailView(gallery: gallery)) {
+                            NavigationLink(destination: ImagesView(gallery: gallery)) {
                                 GalleryCardView(gallery: gallery)
                             }
                             .buttonStyle(.plain)
@@ -180,6 +180,77 @@ struct GalleriesView: View {
                                 if selectedSortOption == .dateAsc || selectedSortOption == .dateDesc { Image(systemName: "checkmark") }
                             }
                         }
+                        
+                        // Rating
+                        Menu {
+                            Button(action: { changeSortOption(to: .ratingDesc) }) {
+                                HStack {
+                                    Text("High → Low")
+                                    if selectedSortOption == .ratingDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: { changeSortOption(to: .ratingAsc) }) {
+                                HStack {
+                                    Text("Low → High")
+                                    if selectedSortOption == .ratingAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Rating")
+                                if selectedSortOption == .ratingDesc || selectedSortOption == .ratingAsc { Image(systemName: "checkmark") }
+                            }
+                        }
+                        
+                        // Created
+                        Menu {
+                            Button(action: { changeSortOption(to: .createdAtDesc) }) {
+                                HStack {
+                                    Text("Newest First")
+                                    if selectedSortOption == .createdAtDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: { changeSortOption(to: .createdAtAsc) }) {
+                                HStack {
+                                    Text("Oldest First")
+                                    if selectedSortOption == .createdAtAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Created")
+                                if selectedSortOption == .createdAtDesc || selectedSortOption == .createdAtAsc { Image(systemName: "checkmark") }
+                            }
+                        }
+                        
+                        // Updated
+                        Menu {
+                            Button(action: { changeSortOption(to: .updatedAtDesc) }) {
+                                HStack {
+                                    Text("Newest First")
+                                    if selectedSortOption == .updatedAtDesc { Image(systemName: "checkmark") }
+                                }
+                            }
+                            Button(action: { changeSortOption(to: .updatedAtAsc) }) {
+                                HStack {
+                                    Text("Oldest First")
+                                    if selectedSortOption == .updatedAtAsc { Image(systemName: "checkmark") }
+                                }
+                            }
+                        } label: {
+                            HStack {
+                                Text("Updated")
+                                if selectedSortOption == .updatedAtDesc || selectedSortOption == .updatedAtAsc { Image(systemName: "checkmark") }
+                            }
+                        }
+                        
+                        // Random
+                        Button(action: { changeSortOption(to: .random) }) {
+                            HStack {
+                                Text("Random")
+                                if selectedSortOption == .random { Image(systemName: "checkmark") }
+                            }
+                        }
                     } label: {
                         Image(systemName: "arrow.up.arrow.down.circle")
                             .foregroundColor(.appAccent)
@@ -269,6 +340,7 @@ struct GalleriesView: View {
 
 struct GalleryCardView: View {
     let gallery: Gallery
+    @ObservedObject var appearanceManager = AppearanceManager.shared
     
     var body: some View {
         Color.clear
@@ -327,12 +399,31 @@ struct GalleryCardView: View {
                                 }
                                 
                                 Spacer()
+                                
+                                // Date Badge (Top Right)
+                                if let date = gallery.date {
+                                    Text(date)
+                                        .font(.system(size: 9, weight: .bold))
+                                        .lineLimit(1)
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 3)
+                                        .background(Color.black.opacity(0.6))
+                                        .clipShape(Capsule())
+                                }
                             }
                             .padding(6)
                             
                             Spacer()
                             
                             HStack(alignment: .bottom) {
+                                // Info Section (Bottom Left Title)
+                                Text(gallery.displayName)
+                                   .font(.system(size: geometry.size.width * 0.08, weight: .bold))
+                                   .foregroundColor(.white)
+                                   .lineLimit(1)
+                                   .shadow(radius: 2)
+                                
                                 Spacer()
                                 
                                 // Image Count Badge (Bottom Right)
@@ -350,18 +441,8 @@ struct GalleryCardView: View {
                                     .clipShape(Capsule())
                                 }
                             }
-                            .padding(6)
+                            .padding(8)
                         }
-                        
-                        // Info Section (Bottom Title)
-                        VStack(alignment: .leading, spacing: 2) {
-                             Text(gallery.displayName)
-                                .font(.system(size: geometry.size.width * 0.08, weight: .bold)) // Scaled font
-                                .foregroundColor(.white)
-                                .lineLimit(1)
-                                .shadow(radius: 2)
-                        }
-                        .padding(8)
                     }
                 }
             )
@@ -372,156 +453,6 @@ struct GalleryCardView: View {
     }
 }
 
-struct GalleryDetailView: View {
-    let gallery: Gallery
-    @StateObject private var viewModel = StashDBViewModel()
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
-    
-    @State private var selectedSortOption: StashDBViewModel.ImageSortOption = StashDBViewModel.ImageSortOption(rawValue: TabManager.shared.getDetailSortOption(for: "gallery_detail") ?? "") ?? .dateDesc
-    
-    private func changeSortOption(to newOption: StashDBViewModel.ImageSortOption) {
-        selectedSortOption = newOption
-        // Save to TabManager (Session)
-        TabManager.shared.setDetailSortOption(for: "gallery_detail", option: newOption.rawValue)
-        viewModel.fetchGalleryImages(galleryId: gallery.id, sortBy: newOption, isInitialLoad: true)
-    }
-
-    // Grid Setup
-    private var columns: [GridItem] {
-        if horizontalSizeClass == .regular {
-            // iPad: 4 columns
-            return Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
-        } else {
-            // iPhone: 2 columns
-            return [
-                GridItem(.flexible(), spacing: 12),
-                GridItem(.flexible(), spacing: 12)
-            ]
-        }
-    }
-
-    var body: some View {
-        Group {
-            if viewModel.isLoadingGalleryImages && viewModel.galleryImages.isEmpty {
-                VStack {
-                    Spacer()
-                    ProgressView("Loading images...")
-                    Spacer()
-                }
-            } else if viewModel.galleryImages.isEmpty && !viewModel.isLoadingGalleryImages {
-                SharedEmptyStateView(
-                    icon: "photo.on.rectangle",
-                    title: "No images found",
-                    buttonText: "Reload",
-                    onRetry: { 
-                        viewModel.fetchGalleryImages(galleryId: gallery.id, sortBy: selectedSortOption, isInitialLoad: true)
-                    }
-                )
-            } else {
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(Array(viewModel.galleryImages.enumerated()), id: \.element.id) { index, image in
-                            NavigationLink(destination: FullScreenImageView(images: $viewModel.galleryImages, currentIndex: index)) {
-                                GalleryImageCard(image: image)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        
-                        if viewModel.isLoadingGalleryImages {
-                            ProgressView()
-                                .padding()
-                        } else if viewModel.hasMoreGalleryImages {
-                            Color.clear
-                                .frame(height: 1)
-                                .onAppear {
-                                    viewModel.loadMoreGalleryImages(galleryId: gallery.id)
-                                }
-                        }
-                    }
-                    .padding(16)
-                }
-            }
-        }
-        .navigationTitle(gallery.displayName)
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            if viewModel.galleryImages.isEmpty {
-                viewModel.fetchGalleryImages(galleryId: gallery.id, sortBy: selectedSortOption)
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    ForEach(StashDBViewModel.ImageSortOption.allCases, id: \.self) { option in
-                        Button(action: {
-                            changeSortOption(to: option)
-                        }) {
-                            HStack {
-                                Text(option.displayName)
-                                if option == selectedSortOption {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                } label: {
-                    Image(systemName: "arrow.up.arrow.down")
-                        .foregroundColor(.appAccent)
-                }
-            }
-        }
-    }
-}
-
-struct GalleryImageCard: View {
-    let image: StashImage
-    
-    var body: some View {
-        Color.clear
-            .aspectRatio(1, contentMode: .fit)
-            .overlay(
-                GeometryReader { geometry in
-                    ZStack {
-                        Rectangle().fill(Color.gray.opacity(0.1))
-                        
-                        if let url = image.thumbnailURL {
-                            CustomAsyncImage(url: url) { loader in
-                                 if let img = loader.image {
-                                     img.resizable().scaledToFill()
-                                 } else {
-                                     ProgressView()
-                                 }
-                            }
-                        }
-                    }
-                    .frame(width: geometry.size.width, height: geometry.size.height)
-                    .clipped()
-                    
-                    // Date Badge (Top Right)
-                    VStack {
-                        HStack {
-                            Spacer()
-                            if !image.formattedDate.isEmpty {
-                                Text(image.formattedDate)
-                                    .font(.system(size: 9, weight: .bold))
-                                    .lineLimit(1)
-                                    .foregroundColor(.white)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 3)
-                                    .background(Color.black.opacity(0.6))
-                                    .clipShape(Capsule())
-                            }
-                        }
-                        Spacer()
-                    }
-                    .padding(6)
-                }
-            )
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .contentShape(RoundedRectangle(cornerRadius: 12))
-            .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
-    }
-}
 
 struct FullScreenImageView: View {
     @Binding var images: [StashImage]
@@ -534,10 +465,11 @@ struct FullScreenImageView: View {
         ZStack {
             Color.black.edgesIgnoringSafeArea(.all)
             
+            // Image Pager
             TabView(selection: $currentIndex) {
-                ForEach(images.indices, id: \.self) { index in
+                ForEach(images) { image in
                     ZoomableScrollView {
-                        if let url = images[index].imageURL {
+                        if let url = image.imageURL {
                             CustomAsyncImage(url: url) { loader in
                                 if let data = loader.imageData, isGIF(data) {
                                     GIFView(data: data)
@@ -561,20 +493,82 @@ struct FullScreenImageView: View {
                             }
                         }
                     }
-                    .tag(index)
+                    .tag(images.firstIndex(where: { $0.id == image.id }) ?? 0)
+                    .ignoresSafeArea()
                 }
             }
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+            .ignoresSafeArea()
+            
+            // Metadata Overlay (Bottom)
+            if currentIndex < images.count {
+                VStack {
+                    Spacer()
+                    
+                    let image = images[currentIndex]
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            // Performer Link
+                            if let performers = image.performers, let firstPerf = performers.first {
+                                let performerObj = Performer(
+                                    id: firstPerf.id, name: firstPerf.name, disambiguation: nil, birthdate: nil, country: nil, imagePath: nil, sceneCount: 0, galleryCount: nil, gender: nil, ethnicity: nil, height: nil, weight: nil, measurements: nil, fakeTits: nil, careerLength: nil, tattoos: nil, piercings: nil, aliasList: nil, favorite: nil, rating100: nil, createdAt: nil, updatedAt: nil
+                                )
+                                 NavigationLink(destination: PerformerDetailView(performer: performerObj)) {
+                                    Text(firstPerf.name)
+                                        .font(.headline)
+                                        .fontWeight(.bold)
+                                        .foregroundColor(.white)
+                                        .shadow(radius: 2)
+                                }
+                                .buttonStyle(.plain)
+                                
+                                Text("-")
+                                    .font(.headline)
+                                    .foregroundColor(.white)
+                                    .shadow(radius: 2)
+                            }
+                            
+                            // Gallery Link
+                            if let galleries = image.galleries, let gallery = galleries.first {
+                                 let galleryObj = Gallery(id: gallery.id, title: gallery.title ?? "Gallery", date: nil, details: nil, imageCount: nil, organized: nil, createdAt: nil, updatedAt: nil, studio: nil, performers: nil, cover: nil)
+                                 
+                                 NavigationLink(destination: ImagesView(gallery: galleryObj)) {
+                                     Text(gallery.title ?? "Unknown Gallery")
+                                         .font(.body)
+                                         .fontWeight(.semibold)
+                                         .foregroundColor(.white)
+                                         .lineLimit(1)
+                                         .shadow(radius: 2)
+                                 }
+                                 .buttonStyle(.plain)
+                            } else {
+                                 // Fallback Title if no gallery
+                                 Text(image.title ?? "Image")
+                                     .font(.body)
+                                     .fontWeight(.semibold)
+                                     .foregroundColor(.white)
+                                     .lineLimit(1)
+                                     .shadow(radius: 2)
+                            }
+                        }
+                    }
+                    .padding()
+                    .padding(.bottom, 20)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(
+                        LinearGradient(
+                            gradient: Gradient(colors: [.clear, .black.opacity(0.8)]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+                }
+            }
         }
-        .navigationTitle(currentIndex < images.count ? images[currentIndex].displayFilename : "")
+        .background(Color.black.edgesIgnoringSafeArea(.all))
+        .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text(currentIndex < images.count ? images[currentIndex].displayFilename : "")
-                    .font(.headline)
-                    .foregroundColor(.white)
-            }
-            
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(role: .destructive) {
                     showingDeleteConfirmation = true
@@ -599,10 +593,12 @@ struct FullScreenImageView: View {
         let imageToDelete = images[currentIndex]
         
         viewModel.deleteImage(imageId: imageToDelete.id) { success in
-            if success {
-                DispatchQueue.main.async {
-                    // Remove from binding - will update parent view automatically
-                    images.remove(at: currentIndex)
+            DispatchQueue.main.async {
+                if success {
+                     // Remove from binding - will update parent view automatically
+                    if images.indices.contains(currentIndex) {
+                        images.remove(at: currentIndex)
+                    }
                     
                     // Navigate back or adjust index
                     if images.isEmpty {

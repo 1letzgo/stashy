@@ -18,6 +18,7 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
     case reels
     case search
     case settings
+    case images
     
     var id: String { rawValue }
     
@@ -28,6 +29,7 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
         case .performers: return "Performers"
         case .scenes: return "Scenes"
         case .galleries: return "Galleries"
+        case .images: return "Images"
         case .tags: return "Tags"
         case .media: return "Media"
         case .catalogue: return "Home"
@@ -35,6 +37,7 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
         case .reels: return "StashTok"
         case .search: return "Search"
         case .settings: return "Settings"
+
         }
     }
     
@@ -45,6 +48,7 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
         case .performers: return "person.3"
         case .scenes: return "film"
         case .galleries: return "photo.stack"
+        case .images: return "photo"
         case .tags: return "tag"
         case .media: return "play.square.stack"
         case .catalogue: return "square.grid.2x2.fill"
@@ -52,6 +56,7 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
         case .reels: return "play.rectangle.on.rectangle"
         case .search: return "magnifyingglass"
         case .settings: return "gear"
+
         }
     }
 }
@@ -244,7 +249,8 @@ class TabManager: ObservableObject {
                 TabConfig(id: .performers, isVisible: true, sortOrder: 2, defaultSortOption: "sceneCountDesc", defaultFilterId: nil, defaultFilterName: nil),
                 TabConfig(id: .scenes, isVisible: true, sortOrder: 3, defaultSortOption: "dateDesc", defaultFilterId: nil, defaultFilterName: nil),
                 TabConfig(id: .galleries, isVisible: true, sortOrder: 4, defaultSortOption: "dateDesc"),
-                TabConfig(id: .tags, isVisible: true, sortOrder: 5, defaultSortOption: "sceneCountDesc"),
+                TabConfig(id: .images, isVisible: true, sortOrder: 5, defaultSortOption: "dateDesc"),
+                TabConfig(id: .tags, isVisible: true, sortOrder: 6, defaultSortOption: "sceneCountDesc"),
                 TabConfig(id: .media, isVisible: true, sortOrder: 6, defaultSortOption: nil),
                 TabConfig(id: .catalogue, isVisible: true, sortOrder: 7, defaultSortOption: nil),
                 TabConfig(id: .downloads, isVisible: true, sortOrder: 8, defaultSortOption: nil),
@@ -273,7 +279,8 @@ class TabManager: ObservableObject {
                 TabConfig(id: .performers, isVisible: true, sortOrder: 2, defaultSortOption: "sceneCountDesc", defaultFilterId: nil, defaultFilterName: nil),
                 TabConfig(id: .scenes, isVisible: true, sortOrder: 3, defaultSortOption: "dateDesc", defaultFilterId: nil, defaultFilterName: nil),
                 TabConfig(id: .galleries, isVisible: true, sortOrder: 4, defaultSortOption: "dateDesc"),
-                TabConfig(id: .tags, isVisible: true, sortOrder: 5, defaultSortOption: "sceneCountDesc"),
+                TabConfig(id: .images, isVisible: true, sortOrder: 5, defaultSortOption: "dateDesc"),
+                TabConfig(id: .tags, isVisible: true, sortOrder: 6, defaultSortOption: "sceneCountDesc"),
                 TabConfig(id: .media, isVisible: true, sortOrder: 6, defaultSortOption: nil),
                 TabConfig(id: .catalogue, isVisible: true, sortOrder: 7, defaultSortOption: nil),
                 TabConfig(id: .downloads, isVisible: true, sortOrder: 8, defaultSortOption: nil),

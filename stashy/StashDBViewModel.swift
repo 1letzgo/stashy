@@ -181,26 +181,36 @@ class StashDBViewModel: ObservableObject {
     enum GallerySortOption: String, CaseIterable {
         case titleAsc
         case titleDesc
-        // case imageCountDesc // Unsupported server-side
-        // case imageCountAsc // Unsupported server-side
         case dateDesc
         case dateAsc
+        case ratingDesc
+        case ratingAsc
+        case createdAtDesc
+        case createdAtAsc
+        case updatedAtDesc
+        case updatedAtAsc
+        case random
 
         var displayName: String {
             switch self {
             case .titleAsc: return "Name (A-Z)"
             case .titleDesc: return "Name (Z-A)"
-            // case .imageCountDesc: return "Image Count (High-Low)"
-            // case .imageCountAsc: return "Image Count (Low-High)"
             case .dateDesc: return "Date (Newest)"
             case .dateAsc: return "Date (Oldest)"
+            case .ratingDesc: return "Rating (High-Low)"
+            case .ratingAsc: return "Rating (Low-High)"
+            case .createdAtDesc: return "Created (Newest)"
+            case .createdAtAsc: return "Created (Oldest)"
+            case .updatedAtDesc: return "Updated (Newest)"
+            case .updatedAtAsc: return "Updated (Oldest)"
+            case .random: return "Random"
             }
         }
 
         var direction: String {
             switch self {
-            case .titleAsc, .dateAsc: return "ASC"
-            case .titleDesc, .dateDesc: return "DESC"
+            case .titleAsc, .dateAsc, .ratingAsc, .createdAtAsc, .updatedAtAsc: return "ASC"
+            case .titleDesc, .dateDesc, .ratingDesc, .createdAtDesc, .updatedAtDesc, .random: return "DESC"
             }
         }
 
@@ -208,6 +218,10 @@ class StashDBViewModel: ObservableObject {
             switch self {
             case .titleAsc, .titleDesc: return "title"
             case .dateDesc, .dateAsc: return "date"
+            case .ratingDesc, .ratingAsc: return "rating"
+            case .createdAtDesc, .createdAtAsc: return "created_at"
+            case .updatedAtDesc, .updatedAtAsc: return "updated_at"
+            case .random: return "random"
             }
         }
     }
@@ -238,6 +252,13 @@ class StashDBViewModel: ObservableObject {
         case titleDesc
         case dateDesc
         case dateAsc
+        case ratingDesc
+        case ratingAsc
+        case createdAtDesc
+        case createdAtAsc
+        case updatedAtDesc
+        case updatedAtAsc
+        case random
         
         var displayName: String {
             switch self {
@@ -245,13 +266,20 @@ class StashDBViewModel: ObservableObject {
             case .titleDesc: return "Title (Z-A)"
             case .dateDesc: return "Date (Newest)"
             case .dateAsc: return "Date (Oldest)"
+            case .ratingDesc: return "Rating (High-Low)"
+            case .ratingAsc: return "Rating (Low-High)"
+            case .createdAtDesc: return "Created (Newest)"
+            case .createdAtAsc: return "Created (Oldest)"
+            case .updatedAtDesc: return "Updated (Newest)"
+            case .updatedAtAsc: return "Updated (Oldest)"
+            case .random: return "Random"
             }
         }
         
         var direction: String {
             switch self {
-            case .titleAsc, .dateAsc: return "ASC"
-            case .titleDesc, .dateDesc: return "DESC"
+            case .titleAsc, .dateAsc, .ratingAsc, .createdAtAsc, .updatedAtAsc: return "ASC"
+            case .titleDesc, .dateDesc, .ratingDesc, .createdAtDesc, .updatedAtDesc, .random: return "DESC"
             }
         }
         
@@ -259,6 +287,10 @@ class StashDBViewModel: ObservableObject {
             switch self {
             case .titleAsc, .titleDesc: return "title"
             case .dateDesc, .dateAsc: return "date"
+            case .ratingDesc, .ratingAsc: return "rating"
+            case .createdAtDesc, .createdAtAsc: return "created_at"
+            case .updatedAtDesc, .updatedAtAsc: return "updated_at"
+            case .random: return "random"
             }
         }
     }
@@ -1220,14 +1252,9 @@ class StashDBViewModel: ObservableObject {
         let page = isInitialLoad ? 1 : currentPerformerGalleryPage + 1
         
         // Sort Logic
-        var sortField = "date"
-        var sortDirection = "DESC"
-        switch sortBy {
-        case .titleAsc: sortField = "title"; sortDirection = "ASC"
-        case .titleDesc: sortField = "title"; sortDirection = "DESC"
-        case .dateDesc: sortField = "date"; sortDirection = "DESC"
-        case .dateAsc: sortField = "date"; sortDirection = "ASC"
-        }
+        // Sort Logic
+        let sortField = sortBy.sortField
+        let sortDirection = sortBy.direction
         
         // Find galleries with performer filter
         let query = GraphQLQueries.queryWithFragments("findGalleries")
@@ -1297,14 +1324,9 @@ class StashDBViewModel: ObservableObject {
         let page = isInitialLoad ? 1 : currentStudioGalleryPage + 1
         
         // Sort Logic
-        var sortField = "date"
-        var sortDirection = "DESC"
-        switch sortBy {
-        case .titleAsc: sortField = "title"; sortDirection = "ASC"
-        case .titleDesc: sortField = "title"; sortDirection = "DESC"
-        case .dateDesc: sortField = "date"; sortDirection = "DESC"
-        case .dateAsc: sortField = "date"; sortDirection = "ASC"
-        }
+        // Sort Logic
+        let sortField = sortBy.sortField
+        let sortDirection = sortBy.direction
         
         // Find galleries with studio filter
         let query = GraphQLQueries.queryWithFragments("findGalleries")
@@ -3257,6 +3279,25 @@ struct Studio: Codable, Identifiable {
         case updatedAt = "updated_at"
     }
     
+    init(id: String, name: String, url: String? = nil, sceneCount: Int = 0, performerCount: Int? = nil, galleryCount: Int? = nil, details: String? = nil, imagePath: String? = nil, favorite: Bool? = nil, rating100: Int? = nil, createdAt: String? = nil, updatedAt: String? = nil) {
+        self.id = id
+        self.name = name
+        self.url = url
+        self.sceneCount = sceneCount
+        self.performerCount = performerCount
+        self.galleryCount = galleryCount
+        self.details = details
+        self.imagePath = imagePath
+        self.favorite = favorite
+        self.rating100 = rating100
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+    }
+    
+    init(from galleryStudio: GalleryStudio) {
+        self.init(id: galleryStudio.id, name: galleryStudio.name)
+    }
+    
     // Computed property for thumbnail URL
     var thumbnailURL: URL? {
         print("🖼️ STUDIO THUMBNAIL DEBUG for studio \(id):")
@@ -3340,10 +3381,13 @@ struct Gallery: Codable, Identifiable {
     let studio: GalleryStudio?
     let performers: [GalleryPerformer]?
     let cover: GalleryCover?
+
     
     enum CodingKeys: String, CodingKey {
         case id, title, date, details, imageCount = "image_count", organized, createdAt = "created_at", updatedAt = "updated_at", studio, performers, cover
     }
+    
+
     
     var thumbnailURL: URL? {
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
@@ -3373,9 +3417,22 @@ struct GalleryStudio: Codable {
     let name: String
 }
 
-struct GalleryPerformer: Codable {
+struct GalleryPerformer: Codable, Identifiable {
     let id: String
     let name: String
+}
+
+// struct GalleryFile: Codable {
+//     let `extension`: String?
+// }
+
+struct ImageFile: Codable {
+    let path: String
+}
+
+struct ImageGallery: Codable, Identifiable {
+    let id: String
+    let title: String?
 }
 
 struct GalleryCover: Codable {
@@ -3406,15 +3463,35 @@ struct FindImagesResult: Codable {
 struct StashImage: Codable, Identifiable {
     let id: String
     let title: String?
-    // Add date property (ensure it exists in GraphQL fragment)
     let date: String?
     let paths: ImagePaths?
+    // let files: [ImageFile]?
+    let visual_files: [ImageFile]?
     let performers: [GalleryPerformer]?
     let studio: GalleryStudio?
+    let galleries: [ImageGallery]?
+    
+    enum CodingKeys: String, CodingKey {
+        case id, title, date, paths, performers, studio, galleries, visual_files
+    }
+    
+    var fileExtension: String? {
+        // Primary: Use 'visual_files' array if available
+        if let path = visual_files?.first?.path {
+            return URL(fileURLWithPath: path).pathExtension.uppercased()
+        }
+        
+        // Fallback: Use 'paths.image'
+        if let imagePath = paths?.image {
+            let cleanPath = imagePath.components(separatedBy: "?").first ?? imagePath
+            return URL(fileURLWithPath: cleanPath).pathExtension.uppercased()
+        }
+        
+        return nil
+    }
     
     var formattedDate: String {
         guard let dateString = date else { return "" }
-        // Basic formatting: YYYY-MM-DD is usually standard from Stash
         return dateString
     }
     
@@ -3465,15 +3542,9 @@ struct StashImage: Codable, Identifiable {
         // Last resort: use ID
         return "Image \(id.prefix(8))"
     }
-    
-    var fileExtension: String {
-        guard let path = paths?.image else { return "IMG" }
-        // Strip query params
-        let cleanPath = path.components(separatedBy: "?").first ?? path
-        let ext = URL(fileURLWithPath: cleanPath).pathExtension.uppercased()
-        return ext.isEmpty ? "IMG" : ext
-    }
 }
+
+
 
 struct ImagePaths: Codable {
     let thumbnail: String?

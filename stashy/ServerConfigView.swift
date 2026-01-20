@@ -696,6 +696,18 @@ struct TabDefaultSortView: View {
                 .pickerStyle(.menu)
                 .labelsHidden()
 
+            case .images:
+                Picker("", selection: Binding(
+                    get: { StashDBViewModel.ImageSortOption(rawValue: tabManager.getPersistentSortOption(for: tab) ?? "") ?? .dateDesc },
+                    set: { tabManager.setPersistentSortOption(for: tab, option: $0.rawValue) }
+                )) {
+                    ForEach(StashDBViewModel.ImageSortOption.allCases, id: \.self) { option in
+                        Text(option.displayName).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+
             default:
                 EmptyView()
             }

@@ -1,7 +1,7 @@
 fragment ImageFields on Image {
   id title rating100 organized date created_at updated_at
   paths { thumbnail preview image }
-  files { extension }
+  visual_files { ... on BaseFile { path } }
   galleries { id title }
   performers { id name }
   studio { id name }

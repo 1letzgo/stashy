@@ -568,7 +568,7 @@ struct SceneDetailView: View {
 
             if let galleries = activeScene.galleries, !galleries.isEmpty {
                 WrappedHStack(items: galleries) { gallery in
-                    NavigationLink(destination: GalleryDetailView(gallery: gallery)) {
+                    NavigationLink(destination: ImagesView(gallery: gallery)) {
                         HStack(spacing: 6) {
                             if let url = gallery.coverURL {
                                 CustomAsyncImage(url: url) { loader in
@@ -740,7 +740,7 @@ struct SceneDetailView: View {
             }
         .alert("Really delete scene and files?", isPresented: $showDeleteWithFilesConfirmation) {
             Button("Cancel", role: .cancel) { }
-            Button("Delete All", role: .destructive) {
+            Button("Delete", role: .destructive) {
                 deleteSceneWithFiles()
             }
         } message: {

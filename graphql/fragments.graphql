@@ -36,8 +36,9 @@ fragment GalleryFields on Gallery {
 }
 
 fragment ImageFields on Image {
-  id title rating100 organized created_at updated_at
+  id title rating100 organized date created_at updated_at
   paths { thumbnail preview image }
+  visual_files { ... on BaseFile { path } }
   galleries { id title }
   performers { id name }
   studio { id name }
