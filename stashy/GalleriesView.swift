@@ -271,102 +271,104 @@ struct GalleryCardView: View {
     let gallery: Gallery
     
     var body: some View {
-        ZStack {
-            GeometryReader { geometry in
-                ZStack(alignment: .bottomLeading) {
-                    // Image (Strictly filling the square)
-                    ZStack {
-                        Color.gray.opacity(0.2)
+        Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .overlay(
+                GeometryReader { geometry in
+                    ZStack(alignment: .bottomLeading) {
+                        // Image (Strictly filling the square)
+                        ZStack {
+                            Color.gray.opacity(0.2)
 
-                        if let url = gallery.coverURL {
-                            CustomAsyncImage(url: url) { loader in
-                                if loader.isLoading {
-                                    ProgressView()
-                                } else if let image = loader.image {
-                                    image
-                                        .resizable()
-                                        .scaledToFill()
-                                } else {
-                                    Image(systemName: "photo.on.rectangle")
-                                        .font(.system(size: 40))
-                                        .foregroundColor(.secondary)
+                            if let url = gallery.coverURL {
+                                CustomAsyncImage(url: url) { loader in
+                                    if loader.isLoading {
+                                        ProgressView()
+                                    } else if let image = loader.image {
+                                        image
+                                            .resizable()
+                                            .scaledToFill()
+                                    } else {
+                                        Image(systemName: "photo.on.rectangle")
+                                            .font(.system(size: 40))
+                                            .foregroundColor(.secondary)
+                                    }
                                 }
+                            } else {
+                                Image(systemName: "photo.on.rectangle")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(.secondary)
                             }
-                        } else {
-                            Image(systemName: "photo.on.rectangle")
-                                .font(.system(size: 40))
-                                .foregroundColor(.secondary)
                         }
-                    }
-                    .frame(width: geometry.size.width, height: geometry.size.width)
-                    .clipped()
-                    
-                    // Gradient Overlay
-                    LinearGradient(
-                        gradient: Gradient(colors: [.clear, .black.opacity(0.8)]),
-                        startPoint: .top,
-                        endPoint: .bottom
-                    )
-                    .frame(height: geometry.size.width * 0.4)
-                    
-                    // Badges Overlay Layer
-                    VStack {
-                        HStack(alignment: .top) {
-                            // Studio Badge (Top Left)
-                            if let studio = gallery.studio {
-                                Text(studio.name)
-                                    .font(.system(size: 9, weight: .bold))
-                                    .lineLimit(1)
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+                        
+                        // Gradient Overlay
+                        LinearGradient(
+                            gradient: Gradient(colors: [.clear, .black.opacity(0.8)]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: geometry.size.height * 0.4)
+                        
+                        // Badges Overlay Layer
+                        VStack {
+                            HStack(alignment: .top) {
+                                // Studio Badge (Top Left)
+                                if let studio = gallery.studio {
+                                    Text(studio.name)
+                                        .font(.system(size: 9, weight: .bold))
+                                        .lineLimit(1)
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 6)
+                                        .padding(.vertical, 3)
+                                        .background(Color.black.opacity(0.6))
+                                        .clipShape(Capsule())
+                                }
+                                
+                                Spacer()
+                            }
+                            .padding(6)
+                            
+                            Spacer()
+                            
+                            HStack(alignment: .bottom) {
+                                Spacer()
+                                
+                                // Image Count Badge (Bottom Right)
+                                if let count = gallery.imageCount {
+                                    HStack(spacing: 3) {
+                                        Image(systemName: "photo")
+                                            .font(.system(size: 10, weight: .bold))
+                                        Text("\(count)")
+                                            .font(.system(size: 10, weight: .bold))
+                                    }
                                     .foregroundColor(.white)
-                                    .padding(.horizontal, 6)
-                                    .padding(.vertical, 3)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
                                     .background(Color.black.opacity(0.6))
                                     .clipShape(Capsule())
-                            }
-                            
-                            Spacer()
-                        }
-                        .padding(6)
-                        
-                        Spacer()
-                        
-                        HStack(alignment: .bottom) {
-                            Spacer()
-                            
-                            // Image Count Badge (Bottom Right)
-                            if let count = gallery.imageCount {
-                                HStack(spacing: 3) {
-                                    Image(systemName: "photo")
-                                        .font(.system(size: 10, weight: .bold))
-                                    Text("\(count)")
-                                        .font(.system(size: 10, weight: .bold))
                                 }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.black.opacity(0.6))
-                                .clipShape(Capsule())
                             }
+                            .padding(6)
                         }
-                        .padding(6)
+                        
+                        // Info Section (Bottom Title)
+                        VStack(alignment: .leading, spacing: 2) {
+                             Text(gallery.displayName)
+                                .font(.system(size: geometry.size.width * 0.08, weight: .bold)) // Scaled font
+                                .foregroundColor(.white)
+                                .lineLimit(1)
+                                .shadow(radius: 2)
+                        }
+                        .padding(8)
                     }
-                    
-                    // Info Section (Bottom Title)
-                    VStack(alignment: .leading, spacing: 2) {
-                         Text(gallery.displayName)
-                            .font(.system(size: geometry.size.width * 0.08, weight: .bold)) // Scaled font
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                            .shadow(radius: 2)
-                    }
-                    .padding(8)
                 }
-            }
-            .aspectRatio(1, contentMode: .fit)
-        }
-        .background(Color(UIColor.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+            )
+            .background(Color(UIColor.secondarySystemBackground))
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .contentShape(RoundedRectangle(cornerRadius: 12)) // Ensure hit testing works on entire card
+            .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
     }
 }
 
@@ -475,47 +477,49 @@ struct GalleryImageCard: View {
     let image: StashImage
     
     var body: some View {
-        ZStack {
-            GeometryReader { geometry in
-                ZStack {
-                    Rectangle().fill(Color.gray.opacity(0.1))
-                    
-                    if let url = image.thumbnailURL {
-                        CustomAsyncImage(url: url) { loader in
-                             if let img = loader.image {
-                                 img.resizable().scaledToFill()
-                             } else {
-                                 ProgressView()
-                             }
-                        }
-                    }
-                }
-                .frame(width: geometry.size.width, height: geometry.size.width) // Square
-                .clipped()
-                
-                // Date Badge (Top Right)
-                VStack {
-                    HStack {
-                        Spacer()
-                        if !image.formattedDate.isEmpty {
-                            Text(image.formattedDate)
-                                .font(.system(size: 9, weight: .bold))
-                                .lineLimit(1)
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 6)
-                                .padding(.vertical, 3)
-                                .background(Color.black.opacity(0.6))
-                                .clipShape(Capsule())
-                        }
-                    }
-                    Spacer()
-                }
-                .padding(6)
-            }
+        Color.clear
             .aspectRatio(1, contentMode: .fit)
-        }
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+            .overlay(
+                GeometryReader { geometry in
+                    ZStack {
+                        Rectangle().fill(Color.gray.opacity(0.1))
+                        
+                        if let url = image.thumbnailURL {
+                            CustomAsyncImage(url: url) { loader in
+                                 if let img = loader.image {
+                                     img.resizable().scaledToFill()
+                                 } else {
+                                     ProgressView()
+                                 }
+                            }
+                        }
+                    }
+                    .frame(width: geometry.size.width, height: geometry.size.height)
+                    .clipped()
+                    
+                    // Date Badge (Top Right)
+                    VStack {
+                        HStack {
+                            Spacer()
+                            if !image.formattedDate.isEmpty {
+                                Text(image.formattedDate)
+                                    .font(.system(size: 9, weight: .bold))
+                                    .lineLimit(1)
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 6)
+                                    .padding(.vertical, 3)
+                                    .background(Color.black.opacity(0.6))
+                                    .clipShape(Capsule())
+                            }
+                        }
+                        Spacer()
+                    }
+                    .padding(6)
+                }
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .contentShape(RoundedRectangle(cornerRadius: 12))
+            .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
     }
 }
 
