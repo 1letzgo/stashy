@@ -14,6 +14,7 @@ class ScenesViewModel: ObservableObject {
     // MARK: - Dependencies
     
     private let sceneRepository: SceneRepositoryProtocol
+    private let filterRepository: FilterRepositoryProtocol
     
     // MARK: - Published Properties
     
@@ -21,6 +22,8 @@ class ScenesViewModel: ObservableObject {
     @Published var currentSortOption: StashDBViewModel.SceneSortOption = .dateDesc
     @Published var searchQuery: String = ""
     @Published var currentFilter: StashDBViewModel.SavedFilter?
+    @Published var savedFilters: [String: StashDBViewModel.SavedFilter] = [:]
+    @Published var isLoadingFilters: Bool = false
     
     // MARK: - Private Properties
     
@@ -28,8 +31,12 @@ class ScenesViewModel: ObservableObject {
     
     // MARK: - Initialization
     
-    init(sceneRepository: SceneRepositoryProtocol = SceneRepository()) {
+    init(
+        sceneRepository: SceneRepositoryProtocol = SceneRepository(),
+        filterRepository: FilterRepositoryProtocol = FilterRepository()
+    ) {
         self.sceneRepository = sceneRepository
+        self.filterRepository = filterRepository
         
         // Initialize with default loader
         self.scenesLoader = PaginatedLoader.scenes(
@@ -86,6 +93,17 @@ class ScenesViewModel: ObservableObject {
     
     // MARK: - Public Methods
     
+    func fetchSavedFilters() async {
+        isLoadingFilters = true
+        do {
+            let filters = try await filterRepository.fetchSavedFilters()
+            self.savedFilters = Dictionary(uniqueKeysWithValues: filters.map { ($0.id, $0) })
+        } catch {
+            print("❌ Error fetching saved filters: \(error.localizedDescription)")
+        }
+        isLoadingFilters = false
+    }
+    
     func loadInitialScenes() async {
         await scenesLoader.loadInitial()
     }
@@ -116,6 +134,18 @@ class ScenesViewModel: ObservableObject {
     
     func clearFilter() {
         currentFilter = nil
+    }
+    
+    func updateSceneResumeTime(id: String, newResumeTime: Double) {
+        if let index = scenesLoader.items.firstIndex(where: { $0.id == id }) {
+            var updatedScene = scenesLoader.items[index]
+            updatedScene.resume_time = newResumeTime
+            scenesLoader.items[index] = updatedScene
+        }
+    }
+    
+    func removeScene(id: String) {
+        scenesLoader.items.removeAll(where: { $0.id == id })
     }
     
     // MARK: - Computed Properties
