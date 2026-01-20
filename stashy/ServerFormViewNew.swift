@@ -187,6 +187,7 @@ struct ServerFormViewNew: View {
                         HStack {
                             Spacer()
                             Label("Delete Server", systemImage: "trash")
+                                .foregroundColor(appearanceManager.tintColor)
                             Spacer()
                         }
                     }

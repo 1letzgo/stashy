@@ -281,7 +281,7 @@ struct ReelsView: View {
                     showDeleteConfirmation = true
                 } label: {
                     Image(systemName: "trash")
-                        .foregroundColor(.red)
+                        .foregroundColor(appearanceManager.tintColor)
                 }
             }
         }

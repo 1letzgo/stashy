@@ -77,8 +77,9 @@ struct SceneDetailView: View {
                     showDeleteWithFilesConfirmation = true
                 } label: {
                     Image(systemName: "trash")
+                        .foregroundColor(appearanceManager.tintColor)
                 }
-                .tint(.red)
+                .tint(appearanceManager.tintColor)
             }
         }
     }

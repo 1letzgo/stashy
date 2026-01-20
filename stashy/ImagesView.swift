@@ -107,7 +107,7 @@ struct ImagesView: View {
         NavigationLink(destination: FullScreenImageView(images: Binding(
             get: { displayedImages },
             set: { _ in } // images are generally read-only from this view
-        ), currentIndex: index)) {
+        ), selectedImageId: image.id)) {
             ImageThumbnailCard(image: image)
                 .onAppear {
                     if image.id == displayedImages.last?.id {

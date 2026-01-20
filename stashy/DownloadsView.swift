@@ -493,8 +493,8 @@ struct DownloadDetailView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding()
-                    .background(Color.red.opacity(0.1))
-                    .foregroundColor(.red)
+                    .background(appearanceManager.tintColor.opacity(0.1))
+                    .foregroundColor(appearanceManager.tintColor)
                     .clipShape(RoundedRectangle(cornerRadius: 12))
                 }
                 .padding(.top, 10)

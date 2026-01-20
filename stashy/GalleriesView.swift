@@ -456,7 +456,8 @@ struct GalleryCardView: View {
 
 struct FullScreenImageView: View {
     @Binding var images: [StashImage]
-    @State var currentIndex: Int
+    @State var selectedImageId: String
+    @ObservedObject var appearanceManager = AppearanceManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @Environment(\.dismiss) var dismiss
     @State private var showingDeleteConfirmation = false
@@ -466,7 +467,7 @@ struct FullScreenImageView: View {
             Color.black.edgesIgnoringSafeArea(.all)
             
             // Image Pager
-            TabView(selection: $currentIndex) {
+            TabView(selection: $selectedImageId) {
                 ForEach(images) { image in
                     ZoomableScrollView {
                         if let url = image.imageURL {
@@ -493,7 +494,7 @@ struct FullScreenImageView: View {
                             }
                         }
                     }
-                    .tag(images.firstIndex(where: { $0.id == image.id }) ?? 0)
+                    .tag(image.id)
                     .ignoresSafeArea()
                 }
             }
@@ -501,11 +502,9 @@ struct FullScreenImageView: View {
             .ignoresSafeArea()
             
             // Metadata Overlay (Bottom)
-            if currentIndex < images.count {
+            if let image = images.first(where: { $0.id == selectedImageId }) {
                 VStack {
                     Spacer()
-                    
-                    let image = images[currentIndex]
                     VStack(alignment: .leading, spacing: 8) {
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
                             // Performer Link
@@ -574,7 +573,7 @@ struct FullScreenImageView: View {
                     showingDeleteConfirmation = true
                 } label: {
                     Image(systemName: "trash")
-                        .foregroundColor(.red)
+                        .foregroundColor(appearanceManager.tintColor)
                 }
             }
         }
@@ -589,22 +588,35 @@ struct FullScreenImageView: View {
     }
     
     private func deleteCurrentImage() {
-        guard currentIndex < images.count else { return }
+        guard let currentIndex = images.firstIndex(where: { $0.id == selectedImageId }) else { return }
         let imageToDelete = images[currentIndex]
+        
+        // Find next ID before deletion
+        let nextId: String?
+        if images.count > 1 {
+            if currentIndex < images.count - 1 {
+                nextId = images[currentIndex + 1].id
+            } else {
+                nextId = images[currentIndex - 1].id
+            }
+        } else {
+            nextId = nil
+        }
         
         viewModel.deleteImage(imageId: imageToDelete.id) { success in
             DispatchQueue.main.async {
                 if success {
-                     // Remove from binding - will update parent view automatically
-                    if images.indices.contains(currentIndex) {
-                        images.remove(at: currentIndex)
+                    // Update selection to next image first
+                    if let nextId = nextId {
+                        selectedImageId = nextId
                     }
                     
-                    // Navigate back or adjust index
+                    // Remove from binding - will update parent view automatically
+                    images.removeAll { $0.id == imageToDelete.id }
+                    
+                    // Exit if empty
                     if images.isEmpty {
                         dismiss()
-                    } else if currentIndex >= images.count {
-                        currentIndex = images.count - 1
                     }
                 }
             }

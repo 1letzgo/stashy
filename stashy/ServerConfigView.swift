@@ -994,7 +994,7 @@ struct ServerDetailView: View {
                     presentationMode.wrappedValue.dismiss()
                 }) {
                     Label("Delete Server", systemImage: "trash")
-                        .foregroundColor(.primary)
+                        .foregroundColor(appearanceManager.tintColor)
                 }
             }
         }
