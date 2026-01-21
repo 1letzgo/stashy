@@ -735,7 +735,7 @@ struct ReelItemView: View {
             }
             .frame(maxWidth: .infinity, alignment: .bottomTrailing)
             .padding(.trailing, 12)
-            .padding(.bottom, 125) // Moved 5px higher
+            .padding(.bottom, 130) // Moved 5px higher
             .opacity(showUI ? 1 : 0)
             .animation(.easeInOut(duration: 0.3), value: showUI)
             

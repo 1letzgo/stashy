@@ -18,6 +18,7 @@ struct StudioDetailView: View {
     @State private var isChangingSort = false
     @State private var isFavorite: Bool = false
     @State private var isUpdatingFavorite: Bool = false
+    @State private var isHeaderExpanded = false // Added state for expansion
     
     enum DetailTab: String, CaseIterable {
         case scenes = "Scenes"
@@ -189,71 +190,90 @@ struct StudioDetailView: View {
     // MARK: - Subviews
     
     private var headerCard: some View {
-        VStack(spacing: 0) {
-            HStack(alignment: .top, spacing: 0) {
-                // Logo Block (Left, flush)
-                ZStack {
-                    Color.studioHeaderGray
-                    StudioImageView(studio: studio)
-                        .padding(8)
-                }
-                .frame(width: 140, height: 115)
-                .clipped()
-                
-                // Detail area
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(alignment: .top) {
-                        Text(studio.name)
-                            .font(.headline)
-                            .fontWeight(.bold)
-                            .foregroundColor(.primary)
-                            .lineLimit(2)
-                        
-                        Spacer()
-                        
-                        // Stats Badges (Condensed like Performer)
-                        HStack(spacing: 4) {
-                            miniBadge(icon: "film", text: "\(effectiveScenesCount)")
-                            if effectiveGalleriesCount > 0 {
-                                miniBadge(icon: "photo.stack", text: "\(effectiveGalleriesCount)")
-                            }
-                        }
-                    }
-                    
-                    // Info List
-                    let details = getStudioDetails(studio)
-                    if !details.isEmpty {
-                        VStack(alignment: .leading, spacing: 6) {
-                            ForEach(details, id: \.label) { detail in
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(detail.label)
-                                        .font(.system(size: 8))
-                                        .foregroundColor(.secondary)
-                                    Text(detail.value)
-                                        .font(.system(size: 11, weight: .bold))
-                                        .foregroundColor(.primary)
-                                        .lineLimit(1)
-                                }
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top) {
+                Text(studio.name)
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+                Spacer()
+            }
+            
+            // Info List
+            let details = getStudioDetails(studio)
+            // User wants "hide starting from 3rd line".
+            // Line 1: Details 1-2
+            // Line 2: Details 3-4 OR URL (if <= 2 details)
+            // So we always allow up to 4 details (2 rows) visible if no URL conflict,
+            // or if URL exists but we prioritize details 3-4 over URL to maximize info density?
+            // User complaint: "You hide the second row [Item 3] already".
+            // So we MUST show Item 3+4 if present. This takes 2 rows.
+            // If 2 rows taken by details, URL (Row 3) must be hidden.
+            let visibleDetails = isHeaderExpanded ? details : Array(details.prefix(4))
+            let hasURL = studio.url != nil && !studio.url!.isEmpty
+            
+            if !visibleDetails.isEmpty {
+                VStack(alignment: .leading, spacing: 4) {
+                    LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], alignment: .leading, spacing: 6) {
+                        ForEach(visibleDetails, id: \.label) { detail in
+                            VStack(alignment: .leading, spacing: 0) {
+                                Text(detail.label)
+                                    .font(.system(size: 8))
+                                    .foregroundColor(.secondary)
+                                    .textCase(.uppercase)
+                                Text(detail.value)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(.primary)
+                                    .lineLimit(1)
                             }
                         }
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
+            }
+            
+            // URL Link (Always on its own row)
+            // Show if expanded OR if we have space (details <= 2, i.e. 1 row used)
+            if hasURL && (isHeaderExpanded || details.count <= 2) {
+                 VStack(alignment: .leading, spacing: 2) {
+                     Text("URL")
+                         .font(.system(size: 8))
+                         .foregroundColor(.secondary)
+                         .textCase(.uppercase)
+                     Link(destination: URL(string: studio.url!) ?? URL(string: "https://google.com")!) {
+                         Text(studio.url!)
+                             .font(.system(size: 11, weight: .bold))
+                             .foregroundColor(.appAccent)
+                             .lineLimit(1)
+                     }
+                 }
             }
             
             // Description (Full width if present)
             if let desc = studio.details, !desc.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
-                    Divider().padding(.horizontal, 12)
+                    Divider()
                     Text(desc)
                         .font(.caption)
                         .foregroundColor(.secondary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 4)
                 }
             }
         }
+        .padding(.leading, 140 + 12) // Logo width + spacing
+        .padding(.trailing, 12)
+        .padding(.vertical, 10)
+        .frame(minWidth: 0, maxWidth: .infinity, minHeight: 115, alignment: .topLeading) // Ensure minimum height for logo and top alignment
+        .overlay(
+            ZStack {
+                Color.studioHeaderGray
+                StudioImageView(studio: studio)
+                    .padding(8)
+            }
+            .frame(width: 140)
+            .clipped()
+            , alignment: .leading
+        )
         .background(Color(UIColor.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
@@ -261,18 +281,51 @@ struct StudioDetailView: View {
                 .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
         )
         .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+        .overlay(
+            Group {
+                let details = getStudioDetails(studio)
+                let hasURL = studio.url != nil && !studio.url!.isEmpty
+                
+                // Button needed if:
+                // 1. More details than shown (count > 4)
+                // 2. URL exists but is hidden (count > 2)
+                if details.count > 4 || (hasURL && details.count > 2) {
+                    Button(action: {
+                        withAnimation(.spring()) {
+                            isHeaderExpanded.toggle()
+                        }
+                    }) {
+                        Image(systemName: isHeaderExpanded ? "chevron.up" : "chevron.down")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundColor(appearanceManager.tintColor)
+                            .padding(6)
+                            .background(appearanceManager.tintColor.opacity(0.1))
+                            .clipShape(Circle())
+                    }
+                    .padding(8)
+                }
+            },
+            alignment: .bottomTrailing
+        )
     }
 
     private func getStudioDetails(_ s: Studio) -> [(label: String, value: String)] {
         var list: [(label: String, value: String)] = []
         
+        // Add Scenes and Galleries as the first row (matching PerformerDetailView)
+        list.append((label: "SCENES", value: "\(effectiveScenesCount)"))
+        
+        if effectiveGalleriesCount > 0 {
+            list.append((label: "GALLERIES", value: "\(effectiveGalleriesCount)"))
+        } else {
+             // Optional: Add placeholder if needed for grid alignment, but usually fine to omit
+        }
+        
         if let count = s.performerCount, count > 0 {
             list.append((label: "PERFORMERS", value: "\(count)"))
         }
         
-        if let val = s.url, !val.isEmpty {
-            list.append((label: "URL", value: val))
-        }
+        // URL is now handled separately in the view to ensure it gets its own row
         
         return list
     }

@@ -8,6 +8,7 @@
 import SwiftUI
 import AVFoundation
 import AVKit
+import WebKit
 
 struct SceneDetailView: View {
     let scene: Scene
@@ -389,14 +390,7 @@ struct SceneDetailView: View {
             .background(Color(UIColor.systemBackground))
         }
         .background(Color(UIColor.systemBackground))
-        .clipShape(
-            UnevenRoundedRectangle(
-                topLeadingRadius: 12,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: 12
-            )
-        )
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
         .overlay(
             Group {
@@ -508,9 +502,9 @@ struct SceneDetailView: View {
                                 }
                             }
                             .padding(4)
-                            .background(appearanceManager.tintColor.opacity(0.1))
+                            .background(appearanceManager.tintColor)
                             .clipShape(Circle())
-                            .overlay(Circle().stroke(appearanceManager.tintColor.opacity(0.2), lineWidth: 1))
+                            .overlay(Circle().stroke(appearanceManager.tintColor.opacity(0.1), lineWidth: 0.2))
                             
                             // Name Pill Overlaid at Bottom
                             Text(scenePerformer.name)
@@ -518,9 +512,15 @@ struct SceneDetailView: View {
                                 .fontWeight(.bold)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(appearanceManager.tintColor)
-                                .foregroundColor(.white)
+                                .background(
+                                    ZStack {
+                                        Color(UIColor.systemBackground)
+                                        appearanceManager.tintColor.opacity(0.1)
+                                    }
+                                )
+                                .foregroundColor(appearanceManager.tintColor)
                                 .clipShape(Capsule())
+                                .overlay(Capsule().stroke(appearanceManager.tintColor, lineWidth: 0.5))
                                 .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
                                 .offset(y: 8) // Push it slightly over the bottom edge
                         }
@@ -551,19 +551,15 @@ struct SceneDetailView: View {
                 VStack {
                     NavigationLink(destination: StudioDetailView(studio: studio.toStudio())) {
                         ZStack(alignment: .bottom) {
-                            // Dummy Studio Thumbnail (Circle)
+                            // Studio Logo (Rounded Rectangle)
                             ZStack {
-                                Image(systemName: "building.2.fill")
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                                    .frame(width: 40, height: 40)
-                                    .foregroundColor(appearanceManager.tintColor.opacity(0.4))
+                                StudioImageView(studio: studio.toStudio())
+                                    .padding(8)
                             }
-                            .frame(width: 80, height: 80)
-                            .padding(4)
-                            .background(appearanceManager.tintColor.opacity(0.1))
-                            .clipShape(Circle())
-                            .overlay(Circle().stroke(appearanceManager.tintColor.opacity(0.2), lineWidth: 1))
+                            .frame(width: 110, height: 88)
+                            .background(appearanceManager.tintColor)
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .overlay(RoundedRectangle(cornerRadius: 12).stroke(appearanceManager.tintColor.opacity(0.1), lineWidth: 0.2))
                             
                             // Name Pill Overlaid at Bottom
                             Text(studio.name)
@@ -571,9 +567,15 @@ struct SceneDetailView: View {
                                 .fontWeight(.bold)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(appearanceManager.tintColor)
-                                .foregroundColor(.white)
+                                .background(
+                                    ZStack {
+                                        Color(UIColor.systemBackground)
+                                        appearanceManager.tintColor.opacity(0.1)
+                                    }
+                                )
+                                .foregroundColor(appearanceManager.tintColor)
                                 .clipShape(Capsule())
+                                .overlay(Capsule().stroke(appearanceManager.tintColor, lineWidth: 0.5))
                                 .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
                                 .offset(y: 8)
                         }
@@ -685,6 +687,7 @@ struct SceneDetailView: View {
                                     .background(appearanceManager.tintColor.opacity(0.1))
                                     .foregroundColor(appearanceManager.tintColor)
                                     .clipShape(Capsule())
+                                    .overlay(Capsule().stroke(appearanceManager.tintColor, lineWidth: 0.5))
                             }
                             .buttonStyle(.plain)
                         }
@@ -950,8 +953,14 @@ struct SceneDetailView: View {
         }
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background((color ?? appearanceManager.tintColor).opacity(0.1))
+        .background(
+            ZStack {
+                Color(UIColor.systemBackground)
+                (color ?? appearanceManager.tintColor).opacity(0.1)
+            }
+        )
         .clipShape(Capsule())
+        .overlay(Capsule().stroke(color ?? appearanceManager.tintColor, lineWidth: 0.5))
     }
 }
 
@@ -1154,6 +1163,9 @@ struct AddMarkerSheet: View {
                             .contentShape(Rectangle())
                             .onTapGesture {
                                 primaryTagId = tag.id
+                                if title.isEmpty {
+                                    title = tag.name
+                                }
                             }
                         }
                         

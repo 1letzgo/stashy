@@ -9,6 +9,7 @@ struct UniversalSearchView: View {
     @StateObject private var viewModel = StashDBViewModel()
     @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
+    @ObservedObject var appearanceManager = AppearanceManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
     
     @State private var searchText = ""
@@ -168,51 +169,54 @@ struct UniversalSearchView: View {
                     }
                 }
                 .padding(.horizontal, 12)
+                .padding(.bottom, 8)
             }
         }
     }
     
     private func performerCard(_ performer: Performer) -> some View {
-        VStack(spacing: 8) {
-            if let imageURL = performer.thumbnailURL {
-                CustomAsyncImage(url: imageURL) { loader in
-                    if loader.isLoading {
-                        Circle()
-                            .fill(Color.gray.opacity(0.2))
-                            .frame(width: 80, height: 80)
-                            .overlay(ProgressView())
-                    } else if let image = loader.image {
-                        image
-                            .resizable()
-                            .aspectRatio(contentMode: .fill)
-                            .frame(width: 80, height: 120)
-                            .clipped()
-                            .clipShape(Circle())
-                            .alignmentGuide(.top) { d in d[.top] }
-                    } else {
-                        performerPlaceholder
+        ZStack(alignment: .bottom) {
+            // Thumbnail Circle
+            ZStack {
+                if let imageURL = performer.thumbnailURL {
+                    CustomAsyncImage(url: imageURL) { loader in
+                        if loader.isLoading {
+                            Circle()
+                                .fill(Color.gray.opacity(0.1))
+                                .frame(width: 80, height: 80)
+                                .overlay(ProgressView())
+                        } else if let image = loader.image {
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 80, height: 80, alignment: .top)
+                                .clipShape(Circle())
+                        } else {
+                            performerPlaceholder
+                        }
                     }
+                } else {
+                    performerPlaceholder
                 }
-            } else {
-                performerPlaceholder
             }
+            .padding(4)
+            .background(appearanceManager.tintColor)
+            .clipShape(Circle())
+            .overlay(Circle().stroke(appearanceManager.tintColor.opacity(0.1), lineWidth: 0.2))
             
-            Text(performer.name)
-                .font(.caption)
-                .fontWeight(.medium)
-                .lineLimit(1)
-                .frame(width: 80)
+            // Name Pill Overlaid at Bottom
+            InfoPill(icon: nil, text: performer.name)
+                .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                .offset(y: 8)
         }
+        .frame(width: 100) // Ensure enough width for the pill overflow if needed
     }
     
     private var performerPlaceholder: some View {
-        Circle()
-            .fill(Color.gray.opacity(0.2))
+        Image(systemName: "person.circle.fill")
+            .resizable()
             .frame(width: 80, height: 80)
-            .overlay(
-                Image(systemName: "person.fill")
-                    .foregroundColor(.secondary)
-            )
+            .foregroundColor(appearanceManager.tintColor.opacity(0.4))
     }
     
     private var studiosSection: some View {
@@ -221,41 +225,37 @@ struct UniversalSearchView: View {
                 coordinator.navigateToStudios(search: searchText)
             }
             
-            VStack(spacing: 0) {
-                ForEach(studios) { studio in
-                    NavigationLink(destination: StudioDetailView(studio: studio)) {
-                        HStack {
-                            Image(systemName: "building.2")
-                                .foregroundColor(.appAccent)
-                                .frame(width: 30)
-                            
-                            Text(studio.name)
-                                .foregroundColor(.primary)
-                            
-                            Spacer()
-                            
-                            Text("\(studio.sceneCount) scenes")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            Image(systemName: "chevron.right")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(studios) { studio in
+                        NavigationLink(destination: StudioDetailView(studio: studio)) {
+                            studioCard(studio)
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 10)
-                    }
-                    .buttonStyle(.plain)
-                    
-                    if studio.id != studios.last?.id {
-                        Divider()
-                            .padding(.leading, 54)
+                        .buttonStyle(.plain)
                     }
                 }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
             }
-            .background(Color(UIColor.secondarySystemBackground))
-            .cornerRadius(12)
-            .padding(.horizontal, 12)
+        }
+    }
+    
+    private func studioCard(_ studio: Studio) -> some View {
+        ZStack(alignment: .bottom) {
+            // Logo Container
+            ZStack {
+                StudioImageView(studio: studio)
+                    .padding(8)
+            }
+            .frame(width: 120, height: 90)
+            .background(appearanceManager.tintColor)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .overlay(RoundedRectangle(cornerRadius: 12).stroke(appearanceManager.tintColor.opacity(0.1), lineWidth: 0.2))
+            
+            // Name Pill
+            InfoPill(icon: nil, text: studio.name)
+                .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                .offset(y: 8)
         }
     }
     
@@ -268,13 +268,7 @@ struct UniversalSearchView: View {
             FlowLayout(spacing: 8) {
                 ForEach(tags) { tag in
                     NavigationLink(destination: TagDetailView(selectedTag: tag)) {
-                        Text("\(tag.name) (\(tag.sceneCount ?? 0))")
-                            .font(.subheadline)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(Color.appAccent.opacity(0.15))
-                            .foregroundColor(.appAccent)
-                            .cornerRadius(16)
+                        InfoPill(icon: "tag.fill", text: "\(tag.name) (\(tag.sceneCount ?? 0))")
                     }
                     .buttonStyle(.plain)
                 }
@@ -290,7 +284,7 @@ struct UniversalSearchView: View {
             }
             
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
+                HStack(alignment: .top, spacing: 12) {
                     ForEach(scenes) { scene in
                         NavigationLink(destination: SceneDetailView(scene: scene)) {
                             sceneCard(scene)
@@ -333,25 +327,24 @@ struct UniversalSearchView: View {
                     }
                 }
                 .padding(.horizontal, 12)
+                .padding(.bottom, 8)
             }
         }
     }
     
     private func galleryCard(_ gallery: Gallery) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        ZStack(alignment: .bottom) {
+            // Cover Image
             if let coverURL = gallery.coverURL {
                 CustomAsyncImage(url: coverURL) { loader in
                     if loader.isLoading {
                         Rectangle()
                             .fill(Color.gray.opacity(0.2))
-                            .frame(width: 120, height: 120)
                             .overlay(ProgressView())
                     } else if let image = loader.image {
                         image
                             .resizable()
                             .scaledToFill()
-                            .frame(width: 120, height: 120)
-                            .clipped()
                     } else {
                         galleryPlaceholder
                     }
@@ -359,20 +352,22 @@ struct UniversalSearchView: View {
             } else {
                 galleryPlaceholder
             }
-            
-            Text(gallery.title)
-                .font(.caption)
-                .fontWeight(.medium)
-                .lineLimit(2)
-                .frame(width: 120, alignment: .leading)
         }
-        .cornerRadius(8)
+        .frame(width: 140, height: 100)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            InfoPill(icon: "photo.stack", text: gallery.title)
+                .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                .offset(y: 8)
+            , alignment: .bottom
+        )
+        // Ensure the pill draws outside the clip
+        .zIndex(1)
     }
     
     private var galleryPlaceholder: some View {
         Rectangle()
             .fill(Color.gray.opacity(0.2))
-            .frame(width: 120, height: 120)
             .overlay(
                 Image(systemName: "photo.stack")
                     .foregroundColor(.secondary)

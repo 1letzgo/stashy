@@ -297,11 +297,50 @@ struct ShimmerModifier: ViewModifier {
     }
 }
 
+
 struct SkeletonModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .opacity(0.5)
             .overlay(Color.gray.opacity(0.2))
             .shimmer()
+    }
+}
+
+// MARK: - Shared UI Components
+
+struct InfoPill: View {
+    let icon: String?
+    let text: String
+    var color: Color? = nil
+    
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+    
+    private var activeColor: Color {
+        color ?? appearanceManager.tintColor
+    }
+    
+    var body: some View {
+        HStack(spacing: 4) {
+            if let icon = icon, !icon.isEmpty {
+                Image(systemName: icon)
+                    .font(.caption)
+                    .foregroundColor(activeColor)
+            }
+            Text(text)
+                .font(.caption)
+                .fontWeight(.bold)
+                .foregroundColor(activeColor)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(
+            ZStack {
+                Color(UIColor.systemBackground)
+                activeColor.opacity(0.1)
+            }
+        )
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(activeColor, lineWidth: 0.5))
     }
 }

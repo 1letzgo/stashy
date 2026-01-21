@@ -498,7 +498,12 @@ struct HomeSceneCardView: View {
             .padding(8)
         }
         .frame(width: cardWidth, height: cardWidth * 9 / 16)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+        .clipShape(RoundedRectangle(cornerRadius: 12)) // Updated to 12
+        .overlay(
+            // Optional: Add border if needed, but usually shadow is enough
+            // RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+            EmptyView()
+        )
         .onDisappear {
             stopPreview()
         }
