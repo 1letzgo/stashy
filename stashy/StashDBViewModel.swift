@@ -2550,7 +2550,7 @@ struct GenerateData: Codable {
         }
     }
     
-    func createSceneMarker(sceneId: String, title: String, seconds: Double, primaryTagId: String, completion: @escaping (Bool) -> Void) {
+    func createSceneMarker(sceneId: String, title: String, seconds: Double, endSeconds: Double? = nil, primaryTagId: String, completion: @escaping (Bool) -> Void) {
         let mutation = """
         mutation SceneMarkerCreate($input: SceneMarkerCreateInput!) {
             sceneMarkerCreate(input: $input) {
@@ -2561,13 +2561,19 @@ struct GenerateData: Codable {
         }
         """
         
+        var input: [String: Any] = [
+            "scene_id": sceneId,
+            "title": title,
+            "seconds": seconds,
+            "primary_tag_id": primaryTagId
+        ]
+        
+        if let endSeconds = endSeconds {
+            input["end_seconds"] = endSeconds
+        }
+        
         let variables: [String: Any] = [
-            "input": [
-                "scene_id": sceneId,
-                "title": title,
-                "seconds": seconds,
-                "primary_tag_id": primaryTagId
-            ]
+            "input": input
         ]
         
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
@@ -3400,6 +3406,7 @@ struct Tag: Codable, Identifiable {
     let name: String
     let imagePath: String?
     let sceneCount: Int?
+    let galleryCount: Int?
     let favorite: Bool?
     let createdAt: String?
     let updatedAt: String?
@@ -3408,6 +3415,7 @@ struct Tag: Codable, Identifiable {
         case id, name, favorite
         case imagePath = "image_path"
         case sceneCount = "scene_count"
+        case galleryCount = "gallery_count"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
     }

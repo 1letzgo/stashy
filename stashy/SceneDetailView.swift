@@ -88,287 +88,315 @@ struct SceneDetailView: View {
 
     private var videoPlayerCard: some View {
         VStack(spacing: 0) {
-            if activeScene.videoURL != nil {
-                if isPlaybackStarted, let player = player {
-                    VideoPlayerView(player: player, isFullscreen: $isFullscreen)
+            // 1. Video Player Area (Top Rounded)
+            VStack(spacing: 0) {
+                if activeScene.videoURL != nil {
+                    if isPlaybackStarted, let player = player {
+                        VideoPlayerView(player: player, isFullscreen: $isFullscreen)
+                            .aspectRatio(16/9, contentMode: .fit)
+                            .frame(maxWidth: .infinity)
+                            .clipShape(
+                                UnevenRoundedRectangle(
+                                    topLeadingRadius: 12,
+                                    bottomLeadingRadius: 0,
+                                    bottomTrailingRadius: 0,
+                                    topTrailingRadius: 12
+                                )
+                            )
+                    } else {
+                        // Preview/Poster state with Play Button
+                        ZStack {
+                            // Background / Thumbnail - constrained to 16:9
+                            GeometryReader { geo in
+                                if let url = activeScene.thumbnailURL {
+                                    CustomAsyncImage(url: url) { loader in
+                                        if let image = loader.image {
+                                            image
+                                                .resizable()
+                                                .scaledToFill()
+                                                .frame(width: geo.size.width, height: geo.size.height)
+                                                .clipped()
+                                        } else {
+                                            Rectangle()
+                                                .fill(Color.gray.opacity(0.1))
+                                                .skeleton()
+                                        }
+                                    }
+                                } else {
+                                    // No thumbnail - show placeholder
+                                    Rectangle()
+                                        .fill(Color.black.opacity(0.9))
+                                        .overlay(
+                                            Image(systemName: "film")
+                                                .font(.system(size: 50))
+                                                .foregroundColor(.gray.opacity(0.5))
+                                        )
+                                }
+                            }
+                            
+                            // Video Preview Overlay
+                            if isPreviewing, let previewPlayer = previewPlayer {
+                                GeometryReader { geo in
+                                    AspectFillVideoPlayer(player: previewPlayer)
+                                        .frame(width: geo.size.width, height: geo.size.height)
+                                        .clipped()
+                                        .allowsHitTesting(false)
+                                        .transition(.opacity)
+                                }
+                            }
+                            
+                            // Play Buttons Overlay (Hide when previewing)
+                            if !isPreviewing {
+                                if let resumeTime = activeScene.resumeTime, resumeTime > 0 {
+                                    VStack(spacing: 16) {
+                                        Button(action: { startPlayback(resume: true) }) {
+                                            HStack(spacing: 8) {
+                                                Image(systemName: "clock.arrow.circlepath")
+                                                Text("Resume from \(formatTime(resumeTime))")
+                                                    .fontWeight(.bold)
+                                            }
+                                            .padding(.horizontal, 20)
+                                            .padding(.vertical, 12)
+                                            .background(appearanceManager.tintColor)
+                                            .foregroundColor(.white)
+                                            .clipShape(Capsule())
+                                            .shadow(color: .black.opacity(0.3), radius: 5)
+                                        }
+                                        
+                                        Button(action: { startPlayback(resume: false) }) {
+                                            Text("Start from beginning")
+                                                .font(.caption)
+                                                .fontWeight(.medium)
+                                                .foregroundColor(.white)
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 6)
+                                                .background(appearanceManager.tintColor)
+                                                .clipShape(Capsule())
+                                                .shadow(color: .black.opacity(0.2), radius: 3)
+                                        }
+                                    }
+                                } else {
+                                    // Large Play Button Overlay
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.black.opacity(0.4))
+                                            .frame(width: 70, height: 70)
+                                            .blur(radius: 1)
+                                        
+                                        Image(systemName: "play.fill")
+                                            .font(.system(size: 30, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .offset(x: 2) // Visually center the play triangle
+                                    }
+                                    .contentShape(Rectangle())
+                                    .onTapGesture {
+                                        startPlayback(resume: false)
+                                    }
+                                }
+                                
+                                // Persistent Progress Bar at the bottom of the thumbnail area
+                                if let resumeTime = activeScene.resumeTime, resumeTime > 0, let duration = activeScene.sceneDuration, duration > 0 {
+                                    ProgressView(value: resumeTime, total: duration)
+                                        .progressViewStyle(LinearProgressViewStyle(tint: appearanceManager.tintColor))
+                                        .frame(height: 4)
+                                        .frame(maxHeight: .infinity, alignment: .bottom)
+                                }
+                            }
+                        }
+                        .frame(maxWidth: .infinity)
+                        .aspectRatio(16/9, contentMode: .fit)
+                        .background(Color(UIColor.secondarySystemBackground))
+                        .clipShape(
+                            UnevenRoundedRectangle(
+                                topLeadingRadius: 12,
+                                bottomLeadingRadius: 0,
+                                bottomTrailingRadius: 0,
+                                topTrailingRadius: 12
+                            )
+                        )
+                        .onLongPressGesture(minimumDuration: 0.15, pressing: { pressing in
+                            isPressing = pressing
+                            if pressing {
+                                startPreview()
+                            } else {
+                                stopPreview()
+                            }
+                        }, perform: {})
+                    }
+                } else {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
                         .aspectRatio(16/9, contentMode: .fit)
                         .frame(maxWidth: .infinity)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                } else {
-                    // Preview/Poster state with Play Button
-                    ZStack {
-                        // Background / Thumbnail - constrained to 16:9
-                        GeometryReader { geo in
-                            if let url = activeScene.thumbnailURL {
-                                CustomAsyncImage(url: url) { loader in
-                                    if let image = loader.image {
-                                        image
-                                            .resizable()
-                                            .scaledToFill()
-                                            .frame(width: geo.size.width, height: geo.size.height)
-                                            .clipped()
-                                    } else {
-                                        Rectangle()
-                                            .fill(Color.gray.opacity(0.1))
-                                            .skeleton()
-                                    }
-                                }
-                            } else {
-                                // No thumbnail - show placeholder
-                                Rectangle()
-                                    .fill(Color.black.opacity(0.9))
-                                    .overlay(
-                                        Image(systemName: "film")
-                                            .font(.system(size: 50))
-                                            .foregroundColor(.gray.opacity(0.5))
-                                    )
+                        .clipShape(
+                            UnevenRoundedRectangle(
+                                topLeadingRadius: 12,
+                                bottomLeadingRadius: 0,
+                                bottomTrailingRadius: 0,
+                                topTrailingRadius: 12
+                            )
+                        )
+                        .overlay(
+                            VStack(spacing: 8) {
+                                Image(systemName: "film")
+                                    .font(.largeTitle)
+                                    .foregroundColor(.secondary)
+                                Text("Video not available")
+                                    .foregroundColor(.secondary)
                             }
-                        }
-                        
-                        // Video Preview Overlay
-                        if isPreviewing, let previewPlayer = previewPlayer {
-                            GeometryReader { geo in
-                                AspectFillVideoPlayer(player: previewPlayer)
-                                    .frame(width: geo.size.width, height: geo.size.height)
-                                    .clipped()
-                                    .allowsHitTesting(false)
-                                    .transition(.opacity)
-                            }
-                        }
-                        
-                        // Play Buttons Overlay (Hide when previewing)
-                        if !isPreviewing {
-                            if let resumeTime = activeScene.resumeTime, resumeTime > 0 {
-                                VStack(spacing: 16) {
-                                    Button(action: { startPlayback(resume: true) }) {
-                                        HStack(spacing: 8) {
-                                            Image(systemName: "clock.arrow.circlepath")
-                                            Text("Resume from \(formatTime(resumeTime))")
-                                                .fontWeight(.bold)
-                                        }
-                                        .padding(.horizontal, 20)
-                                        .padding(.vertical, 12)
-                                        .background(appearanceManager.tintColor)
-                                        .foregroundColor(.white)
-                                        .clipShape(Capsule())
-                                        .shadow(color: .black.opacity(0.3), radius: 5)
-                                    }
-                                    
-                                    Button(action: { startPlayback(resume: false) }) {
-                                        Text("Start from beginning")
-                                            .font(.caption)
-                                            .fontWeight(.medium)
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 6)
-                                            .background(appearanceManager.tintColor)
-                                            .clipShape(Capsule())
-                                            .shadow(color: .black.opacity(0.2), radius: 3)
-                                    }
-                                }
-                            } else {
-                                // Large Play Button Overlay
-                                ZStack {
-                                    Circle()
-                                        .fill(Color.black.opacity(0.4))
-                                        .frame(width: 70, height: 70)
-                                        .blur(radius: 1)
-                                    
-                                    Image(systemName: "play.fill")
-                                        .font(.system(size: 30, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .offset(x: 2) // Visually center the play triangle
-                                }
-                                .contentShape(Rectangle())
-                                .onTapGesture {
-                                    startPlayback(resume: false)
-                                }
-                            }
-                            
-                            // Persistent Progress Bar at the bottom of the thumbnail area
-                            if let resumeTime = activeScene.resumeTime, resumeTime > 0, let duration = activeScene.sceneDuration, duration > 0 {
-                                ProgressView(value: resumeTime, total: duration)
-                                    .progressViewStyle(LinearProgressViewStyle(tint: appearanceManager.tintColor))
-                                    .frame(height: 4)
-                                    .frame(maxHeight: .infinity, alignment: .bottom)
-                            }
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    .aspectRatio(16/9, contentMode: .fit)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .onLongPressGesture(minimumDuration: 0.15, pressing: { pressing in
-                        isPressing = pressing
-                        if pressing {
-                            startPreview()
-                        } else {
-                            stopPreview()
-                        }
-                    }, perform: {})
+                        )
                 }
-            } else {
-                Rectangle()
-                    .fill(Color.gray.opacity(0.2))
-                    .aspectRatio(16/9, contentMode: .fit)
-                    .frame(maxWidth: .infinity)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .overlay(
-                        VStack(spacing: 8) {
-                            Image(systemName: "film")
-                                .font(.largeTitle)
-                                .foregroundColor(.secondary)
-                            Text("Video not available")
-                                .foregroundColor(.secondary)
-                        }
-                    )
             }
-        }
-        .background(Color(UIColor.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
-    }
 
-    private var infoCard: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            // Title and Rating in same row
-            HStack(alignment: .top) {
-                Text(activeScene.title ?? "Unbekannter Titel")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(.primary)
-                    .lineLimit(2)
-                
-                Spacer()
-                
-                    VStack(alignment: .trailing, spacing: 12) {
-                        StarRatingView(
-                            rating100: activeScene.rating100,
-                            isInteractive: true,
-                            size: 16,
-                            spacing: 2
-                        ) { newRating in
-                            viewModel.updateSceneRating(sceneId: activeScene.id, rating100: newRating) { success in
-                                if success {
+            // 2. Info Section (Title + Markers + Details)
+            VStack(alignment: .leading, spacing: 12) {
+                // Title
+                HStack(alignment: .top) {
+                    Text(activeScene.title ?? "Unbekannter Titel")
+                        .font(.title2)
+                        .fontWeight(.bold)
+                        .foregroundColor(.primary)
+                        .lineLimit(2)
+                    
+                    Spacer()
+                }
+
+                // Markers Area (Moved below Title)
+                if let markers = activeScene.sceneMarkers, !markers.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 12) {
+                            ForEach(markers.sorted { $0.seconds < $1.seconds }) { marker in
+                                Button(action: {
+                                    seekTo(marker.seconds)
+                                }) {
+                                    markerThumbnail(marker)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                    }
+                    .padding(.horizontal, -12) // Allow edge-to-edge scrolling
+                }
+
+                // Metadata Line (Scrollable swipebar)
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 8) {
+                        // O-Counter
+                        Button(action: {
+                            viewModel.incrementOCounter(sceneId: activeScene.id) { newCount in
+                                if let count = newCount {
                                     DispatchQueue.main.async {
-                                        var updatedScene = self.activeScene
-                                        updatedScene = updatedScene.withRating(newRating)
-                                        self.activeScene = updatedScene
+                                        self.activeScene = self.activeScene.withOCounter(count)
                                     }
                                 }
                             }
+                        }) {
+                            infoPill(icon: "heart.fill", text: "\(activeScene.oCounter ?? 0)", color: .red)
                         }
+                        .buttonStyle(.plain)
                         
-                        HStack(spacing: 8) {
-                            // Add Marker Button
-                            Button(action: {
-                                capturedMarkerTime = player?.currentTime().seconds ?? 0
-                                showingAddMarkerSheet = true
-                            }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "plus.square.fill.on.square.fill")
-                                        .font(.caption)
-                                        .foregroundColor(appearanceManager.tintColor)
-                                    Text("Marker")
-                                        .font(.caption)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.primary)
+                        // Add Marker Button
+                        Button(action: {
+                            capturedMarkerTime = player?.currentTime().seconds ?? 0
+                            showingAddMarkerSheet = true
+                        }) {
+                            infoPill(icon: "plus.square.fill.on.square.fill", text: "Marker", color: .green)
+                        }
+                        .buttonStyle(.plain)
+                        
+                        // Rating
+                        Menu {
+                            Section("Rate Scene") {
+                                ForEach((1...5).reversed(), id: \.self) { starCount in
+                                    Button(action: {
+                                        let newRating = starCount * 20
+                                        viewModel.updateSceneRating(sceneId: activeScene.id, rating100: newRating) { success in
+                                            if success {
+                                                DispatchQueue.main.async {
+                                                    self.activeScene = self.activeScene.withRating(newRating)
+                                                }
+                                            }
+                                        }
+                                    }) {
+                                        Label("\(starCount) Stars", systemImage: "star.fill")
+                                    }
                                 }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(appearanceManager.tintColor.opacity(0.1))
-                                .clipShape(Capsule())
-                            }
-                            .buttonStyle(.plain)
-                            
-                            // O-Counter (Manual)
-                            Button(action: {
-                                viewModel.incrementOCounter(sceneId: activeScene.id) { newCount in
-                                    if let count = newCount {
-                                        DispatchQueue.main.async {
-                                            self.activeScene = self.activeScene.withOCounter(count)
+                                
+                                Button(role: .destructive, action: {
+                                    viewModel.updateSceneRating(sceneId: activeScene.id, rating100: nil) { success in
+                                        if success {
+                                            DispatchQueue.main.async {
+                                                self.activeScene = self.activeScene.withRating(nil)
+                                            }
                                         }
                                     }
+                                }) {
+                                    Label("No Rating", systemImage: "star.slash")
                                 }
-                            }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "heart.fill")
-                                        .font(.caption)
-                                        .foregroundColor(.red)
-                                    Text("\(activeScene.oCounter ?? 0)")
-                                        .font(.caption)
-                                        .fontWeight(.bold)
-                                        .foregroundColor(.primary)
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.red.opacity(0.1))
-                                .clipShape(Capsule())
                             }
-                            .buttonStyle(.plain)
+                        } label: {
+                            let stars = Double(activeScene.rating100 ?? 0) / 20.0
+                            infoPill(
+                                icon: activeScene.rating100 == nil ? "star" : "star.fill",
+                                text: activeScene.rating100 == nil ? "Rate" : String(format: "%.1f", stars),
+                                color: activeScene.rating100 == nil ? .secondary : .orange
+                            )
+                        }
+
+                        // Resolution
+                        if let firstFile = activeScene.files?.first,
+                           let height = firstFile.height {
+                            let res = height >= 2160 ? "4K" : (height >= 1080 ? "1080p" : (height >= 720 ? "720p" : "\(height)p"))
+                            infoPill(icon: "video.fill", text: res, color: .blue)
+                        }
+
+                        // Organized Status
+                        if activeScene.organized == true {
+                            infoPill(icon: "checkmark.seal.fill", text: "Organized", color: .green)
+                        }
+
+                        // Date
+                        if let date = activeScene.date {
+                            infoPill(icon: "calendar", text: date)
+                        }
+                        
+                        // Duration
+                        if let duration = activeScene.sceneDuration {
+                            infoPill(icon: "clock", text: formatTime(duration))
+                        }
+                        
+                        // Play Count
+                        if let playCount = activeScene.playCount, playCount > 0 {
+                            infoPill(icon: "play.circle", text: "\(playCount) plays")
                         }
                     }
-            }
-            
-            // Metadata Line
-            HStack(spacing: 16) {
-                if let date = activeScene.date {
-                    HStack(spacing: 6) {
-                        Image(systemName: "calendar")
-                            .font(.caption)
-                            .foregroundColor(appearanceManager.tintColor)
-                        Text(date)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                    .padding(.horizontal, 12)
                 }
+                .padding(.horizontal, -12)
                 
-                if let duration = activeScene.sceneDuration {
-                    HStack(spacing: 6) {
-                        Image(systemName: "clock")
-                            .font(.caption)
-                            .foregroundColor(appearanceManager.tintColor)
-                        Text(formatTime(duration))
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                if let playCount = activeScene.playCount, playCount > 0 {
-                    HStack(spacing: 6) {
-                        Image(systemName: "play.circle")
-                            .font(.caption)
-                            .foregroundColor(appearanceManager.tintColor)
-                        Text("\(playCount) plays")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                if let resumeTime = activeScene.resumeTime, resumeTime > 0 {
-                    HStack(spacing: 6) {
-                        Image(systemName: "clock.arrow.circlepath")
-                            .font(.caption)
-                            .foregroundColor(appearanceManager.tintColor)
-                        Text("Resume: \(formatTime(resumeTime))")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+                // Description
+                if let details = activeScene.details, !details.isEmpty {
+                    Text(details)
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .lineLimit(isHeaderExpanded ? nil : 2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
             }
-            
-            // Description Section
-            if let details = activeScene.details, !details.isEmpty {
-                Text(details)
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .lineLimit(isHeaderExpanded ? nil : 2)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-            }
+            .padding(12)
+            .padding(.bottom, (activeScene.details?.isEmpty ?? true) ? 0 : 20) // Extra space for toggle pill
+            .background(Color(UIColor.systemBackground))
         }
-        .padding(12)
-        .padding(.bottom, (activeScene.details?.isEmpty ?? true) ? 0 : 20) // Extra space for button if description exists
         .background(Color(UIColor.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(
+            UnevenRoundedRectangle(
+                topLeadingRadius: 12,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: 12
+            )
+        )
         .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
         .overlay(
             Group {
@@ -391,77 +419,57 @@ struct SceneDetailView: View {
             alignment: .bottomTrailing
         )
     }
-
-    private var markersCard: some View {
-        Group {
-            if let markers = activeScene.sceneMarkers, !markers.isEmpty {
-                VStack(alignment: .leading, spacing: 0) {
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 12) {
-                            ForEach(markers.sorted { $0.seconds < $1.seconds }) { marker in
-                                Button(action: {
-                                    seekTo(marker.seconds)
-                                }) {
-                                    VStack(alignment: .leading, spacing: 8) {
-                                        // Marker Image
-                                        ZStack(alignment: .bottomTrailing) {
-                                            if let url = marker.thumbnailURL {
-                                                CustomAsyncImage(url: url) { loader in
-                                                    if let image = loader.image {
-                                                        image
-                                                             .resizable()
-                                                            .scaledToFill()
-                                                            .frame(width: 80, height: 45)
-                                                            .clipped()
-                                                    } else {
-                                                        Rectangle()
-                                                            .fill(Color.gray.opacity(0.1))
-                                                            .frame(width: 80, height: 45)
-                                                            .skeleton()
-                                                    }
-                                                }
-                                            } else {
-                                                Rectangle()
-                                                    .fill(Color.gray.opacity(0.2))
-                                                    .frame(width: 80, height: 45)
-                                                    .overlay(Image(systemName: "bookmark").foregroundColor(.secondary))
-                                            }
-                                            
-                                            // Timestamp label
-                                            Text(formatTime(marker.seconds))
-                                                .font(.system(size: 8))
-                                                .fontWeight(.bold)
-                                                .padding(.horizontal, 4)
-                                                .padding(.vertical, 1)
-                                                .background(Color.black.opacity(0.6))
-                                                .foregroundColor(.white)
-                                                .clipShape(RoundedRectangle(cornerRadius: 3))
-                                                .padding(2)
-                                        }
-                                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                                        
-                                        // Marker Title
-                                        Text(marker.title ?? "Marker at \(formatTime(marker.seconds))")
-                                            .font(.system(size: 10))
-                                            .fontWeight(.medium)
-                                            .lineLimit(2)
-                                            .frame(width: 80, alignment: .leading)
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                            }
+    
+    @ViewBuilder
+    private func markerThumbnail(_ marker: SceneMarker) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            // Marker Image
+            ZStack(alignment: .bottomTrailing) {
+                if let url = marker.thumbnailURL {
+                    CustomAsyncImage(url: url) { loader in
+                        if let image = loader.image {
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 80, height: 45)
+                                .clipped()
+                        } else {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.1))
+                                .frame(width: 80, height: 45)
+                                .skeleton()
                         }
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 12)
-                        .padding(.top, 12)
                     }
+                } else {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 80, height: 45)
+                        .overlay(Image(systemName: "bookmark").foregroundColor(.secondary))
                 }
-                .background(Color(UIColor.systemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+                
+                // Timestamp label
+                Text(formatTime(marker.seconds))
+                    .font(.system(size: 8))
+                    .fontWeight(.bold)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(Color.black.opacity(0.6))
+                    .foregroundColor(.white)
+                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                    .padding(2)
             }
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            
+            // Marker Title
+            Text(marker.title ?? "Marker at \(formatTime(marker.seconds))")
+                .font(.system(size: 10))
+                .fontWeight(.medium)
+                .lineLimit(2)
+                .frame(width: 80, alignment: .leading)
         }
     }
+
+
 
     private var performersCard: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -725,9 +733,6 @@ struct SceneDetailView: View {
             VStack(spacing: 12) {
                 videoPlayerCard
                 
-                markersCard
-                
-                infoCard
 
                 if !activeScene.performers.isEmpty || activeScene.studio != nil {
                     HStack(alignment: .top, spacing: 12) {
@@ -932,11 +937,26 @@ struct SceneDetailView: View {
         player?.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
         player?.play()
     }
+
+    private func infoPill(icon: String, text: String, color: Color? = nil) -> some View {
+        HStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.caption)
+                .foregroundColor(color ?? appearanceManager.tintColor)
+            Text(text)
+                .font(.caption)
+                .fontWeight(.bold)
+                .foregroundColor(.primary)
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background((color ?? appearanceManager.tintColor).opacity(0.1))
+        .clipShape(Capsule())
+    }
 }
 
 // Extensions for Scene conversion
 
-// Extend Scene to include videoURL computed property
 // Extend Scene to include videoURL computed property
 // REMOVED: Now in StashDBViewModel.swift
 
@@ -995,7 +1015,7 @@ extension SceneStudio {
     }
 }
 
-// Simple WrappedHStack for Flow Layout
+
 struct WrappedHStack<Data: RandomAccessCollection, Content: View>: View where Data.Element: Identifiable {
     let items: Data
     let content: (Data.Element) -> Content
@@ -1070,6 +1090,7 @@ struct AddMarkerSheet: View {
     @State private var searchText: String = ""
     @State private var isCreating = false
     @State private var isLoadingTags = false
+    @State private var endTimeString: String = ""
     
     var filteredTags: [Tag] {
         if searchText.isEmpty {
@@ -1084,8 +1105,20 @@ struct AddMarkerSheet: View {
             Form {
                 Section(header: Text("Marker Details")) {
                     TextField("Name", text: $title)
-                    Text("Time: \(formatTime(seconds))")
-                        .foregroundColor(.secondary)
+                    HStack {
+                        Text("Start Time:")
+                        Spacer()
+                        Text(formatTime(seconds))
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    HStack {
+                        Text("End Time (optional):")
+                        Spacer()
+                        TextField("Seconds or MM:SS", text: $endTimeString)
+                            .multilineTextAlignment(.trailing)
+                            .keyboardType(.numbersAndPunctuation)
+                    }
                 }
                 
                 Section(header: Text("Primary Tag")) {
@@ -1164,7 +1197,16 @@ struct AddMarkerSheet: View {
     
     private func createMarker() {
         isCreating = true
-        viewModel.createSceneMarker(sceneId: sceneId, title: title, seconds: seconds, primaryTagId: primaryTagId) { success in
+        
+        let endSeconds = parseTime(endTimeString)
+        
+        viewModel.createSceneMarker(
+            sceneId: sceneId,
+            title: title,
+            seconds: seconds,
+            endSeconds: endSeconds,
+            primaryTagId: primaryTagId
+        ) { success in
             DispatchQueue.main.async {
                 isCreating = false
                 if success {
@@ -1173,6 +1215,25 @@ struct AddMarkerSheet: View {
                 }
             }
         }
+    }
+    
+    private func parseTime(_ timeString: String) -> Double? {
+        if timeString.isEmpty { return nil }
+        
+        // Try direct double first
+        if let s = Double(timeString) { return s }
+        
+        // Try MM:SS or HH:MM:SS
+        let components = timeString.split(separator: ":").compactMap { Double($0) }.reversed()
+        var total: Double = 0
+        var multiplier: Double = 1
+        
+        for component in components {
+            total += component * multiplier
+            multiplier *= 60
+        }
+        
+        return total > 0 ? total : nil
     }
     
     private func formatTime(_ seconds: Double) -> String {

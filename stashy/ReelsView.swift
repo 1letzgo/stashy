@@ -136,47 +136,39 @@ struct ReelsView: View {
             reelsToolbar
         }
         .onAppear {
-            viewModel.fetchSavedFilters()
+            viewModel.fetchSavedFilters() // This is async, might use cache
             
-            // 1. High Priority: Coordinator Pre-selection
-            if let performer = coordinator.reelsPerformer {
-                let tags = coordinator.reelsTags
+            // Determine initial state
+            var initialPerformer: ScenePerformer? = coordinator.reelsPerformer
+            var initialTags: [Tag] = coordinator.reelsTags
+            
+            // Clear coordinator immediately
+            if initialPerformer != nil || !initialTags.isEmpty {
                 coordinator.reelsPerformer = nil
                 coordinator.reelsTags = []
-                applySettings(sortBy: selectedSortOption, filter: nil, performer: performer, tags: tags)
-                return
-            } 
-            
-            if !coordinator.reelsTags.isEmpty {
-                let tags = coordinator.reelsTags
-                coordinator.reelsTags = []
-                applySettings(sortBy: selectedSortOption, filter: nil, performer: nil, tags: tags)
-                return
+            } else {
+                // Fallback to state if not coming from coordinator
+                initialPerformer = selectedPerformer
+                initialTags = selectedTags
             }
             
-            // 2. Middle Priority: Default Filter
-            if let defaultId = TabManager.shared.getDefaultFilterId(for: .reels) {
-                if let filter = viewModel.savedFilters[defaultId] {
-                    // Already loaded, apply if no filter is currently active
-                    if selectedFilter == nil {
-                        applySettings(sortBy: selectedSortOption, filter: filter, performer: nil, tags: [])
-                    }
-                    return
-                }
-                // Not yet loaded, wait for onChange(of: viewModel.savedFilters)
-                return
+            // Check if default filter is already available in cache
+            var initialFilter = selectedFilter
+            if initialFilter == nil, let defaultId = TabManager.shared.getDefaultFilterId(for: .reels) {
+                initialFilter = viewModel.savedFilters[defaultId]
             }
             
-            // 3. Low Priority: Fallback generic load
-            // Only if we have no scenes and no special configuration
-            if viewModel.scenes.isEmpty {
+            // If we have context (coordinator) OR we have nothing loaded yet
+            if (initialPerformer != nil || !initialTags.isEmpty) || (viewModel.scenes.isEmpty && selectedFilter == nil) {
                 let savedSort = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
-                applySettings(sortBy: savedSort, filter: nil, performer: nil, tags: []) 
+                applySettings(sortBy: savedSort, filter: initialFilter, performer: initialPerformer, tags: initialTags)
             }
         }
         .onChange(of: viewModel.savedFilters) { _, newValue in
+            // Only apply default filter if we haven't set a filter yet
             if selectedFilter == nil, let defaultId = TabManager.shared.getDefaultFilterId(for: .reels) {
                 if let filter = newValue[defaultId] {
+                    // This will merge with current selectedPerformer/Tags state
                     applySettings(sortBy: selectedSortOption, filter: filter, performer: selectedPerformer, tags: selectedTags)
                 }
             }
@@ -784,7 +776,7 @@ struct ReelItemView: View {
                             HStack(spacing: 8) {
                                 ForEach(tags) { tag in
                                     Button(action: {
-                                        let fullTag = Tag(id: tag.id, name: tag.name, imagePath: nil, sceneCount: nil, favorite: nil, createdAt: nil, updatedAt: nil)
+                                        let fullTag = Tag(id: tag.id, name: tag.name, imagePath: nil, sceneCount: nil, galleryCount: nil, favorite: nil, createdAt: nil, updatedAt: nil)
                                         onTagTap(fullTag)
                                     }) {
                                         Text("#\(tag.name)")

@@ -249,12 +249,118 @@ struct PerformerDetailView: View {
     
     private var sceneSortMenu: some View {
         Menu {
-            ForEach(StashDBViewModel.SceneSortOption.allCases, id: \.self) { option in
-                Button(action: { changeSortOption(to: option) }) {
+            // Random
+            Button(action: { changeSortOption(to: .random) }) {
+                HStack {
+                    Text("Random")
+                    if selectedSortOption == .random { Image(systemName: "checkmark") }
+                }
+            }
+            
+            Divider()
+            
+            // Date
+            Menu {
+                Button(action: { changeSortOption(to: .dateDesc) }) {
                     HStack {
-                        Text(option.displayName)
-                        if option == selectedSortOption { Image(systemName: "checkmark") }
+                        Text("Newest First")
+                        if selectedSortOption == .dateDesc { Image(systemName: "checkmark") }
                     }
+                }
+                Button(action: { changeSortOption(to: .dateAsc) }) {
+                    HStack {
+                        Text("Oldest First")
+                        if selectedSortOption == .dateAsc { Image(systemName: "checkmark") }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text("Date")
+                    if selectedSortOption == .dateAsc || selectedSortOption == .dateDesc { Image(systemName: "checkmark") }
+                }
+            }
+            
+            // Title
+            Menu {
+                Button(action: { changeSortOption(to: .titleAsc) }) {
+                    HStack {
+                        Text("A → Z")
+                        if selectedSortOption == .titleAsc { Image(systemName: "checkmark") }
+                    }
+                }
+                Button(action: { changeSortOption(to: .titleDesc) }) {
+                    HStack {
+                        Text("Z → A")
+                        if selectedSortOption == .titleDesc { Image(systemName: "checkmark") }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text("Title")
+                    if selectedSortOption == .titleAsc || selectedSortOption == .titleDesc { Image(systemName: "checkmark") }
+                }
+            }
+            
+            // Duration
+            Menu {
+                Button(action: { changeSortOption(to: .durationDesc) }) {
+                    HStack {
+                        Text("Longest First")
+                        if selectedSortOption == .durationDesc { Image(systemName: "checkmark") }
+                    }
+                }
+                Button(action: { changeSortOption(to: .durationAsc) }) {
+                    HStack {
+                        Text("Shortest First")
+                        if selectedSortOption == .durationAsc { Image(systemName: "checkmark") }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text("Duration")
+                    if selectedSortOption == .durationAsc || selectedSortOption == .durationDesc { Image(systemName: "checkmark") }
+                }
+            }
+            
+            // Rating
+            Menu {
+                Button(action: { changeSortOption(to: .ratingDesc) }) {
+                    HStack {
+                        Text("High → Low")
+                        if selectedSortOption == .ratingDesc { Image(systemName: "checkmark") }
+                    }
+                }
+                Button(action: { changeSortOption(to: .ratingAsc) }) {
+                    HStack {
+                        Text("Low → High")
+                        if selectedSortOption == .ratingAsc { Image(systemName: "checkmark") }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text("Rating")
+                    if selectedSortOption == .ratingAsc || selectedSortOption == .ratingDesc { Image(systemName: "checkmark") }
+                }
+            }
+            
+            // Counter
+            Menu {
+                Button(action: { changeSortOption(to: .oCounterDesc) }) {
+                    HStack {
+                        Text("High → Low")
+                        if selectedSortOption == .oCounterDesc { Image(systemName: "checkmark") }
+                    }
+                }
+                Button(action: { changeSortOption(to: .oCounterAsc) }) {
+                    HStack {
+                        Text("Low → High")
+                        if selectedSortOption == .oCounterAsc { Image(systemName: "checkmark") }
+                    }
+                }
+            } label: {
+                HStack {
+                    Text("Counter")
+                    if selectedSortOption == .oCounterAsc || selectedSortOption == .oCounterDesc { Image(systemName: "checkmark") }
                 }
             }
         } label: {
@@ -307,12 +413,6 @@ struct PerformerDetailView: View {
                     
                     // Stats Badges (Top Right)
                     HStack(spacing: 4) {
-                        let galleryCount = displayPerformer.galleryCount ?? viewModel.totalPerformerGalleries
-                        if galleryCount > 0 {
-                            cardBadge(icon: "photo.stack", text: "\(galleryCount)")
-                        }
-                        cardBadge(icon: "film", text: "\(displayPerformer.sceneCount)")
-                        
                         // StashTok Button
                         Button(action: {
                             let sp = ScenePerformer(id: displayPerformer.id, name: displayPerformer.name, sceneCount: displayPerformer.sceneCount, galleryCount: displayPerformer.galleryCount)
@@ -358,8 +458,12 @@ struct PerformerDetailView: View {
             .padding(.horizontal, 12)
             .frame(maxWidth: .infinity, minHeight: collapsedHeight, alignment: .topLeading)
         }
-        .background(Color.appBackground)
+        .background(Color(UIColor.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+        )
         .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
         .overlay(
             Group {
@@ -424,6 +528,17 @@ struct PerformerDetailView: View {
 
     private func getPerformerDetails(_ p: Performer) -> [(label: String, value: String)] {
         var list: [(label: String, value: String)] = []
+        
+        // Add Scenes and Galleries as the first row
+        list.append((label: "SCENES", value: "\(p.sceneCount)"))
+        if let gCount = p.galleryCount ?? viewModel.totalPerformerGalleries as Int?, gCount > 0 {
+            list.append((label: "GALLERIES", value: "\(gCount)"))
+        } else {
+            // Add a placeholder to keep the grid aligned if galleries are 0
+            // Or just leave it if there's only 1 item in the first row. 
+            // Usually it looks better if the first row is full.
+            // But if there are no galleries, maybe just leave it.
+        }
         
         if let val = p.gender, !val.isEmpty { list.append((label: "GENDER", value: val)) }
         if let val = p.fakeTits, !val.isEmpty { list.append((label: "Tits", value: val)) }
