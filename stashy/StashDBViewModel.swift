@@ -523,6 +523,7 @@ class StashDBViewModel: ObservableObject {
     @Published var hasMorePerformerScenes = true
     private var currentPerformerScenePage = 1
     private var currentPerformerSceneSortOption: SceneSortOption = .dateDesc
+    private var currentPerformerDetailFilter: SavedFilter? = nil
 
     // Studio scenes
     @Published var studioScenes: [Scene] = []
@@ -531,6 +532,16 @@ class StashDBViewModel: ObservableObject {
     @Published var hasMoreStudioScenes = true
     private var currentStudioScenePage = 1
     private var currentStudioSceneSortOption: SceneSortOption = .dateDesc
+    private var currentStudioDetailFilter: SavedFilter? = nil
+    
+    // Tag Scenes (Adding property here as it seems missing/implicit in other parts or I missed it)
+    @Published var tagScenes: [Scene] = []
+    @Published var totalTagScenes: Int = 0
+    @Published var isLoadingTagScenes = false
+    @Published var hasMoreTagScenes = true
+    private var currentTagScenePage = 1
+    private var currentTagSceneSortOption: SceneSortOption = .dateDesc
+    private var currentTagDetailFilter: SavedFilter? = nil
 
     private var cancellables = Set<AnyCancellable>()
     
@@ -1380,10 +1391,11 @@ class StashDBViewModel: ObservableObject {
         }
     }
     
-    func fetchPerformerScenes(performerId: String, sortBy: SceneSortOption = .dateDesc, isInitialLoad: Bool = true) {
+    func fetchPerformerScenes(performerId: String, sortBy: SceneSortOption = .dateDesc, isInitialLoad: Bool = true, filter: SavedFilter? = nil) {
         if isInitialLoad {
             currentPerformerScenePage = 1
             currentPerformerSceneSortOption = sortBy
+            currentPerformerDetailFilter = filter
             // performerScenes = [] <-- Don't clear to keep navigation stable
             totalPerformerScenes = 0
             isLoadingPerformerScenes = true
@@ -1403,11 +1415,19 @@ class StashDBViewModel: ObservableObject {
             "direction": sortBy.direction
         ]
         
-        let sceneFilter: [String: Any] = [
-            "performers": [
-                "modifier": "INCLUDES",
-                "value": [performerId]
-            ]
+        var sceneFilter: [String: Any] = [:]
+        
+        if let savedFilter = currentPerformerDetailFilter {
+            if let dict = savedFilter.filterDict {
+                sceneFilter = sanitizeFilter(dict)
+            } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
+                sceneFilter = sanitizeFilter(objDict)
+            }
+        }
+        
+        sceneFilter["performers"] = [
+            "modifier": "INCLUDES",
+            "value": [performerId]
         ]
         
         let variables: [String: Any] = [
@@ -1483,10 +1503,11 @@ class StashDBViewModel: ObservableObject {
         }
     }
     
-    func fetchStudioScenes(studioId: String, sortBy: SceneSortOption = .dateDesc, isInitialLoad: Bool = true) {
+    func fetchStudioScenes(studioId: String, sortBy: SceneSortOption = .dateDesc, isInitialLoad: Bool = true, filter: SavedFilter? = nil) {
         if isInitialLoad {
             currentStudioScenePage = 1
             currentStudioSceneSortOption = sortBy
+            currentStudioDetailFilter = filter
             // studioScenes = []
             totalStudioScenes = 0
             isLoadingStudioScenes = true
@@ -1506,11 +1527,19 @@ class StashDBViewModel: ObservableObject {
             "direction": sortBy.direction
         ]
         
-        let sceneFilter: [String: Any] = [
-            "studios": [
-                "modifier": "INCLUDES",
-                "value": [studioId]
-            ]
+        var sceneFilter: [String: Any] = [:]
+        
+        if let savedFilter = currentStudioDetailFilter {
+            if let dict = savedFilter.filterDict {
+                sceneFilter = sanitizeFilter(dict)
+            } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
+                sceneFilter = sanitizeFilter(objDict)
+            }
+        }
+        
+        sceneFilter["studios"] = [
+            "modifier": "INCLUDES",
+            "value": [studioId]
         ]
         
         let variables: [String: Any] = [
@@ -1910,10 +1939,11 @@ class StashDBViewModel: ObservableObject {
         }
     }
     
-    func fetchTagScenes(tagId: String, sortBy: SceneSortOption = .dateDesc, isInitialLoad: Bool = true) {
+    func fetchTagScenes(tagId: String, sortBy: SceneSortOption = .dateDesc, isInitialLoad: Bool = true, filter: SavedFilter? = nil) {
         if isInitialLoad {
             currentTagScenePage = 1
             currentTagSceneSortOption = sortBy
+            currentTagDetailFilter = filter
             // tagScenes = []
             totalTagScenes = 0
             isLoadingTagScenes = true
@@ -1933,11 +1963,19 @@ class StashDBViewModel: ObservableObject {
             "direction": sortBy.direction
         ]
         
-        let sceneFilter: [String: Any] = [
-            "tags": [
-                "modifier": "INCLUDES",
-                "value": [tagId]
-            ]
+        var sceneFilter: [String: Any] = [:]
+        
+        if let savedFilter = currentTagDetailFilter {
+            if let dict = savedFilter.filterDict {
+                sceneFilter = sanitizeFilter(dict)
+            } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
+                sceneFilter = sanitizeFilter(objDict)
+            }
+        }
+        
+        sceneFilter["tags"] = [
+            "modifier": "INCLUDES",
+            "value": [tagId]
         ]
         
         let variables: [String: Any] = [

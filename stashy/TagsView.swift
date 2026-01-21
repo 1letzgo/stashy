@@ -408,7 +408,20 @@ struct TagDetailView: View {
 
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
             TabManager.shared.setDetailSortOption(for: "tag_detail", option: newOption.rawValue)
-            self.viewModel.fetchTagScenes(tagId: self.selectedTag.id, sortBy: newOption, isInitialLoad: true)
+            
+            // Use existing filter if we have one loaded in viewModel, but we can't access it easily outside.
+            // However, fetchTagScenes will use the internal `currentTagDetailFilter` if isInitialLoad is false?
+            // No, fetchTagScenes takes `filter` arg. Only if isInitialLoad is TRUE does it store it.
+            // If isInitialLoad is TRUE, I MUST pass the filter again if I want to persist it?
+            // Yes, my implementation overwrite `currentTagDetailFilter = filter` on initial load.
+            
+            // But wait, here I am calling with isInitialLoad: true to reset pagination/sort.
+            // So I need to retrieve the filter again.
+            
+            let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes)
+            let filter = defaultId.flatMap { self.viewModel.savedFilters[$0] }
+            
+            self.viewModel.fetchTagScenes(tagId: self.selectedTag.id, sortBy: newOption, isInitialLoad: true, filter: filter)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 self.isChangingSort = false
             }
@@ -716,7 +729,16 @@ struct TagDetailView: View {
             }
         }
         .onAppear {
-            viewModel.fetchTagScenes(tagId: selectedTag.id, sortBy: selectedSortOption, isInitialLoad: true)
+            // Check for default filter
+            let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes)
+            
+            if defaultId != nil {
+                // Fetch filters first, scenes will load in onChange
+                viewModel.fetchSavedFilters()
+            } else {
+                // No default filter, load immediately
+                viewModel.fetchTagScenes(tagId: selectedTag.id, sortBy: selectedSortOption, isInitialLoad: true)
+            }
             
             // Initial fetch to get favorite status
              viewModel.fetchTag(tagId: selectedTag.id) { updatedTag in
@@ -726,6 +748,17 @@ struct TagDetailView: View {
                      self.isFavorite = selectedTag.favorite ?? false
                  }
              }
+        }
+        .onChange(of: viewModel.savedFilters) { oldValue, newValue in
+            if let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes) {
+                if let filter = newValue[defaultId] {
+                    // Found default filter, apply it
+                    viewModel.fetchTagScenes(tagId: selectedTag.id, sortBy: selectedSortOption, isInitialLoad: true, filter: filter)
+                } else if !viewModel.isLoadingSavedFilters {
+                    // Default filter ID exists but not found (e.g. deleted), load without filter
+                    viewModel.fetchTagScenes(tagId: selectedTag.id, sortBy: selectedSortOption, isInitialLoad: true)
+                }
+            }
         }
     }
 }

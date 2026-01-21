@@ -50,7 +50,9 @@ struct StudioDetailView: View {
         refreshTrigger = UUID()
 
         // Fetch new data immediately
-        viewModel.fetchStudioScenes(studioId: studio.id, sortBy: newOption, isInitialLoad: true)
+        let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes)
+        let filter = defaultId.flatMap { viewModel.savedFilters[$0] }
+        viewModel.fetchStudioScenes(studioId: studio.id, sortBy: newOption, isInitialLoad: true, filter: filter)
     }
     
     private var columns: [GridItem] {
@@ -137,6 +139,15 @@ struct StudioDetailView: View {
             print("🔄 STUDIO DETAIL: Recieved SceneDeleted notification, refreshing...")
             refreshTrigger = UUID()
             viewModel.fetchStudioScenes(studioId: studio.id, sortBy: selectedSortOption, isInitialLoad: true)
+        }
+        .onChange(of: viewModel.savedFilters) { oldValue, newValue in
+            if let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes), viewModel.studioScenes.isEmpty {
+                 if let filter = newValue[defaultId] {
+                      viewModel.fetchStudioScenes(studioId: studio.id, sortBy: selectedSortOption, isInitialLoad: true, filter: filter)
+                 } else if !viewModel.isLoadingSavedFilters {
+                      viewModel.fetchStudioScenes(studioId: studio.id, sortBy: selectedSortOption, isInitialLoad: true)
+                 }
+            }
         }
         .navigationTitle("")
 #if !os(tvOS)
@@ -542,11 +553,18 @@ struct StudioDetailView: View {
     }
     
     private func loadData() {
-        if viewModel.studioScenes.isEmpty && !viewModel.isLoadingStudioScenes {
-            viewModel.fetchStudioScenes(studioId: studio.id, sortBy: selectedSortOption, isInitialLoad: true)
-        }
         if viewModel.studioGalleries.isEmpty && !viewModel.isLoadingStudioGalleries {
             viewModel.fetchStudioGalleries(studioId: studio.id, isInitialLoad: true)
+        }
+        
+        // Scenes with filter
+        let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes)
+        if defaultId != nil {
+             viewModel.fetchSavedFilters()
+        } else {
+             if viewModel.studioScenes.isEmpty && !viewModel.isLoadingStudioScenes {
+                 viewModel.fetchStudioScenes(studioId: studio.id, sortBy: selectedSortOption, isInitialLoad: true)
+             }
         }
     }
 }
