@@ -65,6 +65,7 @@ struct StudiosView: View {
             onAppearAction()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+            selectedFilter = nil
             performSearch()
         }
         .onChange(of: searchText) { oldValue, newValue in
@@ -277,10 +278,14 @@ struct StudiosView: View {
     }
 
     private func onSavedFiltersChange(_ newValue: [String: StashDBViewModel.SavedFilter]) {
-        if selectedFilter == nil, let defaultId = TabManager.shared.getDefaultFilterId(for: .studios) {
-            if let filter = newValue[defaultId] {
+        if selectedFilter == nil {
+            if let defaultId = TabManager.shared.getDefaultFilterId(for: .studios),
+               let filter = newValue[defaultId] {
                 selectedFilter = filter
                 viewModel.fetchStudios(sortBy: selectedSortOption, searchQuery: searchText, filter: filter)
+            } else if !viewModel.isLoadingSavedFilters {
+                // Default filter was set but not found, or filters finished loading and none match
+                viewModel.fetchStudios(sortBy: selectedSortOption, searchQuery: searchText, filter: nil)
             }
         }
     }

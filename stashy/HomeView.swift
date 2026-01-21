@@ -309,14 +309,10 @@ struct HomeRowView: View {
         .onAppear {
             checkAndLoadScenes()
         }
-        .onChange(of: viewModel.savedFilters) { _, newValue in
-            // If we were waiting for a dashboard filter, and it just arrived, load now
-            if let filterId = TabManager.shared.getDefaultFilterId(for: .dashboard) {
-                if newValue[filterId] != nil {
-                    // Filter loaded!
-                    loadScenes()
-                }
-            }
+        .onChange(of: viewModel.savedFilters) { _, _ in
+            // When filters are updated (loaded), try to load scenes.
+            // checkAndLoadScenes will decide if it's safe to load now.
+            checkAndLoadScenes()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
             if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.dashboard.rawValue {
@@ -325,12 +321,20 @@ struct HomeRowView: View {
                 checkAndLoadScenes()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+            // Clear cache and reload on server switch
+            viewModel.homeRowScenes[config.type] = nil
+            checkAndLoadScenes()
+        }
     }
     
     private func checkAndLoadScenes() {
         // If a default filter is set but not loaded yet, wait.
         if let filterId = TabManager.shared.getDefaultFilterId(for: .dashboard) {
-            if viewModel.savedFilters[filterId] != nil {
+            // We load if:
+            // 1. The filter is found
+            // 2. OR we finished loading all filters and it's NOT found (fallback)
+            if viewModel.savedFilters[filterId] != nil || !viewModel.isLoadingSavedFilters {
                 loadScenes()
             } else {
                 // Filter set but not loaded. Do nothing, wait for onChange.

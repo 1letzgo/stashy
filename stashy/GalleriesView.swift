@@ -313,6 +313,7 @@ struct GalleriesView: View {
             viewModel.fetchSavedFilters()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+            selectedFilter = nil
             performSearch()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
@@ -328,9 +329,13 @@ struct GalleriesView: View {
         }
         .onChange(of: viewModel.savedFilters) { oldValue, newValue in
             // Apply default filter if set and none selected yet
-            if selectedFilter == nil, let defaultId = TabManager.shared.getDefaultFilterId(for: .galleries) {
-                if let filter = newValue[defaultId] {
+            if selectedFilter == nil {
+                if let defaultId = TabManager.shared.getDefaultFilterId(for: .galleries),
+                   let filter = newValue[defaultId] {
                     selectedFilter = filter
+                    performSearch()
+                } else if !viewModel.isLoadingSavedFilters {
+                    // Default filter was set but not found, or filters finished loading and none match
                     performSearch()
                 }
             }

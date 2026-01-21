@@ -298,6 +298,7 @@ struct PerformersView: View {
             viewModel.fetchSavedFilters()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+            selectedFilter = nil
             performSearch()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
@@ -313,10 +314,14 @@ struct PerformersView: View {
         }
         .onChange(of: viewModel.savedFilters) { oldValue, newValue in
             // Apply default filter if set and none selected yet
-            if selectedFilter == nil, let defaultId = TabManager.shared.getDefaultFilterId(for: .performers) {
-                if let filter = newValue[defaultId] {
+            if selectedFilter == nil {
+                if let defaultId = TabManager.shared.getDefaultFilterId(for: .performers),
+                   let filter = newValue[defaultId] {
                     selectedFilter = filter
                     viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: filter)
+                } else if !viewModel.isLoadingSavedFilters {
+                    // Default filter was set but not found, or filters finished loading and none match
+                    viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: nil)
                 }
             }
         }

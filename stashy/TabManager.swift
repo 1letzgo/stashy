@@ -170,11 +170,29 @@ class TabManager: ObservableObject {
     private let homeRowsKey = "HomeRowsConfig"
     
     init() {
+        // Initial load based on currently active server
+        loadAllConfigs()
+        
+        // Listen for server changes to reload server-specific configuration
+        NotificationCenter.default.addObserver(self, selector: #selector(handleServerChange), name: NSNotification.Name("ServerConfigChanged"), object: nil)
+    }
+    
+    @objc private func handleServerChange() {
+        print("🔄 TabManager: Server changed, reloading configurations")
+        loadAllConfigs()
+    }
+    
+    private func loadAllConfigs() {
         loadConfig()
         loadDetailConfigs()
         loadHomeRows()
-        
-        // Downloads tab visibility is now managed by user preference
+    }
+    
+    private var currentServerSuffix: String {
+        if let activeConfig = ServerConfigManager.shared.activeConfig {
+            return "_\(activeConfig.id.uuidString)"
+        }
+        return ""
     }
     
     var visibleTabs: [AppTab] {
@@ -201,7 +219,32 @@ class TabManager: ObservableObject {
     // The user wants to toggle visibility of Studios, Performers, Scenes, Tags.
     
     func loadConfig() {
-        if let data = UserDefaults.standard.data(forKey: userDefaultsKey),
+        let suffix = currentServerSuffix
+        let serverSpecificKey = "\(userDefaultsKey)\(suffix)"
+        
+        var data = UserDefaults.standard.data(forKey: serverSpecificKey)
+        
+        // Migration: If no server-specific config exists, try to load legacy global config
+        if data == nil && !suffix.isEmpty {
+            data = UserDefaults.standard.data(forKey: userDefaultsKey)
+            if let legacyData = data {
+                // CLEAR filter IDs during migration to prevent cross-server filter inheritance
+                if var decoded = try? JSONDecoder().decode([TabConfig].self, from: legacyData) {
+                    for i in 0..<decoded.count {
+                        decoded[i].defaultFilterId = nil
+                        decoded[i].defaultFilterName = nil
+                    }
+                    if let modifiedData = try? JSONEncoder().encode(decoded) {
+                        data = modifiedData
+                        print("💾 TabManager: Migrated legacy config (filters cleared) for server \(suffix)")
+                        // Save it immediately for the new server suffix
+                        UserDefaults.standard.set(modifiedData, forKey: serverSpecificKey)
+                    }
+                }
+            }
+        }
+
+        if let data = data,
            let decoded = try? JSONDecoder().decode([TabConfig].self, from: data) {
             
             // Migration: rename home to dashboard if needed
@@ -292,7 +335,20 @@ class TabManager: ObservableObject {
     }
     
     func loadHomeRows() {
-        if let data = UserDefaults.standard.data(forKey: homeRowsKey),
+        let suffix = currentServerSuffix
+        let serverSpecificKey = "\(homeRowsKey)\(suffix)"
+        
+        var data = UserDefaults.standard.data(forKey: serverSpecificKey)
+        
+        // Migration
+        if data == nil && !suffix.isEmpty {
+            data = UserDefaults.standard.data(forKey: homeRowsKey)
+            if let legacyData = data {
+                UserDefaults.standard.set(legacyData, forKey: serverSpecificKey)
+            }
+        }
+        
+        if let data = data,
            let decoded = try? JSONDecoder().decode([HomeRowConfig].self, from: data) {
             self.homeRows = decoded.sorted { $0.sortOrder < $1.sortOrder }
             
@@ -324,7 +380,8 @@ class TabManager: ObservableObject {
     
     func saveHomeRows() {
         if let encoded = try? JSONEncoder().encode(homeRows) {
-            UserDefaults.standard.set(encoded, forKey: homeRowsKey)
+            let key = "\(homeRowsKey)\(currentServerSuffix)"
+            UserDefaults.standard.set(encoded, forKey: key)
         }
     }
     
@@ -396,10 +453,21 @@ class TabManager: ObservableObject {
     }
     
     func loadDetailConfigs() {
+        let suffix = currentServerSuffix
         // Initialize default configs
         var configs: [DetailViewConfig] = []
         for context in DetailViewContext.allCases {
-            let savedOption = UserDefaults.standard.string(forKey: "\(detailSortKey)_\(context.rawValue)")
+            let key = "\(detailSortKey)_\(context.rawValue)\(suffix)"
+            var savedOption = UserDefaults.standard.string(forKey: key)
+            
+            // Migration
+            if savedOption == nil && !suffix.isEmpty {
+                savedOption = UserDefaults.standard.string(forKey: "\(detailSortKey)_\(context.rawValue)")
+                if let legacyOption = savedOption {
+                    UserDefaults.standard.set(legacyOption, forKey: key)
+                }
+            }
+            
             configs.append(DetailViewConfig(id: context, defaultSortOption: savedOption ?? "dateDesc"))
         }
         self.detailViews = configs
@@ -407,7 +475,8 @@ class TabManager: ObservableObject {
     
     func saveConfig() {
         if let encoded = try? JSONEncoder().encode(tabs) {
-            UserDefaults.standard.set(encoded, forKey: userDefaultsKey)
+            let key = "\(userDefaultsKey)\(currentServerSuffix)"
+            UserDefaults.standard.set(encoded, forKey: key)
         }
     }
     
@@ -493,7 +562,8 @@ class TabManager: ObservableObject {
             objectWillChange.send()
             detailViews[index].defaultSortOption = option
             sessionDetailSortOptions[context] = option
-            UserDefaults.standard.set(option, forKey: "\(detailSortKey)_\(context)")
+            let key = "\(detailSortKey)_\(context)\(currentServerSuffix)"
+            UserDefaults.standard.set(option, forKey: key)
         }
     }
     

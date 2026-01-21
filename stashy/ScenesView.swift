@@ -365,6 +365,7 @@ struct ScenesView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+            selectedFilter = nil
             performSearch()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
@@ -398,14 +399,19 @@ struct ScenesView: View {
             
             // Apply default filter if set and none selected yet
             // Uses selectedSortOption which may have just been set from coordinator above
-            if selectedFilter == nil, let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes) {
-                if let filter = newValue[defaultId] {
+            if selectedFilter == nil {
+                if let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes),
+                   let filter = newValue[defaultId] {
                     selectedFilter = filter
                     viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: filter)
                     // Reset flag after using injected sort with default filter
                     if hasInjectedSort {
                         hasInjectedSort = false
                     }
+                } else if !viewModel.isLoadingSavedFilters {
+                    // Default filter was set but NO filters were found on server, or filters finished loading and defaultId is missing
+                    // Trigger fetch without filter to avoid being stuck in loading state
+                    viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: nil)
                 }
             }
         }
