@@ -12,6 +12,7 @@ struct ServerConfigView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @ObservedObject private var configManager = ServerConfigManager.shared
+    @EnvironmentObject var coordinator: NavigationCoordinator
     
     // UI State
     @State private var showSuccessMessage: Bool = false
@@ -20,12 +21,9 @@ struct ServerConfigView: View {
     @State private var scanAlertMessage: String = ""
     @State private var showingAddServerSheet = false
     @State private var editingServer: ServerConfig?
-    @StateObject private var store = SubscriptionManager.shared
-    @State private var showingPaywall = false
 
     var body: some View {
         Form {
-            premiumSection
             serversSection
             
             if let _ = configManager.activeConfig {
@@ -87,57 +85,8 @@ struct ServerConfigView: View {
         } message: {
             Text(scanAlertMessage)
         }
-        .sheet(isPresented: $showingPaywall) {
-            PaywallView()
-        }
     }
     
-    private var premiumSection: some View {
-        Section {
-            Group {
-                if store.isPremium {
-                    premiumContent
-                } else {
-                    Button {
-                        showingPaywall = true
-                    } label: {
-                        premiumContent
-                    }
-                }
-            }
-        }
-    }
-
-    private var premiumContent: some View {
-        HStack {
-            ZStack {
-                Circle()
-                    .fill(appearanceManager.tintColor)
-                    .frame(width: 36, height: 36)
-                Image(systemName: "crown.fill")
-                    .font(.system(size: 18))
-                    .foregroundColor(.white)
-            }
-            .padding(.trailing, 8)
-            
-            VStack(alignment: .leading, spacing: 2) {
-                Text(store.isPremium ? "stashy VIP Active" : "Get stashy VIP")
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                Text(store.isPremium ? "Thanks for your support!" : "Unlock downloads & offline mode")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-            
-            if !store.isPremium {
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(.secondary)
-            }
-        }
-    }
     
     // MARK: - Subviews
     
@@ -156,6 +105,7 @@ struct ServerConfigView: View {
                             viewModel.resetData()
                             viewModel.testConnection()
                             viewModel.fetchStatistics()
+                            coordinator.resetAllStacks()
                         },
                         onEdit: {
                             editingServer = server
@@ -297,13 +247,11 @@ struct ServerFormView: View {
     @Environment(\.presentationMode) var presentationMode
     
     // Form State
+    // Form State
     @State private var name: String = "My Stash"
-    @State private var connectionType: ConnectionType = .ipAddress
-    @State private var ipAddress: String = ""
-    @State private var port: String = ""
-    @State private var domain: String = ""
+    @State private var serverAddress: String = ""
+    @State private var serverProtocol: ServerProtocol = .https
     @State private var apiKey: String = ""
-    @State private var useHTTPS: Bool = true
     
     let configToEdit: ServerConfig?
     let onSave: (ServerConfig) -> Void
@@ -320,13 +268,7 @@ struct ServerFormView: View {
     }
     
     var isConfigValid: Bool {
-        if name.isEmpty { return false }
-        switch connectionType {
-        case .ipAddress:
-            return !ipAddress.isEmpty && !port.isEmpty
-        case .domain:
-            return !domain.isEmpty
-        }
+        return !name.isEmpty && !serverAddress.isEmpty
     }
     
     var body: some View {
@@ -334,43 +276,33 @@ struct ServerFormView: View {
             Section("Server Details") {
                 TextField("Server Name", text: $name)
                 
-                Picker("Connection Type", selection: $connectionType) {
-                    ForEach(ConnectionType.allCases, id: \.self) { type in
-                        Text(type.displayName).tag(type)
+                Picker("Protocol", selection: $serverProtocol) {
+                    ForEach(ServerProtocol.allCases, id: \.self) { proto in
+                        Text(proto.displayName).tag(proto)
                     }
                 }
                 .pickerStyle(.segmented)
-                .disabled(configToEdit != nil) // Prevent changing type for existing server
                 
-                if connectionType == .ipAddress {
-                    HStack {
-                        Text("IP Address")
-                        Spacer()
-                        TextField("192.168.1.100", text: $ipAddress)
-                            .keyboardType(.numbersAndPunctuation)
-                            .autocapitalization(.none)
-                            .multilineTextAlignment(.trailing)
-                    }
-                    
-                    HStack {
-                        Text("Port")
-                        Spacer()
-                        TextField("9999", text: $port)
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.trailing)
-                    }
-                } else {
-                    HStack {
-                        Text("Domain")
-                        Spacer()
-                        TextField("example.com", text: $domain)
-                            .keyboardType(.URL)
-                            .autocapitalization(.none)
-                            .multilineTextAlignment(.trailing)
-                    }
-                    
-                    Toggle("Use HTTPS", isOn: $useHTTPS)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Server Address")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    TextField("192.168.1.100:9999 or stash.example.com", text: $serverAddress)
+                        .keyboardType(.URL)
+                        .autocapitalization(.none)
+                        .autocorrectionDisabled()
+                        .multilineTextAlignment(.trailing)
+                        .onChange(of: serverAddress) { oldValue, newValue in
+                            if newValue.lowercased().hasPrefix("https://") {
+                                serverProtocol = .https
+                                serverAddress = String(newValue.dropFirst(8))
+                            } else if newValue.lowercased().hasPrefix("http://") {
+                                serverProtocol = .http
+                                serverAddress = String(newValue.dropFirst(7))
+                            }
+                        }
                 }
+                .padding(.vertical, 4)
                 
                 // API Key
                 HStack {
@@ -417,12 +349,9 @@ struct ServerFormView: View {
         .onAppear {
             if let config = configToEdit {
                 name = config.name
-                connectionType = config.connectionType
-                ipAddress = config.ipAddress
-                port = config.port
-                domain = config.domain
+                serverAddress = config.serverAddress + (config.port != nil ? ":\(config.port!)" : "")
+                serverProtocol = config.serverProtocol
                 apiKey = config.apiKey ?? ""
-                useHTTPS = config.useHTTPS
             }
         }
         .alert("Delete Server", isPresented: $showingDeleteAlert) {
@@ -437,15 +366,14 @@ struct ServerFormView: View {
     }
     
     private func saveServer() {
+        let parsed = ServerConfig.parseHostAndPort(serverAddress)
         let newConfig = ServerConfig(
             id: configToEdit?.id ?? UUID(), // Preserve ID if editing, new UUID if adding
             name: name,
-            connectionType: connectionType,
-            ipAddress: ipAddress,
-            port: port,
-            domain: domain,
-            apiKey: apiKey.isEmpty ? nil : apiKey,
-            useHTTPS: useHTTPS
+            serverAddress: parsed.host,
+            port: parsed.port,
+            serverProtocol: serverProtocol,
+            apiKey: apiKey.isEmpty ? nil : apiKey
         )
         onSave(newConfig)
     }
@@ -933,8 +861,12 @@ struct ServerDetailView: View {
     @ObservedObject var configManager = ServerConfigManager.shared
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @EnvironmentObject var coordinator: NavigationCoordinator
     
     @State private var showingEditSheet = false
+    @State private var isScanning = false
+    @State private var showScanAlert = false
+    @State private var scanAlertMessage = ""
     @Environment(\.presentationMode) var presentationMode
     
     var isActive: Bool {
@@ -946,7 +878,8 @@ struct ServerDetailView: View {
             Section("Server Information") {
                 LabeledContent("Name", value: server.name)
                 LabeledContent("URL", value: server.baseURL)
-                LabeledContent("Platform", value: server.domain.isEmpty ? "IP Address" : "Domain")
+                
+                LabeledContent("Protocol", value: server.serverProtocol.displayName)
                 
                 if isActive {
                     HStack {
@@ -971,15 +904,27 @@ struct ServerDetailView: View {
                          connectServer()
                      }
                      // Give it a moment to connect or just trigger scan (viewModel will handle connection check usually)
+                     isScanning = true
                      DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                          viewModel.triggerLibraryScan { success, message in
-                             // Scan triggered
+                             DispatchQueue.main.async {
+                                 isScanning = false
+                                 scanAlertMessage = message
+                                 showScanAlert = true
+                             }
                          }
                      }
                 }) {
-                    Label("Scan Library", systemImage: "arrow.triangle.2.circlepath")
-                        .foregroundColor(.primary)
+                    HStack {
+                        Label("Scan Library", systemImage: "arrow.triangle.2.circlepath")
+                            .foregroundColor(.primary)
+                        Spacer()
+                        if isScanning {
+                            ProgressView()
+                        }
+                    }
                 }
+                .disabled(isScanning)
                 
                 Button(action: { showingEditSheet = true }) {
                     Label("Edit Configuration", systemImage: "pencil")
@@ -999,6 +944,11 @@ struct ServerDetailView: View {
             }
         }
         .navigationTitle(server.name)
+        .alert("Library Scan", isPresented: $showScanAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(scanAlertMessage)
+        }
         .sheet(isPresented: $showingEditSheet) {
             NavigationView {
                 ServerFormViewNew(configToEdit: server) { updatedConfig in
@@ -1026,5 +976,6 @@ struct ServerDetailView: View {
         viewModel.resetData()
         viewModel.testConnection()
         viewModel.fetchStatistics()
+        coordinator.resetAllStacks()
     }
 }

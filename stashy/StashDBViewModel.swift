@@ -9,7 +9,6 @@ import SwiftUI
 import Combine
 import AVFoundation
 import AVKit
-import StoreKit
 
 // MARK: - App Colors
 
@@ -551,41 +550,72 @@ class StashDBViewModel: ObservableObject {
         performers = []
         studios = []
         galleries = []
+        tags = []
+        allImages = []
+        
         homeRowScenes = [:]
+        homeRowLoadingState = [:]
         isServerConnected = false
         
-        // Reset PaginationScenes = []
         performerGalleries = []
         studioGalleries = []
-        tags = []
+        performerScenes = []
+        studioScenes = []
+        tagScenes = []
+        
         savedFilters = [:]
         
         totalScenes = 0
         totalPerformers = 0
         totalStudios = 0
         totalTags = 0
+        totalGalleries = 0
+        totalImages = 0
+        totalPerformerScenes = 0
+        totalStudioScenes = 0
+        totalTagScenes = 0
         
         currentScenePage = 1
         currentPerformerPage = 1
         currentStudioPage = 1
         currentTagPage = 1
+        currentGalleryPage = 1
+        currentImagePage = 1
         
         hasMoreScenes = true
         hasMorePerformers = true
         hasMoreStudios = true
         hasMoreTags = true
+        hasMoreGalleries = true
+        hasMoreImages = true
+        
+        currentSceneSortOption = .dateDesc
+        currentSceneFilter = nil
+        
+        currentPerformerSortOption = .nameAsc
+        currentPerformerFilter = nil
+        
+        currentStudioSortOption = .nameAsc
+        currentStudioFilter = nil
+        
+        currentGallerySortOption = .dateDesc
+        currentGalleryFilter = nil
+        
+        currentImageSortOption = .dateDesc
+        currentTagSortOption = .nameAsc
         
         currentPerformerGalleryPage = 1
         currentStudioGalleryPage = 1
         hasMorePerformerGalleries = true
         hasMoreStudioGalleries = true
         
+        // Detail View Filters
+        currentPerformerDetailFilter = nil
+        currentStudioDetailFilter = nil
+        currentTagDetailFilter = nil
+        
         serverStatus = "Connecting..."
         errorMessage = nil
-        
-        // Clear home row cache
-        homeRowScenes = [:]
-        homeRowLoadingState = [:]
     }
     
     // MARK: - In-Place Scene Updates (without full reload)
@@ -707,7 +737,7 @@ class StashDBViewModel: ObservableObject {
                 let result = try JSONDecoder().decode(SavedFiltersResponse.self, from: data)
                 DispatchQueue.main.async {
                     if let findResult = result.data?.findSavedFilters {
-                        self?.savedFilters = Dictionary(uniqueKeysWithValues: findResult.map { ($0.id, $0) })
+                        self?.savedFilters = Dictionary(findResult.map { ($0.id, $0) }, uniquingKeysWith: { (first, second) in second })
                         print("✅ Fetched \(findResult.count) saved filters")
                     }
                 }
@@ -807,7 +837,17 @@ class StashDBViewModel: ObservableObject {
             .store(in: &cancellables)
     }
 
+    private var lastStatsFetch: Date?
+    private var isFetchingStats = false
+
     func fetchStatistics() {
+        // Prevent redundant fetches within 3 seconds
+        if isFetchingStats { return }
+        if let last = lastStatsFetch, Date().timeIntervalSince(last) < 3.0 {
+            return
+        }
+        
+        isFetchingStats = true
         errorMessage = nil // Clear error when starting
         let statisticsQuery = """
         {
@@ -815,7 +855,11 @@ class StashDBViewModel: ObservableObject {
         }
         """
         
-        performGraphQLQuery(query: statisticsQuery) { (response: StashStatisticsResponse?) in
+        performGraphQLQuery(query: statisticsQuery) { [weak self] (response: StashStatisticsResponse?) in
+            guard let self = self else { return }
+            self.isFetchingStats = false
+            self.lastStatsFetch = Date()
+            
             if let stats = response?.data?.stats {
                 DispatchQueue.main.async {
                     self.statistics = stats
@@ -948,7 +992,7 @@ class StashDBViewModel: ObservableObject {
     
     // MARK: - Home Tab Support
     
-    func fetchScenesForHomeRow(config: HomeRowConfig, completion: @escaping ([Scene]) -> Void) {
+    func fetchScenesForHomeRow(config: HomeRowConfig, limit: Int = 10, completion: @escaping ([Scene]) -> Void) {
         let rowType = config.type
         
         // Return cached data immediately if available
@@ -974,7 +1018,6 @@ class StashDBViewModel: ObservableObject {
         }
         
         // Check for Default Dashboard Filter
-        // Check for Default Dashboard Filter
         if let filterId = TabManager.shared.getDefaultFilterId(for: .dashboard),
            let savedFilter = savedFilters[filterId] {
             // Apply saved filter criteria
@@ -988,9 +1031,6 @@ class StashDBViewModel: ObservableObject {
                      sceneFilter[key] = value
                  }
             }
-        } else {
-            // Fallback debugging log (optional, remove later)
-             // print("ℹ️ No default dashboard filter set")
         }
         
         switch config.type {
@@ -1015,7 +1055,7 @@ class StashDBViewModel: ObservableObject {
         }
         
         // Construct the query
-        let perPage = 10
+        let perPage = limit
         
         let queryVariables: [String: Any] = [
             "filter": [
@@ -1840,13 +1880,6 @@ class StashDBViewModel: ObservableObject {
     private var currentTagSortOption: TagSortOption = .nameAsc
     private var currentTagSearchQuery: String = ""
     
-    // Tag Scenes
-    @Published var tagScenes: [Scene] = []
-    @Published var totalTagScenes: Int = 0
-    @Published var isLoadingTagScenes = false
-    @Published var hasMoreTagScenes = true
-    private var currentTagScenePage = 1
-    private var currentTagSceneSortOption: SceneSortOption = .dateDesc
     
     func fetchTags(sortBy: TagSortOption = .nameAsc, searchQuery: String = "", isInitialLoad: Bool = true, filter: SavedFilter? = nil) {
         if isInitialLoad {
@@ -3007,13 +3040,19 @@ struct Scene: Codable, Identifiable {
     // Computed property for thumbnail URL
     var thumbnailURL: URL? {
         // Use path from API if available
-        if let screenshotPath = paths?.screenshot, let url = URL(string: screenshotPath) {
-             return url
+        if let screenshotPath = paths?.screenshot {
+            // Check if it already has params (rare but possible) or ends in extension
+            let separator = screenshotPath.contains("?") ? "&" : "?"
+            // Append width optimization
+            let optimizedPath = "\(screenshotPath)\(separator)width=640"
+            if let url = URL(string: optimizedPath) {
+                 return url
+            }
         }
         
         // Fallback to manual construction
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
-        return URL(string: "\(config.baseURL)/scene/\(id)/screenshot")
+        return URL(string: "\(config.baseURL)/scene/\(id)/screenshot?width=640")
     }
 
     // Computed property for stream URL
@@ -3237,6 +3276,14 @@ struct PerformersData: Codable {
 struct FindPerformersResult: Codable {
     let count: Int
     let performers: [Performer]
+}
+
+struct SinglePerformerResponse: Codable {
+    let data: SinglePerformerData?
+}
+
+struct SinglePerformerData: Codable {
+    let findPerformer: Performer?
 }
 
 struct FindPerformersByIdsResult: Codable {
@@ -3504,12 +3551,15 @@ struct Gallery: Codable, Identifiable {
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
         guard let thumbnailPath = cover?.paths.thumbnail else { return nil }
         
+        let separator = thumbnailPath.contains("?") ? "&" : "?"
+        let optimizedPath = "\(thumbnailPath)\(separator)width=640"
+        
         // Check if the path is already an absolute URL
-        if thumbnailPath.starts(with: "http://") || thumbnailPath.starts(with: "https://") {
-            return URL(string: thumbnailPath)
+        if optimizedPath.starts(with: "http://") || optimizedPath.starts(with: "https://") {
+            return URL(string: optimizedPath)
         } else {
             // Relative path, prepend baseURL
-            return URL(string: config.baseURL + thumbnailPath)
+            return URL(string: config.baseURL + optimizedPath)
         }
     }
     
@@ -3610,10 +3660,13 @@ struct StashImage: Codable, Identifiable {
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
         guard let thumbnailPath = paths?.thumbnail else { return nil }
         
-        if thumbnailPath.starts(with: "http://") || thumbnailPath.starts(with: "https://") {
-            return URL(string: thumbnailPath)
+        let separator = thumbnailPath.contains("?") ? "&" : "?"
+        let optimizedPath = "\(thumbnailPath)\(separator)width=640"
+        
+        if optimizedPath.starts(with: "http://") || optimizedPath.starts(with: "https://") {
+            return URL(string: optimizedPath)
         } else {
-            return URL(string: config.baseURL + thumbnailPath)
+            return URL(string: config.baseURL + optimizedPath)
         }
     }
     
@@ -4132,315 +4185,4 @@ extension StashDBViewModel {
 
 
 
-@MainActor
-class SubscriptionManager: ObservableObject {
-    static let shared = SubscriptionManager()
-    
-    @Published var isPremium: Bool = false
-    @Published var products: [Product] = []
-    @Published var hasError: Bool = false
-    
-    var vipPriceDisplay: String {
-        if let vipProduct = products.first(where: { $0.id == subscriptionId }) {
-            return "Upgrade for \(vipProduct.displayPrice) / Month"
-        }
-        return "Upgrade to VIP"
-    }
-    
-    private let subscriptionId = "de.letzgo.stashy.premium.sub"
-    private let lifetimeId = "de.letzgo.stashy.premium.lifetime"
-    
-    private var updateListenerTask: Task<Void, Error>? = nil
-    
-    init() {
-        // Check local status or StoreKit status
-        self.isPremium = UserDefaults.standard.bool(forKey: "isPremium")
-        
-        updateListenerTask = listenForTransactions()
-        
-        Task {
-            await refreshPurchaseStatus()
-            await fetchProducts()
-        }
-    }
-    
-    deinit {
-        updateListenerTask?.cancel()
-    }
-    
-    func fetchProducts() async {
-        self.hasError = false
-        do {
-            let storeProducts = try await Product.products(for: [subscriptionId, lifetimeId])
-            self.products = storeProducts.sorted(by: { $0.price < $1.price })
-            print("Fetched \(self.products.count) products")
-            if self.products.isEmpty {
-                self.hasError = true
-            }
-        } catch {
-            print("Failed product fetch: \(error)")
-            self.hasError = true
-        }
-    }
-    
-    #if DEBUG
-    func debugUnlock() {
-        self.isPremium = true
-        UserDefaults.standard.set(true, forKey: "isPremium")
-    }
-    #endif
-    
-    func buy(_ product: Product) async throws {
-        let result = try await product.purchase()
-        
-        switch result {
-        case .success(let verification):
-            let _ = try checkVerified(verification)
-            await refreshPurchaseStatus()
-        case .userCancelled, .pending:
-            break
-        @unknown default:
-            break
-        }
-    }
-    
-    func restorePurchases() async {
-        try? await AppStore.sync()
-        await refreshPurchaseStatus()
-    }
-    
-    func refreshPurchaseStatus() async {
-        var purchased = false
-        
-        // Iterate through all user's transactions
-        for await result in Transaction.currentEntitlements {
-            do {
-                let transaction = try checkVerified(result)
-                if transaction.productID == subscriptionId || transaction.productID == lifetimeId {
-                    if let expirationDate = transaction.expirationDate {
-                        if expirationDate > Date() {
-                            purchased = true
-                        }
-                    } else {
-                        // Lifetime
-                        purchased = true
-                    }
-                }
-            } catch {
-                print("Failed verification: \(error)")
-            }
-        }
-        
-        self.isPremium = purchased
-        UserDefaults.standard.set(purchased, forKey: "isPremium")
-    }
-    
-    private func listenForTransactions() -> Task<Void, Error> {
-        return Task.detached {
-            for await result in Transaction.updates {
-                do {
-                    let _ = try self.checkVerified(result)
-                    await self.refreshPurchaseStatus()
-                } catch {
-                    print("Transaction update check failed: \(error)")
-                }
-            }
-        }
-    }
-    
-    private nonisolated func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
-        switch result {
-        case .unverified:
-            throw StoreError.failedVerification
-        case .verified(let safe):
-            return safe
-        }
-    }
-}
-
-enum StoreError: Error {
-    case failedVerification
-}
-
-struct PaywallView: View {
-    @ObservedObject var appearanceManager = AppearanceManager.shared
-    @StateObject private var store = SubscriptionManager.shared
-    @Environment(\.dismiss) var dismiss
-    @State private var isPurchasing = false
-    @State private var showError = false
-    @State private var errorMessage = ""
-    
-    var body: some View {
-        NavigationView {
-            ZStack {
-                Color.appBackground.ignoresSafeArea()
-                
-                VStack(spacing: 24) {
-                    // Header
-                    VStack(spacing: 16) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.appAccent.opacity(0.1))
-                                .frame(width: 100, height: 100)
-                            
-                            Image(systemName: "play.square.stack.fill")
-                                .font(.system(size: 44))
-                                .foregroundColor(.appAccent)
-                        }
-                        
-                        Text("Become stashy VIP")
-                            .font(.system(size: 28, weight: .bold))
-                            .foregroundColor(.primary)
-                        
-                        Text("Save your favorite scenes directly to your device and watch them anytime, even offline.")
-                            .font(.body)
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 32)
-                    }
-                    .padding(.top, 40)
-                    
-                    Spacer()
-                    
-                    // Options
-                    VStack(spacing: 12) {
-                        if store.products.isEmpty {
-                            if store.hasError {
-                                Text("Products could not be loaded.")
-                                    .foregroundColor(.secondary)
-                                
-                                Button("Try Again") {
-                                    Task { await store.fetchProducts() }
-                                }
-                                .buttonStyle(.bordered)
-                                .tint(Color.appAccent)
-                                
-                                #if DEBUG
-                                Button("Debug Unlock (Dev Only)") {
-                                    store.debugUnlock()
-                                    dismiss()
-                                }
-                                .padding(.top, 20)
-                                .foregroundColor(.red)
-                                #endif
-                            } else {
-                                ProgressView()
-                                    .padding()
-                                
-                                #if DEBUG
-                                Button("Debug Unlock (Dev Only)") {
-                                    store.debugUnlock()
-                                    dismiss()
-                                }
-                                .padding(.top, 40)
-                                .foregroundColor(.red)
-                                #endif
-                            }
-                        } else {
-                            ForEach(store.products) { product in
-                                Button {
-                                    purchase(product)
-                                } label: {
-                                    HStack {
-                                        VStack(alignment: .leading, spacing: 4) {
-                                            Text(product.displayName)
-                                                .font(.headline)
-                                                .foregroundColor(.primary)
-                                            Text(product.description)
-                                                .font(.caption)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        
-                                        Spacer()
-                                        
-                                        Text(product.displayPrice)
-                                            .font(.title3)
-                                            .fontWeight(.bold)
-                                            .foregroundColor(.appAccent)
-                                    }
-                                    .padding()
-                                    .background(Color(UIColor.secondarySystemBackground))
-                                    .clipShape(RoundedRectangle(cornerRadius: 16))
-                                    .overlay(
-                                        RoundedRectangle(cornerRadius: 16)
-                                            .stroke(Color.appAccent.opacity(0.2), lineWidth: 1)
-                                    )
-                                }
-                                .disabled(isPurchasing)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, 20)
-                    
-                    Spacer()
-                    
-                    // Bottom Buttons
-                    VStack(spacing: 16) {
-                        Button {
-                            Task {
-                                await store.restorePurchases()
-                                if store.isPremium {
-                                    dismiss()
-                                }
-                            }
-                        } label: {
-                            Text("Restore Purchase")
-                                .font(.subheadline)
-                                .fontWeight(.medium)
-                                .foregroundColor(.secondary)
-                        }
-                        
-                        Text("Subscriptions will automatically renew unless canceled in your iTunes settings.")
-                            .font(.system(size: 10))
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 40)
-                    }
-                    .padding(.bottom, 20)
-                }
-                
-                if isPurchasing {
-                    Color.black.opacity(0.3)
-                        .ignoresSafeArea()
-                    ProgressView()
-                        .scaleEffect(1.5)
-                        .padding()
-                        .background(Color(UIColor.systemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-            }
-            .navigationTitle("StashTok")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Close") {
-                        dismiss()
-                    }
-                    .foregroundColor(.appAccent)
-                }
-            }
-            .alert("Purchase Failed", isPresented: $showError) {
-                Button("OK", role: .cancel) { }
-            } message: {
-                Text(errorMessage)
-            }
-        }
-    }
-    
-    private func purchase(_ product: Product) {
-        isPurchasing = true
-        Task {
-            do {
-                try await store.buy(product)
-                if store.isPremium {
-                    dismiss()
-                }
-            } catch {
-                errorMessage = error.localizedDescription
-                showError = true
-            }
-            isPurchasing = false
-        }
-    }
-}
 

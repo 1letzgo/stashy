@@ -39,16 +39,7 @@ class FilterRepository: FilterRepositoryProtocol {
         }
         """
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.execute(query: query) { (result: Result<StashDBViewModel.SavedFiltersResponse, GraphQLNetworkError>) in
-                switch result {
-                case .success(let response):
-                    let filters = response.data?.findSavedFilters ?? []
-                    continuation.resume(returning: filters)
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let response: StashDBViewModel.SavedFiltersResponse = try await graphQLClient.execute(query: query)
+        return response.data?.findSavedFilters ?? []
     }
 }

@@ -86,8 +86,8 @@ class SceneRepository: SceneRepositoryProtocol {
         }
         
         // Apply saved filter if present
-        if let savedFilter = filter, let filterJson = savedFilter.filter {
-            sceneFilter = filterJson
+        if let savedFilter = filter, let filterDict = savedFilter.filterDict {
+            sceneFilter = filterDict
         }
         
         var variables: [String: Any] = [
@@ -103,18 +103,10 @@ class SceneRepository: SceneRepositoryProtocol {
             variables["scene_filter"] = sceneFilter
         }
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.execute(query: query, variables: variables) { (result: Result<AltScenesResponse, GraphQLNetworkError>) in
-                switch result {
-                case .success(let response):
-                    let scenes = response.data?.findScenes?.scenes ?? []
-                    let total = response.data?.findScenes?.count ?? 0
-                    continuation.resume(returning: (scenes, total))
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let response: AltScenesResponse = try await graphQLClient.execute(query: query, variables: variables)
+        let scenes = response.data?.findScenes?.scenes ?? []
+        let total = response.data?.findScenes?.count ?? 0
+        return (scenes, total)
     }
     
     // MARK: - Fetch Performer Scenes
@@ -142,18 +134,10 @@ class SceneRepository: SceneRepositoryProtocol {
             ]
         ]
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.execute(query: query, variables: variables) { (result: Result<AltScenesResponse, GraphQLNetworkError>) in
-                switch result {
-                case .success(let response):
-                    let scenes = response.data?.findScenes?.scenes ?? []
-                    let total = response.data?.findScenes?.count ?? 0
-                    continuation.resume(returning: (scenes, total))
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let response: AltScenesResponse = try await graphQLClient.execute(query: query, variables: variables)
+        let scenes = response.data?.findScenes?.scenes ?? []
+        let total = response.data?.findScenes?.count ?? 0
+        return (scenes, total)
     }
     
     // MARK: - Fetch Studio Scenes
@@ -182,18 +166,10 @@ class SceneRepository: SceneRepositoryProtocol {
             ]
         ]
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.execute(query: query, variables: variables) { (result: Result<AltScenesResponse, GraphQLNetworkError>) in
-                switch result {
-                case .success(let response):
-                    let scenes = response.data?.findScenes?.scenes ?? []
-                    let total = response.data?.findScenes?.count ?? 0
-                    continuation.resume(returning: (scenes, total))
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let response: AltScenesResponse = try await graphQLClient.execute(query: query, variables: variables)
+        let scenes = response.data?.findScenes?.scenes ?? []
+        let total = response.data?.findScenes?.count ?? 0
+        return (scenes, total)
     }
     
     // MARK: - Fetch Tag Scenes
@@ -222,18 +198,10 @@ class SceneRepository: SceneRepositoryProtocol {
             ]
         ]
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.execute(query: query, variables: variables) { (result: Result<AltScenesResponse, GraphQLNetworkError>) in
-                switch result {
-                case .success(let response):
-                    let scenes = response.data?.findScenes?.scenes ?? []
-                    let total = response.data?.findScenes?.count ?? 0
-                    continuation.resume(returning: (scenes, total))
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let response: AltScenesResponse = try await graphQLClient.execute(query: query, variables: variables)
+        let scenes = response.data?.findScenes?.scenes ?? []
+        let total = response.data?.findScenes?.count ?? 0
+        return (scenes, total)
     }
     
     // MARK: - Fetch Scene Details
@@ -242,16 +210,8 @@ class SceneRepository: SceneRepositoryProtocol {
         let query = GraphQLQueries.queryWithFragments("findScene")
         let variables: [String: Any] = ["id": sceneId]
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.execute(query: query, variables: variables) { (result: Result<SingleSceneResponse, GraphQLNetworkError>) in
-                switch result {
-                case .success(let response):
-                    continuation.resume(returning: response.data?.findScene)
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let response: SingleSceneResponse = try await graphQLClient.execute(query: query, variables: variables)
+        return response.data?.findScene
     }
     
     // MARK: - Update Resume Time
@@ -269,20 +229,15 @@ class SceneRepository: SceneRepositoryProtocol {
             "resume_time": Double(formattedTime) ?? resumeTime
         ]
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.performMutation(mutation: mutation, variables: variables) { result in
-                switch result {
-                case .success(let response):
-                    if let data = response["data"]?.value as? [String: Any],
-                       data["sceneSaveActivity"] != nil {
-                        continuation.resume(returning: true)
-                    } else {
-                        continuation.resume(returning: false)
-                    }
-                case .failure:
-                    continuation.resume(returning: false)
-                }
+        do {
+            let response = try await graphQLClient.performMutation(mutation: mutation, variables: variables)
+            if let data = response["data"]?.value as? [String: Any],
+               data["sceneSaveActivity"] != nil {
+                return true
             }
+            return false
+        } catch {
+            return false
         }
     }
     
@@ -297,20 +252,15 @@ class SceneRepository: SceneRepositoryProtocol {
         
         let variables: [String: Any] = ["id": sceneId]
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.performMutation(mutation: mutation, variables: variables) { result in
-                switch result {
-                case .success(let response):
-                    if let data = response["data"]?.value as? [String: Any],
-                       data["sceneAddPlay"] != nil {
-                        continuation.resume(returning: true)
-                    } else {
-                        continuation.resume(returning: false)
-                    }
-                case .failure:
-                    continuation.resume(returning: false)
-                }
+        do {
+            let response = try await graphQLClient.performMutation(mutation: mutation, variables: variables)
+            if let data = response["data"]?.value as? [String: Any],
+               data["sceneAddPlay"] != nil {
+                return true
             }
+            return false
+        } catch {
+            return false
         }
     }
     
@@ -325,20 +275,15 @@ class SceneRepository: SceneRepositoryProtocol {
         
         let variables: [String: Any] = ["id": sceneId]
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.performMutation(mutation: mutation, variables: variables) { result in
-                switch result {
-                case .success(let response):
-                    if let data = response["data"]?.value as? [String: Any],
-                       data["sceneDestroy"] != nil {
-                        continuation.resume(returning: true)
-                    } else {
-                        continuation.resume(returning: false)
-                    }
-                case .failure:
-                    continuation.resume(returning: false)
-                }
+        do {
+            let response = try await graphQLClient.performMutation(mutation: mutation, variables: variables)
+            if let data = response["data"]?.value as? [String: Any],
+               data["sceneDestroy"] != nil {
+                return true
             }
+            return false
+        } catch {
+            return false
         }
     }
 }

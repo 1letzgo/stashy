@@ -73,8 +73,8 @@ class GalleryRepository: GalleryRepositoryProtocol {
         }
         
         // Apply saved filter if present
-        if let savedFilter = filter, let filterJson = savedFilter.filter {
-            galleryFilter = filterJson
+        if let savedFilter = filter, let filterDict = savedFilter.filterDict {
+            galleryFilter = filterDict
         }
         
         var variables: [String: Any] = [
@@ -90,18 +90,10 @@ class GalleryRepository: GalleryRepositoryProtocol {
             variables["gallery_filter"] = galleryFilter
         }
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.execute(query: query, variables: variables) { (result: Result<GalleryResponse, GraphQLNetworkError>) in
-                switch result {
-                case .success(let response):
-                    let galleries = response.data?.findGalleries?.galleries ?? []
-                    let total = response.data?.findGalleries?.count ?? 0
-                    continuation.resume(returning: (galleries, total))
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let response: GalleriesResponse = try await graphQLClient.execute(query: query, variables: variables)
+        let galleries = response.data?.findGalleries.galleries ?? []
+        let total = response.data?.findGalleries.count ?? 0
+        return (galleries, total)
     }
     
     // MARK: - Fetch Performer Galleries
@@ -129,18 +121,10 @@ class GalleryRepository: GalleryRepositoryProtocol {
             ]
         ]
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.execute(query: query, variables: variables) { (result: Result<GalleryResponse, GraphQLNetworkError>) in
-                switch result {
-                case .success(let response):
-                    let galleries = response.data?.findGalleries?.galleries ?? []
-                    let total = response.data?.findGalleries?.count ?? 0
-                    continuation.resume(returning: (galleries, total))
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let response: GalleriesResponse = try await graphQLClient.execute(query: query, variables: variables)
+        let galleries = response.data?.findGalleries.galleries ?? []
+        let total = response.data?.findGalleries.count ?? 0
+        return (galleries, total)
     }
     
     // MARK: - Fetch Studio Galleries
@@ -169,18 +153,10 @@ class GalleryRepository: GalleryRepositoryProtocol {
             ]
         ]
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.execute(query: query, variables: variables) { (result: Result<GalleryResponse, GraphQLNetworkError>) in
-                switch result {
-                case .success(let response):
-                    let galleries = response.data?.findGalleries?.galleries ?? []
-                    let total = response.data?.findGalleries?.count ?? 0
-                    continuation.resume(returning: (galleries, total))
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let response: GalleriesResponse = try await graphQLClient.execute(query: query, variables: variables)
+        let galleries = response.data?.findGalleries.galleries ?? []
+        let total = response.data?.findGalleries.count ?? 0
+        return (galleries, total)
     }
     
     // MARK: - Fetch Gallery Images
@@ -208,17 +184,9 @@ class GalleryRepository: GalleryRepositoryProtocol {
             ]
         ]
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.execute(query: query, variables: variables) { (result: Result<ImagesResponse, GraphQLNetworkError>) in
-                switch result {
-                case .success(let response):
-                    let images = response.data?.findImages?.images ?? []
-                    let total = response.data?.findImages?.count ?? 0
-                    continuation.resume(returning: (images, total))
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let response: GalleryImagesResponse = try await graphQLClient.execute(query: query, variables: variables)
+        let images = response.data?.findImages.images ?? []
+        let total = response.data?.findImages.count ?? 0
+        return (images, total)
     }
 }

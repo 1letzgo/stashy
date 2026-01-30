@@ -134,6 +134,21 @@ class NavigationCoordinator: ObservableObject {
         self.reelsTabID = UUID() // Force reset stack if needed
         self.selectedTab = .reels
     }
+    
+    func resetAllStacks() {
+        homeTabID = UUID()
+        performersTabID = UUID()
+        studiosTabID = UUID()
+        catalogueTabID = UUID()
+        downloadsTabID = UUID()
+        reelsTabID = UUID()
+        settingsTabID = UUID()
+        
+        // Optionally reset to first visible tab
+        if let firstTab = TabManager.shared.visibleTabs.first {
+            selectedTab = firstTab
+        }
+    }
 }
 
 // MARK: - SHARED UI COMPONENTS (Extracted for decluttering)

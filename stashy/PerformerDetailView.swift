@@ -39,9 +39,7 @@ struct PerformerDetailView: View {
         refreshTrigger = UUID()
         
         // Fetch new data immediately
-        let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes)
-        let filter = defaultId.flatMap { viewModel.savedFilters[$0] }
-        viewModel.fetchPerformerScenes(performerId: performer.id, sortBy: newOption, isInitialLoad: true, filter: filter)
+        viewModel.fetchPerformerScenes(performerId: performer.id, sortBy: newOption, isInitialLoad: true)
     }
     
     private var columns: [GridItem] {
@@ -130,15 +128,6 @@ struct PerformerDetailView: View {
                 selectedDetailTab = .galleries
             }
         }
-        .onChange(of: viewModel.savedFilters) { oldValue, newValue in
-            if let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes), viewModel.performerScenes.isEmpty {
-                 if let filter = newValue[defaultId] {
-                      viewModel.fetchPerformerScenes(performerId: performer.id, sortBy: selectedSortOption, isInitialLoad: true, filter: filter)
-                 } else if !viewModel.isLoadingSavedFilters {
-                      viewModel.fetchPerformerScenes(performerId: performer.id, sortBy: selectedSortOption, isInitialLoad: true)
-                 }
-            }
-        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneDeleted"))) { _ in
             print("🔄 SceneDeleted - Re-loading performer data")
             viewModel.fetchPerformerScenes(performerId: performer.id, sortBy: selectedSortOption, isInitialLoad: true)
@@ -196,24 +185,15 @@ struct PerformerDetailView: View {
     // MARK: - Helper Views & Methods
     
     private func loadData() {
-        // Check for default filter
-        let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes)
-        
-        if defaultId != nil {
-             // Only fetch if we need the filter and haven't loaded it or need to apply it?
-             // Since viewModel is new, we must fetch filters.
-             viewModel.fetchSavedFilters()
-        } else {
-             if viewModel.performerScenes.isEmpty && !viewModel.isLoadingPerformerScenes {
-                 viewModel.fetchPerformerScenes(performerId: performer.id, sortBy: selectedSortOption, isInitialLoad: true)
-             }
+        if viewModel.performerScenes.isEmpty && !viewModel.isLoadingPerformerScenes {
+            viewModel.fetchPerformerScenes(performerId: performer.id, sortBy: selectedSortOption, isInitialLoad: true)
         }
         if viewModel.performerGalleries.isEmpty && !viewModel.isLoadingPerformerGalleries {
             viewModel.fetchPerformerGalleries(performerId: performer.id, isInitialLoad: true)
         }
         
         // Only load metadata if we don't have enough details (like gender/ethnicity)
-        if performer.gender == nil || performer.ethnicity == nil {
+        if displayPerformer.gender == nil || displayPerformer.ethnicity == nil {
             loadPerformerMetadata()
         }
     }

@@ -64,6 +64,17 @@ struct StudiosView: View {
         .onAppear {
             onAppearAction()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
+            if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.studios.rawValue {
+                if let defaultId = TabManager.shared.getDefaultFilterId(for: .studios),
+                   let newFilter = viewModel.savedFilters[defaultId] {
+                    selectedFilter = newFilter
+                } else {
+                    selectedFilter = nil
+                }
+                performSearch()
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
             selectedFilter = nil
             performSearch()

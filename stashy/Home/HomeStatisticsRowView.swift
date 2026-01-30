@@ -1,0 +1,161 @@
+
+import SwiftUI
+
+struct HomeStatisticsRowView: View {
+    @ObservedObject var viewModel: StashDBViewModel
+    @ObservedObject var tabManager = TabManager.shared
+    @EnvironmentObject var coordinator: NavigationCoordinator
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text("Statistics")
+                .font(.headline)
+                .foregroundColor(.primary)
+                .padding(.horizontal, 12)
+            
+            VStack(alignment: .leading, spacing: 10) {
+                if let stats = viewModel.statistics {
+                    let columns = [
+                        GridItem(.flexible(), spacing: 8),
+                        GridItem(.flexible(), spacing: 8),
+                        GridItem(.flexible(), spacing: 8)
+                    ]
+                    
+                    let sortedTabs = tabManager.tabs
+                        .filter { tab in
+                            (tab.id == .scenes || tab.id == .galleries || 
+                             tab.id == .performers || tab.id == .studios || tab.id == .tags) && tab.isVisible
+                        }
+                        .sorted { $0.sortOrder < $1.sortOrder }
+
+                    LazyVGrid(columns: columns, spacing: 10) {
+                        ForEach(sortedTabs) { tab in
+                            Group {
+                                switch tab.id {
+                                case .scenes:
+                                    StatCard(title: "Scenes", value: formatCount(stats.sceneCount), icon: "film", color: .blue)
+                                        .onTapGesture { coordinator.navigateToScenes() }
+                                case .galleries:
+                                    StatCard(title: "Galleries", value: formatCount(stats.galleryCount), icon: "photo.stack", color: .green)
+                                        .onTapGesture { coordinator.navigateToGalleries() }
+                                    // Binde images immer hinter galleries
+                                    StatCard(title: "Images", value: formatCount(stats.imageCount), icon: "photo", color: .teal)
+                                        .onTapGesture { coordinator.navigateToImages() }
+                                case .performers:
+                                    StatCard(title: "Performers", value: formatCount(stats.performerCount), icon: "person.2", color: .purple)
+                                        .onTapGesture { coordinator.navigateToPerformers() }
+                                case .studios:
+                                    StatCard(title: "Studios", value: formatCount(stats.studioCount), icon: "building.2", color: .orange)
+                                        .onTapGesture { coordinator.navigateToStudios() }
+                                case .tags:
+                                    StatCard(title: "Tags", value: formatCount(stats.tagCount), icon: "tag", color: .pink)
+                                        .onTapGesture { coordinator.navigateToTags() }
+                                default:
+                                    EmptyView()
+                                }
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                } else if viewModel.isLoading {
+                    let columns = [
+                        GridItem(.flexible(), spacing: 8),
+                        GridItem(.flexible(), spacing: 8),
+                        GridItem(.flexible(), spacing: 8)
+                    ]
+                    
+                    LazyVGrid(columns: columns, spacing: 10) {
+                        ForEach(0..<6) { _ in
+                            RoundedRectangle(cornerRadius: 10)
+                                .fill(Color.gray.opacity(0.1))
+                                .frame(height: 46)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                } else {
+                    // Error state
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle")
+                        .foregroundColor(.secondary)
+                        Text("Stats unavailable")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    .padding(.horizontal, 12)
+                }
+            }
+            
+            if isTestFlightBuild() {
+                TestFlightNoticeCard()
+            }
+        }
+    }
+    
+    // MARK: - Formatting Helpers
+    
+    private func formatCount(_ value: Int) -> String {
+        let formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.locale = Locale.current // Respect user's country/region
+        return formatter.string(from: NSNumber(value: value)) ?? "\(value)"
+    }
+    
+    private func formatSize(_ value: Int64) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.countStyle = .file
+        formatter.allowedUnits = [.useTB, .useGB, .useMB]
+        formatter.includesUnit = true
+        return formatter.string(fromByteCount: value)
+    }
+    
+    private func formatDuration(_ value: Float) -> String {
+        let totalSeconds = Int(value)
+        let hours = totalSeconds / 3600
+        
+        // Formatter for nicer output "124h 30m"
+        let formatter = DateComponentsFormatter()
+        formatter.allowedUnits = [.hour, .minute]
+        formatter.unitsStyle = .abbreviated
+        formatter.maximumUnitCount = 2
+        
+        return formatter.string(from: TimeInterval(value)) ?? "\(hours)h"
+    }
+}
+
+struct StatCard: View {
+    let title: String
+    let value: String
+    let icon: String
+    let color: Color
+    
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.system(size: 16, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: 22, alignment: .center)
+            
+            VStack(alignment: .leading, spacing: 0) {
+                Text(value)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundColor(.white)
+                
+                Text(title.uppercased())
+                    .font(.system(size: 8, weight: .bold))
+                    .foregroundColor(.white.opacity(0.8))
+            }
+            Spacer()
+        }
+        .padding(.horizontal, 8)
+        .frame(maxWidth: .infinity)
+        .frame(height: 46)
+        .background(
+            LinearGradient(
+                colors: [color, color.opacity(0.6)],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        )
+        .cornerRadius(10)
+    }
+}

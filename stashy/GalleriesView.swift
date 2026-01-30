@@ -312,10 +312,6 @@ struct GalleriesView: View {
             }
             viewModel.fetchSavedFilters()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
-            selectedFilter = nil
-            performSearch()
-        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
             if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.galleries.rawValue {
                 if let defaultId = TabManager.shared.getDefaultFilterId(for: .galleries),
@@ -326,6 +322,10 @@ struct GalleriesView: View {
                 }
                 performSearch()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+            selectedFilter = nil
+            performSearch()
         }
         .onChange(of: viewModel.savedFilters) { oldValue, newValue in
             // Apply default filter if set and none selected yet

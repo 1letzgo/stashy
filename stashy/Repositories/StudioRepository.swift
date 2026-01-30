@@ -52,8 +52,8 @@ class StudioRepository: StudioRepositoryProtocol {
         }
         
         // Apply saved filter if present
-        if let savedFilter = filter, let filterJson = savedFilter.filter {
-            studioFilter = filterJson
+        if let savedFilter = filter, let filterDict = savedFilter.filterDict {
+            studioFilter = filterDict
         }
         
         var variables: [String: Any] = [
@@ -69,18 +69,10 @@ class StudioRepository: StudioRepositoryProtocol {
             variables["studio_filter"] = studioFilter
         }
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.execute(query: query, variables: variables) { (result: Result<StudioResponse, GraphQLNetworkError>) in
-                switch result {
-                case .success(let response):
-                    let studios = response.data?.findStudios?.studios ?? []
-                    let total = response.data?.findStudios?.count ?? 0
-                    continuation.resume(returning: (studios, total))
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let response: StudiosResponse = try await graphQLClient.execute(query: query, variables: variables)
+        let studios = response.data?.findStudios.studios ?? []
+        let total = response.data?.findStudios.count ?? 0
+        return (studios, total)
     }
     
     // MARK: - Fetch Studio Details
@@ -89,15 +81,7 @@ class StudioRepository: StudioRepositoryProtocol {
         let query = GraphQLQueries.queryWithFragments("findStudio")
         let variables: [String: Any] = ["id": studioId]
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.execute(query: query, variables: variables) { (result: Result<SingleStudioResponse, GraphQLNetworkError>) in
-                switch result {
-                case .success(let response):
-                    continuation.resume(returning: response.data?.findStudio)
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let response: SingleStudioResponse = try await graphQLClient.execute(query: query, variables: variables)
+        return response.data?.findStudio
     }
 }

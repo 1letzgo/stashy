@@ -14,12 +14,9 @@ struct ServerFormViewNew: View {
     
     // Form State
     @State private var name: String = "My Stash"
-    @State private var connectionType: ConnectionType = .ipAddress
-    @State private var ipAddress: String = ""
-    @State private var port: String = "9999"
-    @State private var domain: String = ""
+    @State private var serverAddress: String = ""
+    @State private var serverProtocol: ServerProtocol = .https
     @State private var apiKey: String = ""
-    @State private var useHTTPS: Bool = true
     
     // Connection Test State
     @State private var isTesting: Bool = false
@@ -45,79 +42,62 @@ struct ServerFormViewNew: View {
     }
     
     var isConfigValid: Bool {
-        if name.isEmpty { return false }
-        switch connectionType {
-        case .ipAddress:
-            return !ipAddress.isEmpty && !port.isEmpty && isValidPort
-        case .domain:
-            return !domain.isEmpty
-        }
-    }
-    
-    var isValidPort: Bool {
-        guard let portNum = Int(port) else { return false }
-        return portNum > 0 && portNum <= 65535
+        return !name.isEmpty && !serverAddress.isEmpty
     }
     
     var currentBaseURL: String {
-        switch connectionType {
-        case .ipAddress:
-            return "http://\(ipAddress):\(port)"
-        case .domain:
-            let scheme = useHTTPS ? "https" : "http"
-            return "\(scheme)://\(domain)"
+        let parsed = ServerConfig.parseHostAndPort(serverAddress)
+        let effectivePort = parsed.port ?? serverProtocol.defaultPort
+        let scheme = serverProtocol == .https ? "https" : "http"
+        
+        let needsPort = (serverProtocol == .https && effectivePort != "443") || 
+                       (serverProtocol == .http && effectivePort != "80")
+        
+        if needsPort {
+            return "\(scheme)://\(parsed.host):\(effectivePort)"
+        } else {
+            return "\(scheme)://\(parsed.host)"
         }
     }
     
     var body: some View {
         Form {
-            // Server Details Section
             Section {
                 TextField("Server Name", text: $name)
                     .textContentType(.organizationName)
                 
-                Picker("Connection Type", selection: $connectionType) {
-                    ForEach(ConnectionType.allCases, id: \.self) { type in
-                        Text(type.displayName).tag(type)
+                Picker("Protocol", selection: $serverProtocol) {
+                    ForEach(ServerProtocol.allCases, id: \.self) { proto in
+                        Text(proto.displayName).tag(proto)
                     }
                 }
                 .pickerStyle(.segmented)
-                .onChange(of: connectionType) { _, _ in resetTestState() }
+                .onChange(of: serverProtocol) { _, _ in resetTestState() }
                 
-                if connectionType == .ipAddress {
-                    HStack {
-                        Text("IP Address")
-                        Spacer()
-                        TextField("192.168.1.100", text: $ipAddress)
-                            .keyboardType(.numbersAndPunctuation)
-                            .autocapitalization(.none)
-                            .multilineTextAlignment(.trailing)
-                            .onChange(of: ipAddress) { _, _ in resetTestState() }
-                    }
-                    
-                    HStack {
-                        Text("Port")
-                        Spacer()
-                        TextField("9999", text: $port)
-                            .keyboardType(.numberPad)
-                            .multilineTextAlignment(.trailing)
-                            .foregroundColor(isValidPort || port.isEmpty ? .primary : .red)
-                            .onChange(of: port) { _, _ in resetTestState() }
-                    }
-                } else {
-                    HStack {
-                        Text("Domain")
-                        Spacer()
-                        TextField("stash.example.com", text: $domain)
-                            .keyboardType(.URL)
-                            .autocapitalization(.none)
-                            .multilineTextAlignment(.trailing)
-                            .onChange(of: domain) { _, _ in resetTestState() }
-                    }
-                    
-                    Toggle("Use HTTPS", isOn: $useHTTPS)
-                        .onChange(of: useHTTPS) { _, _ in resetTestState() }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Server Address")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    TextField("192.168.1.100:9999 or stash.example.com", text: $serverAddress)
+                        .keyboardType(.URL)
+                        .autocapitalization(.none)
+                        .autocorrectionDisabled()
+                        .onChange(of: serverAddress) { oldValue, newValue in
+                            resetTestState()
+                            if newValue.lowercased().hasPrefix("https://") {
+                                serverProtocol = .https
+                                if newValue.count > 8 {
+                                    serverAddress = String(newValue.dropFirst(8))
+                                }
+                            } else if newValue.lowercased().hasPrefix("http://") {
+                                serverProtocol = .http
+                                if newValue.count > 7 {
+                                    serverAddress = String(newValue.dropFirst(7))
+                                }
+                            }
+                        }
                 }
+                .padding(.vertical, 4)
             } header: {
                 Text("Server Details")
             }
@@ -139,7 +119,15 @@ struct ServerFormViewNew: View {
             
             // Connection Test Section
             Section {
-                Button(action: testConnection) {
+                Button(action: {
+                    // Clean address before testing
+                    let detection = ServerConfig.detectProtocol(from: serverAddress)
+                    if let proto = detection.protocol {
+                        serverProtocol = proto
+                    }
+                    serverAddress = detection.address
+                    testConnection()
+                }) {
                     HStack {
                         if isTesting {
                             ProgressView()
@@ -204,6 +192,13 @@ struct ServerFormViewNew: View {
             }
             ToolbarItem(placement: .confirmationAction) {
                 Button("Save") {
+                    // Clean address before saving
+                    let detection = ServerConfig.detectProtocol(from: serverAddress)
+                    if let proto = detection.protocol {
+                        serverProtocol = proto
+                    }
+                    serverAddress = detection.address
+                    
                     saveServer()
                     presentationMode.wrappedValue.dismiss()
                 }
@@ -213,11 +208,8 @@ struct ServerFormViewNew: View {
         .onAppear {
             if let config = configToEdit {
                 name = config.name
-                connectionType = config.connectionType
-                ipAddress = config.ipAddress
-                port = config.port
-                domain = config.domain
-                useHTTPS = config.useHTTPS
+                serverAddress = config.serverAddress + (config.port != nil ? ":\(config.port!)" : "")
+                serverProtocol = config.serverProtocol
                 
                 // Load API key from Keychain first, fallback to config
                 if let savedKey = KeychainManager.shared.loadAPIKey(forServerID: config.id) {
@@ -348,15 +340,14 @@ struct ServerFormViewNew: View {
             KeychainManager.shared.deleteAPIKey(forServerID: serverID)
         }
         
+        let parsed = ServerConfig.parseHostAndPort(serverAddress)
         let newConfig = ServerConfig(
             id: serverID,
             name: name,
-            connectionType: connectionType,
-            ipAddress: ipAddress,
-            port: port,
-            domain: domain,
-            apiKey: nil, // API key now stored in Keychain
-            useHTTPS: useHTTPS
+            serverAddress: parsed.host,
+            port: parsed.port,
+            serverProtocol: serverProtocol,
+            apiKey: nil // API key now stored in Keychain
         )
         onSave(newConfig)
     }

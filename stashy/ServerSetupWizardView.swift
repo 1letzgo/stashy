@@ -13,14 +13,11 @@ struct ServerSetupWizardView: View {
     
     // Wizard State
     @State private var currentStep = 1
-    private let totalSteps = 3
+    private let totalSteps = 2  // Reduced from 3
     
     // Form Data
-    @State private var connectionType: ConnectionType = .ipAddress
-    @State private var ipAddress = ""
-    @State private var port = "9999"
-    @State private var domain = ""
-    @State private var useHTTPS = true
+    @State private var serverAddress = ""
+    @State private var serverProtocol: ServerProtocol = .https
     @State private var apiKey = ""
     @State private var serverName = "My Stash"
     
@@ -47,9 +44,8 @@ struct ServerSetupWizardView: View {
                 
                 // Step Content
                 TabView(selection: $currentStep) {
-                    step1ConnectionType.tag(1)
-                    step2AddressAndKey.tag(2)
-                    step3Test.tag(3)
+                    step1ServerDetails.tag(1)
+                    step2Test.tag(2)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .animation(.easeInOut, value: currentStep)
@@ -83,108 +79,23 @@ struct ServerSetupWizardView: View {
         }
     }
     
-    // MARK: - Step 1: Connection Type
+    // MARK: - Step 1: Server Details
     
-    private var step1ConnectionType: some View {
-        VStack(spacing: 32) {
-            Spacer()
-            
-            VStack(spacing: 12) {
-                Image(systemName: "network")
-                    .font(.system(size: 60))
-                    .foregroundColor(appearanceManager.tintColor)
-                
-                Text("How do you connect?")
-                    .font(.title2.bold())
-                
-                Text("Choose how you access your Stash server")
-                    .font(.body)
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 32)
-            }
-            
-            Spacer()
-            
-            VStack(spacing: 16) {
-                connectionTypeButton(
-                    type: .ipAddress,
-                    icon: "number",
-                    title: "IP Address",
-                    description: "Local network (e.g. 192.168.1.100)"
-                )
-                
-                connectionTypeButton(
-                    type: .domain,
-                    icon: "globe",
-                    title: "Domain",
-                    description: "External address (e.g. stash.example.com)"
-                )
-            }
-            .padding(.horizontal, 24)
-            
-            Spacer()
-        }
-    }
-    
-    private func connectionTypeButton(type: ConnectionType, icon: String, title: String, description: String) -> some View {
-        Button(action: {
-            connectionType = type
-        }) {
-            HStack(spacing: 16) {
-                ZStack {
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(connectionType == type ? appearanceManager.tintColor : Color.gray.opacity(0.15))
-                        .frame(width: 50, height: 50)
-                    
-                    Image(systemName: icon)
-                        .font(.system(size: 22))
-                        .foregroundColor(connectionType == type ? .white : .primary)
-                }
-                
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(title)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    Text(description)
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                }
-                
-                Spacer()
-                
-                if connectionType == type {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(appearanceManager.tintColor)
-                        .font(.title2)
-                }
-            }
-            .padding(16)
-            .background(
-                RoundedRectangle(cornerRadius: 16)
-                    .fill(Color(.secondarySystemGroupedBackground))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16)
-                            .stroke(connectionType == type ? appearanceManager.tintColor : Color.clear, lineWidth: 2)
-                    )
-            )
-        }
-        .buttonStyle(.plain)
-    }
-    
-    // MARK: - Step 2: Address & API Key
-    
-    private var step2AddressAndKey: some View {
+    private var step1ServerDetails: some View {
         ScrollView {
             VStack(spacing: 24) {
                 VStack(spacing: 12) {
-                    Image(systemName: connectionType == .ipAddress ? "number" : "globe")
+                    Image(systemName: "server.rack")
                         .font(.system(size: 50))
                         .foregroundColor(appearanceManager.tintColor)
                     
                     Text("Server Details")
                         .font(.title2.bold())
+                    
+                    Text("Enter your Stash server information")
+                        .font(.body)
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
                 }
                 .padding(.top, 32)
                 
@@ -201,54 +112,54 @@ struct ServerSetupWizardView: View {
                             .cornerRadius(12)
                     }
                     
-                    if connectionType == .ipAddress {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("IP Address")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            TextField("192.168.1.100", text: $ipAddress)
-                                .keyboardType(.numbersAndPunctuation)
-                                .autocapitalization(.none)
-                                .padding()
-                                .background(Color(.secondarySystemGroupedBackground))
-                                .cornerRadius(12)
-                        }
+                    // Protocol Picker
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Protocol")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
                         
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Port")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            TextField("9999", text: $port)
-                                .keyboardType(.numberPad)
-                                .padding()
-                                .background(Color(.secondarySystemGroupedBackground))
-                                .cornerRadius(12)
-                        }
-                    } else {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text("Domain")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            
-                            TextField("stash.example.com", text: $domain)
-                                .keyboardType(.URL)
-                                .autocapitalization(.none)
-                                .padding()
-                                .background(Color(.secondarySystemGroupedBackground))
-                                .cornerRadius(12)
-                        }
-                        
-                        Toggle(isOn: $useHTTPS) {
-                            HStack {
-                                Image(systemName: "lock.shield")
-                                Text("Use HTTPS")
+                        Picker("Protocol", selection: $serverProtocol) {
+                            ForEach(ServerProtocol.allCases, id: \.self) { proto in
+                                Text(proto.displayName).tag(proto)
                             }
                         }
+                        .pickerStyle(.segmented)
                         .padding()
                         .background(Color(.secondarySystemGroupedBackground))
                         .cornerRadius(12)
+                    }
+                    
+                    // Server Address
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Server Address")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        
+                        TextField("192.168.1.100:9999 or stash.example.com", text: $serverAddress)
+                            .keyboardType(.URL)
+                            .autocapitalization(.none)
+                            .autocorrectionDisabled()
+                            .padding()
+                            .background(Color(.secondarySystemGroupedBackground))
+                            .cornerRadius(12)
+                            .onChange(of: serverAddress) { oldValue, newValue in
+                                if newValue.lowercased().hasPrefix("https://") {
+                                    serverProtocol = .https
+                                    // Only strip if there's more after the prefix (e.g. pasted or typed first char)
+                                    if newValue.count > 8 {
+                                        serverAddress = String(newValue.dropFirst(8))
+                                    }
+                                } else if newValue.lowercased().hasPrefix("http://") {
+                                    serverProtocol = .http
+                                    if newValue.count > 7 {
+                                        serverAddress = String(newValue.dropFirst(7))
+                                    }
+                                }
+                            }
+                        
+                        Text("Enter address (e.g. timeout.com:9999)")
+                            .font(.caption2)
+                            .foregroundColor(.secondary.opacity(0.8))
                     }
                     
                     // API Key
@@ -277,9 +188,9 @@ struct ServerSetupWizardView: View {
         }
     }
     
-    // MARK: - Step 3: Connection Test
+    // MARK: - Step 2: Connection Test
     
-    private var step3Test: some View {
+    private var step2Test: some View {
         VStack(spacing: 32) {
             Spacer()
             
@@ -359,9 +270,8 @@ struct ServerSetupWizardView: View {
             if currentStep > 1 {
                 Button(action: { 
                     withAnimation { currentStep -= 1 }
-                    if currentStep == 2 {
-                        connectionTestResult = .notTested
-                    }
+                    // Reset connection test when going back
+                    connectionTestResult = .notTested
                 }) {
                     HStack {
                         Image(systemName: "chevron.left")
@@ -377,6 +287,13 @@ struct ServerSetupWizardView: View {
             
             Button(action: {
                 if currentStep < totalSteps {
+                    // Clean address before moving to test step
+                    let detection = ServerConfig.detectProtocol(from: serverAddress)
+                    if let proto = detection.protocol {
+                        serverProtocol = proto
+                    }
+                    serverAddress = detection.address
+                    
                     withAnimation { currentStep += 1 }
                 } else {
                     completeSetup()
@@ -405,14 +322,8 @@ struct ServerSetupWizardView: View {
     private var canProceed: Bool {
         switch currentStep {
         case 1:
-            return true
+            return !serverAddress.isEmpty && !serverName.isEmpty
         case 2:
-            if connectionType == .ipAddress {
-                return !ipAddress.isEmpty && !port.isEmpty && !serverName.isEmpty
-            } else {
-                return !domain.isEmpty && !serverName.isEmpty
-            }
-        case 3:
             if case .success = connectionTestResult {
                 return true
             }
@@ -467,14 +378,13 @@ struct ServerSetupWizardView: View {
     }
     
     private func buildConfig() -> ServerConfig {
-        ServerConfig(
+        let parsed = ServerConfig.parseHostAndPort(serverAddress)
+        return ServerConfig(
             name: serverName,
-            connectionType: connectionType,
-            ipAddress: ipAddress,
-            port: port,
-            domain: domain,
-            apiKey: apiKey.isEmpty ? nil : apiKey,
-            useHTTPS: useHTTPS
+            serverAddress: parsed.host,
+            port: parsed.port,
+            serverProtocol: serverProtocol,
+            apiKey: apiKey.isEmpty ? nil : apiKey
         )
     }
     

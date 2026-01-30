@@ -52,8 +52,8 @@ class PerformerRepository: PerformerRepositoryProtocol {
         }
         
         // Apply saved filter if present
-        if let savedFilter = filter, let filterJson = savedFilter.filter {
-            performerFilter = filterJson
+        if let savedFilter = filter, let filterDict = savedFilter.filterDict {
+            performerFilter = filterDict
         }
         
         var variables: [String: Any] = [
@@ -69,18 +69,10 @@ class PerformerRepository: PerformerRepositoryProtocol {
             variables["performer_filter"] = performerFilter
         }
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.execute(query: query, variables: variables) { (result: Result<PerformerResponse, GraphQLNetworkError>) in
-                switch result {
-                case .success(let response):
-                    let performers = response.data?.findPerformers?.performers ?? []
-                    let total = response.data?.findPerformers?.count ?? 0
-                    continuation.resume(returning: (performers, total))
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let response: PerformersResponse = try await graphQLClient.execute(query: query, variables: variables)
+        let performers = response.data?.findPerformers.performers ?? []
+        let total = response.data?.findPerformers.count ?? 0
+        return (performers, total)
     }
     
     // MARK: - Fetch Performer Details
@@ -89,15 +81,7 @@ class PerformerRepository: PerformerRepositoryProtocol {
         let query = GraphQLQueries.queryWithFragments("findPerformer")
         let variables: [String: Any] = ["id": performerId]
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.execute(query: query, variables: variables) { (result: Result<SinglePerformerResponse, GraphQLNetworkError>) in
-                switch result {
-                case .success(let response):
-                    continuation.resume(returning: response.data?.findPerformer)
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let response: SinglePerformerResponse = try await graphQLClient.execute(query: query, variables: variables)
+        return response.data?.findPerformer
     }
 }

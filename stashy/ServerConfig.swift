@@ -7,6 +7,23 @@
 
 import Foundation
 
+enum ServerProtocol: String, Codable, CaseIterable {
+    case http = "HTTP"
+    case https = "HTTPS"
+    
+    var displayName: String {
+        rawValue
+    }
+    
+    var defaultPort: String {
+        switch self {
+        case .http: return "80"
+        case .https: return "443"
+        }
+    }
+}
+
+// Legacy enum for backward compatibility
 enum ConnectionType: String, Codable, CaseIterable {
     case ipAddress = "IP Address"
     case domain = "Domain"
@@ -19,33 +36,32 @@ enum ConnectionType: String, Codable, CaseIterable {
 struct ServerConfig: Codable, Identifiable, Equatable {
     var id: UUID = UUID()
     var name: String = "My Stash"
-    var connectionType: ConnectionType
-    var ipAddress: String
-    var port: String
-    var domain: String
-    var apiKey: String?  // Optional API Key for authentication
-    var useHTTPS: Bool  // HTTP or HTTPS for Domain
+    var serverAddress: String  // Unified field for IP or domain
+    var port: String?          // Optional port
+    var serverProtocol: ServerProtocol
+    var apiKey: String?        // Optional API Key for authentication
 
     var baseURL: String {
+        let effectivePort = port ?? serverProtocol.defaultPort
+        let scheme = serverProtocol == .https ? "https" : "http"
+        
+        // Only append port if it's not the default for the protocol
+        let needsPort = (serverProtocol == .https && effectivePort != "443") || 
+                       (serverProtocol == .http && effectivePort != "80")
+        
         let url: String
-        switch connectionType {
-        case .ipAddress:
-            url = "http://\(ipAddress):\(port)"
-        case .domain:
-            let scheme = useHTTPS ? "https" : "http"
-            url = "\(scheme)://\(domain)"
+        if needsPort {
+            url = "\(scheme)://\(serverAddress):\(effectivePort)"
+        } else {
+            url = "\(scheme)://\(serverAddress)"
         }
+        
         print("🌐 SERVER CONFIG: Using URL: \(url)")
         return url
     }
 
     var hasValidConfig: Bool {
-        switch connectionType {
-        case .ipAddress:
-            return !ipAddress.isEmpty && !port.isEmpty
-        case .domain:
-            return !domain.isEmpty
-        }
+        return !serverAddress.isEmpty
     }
     
     /// API key from Keychain (preferred) or stored value (migration fallback)
@@ -58,46 +74,121 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         return apiKey
     }
 
-    // Backward compatibility initializer
-    init(ipAddress: String, port: String) {
-        self.connectionType = .ipAddress
-        self.ipAddress = ipAddress
-        self.port = port
-        self.domain = ""
-        self.apiKey = nil
-        self.useHTTPS = true
-    }
-
-    init(id: UUID = UUID(), name: String = "My Stash", connectionType: ConnectionType, ipAddress: String, port: String, domain: String, apiKey: String? = nil, useHTTPS: Bool = true) {
+    // Modern initializer
+    init(
+        id: UUID = UUID(),
+        name: String = "My Stash",
+        serverAddress: String,
+        port: String? = nil,
+        serverProtocol: ServerProtocol = .https,
+        apiKey: String? = nil
+    ) {
         self.id = id
         self.name = name
-        self.connectionType = connectionType
-        self.ipAddress = ipAddress
+        self.serverAddress = serverAddress
         self.port = port
-        self.domain = domain
+        self.serverProtocol = serverProtocol
         self.apiKey = apiKey
-        self.useHTTPS = useHTTPS
     }
     
-    // Decoder für Backward Compatibility
+    // Backward compatibility decoder
     init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         name = try container.decodeIfPresent(String.self, forKey: .name) ?? "My Stash"
-        connectionType = try container.decode(ConnectionType.self, forKey: .connectionType)
-        ipAddress = try container.decode(String.self, forKey: .ipAddress)
-        port = try container.decode(String.self, forKey: .port)
-        domain = try container.decode(String.self, forKey: .domain)
         apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey)
-        useHTTPS = try container.decodeIfPresent(Bool.self, forKey: .useHTTPS) ?? true
+        
+        // Try to decode new format first
+        if let serverAddress = try? container.decode(String.self, forKey: .serverAddress),
+           let protocolValue = try? container.decode(ServerProtocol.self, forKey: .serverProtocol) {
+            // New format
+            self.serverAddress = serverAddress
+            self.port = try container.decodeIfPresent(String.self, forKey: .port)
+            self.serverProtocol = protocolValue
+        } else {
+            // Legacy format - migrate
+            let connectionType = try container.decode(ConnectionType.self, forKey: .connectionType)
+            let useHTTPS = try container.decodeIfPresent(Bool.self, forKey: .useHTTPS) ?? true
+            
+            switch connectionType {
+            case .ipAddress:
+                self.serverAddress = try container.decode(String.self, forKey: .ipAddress)
+                self.port = try container.decode(String.self, forKey: .port)
+                self.serverProtocol = .http  // IP addresses were always HTTP in old format
+            case .domain:
+                self.serverAddress = try container.decode(String.self, forKey: .domain)
+                self.port = nil  // Domains didn't have explicit port in old format
+                self.serverProtocol = useHTTPS ? .https : .http
+            }
+            
+            print("📦 Migrated legacy server config: \(name)")
+        }
+    }
+    
+    // Custom encoder to match the coding keys
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(serverAddress, forKey: .serverAddress)
+        try container.encodeIfPresent(port, forKey: .port)
+        try container.encode(serverProtocol, forKey: .serverProtocol)
+        try container.encodeIfPresent(apiKey, forKey: .apiKey)
     }
     
     enum CodingKeys: String, CodingKey {
-        case id, name, connectionType, ipAddress, port, domain, apiKey, useHTTPS
+        case id, name, apiKey
+        // New format keys
+        case serverAddress, port, serverProtocol
+        // Legacy format keys (for backward compatibility)
+        case connectionType, ipAddress, domain, useHTTPS
     }
     
     static func == (lhs: ServerConfig, rhs: ServerConfig) -> Bool {
         return lhs.id == rhs.id
+    }
+    
+    /// Detects protocol from input string and returns it along with the cleaned address
+    static func detectProtocol(from input: String) -> (protocol: ServerProtocol?, address: String) {
+        let cleaned = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        let lowercased = cleaned.lowercased()
+        
+        if lowercased.hasPrefix("https://") {
+            return (.https, String(cleaned.dropFirst(8)))
+        } else if lowercased.hasPrefix("http://") {
+            return (.http, String(cleaned.dropFirst(7)))
+        }
+        
+        return (nil, cleaned)
+    }
+
+    /// Parses an input string (e.g. "1.2.3.4:9999" or "example.com") into host and port components
+    static func parseHostAndPort(_ input: String) -> (host: String, port: String?) {
+        // First, strip protocol if present
+        let detection = detectProtocol(from: input)
+        let safeInput = detection.address
+        
+        // Use URL parser to robustly handle parsing
+        // We prepend a dummy scheme to ensure URL recognizes it as a valid URL structure
+        let dummyUrlString = "http://\(safeInput)"
+        
+        guard let url = URL(string: dummyUrlString), let host = url.host else {
+            // Fallback: simple split on last colon if URL parsing fails
+            if let lastColonIndex = safeInput.lastIndex(of: ":") {
+                let hostPart = String(safeInput[..<lastColonIndex])
+                let portPart = String(safeInput[safeInput.index(after: lastColonIndex)...])
+                // Validate port is numeric
+                if Int(portPart) != nil {
+                    return (hostPart, portPart)
+                }
+            }
+            return (safeInput, nil)
+        }
+        
+        // port is an Int in URL, convert to String?
+        let portString = url.port.map { String($0) }
+        return (host, portString)
     }
 }
 

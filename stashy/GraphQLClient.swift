@@ -230,7 +230,27 @@ class GraphQLClient {
         }
     }
     
-    /// Execute a GraphQL mutation with JSON response
+    /// Execute a GraphQL mutation using async/await
+    func performMutation(
+        mutation: String,
+        variables: [String: Any]
+    ) async throws -> [String: StashJSONValue] {
+        var body: [String: Any] = ["query": mutation]
+        body["variables"] = variables
+        
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            throw GraphQLNetworkError.decodingError(NSError(domain: "JSONEncoding", code: -1))
+        }
+        
+        let request = try buildRequest(query: bodyString, variables: nil)
+        let (data, response) = try await session.data(for: request)
+        try validateResponse(response, data: data)
+        
+        return try JSONDecoder().decode([String: StashJSONValue].self, from: data)
+    }
+    
+    /// Execute a GraphQL mutation with completion handler (for gradual migration)
     func performMutation(
         mutation: String,
         variables: [String: Any],
@@ -238,19 +258,7 @@ class GraphQLClient {
     ) {
         Task {
             do {
-                var body: [String: Any] = ["query": mutation]
-                body["variables"] = variables
-                
-                guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
-                      let bodyString = String(data: bodyData, encoding: .utf8) else {
-                    throw GraphQLNetworkError.decodingError(NSError(domain: "JSONEncoding", code: -1))
-                }
-                
-                let request = try buildRequest(query: bodyString, variables: nil)
-                let (data, response) = try await session.data(for: request)
-                try validateResponse(response, data: data)
-                
-                let decoded = try JSONDecoder().decode([String: StashJSONValue].self, from: data)
+                let decoded = try await performMutation(mutation: mutation, variables: variables)
                 await MainActor.run {
                     completion(.success(decoded))
                 }

@@ -9,8 +9,43 @@ import Foundation
 import AVKit
 import AVFoundation
 import WebKit
+import StoreKit
 
 // MARK: - Global Helper Functions
+
+private var _cachedIsTestFlight: Bool?
+
+func isTestFlightBuild() -> Bool {
+    #if targetEnvironment(simulator) || DEBUG
+    return true
+    #else
+    if let cached = _cachedIsTestFlight {
+        return cached
+    }
+    
+    let isTestFlight: Bool
+    if #available(iOS 18.0, *) {
+        // For iOS 18+, the receipt URL is deprecated.
+        // We should ideally use AppTransaction.shared, which is async.
+        // As a temporary synchronous bridge, we check the legacy path but wrap it
+        // OR we return a default. For TestFlight builds, the legacy check still works.
+        isTestFlight = Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+        
+        // Start an async task to update the cache properly via AppTransaction
+        Task {
+            if let result = try? await AppTransaction.shared,
+               case .verified(let appTransaction) = result {
+                _cachedIsTestFlight = appTransaction.environment == .sandbox
+            }
+        }
+    } else {
+        isTestFlight = Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+    }
+    
+    _cachedIsTestFlight = isTestFlight
+    return isTestFlight
+    #endif
+}
 
 func isHeadphonesConnected() -> Bool {
     let currentRoute = AVAudioSession.sharedInstance().currentRoute

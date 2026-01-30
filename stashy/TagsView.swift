@@ -279,14 +279,30 @@ struct TagsView: View {
             }
             viewModel.fetchSavedFilters()
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
+            if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.tags.rawValue {
+                if let defaultId = TabManager.shared.getDefaultFilterId(for: .tags),
+                   let newFilter = viewModel.savedFilters[defaultId] {
+                    selectedFilter = newFilter
+                } else {
+                    selectedFilter = nil
+                }
+                performSearch()
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+            selectedFilter = nil
             performSearch()
         }
         .onChange(of: viewModel.savedFilters) { oldValue, newValue in
             // Apply default filter if set and none selected yet
-            if selectedFilter == nil, let defaultId = TabManager.shared.getDefaultFilterId(for: .tags) {
-                if let filter = newValue[defaultId] {
+            if selectedFilter == nil {
+                if let defaultId = TabManager.shared.getDefaultFilterId(for: .tags),
+                   let filter = newValue[defaultId] {
                     selectedFilter = filter
+                    performSearch()
+                } else if !viewModel.isLoadingSavedFilters {
+                    // Default filter was set but not found, or filters finished loading and none match
                     performSearch()
                 }
             }
@@ -418,10 +434,7 @@ struct TagDetailView: View {
             // But wait, here I am calling with isInitialLoad: true to reset pagination/sort.
             // So I need to retrieve the filter again.
             
-            let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes)
-            let filter = defaultId.flatMap { self.viewModel.savedFilters[$0] }
-            
-            self.viewModel.fetchTagScenes(tagId: self.selectedTag.id, sortBy: newOption, isInitialLoad: true, filter: filter)
+            self.viewModel.fetchTagScenes(tagId: self.selectedTag.id, sortBy: newOption, isInitialLoad: true)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                 self.isChangingSort = false
             }
@@ -729,34 +742,16 @@ struct TagDetailView: View {
             }
         }
         .onAppear {
-            // Check for default filter
-            let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes)
-            
-            if defaultId != nil {
-                // Fetch filters first, scenes will load in onChange
-                viewModel.fetchSavedFilters()
-            } else {
-                // No default filter, load immediately
+            if viewModel.tagScenes.isEmpty && !viewModel.isLoadingTagScenes {
                 viewModel.fetchTagScenes(tagId: selectedTag.id, sortBy: selectedSortOption, isInitialLoad: true)
             }
             
             // Initial fetch to get favorite status
-             viewModel.fetchTag(tagId: selectedTag.id) { updatedTag in
-                 if let tag = updatedTag {
-                     self.isFavorite = tag.favorite ?? false
-                 } else {
-                     self.isFavorite = selectedTag.favorite ?? false
-                 }
-             }
-        }
-        .onChange(of: viewModel.savedFilters) { oldValue, newValue in
-            if let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes) {
-                if let filter = newValue[defaultId] {
-                    // Found default filter, apply it
-                    viewModel.fetchTagScenes(tagId: selectedTag.id, sortBy: selectedSortOption, isInitialLoad: true, filter: filter)
-                } else if !viewModel.isLoadingSavedFilters {
-                    // Default filter ID exists but not found (e.g. deleted), load without filter
-                    viewModel.fetchTagScenes(tagId: selectedTag.id, sortBy: selectedSortOption, isInitialLoad: true)
+            viewModel.fetchTag(tagId: selectedTag.id) { updatedTag in
+                if let tag = updatedTag {
+                    self.isFavorite = tag.favorite ?? false
+                } else {
+                    self.isFavorite = selectedTag.favorite ?? false
                 }
             }
         }

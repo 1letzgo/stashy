@@ -50,8 +50,8 @@ class TagRepository: TagRepositoryProtocol {
         }
         
         // Apply saved filter if present
-        if let savedFilter = filter, let filterJson = savedFilter.filter {
-            tagFilter = filterJson
+        if let savedFilter = filter, let filterDict = savedFilter.filterDict {
+            tagFilter = filterDict
         }
         
         var variables: [String: Any] = [
@@ -67,18 +67,10 @@ class TagRepository: TagRepositoryProtocol {
             variables["tag_filter"] = tagFilter
         }
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.execute(query: query, variables: variables) { (result: Result<TagResponse, GraphQLNetworkError>) in
-                switch result {
-                case .success(let response):
-                    let tags = response.data?.findTags?.tags ?? []
-                    let total = response.data?.findTags?.count ?? 0
-                    continuation.resume(returning: (tags, total))
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let response: TagsResponse = try await graphQLClient.execute(query: query, variables: variables)
+        let tags = response.data?.findTags.tags ?? []
+        let total = response.data?.findTags.count ?? 0
+        return (tags, total)
     }
     
     // MARK: - Fetch Tag Details
@@ -87,15 +79,7 @@ class TagRepository: TagRepositoryProtocol {
         let query = GraphQLQueries.queryWithFragments("findTag")
         let variables: [String: Any] = ["id": tagId]
         
-        return try await withCheckedThrowingContinuation { continuation in
-            graphQLClient.execute(query: query, variables: variables) { (result: Result<SingleTagResponse, GraphQLNetworkError>) in
-                switch result {
-                case .success(let response):
-                    continuation.resume(returning: response.data?.findTag)
-                case .failure(let error):
-                    continuation.resume(throwing: error)
-                }
-            }
-        }
+        let response: SingleTagResponse = try await graphQLClient.execute(query: query, variables: variables)
+        return response.data?.findTag
     }
 }

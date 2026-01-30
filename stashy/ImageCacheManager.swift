@@ -16,47 +16,96 @@ class ImageCache {
     
     private let memoryCache = NSCache<NSURL, UIImage>()
     private let fileManager = FileManager.default
-    private let diskCacheDirectory: URL
+    private let baseDiskCacheDirectory: URL
+    private var _cachedServerCacheDirectory: URL?
+    private var lastCleanupDate: Date?
     
     private init() {
         // Memory Cache Config
-        memoryCache.countLimit = 200
-        memoryCache.totalCostLimit = 1024 * 1024 * 200 // 200 MB
+        memoryCache.countLimit = 300 // Increased
+        memoryCache.totalCostLimit = 1024 * 1024 * 300 // 300 MB
         
         // Disk Cache Config
         let paths = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)
-        diskCacheDirectory = paths[0].appendingPathComponent("StashyImageCache")
+        baseDiskCacheDirectory = paths[0].appendingPathComponent("StashyImageCache")
         
-        createDiskCacheDirectory()
+        createBaseDiskCacheDirectory()
+        
+        // Listen for server changes
+        NotificationCenter.default.addObserver(self, selector: #selector(handleServerChange), name: NSNotification.Name("ServerConfigChanged"), object: nil)
     }
     
-    private func createDiskCacheDirectory() {
-        if !fileManager.fileExists(atPath: diskCacheDirectory.path) {
-            try? fileManager.createDirectory(at: diskCacheDirectory, withIntermediateDirectories: true)
+    @objc private func handleServerChange() {
+        resetServerCachePath()
+    }
+    
+    private func createBaseDiskCacheDirectory() {
+        if !fileManager.fileExists(atPath: baseDiskCacheDirectory.path) {
+            try? fileManager.createDirectory(at: baseDiskCacheDirectory, withIntermediateDirectories: true)
         }
     }
     
-    /// Creates a stable cache key by stripping query parameters (like ?t=timestamp)
+    private var currentServerCacheDirectory: URL {
+        if let cached = _cachedServerCacheDirectory {
+            return cached
+        }
+        let serverId = ServerConfigManager.shared.activeConfig?.id.uuidString ?? "default"
+        let dir = baseDiskCacheDirectory.appendingPathComponent(serverId)
+        if !fileManager.fileExists(atPath: dir.path) {
+            try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
+        }
+        _cachedServerCacheDirectory = dir
+        return dir
+    }
+    
+    func resetServerCachePath() {
+        _cachedServerCacheDirectory = nil
+    }
+    
+    /// Creates a stable cache key by stripping variable query parameters (like ?t=timestamp)
+    /// But KEEPS size parameters (width, height) to allow caching different sizes
     private func stableCacheKey(for url: NSURL) -> String {
-        guard let urlComponents = URLComponents(url: url as URL, resolvingAgainstBaseURL: false) else {
-            return url.absoluteString ?? ""
+        let absString = url.absoluteString ?? ""
+        // Fast path: if no query params, return as is
+        if !absString.contains("?") {
+            return absString
         }
-        // Remove query and fragment to get stable key
+        
+        guard let urlComponents = URLComponents(url: url as URL, resolvingAgainstBaseURL: false) else {
+            return absString
+        }
+        
         var stable = urlComponents
-        stable.query = nil
+        // Filter query items to keep only size-related ones
+        if let queryItems = stable.queryItems {
+            let allowedParams = Set(["width", "height", "size"])
+            let filteredItems = queryItems.filter { allowedParams.contains($0.name) }
+            
+            if filteredItems.isEmpty {
+                stable.query = nil
+            } else {
+                stable.queryItems = filteredItems
+            }
+        } else {
+            stable.query = nil
+        }
+        
         stable.fragment = nil
-        return stable.url?.absoluteString ?? url.absoluteString ?? ""
+        return stable.url?.absoluteString ?? absString
     }
     
     private func cacheFileURL(for key: NSURL) -> URL {
         let keyString = stableCacheKey(for: key)
-        // Simple hashing for filename
         let filename = SHA256.hash(data: Data(keyString.utf8)).compactMap { String(format: "%02x", $0) }.joined()
-        return diskCacheDirectory.appendingPathComponent(filename)
+        return currentServerCacheDirectory.appendingPathComponent(filename)
     }
     
-    /// Stable NSURL key for memory cache (without query params)
     private func stableMemoryCacheKey(for url: NSURL) -> NSURL {
+        let absString = url.absoluteString ?? ""
+        if !absString.contains("?") {
+            return url
+        }
+        
         guard let urlComponents = URLComponents(url: url as URL, resolvingAgainstBaseURL: false) else {
             return url
         }
@@ -69,45 +118,40 @@ class ImageCache {
     func object(forKey key: NSURL) -> UIImage? {
         let stableKey = stableMemoryCacheKey(for: key)
         
-        // 1. Check Memory (Fastest)
+        // 1. Memory Cache
         if let image = memoryCache.object(forKey: stableKey) {
             return image
         }
         
-        // 2. Check Disk
+        // 2. Disk Cache
         let fileURL = cacheFileURL(for: key)
         if fileManager.fileExists(atPath: fileURL.path) {
-            // Check expiration (e.g., 7 days)
-            if let attributes = try? fileManager.attributesOfItem(atPath: fileURL.path),
-               let modificationDate = attributes[.modificationDate] as? Date,
-               Date().timeIntervalSince(modificationDate) < 60 * 60 * 24 * 7 {
-                
-                if let data = try? Data(contentsOf: fileURL), let image = UIImage(data: data) {
-                    // Re-cache in memory with stable key
-                    memoryCache.setObject(image, forKey: stableKey)
-                    return image
-                }
-            } else {
-                // Remove expired file
-                try? fileManager.removeItem(at: fileURL)
+            if let data = try? Data(contentsOf: fileURL), let image = UIImage(data: data) {
+                memoryCache.setObject(image, forKey: stableKey)
+                return image
             }
         }
-        
         return nil
     }
     
     func setData(_ data: Data, forKey key: NSURL) {
         let stableKey = stableMemoryCacheKey(for: key)
         
-        // 1. Save to Memory if possible (as Image)
+        // Store in Memory
         if let image = UIImage(data: data) {
             memoryCache.setObject(image, forKey: stableKey)
         }
         
-        // 2. Save raw Data to Disk
+        // Store on Disk
         Task.detached(priority: .background) {
             let fileURL = self.cacheFileURL(for: key)
             try? data.write(to: fileURL)
+            
+            // Only cleanup once every 4 hours to avoid heavy disk IO
+            if self.lastCleanupDate == nil || Date().timeIntervalSince(self.lastCleanupDate!) > 60 * 60 * 4 {
+                self.cleanupOldFiles()
+                self.lastCleanupDate = Date()
+            }
         }
     }
     
@@ -119,10 +163,31 @@ class ImageCache {
         return nil
     }
     
+    private func cleanupOldFiles() {
+        // Simple periodic cleanup: remove files older than 30 days
+        let thirtyDays: TimeInterval = 60 * 60 * 24 * 30
+        let serverDir = currentServerCacheDirectory
+        
+        guard let files = try? fileManager.contentsOfDirectory(at: serverDir, includingPropertiesForKeys: [.contentModificationDateKey]) else { return }
+        
+        for file in files {
+            if let attrs = try? file.resourceValues(forKeys: [.contentModificationDateKey]),
+               let date = attrs.contentModificationDate,
+               Date().timeIntervalSince(date) > thirtyDays {
+                try? fileManager.removeItem(at: file)
+            }
+        }
+    }
+    
     func clearCache() {
         memoryCache.removeAllObjects()
-        try? fileManager.removeItem(at: diskCacheDirectory)
-        createDiskCacheDirectory()
+        try? fileManager.removeItem(at: baseDiskCacheDirectory)
+        createBaseDiskCacheDirectory()
+    }
+    
+    func clearCurrentServerCache() {
+        memoryCache.removeAllObjects()
+        try? fileManager.removeItem(at: currentServerCacheDirectory)
     }
 }
 
@@ -149,20 +214,15 @@ class ImageLoader: ObservableObject {
         }
 
         Task {
-            // Check cache on background thread
-            if let cachedData = ImageCache.shared.data(forKey: url as NSURL) {
-                // print("🖼️ CACHE HIT (Data): \(url.path)")
+            // 1. Check Memory/Disk Cache for UIImage (Fastest)
+            // object(forKey already checks both memory and disk)
+            if let cachedUIImage = ImageCache.shared.object(forKey: url as NSURL) {
                 await MainActor.run {
-                    self.imageData = cachedData
-                    if let uiImage = UIImage(data: cachedData) {
-                        self.image = Image(uiImage: uiImage)
-                    }
+                    self.image = Image(uiImage: cachedUIImage)
                     self.isLoading = false
                 }
                 return
             }
-            
-            // print("🖼️ CACHE MISS: \(url.path)")
 
             do {
                 let data = try await loadImage(from: url)

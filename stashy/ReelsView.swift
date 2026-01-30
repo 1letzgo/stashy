@@ -12,9 +12,7 @@ import AVFoundation
 struct ReelsView: View {
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @StateObject private var viewModel = StashDBViewModel()
-    @ObservedObject private var store = SubscriptionManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
-    @State private var showingPaywall = false
     @State private var selectedSortOption: StashDBViewModel.SceneSortOption = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
     @State private var selectedPerformer: ScenePerformer?
@@ -38,73 +36,9 @@ struct ReelsView: View {
 
 
     var body: some View {
-        Group {
-            if !store.isPremium {
-                paywallView
-            } else {
-                premiumContent
-            }
-        }
+        premiumContent
     }
 
-    @ViewBuilder
-    private var paywallView: some View {
-        VStack(spacing: 24) {
-            Spacer()
-            
-            ZStack {
-                Circle()
-                    .fill(Color.appAccent.opacity(0.1))
-                    .frame(width: 120, height: 120)
-                
-                Image(systemName: "play.square.stack.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.appAccent)
-            }
-            
-            VStack(spacing: 8) {
-                Text("Stashtok VIP Feature")
-                    .font(.title2)
-                    .fontWeight(.bold)
-                
-                Text("Become stashy VIP to unlock Stashtok and offline downloads.")
-                    .foregroundColor(.secondary)
-                    .multilineTextAlignment(.center)
-                    .padding(.horizontal, 40)
-            }
-            
-            Button {
-                showingPaywall = true
-            } label: {
-                Text(store.vipPriceDisplay)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 32)
-                    .padding(.vertical, 14)
-                    .background(Color.appAccent)
-                    .clipShape(Capsule())
-            }
-            
-            Button {
-                Task {
-                    await SubscriptionManager.shared.restorePurchases()
-                }
-            } label: {
-                Text("Restore Purchase")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-            }
-            
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.appBackground)
-        .navigationTitle("StashTok")
-        .navigationBarTitleDisplayMode(.inline)
-        .sheet(isPresented: $showingPaywall) {
-            PaywallView()
-        }
-    }
 
     @ViewBuilder
     private var premiumContent: some View {
@@ -136,40 +70,59 @@ struct ReelsView: View {
             reelsToolbar
         }
         .onAppear {
-            viewModel.fetchSavedFilters() // This is async, might use cache
+            if viewModel.savedFilters.isEmpty {
+                viewModel.fetchSavedFilters()
+            }
             
-            // Determine initial state
-            var initialPerformer: ScenePerformer? = coordinator.reelsPerformer
-            var initialTags: [Tag] = coordinator.reelsTags
+            // Determine initial state from coordinator
+            let initialPerformer: ScenePerformer? = coordinator.reelsPerformer
+            let initialTags: [Tag] = coordinator.reelsTags
             
-            // Clear coordinator immediately
+            // Priority 1: Navigation Context
             if initialPerformer != nil || !initialTags.isEmpty {
                 coordinator.reelsPerformer = nil
                 coordinator.reelsTags = []
-            } else {
-                // Fallback to state if not coming from coordinator
-                initialPerformer = selectedPerformer
-                initialTags = selectedTags
-            }
-            
-            // Check if default filter is already available in cache
-            var initialFilter = selectedFilter
-            if initialFilter == nil, let defaultId = TabManager.shared.getDefaultFilterId(for: .reels) {
-                initialFilter = viewModel.savedFilters[defaultId]
-            }
-            
-            // If we have context (coordinator) OR we have nothing loaded yet
-            if (initialPerformer != nil || !initialTags.isEmpty) || (viewModel.scenes.isEmpty && selectedFilter == nil) {
+                
                 let savedSort = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
-                applySettings(sortBy: savedSort, filter: initialFilter, performer: initialPerformer, tags: initialTags)
+                applySettings(sortBy: savedSort, filter: selectedFilter, performer: initialPerformer, tags: initialTags)
+            } else if viewModel.scenes.isEmpty {
+                // Priority 2: Wait for filters if we expect a default but don't have it yet
+                let defaultId = TabManager.shared.getDefaultFilterId(for: .reels)
+                let hasFilters = !viewModel.savedFilters.isEmpty
+                
+                if defaultId != nil && !hasFilters {
+                    // We need to wait for onChange(of: viewModel.savedFilters) to trigger applySettings
+                    print("🕓 ReelsView: Waiting for filters before initial load...")
+                } else {
+                    // Filters are ready or no default filter set
+                    var initialFilter = selectedFilter
+                    if initialFilter == nil, let defId = defaultId {
+                        initialFilter = viewModel.savedFilters[defId]
+                    }
+                    
+                    let savedSort = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
+                    applySettings(sortBy: savedSort, filter: initialFilter, performer: selectedPerformer, tags: selectedTags)
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
+            if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.reels.rawValue {
+                let defaultId = TabManager.shared.getDefaultFilterId(for: .reels)
+                let newFilter = defaultId != nil ? viewModel.savedFilters[defaultId!] : nil
+                applySettings(sortBy: selectedSortOption, filter: newFilter, performer: selectedPerformer, tags: selectedTags)
             }
         }
         .onChange(of: viewModel.savedFilters) { _, newValue in
-            // Only apply default filter if we haven't set a filter yet
-            if selectedFilter == nil, let defaultId = TabManager.shared.getDefaultFilterId(for: .reels) {
-                if let filter = newValue[defaultId] {
-                    // This will merge with current selectedPerformer/Tags state
+            // Only apply default filter if we haven't set a filter yet AND we are empty
+            if selectedFilter == nil && viewModel.scenes.isEmpty {
+                if let defaultId = TabManager.shared.getDefaultFilterId(for: .reels),
+                   let filter = newValue[defaultId] {
+                    print("✅ ReelsView: Applying default filter after lazy load")
                     applySettings(sortBy: selectedSortOption, filter: filter, performer: selectedPerformer, tags: selectedTags)
+                } else if !newValue.isEmpty {
+                    // Filters arrived but no default matches, or no default set - load unfiltered if still empty
+                     let savedSort = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
+                     applySettings(sortBy: savedSort, filter: nil, performer: selectedPerformer, tags: selectedTags)
                 }
             }
         }
@@ -740,37 +693,31 @@ struct ReelItemView: View {
             .animation(.easeInOut(duration: 0.3), value: showUI)
             
             // Interaction overlay (Labels + Scrubber)
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 6) {
                 Spacer()
                 
-                VStack(alignment: .leading, spacing: 6) {
-                    // Row 1: Performer - Title (Combined)
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        if let performer = scene.performers.first {
-                            Button(action: { onPerformerTap(performer) }) {
-                                Text(performer.name)
-                                    .font(.headline)
-                                    .fontWeight(.bold)
-                                    .foregroundColor(.white)
-                                    .shadow(radius: 2)
-                            }
-                            .buttonStyle(.plain)
-                            
-                            Text("-")
-                                .font(.headline)
+                VStack(alignment: .leading, spacing: 8) {
+                    // Row 1: Performer Name (Primary)
+                    if let performer = scene.performers.first {
+                        Button(action: { onPerformerTap(performer) }) {
+                            Text(performer.name)
+                                .font(.system(size: 17, weight: .bold)) // Standard Headline
                                 .foregroundColor(.white)
-                                .shadow(radius: 2)
+                                .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
                         }
-                        
-                        Text(scene.title ?? "")
-                            .font(.body)
-                            .fontWeight(.semibold)
-                            .foregroundColor(.white)
-                            .shadow(radius: 2)
-                            .lineLimit(1)
+                        .buttonStyle(.plain)
                     }
                     
-                    // Row 2: Tags (Scrollable) in Dark Pills
+                    // Row 2: Title / Date (Secondary)
+                    if let title = scene.title, !title.isEmpty {
+                        Text("\(title) • \(scene.date ?? "")")
+                            .font(.system(size: 15, weight: .medium)) // Subheadline
+                            .foregroundColor(.white.opacity(0.9))
+                            .lineLimit(2)
+                            .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                    }
+                    
+                    // Row 3: Tags (Tertiary) - Horizontal Scroll
                     if let tags = scene.tags, !tags.isEmpty {
                         ScrollView(.horizontal, showsIndicators: false) {
                             HStack(spacing: 8) {
@@ -780,46 +727,44 @@ struct ReelItemView: View {
                                         onTagTap(fullTag)
                                     }) {
                                         Text("#\(tag.name)")
-                                            .font(.caption2)
-                                            .fontWeight(.bold)
-                                            .foregroundColor(.white.opacity(0.9))
-                                            .padding(.horizontal, 8)
-                                            .padding(.vertical, 4)
-                                            .background(Color.black.opacity(0.6))
+                                            .font(.system(size: 13, weight: .semibold))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 10)
+                                            .padding(.vertical, 5)
+                                            .background(.ultraThinMaterial) // More modern look
                                             .clipShape(Capsule())
                                     }
                                     .buttonStyle(.plain)
                                 }
                             }
                         }
+                        .padding(.top, 4) // Slight separation for tags
                     }
                 }
-                .padding(.horizontal)
+                .padding(.horizontal, 16) // Standard side padding
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .offset(y: 10) // Move name and hashtags 10px lower
+                // Ensure text doesn't overlap right sidebar actions (approx width constraint)
+                .padding(.trailing, 60)
                 
-                Slider(value: Binding(get: { currentTime }, set: { val in
-                    currentTime = val
-                    seek(to: val)
-                }), in: 0...duration, onEditingChanged: { editing in
-                    isSeeking = editing
-                    if editing {
-                        player?.pause()
-                    } else {
-                        if isPlaying { player?.play() }
-                        resetUITimer()
+                CustomVideoScrubber(
+                    value: Binding(get: { currentTime }, set: { val in
+                        currentTime = val
+                        seek(to: val)
+                    }),
+                    total: duration,
+                    onEditingChanged: { editing in
+                        isSeeking = editing
+                        if editing {
+                            player?.pause()
+                        } else {
+                            if isPlaying { player?.play() }
+                            resetUITimer()
+                        }
                     }
-                })
-            .accentColor(.white)
-            .offset(y: 5)
-            .onAppear {
-                 let emptyImage = UIImage()
-                 UISlider.appearance().setThumbImage(emptyImage, for: .normal)
-                 UISlider.appearance().setThumbImage(emptyImage, for: .highlighted)
-                 UISlider.appearance().maximumTrackTintColor = .white.withAlphaComponent(0.4)
-            }
+                )
+                .padding(.bottom, 0)
         }
-        .padding(.bottom, 85)
+        .padding(.bottom, 95) // Lifted up to clear TabBar comfortably
         .opacity(showUI ? 1 : 0)
         .animation(.easeInOut(duration: 0.3), value: showUI)
         }
@@ -977,5 +922,48 @@ struct SidebarButton: View {
             .frame(width: 45, height: 45) // Fixed total height for the button
         }
         .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Custom Edge-to-Edge Video Scrubber
+
+struct CustomVideoScrubber: View {
+    @Binding var value: Double
+    var total: Double
+    var onEditingChanged: (Bool) -> Void
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .bottomLeading) {
+                // Background Track (Interactive Area)
+                Rectangle()
+                    .fill(Color.white.opacity(0.3)) // Slight visible track
+                    .frame(height: 2) // Very thin default
+                
+                // Progress Bar
+                Rectangle()
+                    .fill(Color.white)
+                    .frame(width: max(0, min(geometry.size.width, geometry.size.width * (value / total))), height: 2)
+                
+                // Expanded Touch Area (Invisible) for easier scrubbing
+                Rectangle()
+                    .fill(Color.clear)
+                    .frame(height: 20)
+                    .contentShape(Rectangle())
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                onEditingChanged(true)
+                                let percentage = min(max(0, value.location.x / geometry.size.width), 1)
+                                self.value = percentage * total
+                            }
+                            .onEnded { _ in
+                                onEditingChanged(false)
+                            }
+                    )
+            }
+            .frame(maxHeight: .infinity, alignment: .bottom)
+        }
+        .frame(height: 10) // Small height container
     }
 }

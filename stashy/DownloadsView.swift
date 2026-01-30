@@ -11,8 +11,6 @@ import AVKit
 struct DownloadsView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @StateObject private var downloadManager = DownloadManager.shared
-    @ObservedObject private var store = SubscriptionManager.shared
-    @State private var showingPaywall = false
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     
     private var columns: [GridItem] {
@@ -27,135 +25,78 @@ struct DownloadsView: View {
         ZStack {
 
             
-            if !store.isPremium {
-                VStack(spacing: 24) {
+            if downloadManager.downloads.isEmpty && downloadManager.activeDownloads.isEmpty {
+                VStack(spacing: 20) {
                     Spacer()
+                    Image(systemName: "square.and.arrow.down")
+                        .font(.system(size: 64))
+                        .foregroundColor(appearanceManager.tintColor)
                     
-                    ZStack {
-                        Circle()
-                            .fill(Color.appAccent.opacity(0.1))
-                            .frame(width: 120, height: 120)
-                        
-                        Image(systemName: "play.square.stack.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.appAccent)
-                    }
+                    Text("No Downloads yet")
+                        .font(.title3)
+                        .fontWeight(.bold)
                     
-                    VStack(spacing: 8) {
-                        Text("Stashtok VIP Feature")
-                            .font(.title2)
-                            .fontWeight(.bold)
-                        
-                        Text("Become stashy VIP to unlock Stashtok and offline downloads.")
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal, 40)
-                    }
-                    
-                    Button {
-                        showingPaywall = true
-                    } label: {
-                        Text(store.vipPriceDisplay)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 32)
-                            .padding(.vertical, 14)
-                            .background(Color.appAccent)
-                            .clipShape(Capsule())
-                    }
-                    
-                    Button {
-                        Task {
-                            await SubscriptionManager.shared.restorePurchases()
-                        }
-                    } label: {
-                        Text("Restore Purchase")
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
-                    }
-                    
+                    Text("Downloaded scenes will appear here for offline viewing.")
+                        .foregroundColor(.secondary)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
-                .background(Color.appBackground)
-                .sheet(isPresented: $showingPaywall) {
-                    PaywallView()
-                }
             } else {
-
-                if downloadManager.downloads.isEmpty && downloadManager.activeDownloads.isEmpty {
-                    VStack(spacing: 20) {
-                        Spacer()
-                        Image(systemName: "square.and.arrow.down")
-                            .font(.system(size: 64))
-                            .foregroundColor(appearanceManager.tintColor)
-                        
-                        Text("No Downloads yet")
-                            .font(.title3)
-                            .fontWeight(.bold)
-                        
-                        Text("Downloaded scenes will appear here for offline viewing.")
-                            .foregroundColor(.secondary)
-                            .multilineTextAlignment(.center)
-                            .padding(.horizontal)
-                        Spacer()
-                    }
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 20) {
-                            // Active Downloads Section
-                            if !downloadManager.activeDownloads.isEmpty {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    Text("Active Downloads")
-                                        .font(.headline)
-                                        .padding(.horizontal)
-                                    
-                                    ForEach(Array(downloadManager.activeDownloads.values), id: \.id) { download in
-                                        VStack(alignment: .leading, spacing: 6) {
-                                            Text(download.title)
-                                                .font(.subheadline)
-                                                .fontWeight(.medium)
-                                                .lineLimit(1)
-                                            
-                                            ProgressView(value: download.progress)
-                                                .tint(appearanceManager.tintColor)
-                                            
-                                            Text("\(Int(download.progress * 100))%")
-                                                .font(.caption2)
-                                                .foregroundColor(.secondary)
-                                        }
-                                        .padding()
-                                        .background(Color(UIColor.systemBackground))
-                                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                                        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
-                                        .padding(.horizontal)
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 20) {
+                        // Active Downloads Section
+                        if !downloadManager.activeDownloads.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                Text("Active Downloads")
+                                    .font(.headline)
+                                    .padding(.horizontal)
+                                
+                                ForEach(Array(downloadManager.activeDownloads.values), id: \.id) { download in
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text(download.title)
+                                            .font(.subheadline)
+                                            .fontWeight(.medium)
+                                            .lineLimit(1)
+                                        
+                                        ProgressView(value: download.progress)
+                                            .tint(appearanceManager.tintColor)
+                                        
+                                        Text("\(Int(download.progress * 100))%")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
                                     }
-                                }
-                                .padding(.top)
-                            }
-                            
-                            // Completed Downloads Section
-                            if !downloadManager.downloads.isEmpty {
-                                VStack(alignment: .leading, spacing: 12) {
-                                    if !downloadManager.activeDownloads.isEmpty {
-                                        Text("Completed")
-                                            .font(.headline)
-                                            .padding(.horizontal)
-                                    }
-                                    
-                                    LazyVStack(spacing: 12) {
-                                        ForEach(downloadManager.downloads) { downloaded in
-                                            NavigationLink(destination: DownloadDetailView(downloaded: downloaded)) {
-                                                DownloadedSceneCard(downloaded: downloaded)
-                                            }
-                                            .buttonStyle(.plain)
-                                        }
-                                    }
+                                    .padding()
+                                    .background(Color(UIColor.systemBackground))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                                    .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
                                     .padding(.horizontal)
                                 }
-                                .padding(.top, downloadManager.activeDownloads.isEmpty ? 16 : 0)
                             }
+                            .padding(.top)
+                        }
+                        
+                        // Completed Downloads Section
+                        if !downloadManager.downloads.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                if !downloadManager.activeDownloads.isEmpty {
+                                    Text("Completed")
+                                        .font(.headline)
+                                        .padding(.horizontal)
+                                }
+                                
+                                LazyVStack(spacing: 12) {
+                                    ForEach(downloadManager.downloads) { downloaded in
+                                        NavigationLink(destination: DownloadDetailView(downloaded: downloaded)) {
+                                            DownloadedSceneCard(downloaded: downloaded)
+                                        }
+                                        .buttonStyle(.plain)
+                                    }
+                                }
+                                .padding(.horizontal)
+                            }
+                            .padding(.top, downloadManager.activeDownloads.isEmpty ? 16 : 0)
                         }
                     }
                 }
