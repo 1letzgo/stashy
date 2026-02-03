@@ -78,6 +78,11 @@ struct ImagesView: View {
         .toolbar {
             navigationToolbar
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ImageDeleted"))) { notification in
+            if let imageId = notification.userInfo?["imageId"] as? String {
+                viewModel.removeImage(id: imageId)
+            }
+        }
     }
     
     private var displayedImages: [StashImage] {

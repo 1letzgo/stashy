@@ -12,23 +12,18 @@ struct HomeStatisticsRowView: View {
                 .font(.headline)
                 .foregroundColor(.primary)
                 .padding(.horizontal, 12)
-            
-            VStack(alignment: .leading, spacing: 10) {
-                if let stats = viewModel.statistics {
-                    let columns = [
-                        GridItem(.flexible(), spacing: 8),
-                        GridItem(.flexible(), spacing: 8),
-                        GridItem(.flexible(), spacing: 8)
-                    ]
-                    
-                    let sortedTabs = tabManager.tabs
-                        .filter { tab in
-                            (tab.id == .scenes || tab.id == .galleries || 
-                             tab.id == .performers || tab.id == .studios || tab.id == .tags) && tab.isVisible
-                        }
-                        .sorted { $0.sortOrder < $1.sortOrder }
 
-                    LazyVGrid(columns: columns, spacing: 10) {
+            // Einzeiliges scrollbares Menü
+            if let stats = viewModel.statistics {
+                let sortedTabs = tabManager.tabs
+                    .filter { tab in
+                        (tab.id == .scenes || tab.id == .galleries ||
+                         tab.id == .performers || tab.id == .studios || tab.id == .tags) && tab.isVisible
+                    }
+                    .sorted { $0.sortOrder < $1.sortOrder }
+
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
                         ForEach(sortedTabs) { tab in
                             Group {
                                 switch tab.id {
@@ -57,36 +52,28 @@ struct HomeStatisticsRowView: View {
                         }
                     }
                     .padding(.horizontal, 12)
-                } else if viewModel.isLoading {
-                    let columns = [
-                        GridItem(.flexible(), spacing: 8),
-                        GridItem(.flexible(), spacing: 8),
-                        GridItem(.flexible(), spacing: 8)
-                    ]
-                    
-                    LazyVGrid(columns: columns, spacing: 10) {
+                }
+            } else if viewModel.isLoading {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 10) {
                         ForEach(0..<6) { _ in
                             RoundedRectangle(cornerRadius: 10)
                                 .fill(Color.gray.opacity(0.1))
-                                .frame(height: 46)
+                                .frame(width: 110, height: 46)
                         }
                     }
                     .padding(.horizontal, 12)
-                } else {
-                    // Error state
-                    HStack {
-                        Image(systemName: "exclamationmark.triangle")
-                        .foregroundColor(.secondary)
-                        Text("Stats unavailable")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                    .padding(.horizontal, 12)
                 }
-            }
-            
-            if isTestFlightBuild() {
-                TestFlightNoticeCard()
+            } else {
+                // Error state
+                HStack {
+                    Image(systemName: "exclamationmark.triangle")
+                    .foregroundColor(.secondary)
+                    Text("Stats unavailable")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.horizontal, 12)
             }
         }
     }
@@ -127,28 +114,27 @@ struct StatCard: View {
     let value: String
     let icon: String
     let color: Color
-    
+
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: icon)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(.white)
-                .frame(width: 22, alignment: .center)
-            
-            VStack(alignment: .leading, spacing: 0) {
-                Text(value)
-                    .font(.system(size: 13, weight: .bold))
+        VStack(alignment: .center, spacing: 4) {
+            HStack(spacing: 6) {
+                Image(systemName: icon)
+                    .font(.system(size: 14, weight: .bold))
                     .foregroundColor(.white)
                 
-                Text(title.uppercased())
-                    .font(.system(size: 8, weight: .bold))
-                    .foregroundColor(.white.opacity(0.8))
+                Text(value)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.white)
             }
-            Spacer()
+
+            Text(title.uppercased())
+                .font(.system(size: 8, weight: .bold))
+                .foregroundColor(.white.opacity(0.8))
+                .multilineTextAlignment(.center)
         }
-        .padding(.horizontal, 8)
-        .frame(maxWidth: .infinity)
-        .frame(height: 46)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .frame(minWidth: 85, minHeight: 48)
         .background(
             LinearGradient(
                 colors: [color, color.opacity(0.6)],

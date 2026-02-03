@@ -506,67 +506,71 @@ struct FullScreenImageView: View {
             .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
             .ignoresSafeArea()
             
-            // Metadata Overlay (Bottom)
+            // Metadata Overlay (Bottom) - StashTok Style
             if let image = images.first(where: { $0.id == selectedImageId }) {
-                VStack {
+                VStack(alignment: .leading, spacing: 6) {
                     Spacer()
+
                     VStack(alignment: .leading, spacing: 8) {
+                        // Row 1: Performer - Gallery
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
                             // Performer Link
                             if let performers = image.performers, let firstPerf = performers.first {
                                 let performerObj = Performer(
                                     id: firstPerf.id, name: firstPerf.name, disambiguation: nil, birthdate: nil, country: nil, imagePath: nil, sceneCount: 0, galleryCount: nil, gender: nil, ethnicity: nil, height: nil, weight: nil, measurements: nil, fakeTits: nil, careerLength: nil, tattoos: nil, piercings: nil, aliasList: nil, favorite: nil, rating100: nil, createdAt: nil, updatedAt: nil
                                 )
-                                 NavigationLink(destination: PerformerDetailView(performer: performerObj)) {
+                                NavigationLink(destination: PerformerDetailView(performer: performerObj)) {
                                     Text(firstPerf.name)
-                                        .font(.headline)
-                                        .fontWeight(.bold)
+                                        .font(.system(size: 17, weight: .bold))
                                         .foregroundColor(.white)
-                                        .shadow(radius: 2)
+                                        .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
                                 }
                                 .buttonStyle(.plain)
-                                
-                                Text("-")
-                                    .font(.headline)
-                                    .foregroundColor(.white)
-                                    .shadow(radius: 2)
-                            }
-                            
-                            // Gallery Link
-                            if let galleries = image.galleries, let gallery = galleries.first {
-                                 let galleryObj = Gallery(id: gallery.id, title: gallery.title ?? "Gallery", date: nil, details: nil, imageCount: nil, organized: nil, createdAt: nil, updatedAt: nil, studio: nil, performers: nil, cover: nil)
-                                 
-                                 NavigationLink(destination: ImagesView(gallery: galleryObj)) {
-                                     Text(gallery.title ?? "Unknown Gallery")
-                                         .font(.body)
-                                         .fontWeight(.semibold)
-                                         .foregroundColor(.white)
-                                         .lineLimit(1)
-                                         .shadow(radius: 2)
-                                 }
-                                 .buttonStyle(.plain)
-                            } else {
-                                 // Fallback Title if no gallery
-                                 Text(image.title ?? "Image")
-                                     .font(.body)
-                                     .fontWeight(.semibold)
-                                     .foregroundColor(.white)
-                                     .lineLimit(1)
-                                     .shadow(radius: 2)
+
+                                // Gallery Link (optional)
+                                if let galleries = image.galleries, let gallery = galleries.first {
+                                    Text("•")
+                                        .font(.system(size: 17, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+
+                                    let galleryObj = Gallery(id: gallery.id, title: gallery.title ?? "Gallery", date: nil, details: nil, imageCount: nil, organized: nil, createdAt: nil, updatedAt: nil, studio: nil, performers: nil, cover: nil)
+
+                                    NavigationLink(destination: ImagesView(gallery: galleryObj)) {
+                                        Text(gallery.title ?? "Unknown Gallery")
+                                            .font(.system(size: 17, weight: .bold))
+                                            .foregroundColor(.white)
+                                            .lineLimit(1)
+                                            .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            } else if let galleries = image.galleries, let gallery = galleries.first {
+                                // Nur Gallery, kein Performer
+                                let galleryObj = Gallery(id: gallery.id, title: gallery.title ?? "Gallery", date: nil, details: nil, imageCount: nil, organized: nil, createdAt: nil, updatedAt: nil, studio: nil, performers: nil, cover: nil)
+
+                                NavigationLink(destination: ImagesView(gallery: galleryObj)) {
+                                    Text(gallery.title ?? "Unknown Gallery")
+                                        .font(.system(size: 17, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .lineLimit(1)
+                                        .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                                }
+                                .buttonStyle(.plain)
                             }
                         }
+
+                        // Row 2: Title
+                        Text(image.title ?? "Image")
+                            .font(.system(size: 15, weight: .medium))
+                            .foregroundColor(.white.opacity(0.9))
+                            .lineLimit(2)
+                            .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
                     }
-                    .padding()
-                    .padding(.bottom, 20)
+                    .padding(.horizontal, 16)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(
-                        LinearGradient(
-                            gradient: Gradient(colors: [.clear, .black.opacity(0.8)]),
-                            startPoint: .top,
-                            endPoint: .bottom
-                        )
-                    )
                 }
+                .padding(.bottom, 25)
             }
         }
         .background(Color.black.edgesIgnoringSafeArea(.all))
@@ -596,33 +600,12 @@ struct FullScreenImageView: View {
         guard let currentIndex = images.firstIndex(where: { $0.id == selectedImageId }) else { return }
         let imageToDelete = images[currentIndex]
         
-        // Find next ID before deletion
-        let nextId: String?
-        if images.count > 1 {
-            if currentIndex < images.count - 1 {
-                nextId = images[currentIndex + 1].id
-            } else {
-                nextId = images[currentIndex - 1].id
-            }
-        } else {
-            nextId = nil
-        }
         
         viewModel.deleteImage(imageId: imageToDelete.id) { success in
             DispatchQueue.main.async {
                 if success {
-                    // Update selection to next image first
-                    if let nextId = nextId {
-                        selectedImageId = nextId
-                    }
-                    
-                    // Remove from binding - will update parent view automatically
-                    images.removeAll { $0.id == imageToDelete.id }
-                    
-                    // Exit if empty
-                    if images.isEmpty {
-                        dismiss()
-                    }
+                    // Always go back to grid after deletion
+                    dismiss()
                 }
             }
         }

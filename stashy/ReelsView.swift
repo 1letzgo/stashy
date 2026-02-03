@@ -688,7 +688,7 @@ struct ReelItemView: View {
             }
             .frame(maxWidth: .infinity, alignment: .bottomTrailing)
             .padding(.trailing, 12)
-            .padding(.bottom, 130) // Moved 5px higher
+            .padding(.bottom, 135) // Moved even higher
             .opacity(showUI ? 1 : 0)
             .animation(.easeInOut(duration: 0.3), value: showUI)
             
@@ -731,8 +731,9 @@ struct ReelItemView: View {
                                             .foregroundColor(.white)
                                             .padding(.horizontal, 10)
                                             .padding(.vertical, 5)
-                                            .background(.ultraThinMaterial) // More modern look
+                                            .background(Color.black.opacity(0.6))
                                             .clipShape(Capsule())
+                                            .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
                                     }
                                     .buttonStyle(.plain)
                                 }
@@ -743,8 +744,6 @@ struct ReelItemView: View {
                 }
                 .padding(.horizontal, 16) // Standard side padding
                 .frame(maxWidth: .infinity, alignment: .leading)
-                // Ensure text doesn't overlap right sidebar actions (approx width constraint)
-                .padding(.trailing, 60)
                 
                 CustomVideoScrubber(
                     value: Binding(get: { currentTime }, set: { val in

@@ -639,17 +639,27 @@ class StashDBViewModel: ObservableObject {
     func removeScene(id: String) {
         scenes.removeAll { $0.id == id }
         totalScenes = max(0, totalScenes - 1)
-        
+
         // Remove from performer/studio scenes
         performerScenes.removeAll { $0.id == id }
         studioScenes.removeAll { $0.id == id }
-        
+
         // Remove from home row caches
         for rowType in homeRowScenes.keys {
             homeRowScenes[rowType]?.removeAll { $0.id == id }
         }
     }
-    
+
+    /// Removes an image from all lists without reloading
+    func removeImage(id: String) {
+        allImages.removeAll { $0.id == id }
+        totalImages = max(0, totalImages - 1)
+
+        // Remove from gallery images
+        galleryImages.removeAll { $0.id == id }
+        totalGalleryImages = max(0, totalGalleryImages - 1)
+    }
+
     /// Updates just the resume time of a scene in place
     func updateSceneResumeTime(id: String, newResumeTime: Double) {
         // Update main scenes list
@@ -2283,13 +2293,21 @@ class StashDBViewModel: ObservableObject {
           "query": "mutation { imageDestroy(input: { id: \\\"\(imageId)\\\" }) }"
         }
         """
-        
+
         print("🗑️ IMAGE DELETE: Deleting image \(imageId)")
         performGraphQLMutationSilent(query: mutation) { result in
             if let result = result,
                let data = result["data"]?.value as? [String: Any],
                let destroyed = data["imageDestroy"] {
                 print("✅ IMAGE DELETE: Success for image \(imageId). Response: \(destroyed)")
+
+                // Post notification so other views can update
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("ImageDeleted"),
+                    object: nil,
+                    userInfo: ["imageId": imageId]
+                )
+
                 completion(true)
             } else {
                 print("❌ IMAGE DELETE: Failed for image \(imageId)")
