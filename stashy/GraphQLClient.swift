@@ -123,7 +123,7 @@ class GraphQLClient {
     private let timeout: TimeInterval
     private var cancellables = Set<AnyCancellable>()
     
-    init(session: URLSession? = nil, timeout: TimeInterval = 15.0) {
+    init(session: URLSession? = nil, timeout: TimeInterval = 30.0) {
         self.timeout = timeout
         
         // Create custom URLSession configuration for better local server connectivity

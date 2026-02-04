@@ -755,70 +755,32 @@ class StashDBViewModel: ObservableObject {
     }
 
     func fetchSavedFilters() {
-        guard let config = ServerConfigManager.shared.loadConfig(),
-              let url = URL(string: "\(config.baseURL)/graphql") else {
-            return
-        }
-        
         isLoadingSavedFilters = true
         
-        // Query provided by user
         let query = """
-        query GetAllFilterDefinitions {
-          findSavedFilters {
-            id
-            name
-            mode
-            filter
-            object_filter
-          }
+        {
+          "query": "query GetAllFilterDefinitions { findSavedFilters { id name mode filter object_filter } }"
         }
         """
         
-        let body: [String: Any] = ["query": query]
-        
-        guard let jsonData = try? JSONSerialization.data(withJSONObject: body) else { 
-            isLoadingSavedFilters = false
-            return 
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        if let apiKey = config.secureApiKey, !apiKey.isEmpty {
-            request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
-        }
-        
-        request.httpBody = jsonData
-        
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
-            defer {
-                DispatchQueue.main.async {
-                    self?.isLoadingSavedFilters = false
-                }
-            }
-            
-            guard let data = data, error == nil else {
-                print("Error fetching saved filters: \(error?.localizedDescription ?? "Unknown error")")
-                return
-            }
-            
-            do {
-                let result = try JSONDecoder().decode(SavedFiltersResponse.self, from: data)
-                DispatchQueue.main.async {
-                    if let findResult = result.data?.findSavedFilters {
+        // Use execute with variables: nil to send the raw JSON body, same as performGraphQLQuery does
+        GraphQLClient.shared.execute(query: query, variables: nil) { [weak self] (result: Result<SavedFiltersResponse, GraphQLNetworkError>) in
+            DispatchQueue.main.async {
+                self?.isLoadingSavedFilters = false
+                switch result {
+                case .success(let response):
+                    if let findResult = response.data?.findSavedFilters {
                         self?.savedFilters = Dictionary(findResult.map { ($0.id, $0) }, uniquingKeysWith: { (first, second) in second })
                         print("✅ Fetched \(findResult.count) saved filters")
+                    } else {
+                        print("⚠️ Saved filters query successful but data is missing")
                     }
-                }
-            } catch {
-                print("❌ Decoding error (Saved Filters): \(error)")
-                if let str = String(data: data, encoding: .utf8) {
-                    print("Raw response: \(str)")
+                case .failure(let error):
+                    print("❌ Error fetching saved filters: \(error.localizedDescription)")
+                    self?.errorMessage = "Failed to load filters: \(error.localizedDescription)"
                 }
             }
-        }.resume()
+        }
     }
     
     func testConnection() {
@@ -856,7 +818,7 @@ class StashDBViewModel: ObservableObject {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 15 // 15 Seconds Timeout - consistent with GraphQLClient
+        request.timeoutInterval = 30 // Match GraphQLClient
         
         // Add API Key if available
         if let apiKey = customConfig.secureApiKey, !apiKey.isEmpty {
@@ -890,7 +852,7 @@ class StashDBViewModel: ObservableObject {
                     if let urlError = error as? URLError, urlError.code == .timedOut {
                          self?.serverStatus = "Not connected (Timeout)"
                          self?.isServerConnected = false
-                         self?.errorMessage = "Connection timed out after 5 seconds."
+                         self?.errorMessage = "Connection timed out after 30 seconds."
                     } else {
                         print("❌ Connection Error: \(error.localizedDescription)")
                         self?.isServerConnected = false

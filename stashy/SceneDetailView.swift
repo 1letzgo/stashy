@@ -34,6 +34,7 @@ struct SceneDetailView: View {
     @State private var hasAddedPlay = false
     @State private var showingAddMarkerSheet = false
     @State private var capturedMarkerTime: Double = 0
+    @State private var playbackSpeed: Double = 1.0
     private let timer = Timer.publish(every: 10, on: .main, in: .common).autoconnect()
     
     // Preview Video State
@@ -96,6 +97,7 @@ struct SceneDetailView: View {
                     isHeaderExpanded: $isHeaderExpanded,
                     showingAddMarkerSheet: $showingAddMarkerSheet,
                     capturedMarkerTime: $capturedMarkerTime,
+                    playbackSpeed: $playbackSpeed,
                     viewModel: viewModel,
                     onSeek: { seconds in seekTo(seconds) },
                     onStartPlayback: { resume in startPlayback(resume: resume) }
@@ -246,6 +248,7 @@ struct SceneDetailView: View {
             isPlaybackStarted = true
         }
         player?.play()
+        player?.rate = Float(playbackSpeed)
         
         if !hasAddedPlay {
             viewModel.addScenePlay(sceneId: activeScene.id)

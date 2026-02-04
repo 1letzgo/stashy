@@ -27,6 +27,13 @@ struct ReelsView: View {
     enum ReelsMode: String, CaseIterable {
         case scenes = "Scenes"
         case markers = "Markers"
+        
+        var icon: String {
+            switch self {
+            case .scenes: return "film"
+            case .markers: return "mappin.and.ellipse"
+            }
+        }
     }
 
     enum ReelItemData: Identifiable {
@@ -43,11 +50,7 @@ struct ReelsView: View {
         var title: String? {
             switch self {
             case .scene(let s): return s.title
-            case .marker(let m):
-                if let markerTitle = m.title, !markerTitle.isEmpty {
-                    return markerTitle
-                }
-                return m.scene?.title
+            case .marker(let m): return m.scene?.title
             }
         }
         
@@ -265,7 +268,6 @@ struct ReelsView: View {
                 }
             }
         }
-        }
     }
 
     @ViewBuilder
@@ -378,59 +380,61 @@ struct ReelsView: View {
     @ToolbarContentBuilder
     private var reelsToolbar: some ToolbarContent {
         ToolbarItem(placement: .navigationBarLeading) {
-            HStack(spacing: 8) {
-                if reelsMode == .scenes {
-                    // Placeholder or empty for now, delete removed
-                }
-                
+            Menu {
                 Picker("Mode", selection: $reelsMode) {
                     ForEach(ReelsMode.allCases, id: \.self) { mode in
-                        Text(mode.rawValue).tag(mode)
+                        Label(mode.rawValue, systemImage: mode.icon).tag(mode)
                     }
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 130)
-                .onChange(of: reelsMode) { _, newValue in
-                     if newValue == .markers {
-                        // Load default MARKER filter if available, otherwise NO Filter
-                        if selectedFilter == nil {
-                             if let defaultId = TabManager.shared.getDefaultMarkerFilterId(for: .reels),
-                                let filter = viewModel.savedFilters[defaultId] {
-                                 applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                             } else {
-                                 applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                             }
-                        } else {
-                            // Keep current filter if set? Usually switching modes resets filter context unless specialized logic.
-                            // User asked: "Wenn kein filter auf dem server vorhanden ist, dann benutze auch keinen." implies explicit handling.
-                            // Let's reset to default if switching modes generally.
-                            if let defaultId = TabManager.shared.getDefaultMarkerFilterId(for: .reels),
-                               let filter = viewModel.savedFilters[defaultId] {
-                                 applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                            } else {
-                                applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                            }
-                        }
-                     } else {
-                        // Scenes Mode
-                        if selectedFilter == nil {
-                            if let defaultId = TabManager.shared.getDefaultFilterId(for: .reels),
-                               let filter = viewModel.savedFilters[defaultId] {
-                                applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                            } else {
-                                applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                            }
-                        } else {
-                             // Reset to default scene filter when switching back
-                             if let defaultId = TabManager.shared.getDefaultFilterId(for: .reels),
-                                let filter = viewModel.savedFilters[defaultId] {
-                                 applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                             } else {
-                                 applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                             }
-                        }
-                     }
+            } label: {
+                HStack(spacing: 4) {
+                    Image(systemName: reelsMode.icon)
+                        .fontWeight(.semibold)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8, weight: .bold))
                 }
+                .foregroundColor(.primary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .background(Color.secondary.opacity(0.1))
+                .clipShape(Capsule())
+            }
+            .onChange(of: reelsMode) { _, newValue in
+                 if newValue == .markers {
+                    // Load default MARKER filter if available, otherwise NO Filter
+                    if selectedFilter == nil {
+                         if let defaultId = TabManager.shared.getDefaultMarkerFilterId(for: .reels),
+                            let filter = viewModel.savedFilters[defaultId] {
+                             applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+                         } else {
+                             applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+                         }
+                    } else {
+                        if let defaultId = TabManager.shared.getDefaultMarkerFilterId(for: .reels),
+                           let filter = viewModel.savedFilters[defaultId] {
+                             applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+                        } else {
+                            applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+                        }
+                    }
+                 } else {
+                    // Scenes Mode
+                    if selectedFilter == nil {
+                        if let defaultId = TabManager.shared.getDefaultFilterId(for: .reels),
+                           let filter = viewModel.savedFilters[defaultId] {
+                            applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+                        } else {
+                            applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+                        }
+                    } else {
+                         if let defaultId = TabManager.shared.getDefaultFilterId(for: .reels),
+                            let filter = viewModel.savedFilters[defaultId] {
+                             applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+                         } else {
+                             applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+                         }
+                    }
+                 }
             }
         }
         
@@ -797,6 +801,9 @@ struct ReelsView: View {
                 .foregroundColor(filterColor)
         }
     }
+
+}
+
 
 
 struct ReelItemView: View {
@@ -1269,4 +1276,3 @@ struct CustomVideoScrubber: View {
         .frame(height: 10) // Small height container
     }
 }
-    

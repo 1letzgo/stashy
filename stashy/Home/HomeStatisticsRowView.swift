@@ -59,7 +59,7 @@ struct HomeStatisticsRowView: View {
                         ForEach(0..<6) { _ in
                             RoundedRectangle(cornerRadius: 12)
                                 .fill(Color.gray.opacity(0.1))
-                                .frame(width: 85, height: 95)
+                                .frame(width: 90, height: 95)
                         }
                     }
                     .padding(.horizontal, 12)
@@ -132,7 +132,7 @@ struct StatCard: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 12)
-        .frame(width: 85, height: 95)
+        .frame(width: 90, height: 95)
         .background(
             LinearGradient(
                 colors: [color, color.opacity(0.6)],

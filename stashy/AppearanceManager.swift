@@ -45,7 +45,7 @@ class AppearanceManager: ObservableObject {
             defaults.set(Float(alpha), forKey: kTintColorAlpha)
             defaults.synchronize() // Force save just to be safe, though not strictly required in modern iOS
         } else {
-            print("❌ Failed to get color components for saving")
+            print(NSLocalizedString("appearance.saveColor.failed", comment: "Failed to get color components for saving"))
         }
     }
     
@@ -70,19 +70,23 @@ class AppearanceManager: ObservableObject {
     
     // Preset Colors
     let presets: [ColorOption] = [
-        ColorOption(name: "Stashy Brown", color: .appAccent),
-        ColorOption(name: "Blue", color: .blue),
-        ColorOption(name: "Red", color: .red),
-        ColorOption(name: "Orange", color: .orange),
-        ColorOption(name: "Green", color: .green),
-        ColorOption(name: "Purple", color: .purple),
-        ColorOption(name: "Pink", color: .pink),
-        ColorOption(name: "Gray", color: .gray)
+        ColorOption(nameKey: "appearance.presets.stashy_brown", color: .appAccent),
+        ColorOption(nameKey: "appearance.presets.blue", color: .blue),
+        ColorOption(nameKey: "appearance.presets.red", color: .red),
+        ColorOption(nameKey: "appearance.presets.orange", color: .orange),
+        ColorOption(nameKey: "appearance.presets.green", color: .green),
+        ColorOption(nameKey: "appearance.presets.purple", color: .purple),
+        ColorOption(nameKey: "appearance.presets.pink", color: .pink),
+        ColorOption(nameKey: "appearance.presets.gray", color: .gray)
     ]
 }
 
 struct ColorOption: Identifiable, Hashable {
     let id = UUID()
-    let name: String
+    let nameKey: String
     let color: Color
+
+    var localizedName: String {
+        NSLocalizedString(nameKey, comment: "Preset color name")
+    }
 }

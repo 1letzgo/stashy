@@ -685,11 +685,6 @@ struct TabDefaultFilterView: View {
             Section {
                 filterPicker(for: .dashboard, title: "Dashboard", icon: "chart.bar.fill")
                 filterPicker(for: .scenes, title: "Scenes", icon: "film")
-                
-                Section("StashTok") {
-                    filterPicker(for: .reels, title: "Scenes", icon: "film", modeOverride: .scenes)
-                    markerFilterPicker(for: .reels, title: "Markers", icon: "mappin.and.ellipse")
-                }
                 filterPicker(for: .galleries, title: "Galleries", icon: "photo.stack")
                 filterPicker(for: .performers, title: "Performers", icon: "person.3")
                 filterPicker(for: .studios, title: "Studios", icon: "building.2")
@@ -698,6 +693,15 @@ struct TabDefaultFilterView: View {
                 Text("Default Filters")
             } footer: {
                 Text("Pick a saved filter that will be applied automatically when you open the respective tab.")
+            }
+            
+            Section {
+                filterPicker(for: .reels, title: "Scenes", icon: "film", modeOverride: .scenes)
+                markerFilterPicker(for: .reels, title: "Markers", icon: "mappin.and.ellipse")
+            } header: {
+                Text("StashTok Default Filters")
+            } footer: {
+                Text("Set separate default filters for scenes and markers in StashTok.")
             }
         }
         .listStyle(.insetGrouped)
@@ -763,6 +767,47 @@ struct TabDefaultFilterView: View {
                     .pickerStyle(.menu)
                     .labelsHidden()
                 }
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private func markerFilterPicker(for tab: AppTab, title: String, icon: String) -> some View {
+        let mode: StashDBViewModel.FilterMode = .sceneMarkers
+        
+        let filters = viewModel.savedFilters.values
+            .filter { $0.mode == mode }
+            .sorted { $0.name < $1.name }
+        
+        let currentId = tabManager.getDefaultMarkerFilterId(for: tab)
+        
+        HStack {
+            Label(title, systemImage: icon)
+            Spacer()
+            
+            if filters.isEmpty && !viewModel.isLoadingSavedFilters {
+                Text("No filters found")
+                    .foregroundColor(.secondary)
+                    .font(.subheadline)
+            } else {
+                Picker("", selection: Binding(
+                    get: { currentId ?? "" },
+                    set: { newId in
+                        if newId.isEmpty {
+                            tabManager.setDefaultMarkerFilter(for: tab, filterId: nil, filterName: nil)
+                        } else if let filter = filters.first(where: { $0.id == newId }) {
+                            tabManager.setDefaultMarkerFilter(for: tab, filterId: filter.id, filterName: filter.name)
+                        }
+                    }
+                )) {
+                    Text("None").tag("")
+                    
+                    ForEach(filters) { filter in
+                        Text(filter.name).tag(filter.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
             }
         }
     }

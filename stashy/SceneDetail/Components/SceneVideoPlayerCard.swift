@@ -11,6 +11,7 @@ struct SceneVideoPlayerCard: View {
     @Binding var isHeaderExpanded: Bool
     @Binding var showingAddMarkerSheet: Bool
     @Binding var capturedMarkerTime: Double
+    @Binding var playbackSpeed: Double
     
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
@@ -279,6 +280,30 @@ struct SceneVideoPlayerCard: View {
                                 color: activeScene.rating100 == nil ? .secondary : .orange
                             )
                         }
+                        
+                        // Playback Speed
+                        Menu {
+                            Section("Playback Speed") {
+                                ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { speed in
+                                    Button(action: {
+                                        playbackSpeed = speed
+                                        if player?.timeControlStatus == .playing {
+                                            player?.rate = Float(speed)
+                                        }
+                                    }) {
+                                        HStack {
+                                            Text(String(format: "%.2fx", speed))
+                                            if playbackSpeed == speed {
+                                                Image(systemName: "checkmark")
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } label: {
+                            infoPill(icon: "speedometer", text: String(format: "%.2fx", playbackSpeed), color: .purple)
+                        }
+                        .buttonStyle(.plain)
 
                         // Resolution
                         if let firstFile = activeScene.files?.first,
