@@ -57,9 +57,9 @@ struct HomeStatisticsRowView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
                         ForEach(0..<6) { _ in
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: 12)
                                 .fill(Color.gray.opacity(0.1))
-                                .frame(width: 110, height: 46)
+                                .frame(width: 85, height: 95)
                         }
                     }
                     .padding(.horizontal, 12)
@@ -116,25 +116,23 @@ struct StatCard: View {
     let color: Color
 
     var body: some View {
-        VStack(alignment: .center, spacing: 4) {
-            HStack(spacing: 6) {
-                Image(systemName: icon)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white)
-                
-                Text(value)
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white)
-            }
+        VStack(alignment: .center, spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 22, weight: .bold))
+                .foregroundColor(.white)
+            
+            Text(value)
+                .font(.system(size: 16, weight: .bold))
+                .foregroundColor(.white)
 
             Text(title.uppercased())
-                .font(.system(size: 8, weight: .bold))
+                .font(.system(size: 10, weight: .bold))
                 .foregroundColor(.white.opacity(0.8))
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .frame(minWidth: 85, minHeight: 48)
+        .padding(.vertical, 12)
+        .frame(width: 85, height: 95)
         .background(
             LinearGradient(
                 colors: [color, color.opacity(0.6)],
@@ -142,6 +140,6 @@ struct StatCard: View {
                 endPoint: .bottomTrailing
             )
         )
-        .cornerRadius(10)
+        .cornerRadius(12)
     }
 }

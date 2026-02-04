@@ -1,0 +1,44 @@
+query FindSceneMarkers($filter: FindFilterType, $scene_marker_filter: SceneMarkerFilterType) {
+  findSceneMarkers(filter: $filter, scene_marker_filter: $scene_marker_filter) {
+    count
+    scene_markers {
+      id
+      title
+      seconds
+      screenshot
+      preview
+      stream
+      scene {
+        id
+        title
+        date
+        rating100
+        play_count
+        o_counter
+        files {
+          id
+          path
+          format
+          width
+          height
+          duration
+          video_codec
+          audio_codec
+          bit_rate
+          frame_rate
+        }
+        performers {
+          ...PerformerFields
+        }
+      }
+      primary_tag {
+        id
+        name
+      }
+      tags {
+        id
+        name
+      }
+    }
+  }
+}

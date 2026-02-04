@@ -685,7 +685,11 @@ struct TabDefaultFilterView: View {
             Section {
                 filterPicker(for: .dashboard, title: "Dashboard", icon: "chart.bar.fill")
                 filterPicker(for: .scenes, title: "Scenes", icon: "film")
-                filterPicker(for: .reels, title: "StashTok", icon: "play.rectangle.on.rectangle")
+                
+                Section("StashTok") {
+                    filterPicker(for: .reels, title: "Scenes", icon: "film", modeOverride: .scenes)
+                    markerFilterPicker(for: .reels, title: "Markers", icon: "mappin.and.ellipse")
+                }
                 filterPicker(for: .galleries, title: "Galleries", icon: "photo.stack")
                 filterPicker(for: .performers, title: "Performers", icon: "person.3")
                 filterPicker(for: .studios, title: "Studios", icon: "building.2")
@@ -712,8 +716,8 @@ struct TabDefaultFilterView: View {
     }
     
     @ViewBuilder
-    private func filterPicker(for tab: AppTab, title: String, icon: String) -> some View {
-        let mode: StashDBViewModel.FilterMode? = {
+    private func filterPicker(for tab: AppTab, title: String, icon: String, modeOverride: StashDBViewModel.FilterMode? = nil) -> some View {
+        let mode: StashDBViewModel.FilterMode? = modeOverride ?? {
             switch tab {
             case .scenes, .reels, .dashboard: return .scenes
             case .performers: return .performers
@@ -764,7 +768,7 @@ struct TabDefaultFilterView: View {
     }
 }
 
-// Subview for Server Statistics
+
 struct ServerStatisticsView: View {
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject private var configManager = ServerConfigManager.shared
@@ -978,4 +982,5 @@ struct ServerDetailView: View {
         viewModel.fetchStatistics()
         coordinator.resetAllStacks()
     }
+
 }

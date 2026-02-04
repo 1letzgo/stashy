@@ -57,6 +57,7 @@ class StashDBViewModel: ObservableObject {
         case studios = "STUDIOS"
         case galleries = "GALLERIES"
         case tags = "TAGS"
+        case sceneMarkers = "SCENE_MARKERS"
         case unknown = "UNKNOWN"
         
         init(from decoder: Decoder) throws {
@@ -147,6 +148,17 @@ class StashDBViewModel: ObservableObject {
     private var currentSceneSortOption: SceneSortOption = .dateDesc
     private let scenesPerPage = 20
     @Published var currentSceneFilter: SavedFilter? = nil
+    
+    // Pagination properties for markers
+    @Published var sceneMarkers: [SceneMarker] = []
+    @Published var totalSceneMarkers: Int = 0
+    @Published var isLoadingMarkers = false
+    @Published var hasMoreMarkers = true
+    private var currentMarkerPage = 1
+    private var currentMarkerSortOption: SceneMarkerSortOption = .createdAtDesc
+    private let markersPerPage = 20
+    @Published var currentMarkerFilter: SavedFilter? = nil
+    private var currentMarkerSearchQuery: String = ""
 
     // Pagination properties for performers
     @Published var totalPerformers: Int = 0
@@ -453,6 +465,50 @@ class StashDBViewModel: ObservableObject {
         }
     }
 
+    // Marker sort options
+    enum SceneMarkerSortOption: String, CaseIterable {
+        case random
+        case createdAtDesc
+        case createdAtAsc
+        case updatedAtDesc
+        case updatedAtAsc
+        case titleAsc
+        case titleDesc
+        case secondsAsc
+        case secondsDesc
+
+        var displayName: String {
+            switch self {
+            case .createdAtDesc: return "Created (Newest First)"
+            case .createdAtAsc: return "Created (Oldest First)"
+            case .updatedAtDesc: return "Updated (Newest First)"
+            case .updatedAtAsc: return "Updated (Oldest First)"
+            case .titleAsc: return "Title (A-Z)"
+            case .titleDesc: return "Title (Z-A)"
+            case .secondsAsc: return "Time (Start)"
+            case .secondsDesc: return "Time (End)"
+            case .random: return "Random"
+            }
+        }
+
+        var direction: String {
+            switch self {
+            case .createdAtDesc, .updatedAtDesc, .titleDesc, .secondsDesc, .random: return "DESC"
+            case .createdAtAsc, .updatedAtAsc, .titleAsc, .secondsAsc: return "ASC"
+            }
+        }
+
+        var sortField: String {
+            switch self {
+            case .createdAtDesc, .createdAtAsc: return "created_at"
+            case .updatedAtDesc, .updatedAtAsc: return "updated_at"
+            case .titleAsc, .titleDesc: return "title"
+            case .secondsAsc, .secondsDesc: return "seconds"
+            case .random: return "random"
+            }
+        }
+    }
+
     // Tag sort options
     enum TagSortOption: String, CaseIterable {
         case random
@@ -591,6 +647,11 @@ class StashDBViewModel: ObservableObject {
         
         currentSceneSortOption = .dateDesc
         currentSceneFilter = nil
+        
+        currentMarkerPage = 1
+        hasMoreMarkers = true
+        currentMarkerSortOption = .createdAtDesc
+        sceneMarkers = []
         
         currentPerformerSortOption = .nameAsc
         currentPerformerFilter = nil
@@ -904,6 +965,86 @@ class StashDBViewModel: ObservableObject {
         loadScenesPage(page: currentScenePage, sortBy: currentSceneSortOption, searchQuery: currentSceneSearchQuery)
     }
 
+    func fetchSceneMarkers(sortBy: SceneMarkerSortOption = .createdAtDesc, searchQuery: String = "", filter: SavedFilter? = nil) {
+        currentMarkerPage = 1
+        currentMarkerSortOption = sortBy
+        currentMarkerSearchQuery = searchQuery
+        currentMarkerFilter = filter
+        hasMoreMarkers = true
+        sceneMarkers = []
+        
+        loadMarkersPage(page: currentMarkerPage, sortBy: sortBy, searchQuery: searchQuery)
+    }
+
+    func loadMoreMarkers() {
+        guard !isLoadingMarkers && hasMoreMarkers else { return }
+        currentMarkerPage += 1
+        loadMarkersPage(page: currentMarkerPage, sortBy: currentMarkerSortOption, searchQuery: currentMarkerSearchQuery)
+    }
+
+    private func loadMarkersPage(page: Int, sortBy: SceneMarkerSortOption, searchQuery: String = "") {
+        let isInitialLoad = (page == 1)
+        if isInitialLoad {
+            isLoading = true
+        } else {
+            isLoadingMarkers = true // Using isLoadingMarkers for pagination loading state
+        }
+        errorMessage = nil
+
+        let query = GraphQLQueries.queryWithFragments("findSceneMarkers")
+        
+        var filterDict: [String: Any] = [
+            "page": page,
+            "per_page": markersPerPage,
+            "sort": sortBy.sortField,
+            "direction": sortBy.direction
+        ]
+        if !searchQuery.isEmpty {
+            filterDict["q"] = searchQuery
+        }
+        
+        var variables: [String: Any] = [
+            "filter": filterDict
+        ]
+        
+        if let savedFilter = currentMarkerFilter {
+            if let dict = savedFilter.filterDict {
+                variables["scene_marker_filter"] = sanitizeFilter(dict, isMarker: true)
+            } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
+                variables["scene_marker_filter"] = sanitizeFilter(objDict, isMarker: true)
+            }
+        }
+
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            return
+        }
+
+        performGraphQLQuery(query: bodyString) { (response: MarkersResponse?) in
+            if let result = response?.data?.findSceneMarkers {
+                DispatchQueue.main.async {
+                    if isInitialLoad {
+                        self.sceneMarkers = result.scene_markers
+                        self.totalSceneMarkers = result.count
+                    } else {
+                        self.sceneMarkers.append(contentsOf: result.scene_markers)
+                    }
+                    
+                    self.hasMoreMarkers = result.scene_markers.count == self.markersPerPage
+                    self.currentMarkerPage = page
+                    self.isLoadingMarkers = false
+                    self.isLoading = false
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.isLoadingMarkers = false
+                    self.isLoading = false
+                    self.errorMessage = "Could not load markers"
+                }
+            }
+        }
+    }
+
     private func loadScenesPage(page: Int, sortBy: SceneSortOption, searchQuery: String = "") {
         let isInitialLoad = (page == 1)
         if isInitialLoad {
@@ -1153,7 +1294,7 @@ class StashDBViewModel: ObservableObject {
         )
     }
 
-    private func sanitizeFilter(_ dict: [String: Any]) -> [String: Any] {
+    private func sanitizeFilter(_ dict: [String: Any], isMarker: Bool = false) -> [String: Any] {
         var newDict = dict
         
         // 0. Convert "c" array (UI Format) to top-level keys (API Format)
@@ -1162,6 +1303,15 @@ class StashDBViewModel: ObservableObject {
                 if let key = item["id"] as? String {
                     var outputItem = item
                     outputItem.removeValue(forKey: "id")
+                    
+                    // For markers, move scene-specific criteria to nested scene_filter
+                    if isMarker && (key == "orientation" || key == "duration" || key == "rating" || key == "organized") {
+                        var sceneFilter = newDict["scene_filter"] as? [String: Any] ?? [:]
+                        sceneFilter[key] = outputItem
+                        newDict["scene_filter"] = sceneFilter
+                        continue
+                    }
+                    
                     newDict[key] = outputItem
                 }
             }
@@ -1174,11 +1324,26 @@ class StashDBViewModel: ObservableObject {
             newDict.removeValue(forKey: key)
         }
         
+        // Marker specific: move top-level orientation/duration to scene_filter if they exist
+        if isMarker {
+            let sceneSpecificKeys = ["orientation", "duration", "rating", "organized"]
+            for key in sceneSpecificKeys {
+                if let val = newDict[key] {
+                    var sceneFilter = newDict["scene_filter"] as? [String: Any] ?? [:]
+                    sceneFilter[key] = val
+                    newDict["scene_filter"] = sceneFilter
+                    newDict.removeValue(forKey: key)
+                }
+            }
+        }
+        
         // 2. Iterate over all keys to handle nested structures recursively
         for (key, value) in newDict {
             if var subDict = value as? [String: Any] {
                 // Perform Recursive call first on sub-elements
-                subDict = sanitizeFilter(subDict)
+                // IMPORTANT: Pass isMarker: false to recursive calls to avoid infinite recursion 
+                // into scene_filter if the subDict is already a scene_filter.
+                subDict = sanitizeFilter(subDict, isMarker: false)
                 
                 // 3. Special handling for has_markers - Stash expects string "true"/"false", not boolean
                 if key == "has_markers" {
@@ -2993,6 +3158,19 @@ struct AltFindScenesResult: Codable {
     let scenes: [Scene]
 }
 
+struct MarkersResponse: Codable {
+    let data: MarkersData?
+}
+
+struct MarkersData: Codable {
+    let findSceneMarkers: FindMarkersResult
+}
+
+struct FindMarkersResult: Codable {
+    let count: Int
+    let scene_markers: [SceneMarker]
+}
+
 struct SingleSceneResponse: Codable {
     let data: SingleSceneData?
 }
@@ -3210,6 +3388,17 @@ struct ScenePaths: Codable {
     let caption: String?
 }
 
+struct MarkerScene: Codable, Identifiable {
+    let id: String
+    let title: String?
+    let date: String?
+    let files: [SceneFile]?
+    let performers: [ScenePerformer]?
+    let rating100: Int?
+    let playCount: Int?
+    let oCounter: Int?
+}
+
 struct SceneMarker: Codable, Identifiable {
     let id: String
     let title: String?
@@ -3219,9 +3408,10 @@ struct SceneMarker: Codable, Identifiable {
     let screenshot: String?
     let preview: String?
     let stream: String?
+    let scene: MarkerScene?
     
     enum CodingKeys: String, CodingKey {
-        case id, title, seconds, tags, screenshot, preview, stream
+        case id, title, seconds, tags, screenshot, preview, stream, scene
         case primaryTag = "primary_tag"
     }
     
@@ -3241,6 +3431,24 @@ struct SceneMarker: Codable, Identifiable {
         // Fallback to manual construction
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
         return URL(string: "\(config.baseURL)/scenemarker/\(id)/screenshot")
+    }
+    
+    // Computed property for stream URL
+    var videoURL: URL? {
+        if let streamPath = stream, let url = URL(string: streamPath) {
+             return url
+        }
+        guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
+        return URL(string: "\(config.baseURL)/scenemarker/\(id)/stream")
+    }
+    
+    // Computed property for preview URL
+    var previewURL: URL? {
+        if let previewPath = preview, let url = URL(string: previewPath) {
+             return url
+        }
+        guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
+        return URL(string: "\(config.baseURL)/scenemarker/\(id)/preview")
     }
 }
 

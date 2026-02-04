@@ -106,9 +106,11 @@ struct TabConfig: Codable, Identifiable, Equatable {
     var defaultSortOption: String?
     var defaultFilterId: String?
     var defaultFilterName: String?
+    var defaultMarkerFilterId: String?
+    var defaultMarkerFilterName: String?
     
     enum CodingKeys: String, CodingKey {
-        case id, isVisible, sortOrder, defaultFilterId, defaultFilterName
+        case id, isVisible, sortOrder, defaultFilterId, defaultFilterName, defaultMarkerFilterId, defaultMarkerFilterName
         case defaultSortOption = "sortOption"
     }
 }
@@ -529,6 +531,31 @@ class TabManager: ObservableObject {
         if let index = tabs.firstIndex(where: { $0.id == tab }) {
             tabs[index].defaultFilterId = filterId
             tabs[index].defaultFilterName = filterName
+            saveConfig()
+            
+            // Notify listeners that the default filter has changed
+            NotificationCenter.default.post(
+                name: NSNotification.Name("DefaultFilterChanged"),
+                object: nil,
+                userInfo: ["tab": tab.id]
+            )
+        }
+    }
+    
+    // Helper to get default marker filter for a tab
+    func getDefaultMarkerFilterId(for tab: AppTab) -> String? {
+        return tabs.first(where: { $0.id == tab })?.defaultMarkerFilterId
+    }
+
+    func getDefaultMarkerFilterName(for tab: AppTab) -> String? {
+        return tabs.first(where: { $0.id == tab })?.defaultMarkerFilterName
+    }
+
+    // Helper to set default marker filter for a tab
+    func setDefaultMarkerFilter(for tab: AppTab, filterId: String?, filterName: String?) {
+        if let index = tabs.firstIndex(where: { $0.id == tab }) {
+            tabs[index].defaultMarkerFilterId = filterId
+            tabs[index].defaultMarkerFilterName = filterName
             saveConfig()
             
             // Notify listeners that the default filter has changed

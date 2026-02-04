@@ -271,7 +271,6 @@ struct StudioDetailView: View {
                     .padding(8)
             }
             .frame(width: 140)
-            .clipped()
             , alignment: .leading
         )
         .background(Color(UIColor.secondarySystemBackground))

@@ -121,6 +121,9 @@ class GraphQLQueries {
         case "findImages":
             fragments = loadQuery(named: "fragment_ImageFields")
             
+        case "findSceneMarkers":
+            fragments = loadQuery(named: "fragment_PerformerFields")
+            
         default:
             print("⚠️ Warning: No explicit fragment mapping for \(queryName)")
         }

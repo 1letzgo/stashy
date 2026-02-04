@@ -60,6 +60,7 @@ struct HomeView: View {
                         }
                     }) {
                         Image(systemName: "bag.circle.fill")
+                            .font(.system(size: 28))
                             .foregroundColor(.blue)
                     }
                 }

@@ -532,7 +532,7 @@ struct StudioCardView: View {
                 
                 Spacer()
                 
-                HStack(spacing: 10) {
+                HStack(spacing: 8) {
                     // Scenes
                     HStack(spacing: 3) {
                         Image(systemName: "film")
@@ -552,6 +552,7 @@ struct StudioCardView: View {
                     }
                 }
                 .foregroundColor(.secondary)
+                .layoutPriority(1) // Ensure counts get space first
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
@@ -595,8 +596,8 @@ struct SVGWebView: UIViewRepresentable {
                         min-width: 100vw;
                     }
                     svg {
-                        max-width: 90%;
-                        max-height: 90%;
+                        width: 100%;
+                        height: 100%;
                         object-fit: contain;
                     }
                 </style>
