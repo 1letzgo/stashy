@@ -22,6 +22,7 @@ struct SceneDetailView: View {
     }
     @State private var player: AVPlayer?
     @State private var showDeleteWithFilesConfirmation = false
+    @State private var isDeleting = false
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var coordinator: NavigationCoordinator
 
@@ -178,6 +179,12 @@ struct SceneDetailView: View {
             }
         }
         .onDisappear {
+            if isDeleting {
+                player?.pause()
+                stopPreview()
+                return
+            }
+            
             if !isFullscreen {
                 player?.pause()
             }
@@ -219,6 +226,7 @@ struct SceneDetailView: View {
         }
         .onReceive(timer) { _ in
             // Periodically save progress while playing
+            if isDeleting { return }
             if let player = player, player.timeControlStatus == .playing {
                 let currentTime = player.currentTime().seconds
                 if currentTime > 0 {
@@ -257,11 +265,13 @@ struct SceneDetailView: View {
     }
 
     private func deleteSceneWithFiles() {
+        isDeleting = true
         viewModel.deleteSceneWithFiles(scene: activeScene) { success in
             if success {
                 print("🎉 Scene and files completely removed!")
                 self.dismiss()
             } else {
+                isDeleting = false
                 print("❌ Failed to delete scene or files")
             }
         }

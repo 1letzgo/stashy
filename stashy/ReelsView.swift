@@ -321,7 +321,7 @@ struct ReelsView: View {
                             else if case .marker(let marker) = item { targetSceneId = marker.scene?.id }
                             
                             if let sceneId = targetSceneId {
-                                // Optimistic Update for Scene List
+                                // 1. Optimistic Update for Scene List
                                 if let sceneIndex = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
                                     let originalRating = viewModel.scenes[sceneIndex].rating100
                                     viewModel.scenes[sceneIndex] = viewModel.scenes[sceneIndex].withRating(newRating)
@@ -333,9 +333,22 @@ struct ReelsView: View {
                                             }
                                         }
                                     }
-                                } else {
-                                     // Just update backend if not in scene list
-                                     viewModel.updateSceneRating(sceneId: sceneId, rating100: newRating) { _ in }
+                                }
+                                
+                                // 2. Optimistic Update for Scene Markers (All markers belonging to this scene)
+                                let markerIndices = viewModel.sceneMarkers.enumerated().compactMap { index, marker in
+                                    marker.scene?.id == sceneId ? index : nil
+                                }
+                                
+                                for index in markerIndices {
+                                    if let markerScene = viewModel.sceneMarkers[index].scene {
+                                        viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withRating(newRating))
+                                    }
+                                }
+                                
+                                // If not in scenes list, still perform update
+                                if !viewModel.scenes.contains(where: { $0.id == sceneId }) {
+                                    viewModel.updateSceneRating(sceneId: sceneId, rating100: newRating) { _ in }
                                 }
                             }
                         },
@@ -910,19 +923,8 @@ struct ReelItemView: View {
                     }
                 }
                 
-                // Mute Button
-                SidebarButton(
-                    icon: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                    label: isMuted ? "Muted" : "Mute",
-                    count: 0,
-                    hideCount: true,
-                    color: .white
-                ) {
-                    isMuted.toggle()
-                    resetUITimer()
-                }
 
-                // O-Counter (Only for scenes)
+                // O-Counter (Available for scenes & markers)
                 if let oCounter = item.oCounter {
                     SidebarButton(
                         icon: "heart",
@@ -935,7 +937,7 @@ struct ReelItemView: View {
                         else if case .marker(let marker) = item { targetSceneId = marker.scene?.id }
                         
                         if let sceneId = targetSceneId {
-                            // Optimistic update
+                            // 1. Scene List Update
                             if let index = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
                                 let originalCount = viewModel.scenes[index].oCounter ?? 0
                                 viewModel.scenes[index] = viewModel.scenes[index].withOCounter(originalCount + 1)
@@ -951,15 +953,45 @@ struct ReelItemView: View {
                                         }
                                     }
                                 }
-                            } else {
-                                 viewModel.incrementOCounter(sceneId: sceneId) { _ in }
+                            }
+                            
+                            // 2. Scene Markers Update
+                            let markerIndices = viewModel.sceneMarkers.enumerated().compactMap { index, marker in
+                                marker.scene?.id == sceneId ? index : nil
+                            }
+                            
+                            for index in markerIndices {
+                                if let markerScene = viewModel.sceneMarkers[index].scene {
+                                    let originalCount = markerScene.oCounter ?? 0
+                                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withOCounter(originalCount + 1))
+                                    
+                                    // If NOT already handled by scene list update above
+                                    if !viewModel.scenes.contains(where: { $0.id == sceneId }) {
+                                        viewModel.incrementOCounter(sceneId: sceneId) { newCount in
+                                            if let count = newCount {
+                                                DispatchQueue.main.async {
+                                                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withOCounter(count))
+                                                }
+                                            } else {
+                                                DispatchQueue.main.async {
+                                                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withOCounter(originalCount))
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                            
+                            // 3. Fallback (if not in any list)
+                            if !viewModel.scenes.contains(where: { $0.id == sceneId }) && markerIndices.isEmpty {
+                                viewModel.incrementOCounter(sceneId: sceneId) { _ in }
                             }
                         }
                         resetUITimer()
                     }
                 }
                 
-                // View Counter (Only for scenes)
+                // View Counter (Available for scenes & markers)
                 if let playCount = item.playCount {
                     SidebarButton(
                         icon: "stopwatch",
@@ -967,6 +999,18 @@ struct ReelItemView: View {
                         count: playCount,
                         color: .white
                     ) { }
+                }
+
+                // Mute Button
+                SidebarButton(
+                    icon: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                    label: isMuted ? "Muted" : "Mute",
+                    count: 0,
+                    hideCount: true,
+                    color: .white
+                ) {
+                    isMuted.toggle()
+                    resetUITimer()
                 }
 
                 Spacer()

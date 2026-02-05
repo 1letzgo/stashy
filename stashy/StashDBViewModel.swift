@@ -3002,10 +3002,12 @@ extension StashDBViewModel {
                                 if !fileIds.isEmpty {
                                     Task { @MainActor [weak self] in
                                         self?.deleteSceneFiles(fileIds: fileIds, config: config) { success in
-                                            if success {
-                                                NotificationCenter.default.post(name: NSNotification.Name("SceneDeleted"), object: nil, userInfo: ["sceneId": scene.id])
+                                            DispatchQueue.main.async {
+                                                if success {
+                                                    NotificationCenter.default.post(name: NSNotification.Name("SceneDeleted"), object: nil, userInfo: ["sceneId": scene.id])
+                                                }
+                                                completion(success)
                                             }
-                                            completion(success)
                                         }
                                     }
                                 } else {
@@ -3421,6 +3423,19 @@ struct MarkerScene: Codable, Identifiable {
     let rating100: Int?
     let playCount: Int?
     let oCounter: Int?
+
+    enum CodingKeys: String, CodingKey {
+        case id, title, date, files, performers, rating100
+        case playCount = "play_count"
+        case oCounter = "o_counter"
+    }
+
+    func withRating(_ rating: Int?) -> MarkerScene {
+        MarkerScene(id: id, title: title, date: date, files: files, performers: performers, rating100: rating, playCount: playCount, oCounter: oCounter)
+    }
+    func withOCounter(_ count: Int?) -> MarkerScene {
+        MarkerScene(id: id, title: title, date: date, files: files, performers: performers, rating100: rating100, playCount: playCount, oCounter: count)
+    }
 }
 
 struct SceneMarker: Codable, Identifiable {
@@ -3437,6 +3452,10 @@ struct SceneMarker: Codable, Identifiable {
     enum CodingKeys: String, CodingKey {
         case id, title, seconds, tags, screenshot, preview, stream, scene
         case primaryTag = "primary_tag"
+    }
+    
+    func withScene(_ newScene: MarkerScene?) -> SceneMarker {
+        SceneMarker(id: id, title: title, seconds: seconds, primaryTag: primaryTag, tags: tags, screenshot: screenshot, preview: preview, stream: stream, scene: newScene)
     }
     
     // Computed property for thumbnail URL
