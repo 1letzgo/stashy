@@ -119,7 +119,7 @@ enum GraphQLNetworkError: LocalizedError {
 class GraphQLClient {
     static let shared = GraphQLClient()
     
-    private let session: URLSession
+    private var session: URLSession
     private let timeout: TimeInterval
     private var cancellables = Set<AnyCancellable>()
     
@@ -146,18 +146,56 @@ class GraphQLClient {
             )
         }
     }
+
+    /// Cancel all pending requests and reset the session.
+    /// Useful when switching servers to prevent old data from being processed.
+    func cancelAllRequests() {
+        session.invalidateAndCancel()
+        
+        // Re-create the session with the same configuration and delegate
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = timeout
+        config.timeoutIntervalForResource = timeout * 2
+        config.waitsForConnectivity = false
+        config.allowsCellularAccess = true
+        config.allowsConstrainedNetworkAccess = true
+        config.allowsExpensiveNetworkAccess = true
+        
+        self.session = URLSession(
+            configuration: config,
+            delegate: GraphQLURLSessionDelegate(),
+            delegateQueue: nil
+        )
+        print("📱 GraphQL: Cancelled all pending requests and reset session")
+    }
     
     // MARK: - Async/Await API (Preferred)
     
     /// Execute a GraphQL query and decode the response
     func execute<T: Decodable>(
         query: String,
-        variables: [String: Any]? = nil
+        variables: [String: Any]? = nil,
+        retryCount: Int = 0
     ) async throws -> T {
         let request = try buildRequest(query: query, variables: variables)
         
         let (data, response) = try await session.data(for: request)
         
+        // 1. Peek for "database is locked" errors FIRST
+        // This allows retry logic to trigger even if validateResponse would throw
+        if isDatabaseLocked(data: data) {
+            if retryCount < 3 {
+                let waitTime = UInt64(500 * 1_000_000 * (retryCount + 1)) // 500ms, 1000ms, 1500ms
+                print("⚠️ GraphQL: Database is locked. Retrying in \(Double(waitTime)/1_000_000_000)s... (Attempt \(retryCount + 1))")
+                try await Task.sleep(nanoseconds: waitTime)
+                return try await execute(query: query, variables: variables, retryCount: retryCount + 1)
+            } else {
+                print("❌ GraphQL: Database is locked after 3 retries.")
+                throw GraphQLNetworkError.graphQLError(message: "Database is locked")
+            }
+        }
+        
+        // 2. Validate other aspects of the response
         try validateResponse(response, data: data)
         
         do {
@@ -272,6 +310,20 @@ class GraphQLClient {
     
     // MARK: - Private Helpers
     
+    private func isDatabaseLocked(data: Data) -> Bool {
+        guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let errors = json["errors"] as? [[String: Any]] else {
+            return false
+        }
+        
+        for error in errors {
+            if let message = error["message"] as? String, message.contains("database is locked") {
+                return true
+            }
+        }
+        return false
+    }
+
     private func buildRequest(query: String, variables: [String: Any]?) throws -> URLRequest {
         guard let config = ServerConfigManager.shared.loadConfig(),
               config.hasValidConfig else {
@@ -288,6 +340,7 @@ class GraphQLClient {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = timeout
+        request.cachePolicy = .reloadIgnoringLocalCacheData
         
         // Add API Key if available
         if let apiKey = config.secureApiKey, !apiKey.isEmpty {

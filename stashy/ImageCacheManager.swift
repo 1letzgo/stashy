@@ -36,6 +36,7 @@ class ImageCache {
     }
     
     @objc private func handleServerChange() {
+        memoryCache.removeAllObjects()
         resetServerCachePath()
     }
     
@@ -101,18 +102,8 @@ class ImageCache {
     }
     
     private func stableMemoryCacheKey(for url: NSURL) -> NSURL {
-        let absString = url.absoluteString ?? ""
-        if !absString.contains("?") {
-            return url
-        }
-        
-        guard let urlComponents = URLComponents(url: url as URL, resolvingAgainstBaseURL: false) else {
-            return url
-        }
-        var stable = urlComponents
-        stable.query = nil
-        stable.fragment = nil
-        return (stable.url ?? url as URL) as NSURL
+        let keyString = stableCacheKey(for: url)
+        return (URL(string: keyString) ?? url as URL) as NSURL
     }
     
     func object(forKey key: NSURL) -> UIImage? {
@@ -191,18 +182,79 @@ class ImageCache {
     }
 }
 
+// MARK: - Image Loader Session Delegate (SSL Handling)
+
+class ImageLoaderSessionDelegate: NSObject, URLSessionDelegate {
+    func urlSession(_ session: URLSession, didReceive challenge: URLAuthenticationChallenge, completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void) {
+        if challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust {
+            let host = challenge.protectionSpace.host
+            print("📱 ImageLoader SSL Challenge for host: \(host)")
+            
+            // Accept self-signed certificates for local/private IP ranges
+            if isLocalOrPrivateIP(host) {
+                print("✅ ImageLoader: Accepting SSL Trust for private/test host: \(host)")
+                if let serverTrust = challenge.protectionSpace.serverTrust {
+                    completionHandler(.useCredential, URLCredential(trust: serverTrust))
+                    return
+                }
+            } else {
+                print("⚠️ ImageLoader: Host \(host) not in private ranges, using default SSL handling")
+            }
+        }
+        completionHandler(.performDefaultHandling, nil)
+    }
+    
+    private func isLocalOrPrivateIP(_ host: String) -> Bool {
+        if host == "localhost" || host == "127.0.0.1" || host == "::1" { return true }
+        let privateRanges = ["10.", "172.16.", "172.17.", "172.18.", "172.19.", "172.20.", "172.21.", "172.22.", "172.23.", "172.24.", "172.25.", "172.26.", "172.27.", "172.28.", "172.29.", "172.30.", "172.31.", "192.168."]
+        for range in privateRanges { if host.hasPrefix(range) { return true } }
+        
+        // Also allow stashytest.gole.tz specifically as it's the test domain showing SSL issues in logs
+        if host.contains("gole.tz") { return true }
+        
+        return false
+    }
+}
+
 // MARK: - Image Loader
 
+@MainActor
 class ImageLoader: ObservableObject {
     @Published var image: Image?
     @Published var imageData: Data?
     @Published var isLoading = true
     @Published var error: Error?
 
-    private let url: URL?
+    private var url: URL?
+    private var fetchTask: Task<Void, Never>?
+    private let session: URLSession
+
+    deinit {
+        fetchTask?.cancel()
+    }
 
     init(url: URL?) {
         self.url = url
+        
+        // Create custom session for SSL support
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 30
+        self.session = URLSession(configuration: config, delegate: ImageLoaderSessionDelegate(), delegateQueue: nil)
+        
+        loadImage()
+    }
+
+    func updateURL(_ newURL: URL?, force: Bool = false) {
+        if !force {
+            guard newURL != self.url else { return }
+        }
+        
+        fetchTask?.cancel()
+        self.url = newURL
+        self.image = nil
+        self.error = nil
+        self.isLoading = true
         loadImage()
     }
 
@@ -213,35 +265,37 @@ class ImageLoader: ObservableObject {
             return
         }
 
-        Task {
+        fetchTask?.cancel()
+        fetchTask = Task {
+            // Check cancellation
+            if Task.isCancelled { return }
+            
             // 1. Check Memory/Disk Cache for UIImage (Fastest)
             // object(forKey already checks both memory and disk)
             if let cachedUIImage = ImageCache.shared.object(forKey: url as NSURL) {
-                await MainActor.run {
-                    self.image = Image(uiImage: cachedUIImage)
-                    self.isLoading = false
-                }
+                if Task.isCancelled { return }
+                self.image = Image(uiImage: cachedUIImage)
+                self.isLoading = false
                 return
             }
 
             do {
                 let data = try await loadImage(from: url)
-                await MainActor.run {
-                    self.imageData = data
-                    if let uiImage = UIImage(data: data) {
-                        // Save to cache
-                        ImageCache.shared.setData(data, forKey: url as NSURL)
-                        self.image = Image(uiImage: uiImage)
-                    } else {
-                        self.error = CustomAsyncImageError.invalidImageData
-                    }
-                    self.isLoading = false
+                if Task.isCancelled { return }
+                
+                self.imageData = data
+                if let uiImage = UIImage(data: data) {
+                    // Save to cache
+                    ImageCache.shared.setData(data, forKey: url as NSURL)
+                    self.image = Image(uiImage: uiImage)
+                } else {
+                    self.error = CustomAsyncImageError.invalidImageData
                 }
+                self.isLoading = false
             } catch {
-                await MainActor.run {
-                    self.error = error
-                    self.isLoading = false
-                }
+                if Task.isCancelled { return }
+                self.error = error
+                self.isLoading = false
             }
         }
     }
@@ -258,10 +312,11 @@ class ImageLoader: ObservableObject {
         }
 
         do {
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await session.data(for: request)
             
             if let httpResponse = response as? HTTPURLResponse,
                !(200...299).contains(httpResponse.statusCode) {
+                print("❌ ImageLoader Error: HTTP \(httpResponse.statusCode) for \(url)")
                 // Check for specific server errors
                 if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                      // Auth error?
@@ -271,6 +326,7 @@ class ImageLoader: ObservableObject {
             
             return data
         } catch {
+            print("❌ ImageLoader Network Error: \(error.localizedDescription) for \(url)")
             // Re-throw NSURLErrorDomain errors (like cannotConnectToHost)
             // so they can be identified as connection issues
             throw error
@@ -299,6 +355,7 @@ struct CustomAsyncImage<Content: View>: View {
     @ViewBuilder let content: (ImageLoader) -> Content
 
     @StateObject private var loader: ImageLoader
+    @ObservedObject private var configManager = ServerConfigManager.shared
 
     init(url: URL?, @ViewBuilder content: @escaping (ImageLoader) -> Content) {
         self.url = url
@@ -308,5 +365,12 @@ struct CustomAsyncImage<Content: View>: View {
 
     var body: some View {
         content(loader)
+            .onChange(of: url) { oldValue, newValue in
+                loader.updateURL(newValue)
+            }
+            .onChange(of: configManager.activeConfig?.id) { _, _ in
+                // Force reload even if URL is same string, as headers (API Key) changed
+                loader.updateURL(url, force: true)
+            }
     }
 }

@@ -58,6 +58,7 @@ struct MainTabView: View {
                     .applyAppBackground()
             }
         }
+        .id(coordinator.serverSwitchID)
         .tint(appearanceManager.tintColor)
         .onAppear {
             checkConfiguration()

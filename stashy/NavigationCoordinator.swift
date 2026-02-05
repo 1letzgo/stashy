@@ -30,6 +30,7 @@ class NavigationCoordinator: ObservableObject {
     @Published var downloadsTabID = UUID()
     @Published var reelsTabID = UUID()
     @Published var settingsTabID = UUID()
+    @Published var serverSwitchID = UUID()
     
     // Sub-tab control for Combined Tabs
     @Published var catalogueSubTab: String = ""
@@ -52,6 +53,13 @@ class NavigationCoordinator: ObservableObject {
         if let firstTab = TabManager.shared.visibleTabs.first {
             selectedTab = firstTab
         }
+        
+        // Listen for server changes to reset all stacks
+        NotificationCenter.default.addObserver(self, selector: #selector(handleServerChange), name: NSNotification.Name("ServerConfigChanged"), object: nil)
+    }
+    
+    @objc private func handleServerChange() {
+        resetAllStacks()
     }
     
     func openPerformer(_ performer: Performer) {
@@ -143,11 +151,11 @@ class NavigationCoordinator: ObservableObject {
         downloadsTabID = UUID()
         reelsTabID = UUID()
         settingsTabID = UUID()
+        serverSwitchID = UUID()
         
-        // Optionally reset to first visible tab
-        if let firstTab = TabManager.shared.visibleTabs.first {
-            selectedTab = firstTab
-        }
+        // Force navigation to Home (Dashboard) sub-tab
+        self.catalogueSubTab = "Dashboard"
+        self.selectedTab = .catalogue
     }
 }
 

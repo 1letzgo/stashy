@@ -75,6 +75,12 @@ struct HomeRowView: View {
             // checkAndLoadScenes will decide if it's safe to load now.
             checkAndLoadScenes()
         }
+        .onChange(of: viewModel.isLoadingSavedFilters) { oldValue, newValue in
+            // If we finished loading filters (true -> false), check if we can load scenes now
+            if oldValue == true && newValue == false {
+                checkAndLoadScenes()
+            }
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
             if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.dashboard.rawValue {
                 // Force reload this row by clearing cache first

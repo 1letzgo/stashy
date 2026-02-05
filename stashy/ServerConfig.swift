@@ -214,6 +214,9 @@ class ServerConfigManager: ObservableObject {
             self.activeConfig = config
             print("✅ Active server updated: \(config.name)")
             
+            // Clear system URL cache to avoid using stale data/auth for the new server
+            URLCache.shared.removeAllCachedResponses()
+            
             // Notify all ViewModels to reset their data
             NotificationCenter.default.post(name: NSNotification.Name("ServerConfigChanged"), object: nil)
         }

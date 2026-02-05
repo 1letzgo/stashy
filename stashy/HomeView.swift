@@ -19,13 +19,6 @@ struct HomeView: View {
         ZStack {
             if configManager.activeConfig == nil {
                 ConnectionErrorView { viewModel.fetchStatistics() }
-            } else if viewModel.isLoading && viewModel.statistics == nil {
-                VStack {
-                    Spacer()
-                    ProgressView("Loading Dashboard...")
-                    Spacer()
-                }
-                .frame(maxWidth: .infinity)
             } else if viewModel.statistics == nil && viewModel.errorMessage != nil {
                 ConnectionErrorView { viewModel.fetchStatistics() }
             } else {
@@ -68,14 +61,12 @@ struct HomeView: View {
         }
         .onAppear {
             if configManager.activeConfig != nil {
-                viewModel.fetchStatistics()
-                viewModel.fetchSavedFilters() // Fetch filters so dashboard rows can use them
+                viewModel.initializeServerConnection()
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
-            // Reload data when server config changes (e.g., after wizard setup)
-            viewModel.fetchStatistics()
-            viewModel.fetchSavedFilters()
+            // Reload data when server config changes
+            viewModel.initializeServerConnection()
         }
         // Scene Update Listeners - update home row scenes in place
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneResumeTimeUpdated"))) { notification in
@@ -92,10 +83,7 @@ struct HomeView: View {
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
             if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.dashboard.rawValue {
                 // Reload dashboard if its filter changed
-                viewModel.fetchStatistics()
-                viewModel.fetchSavedFilters() // Ensure filter dict is up to date
-                // We might need to force reload cached rows too
-                // For now, fetching stats should be enough if rows are reactive
+                viewModel.initializeServerConnection()
             }
         }
     }

@@ -9,23 +9,17 @@ import SwiftUI
 import Combine
 import AVFoundation
 import AVKit
+import Foundation
 
 // MARK: - App Colors
 
-// Benutzerdefinierte Akzentfarbe - dunkles Braun #644C3D
 extension Color {
     static let appAccent = Color(red: 0x64/255.0, green: 0x4C/255.0, blue: 0x3D/255.0)
     static let appBackground = Color(UIColor.systemGray6)
     static let studioHeaderGray = Color(red: 44/255.0, green: 44/255.0, blue: 46/255.0)
 }
 
-// MARK: - Filter Enums
-
-
-
-
-
-import Foundation
+// MARK: - Network Errors
 
 enum NetworkError: Error {
     case invalidURL
@@ -36,21 +30,21 @@ enum NetworkError: Error {
 
     var localizedDescription: String {
         switch self {
-        case .invalidURL:
-            return "Invalid server URL"
-        case .noData:
-            return "No data received from server"
-        case .decodingError:
-            return "Error processing server response"
-        case .serverError(let message):
-            return "Server error: \(message)"
-        case .networkError(let error):
-            return "Network error: \(error.localizedDescription)"
+        case .invalidURL: return "Invalid server URL"
+        case .noData: return "No data received from server"
+        case .decodingError: return "Error processing server response"
+        case .serverError(let message): return "Server error: \(message)"
+        case .networkError(let error): return "Network error: \(error.localizedDescription)"
         }
     }
 }
 
+@MainActor
 class StashDBViewModel: ObservableObject {
+    @Published var isLoading = true
+    @Published var errorMessage: String?
+    @Published var serverStatus: String = "Nicht verbunden"
+
     enum FilterMode: String, Codable {
         case scenes = "SCENES"
         case performers = "PERFORMERS"
@@ -114,18 +108,47 @@ class StashDBViewModel: ObservableObject {
         NotificationCenter.default.removeObserver(self)
     }
 
-    @objc private func handleServerChange() {
-        DispatchQueue.main.async {
-            self.resetData()
-            print("🔄 StashDBViewModel reset due to server change")
-        }
-    }
-    @Published var isLoading = true
-    @Published var errorMessage: String?
-    @Published var serverStatus: String = "Nicht verbunden"
 
     @Published var savedFilters: [String: SavedFilter] = [:]
     @Published var isLoadingSavedFilters = false
+    private var isInitializing = false
+    
+    /// Main entry point for starting/refreshing a server connection
+    func initializeServerConnection() {
+        guard !isInitializing else { return }
+        isInitializing = true
+        
+        print("🚀 Starting staggered server initialization...")
+        
+        // 1. First, fetch saved filters as they are needed for dashboard row queries
+        fetchSavedFilters { [weak self] success in
+            guard let self = self else { return }
+            
+            // 2. Once filters are done (or failed), fetch statistics
+            self.fetchStatistics { [weak self] success in
+                guard let self = self else { return }
+                
+                // 3. Mark initialization as done so rows can start loading
+                // Fetching rows will happen automatically via HomeRowView's .onChange(of: savedFilters)
+                // but we can also trigger a broad reload if needed.
+                DispatchQueue.main.async {
+                    self.isLoading = false
+                    self.isInitializing = false
+                    print("✅ Staggered initialization sequence completed")
+                }
+            }
+        }
+    }
+    
+    @objc private func handleServerChange() {
+        GraphQLClient.shared.cancelAllRequests()
+        DispatchQueue.main.async {
+            self.isLoading = true // Show loading immediately
+            self.resetData()
+            print("🔄 StashDBViewModel reset due to server change")
+            self.initializeServerConnection()
+        }
+    }
     
     // Home Row Caching - prevents reload on view recreation
     @Published var homeRowScenes: [HomeRowType: [Scene]] = [:]
@@ -139,6 +162,10 @@ class StashDBViewModel: ObservableObject {
     @Published var scenes: [Scene] = []
     @Published var performers: [Performer] = []
     @Published var studios: [Studio] = []
+    
+    // Throttling states
+    private var isFetchingFilters = false
+    private var isFetchingHomeRows: Set<HomeRowType> = []
 
     // Pagination properties for scenes
     @Published var totalScenes: Int = 0
@@ -612,6 +639,13 @@ class StashDBViewModel: ObservableObject {
         homeRowScenes = [:]
         homeRowLoadingState = [:]
         isServerConnected = false
+        isInitializing = false // Reset initialization guard
+        isLoading = true // Start in loading state
+        isLoadingSavedFilters = false // Reset filter loading state
+        errorMessage = nil
+        isFetchingStats = false
+        isFetchingFilters = false
+        isFetchingHomeRows.removeAll()
         
         performerGalleries = []
         studioGalleries = []
@@ -620,6 +654,7 @@ class StashDBViewModel: ObservableObject {
         tagScenes = []
         
         savedFilters = [:]
+        statistics = nil
         
         totalScenes = 0
         totalPerformers = 0
@@ -747,14 +782,21 @@ class StashDBViewModel: ObservableObject {
         // Update home row caches
         for (rowType, rowScenes) in homeRowScenes {
             if let index = rowScenes.firstIndex(where: { $0.id == id }) {
-                var updated = homeRowScenes[rowType]![index]
+                // Safe access using local copy 'rowScenes' instead of force unwrapping dictionary again
+                var updated = rowScenes[index]
                 updated = updated.withResumeTime(newResumeTime)
                 homeRowScenes[rowType]?[index] = updated
             }
         }
     }
 
-    func fetchSavedFilters() {
+    /// Fetch all saved filters
+    func fetchSavedFilters(completion: ((Bool) -> Void)? = nil) {
+        if isFetchingFilters { 
+            completion?(false)
+            return 
+        }
+        isFetchingFilters = true
         isLoadingSavedFilters = true
         
         let query = """
@@ -765,19 +807,24 @@ class StashDBViewModel: ObservableObject {
         
         // Use execute with variables: nil to send the raw JSON body, same as performGraphQLQuery does
         GraphQLClient.shared.execute(query: query, variables: nil) { [weak self] (result: Result<SavedFiltersResponse, GraphQLNetworkError>) in
-            DispatchQueue.main.async {
-                self?.isLoadingSavedFilters = false
+            guard let self = self else { return }
+            Task { @MainActor in
+                self.isLoadingSavedFilters = false
+                self.isFetchingFilters = false
                 switch result {
                 case .success(let response):
                     if let findResult = response.data?.findSavedFilters {
-                        self?.savedFilters = Dictionary(findResult.map { ($0.id, $0) }, uniquingKeysWith: { (first, second) in second })
+                        self.savedFilters = Dictionary(findResult.map { ($0.id, $0) }, uniquingKeysWith: { (first, second) in second })
                         print("✅ Fetched \(findResult.count) saved filters")
+                        completion?(true)
                     } else {
                         print("⚠️ Saved filters query successful but data is missing")
+                        completion?(false)
                     }
                 case .failure(let error):
                     print("❌ Error fetching saved filters: \(error.localizedDescription)")
-                    self?.errorMessage = "Failed to load filters: \(error.localizedDescription)"
+                    self.errorMessage = "Failed to load filters: \(error.localizedDescription)"
+                    completion?(false)
                 }
             }
         }
@@ -873,10 +920,14 @@ class StashDBViewModel: ObservableObject {
     private var lastStatsFetch: Date?
     private var isFetchingStats = false
 
-    func fetchStatistics() {
+    func fetchStatistics(completion: ((Bool) -> Void)? = nil) {
         // Prevent redundant fetches within 3 seconds
-        if isFetchingStats { return }
+        if isFetchingStats { 
+            completion?(false)
+            return 
+        }
         if let last = lastStatsFetch, Date().timeIntervalSince(last) < 3.0 {
+            completion?(true)
             return
         }
         
@@ -897,10 +948,12 @@ class StashDBViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     self.statistics = stats
                     self.errorMessage = nil // Clear error on success
+                    completion?(true)
                 }
             } else {
                 DispatchQueue.main.async {
                     self.errorMessage = "Statistics could not be loaded - possibly not supported"
+                    completion?(false)
                 }
             }
         }
@@ -1115,10 +1168,11 @@ class StashDBViewModel: ObservableObject {
         }
         
         // Already loading this row? Don't start another request
-        if homeRowLoadingState[rowType] == true {
+        if isFetchingHomeRows.contains(rowType) || homeRowLoadingState[rowType] == true {
             return
         }
         
+        isFetchingHomeRows.insert(rowType)
         homeRowLoadingState[rowType] = true
         
         var sceneFilter: [String: Any] = [:]
@@ -1190,6 +1244,7 @@ class StashDBViewModel: ObservableObject {
         guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
               let bodyString = String(data: bodyData, encoding: .utf8) else {
             homeRowLoadingState[rowType] = false
+            isFetchingHomeRows.remove(rowType)
             completion([])
             return
         }
@@ -1197,6 +1252,7 @@ class StashDBViewModel: ObservableObject {
         performGraphQLQuery(query: bodyString) { [weak self] (response: AltScenesResponse?) in
             DispatchQueue.main.async {
                 self?.homeRowLoadingState[rowType] = false
+                self?.isFetchingHomeRows.remove(rowType)
                 let scenes = response?.data?.findScenes?.scenes ?? []
                 // Cache the result
                 self?.homeRowScenes[rowType] = scenes
@@ -2554,7 +2610,13 @@ class StashDBViewModel: ObservableObject {
             return
         }
         
-        var request = URLRequest(url: URL(string: "\(config.baseURL)/graphql")!)
+        guard let url = URL(string: "\(config.baseURL)/graphql") else {
+            print("❌ Invalid URL in performGraphQLMutationSilent: \(config.baseURL)")
+            completion(nil)
+            return
+        }
+        
+        var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if let apiKey = config.secureApiKey, !apiKey.isEmpty {
@@ -2565,15 +2627,15 @@ class StashDBViewModel: ObservableObject {
         
         URLSession.shared.dataTask(with: request) { data, _, _ in
             guard let data = data else {
-                completion(nil)
+                Task { @MainActor in completion(nil) }
                 return
             }
             
             do {
                 let decoded = try JSONDecoder().decode([String: StashJSONValue].self, from: data)
-                completion(decoded)
+                Task { @MainActor in completion(decoded) }
             } catch {
-                completion(nil)
+                Task { @MainActor in completion(nil) }
             }
         }.resume()
     }
@@ -2938,8 +3000,8 @@ extension StashDBViewModel {
                                dataDict["sceneDestroy"] != nil {
                                 
                                 if !fileIds.isEmpty {
-                                    self?.deleteSceneFiles(fileIds: fileIds, config: config) { success in
-                                        DispatchQueue.main.async {
+                                    Task { @MainActor [weak self] in
+                                        self?.deleteSceneFiles(fileIds: fileIds, config: config) { success in
                                             if success {
                                                 NotificationCenter.default.post(name: NSNotification.Name("SceneDeleted"), object: nil, userInfo: ["sceneId": scene.id])
                                             }
@@ -3969,7 +4031,7 @@ class DownloadManager: NSObject, ObservableObject {
 
     override private init() {
         let fileManager = FileManager.default
-        let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first!
+        let documents = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first ?? fileManager.temporaryDirectory
         downloadsFolder = documents.appendingPathComponent("Downloads", isDirectory: true)
         
         if !fileManager.fileExists(atPath: downloadsFolder.path) {
