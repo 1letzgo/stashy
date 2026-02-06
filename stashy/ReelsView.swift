@@ -256,44 +256,79 @@ struct ReelsView: View {
                 
                 let savedSort = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
                 applySettings(sortBy: savedSort, filter: selectedFilter, performer: initialPerformer, tags: initialTags)
-            } else if viewModel.scenes.isEmpty {
-                // Priority 2: Wait for filters if we expect a default but don't have it yet
-                let defaultId = TabManager.shared.getDefaultFilterId(for: .reels)
-                let hasFilters = !viewModel.savedFilters.isEmpty
-                
-                if defaultId != nil && !hasFilters {
-                    // We need to wait for onChange(of: viewModel.savedFilters) to trigger applySettings
-                    print("🕓 ReelsView: Waiting for filters before initial load...")
-                } else {
-                    // Filters are ready or no default filter set
-                    var initialFilter = selectedFilter
-                    if initialFilter == nil, let defId = defaultId {
-                        initialFilter = viewModel.savedFilters[defId]
-                    }
+            } else {
+                let isCurrentlyEmpty = (reelsMode == .scenes ? viewModel.scenes.isEmpty : viewModel.sceneMarkers.isEmpty)
+                if isCurrentlyEmpty {
+                    // Priority 2: Try to apply default filter
+                    let defaultId = reelsMode == .scenes ? 
+                        TabManager.shared.getDefaultFilterId(for: .reels) : 
+                        TabManager.shared.getDefaultMarkerFilterId(for: .reels)
+                        
+                    let hasFiltersArrived = !viewModel.savedFilters.isEmpty
                     
-                    let savedSort = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
-                    applySettings(sortBy: savedSort, filter: initialFilter, performer: selectedPerformer, tags: selectedTags)
+                    if defaultId != nil, !hasFiltersArrived {
+                        // We need to wait for onChange(of: viewModel.savedFilters) to trigger applySettings
+                        print("🕓 ReelsView: Waiting for filters before initial load...")
+                    } else {
+                        // Filters are ready OR no default filter is configured
+                        var initialFilter = selectedFilter
+                        if initialFilter == nil, let defId = defaultId {
+                            initialFilter = viewModel.savedFilters[defId]
+                        }
+                        
+                        let savedSort = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
+                        applySettings(sortBy: savedSort, filter: initialFilter, performer: selectedPerformer, tags: selectedTags)
+                    }
                 }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
             if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.reels.rawValue {
-                let defaultId = TabManager.shared.getDefaultFilterId(for: .reels)
+                let defaultId = reelsMode == .scenes ? 
+                    TabManager.shared.getDefaultFilterId(for: .reels) : 
+                    TabManager.shared.getDefaultMarkerFilterId(for: .reels)
+                
                 let newFilter = defaultId != nil ? viewModel.savedFilters[defaultId!] : nil
                 applySettings(sortBy: selectedSortOption, filter: newFilter, performer: selectedPerformer, tags: selectedTags)
             }
         }
         .onChange(of: viewModel.savedFilters) { _, newValue in
             // Only apply default filter if we haven't set a filter yet AND we are empty
-            if selectedFilter == nil && viewModel.scenes.isEmpty {
-                if let defaultId = TabManager.shared.getDefaultFilterId(for: .reels),
-                   let filter = newValue[defaultId] {
-                    print("✅ ReelsView: Applying default filter after lazy load")
+            let isCurrentlyEmpty = (reelsMode == .scenes ? viewModel.scenes.isEmpty : viewModel.sceneMarkers.isEmpty)
+            
+            if selectedFilter == nil && isCurrentlyEmpty {
+                let defaultId = reelsMode == .scenes ? 
+                    TabManager.shared.getDefaultFilterId(for: .reels) : 
+                    TabManager.shared.getDefaultMarkerFilterId(for: .reels)
+                
+                if let defId = defaultId, let filter = newValue[defId] {
+                    print("✅ ReelsView: Applying default \(reelsMode.rawValue) filter after lazy load")
                     applySettings(sortBy: selectedSortOption, filter: filter, performer: selectedPerformer, tags: selectedTags)
-                } else if !newValue.isEmpty {
-                    // Filters arrived but no default matches, or no default set - load unfiltered if still empty
-                     let savedSort = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
-                     applySettings(sortBy: savedSort, filter: nil, performer: selectedPerformer, tags: selectedTags)
+                } else {
+                    // Filters arrived but no default matches, no default set, or NO filters on server.
+                    // Follow the 'clean' fix: just load unfiltered content.
+                    print("ℹ️ ReelsView: No default filter found on server, loading unfiltered \(reelsMode.rawValue)")
+                    let savedSort = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
+                    applySettings(sortBy: savedSort, filter: nil, performer: selectedPerformer, tags: selectedTags)
+                }
+            }
+        }
+        .onChange(of: viewModel.isLoadingSavedFilters) { _, isLoading in
+            if !isLoading {
+                // Filters finished loading. If we are still empty and no filter selected, try to load.
+                let isCurrentlyEmpty = (reelsMode == .scenes ? viewModel.scenes.isEmpty : viewModel.sceneMarkers.isEmpty)
+                if selectedFilter == nil && isCurrentlyEmpty {
+                    print("ℹ️ ReelsView: Filter loading finished, ensuring content loads...")
+                    let defaultId = reelsMode == .scenes ? 
+                        TabManager.shared.getDefaultFilterId(for: .reels) : 
+                        TabManager.shared.getDefaultMarkerFilterId(for: .reels)
+                        
+                    if let defId = defaultId, let filter = viewModel.savedFilters[defId] {
+                         applySettings(sortBy: selectedSortOption, filter: filter, performer: selectedPerformer, tags: selectedTags)
+                    } else {
+                         let savedSort = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
+                         applySettings(sortBy: savedSort, filter: nil, performer: selectedPerformer, tags: selectedTags)
+                    }
                 }
             }
         }

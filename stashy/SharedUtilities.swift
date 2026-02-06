@@ -13,6 +13,22 @@ import StoreKit
 
 // MARK: - Global Helper Functions
 
+/// Adds the API key as a query parameter to the URL for authentication
+func signedURL(_ url: URL?) -> URL? {
+    guard let url = url else { return nil }
+    guard let config = ServerConfigManager.shared.activeConfig, 
+          let key = config.secureApiKey, !key.isEmpty else { return url }
+    
+    // Check if apikey is already present (case-insensitive check)
+    if url.query?.lowercased().contains("apikey=") == true { return url }
+    
+    var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+    var items = comps?.queryItems ?? []
+    items.append(URLQueryItem(name: "apikey", value: key))
+    comps?.queryItems = items
+    return comps?.url ?? url
+}
+
 private var _cachedIsTestFlight: Bool?
 
 func isTestFlightBuild() -> Bool {

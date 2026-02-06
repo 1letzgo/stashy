@@ -3435,21 +3435,9 @@ struct Scene: Codable, Identifiable {
 
         let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .fhd
         
-        // Helper to sign the URL with apikey
-        func signed(_ url: URL?) -> URL? {
-            guard let url = url else { return nil }
-            guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty else { return url }
-            if url.query?.lowercased().contains("apikey=") == true { return url }
-            var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
-            var items = comps?.queryItems ?? []
-            items.append(URLQueryItem(name: "apikey", value: key))
-            comps?.queryItems = items
-            return comps?.url ?? url
-        }
-
         // 1. Try best stream (transcoded)
         if let streamURL = bestStream(for: quality) {
-            return signed(streamURL)
+            return signedURL(streamURL)
         }
 
         // 2. Fallbacks (API path or manual construction)
@@ -3472,23 +3460,11 @@ struct Scene: Codable, Identifiable {
             }
         }
         
-        return signed(potentialURL)
+        return signedURL(potentialURL)
     }
 
     // Computed property for download URL (preferring MP4 transcoded stream)
     var downloadURL: URL? {
-        // Helper to sign the URL with apikey
-        func signed(_ url: URL?) -> URL? {
-            guard let url = url else { return nil }
-            guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty else { return url }
-            if url.query?.lowercased().contains("apikey=") == true { return url }
-            var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
-            var items = comps?.queryItems ?? []
-            items.append(URLQueryItem(name: "apikey", value: key))
-            comps?.queryItems = items
-            return comps?.url ?? url
-        }
-
         let compatibleExtensions = ["mp4", "m4v", "mov"]
         let fileFmt = files?.first?.format?.lowercased() ?? ""
         let isOriginalCompatible = compatibleExtensions.contains(fileFmt)
@@ -3508,14 +3484,14 @@ struct Scene: Codable, Identifiable {
             return r1 > r2
         }).first, let url = URL(string: bestMP4.url) {
             print("💾 Download: Using best MP4 transcode (\(bestMP4.label)) for scene \(id)")
-            return signed(url)
+            return signedURL(url)
         }
         
         // 2. Fallback to original ONLY if it's compatible (MP4/MOV/etc)
         if isOriginalCompatible {
              if let streamPath = paths?.stream, let url = URL(string: streamPath) {
                  print("💾 Download: Using compatible original file (\(fileFmt)) for scene \(id)")
-                 return signed(url)
+                 return signedURL(url)
              }
         }
         
@@ -3821,26 +3797,13 @@ struct MarkerScene: Codable, Identifiable {
                 return localURL
             }
         }
-        
-        // Signed helper
-        func signed(_ url: URL?) -> URL? {
-            guard let url = url else { return nil }
-            guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty else { return url }
-            if url.query?.lowercased().contains("apikey=") == true { return url }
-            var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
-            var items = comps?.queryItems ?? []
-            items.append(URLQueryItem(name: "apikey", value: key))
-            comps?.queryItems = items
-            return comps?.url ?? url
-        }
-        
         let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .fhd
         if let streamURL = bestStream(for: quality) {
-            return signed(streamURL)
+            return signedURL(streamURL)
         }
         
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
-        return signed(URL(string: "\(config.baseURL)/scene/\(id)/stream"))
+        return signedURL(URL(string: "\(config.baseURL)/scene/\(id)/stream"))
     }
     
     var thumbnailURL: URL? {
@@ -3853,8 +3816,8 @@ struct MarkerScene: Codable, Identifiable {
             }
         }
         
-        guard let config = ServerConfigManager.shared.loadConfig(), let key = config.secureApiKey else { return nil }
-        return URL(string: "\(config.baseURL)/scene/\(id)/screenshot?apikey=\(key)")
+        guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
+        return signedURL(URL(string: "\(config.baseURL)/scene/\(id)/screenshot"))
     }
 }
 
@@ -3891,31 +3854,19 @@ struct SceneMarker: Codable, Identifiable {
             }
         }
 
-        // Helper to sign the URL with apikey
-        func signed(_ url: URL?) -> URL? {
-            guard let url = url else { return nil }
-            guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty else { return url }
-            if url.query?.lowercased().contains("apikey=") == true { return url }
-            var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
-            var items = comps?.queryItems ?? []
-            items.append(URLQueryItem(name: "apikey", value: key))
-            comps?.queryItems = items
-            return comps?.url ?? url
-        }
-
         // Use path from API if available
         if let screenshotPath = screenshot, let url = URL(string: screenshotPath) {
              if screenshotPath.hasPrefix("http") {
-                 return signed(url)
+                 return signedURL(url)
              } else if let config = ServerConfigManager.shared.loadConfig() {
                  let path = screenshotPath.hasPrefix("/") ? String(screenshotPath.dropFirst()) : screenshotPath
-                 return signed(URL(string: "\(config.baseURL)/\(path)"))
+                 return signedURL(URL(string: "\(config.baseURL)/\(path)"))
              }
         }
         
         // Fallback to manual construction
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
-        return signed(URL(string: "\(config.baseURL)/scenemarker/\(id)/screenshot"))
+        return signedURL(URL(string: "\(config.baseURL)/scenemarker/\(id)/screenshot"))
     }
     
     // Computed property for stream URL
@@ -3934,21 +3885,9 @@ struct SceneMarker: Codable, Identifiable {
 
         let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .fhd
         
-        // Helper to sign the URL with apikey
-        func signed(_ url: URL?) -> URL? {
-            guard let url = url else { return nil }
-            guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty else { return url }
-            if url.query?.lowercased().contains("apikey=") == true { return url }
-            var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
-            var items = comps?.queryItems ?? []
-            items.append(URLQueryItem(name: "apikey", value: key))
-            comps?.queryItems = items
-            return comps?.url ?? url
-        }
-
         // 1. Try best stream from associated scene (transcoded)
         if let scene = scene, let streamURL = scene.bestStream(for: quality) {
-            return signed(streamURL)
+            return signedURL(streamURL)
         }
         
         // 2. Fallbacks (API path or manual construction)
@@ -3970,28 +3909,16 @@ struct SceneMarker: Codable, Identifiable {
             }
         }
         
-        return signed(potentialURL)
+        return signedURL(potentialURL)
     }
     
     // Computed property for preview URL
     var previewURL: URL? {
-        // Helper to sign the URL with apikey
-        func signed(_ url: URL?) -> URL? {
-            guard let url = url else { return nil }
-            guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty else { return url }
-            if url.query?.lowercased().contains("apikey=") == true { return url }
-            var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
-            var items = comps?.queryItems ?? []
-            items.append(URLQueryItem(name: "apikey", value: key))
-            comps?.queryItems = items
-            return comps?.url ?? url
-        }
-
         if let previewPath = preview, let url = URL(string: previewPath) {
-             return signed(url)
+             return signedURL(url)
         }
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
-        return signed(URL(string: "\(config.baseURL)/scenemarker/\(id)/preview"))
+        return signedURL(URL(string: "\(config.baseURL)/scenemarker/\(id)/preview"))
     }
 }
 
@@ -4118,9 +4045,8 @@ struct Performer: Codable, Identifiable, Equatable {
         
         // Generate thumbnail URL using the provided format: /performer/[ID]/image
         let thumbnailURLString = "\(config.baseURL)/performer/\(id)/image"
-        // print("🖼️ Generated performer thumbnail URL: \(thumbnailURLString)")
         
-        return URL(string: thumbnailURLString)
+        return signedURL(URL(string: thumbnailURLString))
     }
 }
 
@@ -4236,9 +4162,8 @@ struct Studio: Codable, Identifiable {
         
         // Generate thumbnail URL using the provided format: /studio/[ID]/image
         let thumbnailURLString = "\(config.baseURL)/studio/\(id)/image"
-        print("🖼️ Generated studio thumbnail URL: \(thumbnailURLString)")
         
-        return URL(string: thumbnailURLString)
+        return signedURL(URL(string: thumbnailURLString))
     }
 }
 
@@ -4279,7 +4204,7 @@ struct Tag: Codable, Identifiable {
     var thumbnailURL: URL? {
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
         // /tag/[ID]/image
-        return URL(string: "\(config.baseURL)/tag/\(id)/image")
+        return signedURL(URL(string: "\(config.baseURL)/tag/\(id)/image"))
     }
 }
 
@@ -4326,10 +4251,10 @@ struct Gallery: Codable, Identifiable {
         
         // Check if the path is already an absolute URL
         if optimizedPath.starts(with: "http://") || optimizedPath.starts(with: "https://") {
-            return URL(string: optimizedPath)
+            return signedURL(URL(string: optimizedPath))
         } else {
             // Relative path, prepend baseURL
-            return URL(string: config.baseURL + optimizedPath)
+            return signedURL(URL(string: config.baseURL + optimizedPath))
         }
     }
     
@@ -4406,6 +4331,14 @@ struct StashImage: Codable, Identifiable {
         case id, title, date, paths, performers, studio, galleries, visual_files
     }
     
+    var isVideo: Bool {
+        let videoExtensions = ["MP4", "MOV", "M4V", "WEBM", "MKV"]
+        if let ext = fileExtension?.uppercased() {
+             return videoExtensions.contains(ext)
+        }
+        return false
+    }
+    
     var fileExtension: String? {
         // Primary: Use 'visual_files' array if available
         if let path = visual_files?.first?.path {
@@ -4434,9 +4367,9 @@ struct StashImage: Codable, Identifiable {
         let optimizedPath = "\(thumbnailPath)\(separator)width=640"
         
         if optimizedPath.starts(with: "http://") || optimizedPath.starts(with: "https://") {
-            return URL(string: optimizedPath)
+            return signedURL(URL(string: optimizedPath))
         } else {
-            return URL(string: config.baseURL + optimizedPath)
+            return signedURL(URL(string: config.baseURL + optimizedPath))
         }
     }
     
@@ -4445,9 +4378,9 @@ struct StashImage: Codable, Identifiable {
         guard let previewPath = paths?.preview else { return nil }
         
         if previewPath.starts(with: "http://") || previewPath.starts(with: "https://") {
-            return URL(string: previewPath)
+            return signedURL(URL(string: previewPath))
         } else {
-            return URL(string: config.baseURL + previewPath)
+            return signedURL(URL(string: config.baseURL + previewPath))
         }
     }
     
@@ -4456,9 +4389,9 @@ struct StashImage: Codable, Identifiable {
         guard let imagePath = paths?.image else { return nil }
         
         if imagePath.starts(with: "http://") || imagePath.starts(with: "https://") {
-            return URL(string: imagePath)
+            return signedURL(URL(string: imagePath))
         } else {
-            return URL(string: config.baseURL + imagePath)
+            return signedURL(URL(string: config.baseURL + imagePath)!)
         }
     }
     

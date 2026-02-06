@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find:*)",
+      "Bash(grep:*)",
+      "Bash(ruby -e:*)",
+      "Bash(gem install:*)",
+      "Bash(ruby add_files_to_project.rb:*)",
+      "Bash(ruby:*)",
+      "Bash(tee:*)",
+      "Bash(pkill:*)",
+      "Bash(xargs:*)",
+      "Bash(ls:*)"
+    ]
+  }
+}

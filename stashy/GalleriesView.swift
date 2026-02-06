@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import AVKit
 
 struct GalleriesView: View {
     @StateObject private var viewModel = StashDBViewModel()
@@ -458,6 +459,49 @@ struct GalleryCardView: View {
     }
 }
 
+struct GalleryItemVideoPlayer: View {
+    let url: URL
+    @State private var player: AVPlayer?
+    let isCurrent: Bool
+    
+    var body: some View {
+        ZStack {
+            if let player = player {
+                VideoPlayerView(player: player, isFullscreen: .constant(false))
+                    .onAppear {
+                        if isCurrent {
+                            player.play()
+                        }
+                    }
+            } else {
+                ProgressView()
+                    .tint(.white)
+            }
+        }
+        .onAppear {
+            if player == nil {
+                let signed = signedURL(url) ?? url
+                let asset = AVURLAsset(url: signed, options: ["AVURLAssetHTTPHeaderFieldsKey": ["ApiKey": ServerConfigManager.shared.activeConfig?.secureApiKey ?? ""]])
+                let playerItem = AVPlayerItem(asset: asset)
+                player = AVPlayer(playerItem: playerItem)
+                if isCurrent {
+                    player?.play()
+                }
+            }
+        }
+        .onDisappear {
+            player?.pause()
+            player = nil
+        }
+        .onChange(of: isCurrent) { _, newValue in
+            if newValue {
+                player?.play()
+            } else {
+                player?.pause()
+            }
+        }
+    }
+}
 
 struct FullScreenImageView: View {
     @Binding var images: [StashImage]
@@ -474,26 +518,32 @@ struct FullScreenImageView: View {
             // Image Pager
             TabView(selection: $selectedImageId) {
                 ForEach(images) { image in
-                    ZoomableScrollView {
-                        if let url = image.imageURL {
-                            CustomAsyncImage(url: url) { loader in
-                                if let data = loader.imageData, isGIF(data) {
-                                    GIFView(data: data)
-                                        .frame(maxWidth: .infinity)
-                                } else if let img = loader.image {
-                                    img
-                                        .resizable()
-                                        .scaledToFit()
-                                } else if loader.isLoading {
-                                    ProgressView()
-                                        .tint(.white)
-                                } else {
-                                    VStack(spacing: 12) {
-                                        Image(systemName: "exclamationmark.triangle")
-                                            .font(.largeTitle)
-                                            .foregroundColor(.white)
-                                        Text("Failed to load image")
-                                            .foregroundColor(.white)
+                    Group {
+                        if image.isVideo, let url = image.imageURL {
+                            GalleryItemVideoPlayer(url: url, isCurrent: selectedImageId == image.id)
+                        } else {
+                            ZoomableScrollView {
+                                if let url = image.imageURL {
+                                    CustomAsyncImage(url: url) { loader in
+                                        if let data = loader.imageData, isGIF(data) {
+                                            GIFView(data: data)
+                                                .frame(maxWidth: .infinity)
+                                        } else if let img = loader.image {
+                                            img
+                                                .resizable()
+                                                .scaledToFit()
+                                        } else if loader.isLoading {
+                                            ProgressView()
+                                                .tint(.white)
+                                        } else {
+                                            VStack(spacing: 12) {
+                                                Image(systemName: "exclamationmark.triangle")
+                                                    .font(.largeTitle)
+                                                    .foregroundColor(.white)
+                                                Text("Failed to load image")
+                                                    .foregroundColor(.white)
+                                            }
+                                        }
                                     }
                                 }
                             }

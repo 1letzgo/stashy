@@ -278,6 +278,17 @@ struct ImageThumbnailCard: View {
                     .frame(width: geometry.size.width, height: geometry.size.height)
                     .clipped()
                     
+                    // Video Play Icon Overlay
+                    if image.isVideo {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 30))
+                            .foregroundColor(.white)
+                            .padding(12)
+                            .background(Color.black.opacity(0.4))
+                            .clipShape(Circle())
+                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    }
+                    
                     // Gradient Overlay
                     LinearGradient(
                         gradient: Gradient(colors: [.clear, .black.opacity(0.8)]),
