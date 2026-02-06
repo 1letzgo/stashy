@@ -23,6 +23,7 @@ struct SceneDetailView: View {
     @State private var player: AVPlayer?
     @State private var showDeleteWithFilesConfirmation = false
     @State private var isDeleting = false
+    @State private var isDownloading = false
     @Environment(\.dismiss) var dismiss
     @EnvironmentObject var coordinator: NavigationCoordinator
 
@@ -57,11 +58,22 @@ struct SceneDetailView: View {
                         Circle()
                             .stroke(appearanceManager.tintColor.opacity(0.3), lineWidth: 2.5)
                         
-                        Circle()
-                            .trim(from: 0, to: activeDownload.progress)
-                            .stroke(appearanceManager.tintColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                            .rotationEffect(.degrees(-90))
-                            .animation(.linear, value: activeDownload.progress)
+                        // If we have a total size > 0, show determinate progress
+                        if activeDownload.totalSize > 0 {
+                            Circle()
+                                .trim(from: 0, to: activeDownload.progress)
+                                .stroke(appearanceManager.tintColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                                .animation(.linear, value: activeDownload.progress)
+                        } else {
+                            // Indeterminate state: Show a rotating segment
+                            Circle()
+                                .trim(from: 0, to: 0.25)
+                                .stroke(appearanceManager.tintColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                                .rotationEffect(.degrees(isDownloading ? 360 : 0))
+                                .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: isDownloading)
+                                .onAppear { isDownloading = true }
+                        }
                     }
                     .frame(width: 18, height: 18)
                 } else {

@@ -412,59 +412,78 @@ struct TabOrderView: View {
     @State private var newRowTitle = ""
     @State private var selectedFilterId = ""
     @State private var navigateToDashboard = false
+    @State private var navigateToReelsModes = false
     @EnvironmentObject var viewModel: StashDBViewModel
     
     var body: some View {
         List {
             Section("Dashboard") {
-                HStack {
-                    Label("Configure Dashboard", systemImage: "uiwindow.split.2x1")
-                    Spacer()
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundColor(.secondary)
+                Button(action: { navigateToDashboard = true }) {
+                    HStack {
+                        Label("Configure Dashboard", systemImage: "uiwindow.split.2x1")
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.bold())
+                            .foregroundColor(.secondary)
+                    }
                 }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    navigateToDashboard = true
-                }
-            }
-            .navigationDestination(isPresented: $navigateToDashboard) {
-                DashboardSettingsView()
+                .buttonStyle(.plain)
+                .background(
+                    NavigationLink("", destination: DashboardSettingsView(), isActive: $navigateToDashboard)
+                        .hidden()
+                )
             }
             
-            Section("Optional Tabs") {
+            Section("StashTok (Reels)") {
                 tabToggle(for: .reels)
+                if tabManager.tabs.first(where: { $0.id == .reels })?.isVisible == true {
+                    Button(action: { navigateToReelsModes = true }) {
+                        HStack {
+                            Label("Configure Modes & Sorting", systemImage: "slider.horizontal.3")
+                                .foregroundColor(appearanceManager.tintColor)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.bold())
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .background(
+                        NavigationLink("", destination: ReelsModeSettingsView(), isActive: $navigateToReelsModes)
+                            .hidden()
+                    )
+                }
+            }
+            
+            Section("Other Tabs") {
                 tabToggle(for: .downloads)
             }
             
-            Section {
-                // Fixed Dashboard Row
+            Section("Home Content Order") {
+                // Fixed Dashboard Row - always visible and at top
                 HStack {
                     Label(AppTab.dashboard.title, systemImage: AppTab.dashboard.icon)
                     Spacer()
-                    Toggle("", isOn: .constant(true))
-                        .labelsHidden()
-                        .disabled(true)
+                    Image(systemName: "line.3.horizontal")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
                 }
-                .tint(appearanceManager.tintColor)
 
                 ForEach(catalogueSubTabs) { tab in
-                    Toggle(isOn: Binding(
-                        get: { tab.isVisible },
-                        set: { _ in tabManager.toggle(tab.id) }
-                    )) {
+                    HStack {
                         Label(tab.id.title, systemImage: tab.id.icon)
+                        Spacer()
+                        Toggle("", isOn: Binding(
+                            get: { tab.isVisible },
+                            set: { _ in tabManager.toggle(tab.id) }
+                        ))
+                        .labelsHidden()
+                        .tint(appearanceManager.tintColor)
                     }
-                    .tint(appearanceManager.tintColor)
                 }
                 .onMove { indices, newOffset in
                     tabManager.moveSubTab(from: indices, to: newOffset, within: .catalogue)
                 }
-            } header: {
-                Text("Home Content")
-            } footer: {
-                Text("The first visible item in this list is the default view. Enabling multiple items shows a switcher.")
             }
         }
         .listStyle(.insetGrouped)
@@ -521,6 +540,93 @@ struct DashboardSettingsView: View {
         .navigationTitle("Dashboard Settings")
     }
 }
+
+// Dedicated View for Reels Mode Settings
+struct ReelsModeSettingsView: View {
+    @ObservedObject var tabManager = TabManager.shared
+    @ObservedObject var appearanceManager = AppearanceManager.shared
+    
+    var body: some View {
+        List {
+            Section {
+                ForEach(tabManager.reelsModes) { modeConfig in
+                    DisclosureGroup {
+                        if modeConfig.isEnabled {
+                            HStack {
+                                Text("Default Sort")
+                                    .font(.subheadline)
+                                    .foregroundColor(.secondary)
+                                Spacer()
+                                
+                                switch modeConfig.type {
+                                case .scenes:
+                                    Picker("", selection: Binding(
+                                        get: { StashDBViewModel.SceneSortOption(rawValue: tabManager.getReelsDefaultSort(for: .scenes) ?? "") ?? .random },
+                                        set: { tabManager.setReelsDefaultSort(for: .scenes, option: $0.rawValue) }
+                                    )) {
+                                        ForEach(StashDBViewModel.SceneSortOption.allCases, id: \.self) { option in
+                                            Text(option.displayName).tag(option)
+                                        }
+                                    }
+                                    .pickerStyle(.menu)
+                                    
+                                case .markers:
+                                    Picker("", selection: Binding(
+                                        get: { StashDBViewModel.SceneMarkerSortOption(rawValue: tabManager.getReelsDefaultSort(for: .markers) ?? "") ?? .random },
+                                        set: { tabManager.setReelsDefaultSort(for: .markers, option: $0.rawValue) }
+                                    )) {
+                                        ForEach(StashDBViewModel.SceneMarkerSortOption.allCases, id: \.self) { option in
+                                            Text(option.displayName).tag(option)
+                                        }
+                                    }
+                                    .pickerStyle(.menu)
+                                    
+                                case .clips:
+                                    Picker("", selection: Binding(
+                                        get: { StashDBViewModel.ImageSortOption(rawValue: tabManager.getReelsDefaultSort(for: .clips) ?? "") ?? .random },
+                                        set: { tabManager.setReelsDefaultSort(for: .clips, option: $0.rawValue) }
+                                    )) {
+                                        ForEach(StashDBViewModel.ImageSortOption.allCases, id: \.self) { option in
+                                            Text(option.displayName).tag(option)
+                                        }
+                                    }
+                                    .pickerStyle(.menu)
+                                }
+                            }
+                            .padding(.vertical, 4)
+                        } else {
+                            Text("Enable this mode to configure sorting.")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    } label: {
+                        HStack {
+                            Label(modeConfig.type.defaultTitle, systemImage: modeConfig.type.icon)
+                            Spacer()
+                            Toggle("", isOn: Binding(
+                                get: { modeConfig.isEnabled },
+                                set: { _ in tabManager.toggleReelsMode(modeConfig.type) }
+                            ))
+                            .labelsHidden()
+                            .tint(appearanceManager.tintColor)
+                        }
+                    }
+                }
+                .onMove { indices, newOffset in
+                    tabManager.moveReelsMode(from: indices, to: newOffset)
+                }
+            } header: {
+                Text("Reels Modes Order")
+            } footer: {
+                Text("The first enabled mode will be shown by default. Reorder to change the sequence in the switcher.")
+            }
+        }
+        .listStyle(.insetGrouped)
+        .environment(\.editMode, .constant(.active))
+        .navigationTitle("StashTok Modes")
+    }
+}
+
 
 // Subview for Default Sort Options
 struct TabDefaultSortView: View {
@@ -617,16 +723,10 @@ struct TabDefaultSortView: View {
                 .labelsHidden()
                 
             case .reels:
-                Picker("", selection: Binding(
-                    get: { StashDBViewModel.SceneSortOption(rawValue: tabManager.getPersistentSortOption(for: tab) ?? "") ?? .random },
-                    set: { tabManager.setPersistentSortOption(for: tab, option: $0.rawValue) }
-                )) {
-                    ForEach(StashDBViewModel.SceneSortOption.allCases, id: \.self) { option in
-                        Text(option.displayName).tag(option)
-                    }
+                NavigationLink(destination: ReelsModeSettingsView()) {
+                    Text("Configure per Mode in StashTok Settings")
+                        .font(.subheadline)
                 }
-                .pickerStyle(.menu)
-                .labelsHidden()
 
             case .images:
                 Picker("", selection: Binding(

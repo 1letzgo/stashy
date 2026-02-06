@@ -53,19 +53,29 @@ struct DownloadsView: View {
                                     .font(.headline)
                                     .padding(.horizontal)
                                 
-                                ForEach(Array(downloadManager.activeDownloads.values), id: \.id) { download in
+                                ForEach(Array(downloadManager.activeDownloads.values).sorted { $0.title < $1.title }, id: \.id) { download in
                                     VStack(alignment: .leading, spacing: 6) {
                                         Text(download.title)
                                             .font(.subheadline)
                                             .fontWeight(.medium)
                                             .lineLimit(1)
                                         
-                                        ProgressView(value: download.progress)
-                                            .tint(appearanceManager.tintColor)
-                                        
-                                        Text("\(Int(download.progress * 100))%")
-                                            .font(.caption2)
-                                            .foregroundColor(.secondary)
+                                        if download.totalSize > 0 {
+                                            ProgressView(value: download.progress)
+                                                .tint(appearanceManager.tintColor)
+                                            
+                                            Text("\(Int(download.progress * 100))%")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        } else {
+                                            ProgressView()
+                                                .progressViewStyle(.linear)
+                                                .tint(appearanceManager.tintColor)
+                                            
+                                            Text("\(ByteCountFormatter.string(fromByteCount: download.downloadedSize, countStyle: .file)) downloaded")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                        }
                                     }
                                     .padding()
                                     .background(Color(UIColor.systemBackground))

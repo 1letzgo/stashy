@@ -10,7 +10,8 @@
       "Bash(tee:*)",
       "Bash(pkill:*)",
       "Bash(xargs:*)",
-      "Bash(ls:*)"
+      "Bash(ls:*)",
+      "Bash(wc:*)"
     ]
   }
 }

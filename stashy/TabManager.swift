@@ -156,12 +156,45 @@ enum HomeRowType: String, Codable {
     }
 }
 
+// MARK: - Reels Mode Configuration
+enum ReelsModeType: String, Codable, CaseIterable {
+    case scenes
+    case markers
+    case clips
+    
+    var defaultTitle: String {
+        switch self {
+        case .scenes: return "Scenes"
+        case .markers: return "Markers"
+        case .clips: return "Clips"
+        }
+    }
+    
+    var icon: String {
+        switch self {
+        case .scenes: return "film"
+        case .markers: return "bookmark.fill"
+        case .clips: return "photo.on.rectangle.angled"
+        }
+    }
+}
+
+struct ReelsModeConfig: Codable, Identifiable, Equatable {
+    let id: UUID
+    var type: ReelsModeType
+    var isEnabled: Bool
+    var sortOrder: Int
+    var defaultSortOption: String?
+}
+
+
 class TabManager: ObservableObject {
     static let shared = TabManager()
     
     @Published var tabs: [TabConfig] = []
     @Published var detailViews: [DetailViewConfig] = []
     @Published var homeRows: [HomeRowConfig] = []
+    @Published var reelsModes: [ReelsModeConfig] = []
     
     // Session-only sort options (not persisted)
     private var sessionSortOptions: [AppTab: String] = [:]
@@ -170,6 +203,7 @@ class TabManager: ObservableObject {
     private let userDefaultsKey = "AppTabsConfig"
     private let detailSortKey = "DetailViewsSortConfig"
     private let homeRowsKey = "HomeRowsConfig"
+    private let reelsModesKey = "ReelsModesConfig"
     
     init() {
         // Initial load based on currently active server
@@ -188,6 +222,7 @@ class TabManager: ObservableObject {
         loadConfig()
         loadDetailConfigs()
         loadHomeRows()
+        loadReelsModes()
     }
     
     private var currentServerSuffix: String {
@@ -454,6 +489,99 @@ class TabManager: ObservableObject {
         // Deprecated
     }
     
+    // MARK: - Reels Mode Configuration
+    
+    func loadReelsModes() {
+        let suffix = currentServerSuffix
+        let serverSpecificKey = "\(reelsModesKey)\(suffix)"
+        
+        var data = UserDefaults.standard.data(forKey: serverSpecificKey)
+        
+        // Migration
+        if data == nil && !suffix.isEmpty {
+            data = UserDefaults.standard.data(forKey: reelsModesKey)
+            if let legacyData = data {
+                UserDefaults.standard.set(legacyData, forKey: serverSpecificKey)
+            }
+        }
+        
+        if let data = data,
+           let decoded = try? JSONDecoder().decode([ReelsModeConfig].self, from: data) {
+            self.reelsModes = decoded.sorted { $0.sortOrder < $1.sortOrder }
+            
+            // Ensure all modes exist (migration for new modes)
+            var hasChanges = false
+            for modeType in ReelsModeType.allCases {
+                if !reelsModes.contains(where: { $0.type == modeType }) {
+                    let newMode = ReelsModeConfig(
+                        id: UUID(),
+                        type: modeType,
+                        isEnabled: true,
+                        sortOrder: reelsModes.count
+                    )
+                    reelsModes.append(newMode)
+                    hasChanges = true
+                }
+            }
+            if hasChanges {
+                saveReelsModes()
+            }
+        } else {
+            // Default Reels Modes
+            self.reelsModes = [
+                ReelsModeConfig(id: UUID(), type: .scenes, isEnabled: true, sortOrder: 0),
+                ReelsModeConfig(id: UUID(), type: .markers, isEnabled: true, sortOrder: 1),
+                ReelsModeConfig(id: UUID(), type: .clips, isEnabled: true, sortOrder: 2)
+            ]
+            saveReelsModes()
+        }
+    }
+    
+    func saveReelsModes() {
+        if let encoded = try? JSONEncoder().encode(reelsModes) {
+            let key = "\(reelsModesKey)\(currentServerSuffix)"
+            UserDefaults.standard.set(encoded, forKey: key)
+        }
+    }
+    
+    func toggleReelsMode(_ type: ReelsModeType) {
+        // Don't allow disabling all modes
+        let enabledCount = reelsModes.filter { $0.isEnabled }.count
+        if let index = reelsModes.firstIndex(where: { $0.type == type }) {
+            if reelsModes[index].isEnabled && enabledCount <= 1 {
+                return // Can't disable the last mode
+            }
+            reelsModes[index].isEnabled.toggle()
+            saveReelsModes()
+        }
+    }
+    
+    func moveReelsMode(from source: IndexSet, to destination: Int) {
+        reelsModes.move(fromOffsets: source, toOffset: destination)
+        for i in 0..<reelsModes.count {
+            reelsModes[i].sortOrder = i
+        }
+        saveReelsModes()
+    }
+    
+    var enabledReelsModes: [ReelsModeType] {
+        reelsModes
+            .filter { $0.isEnabled }
+            .sorted { $0.sortOrder < $1.sortOrder }
+            .map { $0.type }
+    }
+    
+    func getReelsDefaultSort(for type: ReelsModeType) -> String? {
+        return reelsModes.first(where: { $0.type == type })?.defaultSortOption
+    }
+    
+    func setReelsDefaultSort(for type: ReelsModeType, option: String) {
+        if let index = reelsModes.firstIndex(where: { $0.type == type }) {
+            reelsModes[index].defaultSortOption = option
+            saveReelsModes()
+        }
+    }
+
     func loadDetailConfigs() {
         let suffix = currentServerSuffix
         // Initialize default configs

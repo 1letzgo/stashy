@@ -199,34 +199,74 @@ extension View {
 struct GIFView: UIViewRepresentable {
     let data: Data
     
+    func makeCoordinator() -> Coordinator {
+        Coordinator()
+    }
+    
+    class Coordinator {
+        var lastDataHash: Int?
+    }
+    
     func makeUIView(context: Context) -> WKWebView {
-        let webView = WKWebView()
+        let config = WKWebViewConfiguration()
+        config.allowsInlineMediaPlayback = true
+        config.mediaTypesRequiringUserActionForPlayback = []
+        
+        let webView = WKWebView(frame: .zero, configuration: config)
         webView.isOpaque = false
         webView.backgroundColor = .clear
         webView.scrollView.isScrollEnabled = false
         webView.scrollView.contentInsetAdjustmentBehavior = .never
+        webView.isUserInteractionEnabled = false
         return webView
     }
     
     func updateUIView(_ uiView: WKWebView, context: Context) {
+        let currentHash = data.hashValue
+        if context.coordinator.lastDataHash == currentHash {
+            return
+        }
+        context.coordinator.lastDataHash = currentHash
+        
         let base64 = data.base64EncodedString()
         let html = """
+        <!DOCTYPE html>
         <html>
         <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <style>
-        body { margin: 0; padding: 0; background: transparent; display: flex; justify-content: center; align-items: center; height: 100vh; overflow: hidden; }
-        img { width: 100%; height: auto; max-height: 100%; object-fit: contain; }
-        </style>
+            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+            <style>
+                * { margin: 0; padding: 0; box-sizing: border-box; }
+                html, body {
+                    width: 100%;
+                    height: 100%;
+                    background-color: black;
+                    display: flex;
+                    justify-content: center;
+                    align-items: center;
+                    overflow: hidden;
+                }
+                img {
+                    width: 100%;
+                    height: auto;
+                    max-height: 100%;
+                    display: block;
+                    object-fit: contain;
+                    margin: 0 auto;
+                }
+            </style>
         </head>
         <body>
-        <img src="data:image/gif;base64,\(base64)">
+            <img src="data:image/gif;base64,\(base64)">
         </body>
         </html>
         """
         uiView.loadHTMLString(html, baseURL: nil)
     }
 }
+
+
+
+
 
 /// A wrapper around UIScrollView that provides pinch-to-zoom and panning for any SwiftUI view.
 struct ZoomableScrollView<Content: View>: UIViewRepresentable {

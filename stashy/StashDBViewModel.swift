@@ -50,6 +50,7 @@ class StashDBViewModel: ObservableObject {
         case performers = "PERFORMERS"
         case studios = "STUDIOS"
         case galleries = "GALLERIES"
+        case images = "IMAGES"
         case tags = "TAGS"
         case sceneMarkers = "SCENE_MARKERS"
         case unknown = "UNKNOWN"
@@ -2470,6 +2471,108 @@ class StashDBViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Clips Logic
+    
+    @Published var clips: [StashImage] = []
+    @Published var totalClips: Int = 0
+    @Published var isLoadingClips = false
+    @Published var hasMoreClips = true
+    private var currentClipsPage = 1
+    private var currentClipSortOption: ImageSortOption = .dateDesc
+    private var currentClipFilter: SavedFilter?
+    
+    func fetchClips(sortBy: ImageSortOption = .dateDesc, filter: SavedFilter? = nil, isInitialLoad: Bool = true) {
+        if isInitialLoad {
+            currentClipsPage = 1
+            clips = []
+            totalClips = 0
+            isLoadingClips = true
+            hasMoreClips = true
+            currentClipSortOption = sortBy
+            currentClipFilter = filter
+        } else {
+            isLoadingClips = true
+        }
+        
+        let page = isInitialLoad ? 1 : currentClipsPage + 1
+        
+        // Filter for video-like extensions
+        // Regex: .*\.(mp4|gif|mov|webm|m4v)$ (case insensitive usually requires flags, but Stash regex is Go-flavor? or PCRE?)
+        // Stash uses Go regex. (?i) is case insensitive.
+        let videoRegex = "(?i).*\\.(mp4|gif|mov|webm|m4v|mkv)$"
+        
+        let query = GraphQLQueries.queryWithFragments("findImages")
+        
+        // Build image filter, starting with video regex
+        var imageFilter: [String: Any] = [
+            "path": [
+                "value": videoRegex,
+                "modifier": "MATCHES_REGEX"
+            ]
+        ]
+        
+        // Merge with saved filter if provided
+        if let savedFilter = filter {
+            if let dict = savedFilter.filterDict {
+                let sanitized = sanitizeFilter(dict)
+                for (key, value) in sanitized {
+                    if key != "path" { // Don't override our video filter
+                        imageFilter[key] = value
+                    }
+                }
+            } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
+                let sanitized = sanitizeFilter(objDict)
+                for (key, value) in sanitized {
+                    if key != "path" {
+                        imageFilter[key] = value
+                    }
+                }
+            }
+        }
+        
+        let variables: [String: Any] = [
+            "filter": [
+                "page": page,
+                "per_page": 20,
+                "sort": currentClipSortOption.sortField,
+                "direction": currentClipSortOption.direction
+            ],
+            "image_filter": imageFilter
+        ]
+        
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            return
+        }
+        
+        performGraphQLQuery(query: bodyString) { (response: GalleryImagesResponse?) in
+            if let result = response?.data?.findImages {
+                DispatchQueue.main.async {
+                    if isInitialLoad {
+                        self.clips = result.images
+                        self.totalClips = result.count
+                    } else {
+                        self.clips.append(contentsOf: result.images)
+                    }
+                    
+                    self.hasMoreClips = result.images.count == 20
+                    self.currentClipsPage = page
+                    self.isLoadingClips = false
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.isLoadingClips = false
+                }
+            }
+        }
+    }
+    
+    func loadMoreClips() {
+        if !isLoadingClips && hasMoreClips {
+            fetchClips(sortBy: currentClipSortOption, filter: currentClipFilter, isInitialLoad: false)
+        }
+    }
+
     func deleteImage(imageId: String, completion: @escaping (Bool) -> Void) {
         let mutation = """
         {
@@ -2755,6 +2858,69 @@ struct GenerateData: Codable {
         
         performGraphQLQuery(query: bodyString) { (response: TagUpdateResponse?) in
             if let _ = response?.data?.tagUpdate {
+                completion(true)
+            } else {
+                completion(false)
+            }
+        }
+    }
+    
+    func showScene(sceneId: String) {
+        // Implement logic to show scene details or play it
+        print("Show scene not implemented")
+    }
+
+    func updateImageRating(imageId: String, rating100: Int?, completion: @escaping (Bool) -> Void) {
+        let mutation = """
+        mutation ImageUpdate($input: ImageUpdateInput!) {
+            imageUpdate(input: $input) { id rating100 }
+        }
+        """
+        
+        let variables: [String: Any] = [
+            "input": [
+                "id": imageId,
+                "rating100": rating100
+            ]
+        ]
+        
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false)
+            return
+        }
+        
+        performGraphQLQuery(query: bodyString) { (response: ImageUpdateResponse?) in
+            if let _ = response?.data?.imageUpdate {
+                completion(true)
+            } else {
+                completion(false)
+            }
+        }
+    }
+
+    func updateImageOCounter(imageId: String, oCounter: Int?, completion: @escaping (Bool) -> Void) {
+        let mutation = """
+        mutation ImageUpdate($input: ImageUpdateInput!) {
+            imageUpdate(input: $input) { id o_counter }
+        }
+        """
+        
+        let variables: [String: Any] = [
+            "input": [
+                "id": imageId,
+                "o_counter": oCounter
+            ]
+        ]
+        
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false)
+            return
+        }
+        
+        performGraphQLQuery(query: bodyString) { (response: ImageUpdateResponse?) in
+            if let _ = response?.data?.imageUpdate {
                 completion(true)
             } else {
                 completion(false)
@@ -3099,6 +3265,17 @@ struct SceneUpdateResponse: Codable {
 }
 struct SceneUpdateData: Codable {
     let sceneUpdate: UpdatedItem?
+}
+
+struct ImageUpdateResponse: Codable {
+    let data: ImageUpdateData?
+}
+struct ImageUpdateData: Codable {
+    let imageUpdate: ImageRatingUpdateItem?
+}
+struct ImageRatingUpdateItem: Codable {
+    let id: String
+    let rating100: Int?
 }
 
 struct PerformerUpdateResponse: Codable {
@@ -3500,7 +3677,7 @@ struct Scene: Codable, Identifiable {
         if !isOriginalCompatible {
             if let anyMP4 = streams?.first(where: { $0.mime_type == "video/mp4" && !$0.label.lowercased().contains("mkv") }),
                let url = URL(string: anyMP4.url) {
-                return signed(url)
+                return signedURL(url)
             }
         }
         
@@ -4284,6 +4461,8 @@ struct GalleryPerformer: Codable, Identifiable {
 
 struct ImageFile: Codable {
     let path: String
+    let height: Int?
+    let width: Int?
 }
 
 struct ImageGallery: Codable, Identifiable {
@@ -4319,6 +4498,9 @@ struct FindImagesResult: Codable {
 struct StashImage: Codable, Identifiable {
     let id: String
     let title: String?
+    let rating100: Int?
+    let o_counter: Int?
+    let organized: Bool?
     let date: String?
     let paths: ImagePaths?
     // let files: [ImageFile]?
@@ -4326,9 +4508,10 @@ struct StashImage: Codable, Identifiable {
     let performers: [GalleryPerformer]?
     let studio: GalleryStudio?
     let galleries: [ImageGallery]?
+    let tags: [Tag]?
     
     enum CodingKeys: String, CodingKey {
-        case id, title, date, paths, performers, studio, galleries, visual_files
+        case id, title, rating100, o_counter, organized, date, paths, performers, studio, galleries, visual_files, tags
     }
     
     var isVideo: Bool {
@@ -4358,6 +4541,41 @@ struct StashImage: Codable, Identifiable {
         guard let dateString = date else { return "" }
         return dateString
     }
+    
+    func withRating(_ rating: Int?) -> StashImage {
+        return StashImage(
+            id: id,
+            title: title,
+            rating100: rating,
+            o_counter: o_counter,
+            organized: organized,
+            date: date,
+            paths: paths,
+            visual_files: visual_files,
+            performers: performers,
+            studio: studio,
+            galleries: galleries,
+            tags: tags
+        )
+    }
+
+    func withOCounter(_ count: Int?) -> StashImage {
+        return StashImage(
+            id: id,
+            title: title,
+            rating100: rating100,
+            o_counter: count,
+            organized: organized,
+            date: date,
+            paths: paths,
+            visual_files: visual_files,
+            performers: performers,
+            studio: studio,
+            galleries: galleries,
+            tags: tags
+        )
+    }
+
     
     var thumbnailURL: URL? {
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
@@ -4460,6 +4678,8 @@ struct ActiveDownload {
     let id: String
     let title: String
     var progress: Double
+    var totalSize: Int64
+    var downloadedSize: Int64
 }
 
 private final class DownloadTaskMap: @unchecked Sendable {
@@ -4493,7 +4713,7 @@ class DownloadManager: NSObject, ObservableObject {
     private let metadataFile = "downloads_metadata.json"
     
     private nonisolated let taskMap = DownloadTaskMap()
-    private var progressHandlers: [String: (Double) -> Void] = [:]
+    private var progressHandlers: [String: (Double, Int64, Int64) -> Void] = [:]
     private var completionHandlers: [String: (Bool) -> Void] = [:]
     
     private lazy var session: URLSession = {
@@ -4574,7 +4794,7 @@ class DownloadManager: NSObject, ObservableObject {
         
         // Mark as started
         DispatchQueue.main.async {
-            self.activeDownloads[sceneId] = ActiveDownload(id: sceneId, title: title, progress: 0.05)
+            self.activeDownloads[sceneId] = ActiveDownload(id: sceneId, title: title, progress: 0.05, totalSize: 0, downloadedSize: 0)
         }
         
         let sceneFolder = downloadsFolder.appendingPathComponent(sceneId, isDirectory: true)
@@ -4587,7 +4807,7 @@ class DownloadManager: NSObject, ObservableObject {
         // 1. Download Thumbnail
         if let thumbURL = scene.thumbnailURL {
             dispatchGroup.enter()
-            downloadFile(id: sceneId + "_thumb", from: thumbURL, to: sceneFolder.appendingPathComponent("thumbnail.jpg")) { _ in } completion: { success in
+            downloadFile(id: sceneId + "_thumb", from: thumbURL, to: sceneFolder.appendingPathComponent("thumbnail.jpg")) { _, _, _ in } completion: { success in
                 dispatchGroup.leave()
             }
         }
@@ -4595,11 +4815,20 @@ class DownloadManager: NSObject, ObservableObject {
         // 2. Download Video (Uses downloadURL which prefers MP4 transcoded stream)
         if let videoURL = scene.downloadURL {
             dispatchGroup.enter()
-            downloadFile(id: sceneId, from: videoURL, to: sceneFolder.appendingPathComponent("video.mp4")) { progress in
-                DispatchQueue.main.async {
-                    // Map video progress (0-1) to overall progress (0.1 - 1.0)
-                    self.activeDownloads[sceneId]?.progress = 0.1 + (progress * 0.9)
-                    self.objectWillChange.send() // Explicitly trigger UI update
+            
+            // Initialize with size info
+            self.activeDownloads[sceneId] = ActiveDownload(id: sceneId, title: title, progress: 0.1, totalSize: 0, downloadedSize: 0)
+            
+            downloadFile(id: sceneId, from: videoURL, to: sceneFolder.appendingPathComponent("video.mp4")) { progress, written, total in
+                // Update progress
+                Task { @MainActor in
+                    if var activeDownload = self.activeDownloads[sceneId] {
+                        activeDownload.progress = 0.1 + (progress * 0.9)
+                        activeDownload.downloadedSize = written
+                        activeDownload.totalSize = total
+                        self.activeDownloads[sceneId] = activeDownload
+                        self.objectWillChange.send() // Explicitly trigger UI update
+                    }
                 }
             } completion: { success in
                 videoSuccess = success
@@ -4633,7 +4862,7 @@ class DownloadManager: NSObject, ObservableObject {
         }
     }
     
-    private func downloadFile(id: String, from url: URL, to destination: URL, progressHandler: @escaping (Double) -> Void, completion: @escaping (Bool) -> Void) {
+    private func downloadFile(id: String, from url: URL, to destination: URL, progressHandler: @escaping (Double, Int64, Int64) -> Void, completion: @escaping (Bool) -> Void) {
         var request = URLRequest(url: url)
         
         if let config = ServerConfigManager.shared.loadConfig(),
@@ -4699,11 +4928,19 @@ extension DownloadManager: URLSessionDownloadDelegate {
     }
     
     nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        let progress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+        let progress: Double
+        if totalBytesExpectedToWrite > 0 {
+            progress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+        } else {
+            progress = 0.0
+        }
+        
+        // Debug log moved to check if needed, but keeping logic clean first
+        // print("📥 Download Progress: \(totalBytesWritten) / \(totalBytesExpectedToWrite) (...)")
         
         if let (id, _) = taskMap.get(downloadTask.taskIdentifier) {
             Task { @MainActor in
-                self.progressHandlers[id]?(progress)
+                self.progressHandlers[id]?(progress, totalBytesWritten, totalBytesExpectedToWrite)
             }
         }
     }

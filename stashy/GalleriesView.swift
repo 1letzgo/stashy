@@ -7,6 +7,7 @@
 
 import SwiftUI
 import AVKit
+import AVFoundation
 
 struct GalleriesView: View {
     @StateObject private var viewModel = StashDBViewModel()
@@ -461,43 +462,209 @@ struct GalleryCardView: View {
 
 struct GalleryItemVideoPlayer: View {
     let url: URL
-    @State private var player: AVPlayer?
     let isCurrent: Bool
+    
+    // Playback State
+    @State private var player: AVQueuePlayer?
+    @State private var playerLooper: AVPlayerLooper?
+    @State private var isPlaying = false
+    @Binding var isMuted: Bool
+    @State private var showControls = false
+    @State private var controlsTimer: Timer?
+    
+    @State private var currentTime: Double = 0
+    @State private var duration: Double = 1
+    @State private var isSeeking = false
+    @State private var timeObserver: Any?
+    
+    @Environment(\.scenePhase) var scenePhase // Observe app state
     
     var body: some View {
         ZStack {
             if let player = player {
-                VideoPlayerView(player: player, isFullscreen: .constant(false))
+                FullScreenVideoPlayer(player: player as AVPlayer, videoGravity: .resizeAspect)
                     .onAppear {
                         if isCurrent {
-                            player.play()
+                            // Ensure playback starts when view appears and is current
+                            DispatchQueue.main.async {
+                                player.playImmediately(atRate: 1.0)
+                            }
+                        }
+                    }
+                    .onTapGesture {
+                        withAnimation {
+                            showControls.toggle()
+                            if showControls {
+                                resetControlsTimer()
+                            }
+                        }
+                        // Toggle playback on tap
+                        if isPlaying {
+                            player.pause()
+                            isPlaying = false
+                        } else {
+                            player.playImmediately(atRate: 1.0)
+                            isPlaying = true
                         }
                     }
             } else {
                 ProgressView()
                     .tint(.white)
             }
-        }
-        .onAppear {
-            if player == nil {
-                let signed = signedURL(url) ?? url
-                let asset = AVURLAsset(url: signed, options: ["AVURLAssetHTTPHeaderFieldsKey": ["ApiKey": ServerConfigManager.shared.activeConfig?.secureApiKey ?? ""]])
-                let playerItem = AVPlayerItem(asset: asset)
-                player = AVPlayer(playerItem: playerItem)
-                if isCurrent {
-                    player?.play()
+            
+            // Center Play Icon (Stashtok style)
+            if !isPlaying {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 60))
+                            .foregroundColor(.white.opacity(0.7))
+                            .shadow(radius: 10)
+                        Spacer()
+                    }
+                    Spacer()
+                }
+                .contentShape(Rectangle())
+                .onTapGesture {
+                    isPlaying = true
+                    player?.playImmediately(atRate: 1.0)
+                    resetControlsTimer()
+                }
+            }
+            
+            // Overlay Controls
+            ZStack(alignment: .bottomLeading) {
+                
+                // Mute Button removed from here (moved to parent)
+                VStack(alignment: .trailing, spacing: 20) {
+                    Spacer()
+                    Spacer()
+                        .frame(height: 100) // Keep consistent position
+                }
+                .frame(maxWidth: .infinity, alignment: .bottomTrailing)
+                .padding(.trailing, 12)
+                
+                // Scrubber (Conditionally Visible)
+                if showControls || !isPlaying {
+                    VStack {
+                        Spacer()
+                        CustomVideoScrubber(
+                            value: Binding(get: { currentTime }, set: { val in
+                                currentTime = val
+                                seek(to: val)
+                            }),
+                            total: duration,
+                            onEditingChanged: { editing in
+                                isSeeking = editing
+                                if editing {
+                                    player?.pause()
+                                } else {
+                                    if isPlaying { player?.playImmediately(atRate: 1.0) }
+                                    resetControlsTimer()
+                                }
+                            }
+                        )
+                        .padding(.bottom, 20) // Increased padding to ensure visibility and touch area
+                        .padding(.horizontal, 10) // Ensure it doesn't touch edges
+                    }
                 }
             }
         }
+        .onAppear {
+            setupPlayer()
+        }
         .onDisappear {
-            player?.pause()
-            player = nil
+            cleanupPlayer()
         }
         .onChange(of: isCurrent) { _, newValue in
             if newValue {
-                player?.play()
+                // Use playImmediately for reliability, but async to be safe with swipe transitions
+                DispatchQueue.main.async {
+                    player?.playImmediately(atRate: 1.0)
+                }
+                isPlaying = true
             } else {
                 player?.pause()
+                isPlaying = false
+            }
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            switch newPhase {
+            case .active:
+                if isCurrent {
+                    player?.playImmediately(atRate: 1.0)
+                    isPlaying = true
+                }
+            case .background, .inactive:
+                player?.pause()
+                isPlaying = false
+            @unknown default:
+                break
+            }
+        }
+    }
+    
+    // MARK: - Helper Methods
+    
+    private func setupPlayer() {
+        if player == nil {
+            let signed = signedURL(url) ?? url
+            let asset = AVURLAsset(url: signed, options: ["AVURLAssetHTTPHeaderFieldsKey": ["ApiKey": ServerConfigManager.shared.activeConfig?.secureApiKey ?? ""]])
+            
+            // Generate player item
+            let playerItem = AVPlayerItem(asset: asset)
+            
+            let queuePlayer = AVQueuePlayer(playerItem: playerItem)
+            playerLooper = AVPlayerLooper(player: queuePlayer, templateItem: playerItem)
+            
+            player = queuePlayer
+            player?.isMuted = isMuted
+            
+            // Time Observer
+            let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
+            timeObserver = player?.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak player] time in
+                guard let player = player else { return }
+                if !self.isSeeking {
+                    self.currentTime = time.seconds
+                }
+                
+                if let d = player.currentItem?.duration.seconds, d > 0, !d.isNaN {
+                    self.duration = d
+                }
+            }
+            
+            if isCurrent {
+                // Initial playback
+                DispatchQueue.main.async {
+                    player?.playImmediately(atRate: 1.0)
+                }
+            }
+        }
+    }
+    
+    private func cleanupPlayer() {
+        player?.pause()
+        if let timeObserver = timeObserver {
+            player?.removeTimeObserver(timeObserver)
+            self.timeObserver = nil
+        }
+        player = nil
+        playerLooper = nil
+        controlsTimer?.invalidate()
+    }
+    
+    private func seek(to time: Double) {
+        let cmTime = CMTime(seconds: time, preferredTimescale: 600)
+        player?.seek(to: cmTime)
+    }
+    
+    private func resetControlsTimer() {
+        controlsTimer?.invalidate()
+        controlsTimer = Timer.scheduledTimer(withTimeInterval: 3.0, repeats: false) { _ in
+            withAnimation {
+                showControls = false
             }
         }
     }
@@ -510,93 +677,41 @@ struct FullScreenImageView: View {
     @StateObject private var viewModel = StashDBViewModel()
     @Environment(\.dismiss) var dismiss
     @State private var showingDeleteConfirmation = false
+    @State private var isMuted: Bool = !isHeadphonesConnected()
     
     var body: some View {
         ZStack {
             Color.black.edgesIgnoringSafeArea(.all)
             
             // Image Pager
-            TabView(selection: $selectedImageId) {
-                ForEach(images) { image in
-                    Group {
-                        if image.isVideo, let url = image.imageURL {
-                            GalleryItemVideoPlayer(url: url, isCurrent: selectedImageId == image.id)
-                        } else {
-                            ZoomableScrollView {
-                                if let url = image.imageURL {
-                                    CustomAsyncImage(url: url) { loader in
-                                        if let data = loader.imageData, isGIF(data) {
-                                            GIFView(data: data)
-                                                .frame(maxWidth: .infinity)
-                                        } else if let img = loader.image {
-                                            img
-                                                .resizable()
-                                                .scaledToFit()
-                                        } else if loader.isLoading {
-                                            ProgressView()
-                                                .tint(.white)
-                                        } else {
-                                            VStack(spacing: 12) {
-                                                Image(systemName: "exclamationmark.triangle")
-                                                    .font(.largeTitle)
-                                                    .foregroundColor(.white)
-                                                Text("Failed to load image")
-                                                    .foregroundColor(.white)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    .tag(image.id)
-                    .ignoresSafeArea()
-                }
-            }
-            .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
-            .ignoresSafeArea()
+            imagePager
+            
             
             // Metadata Overlay (Bottom) - StashTok Style
             if let image = images.first(where: { $0.id == selectedImageId }) {
-                VStack(alignment: .leading, spacing: 6) {
-                    Spacer()
+                VStack(alignment: .leading, spacing: 8) {
+                    // Row 1: Performer - Gallery
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        // Performer Link
+                        if let performers = image.performers, let firstPerf = performers.first {
+                            let performerObj = Performer(
+                                id: firstPerf.id, name: firstPerf.name, disambiguation: nil, birthdate: nil, country: nil, imagePath: nil, sceneCount: 0, galleryCount: nil, gender: nil, ethnicity: nil, height: nil, weight: nil, measurements: nil, fakeTits: nil, careerLength: nil, tattoos: nil, piercings: nil, aliasList: nil, favorite: nil, rating100: nil, createdAt: nil, updatedAt: nil
+                            )
+                            NavigationLink(destination: PerformerDetailView(performer: performerObj)) {
+                                Text(firstPerf.name)
+                                    .font(.system(size: 17, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                            }
+                            .buttonStyle(.plain)
 
-                    VStack(alignment: .leading, spacing: 8) {
-                        // Row 1: Performer - Gallery
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            // Performer Link
-                            if let performers = image.performers, let firstPerf = performers.first {
-                                let performerObj = Performer(
-                                    id: firstPerf.id, name: firstPerf.name, disambiguation: nil, birthdate: nil, country: nil, imagePath: nil, sceneCount: 0, galleryCount: nil, gender: nil, ethnicity: nil, height: nil, weight: nil, measurements: nil, fakeTits: nil, careerLength: nil, tattoos: nil, piercings: nil, aliasList: nil, favorite: nil, rating100: nil, createdAt: nil, updatedAt: nil
-                                )
-                                NavigationLink(destination: PerformerDetailView(performer: performerObj)) {
-                                    Text(firstPerf.name)
-                                        .font(.system(size: 17, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
-                                }
-                                .buttonStyle(.plain)
+                            // Gallery Link (optional)
+                            if let galleries = image.galleries, let gallery = galleries.first {
+                                Text("•")
+                                    .font(.system(size: 17, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
 
-                                // Gallery Link (optional)
-                                if let galleries = image.galleries, let gallery = galleries.first {
-                                    Text("•")
-                                        .font(.system(size: 17, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
-
-                                    let galleryObj = Gallery(id: gallery.id, title: gallery.title ?? "Gallery", date: nil, details: nil, imageCount: nil, organized: nil, createdAt: nil, updatedAt: nil, studio: nil, performers: nil, cover: nil)
-
-                                    NavigationLink(destination: ImagesView(gallery: galleryObj)) {
-                                        Text(gallery.title ?? "Unknown Gallery")
-                                            .font(.system(size: 17, weight: .bold))
-                                            .foregroundColor(.white)
-                                            .lineLimit(1)
-                                            .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            } else if let galleries = image.galleries, let gallery = galleries.first {
-                                // Nur Gallery, kein Performer
                                 let galleryObj = Gallery(id: gallery.id, title: gallery.title ?? "Gallery", date: nil, details: nil, imageCount: nil, organized: nil, createdAt: nil, updatedAt: nil, studio: nil, performers: nil, cover: nil)
 
                                 NavigationLink(destination: ImagesView(gallery: galleryObj)) {
@@ -608,19 +723,52 @@ struct FullScreenImageView: View {
                                 }
                                 .buttonStyle(.plain)
                             }
-                        }
+                        } else if let galleries = image.galleries, let gallery = galleries.first {
+                            // Nur Gallery, kein Performer
+                            let galleryObj = Gallery(id: gallery.id, title: gallery.title ?? "Gallery", date: nil, details: nil, imageCount: nil, organized: nil, createdAt: nil, updatedAt: nil, studio: nil, performers: nil, cover: nil)
 
-                        // Row 2: Title
-                        Text(image.title ?? "Image")
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(.white.opacity(0.9))
-                            .lineLimit(2)
-                            .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                            NavigationLink(destination: ImagesView(gallery: galleryObj)) {
+                                Text(gallery.title ?? "Unknown Gallery")
+                                    .font(.system(size: 17, weight: .bold))
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                    .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
-                    .padding(.horizontal, 16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                    // Row 2: Title
+                    Text(image.title ?? "Image")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.white.opacity(0.9))
+                        .lineLimit(2)
+                        .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
                 }
-                .padding(.bottom, 25)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 60) // Push up to avoid blocking scrubber
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                .allowsHitTesting(true) // Ensure buttons work, but frame should be transparent
+            }
+            
+            // Static Mute Button (Overlay)
+            if let currentImage = images.first(where: { $0.id == selectedImageId }), currentImage.isVideo {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button {
+                            isMuted.toggle()
+                        } label: {
+                            Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                                .font(.title2)
+                                .foregroundStyle(.white)
+                                .shadow(color: .black.opacity(0.5), radius: 3)
+                        }
+                        .padding(.trailing, 16)
+                        .padding(.bottom, 150)
+                    }
+                }
             }
         }
         .background(Color.black.edgesIgnoringSafeArea(.all))
@@ -643,6 +791,52 @@ struct FullScreenImageView: View {
             }
         } message: {
             Text("This image will be permanently deleted. This action cannot be undone.")
+        }
+    }
+    
+    @ViewBuilder
+    private var imagePager: some View {
+        TabView(selection: $selectedImageId) {
+            ForEach(images) { image in
+                imageContent(for: image)
+                    .tag(image.id)
+                    .ignoresSafeArea()
+            }
+        }
+        .tabViewStyle(PageTabViewStyle(indexDisplayMode: .never))
+        .ignoresSafeArea()
+    }
+    
+    @ViewBuilder
+    private func imageContent(for image: StashImage) -> some View {
+        if image.isVideo, let url = image.imageURL {
+            GalleryItemVideoPlayer(url: url, isCurrent: selectedImageId == image.id, isMuted: $isMuted)
+        } else {
+            ZoomableScrollView {
+                if let url = image.imageURL {
+                    CustomAsyncImage(url: url) { loader in
+                        if let data = loader.imageData, isGIF(data) {
+                            GIFView(data: data)
+                                .frame(maxWidth: .infinity)
+                        } else if let img = loader.image {
+                            img
+                                .resizable()
+                                .scaledToFit()
+                        } else if loader.isLoading {
+                            ProgressView()
+                                .tint(.white)
+                        } else {
+                            VStack(spacing: 12) {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .font(.largeTitle)
+                                    .foregroundColor(.white)
+                                Text("Failed to load image")
+                                    .foregroundColor(.white)
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
     

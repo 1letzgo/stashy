@@ -274,11 +274,13 @@ class ImageLoader: ObservableObject {
             // object(forKey already checks both memory and disk)
             if let cachedUIImage = ImageCache.shared.object(forKey: url as NSURL) {
                 if Task.isCancelled { return }
+                // Also fetch raw data for GIF support
+                self.imageData = ImageCache.shared.data(forKey: url as NSURL)
                 self.image = Image(uiImage: cachedUIImage)
                 self.isLoading = false
                 return
             }
-
+            
             do {
                 let data = try await loadImage(from: url)
                 if Task.isCancelled { return }

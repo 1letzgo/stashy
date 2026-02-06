@@ -370,6 +370,7 @@ struct ImageThumbnailCard: View {
             .aspectRatio(1, contentMode: .fit)
         }
         .clipShape(RoundedRectangle(cornerRadius: 12))
+        .contentShape(RoundedRectangle(cornerRadius: 12))
         .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
     }
 }

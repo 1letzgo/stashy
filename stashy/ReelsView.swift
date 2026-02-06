@@ -11,6 +11,7 @@ import AVFoundation
 
 struct ReelsView: View {
     @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @ObservedObject private var tabManager = TabManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @EnvironmentObject var coordinator: NavigationCoordinator
     @State private var selectedSortOption: StashDBViewModel.SceneSortOption = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
@@ -23,15 +24,35 @@ struct ReelsView: View {
     @State private var sceneToDelete: Scene?
     @State private var reelsMode: ReelsMode = .scenes
     @State private var selectedMarkerSortOption: StashDBViewModel.SceneMarkerSortOption = .random
+    @State private var selectedClipSortOption: StashDBViewModel.ImageSortOption = .random
+    @State private var selectedClipFilter: StashDBViewModel.SavedFilter?
 
     enum ReelsMode: String, CaseIterable {
         case scenes = "Scenes"
         case markers = "Markers"
+        case clips = "Clips"
         
         var icon: String {
             switch self {
             case .scenes: return "film"
             case .markers: return "mappin.and.ellipse"
+            case .clips: return "photo.on.rectangle.angled"
+            }
+        }
+        
+        var toModeType: ReelsModeType {
+            switch self {
+            case .scenes: return .scenes
+            case .markers: return .markers
+            case .clips: return .clips
+            }
+        }
+        
+        init(from type: ReelsModeType) {
+            switch type {
+            case .scenes: self = .scenes
+            case .markers: self = .markers
+            case .clips: self = .clips
             }
         }
     }
@@ -39,11 +60,13 @@ struct ReelsView: View {
     enum ReelItemData: Identifiable {
         case scene(Scene)
         case marker(SceneMarker)
+        case clip(StashImage)
         
         var id: String {
             switch self {
             case .scene(let s): return s.id
             case .marker(let m): return m.id
+            case .clip(let c): return c.id
             }
         }
         
@@ -51,6 +74,7 @@ struct ReelsView: View {
             switch self {
             case .scene(let s): return s.title
             case .marker(let m): return m.scene?.title
+            case .clip(let c): return c.title
             }
         }
         
@@ -58,6 +82,7 @@ struct ReelsView: View {
             switch self {
             case .scene(let s): return s.performers
             case .marker(let m): return m.scene?.performers ?? []
+            case .clip(let c): return c.performers?.map { ScenePerformer(id: $0.id, name: $0.name, sceneCount: nil, galleryCount: nil) } ?? []
             }
         }
         
@@ -70,6 +95,7 @@ struct ReelsView: View {
                     allTags.insert(primary, at: 0)
                 }
                 return allTags
+            case .clip(let c): return c.tags ?? []
             }
         }
         
@@ -77,6 +103,7 @@ struct ReelsView: View {
             switch self {
             case .scene(let s): return s.thumbnailURL
             case .marker(let m): return m.thumbnailURL
+            case .clip(let c): return c.thumbnailURL
             }
         }
         
@@ -111,6 +138,10 @@ struct ReelsView: View {
                     return URL(string: urlString)
                 }
                 return m.videoURL
+                
+            case .clip(let c):
+                // For clips (images that are videos), the imagePath IS the video path
+                return c.imageURL
             }
         }
         
@@ -118,6 +149,7 @@ struct ReelsView: View {
             switch self {
             case .scene: return 0
             case .marker(let m): return m.seconds
+            case .clip: return 0
             }
         }
         
@@ -125,6 +157,7 @@ struct ReelsView: View {
             switch self {
             case .scene(let s): return s.duration
             case .marker(let m): return m.scene?.files?.first?.duration
+            case .clip: return nil  // Images don't have duration in Stash
             }
         }
         
@@ -136,6 +169,11 @@ struct ReelsView: View {
                     return height > width
                 }
                 return false
+            case .clip(let c):
+                if let file = c.visual_files?.first {
+                    return (file.height ?? 0) > (file.width ?? 0)
+                }
+                return false
             }
         }
         
@@ -143,6 +181,7 @@ struct ReelsView: View {
             switch self {
             case .scene(let s): return s.rating100
             case .marker(let m): return m.scene?.rating100
+            case .clip(let c): return c.rating100
             }
         }
         
@@ -150,6 +189,7 @@ struct ReelsView: View {
             switch self {
             case .scene(let s): return s.oCounter
             case .marker(let m): return m.scene?.oCounter
+            case .clip(let c): return c.o_counter
             }
         }
         
@@ -157,6 +197,7 @@ struct ReelsView: View {
             switch self {
             case .scene(let s): return s.playCount
             case .marker(let m): return m.scene?.playCount
+            case .clip: return nil  // Images don't track play count
             }
         }
         
@@ -164,6 +205,7 @@ struct ReelsView: View {
             switch self {
             case .scene(let s): return s.date
             case .marker(let m): return m.scene?.date
+            case .clip(let c): return c.date
             }
         }
         
@@ -171,12 +213,23 @@ struct ReelsView: View {
             switch self {
             case .scene(let s): return s.id
             case .marker(let m): return m.scene?.id
+            case .clip: return nil  // Clips are images, not scenes
+            }
+        }
+        
+        var isGIF: Bool {
+            switch self {
+            case .clip(let c):
+                return c.fileExtension?.uppercased() == "GIF"
+            case .scene: return false
+            case .marker: return false
             }
         }
     }
+
     
 
-    private func applySettings(sortBy: StashDBViewModel.SceneSortOption? = nil, markerSortBy: StashDBViewModel.SceneMarkerSortOption? = nil, filter: StashDBViewModel.SavedFilter?, performer: ScenePerformer? = nil, tags: [Tag] = [], mode: ReelsMode? = nil) {
+    private func applySettings(sortBy: StashDBViewModel.SceneSortOption? = nil, markerSortBy: StashDBViewModel.SceneMarkerSortOption? = nil, clipSortBy: StashDBViewModel.ImageSortOption? = nil, filter: StashDBViewModel.SavedFilter?, clipFilter: StashDBViewModel.SavedFilter? = nil, performer: ScenePerformer? = nil, tags: [Tag] = [], mode: ReelsMode? = nil) {
         if let mode = mode { reelsMode = mode }
         
         if let sortBy = sortBy {
@@ -188,17 +241,29 @@ struct ReelsView: View {
             selectedMarkerSortOption = markerSortBy
         }
         
+        if let clipSortBy = clipSortBy {
+            selectedClipSortOption = clipSortBy
+        }
+        
+        if let clipFilter = clipFilter {
+            selectedClipFilter = clipFilter
+        }
+        
         selectedFilter = filter
         selectedPerformer = performer
         selectedTags = tags
         
-        // Merge performer and tags into filter if needed
+        // Merge performer and tags into filter if needed (Used for Scenes/Markers)
         let mergedFilter = viewModel.mergeFilterWithCriteria(filter: filter, performer: performer, tags: tags)
         
-        if reelsMode == .scenes {
+        switch reelsMode {
+        case .scenes:
             viewModel.fetchScenes(sortBy: selectedSortOption, filter: mergedFilter)
-        } else {
+        case .markers:
             viewModel.fetchSceneMarkers(sortBy: selectedMarkerSortOption, filter: mergedFilter)
+        case .clips:
+            // ALSO use mergedFilter for clips to support Performer/Tags
+            viewModel.fetchClips(sortBy: selectedClipSortOption, filter: mergedFilter, isInitialLoad: true)
         }
     }
 
@@ -213,7 +278,13 @@ struct ReelsView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             
-            let isEmpty = (reelsMode == .scenes ? viewModel.scenes.isEmpty : viewModel.sceneMarkers.isEmpty)
+            let isEmpty: Bool = {
+                switch reelsMode {
+                case .scenes: return viewModel.scenes.isEmpty
+                case .markers: return viewModel.sceneMarkers.isEmpty
+                case .clips: return viewModel.clips.isEmpty
+                }
+            }()
             let isLoading = viewModel.isLoading && isEmpty
 
             if isLoading {
@@ -224,7 +295,6 @@ struct ReelsView: View {
                 reelsListView
             }
         }
-        .ignoresSafeArea()
         .navigationTitle(viewModel.scenes.isEmpty && viewModel.errorMessage != nil ? "StashTok" : "")
         .navigationBarTitleDisplayMode(.inline)
         // Toolbar Background Logic
@@ -361,7 +431,13 @@ struct ReelsView: View {
 
     @ViewBuilder
     private var reelsListView: some View {
-        let items = reelsMode == .scenes ? viewModel.scenes.map { ReelItemData.scene($0) } : viewModel.sceneMarkers.map { ReelItemData.marker($0) }
+        let items: [ReelItemData] = {
+            switch reelsMode {
+            case .scenes: return viewModel.scenes.map { ReelItemData.scene($0) }
+            case .markers: return viewModel.sceneMarkers.map { ReelItemData.marker($0) }
+            case .clips: return viewModel.clips.map { ReelItemData.clip($0) }
+            }
+        }()
         
         ScrollView(.vertical, showsIndicators: false) {
             LazyVStack(spacing: 0) {
@@ -414,18 +490,32 @@ struct ReelsView: View {
                                 if !viewModel.scenes.contains(where: { $0.id == sceneId }) {
                                     viewModel.updateSceneRating(sceneId: sceneId, rating100: newRating) { _ in }
                                 }
+                            } else if case .clip(let image) = item {
+                                // 3. Optimistic Update for Clips List
+                                if let clipIndex = viewModel.clips.firstIndex(where: { $0.id == image.id }) {
+                                    let originalRating = viewModel.clips[clipIndex].rating100
+                                    viewModel.clips[clipIndex] = viewModel.clips[clipIndex].withRating(newRating)
+                                    
+                                    viewModel.updateImageRating(imageId: image.id, rating100: newRating) { success in
+                                        if !success {
+                                            DispatchQueue.main.async {
+                                                viewModel.clips[clipIndex] = viewModel.clips[clipIndex].withRating(originalRating)
+                                            }
+                                        }
+                                    }
+                                }
                             }
                         },
                         viewModel: viewModel
                     )
-                    .containerRelativeFrame(.vertical)
+                    .containerRelativeFrame([.horizontal, .vertical])
                     .id(item.id)
                     .onAppear {
                         if index == items.count - 2 {
-                            if reelsMode == .scenes {
-                                viewModel.loadMoreScenes()
-                            } else {
-                                viewModel.loadMoreMarkers()
+                            switch reelsMode {
+                            case .scenes: viewModel.loadMoreScenes()
+                            case .markers: viewModel.loadMoreMarkers()
+                            case .clips: viewModel.loadMoreClips()
                             }
                         }
                     }
@@ -435,13 +525,20 @@ struct ReelsView: View {
         }
         .scrollTargetBehavior(.paging)
         .onScrollGeometryChange(for: String?.self) { geo in
-            // Find the ID of the scene that is closest to the center or top of the visible area
+            // Find the ID of the scene/item that is closest to the center or top of the visible area
             let offsetY = geo.contentOffset.y
             let height = geo.containerSize.height
             if height > 0 {
                 let index = Int(round(offsetY / height))
-                if index >= 0 && index < viewModel.scenes.count {
-                    return viewModel.scenes[index].id
+                let currentItems: [ReelItemData] = {
+                    switch reelsMode {
+                    case .scenes: return viewModel.scenes.map { .scene($0) }
+                    case .markers: return viewModel.sceneMarkers.map { .marker($0) }
+                    case .clips: return viewModel.clips.map { .clip($0) }
+                    }
+                }()
+                if index >= 0 && index < currentItems.count {
+                    return currentItems[index].id
                 }
             }
             return nil
@@ -452,6 +549,34 @@ struct ReelsView: View {
         }
         .background(Color.black)
         .ignoresSafeArea()
+        .onAppear {
+            // 1. Initialize reelsMode ONLY if current mode is disabled in settings
+            let enabledTypes = tabManager.enabledReelsModes
+            if !enabledTypes.contains(reelsMode.toModeType) {
+                if let first = enabledTypes.first {
+                    reelsMode = ReelsMode(from: first)
+                }
+            }
+            
+            // 2. Load and apply default sort for current mode
+            let currentModeType = reelsMode.toModeType
+            if let defaultSort = tabManager.getReelsDefaultSort(for: currentModeType) {
+                switch reelsMode {
+                case .scenes:
+                    if let option = StashDBViewModel.SceneSortOption(rawValue: defaultSort) {
+                        selectedSortOption = option
+                    }
+                case .markers:
+                    if let option = StashDBViewModel.SceneMarkerSortOption(rawValue: defaultSort) {
+                        selectedMarkerSortOption = option
+                    }
+                case .clips:
+                    if let option = StashDBViewModel.ImageSortOption(rawValue: defaultSort) {
+                        selectedClipSortOption = option
+                    }
+                }
+            }
+        }
     }
 
     @ToolbarContentBuilder
@@ -459,7 +584,8 @@ struct ReelsView: View {
         ToolbarItem(placement: .navigationBarLeading) {
             Menu {
                 Picker("Mode", selection: $reelsMode) {
-                    ForEach(ReelsMode.allCases, id: \.self) { mode in
+                    ForEach(tabManager.enabledReelsModes, id: \.self) { modeType in
+                        let mode = ReelsMode(from: modeType)
                         Label(mode.rawValue, systemImage: mode.icon).tag(mode)
                     }
                 }
@@ -477,45 +603,41 @@ struct ReelsView: View {
                 .clipShape(Capsule())
             }
             .onChange(of: reelsMode) { _, newValue in
-                 if newValue == .markers {
-                    // Load default MARKER filter if available, otherwise NO Filter
-                    if selectedFilter == nil {
-                         if let defaultId = TabManager.shared.getDefaultMarkerFilterId(for: .reels),
-                            let filter = viewModel.savedFilters[defaultId] {
-                             applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                         } else {
-                             applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                         }
+                switch newValue {
+                case .markers:
+                    // Load default MARKER filter if available
+                    if let defaultId = TabManager.shared.getDefaultMarkerFilterId(for: .reels),
+                       let filter = viewModel.savedFilters[defaultId] {
+                        applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
                     } else {
-                        if let defaultId = TabManager.shared.getDefaultMarkerFilterId(for: .reels),
-                           let filter = viewModel.savedFilters[defaultId] {
-                             applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                        } else {
-                            applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                        }
+                        applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags, mode: newValue)
                     }
-                 } else {
-                    // Scenes Mode
-                    if selectedFilter == nil {
-                        if let defaultId = TabManager.shared.getDefaultFilterId(for: .reels),
-                           let filter = viewModel.savedFilters[defaultId] {
-                            applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                        } else {
-                            applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                        }
+                    
+                case .scenes:
+                    // Load default SCENE filter if available
+                    if let defaultId = TabManager.shared.getDefaultFilterId(for: .reels),
+                       let filter = viewModel.savedFilters[defaultId] {
+                        applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
                     } else {
-                         if let defaultId = TabManager.shared.getDefaultFilterId(for: .reels),
-                            let filter = viewModel.savedFilters[defaultId] {
-                             applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                         } else {
-                             applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                         }
+                        applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags, mode: newValue)
                     }
-                 }
+                    
+                case .clips:
+                    // Preserve performer and tags when switching to clips
+                    applySettings(filter: nil, clipFilter: selectedClipFilter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+                }
             }
         }
         
-        if !(viewModel.scenes.isEmpty && viewModel.errorMessage != nil) {
+        let isEmpty: Bool = {
+            switch reelsMode {
+            case .scenes: return viewModel.scenes.isEmpty
+            case .markers: return viewModel.sceneMarkers.isEmpty
+            case .clips: return viewModel.clips.isEmpty
+            }
+        }()
+        
+        if !(isEmpty && viewModel.errorMessage != nil) {
             ToolbarItem(placement: .principal) {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 8) {
@@ -578,10 +700,13 @@ struct ReelsView: View {
     @ViewBuilder
     private var sortMenu: some View {
         Menu {
-            if reelsMode == .scenes {
+            switch reelsMode {
+            case .scenes:
                 sceneSortOptions
-            } else {
+            case .markers:
                 markerSortOptions
+            case .clips:
+                clipSortOptions
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down.circle")
@@ -847,35 +972,142 @@ struct ReelsView: View {
     }
 
     @ViewBuilder
-    private var filterMenu: some View {
+    private var clipSortOptions: some View {
+        // Random
+        Button(action: { applySettings(clipSortBy: .random, filter: nil, clipFilter: selectedClipFilter) }) {
+            HStack {
+                Text("Random")
+                if selectedClipSortOption == .random { Image(systemName: "checkmark") }
+            }
+        }
+        
+        Divider()
+        
+        // Date
         Menu {
-            Button(action: {
-                applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags)
-            }) {
+            Button(action: { applySettings(clipSortBy: .dateDesc, filter: nil, clipFilter: selectedClipFilter) }) {
                 HStack {
-                    Text("No Filter")
-                    if selectedFilter == nil { Image(systemName: "checkmark") }
+                    Text("Newest First")
+                    if selectedClipSortOption == .dateDesc { Image(systemName: "checkmark") }
                 }
             }
+            Button(action: { applySettings(clipSortBy: .dateAsc, filter: nil, clipFilter: selectedClipFilter) }) {
+                HStack {
+                    Text("Oldest First")
+                    if selectedClipSortOption == .dateAsc { Image(systemName: "checkmark") }
+                }
+            }
+        } label: {
+            HStack {
+                Text("Date")
+                if selectedClipSortOption == .dateAsc || selectedClipSortOption == .dateDesc { Image(systemName: "checkmark") }
+            }
+        }
+        
+        // Title
+        Menu {
+            Button(action: { applySettings(clipSortBy: .titleAsc, filter: nil, clipFilter: selectedClipFilter) }) {
+                HStack {
+                    Text("A → Z")
+                    if selectedClipSortOption == .titleAsc { Image(systemName: "checkmark") }
+                }
+            }
+            Button(action: { applySettings(clipSortBy: .titleDesc, filter: nil, clipFilter: selectedClipFilter) }) {
+                HStack {
+                    Text("Z → A")
+                    if selectedClipSortOption == .titleDesc { Image(systemName: "checkmark") }
+                }
+            }
+        } label: {
+            HStack {
+                Text("Title")
+                if selectedClipSortOption == .titleAsc || selectedClipSortOption == .titleDesc { Image(systemName: "checkmark") }
+            }
+        }
+        
+        // Rating
+        Menu {
+            Button(action: { applySettings(clipSortBy: .ratingDesc, filter: nil, clipFilter: selectedClipFilter) }) {
+                HStack {
+                    Text("Highest First")
+                    if selectedClipSortOption == .ratingDesc { Image(systemName: "checkmark") }
+                }
+            }
+            Button(action: { applySettings(clipSortBy: .ratingAsc, filter: nil, clipFilter: selectedClipFilter) }) {
+                HStack {
+                    Text("Lowest First")
+                    if selectedClipSortOption == .ratingAsc { Image(systemName: "checkmark") }
+                }
+            }
+        } label: {
+            HStack {
+                Text("Rating")
+                if selectedClipSortOption == .ratingAsc || selectedClipSortOption == .ratingDesc { Image(systemName: "checkmark") }
+            }
+        }
+    }
 
-            let mode: StashDBViewModel.FilterMode = (reelsMode == .scenes ? .scenes : .sceneMarkers)
-            let activeFilters = viewModel.savedFilters.values
-                .filter { $0.mode == mode && $0.id != "reels_temp" && $0.id != "reels_merged" }
-                .sorted { $0.name < $1.name }
-
-            ForEach(activeFilters) { filter in
+    @ViewBuilder
+    private var filterMenu: some View {
+        Menu {
+            if reelsMode == .clips {
+                // Clips uses image filters
                 Button(action: {
-                    applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags)
+                    selectedClipFilter = nil
+                    applySettings(filter: nil, clipFilter: nil, mode: .clips)
                 }) {
                     HStack {
-                        Text(filter.name)
-                        if selectedFilter?.id == filter.id { Image(systemName: "checkmark") }
+                        Text("No Filter")
+                        if selectedClipFilter == nil { Image(systemName: "checkmark") }
+                    }
+                }
+                
+                let imageFilters = viewModel.savedFilters.values
+                    .filter { $0.mode == .images && $0.id != "reels_temp" && $0.id != "reels_merged" }
+                    .sorted { $0.name < $1.name }
+                
+                ForEach(imageFilters) { filter in
+                    Button(action: {
+                        selectedClipFilter = filter
+                        applySettings(filter: nil, clipFilter: filter, mode: .clips)
+                    }) {
+                        HStack {
+                            Text(filter.name)
+                            if selectedClipFilter?.id == filter.id { Image(systemName: "checkmark") }
+                        }
+                    }
+                }
+            } else {
+                // Scenes/Markers share scene or sceneMarker filters
+                Button(action: {
+                    applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags)
+                }) {
+                    HStack {
+                        Text("No Filter")
+                        if selectedFilter == nil { Image(systemName: "checkmark") }
+                    }
+                }
+
+                let mode: StashDBViewModel.FilterMode = (reelsMode == .scenes ? .scenes : .sceneMarkers)
+                let activeFilters = viewModel.savedFilters.values
+                    .filter { $0.mode == mode && $0.id != "reels_temp" && $0.id != "reels_merged" }
+                    .sorted { $0.name < $1.name }
+
+                ForEach(activeFilters) { filter in
+                    Button(action: {
+                        applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags)
+                    }) {
+                        HStack {
+                            Text(filter.name)
+                            if selectedFilter?.id == filter.id { Image(systemName: "checkmark") }
+                        }
                     }
                 }
             }
         } label: {
-            Image(systemName: selectedFilter != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                .foregroundColor(filterColor)
+            let hasActiveFilter = (reelsMode == .clips ? selectedClipFilter != nil : selectedFilter != nil)
+            Image(systemName: hasActiveFilter ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                .foregroundColor(hasActiveFilter ? appearanceManager.tintColor : .white)
         }
     }
 
@@ -907,7 +1139,26 @@ struct ReelItemView: View {
         ZStack(alignment: .bottomLeading) {
             // Video / Thumbnail layer
             Group {
-                if let player = player {
+                if item.isGIF {
+                    ZoomableScrollView {
+                        CustomAsyncImage(url: item.videoURL) { loader in
+                            if let data = loader.imageData, isGIF(data) {
+                                GIFView(data: data)
+                                    .frame(maxWidth: .infinity)
+                            } else if let img = loader.image {
+                                img
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                            } else if loader.isLoading {
+                                ProgressView()
+                                    .tint(.white)
+                            } else {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .foregroundColor(.white)
+                            }
+                        }
+                    }
+                } else if let player = player {
                     FullScreenVideoPlayer(player: player, videoGravity: item.isPortrait ? .resizeAspectFill : .resizeAspect)
                         .onTapGesture {
                             if !showUI {
@@ -1049,6 +1300,21 @@ struct ReelItemView: View {
                             // 3. Fallback (if not in any list)
                             if !viewModel.scenes.contains(where: { $0.id == sceneId }) && markerIndices.isEmpty {
                                 viewModel.incrementOCounter(sceneId: sceneId) { _ in }
+                            }
+                        } else if case .clip(let image) = item {
+                            // 4. Clip Update
+                            if let index = viewModel.clips.firstIndex(where: { $0.id == image.id }) {
+                                let originalCount = viewModel.clips[index].o_counter ?? 0
+                                let newCount = originalCount + 1
+                                viewModel.clips[index] = viewModel.clips[index].withOCounter(newCount)
+                                
+                                viewModel.updateImageOCounter(imageId: image.id, oCounter: newCount) { success in
+                                    if !success {
+                                        DispatchQueue.main.async {
+                                            viewModel.clips[index] = viewModel.clips[index].withOCounter(originalCount)
+                                        }
+                                    }
+                                }
                             }
                         }
                         resetUITimer()
@@ -1244,6 +1510,8 @@ struct ReelItemView: View {
                 bestURL = s.withStreams(streams).bestStream(for: quality)
             case .marker(let m):
                 bestURL = m.scene?.withStreams(streams).bestStream(for: quality)
+            case .clip:
+                bestURL = nil  // Clips don't use scene streams
             }
             
             if let targetURL = bestURL {

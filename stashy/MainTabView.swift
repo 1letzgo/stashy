@@ -164,10 +164,9 @@ extension MainTabView {
             .id(coordinator.downloadsTabID)
             
         case .reels:
-            NavigationView {
+            NavigationStack {
                 ReelsView()
             }
-            .navigationViewStyle(StackNavigationViewStyle())
             .id(coordinator.reelsTabID)
             
         case .settings:
