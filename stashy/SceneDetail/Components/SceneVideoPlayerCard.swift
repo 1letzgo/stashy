@@ -279,6 +279,10 @@ struct SceneVideoPlayerCard: View {
                 playbackSpeedMenu
                 qualityMenu
 
+                if DownloadManager.shared.isDownloaded(id: activeScene.id) {
+                    infoPill(icon: "checkmark.circle.fill", text: "Downloaded", color: .green)
+                }
+                
                 if activeScene.organized == true {
                     infoPill(icon: "checkmark.seal.fill", text: "Organized", color: .green)
                 }

@@ -83,8 +83,20 @@ struct ReelsView: View {
         var videoURL: URL? {
             let quality = ServerConfigManager.shared.activeConfig?.reelsQuality ?? .sd
             switch self {
-            case .scene(let s): return s.bestStream(for: quality) ?? s.videoURL
-            case .marker(let m): 
+            case .scene(let s):
+                // 0. Check local first
+                if let local = s.videoURL, !local.absoluteString.hasPrefix("http") {
+                    return local
+                }
+                return s.bestStream(for: quality) ?? s.videoURL
+                
+            case .marker(let m):
+                // 0. Check local first (using the scene's video)
+                if let scene = m.scene, let local = scene.videoURL, !local.absoluteString.hasPrefix("http") {
+                    print("📂 Reels: Using local download for marker's scene")
+                    return local
+                }
+                
                 // Always use the full scene stream for markers to allow seeking/looping
                 if let sceneID = m.scene?.id, let config = ServerConfigManager.shared.loadConfig() {
                     // Try to get HLS stream for the scene with reels quality first
@@ -1057,11 +1069,30 @@ struct ReelItemView: View {
                     
                     // Row 2: Title / Date (Secondary)
                     if let title = item.title, !title.isEmpty {
-                        Text(title)
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(.white.opacity(0.9))
-                            .lineLimit(2)
-                            .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                        HStack(spacing: 8) {
+                            Text(title)
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(.white.opacity(0.9))
+                                .lineLimit(2)
+                                .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                            
+                            // Download Indicator
+                            let sceneId: String? = {
+                                if case .scene(let s) = item { return s.id }
+                                if case .marker(let m) = item { return m.scene?.id }
+                                return nil
+                            }()
+                            
+                            if let sId = sceneId, DownloadManager.shared.isDownloaded(id: sId) {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(.white)
+                                    .padding(3)
+                                    .background(Color.green)
+                                    .clipShape(Circle())
+                                    .shadow(radius: 2)
+                            }
+                        }
                     }
                     
                     // Row 3: Tags (Tertiary) - Horizontal Scroll

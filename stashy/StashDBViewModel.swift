@@ -3313,6 +3313,15 @@ struct Scene: Codable, Identifiable {
     
     // Computed property for thumbnail URL
     var thumbnailURL: URL? {
+        // 0. Check local first
+        let fileManager = FileManager.default
+        if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let localURL = docs.appendingPathComponent("Downloads/\(id)/thumbnail.jpg")
+            if fileManager.fileExists(atPath: localURL.path) {
+                return localURL
+            }
+        }
+
         // Helper to sign the URL with apikey
         func signed(_ url: URL?) -> URL? {
             guard let url = url else { return nil }
@@ -3414,6 +3423,16 @@ struct Scene: Codable, Identifiable {
 
     // Computed property for stream URL (respects global default)
     var videoURL: URL? {
+        // 0. Check for local download first (Offline first!)
+        let fileManager = FileManager.default
+        if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let localURL = docs.appendingPathComponent("Downloads/\(id)/video.mp4")
+            if fileManager.fileExists(atPath: localURL.path) {
+                print("📂 Using local download for scene \(id)")
+                return localURL
+            }
+        }
+
         let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .fhd
         
         // Helper to sign the URL with apikey
@@ -3470,14 +3489,47 @@ struct Scene: Codable, Identifiable {
             return comps?.url ?? url
         }
 
-        // 1. Try to find MP4 stream for local storage
-        if let mp4Stream = streams?.first(where: { $0.mime_type == "video/mp4" }),
-           let url = URL(string: mp4Stream.url) {
+        let compatibleExtensions = ["mp4", "m4v", "mov"]
+        let fileFmt = files?.first?.format?.lowercased() ?? ""
+        let isOriginalCompatible = compatibleExtensions.contains(fileFmt)
+
+        // 1. Try to find a high-quality MP4 transcode (specifically excluding HLS and direct MKV links)
+        let mp4Transcodes = streams?.filter { $0.mime_type == "video/mp4" }
+            .filter { stream in
+                let label = stream.label.lowercased()
+                // Exclude direct streams that are just the original incompatible file
+                if label.contains("direct stream") || label.contains("mkv") { return false }
+                return true
+            }
+        
+        if let bestMP4 = mp4Transcodes?.sorted(by: { s1, s2 in
+            let r1 = Int(s1.label.lowercased().replacingOccurrences(of: "p", with: "")) ?? 0
+            let r2 = Int(s2.label.lowercased().replacingOccurrences(of: "p", with: "")) ?? 0
+            return r1 > r2
+        }).first, let url = URL(string: bestMP4.url) {
+            print("💾 Download: Using best MP4 transcode (\(bestMP4.label)) for scene \(id)")
             return signed(url)
         }
         
-        // 2. Otherwise use the standard stream URL
-        return videoURL // videoURL is already signed
+        // 2. Fallback to original ONLY if it's compatible (MP4/MOV/etc)
+        if isOriginalCompatible {
+             if let streamPath = paths?.stream, let url = URL(string: streamPath) {
+                 print("💾 Download: Using compatible original file (\(fileFmt)) for scene \(id)")
+                 return signed(url)
+             }
+        }
+        
+        // 3. Last ditch effort: Look for ANY MP4 stream that isn't the original incompatible file
+        // (Sometimes transcodes don't have clear labels)
+        if !isOriginalCompatible {
+            if let anyMP4 = streams?.first(where: { $0.mime_type == "video/mp4" && !$0.label.lowercased().contains("mkv") }),
+               let url = URL(string: anyMP4.url) {
+                return signed(url)
+            }
+        }
+        
+        print("⚠️ Download: No compatible MP4 file found for scene \(id). Original format: \(fileFmt)")
+        return nil
     }
     
     
@@ -3759,6 +3811,51 @@ struct MarkerScene: Codable, Identifiable {
         
         return nil
     }
+
+    var videoURL: URL? {
+        // 0. Check local first
+        let fileManager = FileManager.default
+        if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let localURL = docs.appendingPathComponent("Downloads/\(id)/video.mp4")
+            if fileManager.fileExists(atPath: localURL.path) {
+                return localURL
+            }
+        }
+        
+        // Signed helper
+        func signed(_ url: URL?) -> URL? {
+            guard let url = url else { return nil }
+            guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty else { return url }
+            if url.query?.lowercased().contains("apikey=") == true { return url }
+            var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            var items = comps?.queryItems ?? []
+            items.append(URLQueryItem(name: "apikey", value: key))
+            comps?.queryItems = items
+            return comps?.url ?? url
+        }
+        
+        let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .fhd
+        if let streamURL = bestStream(for: quality) {
+            return signed(streamURL)
+        }
+        
+        guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
+        return signed(URL(string: "\(config.baseURL)/scene/\(id)/stream"))
+    }
+    
+    var thumbnailURL: URL? {
+        // 0. Check local first
+        let fileManager = FileManager.default
+        if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+            let localURL = docs.appendingPathComponent("Downloads/\(id)/thumbnail.jpg")
+            if fileManager.fileExists(atPath: localURL.path) {
+                return localURL
+            }
+        }
+        
+        guard let config = ServerConfigManager.shared.loadConfig(), let key = config.secureApiKey else { return nil }
+        return URL(string: "\(config.baseURL)/scene/\(id)/screenshot?apikey=\(key)")
+    }
 }
 
 struct SceneMarker: Codable, Identifiable {
@@ -3783,6 +3880,17 @@ struct SceneMarker: Codable, Identifiable {
     
     // Computed property for thumbnail URL
     var thumbnailURL: URL? {
+        // 0. Check local first
+        if let sceneId = scene?.id {
+            let fileManager = FileManager.default
+            if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+                let localURL = docs.appendingPathComponent("Downloads/\(sceneId)/thumbnail.jpg")
+                if fileManager.fileExists(atPath: localURL.path) {
+                    return localURL
+                }
+            }
+        }
+
         // Helper to sign the URL with apikey
         func signed(_ url: URL?) -> URL? {
             guard let url = url else { return nil }
@@ -3812,6 +3920,18 @@ struct SceneMarker: Codable, Identifiable {
     
     // Computed property for stream URL
     var videoURL: URL? {
+        // 0. Check for local download first
+        if let sceneId = scene?.id {
+            let fileManager = FileManager.default
+            if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+                let localURL = docs.appendingPathComponent("Downloads/\(sceneId)/video.mp4")
+                if fileManager.fileExists(atPath: localURL.path) {
+                    print("📂 Using local download for marker \(id)")
+                    return localURL
+                }
+            }
+        }
+
         let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .fhd
         
         // Helper to sign the URL with apikey
@@ -4409,6 +4529,26 @@ struct ActiveDownload {
     var progress: Double
 }
 
+private final class DownloadTaskMap: @unchecked Sendable {
+    private var tasks: [Int: (String, URL)] = [:]
+    private let lock = NSLock()
+    
+    func set(_ taskId: Int, info: (String, URL)) {
+        lock.lock(); defer { lock.unlock() }
+        tasks[taskId] = info
+    }
+    
+    func get(_ taskId: Int) -> (String, URL)? {
+        lock.lock(); defer { lock.unlock() }
+        return tasks[taskId]
+    }
+    
+    func remove(_ taskId: Int) -> (String, URL)? {
+        lock.lock(); defer { lock.unlock() }
+        return tasks.removeValue(forKey: taskId)
+    }
+}
+
 @MainActor
 class DownloadManager: NSObject, ObservableObject {
     static let shared = DownloadManager()
@@ -4419,7 +4559,7 @@ class DownloadManager: NSObject, ObservableObject {
     private let downloadsFolder: URL
     private let metadataFile = "downloads_metadata.json"
     
-    private var downloadTasks: [URLSessionDownloadTask: (String, URL)] = [:] // Task: (ID, TargetURL)
+    private nonisolated let taskMap = DownloadTaskMap()
     private var progressHandlers: [String: (Double) -> Void] = [:]
     private var completionHandlers: [String: (Bool) -> Void] = [:]
     
@@ -4569,7 +4709,7 @@ class DownloadManager: NSObject, ObservableObject {
         }
         
         let task = session.downloadTask(with: request)
-        downloadTasks[task] = (id, destination)
+        taskMap.set(task.taskIdentifier, info: (id, destination))
         progressHandlers[id] = progressHandler
         completionHandlers[id] = completion
         task.resume()
@@ -4596,45 +4736,55 @@ class DownloadManager: NSObject, ObservableObject {
 
 extension DownloadManager: URLSessionDownloadDelegate {
     nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        let temporaryURL = location
-        Task { @MainActor in
-            guard let (id, destination) = self.downloadTasks[downloadTask] else { return }
-            
-            do {
-                if FileManager.default.fileExists(atPath: destination.path) {
-                    try FileManager.default.removeItem(at: destination)
-                }
-                try FileManager.default.moveItem(at: temporaryURL, to: destination)
-                self.completionHandlers[id]?(true)
-            } catch {
-                self.completionHandlers[id]?(false)
+        guard let (id, destination) = taskMap.get(downloadTask.taskIdentifier) else { return }
+        
+        do {
+            if FileManager.default.fileExists(atPath: destination.path) {
+                try? FileManager.default.removeItem(at: destination)
             }
+            try FileManager.default.moveItem(at: location, to: destination)
             
-            self.downloadTasks.removeValue(forKey: downloadTask)
-            self.progressHandlers.removeValue(forKey: id)
-            self.completionHandlers.removeValue(forKey: id)
+            // Success: Remove task from map and notify
+            _ = taskMap.remove(downloadTask.taskIdentifier)
+            
+            Task { @MainActor in
+                self.completionHandlers[id]?(true)
+                self.progressHandlers.removeValue(forKey: id)
+                self.completionHandlers.removeValue(forKey: id)
+            }
+        } catch {
+            print("❌ DownloadManager: Failed to move file: \(error)")
+            // Failure: Remove task from map and notify
+            _ = taskMap.remove(downloadTask.taskIdentifier)
+            
+            Task { @MainActor in
+                self.completionHandlers[id]?(false)
+                self.progressHandlers.removeValue(forKey: id)
+                self.completionHandlers.removeValue(forKey: id)
+            }
         }
     }
     
     nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
         let progress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
-        Task { @MainActor in
-            guard let (id, _) = self.downloadTasks[downloadTask] else { return }
-            self.progressHandlers[id]?(progress)
+        
+        if let (id, _) = taskMap.get(downloadTask.taskIdentifier) {
+            Task { @MainActor in
+                self.progressHandlers[id]?(progress)
+            }
         }
     }
     
     nonisolated func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        let capturedError = error
-        Task { @MainActor in
-            if capturedError != nil {
-                guard let downloadTask = task as? URLSessionDownloadTask,
-                      let (id, _) = self.downloadTasks[downloadTask] else { return }
-                self.completionHandlers[id]?(false)
-                
-                self.downloadTasks.removeValue(forKey: downloadTask)
-                self.progressHandlers.removeValue(forKey: id)
-                self.completionHandlers.removeValue(forKey: id)
+        if let capturedError = error {
+            print("❌ DownloadManager: Task \(task.taskIdentifier) completed with error: \(capturedError)")
+            
+            if let (id, _) = taskMap.remove(task.taskIdentifier) {
+                Task { @MainActor in
+                    self.completionHandlers[id]?(false)
+                    self.progressHandlers.removeValue(forKey: id)
+                    self.completionHandlers.removeValue(forKey: id)
+                }
             }
         }
     }

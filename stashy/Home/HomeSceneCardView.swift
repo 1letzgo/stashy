@@ -98,6 +98,16 @@ struct HomeSceneCardView: View {
                             .background(Color.black.opacity(0.6))
                             .clipShape(RoundedRectangle(cornerRadius: 4))
                     }
+                    
+                    // Download Indicator
+                    if DownloadManager.shared.isDownloaded(id: scene.id) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .font(.system(size: 10))
+                            .foregroundColor(.white)
+                            .padding(4)
+                            .background(Color.green)
+                            .clipShape(Circle())
+                    }
                 }
                 
                 Spacer()

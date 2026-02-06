@@ -91,16 +91,27 @@ struct SceneCardView: View {
                     
                     Spacer()
                     
-                    // Date - Top Right
-                    if let date = scene.date {
-                        Text(date)
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.black.opacity(0.6))
-                            .clipShape(Capsule())
+                    // Date - Top Right (Moved slightly left if checkmark exists)
+                    HStack(spacing: 8) {
+                        if let date = scene.date {
+                            Text(date)
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(.white)
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(Color.black.opacity(0.6))
+                                .clipShape(Capsule())
+                        }
+                        
+                        if DownloadManager.shared.isDownloaded(id: scene.id) {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.caption)
+                                .foregroundColor(.white)
+                                .padding(4)
+                                .background(Color.green)
+                                .clipShape(Circle())
+                        }
                     }
                 }
                 .padding(8)

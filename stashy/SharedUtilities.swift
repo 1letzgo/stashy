@@ -25,11 +25,8 @@ func isTestFlightBuild() -> Bool {
     
     let isTestFlight: Bool
     if #available(iOS 18.0, *) {
-        // For iOS 18+, the receipt URL is deprecated.
-        // We should ideally use AppTransaction.shared, which is async.
-        // As a temporary synchronous bridge, we check the legacy path but wrap it
-        // OR we return a default. For TestFlight builds, the legacy check still works.
-        isTestFlight = Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
+        // For iOS 18+, we rely primarily on the async Task below to update the cache.
+        isTestFlight = Bundle.main.bundleURL.lastPathComponent.contains("sandbox")
         
         // Start an async task to update the cache properly via AppTransaction
         Task {
