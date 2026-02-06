@@ -165,14 +165,26 @@ struct SceneDetailView: View {
         }
         .onAppear {
             // Ensure state is reset when view appears
-            print("🔍 Scene Data (Initial): ID=\(activeScene.id), PlayCount=\(activeScene.playCount ?? -1), ResumeTime=\(activeScene.resumeTime ?? -1)")
+            print("🔍 Scene Detail: ID=\(activeScene.id), PlayCount=\(activeScene.playCount ?? -1)")
             isFullscreen = false
             
-            // Refresh scene details to get latest resume time and play count
+            // 1. Fetch Transcoded Streams in background (Fast Start)
+            viewModel.fetchSceneStreams(sceneId: activeScene.id) { streams in
+                if !streams.isEmpty {
+                    DispatchQueue.main.async {
+                        self.activeScene = self.activeScene.withStreams(streams)
+                        print("✅ Transcoded streams loaded in background: \(streams.count) options")
+                        self.updatePlayerStream()
+                    }
+                }
+            }
+            
+            // 2. Refresh main scene details (stable query)
             viewModel.fetchSceneDetails(sceneId: activeScene.id) { updatedScene in
                 if let updated = updatedScene {
                     DispatchQueue.main.async {
-                        self.activeScene = updated
+                        // Preserve existing streams if they were already loaded
+                        self.activeScene = updated.withStreams(self.activeScene.streams)
                         print("✅ Scene data refreshed: ResumeTime=\(updated.resumeTime ?? 0)")
                     }
                 }
@@ -240,6 +252,7 @@ struct SceneDetailView: View {
         guard let videoURL = activeScene.videoURL else { return }
         
         if player == nil {
+            print("🎬 Player initializing with URL: \(videoURL.absoluteString)")
             player = createPlayer(for: videoURL)
             player?.isMuted = isMuted
             
@@ -339,6 +352,40 @@ struct SceneDetailView: View {
         )
         .clipShape(Capsule())
         .overlay(Capsule().stroke(color ?? appearanceManager.tintColor, lineWidth: 0.5))
+    }
+    
+    /// Updates the player if a better stream becomes available (e.g. replacing an incompatible MKV fallback with a transcribed MP4)
+    private func updatePlayerStream() {
+        guard let currentURL = player?.currentItem?.asset as? AVURLAsset else { return }
+        guard let newURL = activeScene.videoURL else { return }
+        
+        // Only switch if the URL path is different
+        if currentURL.url.absoluteString != newURL.absoluteString {
+            // Check if current URL is the likely incompatible fallback
+            let oldIsFallback = currentURL.url.pathExtension.lowercased() == "mkv"
+            let newIsStream = newURL.pathExtension.lowercased() == "mp4" || newURL.absoluteString.contains("/stream")
+            
+            if oldIsFallback || newIsStream {
+                print("♻️ Upgrading stream in SceneDetailView from \(currentURL.url.lastPathComponent) to \(newURL.lastPathComponent)...")
+                
+                let headers = ["ApiKey": ServerConfigManager.shared.activeConfig?.secureApiKey ?? ""]
+                let asset = AVURLAsset(url: newURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+                let item = AVPlayerItem(asset: asset)
+                
+                let currentTime = player?.currentTime() ?? .zero
+                let wasPlaying = player?.rate ?? 0 > 0
+                
+                player?.replaceCurrentItem(with: item)
+                
+                if currentTime > .zero {
+                    player?.seek(to: currentTime)
+                }
+                
+                if wasPlaying || isPlaybackStarted {
+                    player?.play()
+                }
+            }
+        }
     }
 }
 

@@ -81,13 +81,22 @@ struct ReelsView: View {
         }
         
         var videoURL: URL? {
+            let quality = ServerConfigManager.shared.activeConfig?.reelsQuality ?? .sd
             switch self {
-            case .scene(let s): return s.videoURL
+            case .scene(let s): return s.bestStream(for: quality) ?? s.videoURL
             case .marker(let m): 
                 // Always use the full scene stream for markers to allow seeking/looping
-                // constructed manually from the scene ID found in the marker
                 if let sceneID = m.scene?.id, let config = ServerConfigManager.shared.loadConfig() {
-                    return URL(string: "\(config.baseURL)/scene/\(sceneID)/stream")
+                    // Try to get HLS stream for the scene with reels quality first
+                    if let scene = m.scene, let url = scene.bestStream(for: quality) {
+                        return url
+                    }
+                    
+                    var urlString = "\(config.baseURL)/scene/\(sceneID)/stream"
+                    if let key = config.secureApiKey {
+                        urlString += "?apikey=\(key)"
+                    }
+                    return URL(string: urlString)
                 }
                 return m.videoURL
             }
@@ -145,7 +154,15 @@ struct ReelsView: View {
             case .marker(let m): return m.scene?.date
             }
         }
+        
+        var sceneID: String? {
+            switch self {
+            case .scene(let s): return s.id
+            case .marker(let m): return m.scene?.id
+            }
+        }
     }
+    
 
     private func applySettings(sortBy: StashDBViewModel.SceneSortOption? = nil, markerSortBy: StashDBViewModel.SceneMarkerSortOption? = nil, filter: StashDBViewModel.SavedFilter?, performer: ScenePerformer? = nil, tags: [Tag] = [], mode: ReelsMode? = nil) {
         if let mode = mode { reelsMode = mode }
@@ -1138,67 +1155,118 @@ struct ReelItemView: View {
     }
     
     func setupPlayer() {
-        guard let streamURL = item.videoURL else { return }
-         
-        player = createPlayer(for: streamURL)
+        guard let sid = item.sceneID else {
+            if let url = item.videoURL { initPlayer(with: url) }
+            return
+        }
         
-        if let player = player {
-            player.isMuted = isMuted
-            player.play()
+        // 1. Start with the immediate URL (legacy or cached) for instant playback
+        if let url = item.videoURL {
+            initPlayer(with: url)
+        }
+        
+        // 2. Background fetch for the "best" stream (MP4/HLS)
+        viewModel.fetchSceneStreams(sceneId: sid) { streams in
+            guard !streams.isEmpty else { return }
             
-            let startTime = item.startTime
-            if startTime > 0 {
-                player.seek(to: CMTime(seconds: startTime, preferredTimescale: 600))
+            let quality = ServerConfigManager.shared.activeConfig?.reelsQuality ?? .sd
+            
+            // Re-evaluate the best URL now that we have the full stream list
+            let bestURL: URL?
+            switch item {
+            case .scene(let s):
+                bestURL = s.withStreams(streams).bestStream(for: quality)
+            case .marker(let m):
+                bestURL = m.scene?.withStreams(streams).bestStream(for: quality)
             }
             
-            // Initial duration guess
-            if let d = item.duration, d > 0 {
-                self.duration = d
-            }
-            
-            // Loop (Scenes only)
-            NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { _ in
-                // Weak capture not needed in Struct-based View usually, but let's be safe if needed, 
-                // though usually impossible in SwiftUI View structs.
-                // standard closure is fine.
-                if case .scene = self.item {
-                    if startTime > 0 {
-                        player.seek(to: CMTime(seconds: startTime, preferredTimescale: 600))
-                    } else {
-                        player.seek(to: .zero)
-                    }
-                    player.play()
-                    incrementPlayCount()
+            if let targetURL = bestURL {
+                // Only switch if the target is significantly different from current (e.g. not just apikey diff)
+                let currentURL = (player?.currentItem?.asset as? AVURLAsset)?.url
+                if currentURL?.path != targetURL.path {
+                    // Priority: Upgrade to MP4 if current is legacy, or better HLS if current is HLS
+                    print("⚡ Reels: Optimization found (\(targetURL.pathExtension)). Switching to improved stream.")
+                    initPlayer(with: targetURL)
                 }
             }
+        }
+    }
+    
+    private func initPlayer(with streamURL: URL) {
+        let headers = ["ApiKey": ServerConfigManager.shared.activeConfig?.secureApiKey ?? ""]
+        let asset = AVURLAsset(url: streamURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+        let newItem = AVPlayerItem(asset: asset)
+        
+        let startTime = item.startTime
+        
+        if let existingPlayer = self.player {
+            // Reuse existing player for smoothness and to prevent VideoPlayer re-renders
+            if let observer = timeObserver {
+                existingPlayer.removeTimeObserver(observer)
+                self.timeObserver = nil
+            }
+            NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: existingPlayer.currentItem)
             
-            // Time Observer
-            let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
-            timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
-                if !self.isSeeking {
-                    self.currentTime = time.seconds
-                }
-                
-                // Marker Loop Logic (20s clip)
-                if case .marker = self.item {
-                     let start = self.item.startTime
-                     let end = start + 20.0
-                     if time.seconds >= end {
-                         player.seek(to: CMTime(seconds: start, preferredTimescale: 600))
-                         player.play()
-                     }
+            existingPlayer.replaceCurrentItem(with: newItem)
+        } else {
+            // First time player creation
+            self.player = createPlayer(for: streamURL) // createPlayer handles AVAudioSession
+        }
+        
+        guard let player = self.player else { return }
+        
+        player.isMuted = isMuted
+        if isPlaying { player.play() }
+        
+        if startTime > 0 {
+            player.seek(to: CMTime(seconds: startTime, preferredTimescale: 600))
+        }
+        
+        // Initial duration guess from model
+        if let d = item.duration, d > 0 {
+            self.duration = d
+        }
+        
+        // Loop (Scenes only)
+        NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { _ in
+            if case .scene = self.item {
+                if startTime > 0 {
+                    player.seek(to: CMTime(seconds: startTime, preferredTimescale: 600))
                 } else {
-                     // Scene duration update
-                     if let d = player.currentItem?.duration.seconds, d > 0, !d.isNaN {
-                         self.duration = d
-                     }
+                    player.seek(to: .zero)
                 }
-            }
-            
-            // Increment play count
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                player.play()
                 incrementPlayCount()
             }
+        }
+        
+        // Time Observer
+        let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
+        timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak player] time in
+            guard let player = player else { return }
+            if !self.isSeeking {
+                self.currentTime = time.seconds
+            }
+            
+            // Marker Loop Logic (20s clip)
+            if case .marker = self.item {
+                 let start = self.item.startTime
+                 let end = start + 20.0
+                 if time.seconds >= end {
+                     player.seek(to: CMTime(seconds: start, preferredTimescale: 600))
+                     player.play()
+                 }
+            } else {
+                 // Scene duration update
+                 if let d = player.currentItem?.duration.seconds, d > 0, !d.isNaN {
+                     self.duration = d
+                 }
+            }
+        }
+        
+        // Increment play count (initial)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            incrementPlayCount()
         }
     }
     

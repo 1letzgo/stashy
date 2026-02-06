@@ -49,7 +49,7 @@ class GraphQLQueries {
     // MARK: - Generic Loading (with caching)
     
     /// Loads a GraphQL query from cache or App Bundle
-    private static func loadQuery(named fileName: String) -> String {
+    static func loadQuery(named fileName: String) -> String {
         // Check cache first (thread-safe)
         if let cached = getCachedQuery(fileName) {
             return cached

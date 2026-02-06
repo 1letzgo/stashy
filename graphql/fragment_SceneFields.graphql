@@ -2,7 +2,7 @@ fragment SceneFields on Scene {
   id title details date organized resume_time play_count o_counter rating100 created_at updated_at
   studio { ...StudioFields }
   performers { ...PerformerFields }
-  files { id path width height duration video_codec audio_codec bit_rate frame_rate }
+  files { id path format width height duration video_codec audio_codec bit_rate frame_rate }
   tags { ...TagFields }
   galleries { id title date image_count }
   paths { screenshot preview stream webp vtt sprite funscript interactive_heatmap caption }

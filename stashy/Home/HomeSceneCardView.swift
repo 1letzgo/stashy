@@ -116,7 +116,7 @@ struct HomeSceneCardView: View {
                     
                     // Resume Progress
                     if let resumeTime = scene.resumeTime, resumeTime > 0, let duration = scene.sceneDuration {
-                        ProgressView(value: resumeTime, total: duration)
+                        ProgressView(value: min(resumeTime, duration), total: duration)
                             .progressViewStyle(LinearProgressViewStyle(tint: appearanceManager.tintColor))
                             .frame(height: 3)
                     }

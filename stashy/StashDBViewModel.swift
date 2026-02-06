@@ -1594,9 +1594,9 @@ class StashDBViewModel: ObservableObject {
               let bodyString = String(data: bodyData, encoding: .utf8) else {
             return
         }
-        
         performGraphQLQuery(query: bodyString) { (response: GalleriesResponse?) in
             if let result = response?.data?.findGalleries {
+    
                 DispatchQueue.main.async {
                     if isInitialLoad {
                         self.studioGalleries = result.galleries
@@ -3225,6 +3225,8 @@ struct Scene: Codable, Identifiable {
     let updatedAt: String?
     let paths: ScenePaths?
     let sceneMarkers: [SceneMarker]?
+    var streams: [SceneStream]?
+    
     
     enum CodingKeys: String, CodingKey {
         case id, title, details, date, duration, studio, performers, files, tags, galleries, organized, rating100, paths
@@ -3235,6 +3237,56 @@ struct Scene: Codable, Identifiable {
         case updatedAt = "updated_at"
         case sceneMarkers = "scene_markers"
     }
+
+    // Explicit initializer to handle manual updates like 'withStreams'
+    init(id: String, title: String?, details: String?, date: String?, duration: Double?, studio: SceneStudio?, performers: [ScenePerformer], files: [SceneFile]?, tags: [Tag]?, galleries: [Gallery]?, organized: Bool?, resumeTime: Double?, playCount: Int?, oCounter: Int?, rating100: Int?, createdAt: String?, updatedAt: String?, paths: ScenePaths?, sceneMarkers: [SceneMarker]?, streams: [SceneStream]? = nil) {
+        self.id = id
+        self.title = title
+        self.details = details
+        self.date = date
+        self.duration = duration
+        self.studio = studio
+        self.performers = performers
+        self.files = files
+        self.tags = tags
+        self.galleries = galleries
+        self.organized = organized
+        self.resumeTime = resumeTime
+        self.playCount = playCount
+        self.oCounter = oCounter
+        self.rating100 = rating100
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.paths = paths
+        self.sceneMarkers = sceneMarkers
+        self.streams = streams
+    }
+
+    // Decodable init
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        title = try container.decodeIfPresent(String.self, forKey: .title)
+        details = try container.decodeIfPresent(String.self, forKey: .details)
+        date = try container.decodeIfPresent(String.self, forKey: .date)
+        duration = try container.decodeIfPresent(Double.self, forKey: .duration)
+        studio = try container.decodeIfPresent(SceneStudio.self, forKey: .studio)
+        performers = try container.decode([ScenePerformer].self, forKey: .performers)
+        files = try container.decodeIfPresent([SceneFile].self, forKey: .files)
+        tags = try container.decodeIfPresent([Tag].self, forKey: .tags)
+        galleries = try container.decodeIfPresent([Gallery].self, forKey: .galleries)
+        organized = try container.decodeIfPresent(Bool.self, forKey: .organized)
+        resumeTime = try container.decodeIfPresent(Double.self, forKey: .resumeTime)
+        playCount = try container.decodeIfPresent(Int.self, forKey: .playCount)
+        oCounter = try container.decodeIfPresent(Int.self, forKey: .oCounter)
+        rating100 = try container.decodeIfPresent(Int.self, forKey: .rating100)
+        createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
+        updatedAt = try container.decodeIfPresent(String.self, forKey: .updatedAt)
+        paths = try container.decodeIfPresent(ScenePaths.self, forKey: .paths)
+        sceneMarkers = try container.decodeIfPresent([SceneMarker].self, forKey: .sceneMarkers)
+        streams = nil // Not in default scene query
+    }
+    
     
     // Compat for older views
     struct SceneTag: Codable, Identifiable {
@@ -3261,44 +3313,196 @@ struct Scene: Codable, Identifiable {
     
     // Computed property for thumbnail URL
     var thumbnailURL: URL? {
+        // Helper to sign the URL with apikey
+        func signed(_ url: URL?) -> URL? {
+            guard let url = url else { return nil }
+            guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty else { return url }
+            if url.query?.lowercased().contains("apikey=") == true { return url }
+            var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            var items = comps?.queryItems ?? []
+            items.append(URLQueryItem(name: "apikey", value: key))
+            comps?.queryItems = items
+            return comps?.url ?? url
+        }
+
         // Use path from API if available
         if let screenshotPath = paths?.screenshot {
-            // Check if it already has params (rare but possible) or ends in extension
             let separator = screenshotPath.contains("?") ? "&" : "?"
-            // Append width optimization
             let optimizedPath = "\(screenshotPath)\(separator)width=640"
             if let url = URL(string: optimizedPath) {
-                 return url
+                 return signed(url)
             }
         }
         
         // Fallback to manual construction
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
-        return URL(string: "\(config.baseURL)/scene/\(id)/screenshot?width=640")
+        return signed(URL(string: "\(config.baseURL)/scene/\(id)/screenshot?width=640"))
     }
 
-    // Computed property for stream URL
-    var videoURL: URL? {
-        // Use path from API if available
-        if let streamPath = paths?.stream, let url = URL(string: streamPath) {
+    /// Finds the best available stream matching the requested quality
+    func bestStream(for quality: StreamingQuality) -> URL? {
+        guard let streams = streams, !streams.isEmpty else { return nil }
+        
+        let compatible = ["mp4", "m4v", "mov"]
+        let fmt = files?.first?.format?.lowercased() ?? ""
+        let isCompatible = compatible.contains(fmt)
+        
+        // Rule: For compatible formats (MP4), always prefer direct streaming (Original)
+        // unless the user specifically requested a different quality and we have a match.
+        if isCompatible && (quality == .original) {
+            print("🎬 MP4 detected: Using direct stream for Original quality.")
+            return nil // Use direct URL from paths?.stream
+        }
+        
+        let hlsStreams = streams.filter { $0.mime_type == "application/vnd.apple.mpegurl" }
+        let mp4Streams = streams.filter { $0.mime_type == "video/mp4" }
+            .filter { !$0.label.lowercased().contains("direct stream") && !$0.label.lowercased().contains("mkv") }
+        
+        let targetRes = quality.maxVerticalResolution ?? 0
+        
+        // Rule: For all other formats (or when specific quality is needed), prioritize HLS
+        if !hlsStreams.isEmpty {
+            if targetRes > 0 {
+                let bestHLS = hlsStreams
+                    .compactMap({ stream -> (SceneStream, Int)? in
+                        let resString = stream.label.lowercased().replacingOccurrences(of: "p", with: "")
+                        if let res = Int(resString) { return (stream, res) }
+                        return nil
+                    })
+                    .filter({ $0.1 <= targetRes })
+                    .sorted(by: { $0.1 > $1.1 })
+                    .first?.0
+                
+                if let stream = bestHLS, let url = URL(string: stream.url) {
+                    print("📺 Using HLS stream (\(stream.label)) for quality \(quality.displayName)")
+                    return url
+                }
+            }
+            
+            // Fallback: Use first HLS if no resolution match or for non-compatible formats
+            if let firstHLS = hlsStreams.first, let url = URL(string: firstHLS.url) {
+                print("📺 Using default HLS stream (\(firstHLS.label))")
+                return url
+            }
+        }
+        
+        // Final fallback to MP4 transcodes if HLS is unavailable
+        if targetRes > 0 {
+            let matchingMP4 = mp4Streams
+                .compactMap { stream -> (SceneStream, Int)? in
+                    let resString = stream.label.lowercased().replacingOccurrences(of: "p", with: "")
+                    if let res = Int(resString) { return (stream, res) }
+                    return nil
+                }
+                .filter { $0.1 <= targetRes }
+                .sorted(by: { $0.1 > $1.1 })
+                .first?.0
+            
+            if let mp4 = matchingMP4, let url = URL(string: mp4.url) {
+                print("⚡ Using MP4 transcode (\(mp4.label)) for quality \(quality.displayName)")
+                return url
+            }
+        }
+        
+        // Catch-all: Try any non-mkv MP4 or just the first stream
+        if let firstMP4 = mp4Streams.first, let url = URL(string: firstMP4.url) {
              return url
         }
         
-        // Fallback to manual construction
-        guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
-        return URL(string: "\(config.baseURL)/scene/\(id)/stream")
+        return nil
     }
+
+    // Computed property for stream URL (respects global default)
+    var videoURL: URL? {
+        let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .fhd
+        
+        // Helper to sign the URL with apikey
+        func signed(_ url: URL?) -> URL? {
+            guard let url = url else { return nil }
+            guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty else { return url }
+            if url.query?.lowercased().contains("apikey=") == true { return url }
+            var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            var items = comps?.queryItems ?? []
+            items.append(URLQueryItem(name: "apikey", value: key))
+            comps?.queryItems = items
+            return comps?.url ?? url
+        }
+
+        // 1. Try best stream (transcoded)
+        if let streamURL = bestStream(for: quality) {
+            return signed(streamURL)
+        }
+
+        // 2. Fallbacks (API path or manual construction)
+        let potentialURL: URL?
+        if let streamPath = paths?.stream, let url = URL(string: streamPath) {
+             potentialURL = url
+        } else if let config = ServerConfigManager.shared.loadConfig() {
+            let urlString = "\(config.baseURL)/scene/\(id)/stream"
+            potentialURL = URL(string: urlString)
+        } else {
+            potentialURL = nil
+        }
+        
+        // Safety Check: If we have file info, verify format compatibility
+        if let files = files, let first = files.first, let fmt = first.format {
+            let compatible = ["mp4", "m4v", "mov"]
+            if !compatible.contains(fmt.lowercased()) {
+                print("⛔️ Preventing fallback to incompatible '\(fmt)' file for scene \(id)")
+                return nil
+            }
+        }
+        
+        return signed(potentialURL)
+    }
+
+    // Computed property for download URL (preferring MP4 transcoded stream)
+    var downloadURL: URL? {
+        // Helper to sign the URL with apikey
+        func signed(_ url: URL?) -> URL? {
+            guard let url = url else { return nil }
+            guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty else { return url }
+            if url.query?.lowercased().contains("apikey=") == true { return url }
+            var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            var items = comps?.queryItems ?? []
+            items.append(URLQueryItem(name: "apikey", value: key))
+            comps?.queryItems = items
+            return comps?.url ?? url
+        }
+
+        // 1. Try to find MP4 stream for local storage
+        if let mp4Stream = streams?.first(where: { $0.mime_type == "video/mp4" }),
+           let url = URL(string: mp4Stream.url) {
+            return signed(url)
+        }
+        
+        // 2. Otherwise use the standard stream URL
+        return videoURL // videoURL is already signed
+    }
+    
     
     // Computed property for preview URL (video preview)
     var previewURL: URL? {
+        // Helper to sign the URL with apikey
+        func signed(_ url: URL?) -> URL? {
+            guard let url = url else { return nil }
+            guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty else { return url }
+            if url.query?.lowercased().contains("apikey=") == true { return url }
+            var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            var items = comps?.queryItems ?? []
+            items.append(URLQueryItem(name: "apikey", value: key))
+            comps?.queryItems = items
+            return comps?.url ?? url
+        }
+
         // Use path from API if available
         if let previewPath = paths?.preview, let url = URL(string: previewPath) {
-             return url
+             return signed(url)
         }
         
         // Fallback to manual construction
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
-        return URL(string: "\(config.baseURL)/scene/\(id)/preview")
+        return signed(URL(string: "\(config.baseURL)/scene/\(id)/preview"))
     }
     
     /// Creates a copy with updated resume time
@@ -3322,7 +3526,8 @@ struct Scene: Codable, Identifiable {
             createdAt: createdAt,
             updatedAt: updatedAt,
             paths: paths,
-            sceneMarkers: sceneMarkers
+            sceneMarkers: sceneMarkers,
+            streams: streams
         )
     }
     
@@ -3347,9 +3552,37 @@ struct Scene: Codable, Identifiable {
             createdAt: createdAt,
             updatedAt: updatedAt,
             paths: paths,
-            sceneMarkers: sceneMarkers
+            sceneMarkers: sceneMarkers,
+            streams: streams
         )
     }
+
+    /// Creates a copy with updated streams
+    func withStreams(_ newStreams: [SceneStream]?) -> Scene {
+        return Scene(
+            id: id,
+            title: title,
+            details: details,
+            date: date,
+            duration: duration,
+            studio: studio,
+            performers: performers,
+            files: files,
+            tags: tags,
+            galleries: galleries,
+            organized: organized,
+            resumeTime: resumeTime,
+            playCount: playCount,
+            oCounter: oCounter,
+            rating100: rating100,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            paths: paths,
+            sceneMarkers: sceneMarkers,
+            streams: newStreams
+        )
+    }
+    
     
     /// Creates a copy with updated play count
     func withPlayCount(_ newPlayCount: Int?) -> Scene {
@@ -3372,9 +3605,11 @@ struct Scene: Codable, Identifiable {
             createdAt: createdAt,
             updatedAt: updatedAt,
             paths: paths,
-            sceneMarkers: sceneMarkers
+            sceneMarkers: sceneMarkers,
+            streams: streams
         )
     }
+    
     
     /// Creates a copy with updated o count
     func withOCounter(_ newOCounter: Int?) -> Scene {
@@ -3397,10 +3632,27 @@ struct Scene: Codable, Identifiable {
             createdAt: createdAt,
             updatedAt: updatedAt,
             paths: paths,
-            sceneMarkers: sceneMarkers
+            sceneMarkers: sceneMarkers,
+            streams: streams
         )
     }
+    
 }
+
+struct SceneStream: Codable {
+    let label: String
+    let mime_type: String
+    let url: String
+}
+
+struct SceneStreamsResponse: Codable {
+    let data: SceneStreamsData?
+}
+
+struct SceneStreamsData: Codable {
+    let sceneStreams: [SceneStream]
+}
+
 
 struct ScenePaths: Codable {
     let screenshot: String?
@@ -3423,18 +3675,89 @@ struct MarkerScene: Codable, Identifiable {
     let rating100: Int?
     let playCount: Int?
     let oCounter: Int?
+    let streams: [SceneStream]?
 
     enum CodingKeys: String, CodingKey {
         case id, title, date, files, performers, rating100
         case playCount = "play_count"
         case oCounter = "o_counter"
+        case streams
     }
 
     func withRating(_ rating: Int?) -> MarkerScene {
-        MarkerScene(id: id, title: title, date: date, files: files, performers: performers, rating100: rating, playCount: playCount, oCounter: oCounter)
+        MarkerScene(id: id, title: title, date: date, files: files, performers: performers, rating100: rating, playCount: playCount, oCounter: oCounter, streams: streams)
     }
     func withOCounter(_ count: Int?) -> MarkerScene {
-        MarkerScene(id: id, title: title, date: date, files: files, performers: performers, rating100: rating100, playCount: playCount, oCounter: count)
+        MarkerScene(id: id, title: title, date: date, files: files, performers: performers, rating100: rating100, playCount: playCount, oCounter: count, streams: streams)
+    }
+    func withStreams(_ newStreams: [SceneStream]?) -> MarkerScene {
+        MarkerScene(id: id, title: title, date: date, files: files, performers: performers, rating100: rating100, playCount: playCount, oCounter: oCounter, streams: newStreams)
+    }
+    
+    /// Finds the best available stream matching the requested quality
+    func bestStream(for quality: StreamingQuality) -> URL? {
+        guard let streams = streams, !streams.isEmpty else { return nil }
+        
+        let compatible = ["mp4", "m4v", "mov"]
+        let fmt = files?.first?.format?.lowercased() ?? ""
+        let isCompatible = compatible.contains(fmt)
+        
+        // For markers, we check the associated scene's file format.
+        if isCompatible && (quality == .original) {
+            return nil // Use direct
+        }
+        
+        let hlsStreams = streams.filter { $0.mime_type == "application/vnd.apple.mpegurl" }
+        let mp4Streams = streams.filter { $0.mime_type == "video/mp4" }
+            .filter { !$0.label.lowercased().contains("direct stream") && !$0.label.lowercased().contains("mkv") }
+        
+        let targetRes = quality.maxVerticalResolution ?? 0
+        
+        // Prioritize HLS for non-MP4 or specific quality
+        if !hlsStreams.isEmpty {
+            if targetRes > 0 {
+                let bestHLS = hlsStreams
+                    .compactMap({ stream -> (SceneStream, Int)? in
+                        let resString = stream.label.lowercased().replacingOccurrences(of: "p", with: "")
+                        if let res = Int(resString) { return (stream, res) }
+                        return nil
+                    })
+                    .filter({ $0.1 <= targetRes })
+                    .sorted(by: { $0.1 > $1.1 })
+                    .first?.0
+                
+                if let stream = bestHLS, let url = URL(string: stream.url) {
+                    return url
+                }
+            }
+            
+            if let firstHLS = hlsStreams.first, let url = URL(string: firstHLS.url) {
+                return url
+            }
+        }
+        
+        // Fallback to MP4 transcode
+        if targetRes > 0 {
+            let matchingMP4 = mp4Streams
+                .compactMap { stream -> (SceneStream, Int)? in
+                    let resString = stream.label.lowercased().replacingOccurrences(of: "p", with: "")
+                    if let res = Int(resString) { return (stream, res) }
+                    return nil
+                }
+                .filter { $0.1 <= targetRes }
+                .sorted(by: { $0.1 > $1.1 })
+                .first?.0
+            
+            if let mp4 = matchingMP4, let url = URL(string: mp4.url) {
+                return url
+            }
+        }
+        
+        if let firstMP4 = mp4Streams.first, let url = URL(string: firstMP4.url) {
+             return url
+        }
+        
+        return nil
     }
 }
 
@@ -3460,44 +3783,102 @@ struct SceneMarker: Codable, Identifiable {
     
     // Computed property for thumbnail URL
     var thumbnailURL: URL? {
+        // Helper to sign the URL with apikey
+        func signed(_ url: URL?) -> URL? {
+            guard let url = url else { return nil }
+            guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty else { return url }
+            if url.query?.lowercased().contains("apikey=") == true { return url }
+            var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            var items = comps?.queryItems ?? []
+            items.append(URLQueryItem(name: "apikey", value: key))
+            comps?.queryItems = items
+            return comps?.url ?? url
+        }
+
         // Use path from API if available
         if let screenshotPath = screenshot, let url = URL(string: screenshotPath) {
-             // If URL(string:) succeeds, check if it's absolute or if we need to prepend baseURL
              if screenshotPath.hasPrefix("http") {
-                 return url
+                 return signed(url)
              } else if let config = ServerConfigManager.shared.loadConfig() {
                  let path = screenshotPath.hasPrefix("/") ? String(screenshotPath.dropFirst()) : screenshotPath
-                 return URL(string: "\(config.baseURL)/\(path)")
+                 return signed(URL(string: "\(config.baseURL)/\(path)"))
              }
         }
         
         // Fallback to manual construction
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
-        return URL(string: "\(config.baseURL)/scenemarker/\(id)/screenshot")
+        return signed(URL(string: "\(config.baseURL)/scenemarker/\(id)/screenshot"))
     }
     
     // Computed property for stream URL
     var videoURL: URL? {
-        if let streamPath = stream, let url = URL(string: streamPath) {
-             return url
+        let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .fhd
+        
+        // Helper to sign the URL with apikey
+        func signed(_ url: URL?) -> URL? {
+            guard let url = url else { return nil }
+            guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty else { return url }
+            if url.query?.lowercased().contains("apikey=") == true { return url }
+            var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            var items = comps?.queryItems ?? []
+            items.append(URLQueryItem(name: "apikey", value: key))
+            comps?.queryItems = items
+            return comps?.url ?? url
         }
-        guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
-        return URL(string: "\(config.baseURL)/scenemarker/\(id)/stream")
+
+        // 1. Try best stream from associated scene (transcoded)
+        if let scene = scene, let streamURL = scene.bestStream(for: quality) {
+            return signed(streamURL)
+        }
+        
+        // 2. Fallbacks (API path or manual construction)
+        let potentialURL: URL?
+        if let streamPath = stream, let url = URL(string: streamPath) {
+             potentialURL = url
+        } else if let config = ServerConfigManager.shared.loadConfig() {
+            potentialURL = URL(string: "\(config.baseURL)/scenemarker/\(id)/stream")
+        } else {
+            potentialURL = nil
+        }
+        
+        // Safety Check: Verify format compatibility from associated scene
+        if let scene = scene, let files = scene.files, let first = files.first, let fmt = first.format {
+            let compatible = ["mp4", "m4v", "mov"]
+            if !compatible.contains(fmt.lowercased()) {
+                print("⛔️ Preventing fallback to incompatible '\(fmt)' file for marker \(id)")
+                return nil
+            }
+        }
+        
+        return signed(potentialURL)
     }
     
     // Computed property for preview URL
     var previewURL: URL? {
+        // Helper to sign the URL with apikey
+        func signed(_ url: URL?) -> URL? {
+            guard let url = url else { return nil }
+            guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty else { return url }
+            if url.query?.lowercased().contains("apikey=") == true { return url }
+            var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
+            var items = comps?.queryItems ?? []
+            items.append(URLQueryItem(name: "apikey", value: key))
+            comps?.queryItems = items
+            return comps?.url ?? url
+        }
+
         if let previewPath = preview, let url = URL(string: previewPath) {
-             return url
+             return signed(url)
         }
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
-        return URL(string: "\(config.baseURL)/scenemarker/\(id)/preview")
+        return signed(URL(string: "\(config.baseURL)/scenemarker/\(id)/preview"))
     }
 }
 
 struct SceneFile: Codable, Identifiable {
     let id: String
     let path: String?
+    let format: String?
     let width: Int?
     let height: Int?
     let duration: Double?
@@ -3507,7 +3888,7 @@ struct SceneFile: Codable, Identifiable {
     let frameRate: Double?
     
     enum CodingKeys: String, CodingKey {
-        case id, path, width, height, duration
+        case id, path, format, width, height, duration
         case videoCodec = "video_codec"
         case audioCodec = "audio_codec"
         case bitRate = "bit_rate"
@@ -4028,6 +4409,7 @@ struct ActiveDownload {
     var progress: Double
 }
 
+@MainActor
 class DownloadManager: NSObject, ObservableObject {
     static let shared = DownloadManager()
     
@@ -4106,6 +4488,15 @@ class DownloadManager: NSObject, ObservableObject {
         let sceneId = scene.id
         guard !isDownloaded(id: sceneId), activeDownloads[sceneId] == nil else { return }
         
+        // 1. Fetch streams first to ensure we get a compatible MP4 if original is not
+        StashDBViewModel().fetchSceneStreams(sceneId: sceneId) { streams in
+            let sceneWithStreams = scene.withStreams(streams)
+            self.startDownload(sceneWithStreams)
+        }
+    }
+
+    private func startDownload(_ scene: Scene) {
+        let sceneId = scene.id
         let title = scene.title ?? "Unknown Scene"
         
         // Mark as started
@@ -4128,8 +4519,8 @@ class DownloadManager: NSObject, ObservableObject {
             }
         }
         
-        // 2. Download Video
-        if let videoURL = scene.videoURL {
+        // 2. Download Video (Uses downloadURL which prefers MP4 transcoded stream)
+        if let videoURL = scene.downloadURL {
             dispatchGroup.enter()
             downloadFile(id: sceneId, from: videoURL, to: sceneFolder.appendingPathComponent("video.mp4")) { progress in
                 DispatchQueue.main.async {
@@ -4204,43 +4595,52 @@ class DownloadManager: NSObject, ObservableObject {
 }
 
 extension DownloadManager: URLSessionDownloadDelegate {
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
-        guard let (id, destination) = downloadTasks[downloadTask] else { return }
-        
-        do {
-            if FileManager.default.fileExists(atPath: destination.path) {
-                try FileManager.default.removeItem(at: destination)
-            }
-            try FileManager.default.moveItem(at: location, to: destination)
-            completionHandlers[id]?(true)
-        } catch {
-            completionHandlers[id]?(false)
-        }
-        
-        downloadTasks.removeValue(forKey: downloadTask)
-        progressHandlers.removeValue(forKey: id)
-        completionHandlers.removeValue(forKey: id)
-    }
-    
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
-        guard let (id, _) = downloadTasks[downloadTask] else { return }
-        let progress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
-        progressHandlers[id]?(progress)
-    }
-    
-    func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
-        if error != nil {
-            guard let downloadTask = task as? URLSessionDownloadTask,
-                  let (id, _) = downloadTasks[downloadTask] else { return }
-            completionHandlers[id]?(false)
+    nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
+        let temporaryURL = location
+        Task { @MainActor in
+            guard let (id, destination) = self.downloadTasks[downloadTask] else { return }
             
-            downloadTasks.removeValue(forKey: downloadTask)
-            progressHandlers.removeValue(forKey: id)
-            completionHandlers.removeValue(forKey: id)
+            do {
+                if FileManager.default.fileExists(atPath: destination.path) {
+                    try FileManager.default.removeItem(at: destination)
+                }
+                try FileManager.default.moveItem(at: temporaryURL, to: destination)
+                self.completionHandlers[id]?(true)
+            } catch {
+                self.completionHandlers[id]?(false)
+            }
+            
+            self.downloadTasks.removeValue(forKey: downloadTask)
+            self.progressHandlers.removeValue(forKey: id)
+            self.completionHandlers.removeValue(forKey: id)
         }
     }
-    func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
-        DispatchQueue.main.async {
+    
+    nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didWriteData bytesWritten: Int64, totalBytesWritten: Int64, totalBytesExpectedToWrite: Int64) {
+        let progress = Double(totalBytesWritten) / Double(totalBytesExpectedToWrite)
+        Task { @MainActor in
+            guard let (id, _) = self.downloadTasks[downloadTask] else { return }
+            self.progressHandlers[id]?(progress)
+        }
+    }
+    
+    nonisolated func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+        let capturedError = error
+        Task { @MainActor in
+            if capturedError != nil {
+                guard let downloadTask = task as? URLSessionDownloadTask,
+                      let (id, _) = self.downloadTasks[downloadTask] else { return }
+                self.completionHandlers[id]?(false)
+                
+                self.downloadTasks.removeValue(forKey: downloadTask)
+                self.progressHandlers.removeValue(forKey: id)
+                self.completionHandlers.removeValue(forKey: id)
+            }
+        }
+    }
+    
+    nonisolated func urlSessionDidFinishEvents(forBackgroundURLSession session: URLSession) {
+        Task { @MainActor in
             if let appDelegate = UIApplication.shared.delegate as? AppDelegate,
                let completionHandler = appDelegate.backgroundSessionCompletionHandler {
                 appDelegate.backgroundSessionCompletionHandler = nil
@@ -4447,6 +4847,30 @@ extension StashDBViewModel {
             
             performGraphQLQuery(query: bodyString) { (response: GalleriesResponse?) in
                 continuation.resume(returning: response?.data?.findGalleries.galleries ?? [])
+            }
+        }
+    }
+    
+    func fetchSceneStreams(sceneId: String, completion: @escaping ([SceneStream]) -> Void) {
+        let query = GraphQLQueries.loadQuery(named: "sceneStreams")
+        let variables = ["id": sceneId]
+        
+        let body: [String: Any] = [
+            "query": query,
+            "variables": variables
+        ]
+        
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion([])
+            return
+        }
+        
+        performGraphQLQuery(query: bodyString) { (response: SceneStreamsResponse?) in
+            let streams = response?.data?.sceneStreams ?? []
+            print("📺 Fetched \(streams.count) transcoded streams for scene \(sceneId)")
+            DispatchQueue.main.async {
+                completion(streams)
             }
         }
     }

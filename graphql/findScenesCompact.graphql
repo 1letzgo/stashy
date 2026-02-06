@@ -80,11 +80,6 @@ query FindScenesCompact(
         webp
         caption
       }
-      sceneStreams {
-        url
-        mime_type
-        label
-      }
       captions {
         language_code
         caption_type

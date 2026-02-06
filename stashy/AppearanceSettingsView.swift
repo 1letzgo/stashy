@@ -12,6 +12,42 @@ struct AppearanceSettingsView: View {
     
     var body: some View {
         List {
+            Section(header: Text("Video Quality")) {
+                if let config = ServerConfigManager.shared.activeConfig {
+                    Picker("Library Quality", selection: Binding(
+                        get: { config.defaultQuality },
+                        set: { newValue in
+                            var updated = config
+                            updated.defaultQuality = newValue
+                            ServerConfigManager.shared.saveConfig(updated)
+                            ServerConfigManager.shared.addOrUpdateServer(updated)
+                        }
+                    )) {
+                        ForEach(StreamingQuality.allCases, id: \.self) { quality in
+                            Text(quality.displayName).tag(quality)
+                        }
+                    }
+                    
+                    Picker("Reels Quality", selection: Binding(
+                        get: { config.reelsQuality },
+                        set: { newValue in
+                            var updated = config
+                            updated.reelsQuality = newValue
+                            ServerConfigManager.shared.saveConfig(updated)
+                            ServerConfigManager.shared.addOrUpdateServer(updated)
+                        }
+                    )) {
+                        ForEach(StreamingQuality.allCases, id: \.self) { quality in
+                            Text(quality.displayName).tag(quality)
+                        }
+                    }
+                } else {
+                    Text("Connect to a server to configure quality settings.")
+                        .foregroundColor(.secondary)
+                        .font(.caption)
+                }
+            }
+            
             Section(header: Text("App Accent Color"), footer: Text("This color will be applied to the tab bar, navigation bar buttons, and other interactive elements throughout the app.")) {
                 // Color Picker
                 ColorPicker("Custom Color", selection: $appearanceManager.tintColor, supportsOpacity: false)

@@ -23,6 +23,28 @@ enum ServerProtocol: String, Codable, CaseIterable {
     }
 }
 
+enum StreamingQuality: String, Codable, CaseIterable {
+    case original = "Original"
+    case uhd = "4K (2160p)"
+    case fhd = "Full HD (1080p)"
+    case hd = "HD (720p)"
+    case sd = "Standard (480p)"
+    case low = "Low (240p)"
+    
+    var displayName: String { rawValue }
+    
+    var maxVerticalResolution: Int? {
+        switch self {
+        case .original: return nil
+        case .uhd: return 2160
+        case .fhd: return 1080
+        case .hd: return 720
+        case .sd: return 480
+        case .low: return 240
+        }
+    }
+}
+
 // Legacy enum for backward compatibility
 enum ConnectionType: String, Codable, CaseIterable {
     case ipAddress = "IP Address"
@@ -40,6 +62,8 @@ struct ServerConfig: Codable, Identifiable, Equatable {
     var port: String?          // Optional port
     var serverProtocol: ServerProtocol
     var apiKey: String?        // Optional API Key for authentication
+    var defaultQuality: StreamingQuality = .fhd
+    var reelsQuality: StreamingQuality = .sd
 
     var baseURL: String {
         let effectivePort = port ?? serverProtocol.defaultPort
@@ -81,7 +105,9 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         serverAddress: String,
         port: String? = nil,
         serverProtocol: ServerProtocol = .https,
-        apiKey: String? = nil
+        apiKey: String? = nil,
+        defaultQuality: StreamingQuality = .fhd,
+        reelsQuality: StreamingQuality = .sd
     ) {
         self.id = id
         self.name = name
@@ -89,6 +115,8 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         self.port = port
         self.serverProtocol = serverProtocol
         self.apiKey = apiKey
+        self.defaultQuality = defaultQuality
+        self.reelsQuality = reelsQuality
     }
     
     // Backward compatibility decoder
@@ -98,6 +126,8 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         name = try container.decodeIfPresent(String.self, forKey: .name) ?? "My Stash"
         apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey)
+        defaultQuality = try container.decodeIfPresent(StreamingQuality.self, forKey: .defaultQuality) ?? .fhd
+        reelsQuality = try container.decodeIfPresent(StreamingQuality.self, forKey: .reelsQuality) ?? .sd
         
         // Try to decode new format first
         if let serverAddress = try? container.decode(String.self, forKey: .serverAddress),
@@ -135,12 +165,14 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(port, forKey: .port)
         try container.encode(serverProtocol, forKey: .serverProtocol)
         try container.encodeIfPresent(apiKey, forKey: .apiKey)
+        try container.encode(defaultQuality, forKey: .defaultQuality)
+        try container.encode(reelsQuality, forKey: .reelsQuality)
     }
     
     enum CodingKeys: String, CodingKey {
         case id, name, apiKey
         // New format keys
-        case serverAddress, port, serverProtocol
+        case serverAddress, port, serverProtocol, defaultQuality, reelsQuality
         // Legacy format keys (for backward compatibility)
         case connectionType, ipAddress, domain, useHTTPS
     }
