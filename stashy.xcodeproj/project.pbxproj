@@ -46,7 +46,16 @@
 		DF90B75E2F1A5ECF003ED852 /* StarRatingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */; };
 		DF90B7642F1ACEA3003ED852 /* ServerSetupWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B7632F1ACEA3003ED852 /* ServerSetupWizardView.swift */; };
 		DF90B7662F1B72E5003ED852 /* UniversalSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B7652F1B72E5003ED852 /* UniversalSearchView.swift */; };
-		DFE5045C2E8A8C0100323FF0 /* ServerConfigView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045B2E8A8C0100323FF0 /* ServerConfigView.swift */; };
+		DFST000032F30A0000000003 /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000022F30A0000000002 /* SettingsView.swift */; };
+		DFST000052F30A0000000005 /* ServerListSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000042F30A0000000004 /* ServerListSection.swift */; };
+		DFST000072F30A0000000007 /* ServerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000062F30A0000000006 /* ServerDetailView.swift */; };
+		DFST000092F30A0000000009 /* PlaybackSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000082F30A0000000008 /* PlaybackSettingsSection.swift */; };
+		DFST0000B2F30A000000000B /* ContentSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST0000A2F30A000000000A /* ContentSettingsSection.swift */; };
+		DFST0000D2F30A000000000D /* DashboardSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST0000C2F30A000000000C /* DashboardSettingsView.swift */; };
+		DFST0000F2F30A000000000F /* ReelsModeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST0000E2F30A000000000E /* ReelsModeSettingsView.swift */; };
+		DFST000112F30A0000000011 /* DefaultSortView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000102F30A0000000010 /* DefaultSortView.swift */; };
+		DFST000132F30A0000000013 /* DefaultFilterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000122F30A0000000012 /* DefaultFilterView.swift */; };
+		DFST000152F30A0000000015 /* ServerStatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000142F30A0000000014 /* ServerStatisticsView.swift */; };
 		DFE5045E2E8A8C2000323FF0 /* ScenesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045D2E8A8C2000323FF0 /* ScenesView.swift */; };
 		DFE5045F2E8A8C2000323FF0 /* SceneDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045D2E8A8C2000323FF1 /* SceneDetailView.swift */; };
 		DFE504602E8A8C2000323FF0 /* PerformerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045D2E8A8C2000323FF2 /* PerformerDetailView.swift */; };
@@ -102,7 +111,16 @@
 		DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarRatingView.swift; sourceTree = "<group>"; };
 		DF90B7632F1ACEA3003ED852 /* ServerSetupWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSetupWizardView.swift; sourceTree = "<group>"; };
 		DF90B7652F1B72E5003ED852 /* UniversalSearchView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = UniversalSearchView.swift; sourceTree = "<group>"; };
-		DFE5045B2E8A8C0100323FF0 /* ServerConfigView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerConfigView.swift; sourceTree = "<group>"; };
+		DFST000022F30A0000000002 /* SettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsView.swift; sourceTree = "<group>"; };
+		DFST000042F30A0000000004 /* ServerListSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerListSection.swift; sourceTree = "<group>"; };
+		DFST000062F30A0000000006 /* ServerDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerDetailView.swift; sourceTree = "<group>"; };
+		DFST000082F30A0000000008 /* PlaybackSettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlaybackSettingsSection.swift; sourceTree = "<group>"; };
+		DFST0000A2F30A000000000A /* ContentSettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentSettingsSection.swift; sourceTree = "<group>"; };
+		DFST0000C2F30A000000000C /* DashboardSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSettingsView.swift; sourceTree = "<group>"; };
+		DFST0000E2F30A000000000E /* ReelsModeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReelsModeSettingsView.swift; sourceTree = "<group>"; };
+		DFST000102F30A0000000010 /* DefaultSortView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultSortView.swift; sourceTree = "<group>"; };
+		DFST000122F30A0000000012 /* DefaultFilterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultFilterView.swift; sourceTree = "<group>"; };
+		DFST000142F30A0000000014 /* ServerStatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerStatisticsView.swift; sourceTree = "<group>"; };
 		DFE5045D2E8A8C2000323FF0 /* ScenesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenesView.swift; sourceTree = "<group>"; };
 		DFE5045D2E8A8C2000323FF1 /* SceneDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDetailView.swift; sourceTree = "<group>"; };
 		DFE5045D2E8A8C2000323FF2 /* PerformerDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformerDetailView.swift; sourceTree = "<group>"; };
@@ -146,9 +164,9 @@
 			children = (
 				08FB7794FE84155DC02AAC07 /* App.swift */,
 				DF22BB312F1831C7007C2090 /* AppearanceManager.swift */,
-				DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */,
 				AA0000022E8A9C0000000001 /* Assets.xcassets */,
 				DF675E612F2A46A1004CA019 /* Home */,
+				DFST000012F30A0000000001 /* Settings */,
 				DF22BB142F167223007C2090 /* CatalogsView.swift */,
 				DF22BB172F16743C007C2090 /* DownloadsView.swift */,
 				E69F93D1B9EB47B88F9597C3 /* FilterModels.swift */,
@@ -172,7 +190,6 @@
 				DFE5045D2E8A8C2000323FF1 /* SceneDetailView.swift */,
 				DFE5045D2E8A8C2000323FF0 /* ScenesView.swift */,
 				08FB779EFE84155DC02AAC07 /* ServerConfig.swift */,
-				DFE5045B2E8A8C0100323FF0 /* ServerConfigView.swift */,
 				DFSM000062F2NEWFILE006 /* ServerFormViewNew.swift */,
 				DF90B7632F1ACEA3003ED852 /* ServerSetupWizardView.swift */,
 				DF22BB1C2F16743C007C2090 /* SharedUtilities.swift */,
@@ -230,6 +247,24 @@
 				DF675E782F2A6392004CA019 /* Components */,
 			);
 			path = SceneDetail;
+			sourceTree = "<group>";
+		};
+		DFST000012F30A0000000001 /* Settings */ = {
+			isa = PBXGroup;
+			children = (
+				DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */,
+				DFST0000A2F30A000000000A /* ContentSettingsSection.swift */,
+				DFST0000C2F30A000000000C /* DashboardSettingsView.swift */,
+				DFST000122F30A0000000012 /* DefaultFilterView.swift */,
+				DFST000102F30A0000000010 /* DefaultSortView.swift */,
+				DFST000082F30A0000000008 /* PlaybackSettingsSection.swift */,
+				DFST0000E2F30A000000000E /* ReelsModeSettingsView.swift */,
+				DFST000062F30A0000000006 /* ServerDetailView.swift */,
+				DFST000042F30A0000000004 /* ServerListSection.swift */,
+				DFST000142F30A0000000014 /* ServerStatisticsView.swift */,
+				DFST000022F30A0000000002 /* SettingsView.swift */,
+			);
+			path = Settings;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -323,7 +358,16 @@
 				DF675E7C2F2A6392004CA019 /* SceneStudioCard.swift in Sources */,
 				DF675E7D2F2A6392004CA019 /* ScenePerformersCard.swift in Sources */,
 				DF675E7E2F2A6392004CA019 /* SceneTagsCard.swift in Sources */,
-				DFE5045C2E8A8C0100323FF0 /* ServerConfigView.swift in Sources */,
+				DFST000032F30A0000000003 /* SettingsView.swift in Sources */,
+				DFST000052F30A0000000005 /* ServerListSection.swift in Sources */,
+				DFST000072F30A0000000007 /* ServerDetailView.swift in Sources */,
+				DFST000092F30A0000000009 /* PlaybackSettingsSection.swift in Sources */,
+				DFST0000B2F30A000000000B /* ContentSettingsSection.swift in Sources */,
+				DFST0000D2F30A000000000D /* DashboardSettingsView.swift in Sources */,
+				DFST0000F2F30A000000000F /* ReelsModeSettingsView.swift in Sources */,
+				DFST000112F30A0000000011 /* DefaultSortView.swift in Sources */,
+				DFST000132F30A0000000013 /* DefaultFilterView.swift in Sources */,
+				DFST000152F30A0000000015 /* ServerStatisticsView.swift in Sources */,
 				DFE5045E2E8A8C2000323FF0 /* ScenesView.swift in Sources */,
 				DFE5045F2E8A8C2000323FF0 /* SceneDetailView.swift in Sources */,
 				DF675E6D2F2A6386004CA019 /* GalleryRepository.swift in Sources */,

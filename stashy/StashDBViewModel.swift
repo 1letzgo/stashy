@@ -4002,20 +4002,22 @@ struct SceneMarker: Codable, Identifiable {
     let id: String
     let title: String?
     let seconds: Double
+    let endSeconds: Double?
     let primaryTag: Tag?
     let tags: [Tag]?
     let screenshot: String?
     let preview: String?
     let stream: String?
     let scene: MarkerScene?
-    
+
     enum CodingKeys: String, CodingKey {
         case id, title, seconds, tags, screenshot, preview, stream, scene
+        case endSeconds = "end_seconds"
         case primaryTag = "primary_tag"
     }
-    
+
     func withScene(_ newScene: MarkerScene?) -> SceneMarker {
-        SceneMarker(id: id, title: title, seconds: seconds, primaryTag: primaryTag, tags: tags, screenshot: screenshot, preview: preview, stream: stream, scene: newScene)
+        SceneMarker(id: id, title: title, seconds: seconds, endSeconds: endSeconds, primaryTag: primaryTag, tags: tags, screenshot: screenshot, preview: preview, stream: stream, scene: newScene)
     }
     
     // Computed property for thumbnail URL

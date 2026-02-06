@@ -22,7 +22,7 @@ struct ReelsView: View {
     @State private var currentVisibleSceneId: String?
     @State private var showDeleteConfirmation = false
     @State private var sceneToDelete: Scene?
-    @State private var reelsMode: ReelsMode = .scenes
+    @State private var reelsMode: ReelsMode = ReelsMode(from: TabManager.shared.enabledReelsModes.first ?? .scenes)
     @State private var selectedMarkerSortOption: StashDBViewModel.SceneMarkerSortOption = .random
     @State private var selectedClipSortOption: StashDBViewModel.ImageSortOption = .random
     @State private var selectedClipFilter: StashDBViewModel.SavedFilter?
@@ -152,7 +152,14 @@ struct ReelsView: View {
             case .clip: return 0
             }
         }
-        
+
+        var endTime: Double? {
+            switch self {
+            case .marker(let m): return m.endSeconds
+            default: return nil
+            }
+        }
+
         var duration: Double? {
             switch self {
             case .scene(let s): return s.duration
@@ -1582,10 +1589,10 @@ struct ReelItemView: View {
                 self.currentTime = time.seconds
             }
             
-            // Marker Loop Logic (20s clip)
+            // Marker Loop Logic (use end_seconds if available, otherwise 20s clip)
             if case .marker = self.item {
                  let start = self.item.startTime
-                 let end = start + 20.0
+                 let end = self.item.endTime ?? (start + 20.0)
                  if time.seconds >= end {
                      player.seek(to: CMTime(seconds: start, preferredTimescale: 600))
                      player.play()

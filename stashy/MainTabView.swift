@@ -171,7 +171,7 @@ extension MainTabView {
             
         case .settings:
             NavigationStack {
-                ServerConfigView()
+                SettingsView()
                     .applyAppBackground()
             }
             .id(coordinator.settingsTabID)

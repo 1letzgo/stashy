@@ -11,7 +11,9 @@
       "Bash(pkill:*)",
       "Bash(xargs:*)",
       "Bash(ls:*)",
-      "Bash(wc:*)"
+      "Bash(wc:*)",
+      "Bash(python3:*)",
+      "Bash(xcodebuild:*)"
     ]
   }
 }

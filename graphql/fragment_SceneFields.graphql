@@ -10,6 +10,7 @@ fragment SceneFields on Scene {
     id
     title
     seconds
+    end_seconds
     primary_tag { id name }
     tags { id name }
     screenshot
