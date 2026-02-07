@@ -260,17 +260,17 @@ struct ReelsView: View {
         selectedPerformer = performer
         selectedTags = tags
         
-        // Merge performer and tags into filter if needed (Used for Scenes/Markers)
+        // Merge performer and tags into filter if needed
         let mergedFilter = viewModel.mergeFilterWithCriteria(filter: filter, performer: performer, tags: tags)
-        
+        let mergedClipFilter = viewModel.mergeFilterWithCriteria(filter: selectedClipFilter, performer: performer, tags: tags)
+
         switch reelsMode {
         case .scenes:
             viewModel.fetchScenes(sortBy: selectedSortOption, filter: mergedFilter)
         case .markers:
             viewModel.fetchSceneMarkers(sortBy: selectedMarkerSortOption, filter: mergedFilter)
         case .clips:
-            // ALSO use mergedFilter for clips to support Performer/Tags
-            viewModel.fetchClips(sortBy: selectedClipSortOption, filter: mergedFilter, isInitialLoad: true)
+            viewModel.fetchClips(sortBy: selectedClipSortOption, filter: mergedClipFilter, isInitialLoad: true)
         }
     }
 
@@ -1568,7 +1568,7 @@ struct ReelItemView: View {
             self.duration = d
         }
         
-        // Loop (Scenes only)
+        // Loop (Scenes and Clips)
         NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { _ in
             if case .scene = self.item {
                 if startTime > 0 {
@@ -1578,6 +1578,9 @@ struct ReelItemView: View {
                 }
                 player.play()
                 incrementPlayCount()
+            } else if case .clip = self.item {
+                player.seek(to: .zero)
+                player.play()
             }
         }
         
