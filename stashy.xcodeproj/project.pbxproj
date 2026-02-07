@@ -69,6 +69,8 @@
 		DFSM000012F2NEWFILE001 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSM000022F2NEWFILE002 /* KeychainManager.swift */; };
 		DFSM000032F2NEWFILE003 /* OnboardingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSM000042F2NEWFILE004 /* OnboardingView.swift */; };
 		DFSM000052F2NEWFILE005 /* ServerFormViewNew.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSM000062F2NEWFILE006 /* ServerFormViewNew.swift */; };
+		DFIAP00012F30B0000000001 /* StoreManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFIAP00022F30B0000000002 /* StoreManager.swift */; };
+		DFIAP00032F30B0000000003 /* SupportSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFIAP00042F30B0000000004 /* SupportSection.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -135,6 +137,9 @@
 		DFSM000022F2NEWFILE002 /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
 		DFSM000042F2NEWFILE004 /* OnboardingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingView.swift; sourceTree = "<group>"; };
 		DFSM000062F2NEWFILE006 /* ServerFormViewNew.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerFormViewNew.swift; sourceTree = "<group>"; };
+		DFIAP00022F30B0000000002 /* StoreManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StoreManager.swift; sourceTree = "<group>"; };
+		DFIAP00042F30B0000000004 /* SupportSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SupportSection.swift; sourceTree = "<group>"; };
+		DFIAP00062F30B0000000006 /* Configuration.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Configuration.storekit; sourceTree = "<group>"; };
 		E69F93D1B9EB47B88F9597C3 /* FilterModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterModels.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -195,12 +200,14 @@
 				DF22BB1C2F16743C007C2090 /* SharedUtilities.swift */,
 				DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */,
 				08FB77A2FE84155DC02AAC07 /* StashDBViewModel.swift */,
+				DFIAP00022F30B0000000002 /* StoreManager.swift */,
 				DFE5045D2E8A8C2000323FF4 /* StudioDetailView.swift */,
 				5A626B91113242AAAF2D9CC3 /* StudioFiltersView.swift */,
 				DFE504612E8A8C4000323FF0 /* StudiosView.swift */,
 				DFF7EE402F0D3D2800344A8B /* TabManager.swift */,
 				DF22BB1D2F16743C007C2090 /* TagsView.swift */,
 				DF90B7652F1B72E5003ED852 /* UniversalSearchView.swift */,
+				DFIAP00062F30B0000000006 /* Configuration.storekit */,
 			);
 			path = stashy;
 			sourceTree = "<group>";
@@ -263,6 +270,7 @@
 				DFST000042F30A0000000004 /* ServerListSection.swift */,
 				DFST000142F30A0000000014 /* ServerStatisticsView.swift */,
 				DFST000022F30A0000000002 /* SettingsView.swift */,
+				DFIAP00042F30B0000000004 /* SupportSection.swift */,
 			);
 			path = Settings;
 			sourceTree = "<group>";
@@ -413,6 +421,8 @@
 				DFSM000012F2NEWFILE001 /* KeychainManager.swift in Sources */,
 				DFSM000032F2NEWFILE003 /* OnboardingView.swift in Sources */,
 				DFSM000052F2NEWFILE005 /* ServerFormViewNew.swift in Sources */,
+				DFIAP00012F30B0000000001 /* StoreManager.swift in Sources */,
+				DFIAP00032F30B0000000003 /* SupportSection.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

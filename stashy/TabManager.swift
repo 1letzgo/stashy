@@ -387,13 +387,21 @@ class TabManager: ObservableObject {
         
         if let data = data,
            let decoded = try? JSONDecoder().decode([HomeRowConfig].self, from: data) {
-            self.homeRows = decoded.sorted { $0.sortOrder < $1.sortOrder }
-            
-            // Force update titles for predefined types to ensure they match new defaults
-            for index in 0..<self.homeRows.count {
-                let row = self.homeRows[index]
-                self.homeRows[index].title = row.type.defaultTitle
+            // Deduplicate by type (keep the first occurrence of each type)
+            var seenTypes = Set<HomeRowType>()
+            let unique = decoded.sorted { $0.sortOrder < $1.sortOrder }.filter { row in
+                if seenTypes.contains(row.type) { return false }
+                seenTypes.insert(row.type)
+                return true
             }
+            self.homeRows = unique
+
+            // Re-assign sort orders after dedup
+            for i in 0..<self.homeRows.count {
+                self.homeRows[i].sortOrder = i
+                self.homeRows[i].title = self.homeRows[i].type.defaultTitle
+            }
+            if unique.count != decoded.count { saveHomeRows() }
             ensureStatisticsRow()
             ensureMostViewedRow()
             ensureRandomRow()

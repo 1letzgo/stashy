@@ -14,7 +14,7 @@ struct ReelsView: View {
     @ObservedObject private var tabManager = TabManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @EnvironmentObject var coordinator: NavigationCoordinator
-    @State private var selectedSortOption: StashDBViewModel.SceneSortOption = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
+    @State private var selectedSortOption: StashDBViewModel.SceneSortOption = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .scenes) ?? "") ?? .random
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
     @State private var selectedPerformer: ScenePerformer?
     @State private var selectedTags: [Tag] = []
@@ -23,8 +23,8 @@ struct ReelsView: View {
     @State private var showDeleteConfirmation = false
     @State private var sceneToDelete: Scene?
     @State private var reelsMode: ReelsMode = ReelsMode(from: TabManager.shared.enabledReelsModes.first ?? .scenes)
-    @State private var selectedMarkerSortOption: StashDBViewModel.SceneMarkerSortOption = .random
-    @State private var selectedClipSortOption: StashDBViewModel.ImageSortOption = .random
+    @State private var selectedMarkerSortOption: StashDBViewModel.SceneMarkerSortOption = StashDBViewModel.SceneMarkerSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .markers) ?? "") ?? .random
+    @State private var selectedClipSortOption: StashDBViewModel.ImageSortOption = StashDBViewModel.ImageSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .clips) ?? "") ?? .random
     @State private var selectedClipFilter: StashDBViewModel.SavedFilter?
 
     enum ReelsMode: String, CaseIterable {
@@ -239,17 +239,20 @@ struct ReelsView: View {
     private func applySettings(sortBy: StashDBViewModel.SceneSortOption? = nil, markerSortBy: StashDBViewModel.SceneMarkerSortOption? = nil, clipSortBy: StashDBViewModel.ImageSortOption? = nil, filter: StashDBViewModel.SavedFilter?, clipFilter: StashDBViewModel.SavedFilter? = nil, performer: ScenePerformer? = nil, tags: [Tag] = [], mode: ReelsMode? = nil) {
         if let mode = mode { reelsMode = mode }
         
+        // Update local state and persist to Mode-Specific Config
         if let sortBy = sortBy {
             selectedSortOption = sortBy
-            TabManager.shared.setSortOption(for: .reels, option: sortBy.rawValue)
+            TabManager.shared.setReelsDefaultSort(for: .scenes, option: sortBy.rawValue)
         }
         
         if let markerSortBy = markerSortBy {
             selectedMarkerSortOption = markerSortBy
+            TabManager.shared.setReelsDefaultSort(for: .markers, option: markerSortBy.rawValue)
         }
         
         if let clipSortBy = clipSortBy {
             selectedClipSortOption = clipSortBy
+            TabManager.shared.setReelsDefaultSort(for: .clips, option: clipSortBy.rawValue)
         }
         
         if let clipFilter = clipFilter {
@@ -331,7 +334,10 @@ struct ReelsView: View {
                 coordinator.reelsPerformer = nil
                 coordinator.reelsTags = []
                 
-                let savedSort = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
+                // Load saved sort for Scenes mode (default for nav context)
+                let savedSortStr = TabManager.shared.getReelsDefaultSort(for: .scenes)
+                let savedSort = StashDBViewModel.SceneSortOption(rawValue: savedSortStr ?? "") ?? .random
+                
                 applySettings(sortBy: savedSort, filter: selectedFilter, performer: initialPerformer, tags: initialTags)
             } else {
                 let isCurrentlyEmpty = (reelsMode == .scenes ? viewModel.scenes.isEmpty : viewModel.sceneMarkers.isEmpty)
@@ -353,8 +359,22 @@ struct ReelsView: View {
                             initialFilter = viewModel.savedFilters[defId]
                         }
                         
-                        let savedSort = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
-                        applySettings(sortBy: savedSort, filter: initialFilter, performer: selectedPerformer, tags: selectedTags)
+                        // Load saved sort for current mode
+                        let currentModeType = reelsMode.toModeType
+                        let savedSortStr = TabManager.shared.getReelsDefaultSort(for: currentModeType)
+                        
+                        // Apply based on mode
+                        switch reelsMode {
+                        case .scenes:
+                            let savedSort = StashDBViewModel.SceneSortOption(rawValue: savedSortStr ?? "") ?? .random
+                            applySettings(sortBy: savedSort, filter: initialFilter, performer: selectedPerformer, tags: selectedTags)
+                        case .markers:
+                            let savedSort = StashDBViewModel.SceneMarkerSortOption(rawValue: savedSortStr ?? "") ?? .random
+                            applySettings(markerSortBy: savedSort, filter: initialFilter, performer: selectedPerformer, tags: selectedTags)
+                        case .clips:
+                            let savedSort = StashDBViewModel.ImageSortOption(rawValue: savedSortStr ?? "") ?? .random
+                            applySettings(clipSortBy: savedSort, filter: nil, clipFilter: selectedClipFilter)
+                        }
                     }
                 }
             }
@@ -385,8 +405,21 @@ struct ReelsView: View {
                     // Filters arrived but no default matches, no default set, or NO filters on server.
                     // Follow the 'clean' fix: just load unfiltered content.
                     print("ℹ️ ReelsView: No default filter found on server, loading unfiltered \(reelsMode.rawValue)")
-                    let savedSort = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
-                    applySettings(sortBy: savedSort, filter: nil, performer: selectedPerformer, tags: selectedTags)
+                    
+                    // Load saved sort for current mode
+                    let currentModeType = reelsMode.toModeType
+                    let savedSortStr = TabManager.shared.getReelsDefaultSort(for: currentModeType)
+                    
+                    if reelsMode == .scenes {
+                        let savedSort = StashDBViewModel.SceneSortOption(rawValue: savedSortStr ?? "") ?? .random
+                        applySettings(sortBy: savedSort, filter: nil, performer: selectedPerformer, tags: selectedTags)
+                    } else if reelsMode == .markers {
+                        let savedSort = StashDBViewModel.SceneMarkerSortOption(rawValue: savedSortStr ?? "") ?? .random
+                        applySettings(markerSortBy: savedSort, filter: nil, performer: selectedPerformer, tags: selectedTags)
+                    } else {
+                         let savedSort = StashDBViewModel.ImageSortOption(rawValue: savedSortStr ?? "") ?? .random
+                         applySettings(clipSortBy: savedSort, filter: nil, clipFilter: selectedClipFilter)
+                    }
                 }
             }
         }
@@ -403,8 +436,20 @@ struct ReelsView: View {
                     if let defId = defaultId, let filter = viewModel.savedFilters[defId] {
                          applySettings(sortBy: selectedSortOption, filter: filter, performer: selectedPerformer, tags: selectedTags)
                     } else {
-                         let savedSort = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .reels) ?? "") ?? .random
-                         applySettings(sortBy: savedSort, filter: nil, performer: selectedPerformer, tags: selectedTags)
+                         // Load saved sort for current mode
+                         let currentModeType = reelsMode.toModeType
+                         let savedSortStr = TabManager.shared.getReelsDefaultSort(for: currentModeType)
+                         
+                         if reelsMode == .scenes {
+                             let savedSort = StashDBViewModel.SceneSortOption(rawValue: savedSortStr ?? "") ?? .random
+                             applySettings(sortBy: savedSort, filter: nil, performer: selectedPerformer, tags: selectedTags)
+                         } else if reelsMode == .markers {
+                             let savedSort = StashDBViewModel.SceneMarkerSortOption(rawValue: savedSortStr ?? "") ?? .random
+                             applySettings(markerSortBy: savedSort, filter: nil, performer: selectedPerformer, tags: selectedTags)
+                         } else {
+                             let savedSort = StashDBViewModel.ImageSortOption(rawValue: savedSortStr ?? "") ?? .random
+                             applySettings(clipSortBy: savedSort, filter: nil, clipFilter: selectedClipFilter)
+                         }
                     }
                 }
             }

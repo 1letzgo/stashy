@@ -84,14 +84,6 @@ struct SceneDetailView: View {
                     }
                 }
 
-                // Delete Button
-                Button(role: .destructive) {
-                    showDeleteWithFilesConfirmation = true
-                } label: {
-                    Image(systemName: "trash")
-                        .foregroundColor(appearanceManager.tintColor)
-                }
-                .tint(appearanceManager.tintColor)
             }
         }
     }
@@ -139,6 +131,22 @@ struct SceneDetailView: View {
                         tagsTotalHeight: $tagsTotalHeight
                     )
                 }
+                
+                // Delete Scene Button (Card Style)
+                Button(role: .destructive) {
+                    showDeleteWithFilesConfirmation = true
+                } label: {
+                    HStack {
+                        Image(systemName: "trash")
+                        Text("Delete Scene")
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding()
+                    .background(appearanceManager.tintColor.opacity(0.1))
+                    .foregroundColor(appearanceManager.tintColor)
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                }
+                .padding(.top, 10)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 16)

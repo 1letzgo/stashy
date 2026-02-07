@@ -9,6 +9,7 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject var storeManager = StoreManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @ObservedObject private var configManager = ServerConfigManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -70,6 +71,9 @@ struct SettingsView: View {
                 }
             }
 
+            // MARK: - Support
+            SupportSection(storeManager: storeManager)
+
             // MARK: - About
             aboutSection
         }
@@ -100,6 +104,10 @@ struct SettingsView: View {
                 })
             }
             .presentationDetents([.medium, .large])
+        }
+        .task {
+            await storeManager.loadProducts()
+            await storeManager.checkSubscriptionStatus()
         }
         .onAppear {
             if configManager.activeConfig != nil {

@@ -13,7 +13,6 @@ struct HomeView: View {
     @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
-    @Environment(\.openURL) var openURL
 
     var body: some View {
         ZStack {
@@ -44,21 +43,6 @@ struct HomeView: View {
 
         .navigationTitle("Dashboard")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            if isTestFlightBuild() {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: {
-                        if let url = URL(string: "https://apps.apple.com/us/app/stashy/id6754876029") {
-                            openURL(url)
-                        }
-                    }) {
-                        Image(systemName: "bag.circle.fill")
-                            .font(.system(size: 28))
-                            .foregroundColor(.blue)
-                    }
-                }
-            }
-        }
         .onAppear {
             if configManager.activeConfig != nil {
                 viewModel.initializeServerConnection()
