@@ -2899,6 +2899,32 @@ struct GenerateData: Codable {
         }
     }
 
+    func incrementImageOCounter(imageId: String, completion: ((Int?) -> Void)? = nil) {
+        let mutation = """
+        {
+          "query": "mutation ImageIncrementO($id: ID!) { imageIncrementO(id: $id) }",
+          "variables": { "id": "\(imageId)" }
+        }
+        """
+        
+        print("📷 IMAGE O: Sending increment mutation for image \(imageId)")
+        performGraphQLMutationSilent(query: mutation) { result in
+            if let result = result,
+               let data = result["data"]?.value as? [String: Any],
+               let count = data["imageIncrementO"] as? Int {
+                print("✅ IMAGE O: Success for image \(imageId). New count: \(count)")
+                DispatchQueue.main.async {
+                    completion?(count)
+                }
+            } else {
+                print("❌ IMAGE O: Failed for image \(imageId)")
+                DispatchQueue.main.async {
+                    completion?(nil)
+                }
+            }
+        }
+    }
+    
     func updateImageOCounter(imageId: String, oCounter: Int?, completion: @escaping (Bool) -> Void) {
         let mutation = """
         mutation ImageUpdate($input: ImageUpdateInput!) {
@@ -3276,6 +3302,7 @@ struct ImageUpdateData: Codable {
 struct ImageRatingUpdateItem: Codable {
     let id: String
     let rating100: Int?
+    let o_counter: Int?
 }
 
 struct PerformerUpdateResponse: Codable {

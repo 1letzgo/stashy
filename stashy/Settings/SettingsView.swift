@@ -9,7 +9,6 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
-    @ObservedObject var storeManager = StoreManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @ObservedObject private var configManager = ServerConfigManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -23,6 +22,13 @@ struct SettingsView: View {
 
     var body: some View {
         Form {
+            // MARK: - App Store (TestFlight only)
+            if isTestFlightBuild() {
+                Section {
+                    appStoreBanner
+                }
+            }
+
             // MARK: - Server
             ServerListSection(
                 viewModel: viewModel,
@@ -71,9 +77,6 @@ struct SettingsView: View {
                 }
             }
 
-            // MARK: - Support
-            SupportSection(storeManager: storeManager)
-
             // MARK: - About
             aboutSection
         }
@@ -105,10 +108,6 @@ struct SettingsView: View {
             }
             .presentationDetents([.medium, .large])
         }
-        .task {
-            await storeManager.loadProducts()
-            await storeManager.checkSubscriptionStatus()
-        }
         .onAppear {
             if configManager.activeConfig != nil {
                 viewModel.testConnection()
@@ -119,6 +118,52 @@ struct SettingsView: View {
         } message: {
             Text(scanAlertMessage)
         }
+    }
+
+    // MARK: - App Store Banner
+
+    @Environment(\.openURL) private var openURL
+
+    private var appStoreBanner: some View {
+        Button {
+            if let url = URL(string: "https://apps.apple.com/us/app/stashy/id6754876029") {
+                openURL(url)
+            }
+        } label: {
+            HStack(spacing: 12) {
+                Image(systemName: "apple.logo")
+                    .font(.system(size: 20))
+                    .foregroundColor(.white)
+                    .frame(width: 36, height: 36)
+                    .background(Color.white.opacity(0.15))
+                    .clipShape(Circle())
+
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Get on the App Store")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white)
+                    Text("Support with an App Store download")
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.85))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+
+                Spacer()
+
+                Image(systemName: "chevron.right")
+                    .font(.caption.weight(.semibold))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            .padding(.vertical, 4)
+        }
+        .listRowBackground(
+            LinearGradient(
+                colors: [Color.blue, Color.purple.opacity(0.8)],
+                startPoint: .leading,
+                endPoint: .trailing
+            )
+        )
     }
 
     // MARK: - About

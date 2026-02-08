@@ -15,6 +15,12 @@ struct ImagesView: View {
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     
     @State private var selectedSortOption: StashDBViewModel.ImageSortOption = .dateDesc
+
+    // Multi-Select State
+    @State private var isSelectionMode = false
+    @State private var selectedImageIds: Set<String> = []
+    @State private var showDeleteConfirmation = false
+    @State private var isDeleting = false
     
     init(gallery: Gallery? = nil) {
         self.gallery = gallery
@@ -53,10 +59,24 @@ struct ImagesView: View {
         ScrollView {
             gridContent
                 .padding(16)
+                .padding(.bottom, isSelectionMode ? 80 : 0) // Add padding for floating bar
         }
         .navigationTitle(gallery?.title ?? "Images")
         .navigationBarTitleDisplayMode(.inline)
         .applyAppBackground()
+        .overlay(alignment: .bottom) {
+            if isSelectionMode {
+                floatingDeleteBar
+            }
+        }
+        .alert("Delete \(selectedImageIds.count) images?", isPresented: $showDeleteConfirmation) {
+            Button("Cancel", role: .cancel) { }
+            Button("Delete", role: .destructive) {
+                deleteSelectedImages()
+            }
+        } message: {
+            Text("These images will be permanently deleted. This action cannot be undone.")
+        }
         .onAppear {
             // Apply default sort option
             let defaultSortStr = TabManager.shared.getPersistentSortOption(for: .images) ?? "dateDesc"
@@ -106,30 +126,151 @@ struct ImagesView: View {
     
     @ViewBuilder
     private func imageCell(_ image: StashImage) -> some View {
-        NavigationLink(destination: FullScreenImageView(images: Binding(
-            get: { displayedImages },
-            set: { _ in } // images are generally read-only from this view
-        ), selectedImageId: image.id)) {
-            ImageThumbnailCard(image: image)
-                .onAppear {
-                    if image.id == displayedImages.last?.id {
-                        if let gallery = gallery {
-                            viewModel.loadMoreGalleryImages(galleryId: gallery.id)
+        Group {
+            if isSelectionMode {
+                Button {
+                    toggleSelection(for: image.id)
+                } label: {
+                    ImageThumbnailCard(image: image)
+                        .overlay(
+                            ZStack {
+                                if selectedImageIds.contains(image.id) {
+                                    Color.black.opacity(0.4)
+                                    Image(systemName: "checkmark.circle.fill")
+                                        .font(.title)
+                                        .foregroundColor(appearanceManager.tintColor)
+                                } else {
+                                    Color.clear
+                                    Image(systemName: "circle")
+                                        .font(.title)
+                                        .foregroundColor(.white.opacity(0.7))
+                                        .shadow(radius: 2)
+                                }
+                            }
+                        )
+                }
+                .buttonStyle(.plain)
+            } else {
+                NavigationLink(destination: FullScreenImageView(images: Binding(
+                    get: { displayedImages },
+                    set: { newImages in
+                        if gallery != nil {
+                            viewModel.galleryImages = newImages
                         } else {
-                            viewModel.loadMoreImages()
+                            viewModel.allImages = newImages
                         }
                     }
+                ), selectedImageId: image.id, onLoadMore: {
+                    if let gallery = gallery {
+                        viewModel.loadMoreGalleryImages(galleryId: gallery.id)
+                    } else {
+                        viewModel.loadMoreImages()
+                    }
+                })) {
+                    ImageThumbnailCard(image: image)
                 }
+                .buttonStyle(.plain)
+            }
         }
-        .buttonStyle(.plain)
+        // Pagination trigger
+        .onAppear {
+            if image.id == displayedImages.last?.id {
+                print("Last image appeared. Loading more...")
+                if let gallery = gallery {
+                    viewModel.loadMoreGalleryImages(galleryId: gallery.id)
+                } else {
+                    viewModel.loadMoreImages()
+                }
+            }
+        }
+    }
+    
+    // MARK: - Multi-Select Logic
+    
+    private func toggleSelection(for id: String) {
+        if selectedImageIds.contains(id) {
+            selectedImageIds.remove(id)
+        } else {
+            selectedImageIds.insert(id)
+        }
+    }
+    
+    private func deleteSelectedImages() {
+        isDeleting = true
+        let idsToDelete = Array(selectedImageIds)
+        
+        // Simple batch delete (could be optimized with a dedicated batch API if available)
+        // For now, we'll just iterate. This is not atomic but functional.
+        let group = DispatchGroup()
+        
+        for id in idsToDelete {
+            group.enter()
+            viewModel.deleteImage(imageId: id) { _ in
+                group.leave()
+            }
+        }
+        
+        group.notify(queue: .main) {
+            isDeleting = false
+            selectedImageIds.removeAll()
+            isSelectionMode = false
+            
+            // Refresh data
+            if let gallery = gallery {
+                viewModel.fetchGalleryImages(galleryId: gallery.id)
+            } else {
+                viewModel.fetchImages(sortBy: selectedSortOption)
+            }
+        }
+    }
+    
+    private var floatingDeleteBar: some View {
+        HStack(spacing: 16) {
+             Text("\(selectedImageIds.count) Selected")
+                 .font(.subheadline)
+                 .fontWeight(.bold)
+                 .foregroundColor(.primary)
+             
+             Button(role: .destructive) {
+                 showDeleteConfirmation = true
+             } label: {
+                 Image(systemName: "trash")
+                     .foregroundColor(.red)
+             }
+             .disabled(selectedImageIds.isEmpty)
+        }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
+        .background(Color(UIColor.secondarySystemBackground).opacity(0.95))
+        .clipShape(Capsule())
+        .overlay(Capsule().stroke(Color.primary.opacity(0.1), lineWidth: 0.5))
+        .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 5)
+        .padding(.bottom, 20)
     }
     
     @ToolbarContentBuilder
     private var navigationToolbar: some ToolbarContent {
         ToolbarItem(placement: .navigationBarTrailing) {
-            Menu {
-                // Title
-                Menu {
+            HStack {
+                if isSelectionMode {
+                    Button {
+                         isSelectionMode = false
+                         selectedImageIds.removeAll()
+                    } label: {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(appearanceManager.tintColor)
+                    }
+                } else {
+                    Button {
+                        isSelectionMode = true
+                    } label: {
+                        Image(systemName: "checkmark.circle")
+                            .foregroundColor(appearanceManager.tintColor)
+                    }
+                    
+                    Menu {
+                        // Title
+                        Menu {
                     Button(action: { changeSortOption(to: .titleAsc) }) {
                         HStack {
                             Text("A → Z")
@@ -244,8 +385,10 @@ struct ImagesView: View {
                 Image(systemName: "arrow.up.arrow.down.circle")
                     .foregroundColor(.appAccent)
             }
+            }
         }
     }
+}
 }
 
 struct ImageThumbnailCard: View {

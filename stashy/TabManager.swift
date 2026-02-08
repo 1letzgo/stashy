@@ -108,9 +108,11 @@ struct TabConfig: Codable, Identifiable, Equatable {
     var defaultFilterName: String?
     var defaultMarkerFilterId: String?
     var defaultMarkerFilterName: String?
-    
+    var defaultClipFilterId: String?
+    var defaultClipFilterName: String?
+
     enum CodingKeys: String, CodingKey {
-        case id, isVisible, sortOrder, defaultFilterId, defaultFilterName, defaultMarkerFilterId, defaultMarkerFilterName
+        case id, isVisible, sortOrder, defaultFilterId, defaultFilterName, defaultMarkerFilterId, defaultMarkerFilterName, defaultClipFilterId, defaultClipFilterName
         case defaultSortOption = "sortOption"
     }
 }
@@ -703,6 +705,30 @@ class TabManager: ObservableObject {
         }
     }
     
+    // Helper to get default clip filter for a tab
+    func getDefaultClipFilterId(for tab: AppTab) -> String? {
+        return tabs.first(where: { $0.id == tab })?.defaultClipFilterId
+    }
+
+    func getDefaultClipFilterName(for tab: AppTab) -> String? {
+        return tabs.first(where: { $0.id == tab })?.defaultClipFilterName
+    }
+
+    // Helper to set default clip filter for a tab
+    func setDefaultClipFilter(for tab: AppTab, filterId: String?, filterName: String?) {
+        if let index = tabs.firstIndex(where: { $0.id == tab }) {
+            tabs[index].defaultClipFilterId = filterId
+            tabs[index].defaultClipFilterName = filterName
+            saveConfig()
+
+            NotificationCenter.default.post(
+                name: NSNotification.Name("DefaultFilterChanged"),
+                object: nil,
+                userInfo: ["tab": tab.id]
+            )
+        }
+    }
+
     func getDetailSortOption(for context: String) -> String? {
         if let sessionOption = sessionDetailSortOptions[context] {
             return sessionOption

@@ -252,7 +252,6 @@ struct ReelsView: View {
         
         if let clipSortBy = clipSortBy {
             selectedClipSortOption = clipSortBy
-            TabManager.shared.setReelsDefaultSort(for: .clips, option: clipSortBy.rawValue)
         }
         
         if let clipFilter = clipFilter {
@@ -277,6 +276,146 @@ struct ReelsView: View {
         }
     }
 
+
+
+    private func handleRatingChange(item: ReelItemData, newRating: Int?) {
+        var targetSceneId: String?
+        if case .scene(let scene) = item { targetSceneId = scene.id }
+        else if case .marker(let marker) = item { targetSceneId = marker.scene?.id }
+        
+        if let sceneId = targetSceneId {
+            // 1. Optimistic Update for Scene List
+            if let sceneIndex = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
+                let originalRating = viewModel.scenes[sceneIndex].rating100
+                viewModel.scenes[sceneIndex] = viewModel.scenes[sceneIndex].withRating(newRating)
+                
+                if let r = newRating { 
+                    viewModel.updateSceneRating(sceneId: sceneId, rating100: r) { success in
+                        if !success {
+                            DispatchQueue.main.async {
+                                viewModel.scenes[sceneIndex] = viewModel.scenes[sceneIndex].withRating(originalRating)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            // 2. Optimistic Update for Scene Markers
+            let markerIndices = viewModel.sceneMarkers.enumerated().compactMap { index, marker in
+                marker.scene?.id == sceneId ? index : nil
+            }
+            
+            for index in markerIndices {
+                if let markerScene = viewModel.sceneMarkers[index].scene {
+                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withRating(newRating))
+                }
+            }
+            
+            // If not in scenes list
+            if !viewModel.scenes.contains(where: { $0.id == sceneId }) {
+                if let r = newRating {
+                    viewModel.updateSceneRating(sceneId: sceneId, rating100: r) { _ in }
+                }
+            }
+        } else if case .clip(let image) = item {
+            // 3. Optimistic Update for Clips List
+            if let clipIndex = viewModel.clips.firstIndex(where: { $0.id == image.id }) {
+                let originalRating = viewModel.clips[clipIndex].rating100
+                viewModel.clips[clipIndex] = viewModel.clips[clipIndex].withRating(newRating)
+                
+                if let r = newRating {
+                    viewModel.updateImageRating(imageId: image.id, rating100: r) { success in
+                        if !success {
+                            DispatchQueue.main.async {
+                                viewModel.clips[clipIndex] = viewModel.clips[clipIndex].withRating(originalRating)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func handleOCounterChange(item: ReelItemData, newCount: Int) {
+        var targetSceneId: String?
+        if case .scene(let scene) = item { targetSceneId = scene.id }
+        else if case .marker(let marker) = item { targetSceneId = marker.scene?.id }
+        
+        if let sceneId = targetSceneId {
+            // 1. Scene List Update
+            if let index = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
+                let originalCount = viewModel.scenes[index].oCounter ?? 0
+                viewModel.scenes[index] = viewModel.scenes[index].withOCounter(newCount)
+                
+                viewModel.incrementOCounter(sceneId: sceneId) { returnedCount in
+                    if let count = returnedCount {
+                        DispatchQueue.main.async {
+                            viewModel.scenes[index] = viewModel.scenes[index].withOCounter(count)
+                        }
+                    } else {
+                        DispatchQueue.main.async {
+                            viewModel.scenes[index] = viewModel.scenes[index].withOCounter(originalCount)
+                        }
+                    }
+                }
+            }
+            
+            // 2. Scene Markers Update
+            let markerIndices = viewModel.sceneMarkers.enumerated().compactMap { index, marker in
+                marker.scene?.id == sceneId ? index : nil
+            }
+            
+            for index in markerIndices {
+                if let markerScene = viewModel.sceneMarkers[index].scene {
+                    let originalCount = markerScene.oCounter ?? 0
+                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withOCounter(newCount))
+                    
+                    // If NOT already handled by scene list update
+                    if !viewModel.scenes.contains(where: { $0.id == sceneId }) {
+                         viewModel.incrementOCounter(sceneId: sceneId) { returnedCount in
+                            if let count = returnedCount {
+                                DispatchQueue.main.async {
+                                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withOCounter(count))
+                                }
+                            } else {
+                                DispatchQueue.main.async {
+                                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withOCounter(originalCount))
+                                }
+                            }
+                         }
+                    }
+                }
+            }
+            
+            // 3. Fallback (if not in any list)
+            if !viewModel.scenes.contains(where: { $0.id == sceneId }) && markerIndices.isEmpty {
+                viewModel.incrementOCounter(sceneId: sceneId) { _ in }
+            }
+            
+        } else if case .clip(let image) = item {
+            // 4. Clip Update
+            if let index = viewModel.clips.firstIndex(where: { $0.id == image.id }) {
+                let originalCount = viewModel.clips[index].o_counter ?? 0
+                
+                // Optimistic Update
+                viewModel.clips[index] = viewModel.clips[index].withOCounter(newCount)
+                
+                viewModel.incrementImageOCounter(imageId: image.id) { returnedCount in
+                    if let count = returnedCount {
+                        DispatchQueue.main.async {
+                            viewModel.clips[index] = viewModel.clips[index].withOCounter(count)
+                        }
+                    } else {
+                        DispatchQueue.main.async {
+                            if let revertIndex = viewModel.clips.firstIndex(where: { $0.id == image.id }) {
+                                viewModel.clips[revertIndex] = viewModel.clips[revertIndex].withOCounter(originalCount)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     var body: some View {
         premiumContent
@@ -343,9 +482,13 @@ struct ReelsView: View {
                 let isCurrentlyEmpty = (reelsMode == .scenes ? viewModel.scenes.isEmpty : viewModel.sceneMarkers.isEmpty)
                 if isCurrentlyEmpty {
                     // Priority 2: Try to apply default filter
-                    let defaultId = reelsMode == .scenes ? 
-                        TabManager.shared.getDefaultFilterId(for: .reels) : 
-                        TabManager.shared.getDefaultMarkerFilterId(for: .reels)
+                    let defaultId: String? = {
+                        switch reelsMode {
+                        case .scenes: return TabManager.shared.getDefaultFilterId(for: .reels)
+                        case .markers: return TabManager.shared.getDefaultMarkerFilterId(for: .reels)
+                        case .clips: return TabManager.shared.getDefaultClipFilterId(for: .reels)
+                        }
+                    }()
                         
                     let hasFiltersArrived = !viewModel.savedFilters.isEmpty
                     
@@ -373,7 +516,12 @@ struct ReelsView: View {
                             applySettings(markerSortBy: savedSort, filter: initialFilter, performer: selectedPerformer, tags: selectedTags)
                         case .clips:
                             let savedSort = StashDBViewModel.ImageSortOption(rawValue: savedSortStr ?? "") ?? .random
-                            applySettings(clipSortBy: savedSort, filter: nil, clipFilter: selectedClipFilter)
+                            var clipFilter = selectedClipFilter
+                            if clipFilter == nil, let defId = defaultId {
+                                clipFilter = viewModel.savedFilters[defId]
+                            }
+                            selectedClipFilter = clipFilter
+                            applySettings(clipSortBy: savedSort, filter: nil, clipFilter: clipFilter)
                         }
                     }
                 }
@@ -381,75 +529,120 @@ struct ReelsView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
             if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.reels.rawValue {
-                let defaultId = reelsMode == .scenes ? 
-                    TabManager.shared.getDefaultFilterId(for: .reels) : 
-                    TabManager.shared.getDefaultMarkerFilterId(for: .reels)
-                
-                let newFilter = defaultId != nil ? viewModel.savedFilters[defaultId!] : nil
-                applySettings(sortBy: selectedSortOption, filter: newFilter, performer: selectedPerformer, tags: selectedTags)
+                switch reelsMode {
+                case .scenes:
+                    let defaultId = TabManager.shared.getDefaultFilterId(for: .reels)
+                    let newFilter = defaultId != nil ? viewModel.savedFilters[defaultId!] : nil
+                    applySettings(sortBy: selectedSortOption, filter: newFilter, performer: selectedPerformer, tags: selectedTags)
+                case .markers:
+                    let defaultId = TabManager.shared.getDefaultMarkerFilterId(for: .reels)
+                    let newFilter = defaultId != nil ? viewModel.savedFilters[defaultId!] : nil
+                    applySettings(markerSortBy: selectedMarkerSortOption, filter: newFilter, performer: selectedPerformer, tags: selectedTags)
+                case .clips:
+                    let defaultId = TabManager.shared.getDefaultClipFilterId(for: .reels)
+                    let newFilter = defaultId != nil ? viewModel.savedFilters[defaultId!] : nil
+                    selectedClipFilter = newFilter
+                    applySettings(clipSortBy: selectedClipSortOption, filter: nil, clipFilter: newFilter)
+                }
             }
         }
         .onChange(of: viewModel.savedFilters) { _, newValue in
             // Only apply default filter if we haven't set a filter yet AND we are empty
-            let isCurrentlyEmpty = (reelsMode == .scenes ? viewModel.scenes.isEmpty : viewModel.sceneMarkers.isEmpty)
-            
-            if selectedFilter == nil && isCurrentlyEmpty {
-                let defaultId = reelsMode == .scenes ? 
-                    TabManager.shared.getDefaultFilterId(for: .reels) : 
-                    TabManager.shared.getDefaultMarkerFilterId(for: .reels)
-                
+            let isCurrentlyEmpty: Bool = {
+                switch reelsMode {
+                case .scenes: return viewModel.scenes.isEmpty
+                case .markers: return viewModel.sceneMarkers.isEmpty
+                case .clips: return viewModel.clips.isEmpty
+                }
+            }()
+
+            let noFilterSet = (reelsMode == .clips ? selectedClipFilter == nil : selectedFilter == nil)
+
+            if noFilterSet && isCurrentlyEmpty {
+                let defaultId: String? = {
+                    switch reelsMode {
+                    case .scenes: return TabManager.shared.getDefaultFilterId(for: .reels)
+                    case .markers: return TabManager.shared.getDefaultMarkerFilterId(for: .reels)
+                    case .clips: return TabManager.shared.getDefaultClipFilterId(for: .reels)
+                    }
+                }()
+
                 if let defId = defaultId, let filter = newValue[defId] {
                     print("✅ ReelsView: Applying default \(reelsMode.rawValue) filter after lazy load")
-                    applySettings(sortBy: selectedSortOption, filter: filter, performer: selectedPerformer, tags: selectedTags)
+                    switch reelsMode {
+                    case .scenes:
+                        applySettings(sortBy: selectedSortOption, filter: filter, performer: selectedPerformer, tags: selectedTags)
+                    case .markers:
+                        applySettings(markerSortBy: selectedMarkerSortOption, filter: filter, performer: selectedPerformer, tags: selectedTags)
+                    case .clips:
+                        selectedClipFilter = filter
+                        applySettings(clipSortBy: selectedClipSortOption, filter: nil, clipFilter: filter)
+                    }
                 } else {
-                    // Filters arrived but no default matches, no default set, or NO filters on server.
-                    // Follow the 'clean' fix: just load unfiltered content.
                     print("ℹ️ ReelsView: No default filter found on server, loading unfiltered \(reelsMode.rawValue)")
-                    
-                    // Load saved sort for current mode
                     let currentModeType = reelsMode.toModeType
                     let savedSortStr = TabManager.shared.getReelsDefaultSort(for: currentModeType)
-                    
-                    if reelsMode == .scenes {
+
+                    switch reelsMode {
+                    case .scenes:
                         let savedSort = StashDBViewModel.SceneSortOption(rawValue: savedSortStr ?? "") ?? .random
                         applySettings(sortBy: savedSort, filter: nil, performer: selectedPerformer, tags: selectedTags)
-                    } else if reelsMode == .markers {
+                    case .markers:
                         let savedSort = StashDBViewModel.SceneMarkerSortOption(rawValue: savedSortStr ?? "") ?? .random
                         applySettings(markerSortBy: savedSort, filter: nil, performer: selectedPerformer, tags: selectedTags)
-                    } else {
-                         let savedSort = StashDBViewModel.ImageSortOption(rawValue: savedSortStr ?? "") ?? .random
-                         applySettings(clipSortBy: savedSort, filter: nil, clipFilter: selectedClipFilter)
+                    case .clips:
+                        let savedSort = StashDBViewModel.ImageSortOption(rawValue: savedSortStr ?? "") ?? .random
+                        applySettings(clipSortBy: savedSort, filter: nil, clipFilter: nil)
                     }
                 }
             }
         }
         .onChange(of: viewModel.isLoadingSavedFilters) { _, isLoading in
             if !isLoading {
-                // Filters finished loading. If we are still empty and no filter selected, try to load.
-                let isCurrentlyEmpty = (reelsMode == .scenes ? viewModel.scenes.isEmpty : viewModel.sceneMarkers.isEmpty)
-                if selectedFilter == nil && isCurrentlyEmpty {
+                let isCurrentlyEmpty: Bool = {
+                    switch reelsMode {
+                    case .scenes: return viewModel.scenes.isEmpty
+                    case .markers: return viewModel.sceneMarkers.isEmpty
+                    case .clips: return viewModel.clips.isEmpty
+                    }
+                }()
+                let noFilterSet = (reelsMode == .clips ? selectedClipFilter == nil : selectedFilter == nil)
+
+                if noFilterSet && isCurrentlyEmpty {
                     print("ℹ️ ReelsView: Filter loading finished, ensuring content loads...")
-                    let defaultId = reelsMode == .scenes ? 
-                        TabManager.shared.getDefaultFilterId(for: .reels) : 
-                        TabManager.shared.getDefaultMarkerFilterId(for: .reels)
-                        
+                    let defaultId: String? = {
+                        switch reelsMode {
+                        case .scenes: return TabManager.shared.getDefaultFilterId(for: .reels)
+                        case .markers: return TabManager.shared.getDefaultMarkerFilterId(for: .reels)
+                        case .clips: return TabManager.shared.getDefaultClipFilterId(for: .reels)
+                        }
+                    }()
+
                     if let defId = defaultId, let filter = viewModel.savedFilters[defId] {
-                         applySettings(sortBy: selectedSortOption, filter: filter, performer: selectedPerformer, tags: selectedTags)
+                        switch reelsMode {
+                        case .scenes:
+                            applySettings(sortBy: selectedSortOption, filter: filter, performer: selectedPerformer, tags: selectedTags)
+                        case .markers:
+                            applySettings(markerSortBy: selectedMarkerSortOption, filter: filter, performer: selectedPerformer, tags: selectedTags)
+                        case .clips:
+                            selectedClipFilter = filter
+                            applySettings(clipSortBy: selectedClipSortOption, filter: nil, clipFilter: filter)
+                        }
                     } else {
-                         // Load saved sort for current mode
-                         let currentModeType = reelsMode.toModeType
-                         let savedSortStr = TabManager.shared.getReelsDefaultSort(for: currentModeType)
-                         
-                         if reelsMode == .scenes {
-                             let savedSort = StashDBViewModel.SceneSortOption(rawValue: savedSortStr ?? "") ?? .random
-                             applySettings(sortBy: savedSort, filter: nil, performer: selectedPerformer, tags: selectedTags)
-                         } else if reelsMode == .markers {
-                             let savedSort = StashDBViewModel.SceneMarkerSortOption(rawValue: savedSortStr ?? "") ?? .random
-                             applySettings(markerSortBy: savedSort, filter: nil, performer: selectedPerformer, tags: selectedTags)
-                         } else {
-                             let savedSort = StashDBViewModel.ImageSortOption(rawValue: savedSortStr ?? "") ?? .random
-                             applySettings(clipSortBy: savedSort, filter: nil, clipFilter: selectedClipFilter)
-                         }
+                        let currentModeType = reelsMode.toModeType
+                        let savedSortStr = TabManager.shared.getReelsDefaultSort(for: currentModeType)
+
+                        switch reelsMode {
+                        case .scenes:
+                            let savedSort = StashDBViewModel.SceneSortOption(rawValue: savedSortStr ?? "") ?? .random
+                            applySettings(sortBy: savedSort, filter: nil, performer: selectedPerformer, tags: selectedTags)
+                        case .markers:
+                            let savedSort = StashDBViewModel.SceneMarkerSortOption(rawValue: savedSortStr ?? "") ?? .random
+                            applySettings(markerSortBy: savedSort, filter: nil, performer: selectedPerformer, tags: selectedTags)
+                        case .clips:
+                            let savedSort = StashDBViewModel.ImageSortOption(rawValue: savedSortStr ?? "") ?? .random
+                            applySettings(clipSortBy: savedSort, filter: nil, clipFilter: nil)
+                        }
                     }
                 }
             }
@@ -508,55 +701,10 @@ struct ReelsView: View {
                             applySettings(sortBy: selectedSortOption, filter: selectedFilter, performer: selectedPerformer, tags: newTags)
                         },
                         onRatingChanged: { newRating in
-                            var targetSceneId: String?
-                            if case .scene(let scene) = item { targetSceneId = scene.id }
-                            else if case .marker(let marker) = item { targetSceneId = marker.scene?.id }
-                            
-                            if let sceneId = targetSceneId {
-                                // 1. Optimistic Update for Scene List
-                                if let sceneIndex = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
-                                    let originalRating = viewModel.scenes[sceneIndex].rating100
-                                    viewModel.scenes[sceneIndex] = viewModel.scenes[sceneIndex].withRating(newRating)
-                                    
-                                    viewModel.updateSceneRating(sceneId: sceneId, rating100: newRating) { success in
-                                        if !success {
-                                            DispatchQueue.main.async {
-                                                viewModel.scenes[sceneIndex] = viewModel.scenes[sceneIndex].withRating(originalRating)
-                                            }
-                                        }
-                                    }
-                                }
-                                
-                                // 2. Optimistic Update for Scene Markers (All markers belonging to this scene)
-                                let markerIndices = viewModel.sceneMarkers.enumerated().compactMap { index, marker in
-                                    marker.scene?.id == sceneId ? index : nil
-                                }
-                                
-                                for index in markerIndices {
-                                    if let markerScene = viewModel.sceneMarkers[index].scene {
-                                        viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withRating(newRating))
-                                    }
-                                }
-                                
-                                // If not in scenes list, still perform update
-                                if !viewModel.scenes.contains(where: { $0.id == sceneId }) {
-                                    viewModel.updateSceneRating(sceneId: sceneId, rating100: newRating) { _ in }
-                                }
-                            } else if case .clip(let image) = item {
-                                // 3. Optimistic Update for Clips List
-                                if let clipIndex = viewModel.clips.firstIndex(where: { $0.id == image.id }) {
-                                    let originalRating = viewModel.clips[clipIndex].rating100
-                                    viewModel.clips[clipIndex] = viewModel.clips[clipIndex].withRating(newRating)
-                                    
-                                    viewModel.updateImageRating(imageId: image.id, rating100: newRating) { success in
-                                        if !success {
-                                            DispatchQueue.main.async {
-                                                viewModel.clips[clipIndex] = viewModel.clips[clipIndex].withRating(originalRating)
-                                            }
-                                        }
-                                    }
-                                }
-                            }
+                            handleRatingChange(item: item, newRating: newRating)
+                        },
+                        onOCounterChanged: { newCount in
+                            handleOCounterChange(item: item, newCount: newCount)
                         },
                         viewModel: viewModel
                     )
@@ -675,8 +823,14 @@ struct ReelsView: View {
                     }
                     
                 case .clips:
-                    // Preserve performer and tags when switching to clips
-                    applySettings(filter: nil, clipFilter: selectedClipFilter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+                    // Load default clip filter if available
+                    if let defaultId = TabManager.shared.getDefaultClipFilterId(for: .reels),
+                       let filter = viewModel.savedFilters[defaultId] {
+                        selectedClipFilter = filter
+                        applySettings(filter: nil, clipFilter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+                    } else {
+                        applySettings(filter: nil, clipFilter: selectedClipFilter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+                    }
                 }
             }
         }
@@ -1177,6 +1331,7 @@ struct ReelItemView: View {
     var onPerformerTap: (ScenePerformer) -> Void
     var onTagTap: (Tag) -> Void
     var onRatingChanged: (Int?) -> Void
+    var onOCounterChanged: (Int) -> Void
     @ObservedObject var viewModel: StashDBViewModel
     @State private var isPlaying = true
     @State private var currentTime: Double = 0.0
@@ -1291,87 +1446,17 @@ struct ReelItemView: View {
                 }
                 
 
-                // O-Counter (Available for scenes & markers)
-                if let oCounter = item.oCounter {
-                    SidebarButton(
-                        icon: "heart",
-                        label: "Counter",
-                        count: oCounter,
-                        color: .white
-                    ) {
-                        var targetSceneId: String?
-                        if case .scene(let scene) = item { targetSceneId = scene.id }
-                        else if case .marker(let marker) = item { targetSceneId = marker.scene?.id }
-                        
-                        if let sceneId = targetSceneId {
-                            // 1. Scene List Update
-                            if let index = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
-                                let originalCount = viewModel.scenes[index].oCounter ?? 0
-                                viewModel.scenes[index] = viewModel.scenes[index].withOCounter(originalCount + 1)
-                                
-                                viewModel.incrementOCounter(sceneId: sceneId) { newCount in
-                                    if let count = newCount {
-                                        DispatchQueue.main.async {
-                                            viewModel.scenes[index] = viewModel.scenes[index].withOCounter(count)
-                                        }
-                                    } else {
-                                        DispatchQueue.main.async {
-                                            viewModel.scenes[index] = viewModel.scenes[index].withOCounter(originalCount)
-                                        }
-                                    }
-                                }
-                            }
-                            
-                            // 2. Scene Markers Update
-                            let markerIndices = viewModel.sceneMarkers.enumerated().compactMap { index, marker in
-                                marker.scene?.id == sceneId ? index : nil
-                            }
-                            
-                            for index in markerIndices {
-                                if let markerScene = viewModel.sceneMarkers[index].scene {
-                                    let originalCount = markerScene.oCounter ?? 0
-                                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withOCounter(originalCount + 1))
-                                    
-                                    // If NOT already handled by scene list update above
-                                    if !viewModel.scenes.contains(where: { $0.id == sceneId }) {
-                                        viewModel.incrementOCounter(sceneId: sceneId) { newCount in
-                                            if let count = newCount {
-                                                DispatchQueue.main.async {
-                                                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withOCounter(count))
-                                                }
-                                            } else {
-                                                DispatchQueue.main.async {
-                                                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withOCounter(originalCount))
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                            }
-                            
-                            // 3. Fallback (if not in any list)
-                            if !viewModel.scenes.contains(where: { $0.id == sceneId }) && markerIndices.isEmpty {
-                                viewModel.incrementOCounter(sceneId: sceneId) { _ in }
-                            }
-                        } else if case .clip(let image) = item {
-                            // 4. Clip Update
-                            if let index = viewModel.clips.firstIndex(where: { $0.id == image.id }) {
-                                let originalCount = viewModel.clips[index].o_counter ?? 0
-                                let newCount = originalCount + 1
-                                viewModel.clips[index] = viewModel.clips[index].withOCounter(newCount)
-                                
-                                viewModel.updateImageOCounter(imageId: image.id, oCounter: newCount) { success in
-                                    if !success {
-                                        DispatchQueue.main.async {
-                                            viewModel.clips[index] = viewModel.clips[index].withOCounter(originalCount)
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                        resetUITimer()
-                    }
+                // O-Counter (Available for scenes, markers & clips)
+                let oCounter = item.oCounter ?? 0
+                SidebarButton(
+                    icon: "heart",
+                    label: "Counter",
+                    count: oCounter,
+                    color: .white
+                ) {
+                    onOCounterChanged(oCounter + 1)
                 }
+                .contentShape(Rectangle()) // Ensure good hit target
                 
                 // View Counter (Available for scenes & markers)
                 if let playCount = item.playCount {
@@ -1730,6 +1815,7 @@ struct SidebarButton: View {
                 .frame(height: 12)
             }
             .frame(width: 45, height: 45) // Fixed total height for the button
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }

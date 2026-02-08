@@ -26,14 +26,6 @@ struct DefaultFilterView: View {
                 Text("Pick a saved filter that will be applied automatically when you open the respective tab.")
             }
 
-            Section {
-                filterPicker(for: .reels, title: "Scenes", icon: "film", modeOverride: .scenes)
-                markerFilterPicker(for: .reels, title: "Markers", icon: "mappin.and.ellipse")
-            } header: {
-                Text("StashTok Default Filters")
-            } footer: {
-                Text("Set separate default filters for scenes and markers in StashTok.")
-            }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Default Filters")

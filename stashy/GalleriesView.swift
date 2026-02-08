@@ -643,13 +643,15 @@ struct GalleryItemView: View {
                         }
                         .padding(.vertical, 12)
                         .padding(.horizontal, 8)
-                        .background(Color.black.opacity(0.6))
+                        .background(Color.black.opacity(0.8))
                         .clipShape(Capsule())
-                        .offset(y: -220)
+                        .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 1))
+                        .offset(y: -150)
                         .transition(.scale(scale: 0, anchor: .top).combined(with: .opacity))
                     }
                 }
 
+                // O-Counter
                 // O-Counter
                 SidebarButton(
                     icon: "heart",
@@ -657,21 +659,32 @@ struct GalleryItemView: View {
                     count: image.o_counter ?? 0,
                     color: .white
                 ) {
+                    // Direct update to the binding array
                     if let index = images.firstIndex(where: { $0.id == image.id }) {
                         let originalCount = images[index].o_counter ?? 0
                         let newCount = originalCount + 1
+                        
+                        // Optimistic UI update
                         images[index] = images[index].withOCounter(newCount)
-
-                        viewModel.updateImageOCounter(imageId: image.id, oCounter: newCount) { success in
-                            if !success {
+                        
+                        viewModel.incrementImageOCounter(imageId: image.id) { returnedCount in
+                            if let count = returnedCount {
                                 DispatchQueue.main.async {
-                                    images[index] = images[index].withOCounter(originalCount)
+                                    images[index] = images[index].withOCounter(count)
+                                }
+                            } else {
+                                DispatchQueue.main.async {
+                                    // Revert if failed (need to find index again as it might have shifted, though unlikely in this view)
+                                    if let revertIndex = images.firstIndex(where: { $0.id == image.id }) {
+                                        images[revertIndex] = images[revertIndex].withOCounter(originalCount)
+                                    }
                                 }
                             }
                         }
                     }
                     resetUITimer()
                 }
+                .contentShape(Rectangle()) // Ensure good hit target
 
                 // Mute Button (video only)
                 if image.isVideo {
@@ -903,6 +916,7 @@ struct GalleryItemView: View {
 struct FullScreenImageView: View {
     @Binding var images: [StashImage]
     @State var selectedImageId: String
+    var onLoadMore: (() -> Void)?
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @Environment(\.dismiss) var dismiss
@@ -925,6 +939,11 @@ struct FullScreenImageView: View {
                         )
                         .containerRelativeFrame([.horizontal, .vertical])
                         .id(image.id)
+                        .onAppear {
+                            if image.id == images.last?.id {
+                                onLoadMore?()
+                            }
+                        }
                     }
                 }
                 .scrollTargetLayout()
