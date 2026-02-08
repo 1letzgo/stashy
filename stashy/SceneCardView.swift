@@ -85,7 +85,7 @@ struct SceneCardView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 4)
-                            .background(Color.black.opacity(0.6))
+                            .background(Color.black.opacity(DesignTokens.Opacity.badge))
                             .clipShape(Capsule())
                     }
                     
@@ -100,7 +100,7 @@ struct SceneCardView: View {
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(Color.black.opacity(0.6))
+                                .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                 .clipShape(Capsule())
                         }
                         
@@ -148,7 +148,7 @@ struct SceneCardView: View {
                         .foregroundColor(.white.opacity(0.9))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
-                        .background(Color.black.opacity(0.6))
+                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
                         .clipShape(Capsule())
                     }
 
@@ -162,7 +162,7 @@ struct SceneCardView: View {
                         .foregroundColor(.white.opacity(0.9))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
-                        .background(Color.black.opacity(0.6))
+                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
                         .clipShape(Capsule())
                     }
                 }
@@ -178,8 +178,8 @@ struct SceneCardView: View {
             .padding(12)
         }
         .background(Color(UIColor.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .cardShadow()
         .onDisappear {
             stopPreview()
         }

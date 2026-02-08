@@ -60,7 +60,7 @@ struct ReelsModeSettingsView: View {
                     .padding(.vertical, 6)
                     .listRowSeparator(.hidden)
                     .listRowBackground(
-                        RoundedRectangle(cornerRadius: 10)
+                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
                             .fill(Color(UIColor.secondarySystemGroupedBackground))
                             .padding(.vertical, 4)
                     )

@@ -40,8 +40,8 @@ struct HomeRowView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
                         ForEach(0..<5) { _ in
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.gray.opacity(0.1))
+                            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
+                                .fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
                                 .frame(width: isLarge ? 280 : 200, height: (isLarge ? 280 : 200) * 9 / 16)
                                 .overlay(ProgressView())
                         }

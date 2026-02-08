@@ -88,7 +88,7 @@ struct OnboardingView: View {
                         .padding(.vertical, 16)
                         .background(appearanceManager.tintColor)
                         .foregroundColor(.white)
-                        .cornerRadius(14)
+                        .cornerRadius(DesignTokens.CornerRadius.button)
                     }
                     
                     Text("You'll need a running Stash server to continue")
@@ -119,7 +119,7 @@ struct FeatureRow: View {
     var body: some View {
         HStack(spacing: 16) {
             ZStack {
-                RoundedRectangle(cornerRadius: 10)
+                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
                     .fill(color.opacity(0.15))
                     .frame(width: 44, height: 44)
                 

@@ -100,6 +100,7 @@ struct GalleriesView: View {
                     .padding(16)
                 }
                 .background(Color.appBackground)
+                .refreshable { performSearch() }
             }
         }
         .navigationTitle(hideTitle ? "" : "Galleries")
@@ -131,7 +132,7 @@ struct GalleriesView: View {
                         .foregroundColor(.white.opacity(0.9))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
-                        .background(Color.black.opacity(0.6))
+                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
                         .clipShape(Capsule())
                     }
                 }
@@ -401,7 +402,7 @@ struct GalleryCardView: View {
                                         .foregroundColor(.white)
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 3)
-                                        .background(Color.black.opacity(0.6))
+                                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                         .clipShape(Capsule())
                                 }
                                 
@@ -415,7 +416,7 @@ struct GalleryCardView: View {
                                         .foregroundColor(.white)
                                         .padding(.horizontal, 6)
                                         .padding(.vertical, 3)
-                                        .background(Color.black.opacity(0.6))
+                                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                         .clipShape(Capsule())
                                 }
                             }
@@ -444,7 +445,7 @@ struct GalleryCardView: View {
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
-                                    .background(Color.black.opacity(0.6))
+                                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                     .clipShape(Capsule())
                                 }
                             }
@@ -454,9 +455,9 @@ struct GalleryCardView: View {
                 }
             )
             .background(Color(UIColor.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .contentShape(RoundedRectangle(cornerRadius: 12)) // Ensure hit testing works on entire card
-            .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)) // Ensure hit testing works on entire card
+            .cardShadow()
     }
 }
 
@@ -629,6 +630,7 @@ struct GalleryItemView: View {
                                         if !success {
                                             DispatchQueue.main.async {
                                                 images[index] = images[index].withRating(original)
+                                                ToastManager.shared.show("Failed to save rating", icon: "exclamationmark.triangle", style: .error)
                                             }
                                         }
                                     }
@@ -643,7 +645,7 @@ struct GalleryItemView: View {
                         }
                         .padding(.vertical, 12)
                         .padding(.horizontal, 8)
-                        .background(Color.black.opacity(0.8))
+                        .background(Color.black.opacity(DesignTokens.Opacity.strong))
                         .clipShape(Capsule())
                         .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 1))
                         .offset(y: -150)
@@ -654,7 +656,7 @@ struct GalleryItemView: View {
                 // O-Counter
                 // O-Counter
                 SidebarButton(
-                    icon: "heart",
+                    icon: AppearanceManager.shared.oCounterIcon,
                     label: "Counter",
                     count: image.o_counter ?? 0,
                     color: .white
@@ -674,10 +676,10 @@ struct GalleryItemView: View {
                                 }
                             } else {
                                 DispatchQueue.main.async {
-                                    // Revert if failed (need to find index again as it might have shifted, though unlikely in this view)
                                     if let revertIndex = images.firstIndex(where: { $0.id == image.id }) {
                                         images[revertIndex] = images[revertIndex].withOCounter(originalCount)
                                     }
+                                    ToastManager.shared.show("Counter update failed", icon: "exclamationmark.triangle", style: .error)
                                 }
                             }
                         }
@@ -778,7 +780,7 @@ struct GalleryItemView: View {
                                         .foregroundColor(.white)
                                         .padding(.horizontal, 10)
                                         .padding(.vertical, 5)
-                                        .background(Color.black.opacity(0.6))
+                                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                         .clipShape(Capsule())
                                         .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
                                 }
@@ -988,7 +990,10 @@ struct FullScreenImageView: View {
         viewModel.deleteImage(imageId: imageToDelete.id) { success in
             DispatchQueue.main.async {
                 if success {
+                    ToastManager.shared.show("Image deleted", icon: "trash", style: .success)
                     dismiss()
+                } else {
+                    ToastManager.shared.show("Failed to delete image", icon: "exclamationmark.triangle", style: .error)
                 }
             }
         }

@@ -71,6 +71,7 @@ struct StarRatingView: View {
                 .contentShape(Rectangle())
                 .onTapGesture {
                     guard isInteractive else { return }
+                    HapticManager.selection()
                     // Tapping the same star clears the rating
                     if index == stars {
                         onRatingChanged?(nil)

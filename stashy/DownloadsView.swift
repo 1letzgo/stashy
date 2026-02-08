@@ -79,8 +79,8 @@ struct DownloadsView: View {
                                     }
                                     .padding()
                                     .background(Color(UIColor.systemBackground))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                    .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+                                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                                    .subtleShadow()
                                     .padding(.horizontal)
                                 }
                             }
@@ -155,7 +155,7 @@ struct DownloadedSceneCard: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 2)
-                        .background(Color.black.opacity(0.6))
+                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
                         .clipShape(RoundedRectangle(cornerRadius: 4))
                         .padding(4)
                         .frame(maxWidth: 130, maxHeight: 100, alignment: .bottomTrailing)
@@ -221,8 +221,8 @@ struct DownloadedSceneCard: View {
         }
         .frame(height: 100)
         .background(Color(UIColor.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: Color.black.opacity(0.05), radius: 2, x: 0, y: 1)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .subtleShadow()
     }
     
     private func formatDuration(_ seconds: Double) -> String {
@@ -258,7 +258,7 @@ struct DownloadDetailView: View {
                         VideoPlayerView(player: player, isFullscreen: $isFullScreen)
                             .aspectRatio(16/9, contentMode: .fit) // Keep 16:9 for consistency or use nil for 9:16
                             .frame(maxWidth: .infinity)
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                     } else {
                         ZStack {
                             let thumbURL = downloadManager.getLocalThumbnailURL(for: downloaded)
@@ -277,7 +277,7 @@ struct DownloadDetailView: View {
                             // Large Play Button Overlay
                             ZStack {
                                 Circle()
-                                    .fill(Color.black.opacity(0.4))
+                                    .fill(Color.black.opacity(DesignTokens.Opacity.medium))
                                     .frame(width: 70, height: 70)
                                     .blur(radius: 1)
                                 
@@ -290,7 +290,7 @@ struct DownloadDetailView: View {
                         .aspectRatio(16/9, contentMode: .fit)
                         .frame(maxWidth: .infinity)
                         .background(Color.black)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                         .contentShape(Rectangle())
                         .onTapGesture {
                             if player == nil {
@@ -305,7 +305,7 @@ struct DownloadDetailView: View {
                         }
                     }
                 }
-                .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+                .cardShadow()
                 
                 // Info Card
                 VStack(alignment: .leading, spacing: 10) {
@@ -353,8 +353,8 @@ struct DownloadDetailView: View {
                 .padding(12)
                 .padding(.bottom, (downloaded.details?.isEmpty ?? true) ? 0 : 20)
                 .background(Color(UIColor.systemBackground))
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                .cardShadow()
                 .overlay(
                     Group {
                         if let details = downloaded.details, !details.isEmpty {
@@ -429,8 +429,8 @@ struct DownloadDetailView: View {
                     .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .background(Color(UIColor.systemBackground))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                    .cardShadow()
                 }
                 
                 // Delete Button
@@ -446,7 +446,7 @@ struct DownloadDetailView: View {
                     .padding()
                     .background(appearanceManager.tintColor.opacity(0.1))
                     .foregroundColor(appearanceManager.tintColor)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                 }
                 .padding(.top, 10)
             }

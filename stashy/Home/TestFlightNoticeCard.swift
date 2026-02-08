@@ -47,7 +47,7 @@ struct TestFlightNoticeCard: View {
         .padding(.horizontal, 12)
         .padding(.vertical, 10)
         .background(
-            RoundedRectangle(cornerRadius: 14)
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.button)
                 .fill(LinearGradient(
                     colors: [Color.blue, Color.purple.opacity(0.8)],
                     startPoint: .leading,

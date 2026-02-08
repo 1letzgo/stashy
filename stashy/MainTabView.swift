@@ -60,6 +60,7 @@ struct MainTabView: View {
         }
         .id(coordinator.serverSwitchID)
         .tint(appearanceManager.tintColor)
+        .withToasts()
         .onAppear {
             checkConfiguration()
         }
@@ -132,35 +133,31 @@ extension MainTabView {
     func view(for tab: AppTab) -> some View {
         switch tab {
         case .dashboard:
-            NavigationView {
+            NavigationStack {
                 HomeView()
                     .applyAppBackground()
             }
-            .navigationViewStyle(StackNavigationViewStyle())
             .id(coordinator.homeTabID)
-            
+
         case .performers:
-            NavigationView {
+            NavigationStack {
                 PerformersView()
                     .applyAppBackground()
             }
-            .navigationViewStyle(StackNavigationViewStyle())
             .id(coordinator.performersTabID)
-            
+
         case .catalogue:
-            NavigationView {
+            NavigationStack {
                 CatalogsView()
                     .applyAppBackground()
             }
-            .navigationViewStyle(StackNavigationViewStyle())
             .id(coordinator.catalogueTabID)
-            
+
         case .downloads:
-            NavigationView {
+            NavigationStack {
                 DownloadsView()
                     .applyAppBackground()
             }
-            .navigationViewStyle(StackNavigationViewStyle())
             .id(coordinator.downloadsTabID)
             
         case .reels:

@@ -113,7 +113,7 @@ struct StudiosView: View {
                     .foregroundColor(.white.opacity(0.9))
                     .padding(.horizontal, 10)
                     .padding(.vertical, 8)
-                    .background(Color.black.opacity(0.6))
+                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
                     .clipShape(Capsule())
                 }
             }
@@ -332,8 +332,9 @@ struct StudiosView: View {
                 }
             }
             .padding(16)
-            .padding(.bottom, 70) 
+            .padding(.bottom, 70)
         }
+        .refreshable { performSearch() }
     }
     
 }
@@ -361,7 +362,7 @@ struct StudioImageView: View {
             switch imageLoadState {
             case .loading:
                 Rectangle()
-                    .fill(Color.gray.opacity(0.1))
+                    .fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
                     .overlay(ProgressView())
 
             case .success(let image):
@@ -389,7 +390,7 @@ struct StudioImageView: View {
     
     private var placeholderView: some View {
         Rectangle()
-            .fill(Color.gray.opacity(0.1))
+            .fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
             .overlay(
                 VStack(spacing: 4) {
                     Image(systemName: "building.2")
@@ -558,8 +559,8 @@ struct StudioCardView: View {
             .padding(.vertical, 8)
         }
         .background(Color(UIColor.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .cardShadow()
     }
 }
 

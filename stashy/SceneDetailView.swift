@@ -144,7 +144,7 @@ struct SceneDetailView: View {
                     .padding()
                     .background(appearanceManager.tintColor.opacity(0.1))
                     .foregroundColor(appearanceManager.tintColor)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                 }
                 .padding(.top, 10)
             }
@@ -302,9 +302,11 @@ struct SceneDetailView: View {
         viewModel.deleteSceneWithFiles(scene: activeScene) { success in
             if success {
                 print("🎉 Scene and files completely removed!")
+                ToastManager.shared.show("Scene deleted", icon: "trash", style: .success)
                 self.dismiss()
             } else {
                 isDeleting = false
+                ToastManager.shared.show("Failed to delete scene", icon: "exclamationmark.triangle", style: .error)
                 print("❌ Failed to delete scene or files")
             }
         }

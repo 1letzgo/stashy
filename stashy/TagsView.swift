@@ -79,7 +79,7 @@ struct TagsView: View {
                         .foregroundColor(.white.opacity(0.9))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
-                        .background(Color.black.opacity(0.6))
+                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
                         .clipShape(Capsule())
                     }
                 }
@@ -338,7 +338,7 @@ struct TagsView: View {
                 
                 // Loading indicator for pagination
                 if viewModel.isLoadingMoreTags {
-                    ProgressView("Loading more tags...")
+                    ProgressView()
                         .frame(maxWidth: .infinity)
                         .padding()
                 } else if viewModel.hasMoreTags && !viewModel.tags.isEmpty {
@@ -352,7 +352,7 @@ struct TagsView: View {
             .padding(16)
             .padding(.bottom, 70) // Leave space for floating bar
         }
-
+        .refreshable { performSearch() }
     }
 }
 
@@ -394,12 +394,12 @@ struct TagCardView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: 48) // Optimized height for two lines of subheadline
         .background(Color(UIColor.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .overlay(
-            RoundedRectangle(cornerRadius: 10)
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
                 .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
         )
-        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+        .cardShadow()
     }
 }
 
@@ -602,14 +602,16 @@ struct TagDetailView: View {
                 HStack {
                     Button {
                         guard !isUpdatingFavorite else { return }
+                        HapticManager.light()
                         isUpdatingFavorite = true
                         let newState = !isFavorite
-                        isFavorite = newState
-                        
+                        withAnimation(DesignTokens.Animation.quick) { isFavorite = newState }
+
                         viewModel.toggleTagFavorite(tagId: selectedTag.id, favorite: newState) { success in
                             DispatchQueue.main.async {
                                 if !success {
                                     isFavorite = !newState
+                                    ToastManager.shared.show("Failed to update favorite", icon: "exclamationmark.triangle", style: .error)
                                 }
                                 isUpdatingFavorite = false
                             }

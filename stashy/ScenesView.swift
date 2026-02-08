@@ -110,7 +110,7 @@ struct ScenesView: View {
                         .foregroundColor(.white.opacity(0.9))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
-                        .background(Color.black.opacity(0.6))
+                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
                         .clipShape(Capsule())
                     }
                 }
@@ -463,14 +463,9 @@ struct ScenesView: View {
 
                     // Loading indicator for pagination
                     if viewModel.isLoadingMoreScenes {
-                        VStack(spacing: 8) {
-                            ProgressView()
-                            Text("Loading more scenes...")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 20)
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding()
                     } else if viewModel.hasMoreScenes && !viewModel.scenes.isEmpty {
                         // Invisible element to trigger loading more scenes
                         Color.clear
@@ -497,6 +492,7 @@ struct ScenesView: View {
                 .padding(.bottom, 80) // Add padding so bar doesn't cover content
             }
             .background(Color.appBackground)
+            .refreshable { performSearch() }
             .onChange(of: viewModel.isLoadingMoreScenes) { oldValue, isLoading in
                 if !isLoading && shouldRestoreScroll {
                     // Loading completed, restore scroll position

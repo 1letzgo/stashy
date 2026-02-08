@@ -82,7 +82,7 @@ struct HomeSceneCardView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 6)
                             .padding(.vertical, 3)
-                            .background(Color.black.opacity(0.6))
+                            .background(Color.black.opacity(DesignTokens.Opacity.badge))
                             .clipShape(RoundedRectangle(cornerRadius: 4))
                     }
                     
@@ -95,7 +95,7 @@ struct HomeSceneCardView: View {
                             .foregroundColor(.white)
                             .padding(.horizontal, 4)
                             .padding(.vertical, 2)
-                            .background(Color.black.opacity(0.6))
+                            .background(Color.black.opacity(DesignTokens.Opacity.badge))
                             .clipShape(RoundedRectangle(cornerRadius: 4))
                     }
                     
@@ -135,10 +135,10 @@ struct HomeSceneCardView: View {
             .padding(8)
         }
         .frame(width: cardWidth, height: cardWidth * 9 / 16)
-        .clipShape(RoundedRectangle(cornerRadius: 12)) // Updated to 12
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)) // Updated to 12
         .overlay(
             // Optional: Add border if needed, but usually shadow is enough
-            // RoundedRectangle(cornerRadius: 12).stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+            // RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card).stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
             EmptyView()
         )
         .onDisappear {

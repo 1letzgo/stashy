@@ -289,11 +289,12 @@ struct ReelsView: View {
                 let originalRating = viewModel.scenes[sceneIndex].rating100
                 viewModel.scenes[sceneIndex] = viewModel.scenes[sceneIndex].withRating(newRating)
                 
-                if let r = newRating { 
+                if let r = newRating {
                     viewModel.updateSceneRating(sceneId: sceneId, rating100: r) { success in
                         if !success {
                             DispatchQueue.main.async {
                                 viewModel.scenes[sceneIndex] = viewModel.scenes[sceneIndex].withRating(originalRating)
+                                ToastManager.shared.show("Failed to save rating", icon: "exclamationmark.triangle", style: .error)
                             }
                         }
                     }
@@ -328,6 +329,7 @@ struct ReelsView: View {
                         if !success {
                             DispatchQueue.main.async {
                                 viewModel.clips[clipIndex] = viewModel.clips[clipIndex].withRating(originalRating)
+                                ToastManager.shared.show("Failed to save rating", icon: "exclamationmark.triangle", style: .error)
                             }
                         }
                     }
@@ -355,6 +357,7 @@ struct ReelsView: View {
                     } else {
                         DispatchQueue.main.async {
                             viewModel.scenes[index] = viewModel.scenes[index].withOCounter(originalCount)
+                            ToastManager.shared.show("Counter update failed", icon: "exclamationmark.triangle", style: .error)
                         }
                     }
                 }
@@ -410,6 +413,7 @@ struct ReelsView: View {
                             if let revertIndex = viewModel.clips.firstIndex(where: { $0.id == image.id }) {
                                 viewModel.clips[revertIndex] = viewModel.clips[revertIndex].withOCounter(originalCount)
                             }
+                            ToastManager.shared.show("Counter update failed", icon: "exclamationmark.triangle", style: .error)
                         }
                     }
                 }
@@ -861,7 +865,7 @@ struct ReelsView: View {
                                 .foregroundColor(.white.opacity(0.9))
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 8)
-                                .background(Color.black.opacity(0.6))
+                                .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                 .clipShape(Capsule())
                             }
                         }
@@ -882,7 +886,7 @@ struct ReelsView: View {
                                 .foregroundColor(.white.opacity(0.9))
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 8)
-                                .background(Color.black.opacity(0.6))
+                                .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                 .clipShape(Capsule())
                             }
                         }
@@ -1437,7 +1441,7 @@ struct ReelItemView: View {
                             }
                             .padding(.vertical, 12)
                             .padding(.horizontal, 8)
-                            .background(Color.black.opacity(0.6))
+                            .background(Color.black.opacity(DesignTokens.Opacity.badge))
                             .clipShape(Capsule())
                             .offset(y: -220)
                             .transition(.scale(scale: 0, anchor: .top).combined(with: .opacity))
@@ -1449,7 +1453,7 @@ struct ReelItemView: View {
                 // O-Counter (Available for scenes, markers & clips)
                 let oCounter = item.oCounter ?? 0
                 SidebarButton(
-                    icon: "heart",
+                    icon: AppearanceManager.shared.oCounterIcon,
                     label: "Counter",
                     count: oCounter,
                     color: .white
@@ -1548,7 +1552,7 @@ struct ReelItemView: View {
                                             .foregroundColor(.white)
                                             .padding(.horizontal, 10)
                                             .padding(.vertical, 5)
-                                            .background(Color.black.opacity(0.6))
+                                            .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                             .clipShape(Capsule())
                                             .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
                                     }
@@ -1794,9 +1798,12 @@ struct SidebarButton: View {
     var hideCount: Bool = false
     let color: Color
     var action: () -> Void
-    
+
     var body: some View {
-        Button(action: action) {
+        Button(action: {
+            HapticManager.light()
+            action()
+        }) {
             VStack(spacing: 2) {
                 Image(systemName: icon)
                     .font(.system(size: 24, weight: .bold))

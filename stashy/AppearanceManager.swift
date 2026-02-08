@@ -16,15 +16,27 @@ class AppearanceManager: ObservableObject {
             saveColor(tintColor)
         }
     }
-    
+
+    @Published var oCounterIcon: String {
+        didSet {
+            UserDefaults.standard.set(oCounterIcon, forKey: kOCounterIcon)
+        }
+    }
+
+    var oCounterIconFilled: String {
+        return oCounterIcon.hasSuffix(".fill") ? oCounterIcon : oCounterIcon + ".fill"
+    }
+
     private let kTintColorRed = "kTintColorRed"
     private let kTintColorGreen = "kTintColorGreen"
     private let kTintColorBlue = "kTintColorBlue"
     private let kTintColorAlpha = "kTintColorAlpha"
-    
+    private let kOCounterIcon = "kOCounterIcon"
+
     private init() {
         // Load from UserDefaults or use default
         self.tintColor = .appAccent
+        self.oCounterIcon = UserDefaults.standard.string(forKey: "kOCounterIcon") ?? "heart"
         self.loadColor()
     }
     
@@ -68,6 +80,25 @@ class AppearanceManager: ObservableObject {
         return UIColor(tintColor)
     }
     
+    // Counter Icon Presets
+    let oCounterIconPresets: [IconOption] = [
+        IconOption(icon: "heart", label: "Heart"),
+        IconOption(icon: "star", label: "Star"),
+        IconOption(icon: "flame", label: "Flame"),
+        IconOption(icon: "bolt", label: "Bolt"),
+        IconOption(icon: "hand.thumbsup", label: "Thumbs Up"),
+        IconOption(icon: "circle", label: "Circle"),
+        IconOption(icon: "diamond", label: "Diamond"),
+        IconOption(icon: "crown", label: "Crown"),
+        IconOption(icon: "trophy", label: "Trophy"),
+        IconOption(icon: "moon", label: "Moon"),
+        IconOption(icon: "drop", label: "Drop"),
+        IconOption(icon: "leaf", label: "Leaf"),
+        IconOption(icon: "bell", label: "Bell"),
+        IconOption(icon: "tag", label: "Tag"),
+        IconOption(icon: "eye", label: "Eye"),
+    ]
+
     // Preset Colors
     let presets: [ColorOption] = [
         ColorOption(nameKey: "appearance.presets.stashy_brown", color: .appAccent),
@@ -79,6 +110,12 @@ class AppearanceManager: ObservableObject {
         ColorOption(nameKey: "appearance.presets.pink", color: .pink),
         ColorOption(nameKey: "appearance.presets.gray", color: .gray)
     ]
+}
+
+struct IconOption: Identifiable, Hashable {
+    let id = UUID()
+    let icon: String
+    let label: String
 }
 
 struct ColorOption: Identifiable, Hashable {

@@ -109,7 +109,7 @@ struct ServerSetupWizardView: View {
                         TextField("My Stash", text: $serverName)
                             .padding()
                             .background(Color(.secondarySystemGroupedBackground))
-                            .cornerRadius(12)
+                            .cornerRadius(DesignTokens.CornerRadius.card)
                     }
                     
                     // Protocol Picker
@@ -126,7 +126,7 @@ struct ServerSetupWizardView: View {
                         .pickerStyle(.segmented)
                         .padding()
                         .background(Color(.secondarySystemGroupedBackground))
-                        .cornerRadius(12)
+                        .cornerRadius(DesignTokens.CornerRadius.card)
                     }
                     
                     // Server Address
@@ -141,7 +141,7 @@ struct ServerSetupWizardView: View {
                             .autocorrectionDisabled()
                             .padding()
                             .background(Color(.secondarySystemGroupedBackground))
-                            .cornerRadius(12)
+                            .cornerRadius(DesignTokens.CornerRadius.card)
                             .onChange(of: serverAddress) { oldValue, newValue in
                                 if newValue.lowercased().hasPrefix("https://") {
                                     serverProtocol = .https
@@ -178,7 +178,7 @@ struct ServerSetupWizardView: View {
                             .autocorrectionDisabled()
                             .padding()
                             .background(Color(.secondarySystemGroupedBackground))
-                            .cornerRadius(12)
+                            .cornerRadius(DesignTokens.CornerRadius.card)
                     }
                 }
                 .padding(.horizontal, 24)
@@ -281,7 +281,7 @@ struct ServerSetupWizardView: View {
                     .padding(.vertical, 16)
                     .background(Color(.secondarySystemGroupedBackground))
                     .foregroundColor(.primary)
-                    .cornerRadius(14)
+                    .cornerRadius(DesignTokens.CornerRadius.button)
                 }
             }
             
@@ -311,7 +311,7 @@ struct ServerSetupWizardView: View {
                 .padding(.vertical, 16)
                 .background(canProceed ? appearanceManager.tintColor : Color.gray.opacity(0.3))
                 .foregroundColor(.white)
-                .cornerRadius(14)
+                .cornerRadius(DesignTokens.CornerRadius.button)
             }
             .disabled(!canProceed)
         }

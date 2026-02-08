@@ -116,16 +116,16 @@ struct PerformerDetailView: View {
         .onChange(of: viewModel.totalPerformerGalleries) { oldValue, newValue in
             // Switch to galleries only if no scenes exist and galleries are found
             if !viewModel.isLoadingPerformerScenes && viewModel.totalPerformerScenes == 0 && newValue > 0 {
-                selectedDetailTab = .galleries
+                withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = .galleries }
             }
         }
         .onChange(of: viewModel.totalPerformerScenes) { oldValue, newValue in
             if newValue > 0 {
                 // If scenes are found, always favor scenes tab (as requested)
-                selectedDetailTab = .scenes
+                withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = .scenes }
             } else if newValue == 0 && viewModel.totalPerformerGalleries > 0 {
                 // If scenes explicitly become 0 (or are 0 after load), switch to galleries
-                selectedDetailTab = .galleries
+                withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = .galleries }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneDeleted"))) { _ in
@@ -157,14 +157,16 @@ struct PerformerDetailView: View {
                 HStack {
                      Button {
                          guard !isUpdatingFavorite else { return }
+                         HapticManager.light()
                          isUpdatingFavorite = true
                          let newState = !isFavorite
-                         isFavorite = newState
-                         
+                         withAnimation(DesignTokens.Animation.quick) { isFavorite = newState }
+
                          viewModel.togglePerformerFavorite(performerId: performer.id, favorite: newState) { success in
                              DispatchQueue.main.async {
                                  if !success {
                                      isFavorite = !newState
+                                     ToastManager.shared.show("Failed to update favorite", icon: "exclamationmark.triangle", style: .error)
                                  }
                                  isUpdatingFavorite = false
                              }
@@ -378,7 +380,7 @@ struct PerformerDetailView: View {
                 if let thumbnailURL = displayPerformer.thumbnailURL {
                     CustomAsyncImage(url: thumbnailURL) { loader in
                         if loader.isLoading {
-                            Rectangle().fill(Color.gray.opacity(0.1))
+                            Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
                                 .overlay(ProgressView().scaleEffect(0.6))
                         } else if let image = loader.image {
                             image.resizable()
@@ -397,7 +399,7 @@ struct PerformerDetailView: View {
             .frame(width: imageWidth)
             .frame(minHeight: collapsedHeight)
             .frame(maxHeight: isHeaderExpanded ? .infinity : collapsedHeight)
-            .background(Color.gray.opacity(0.1))
+            .background(Color.gray.opacity(DesignTokens.Opacity.placeholder))
             
             // Details Section
             VStack(alignment: .leading, spacing: 4) {
@@ -459,12 +461,12 @@ struct PerformerDetailView: View {
             .frame(maxWidth: .infinity, minHeight: collapsedHeight, alignment: .topLeading)
         }
         .background(Color(UIColor.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
                 .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
         )
-        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+        .cardShadow()
         .overlay(
             Group {
                 let allDetails = getPerformerDetails(displayPerformer)
@@ -501,7 +503,7 @@ struct PerformerDetailView: View {
     }
 
     private func defaultThumbnailContent(width: CGFloat) -> some View {
-        Rectangle().fill(Color.gray.opacity(0.1))
+        Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
             .frame(width: width)
             .frame(maxHeight: .infinity)
             .overlay(Image(systemName: "person.fill").font(.system(size: 32)).foregroundColor(.appAccent.opacity(0.5)))
@@ -515,7 +517,7 @@ struct PerformerDetailView: View {
         .foregroundColor(.white)
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
-        .background(Color.black.opacity(0.6))
+        .background(Color.black.opacity(DesignTokens.Opacity.badge))
         .clipShape(Capsule())
     }
 

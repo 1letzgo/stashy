@@ -57,8 +57,8 @@ struct HomeStatisticsRowView: View {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
                         ForEach(0..<6) { _ in
-                            RoundedRectangle(cornerRadius: 12)
-                                .fill(Color.gray.opacity(0.1))
+                            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
+                                .fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
                                 .frame(width: 80, height: 90)
                         }
                     }
@@ -140,6 +140,6 @@ struct StatCard: View {
                 endPoint: .bottomTrailing
             )
         )
-        .cornerRadius(12)
+        .cornerRadius(DesignTokens.CornerRadius.card)
     }
 }

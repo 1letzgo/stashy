@@ -182,7 +182,7 @@ struct UniversalSearchView: View {
                     CustomAsyncImage(url: imageURL) { loader in
                         if loader.isLoading {
                             Circle()
-                                .fill(Color.gray.opacity(0.1))
+                                .fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
                                 .frame(width: 80, height: 80)
                                 .overlay(ProgressView())
                         } else if let image = loader.image {
@@ -249,8 +249,8 @@ struct UniversalSearchView: View {
             }
             .frame(width: 120, height: 90)
             .background(appearanceManager.tintColor)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .overlay(RoundedRectangle(cornerRadius: 12).stroke(appearanceManager.tintColor.opacity(0.1), lineWidth: 0.2))
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .overlay(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card).stroke(appearanceManager.tintColor.opacity(0.1), lineWidth: 0.2))
             
             // Name Pill
             InfoPill(icon: nil, text: studio.name)
@@ -354,7 +354,7 @@ struct UniversalSearchView: View {
             }
         }
         .frame(width: 140, height: 100)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .overlay(
             InfoPill(icon: "photo.stack", text: gallery.title)
                 .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)

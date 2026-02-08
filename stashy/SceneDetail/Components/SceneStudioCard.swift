@@ -23,8 +23,8 @@ struct SceneStudioCard: View {
                         }
                         .frame(width: 110, height: 88)
                         .background(appearanceManager.tintColor)
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-                        .overlay(RoundedRectangle(cornerRadius: 12).stroke(appearanceManager.tintColor.opacity(0.1), lineWidth: 0.2))
+                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                        .overlay(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card).stroke(appearanceManager.tintColor.opacity(0.1), lineWidth: 0.2))
                         
                         // Name Pill Overlaid at Bottom
                         Text(studio.name)
@@ -54,7 +54,7 @@ struct SceneStudioCard: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(UIColor.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .cardShadow()
     }
 }

@@ -29,7 +29,7 @@ struct ScenePerformersCard: View {
                                                  .clipShape(Circle())
                                          } else {
                                              Circle()
-                                                 .fill(Color.gray.opacity(0.1))
+                                                 .fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
                                                  .frame(width: 80, height: 80)
                                                  .skeleton()
                                          }
@@ -75,7 +75,7 @@ struct ScenePerformersCard: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         .background(Color(UIColor.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .cardShadow()
     }
 }

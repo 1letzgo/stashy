@@ -103,7 +103,7 @@ struct StudioDetailView: View {
             // If we know from the passed studio object that there are no scenes but there are galleries,
             // switch immediately so the user sees content.
             if effectiveScenesCount == 0 && effectiveGalleriesCount > 0 {
-                selectedDetailTab = .galleries
+                withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = .galleries }
             }
             loadData()
             // Fetch updated studio details (like favorite status) which might be missing from list view objects
@@ -118,19 +118,19 @@ struct StudioDetailView: View {
         .onChange(of: viewModel.isLoadingStudioScenes) { oldValue, newValue in
             // If scene loading finished and we found 0 scenes, but we have galleries, switch to galleries
             if !newValue && effectiveScenesCount == 0 && effectiveGalleriesCount > 0 {
-                selectedDetailTab = .galleries
+                withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = .galleries }
             }
         }
         .onChange(of: effectiveGalleriesCount) { oldValue, newValue in
             if !viewModel.isLoadingStudioScenes && effectiveScenesCount == 0 && newValue > 0 {
-                selectedDetailTab = .galleries
+                withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = .galleries }
             }
         }
         .onChange(of: effectiveScenesCount) { oldValue, newValue in
             if newValue > 0 {
-                selectedDetailTab = .scenes
+                withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = .scenes }
             } else if newValue == 0 && effectiveGalleriesCount > 0 {
-                selectedDetailTab = .galleries
+                withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = .galleries }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneDeleted"))) { _ in
@@ -162,14 +162,16 @@ struct StudioDetailView: View {
                 HStack {
                      Button {
                          guard !isUpdatingFavorite else { return }
+                         HapticManager.light()
                          isUpdatingFavorite = true
                          let newState = !isFavorite
-                         isFavorite = newState
-                         
+                         withAnimation(DesignTokens.Animation.quick) { isFavorite = newState }
+
                          viewModel.toggleStudioFavorite(studioId: studio.id, favorite: newState) { success in
                              DispatchQueue.main.async {
                                  if !success {
                                      isFavorite = !newState
+                                     ToastManager.shared.show("Failed to update favorite", icon: "exclamationmark.triangle", style: .error)
                                  }
                                  isUpdatingFavorite = false
                              }
@@ -274,12 +276,12 @@ struct StudioDetailView: View {
             , alignment: .leading
         )
         .background(Color(UIColor.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .overlay(
-            RoundedRectangle(cornerRadius: 12)
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
                 .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
         )
-        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+        .cardShadow()
         .overlay(
             Group {
                 let details = getStudioDetails(studio)
@@ -339,7 +341,7 @@ struct StudioDetailView: View {
         .foregroundColor(.white)
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
-        .background(Color.black.opacity(0.6))
+        .background(Color.black.opacity(DesignTokens.Opacity.badge))
         .clipShape(Capsule())
     }
     

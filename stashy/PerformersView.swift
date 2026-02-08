@@ -103,7 +103,7 @@ struct PerformersView: View {
                         .foregroundColor(.white.opacity(0.9))
                         .padding(.horizontal, 10)
                         .padding(.vertical, 8)
-                        .background(Color.black.opacity(0.6))
+                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
                         .clipShape(Capsule())
                     }
                 }
@@ -366,10 +366,9 @@ struct PerformersView: View {
 
                     // Loading indicator for pagination
                     if viewModel.isLoadingMorePerformers {
-                        ProgressView("Loading more performers...")
+                        ProgressView()
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .id("loading-indicator")
                     } else if viewModel.hasMorePerformers && !viewModel.performers.isEmpty {
                         // Invisible element to trigger loading more performers
                         Color.clear
@@ -394,7 +393,7 @@ struct PerformersView: View {
                 }
                 .padding(16)
             }
-
+            .refreshable { performSearch() }
             .onChange(of: viewModel.isLoadingMorePerformers) { oldValue, isLoading in
                 if !isLoading && shouldRestoreScroll {
                     // Loading completed, restore scroll position
@@ -472,7 +471,7 @@ struct PerformerCardView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color.black.opacity(0.6))
+                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
                         .clipShape(Capsule())
                         .shadow(color: .black.opacity(0.2), radius: 2)
                     }
@@ -489,7 +488,7 @@ struct PerformerCardView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 4)
-                    .background(Color.black.opacity(0.6))
+                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
                     .clipShape(Capsule())
                     .shadow(color: .black.opacity(0.2), radius: 2)
                 }
@@ -510,8 +509,8 @@ struct PerformerCardView: View {
             .padding(12)
         }
         .background(Color(UIColor.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .cardShadow()
     }
 }
 

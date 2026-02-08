@@ -41,6 +41,44 @@ struct AppearanceSettingsView: View {
                 }
                 .padding(.vertical, 8)
             }
+            Section(header: Text("Counter Icon"), footer: Text("Choose which icon to display for the Counter throughout the app.")) {
+                LazyVGrid(columns: [GridItem(.adaptive(minimum: 56))], spacing: 12) {
+                    ForEach(appearanceManager.oCounterIconPresets) { option in
+                        VStack(spacing: 4) {
+                            ZStack {
+                                Circle()
+                                    .fill(appearanceManager.oCounterIcon == option.icon
+                                          ? appearanceManager.tintColor.opacity(0.15)
+                                          : Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                                    .frame(width: 48, height: 48)
+                                    .overlay(
+                                        Circle()
+                                            .stroke(appearanceManager.oCounterIcon == option.icon
+                                                    ? appearanceManager.tintColor
+                                                    : Color.primary.opacity(0.2), lineWidth: appearanceManager.oCounterIcon == option.icon ? 2 : 1)
+                                    )
+
+                                Image(systemName: option.icon + ".fill")
+                                    .font(.system(size: 20))
+                                    .foregroundColor(appearanceManager.oCounterIcon == option.icon
+                                                     ? appearanceManager.tintColor
+                                                     : .primary.opacity(0.6))
+                            }
+
+                            Text(option.label)
+                                .font(.system(size: 10))
+                                .foregroundColor(.secondary)
+                        }
+                        .onTapGesture {
+                            HapticManager.selection()
+                            withAnimation(DesignTokens.Animation.quick) {
+                                appearanceManager.oCounterIcon = option.icon
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
+            }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Appearance")

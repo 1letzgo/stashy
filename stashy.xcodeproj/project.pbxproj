@@ -69,6 +69,9 @@
 		DFST000112F30A0000000011 /* DefaultSortView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000102F30A0000000010 /* DefaultSortView.swift */; };
 		DFST000132F30A0000000013 /* DefaultFilterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000122F30A0000000012 /* DefaultFilterView.swift */; };
 		DFST000152F30A0000000015 /* ServerStatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000142F30A0000000014 /* ServerStatisticsView.swift */; };
+		DFUI000012F3AUDIT001 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFUI000022F3AUDIT002 /* DesignTokens.swift */; };
+		DFUI000032F3AUDIT003 /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFUI000042F3AUDIT004 /* HapticManager.swift */; };
+		DFUI000052F3AUDIT005 /* ToastManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFUI000062F3AUDIT006 /* ToastManager.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -136,6 +139,9 @@
 		DFST000122F30A0000000012 /* DefaultFilterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultFilterView.swift; sourceTree = "<group>"; };
 		DFST000142F30A0000000014 /* ServerStatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerStatisticsView.swift; sourceTree = "<group>"; };
 		E69F93D1B9EB47B88F9597C3 /* FilterModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterModels.swift; sourceTree = "<group>"; };
+		DFUI000022F3AUDIT002 /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
+		DFUI000042F3AUDIT004 /* HapticManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticManager.swift; sourceTree = "<group>"; };
+		DFUI000062F3AUDIT006 /* ToastManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastManager.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -168,9 +174,11 @@
 				DF675E612F2A46A1004CA019 /* Home */,
 				DFST000012F30A0000000001 /* Settings */,
 				DF22BB142F167223007C2090 /* CatalogsView.swift */,
+				DFUI000022F3AUDIT002 /* DesignTokens.swift */,
 				DF22BB172F16743C007C2090 /* DownloadsView.swift */,
 				E69F93D1B9EB47B88F9597C3 /* FilterModels.swift */,
 				DF22BB182F16743C007C2090 /* GalleriesView.swift */,
+				DFUI000042F3AUDIT004 /* HapticManager.swift */,
 				DF675E6C2F2A6386004CA019 /* Repositories */,
 				DFGQ000022F28A0000000002 /* GraphQLClient.swift */,
 				DF675E792F2A6392004CA019 /* SceneDetail */,
@@ -200,6 +208,7 @@
 				DFE504612E8A8C4000323FF0 /* StudiosView.swift */,
 				DFF7EE402F0D3D2800344A8B /* TabManager.swift */,
 				DF22BB1D2F16743C007C2090 /* TagsView.swift */,
+				DFUI000062F3AUDIT006 /* ToastManager.swift */,
 				DF90B7652F1B72E5003ED852 /* UniversalSearchView.swift */,
 			);
 			path = stashy;
@@ -413,6 +422,9 @@
 				DFSM000012F2NEWFILE001 /* KeychainManager.swift in Sources */,
 				DFSM000032F2NEWFILE003 /* OnboardingView.swift in Sources */,
 				DFSM000052F2NEWFILE005 /* ServerFormViewNew.swift in Sources */,
+				DFUI000012F3AUDIT001 /* DesignTokens.swift in Sources */,
+				DFUI000032F3AUDIT003 /* HapticManager.swift in Sources */,
+				DFUI000052F3AUDIT005 /* ToastManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

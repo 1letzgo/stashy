@@ -30,8 +30,8 @@ struct SceneVideoPlayerCard: View {
             infoSection
         }
         .background(Color(UIColor.systemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .cardShadow()
         .overlay(expandToggleOverlay, alignment: .bottomTrailing)
     }
 
@@ -75,7 +75,7 @@ struct SceneVideoPlayerCard: View {
                                 .clipped()
                         } else {
                             Rectangle()
-                                .fill(Color.gray.opacity(0.1))
+                                .fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
                                 .skeleton()
                         }
                     }
@@ -169,7 +169,7 @@ struct SceneVideoPlayerCard: View {
     private var largePlayButton: some View {
         ZStack {
             Circle()
-                .fill(Color.black.opacity(0.4))
+                .fill(Color.black.opacity(DesignTokens.Opacity.medium))
                 .frame(width: 70, height: 70)
                 .blur(radius: 1)
             
@@ -256,13 +256,14 @@ struct SceneVideoPlayerCard: View {
             HStack(spacing: 8) {
                 // O-Counter
                 Button(action: {
+                    HapticManager.light()
                     viewModel.incrementOCounter(sceneId: activeScene.id) { newCount in
                         if let count = newCount {
                             DispatchQueue.main.async { activeScene = activeScene.withOCounter(count) }
                         }
                     }
                 }) {
-                    infoPill(icon: "heart.fill", text: "\(activeScene.oCounter ?? 0)", color: .red)
+                    infoPill(icon: AppearanceManager.shared.oCounterIconFilled, text: "\(activeScene.oCounter ?? 0)", color: .red)
                 }
                 .buttonStyle(.plain)
                 
@@ -442,7 +443,7 @@ struct SceneVideoPlayerCard: View {
                                 .clipped()
                         } else {
                             Rectangle()
-                                .fill(Color.gray.opacity(0.1))
+                                .fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
                                 .frame(width: 80, height: 45)
                                 .skeleton()
                         }
@@ -460,7 +461,7 @@ struct SceneVideoPlayerCard: View {
                     .fontWeight(.bold)
                     .padding(.horizontal, 4)
                     .padding(.vertical, 1)
-                    .background(Color.black.opacity(0.6))
+                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
                     .foregroundColor(.white)
                     .clipShape(RoundedRectangle(cornerRadius: 3))
                     .padding(2)

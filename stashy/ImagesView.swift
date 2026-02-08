@@ -61,6 +61,13 @@ struct ImagesView: View {
                 .padding(16)
                 .padding(.bottom, isSelectionMode ? 80 : 0) // Add padding for floating bar
         }
+        .refreshable {
+            if let gallery = gallery {
+                viewModel.fetchGalleryImages(galleryId: gallery.id)
+            } else {
+                viewModel.fetchImages(sortBy: selectedSortOption)
+            }
+        }
         .navigationTitle(gallery?.title ?? "Images")
         .navigationBarTitleDisplayMode(.inline)
         .applyAppBackground()
@@ -135,7 +142,7 @@ struct ImagesView: View {
                         .overlay(
                             ZStack {
                                 if selectedImageIds.contains(image.id) {
-                                    Color.black.opacity(0.4)
+                                    Color.black.opacity(DesignTokens.Opacity.medium)
                                     Image(systemName: "checkmark.circle.fill")
                                         .font(.title)
                                         .foregroundColor(appearanceManager.tintColor)
@@ -211,10 +218,12 @@ struct ImagesView: View {
         }
         
         group.notify(queue: .main) {
+            let count = idsToDelete.count
             isDeleting = false
             selectedImageIds.removeAll()
-            isSelectionMode = false
-            
+            withAnimation(DesignTokens.Animation.quick) { isSelectionMode = false }
+            ToastManager.shared.show("\(count) image\(count == 1 ? "" : "s") deleted", icon: "trash", style: .success)
+
             // Refresh data
             if let gallery = gallery {
                 viewModel.fetchGalleryImages(galleryId: gallery.id)
@@ -244,7 +253,7 @@ struct ImagesView: View {
         .background(Color(UIColor.secondarySystemBackground).opacity(0.95))
         .clipShape(Capsule())
         .overlay(Capsule().stroke(Color.primary.opacity(0.1), lineWidth: 0.5))
-        .shadow(color: Color.black.opacity(0.15), radius: 10, x: 0, y: 5)
+        .floatingShadow()
         .padding(.bottom, 20)
     }
     
@@ -254,7 +263,7 @@ struct ImagesView: View {
             HStack {
                 if isSelectionMode {
                     Button {
-                         isSelectionMode = false
+                         withAnimation(DesignTokens.Animation.quick) { isSelectionMode = false }
                          selectedImageIds.removeAll()
                     } label: {
                         Image(systemName: "checkmark.circle.fill")
@@ -262,7 +271,7 @@ struct ImagesView: View {
                     }
                 } else {
                     Button {
-                        isSelectionMode = true
+                        withAnimation(DesignTokens.Animation.quick) { isSelectionMode = true }
                     } label: {
                         Image(systemName: "checkmark.circle")
                             .foregroundColor(appearanceManager.tintColor)
@@ -401,7 +410,7 @@ struct ImageThumbnailCard: View {
                 ZStack(alignment: .bottomLeading) {
                     // Image
                     ZStack {
-                        Color.gray.opacity(0.1)
+                        Color.gray.opacity(DesignTokens.Opacity.placeholder)
                         
                         if let url = image.thumbnailURL {
                             CustomAsyncImage(url: url) { loader in
@@ -427,7 +436,7 @@ struct ImageThumbnailCard: View {
                             .font(.system(size: 30))
                             .foregroundColor(.white)
                             .padding(12)
-                            .background(Color.black.opacity(0.4))
+                            .background(Color.black.opacity(DesignTokens.Opacity.medium))
                             .clipShape(Circle())
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
@@ -452,7 +461,7 @@ struct ImageThumbnailCard: View {
                                      .foregroundColor(.white)
                                      .padding(.horizontal, 5)
                                      .padding(.vertical, 2)
-                                     .background(Color.black.opacity(0.6))
+                                     .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                      .clipShape(Capsule())
                              }
                              
@@ -466,7 +475,7 @@ struct ImageThumbnailCard: View {
                                      .foregroundColor(.white)
                                      .padding(.horizontal, 5)
                                      .padding(.vertical, 2)
-                                     .background(Color.black.opacity(0.6))
+                                     .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                      .clipShape(Capsule())
                              }
                         }
@@ -502,7 +511,7 @@ struct ImageThumbnailCard: View {
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 5)
                                     .padding(.vertical, 2)
-                                    .background(Color.black.opacity(0.8))
+                                    .background(Color.black.opacity(DesignTokens.Opacity.strong))
                                     .clipShape(Capsule())
                             }
                         }
@@ -512,8 +521,8 @@ struct ImageThumbnailCard: View {
             }
             .aspectRatio(1, contentMode: .fit)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .contentShape(RoundedRectangle(cornerRadius: 12))
-        .shadow(color: Color.black.opacity(0.1), radius: 4, x: 0, y: 2)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .cardShadow()
     }
 }
