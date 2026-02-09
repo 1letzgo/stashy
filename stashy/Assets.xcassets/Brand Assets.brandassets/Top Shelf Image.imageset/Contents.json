@@ -1,0 +1,18 @@
+{
+  "images" : [
+    {
+      "filename" : "Design ohne Titel-2.png",
+      "idiom" : "tv",
+      "scale" : "1x"
+    },
+    {
+      "filename" : "Design ohne Titel 1.png",
+      "idiom" : "tv",
+      "scale" : "2x"
+    }
+  ],
+  "info" : {
+    "author" : "xcode",
+    "version" : 1
+  }
+}
