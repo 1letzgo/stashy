@@ -301,10 +301,16 @@ struct StudiosView: View {
             if let defaultId = TabManager.shared.getDefaultFilterId(for: .studios),
                let filter = newValue[defaultId] {
                 selectedFilter = filter
-                viewModel.fetchStudios(sortBy: selectedSortOption, searchQuery: searchText, filter: filter)
+                // Only fetch if empty to avoid resetting scroll
+                if viewModel.studios.isEmpty {
+                    viewModel.fetchStudios(sortBy: selectedSortOption, searchQuery: searchText, filter: filter)
+                }
             } else if !viewModel.isLoadingSavedFilters {
                 // Default filter was set but not found, or filters finished loading and none match
-                viewModel.fetchStudios(sortBy: selectedSortOption, searchQuery: searchText, filter: nil)
+                // Only fetch if empty
+                if viewModel.studios.isEmpty {
+                    viewModel.fetchStudios(sortBy: selectedSortOption, searchQuery: searchText, filter: nil)
+                }
             }
         }
     }

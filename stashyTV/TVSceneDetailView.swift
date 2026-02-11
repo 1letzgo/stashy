@@ -48,14 +48,9 @@ struct TVSceneDetailView: View {
                     // MARK: - Metadata Row
                     metadataRow(scene: scene)
 
-                    // MARK: - Performers Section
-                    if !scene.performers.isEmpty {
-                        performersSection(performers: scene.performers)
-                    }
-
-                    // MARK: - Studio Section
-                    if let studio = scene.studio {
-                        studioSection(studio: studio)
+                    // MARK: - Performers & Studio Section
+                    if !scene.performers.isEmpty || scene.studio != nil {
+                        performersAndStudioSection(performers: scene.performers, studio: scene.studio)
                     }
 
                     // MARK: - Tags Section
@@ -165,6 +160,7 @@ struct TVSceneDetailView: View {
                     endPoint: .bottom
                 )
                 .frame(height: 250)
+                .allowsHitTesting(false)
 
                 // Title overlay
                 VStack(alignment: .leading, spacing: 8) {
@@ -207,6 +203,7 @@ struct TVSceneDetailView: View {
             }
         }
         .buttonStyle(.card)
+        .padding(.horizontal, -60) // Let it span wider
         .disabled(!hasStream || (isWaiting && !hasStream))
     }
 
@@ -276,7 +273,7 @@ struct TVSceneDetailView: View {
         .foregroundColor(.secondary)
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .background(Color(UIColor.systemGray.withAlphaComponent(0.2)))
+        .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 12))
     }
 
@@ -392,81 +389,125 @@ struct TVSceneDetailView: View {
         }
     }
 
-    // MARK: - Performers Section
+    // MARK: - Performers & Studio Section
 
     @ViewBuilder
-    private func performersSection(performers: [ScenePerformer]) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Performers")
-                .font(.title2)
+    private func performersAndStudioSection(performers: [ScenePerformer], studio: SceneStudio?) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            Text("Performers & Studio")
+                .font(.title3)
                 .fontWeight(.bold)
+                .foregroundColor(.secondary)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 24) {
+                HStack(spacing: 40) {
+                    // Studio (Optional)
+                    if let studio = studio {
+                        NavigationLink(destination: TVStudioDetailView(studioId: studio.id, studioName: studio.name)) {
+                            StudioButtonContent(studio: studio)
+                        }
+                        .buttonStyle(.plain)
+                        
+                        if !performers.isEmpty {
+                            Divider()
+                                .frame(height: 120)
+                                .background(Color.secondary.opacity(0.3))
+                        }
+                    }
+
+                    // Performers
                     ForEach(performers) { performer in
                         NavigationLink(destination: TVPerformerDetailView(performerId: performer.id, performerName: performer.name)) {
-                            VStack(spacing: 12) {
-                                // Performer avatar placeholder
-                                ZStack {
-                                    Circle()
-                                        .fill(Color(UIColor.systemGray.withAlphaComponent(0.2)))
-                                        .frame(width: 120, height: 120)
-                                    Image(systemName: "person.fill")
-                                        .font(.system(size: 40))
-                                        .foregroundColor(.secondary)
-                                }
-
-                                Text(performer.name)
-                                    .font(.headline)
-                                    .foregroundColor(.primary)
-                                    .lineLimit(2)
-                                    .multilineTextAlignment(.center)
-                                    .frame(width: 140)
-                            }
+                            PerformerButtonContent(performer: performer)
                         }
-                        .buttonStyle(.card)
+                        .buttonStyle(.plain)
                     }
                 }
+                .padding(.vertical, 20)
                 .padding(.horizontal, 4)
-                .padding(.vertical, 30)
             }
         }
     }
 
-    // MARK: - Studio Section
+    struct StudioButtonContent: View {
+        let studio: SceneStudio
+        @Environment(\.isFocused) var isFocused
+        
+        var body: some View {
+            VStack(alignment: .leading, spacing: 12) {
+                ZStack(alignment: .bottomTrailing) {
+                    // Background for the inset
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(isFocused ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(.ultraThinMaterial))
+                        .scaleEffect(isFocused ? 1.1 : 1.0)
 
-    @ViewBuilder
-    private func studioSection(studio: SceneStudio) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Studio")
-                .font(.title2)
-                .fontWeight(.bold)
-
-            NavigationLink(destination: TVStudioDetailView(studioId: studio.id, studioName: studio.name)) {
-                HStack(spacing: 20) {
-                    Image(systemName: "building.2")
-                        .font(.title2)
-                        .foregroundColor(AppearanceManager.shared.tintColor)
-                        .frame(width: 60, height: 60)
-                        .background(Color(UIColor.systemGray.withAlphaComponent(0.2)))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                    Text(studio.name)
-                        .font(.title3)
-                        .fontWeight(.semibold)
-                        .foregroundColor(.primary)
-
-                    Spacer()
-
-                    Image(systemName: "chevron.right")
-                        .font(.title3)
-                        .foregroundColor(.secondary)
+                    CustomAsyncImage(url: studio.thumbnailURL) { loader in
+                        if let image = loader.image {
+                            image.resizable().scaledToFill()
+                        } else {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.1))
+                                .overlay(Image(systemName: "building.2.fill").font(.system(size: 40)).foregroundColor(.secondary))
+                        }
+                    }
+                    .frame(width: 320 - 16, height: 180 - 16)
+                    .cornerRadius(8)
+                    .padding(8)
+                    .scaleEffect(isFocused ? 1.1 : 1.0)
+                    .clipped()
                 }
-                .padding(20)
-                .background(Color(UIColor.systemGray.withAlphaComponent(0.15)))
-                .clipShape(RoundedRectangle(cornerRadius: 16))
+                .frame(width: 320, height: 180)
+                .shadow(color: .black.opacity(isFocused ? 0.3 : 0), radius: 10, y: 10)
+                
+                Text(studio.name)
+                    .font(.headline)
+                    .foregroundColor(isFocused ? .primary : .secondary)
+                    .lineLimit(1)
+                    .frame(width: 320, alignment: .leading)
+                    .scaleEffect(isFocused ? 1.05 : 1.0)
             }
-            .buttonStyle(.card)
+            .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.3), value: isFocused)
+        }
+    }
+
+    struct PerformerButtonContent: View {
+        let performer: ScenePerformer
+        @Environment(\.isFocused) var isFocused
+        
+        var body: some View {
+            VStack(alignment: .leading, spacing: 12) {
+                ZStack(alignment: .bottomTrailing) {
+                    // Background for the inset
+                    RoundedRectangle(cornerRadius: 12)
+                        .fill(isFocused ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(.ultraThinMaterial))
+                        .scaleEffect(isFocused ? 1.1 : 1.0)
+
+                    CustomAsyncImage(url: performer.thumbnailURL) { loader in
+                        if let image = loader.image {
+                            image.resizable().scaledToFill()
+                        } else {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.1))
+                                .overlay(Image(systemName: "person.fill").font(.system(size: 40)).foregroundColor(.secondary))
+                        }
+                    }
+                    .frame(width: 200 - 12, height: 300 - 12)
+                    .cornerRadius(8)
+                    .padding(6)
+                    .scaleEffect(isFocused ? 1.1 : 1.0)
+                    .clipped()
+                }
+                .frame(width: 200, height: 300)
+                .shadow(color: .black.opacity(isFocused ? 0.3 : 0), radius: 10, y: 10)
+
+                Text(performer.name)
+                    .font(.headline)
+                    .foregroundColor(isFocused ? .primary : .secondary)
+                    .lineLimit(1)
+                    .frame(width: 200, alignment: .leading)
+                    .scaleEffect(isFocused ? 1.05 : 1.0)
+            }
+            .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.3), value: isFocused)
         }
     }
 
@@ -487,7 +528,7 @@ struct TVSceneDetailView: View {
                             .foregroundColor(.primary)
                             .padding(.horizontal, 20)
                             .padding(.vertical, 12)
-                            .background(Color(UIColor.systemGray.withAlphaComponent(0.2)))
+                            .background(.thinMaterial)
                             .clipShape(Capsule())
                     }
                 }
@@ -513,7 +554,7 @@ struct TVSceneDetailView: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(24)
-        .background(Color(UIColor.systemGray.withAlphaComponent(0.15)))
+        .background(.ultraThinMaterial)
         .clipShape(RoundedRectangle(cornerRadius: 16))
     }
 

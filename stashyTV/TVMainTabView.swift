@@ -19,12 +19,14 @@ struct TVMainTabView: View {
                 Label("Dashboard", systemImage: "chart.bar.fill")
             }
 
+/*
             NavigationStack {
                 TVScenesView()
             }
             .tabItem {
                 Label("Scenes", systemImage: "film")
             }
+*/
 
             NavigationStack {
                 TVPerformersView()

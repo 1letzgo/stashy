@@ -12,10 +12,14 @@ struct TVStudioCardView: View {
         VStack(alignment: .leading, spacing: 12) {
             // Studio thumbnail
             ZStack(alignment: .bottomTrailing) {
+                // Background for the inset
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.ultraThinMaterial)
+
                 CustomAsyncImage(url: studio.thumbnailURL) { loader in
                     if loader.isLoading {
                         Rectangle()
-                            .fill(Color.gray.opacity(0.2))
+                            .fill(Color.gray.opacity(0.1))
                             .overlay(ProgressView())
                     } else if let image = loader.image {
                         image
@@ -23,7 +27,7 @@ struct TVStudioCardView: View {
                             .scaledToFill()
                     } else {
                         Rectangle()
-                            .fill(Color.gray.opacity(0.15))
+                            .fill(Color.gray.opacity(0.1))
                             .overlay(
                                 Image(systemName: "building.2.fill")
                                     .font(.system(size: 48))
@@ -31,9 +35,10 @@ struct TVStudioCardView: View {
                             )
                     }
                 }
-                .aspectRatio(16/9, contentMode: .fill)
+                .frame(width: 320 - 16, height: 180 - 16) // 16:9 aspect with 8pt inset each side
+                .cornerRadius(8)
+                .padding(8)
                 .clipped()
-                .cornerRadius(12)
 
                 // Scene count badge
                 if studio.sceneCount > 0 {
@@ -45,7 +50,7 @@ struct TVStudioCardView: View {
                         .background(AppearanceManager.shared.tintColor.opacity(0.9))
                         .foregroundColor(.white)
                         .cornerRadius(8)
-                        .padding(10)
+                        .padding(14) // Offset for inset
                 }
             }
 

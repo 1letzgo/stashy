@@ -16,95 +16,74 @@ struct TVSearchView: View {
     @FocusState private var isSearchFieldFocused: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 40) {
-                // Search Field
-                HStack(spacing: 20) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.title2)
-                        .foregroundStyle(.secondary)
-
-                    TextField("Search scenes, performers...", text: $searchQuery)
-                        .focused($isSearchFieldFocused)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .onSubmit {
-                            performSearch()
+            ScrollView {
+                VStack(alignment: .leading, spacing: 50) {
+                    if viewModel.isLoading {
+                        HStack {
+                            Spacer()
+                            ProgressView("Searching...")
+                                .font(.title3)
+                            Spacer()
+                        }
+                        .padding(.top, 60)
+                    } else if hasSearched && viewModel.scenes.isEmpty && viewModel.performers.isEmpty {
+                        HStack {
+                            Spacer()
+                            VStack(spacing: 16) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 60))
+                                    .foregroundStyle(.tertiary)
+                                Text("No results found for \"\(searchQuery)\"")
+                                    .font(.title3)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                        }
+                        .padding(.top, 60)
+                    } else if hasSearched {
+                        // Scenes Results
+                        if !viewModel.scenes.isEmpty {
+                            scenesResultSection
                         }
 
-                    if !searchQuery.isEmpty {
-                        Button("Clear") {
-                            searchQuery = ""
-                            viewModel.clearSearchResults()
-                            hasSearched = false
+                        // Performers Results
+                        if !viewModel.performers.isEmpty {
+                            performersResultSection
                         }
+                    } else {
+                        // Empty state
+                        HStack {
+                            Spacer()
+                            VStack(spacing: 16) {
+                                Image(systemName: "magnifyingglass")
+                                    .font(.system(size: 60))
+                                    .foregroundStyle(.tertiary)
+                                Text("Search your Stash library")
+                                    .font(.title3)
+                                    .foregroundStyle(.secondary)
+                                Text("Use the remote to type or dictate your search.")
+                                    .font(.callout)
+                                    .foregroundStyle(.tertiary)
+                            }
+                            Spacer()
+                        }
+                        .padding(.top, 80)
                     }
                 }
-                .padding(.horizontal, 60)
-                .padding(.top, 20)
-
-                // Results
-                if viewModel.isLoading {
-                    HStack {
-                        Spacer()
-                        ProgressView("Searching...")
-                            .font(.title3)
-                        Spacer()
-                    }
-                    .padding(.top, 60)
-                } else if hasSearched && viewModel.scenes.isEmpty && viewModel.performers.isEmpty {
-                    HStack {
-                        Spacer()
-                        VStack(spacing: 16) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 60))
-                                .foregroundStyle(.tertiary)
-                            Text("No results found for \"\(searchQuery)\"")
-                                .font(.title3)
-                                .foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                    }
-                    .padding(.top, 60)
-                } else if hasSearched {
-                    ScrollView {
-                        VStack(alignment: .leading, spacing: 50) {
-                            // Scenes Results
-                            if !viewModel.scenes.isEmpty {
-                                scenesResultSection
-                            }
-
-                            // Performers Results
-                            if !viewModel.performers.isEmpty {
-                                performersResultSection
-                            }
-                        }
-                        .padding(.vertical, 60)
-                    }
-                } else {
-                    // Empty state
-                    HStack {
-                        Spacer()
-                        VStack(spacing: 16) {
-                            Image(systemName: "magnifyingglass")
-                                .font(.system(size: 60))
-                                .foregroundStyle(.tertiary)
-                            Text("Search your Stash library")
-                                .font(.title3)
-                                .foregroundStyle(.secondary)
-                            Text("Type a query and press Return to search.")
-                                .font(.callout)
-                                .foregroundStyle(.tertiary)
-                        }
-                        Spacer()
-                    }
-                    .padding(.top, 80)
-                }
-
-                Spacer()
+                .padding(.vertical, 60)
             }
             .navigationTitle("Search")
-            .onAppear {
-                isSearchFieldFocused = true
+            .searchable(text: $searchQuery, placement: .automatic, prompt: "Search scenes, performers...")
+            .onChange(of: searchQuery) { _, newValue in
+                if newValue.isEmpty {
+                    viewModel.clearSearchResults()
+                    hasSearched = false
+                } else {
+                    performSearch()
+                }
+            }
+            .onSubmit(of: .search) {
+                performSearch()
             }
         }
 

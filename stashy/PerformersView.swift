@@ -294,7 +294,9 @@ struct PerformersView: View {
             
             // Only search if we don't have a default filter to wait for, or if filters are already loaded
             if TabManager.shared.getDefaultFilterId(for: .performers) == nil || !viewModel.savedFilters.isEmpty {
-                performSearch()
+                if viewModel.performers.isEmpty {
+                    performSearch()
+                }
             }
             viewModel.fetchSavedFilters()
         }
@@ -319,10 +321,16 @@ struct PerformersView: View {
                 if let defaultId = TabManager.shared.getDefaultFilterId(for: .performers),
                    let filter = newValue[defaultId] {
                     selectedFilter = filter
-                    viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: filter)
+                    // Only fetch if empty to avoid resetting scroll
+                    if viewModel.performers.isEmpty {
+                        viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: filter)
+                    }
                 } else if !viewModel.isLoadingSavedFilters {
                     // Default filter was set but not found, or filters finished loading and none match
-                    viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: nil)
+                    // Only fetch if empty
+                    if viewModel.performers.isEmpty {
+                        viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: nil)
+                    }
                 }
             }
         }

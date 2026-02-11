@@ -64,6 +64,7 @@ struct ServerConfig: Codable, Identifiable, Equatable {
     var port: String?          // Optional port
     var serverProtocol: ServerProtocol
     var apiKey: String?        // Optional API Key for authentication
+    var subpath: String?       // Optional subpath (e.g. "/stash")
     var defaultQuality: StreamingQuality = .fhd
     var reelsQuality: StreamingQuality = .sd
 
@@ -80,6 +81,13 @@ struct ServerConfig: Codable, Identifiable, Equatable {
             url = "\(scheme)://\(serverAddress):\(effectivePort)"
         } else {
             url = "\(scheme)://\(serverAddress)"
+        }
+        
+        if let sub = subpath, !sub.isEmpty {
+            let cleanSub = sub.hasPrefix("/") ? sub : "/\(sub)"
+            let finalURL = url + cleanSub
+            print("🌐 SERVER CONFIG: Using URL with subpath: \(finalURL)")
+            return finalURL
         }
         
         print("🌐 SERVER CONFIG: Using URL: \(url)")
@@ -110,6 +118,7 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         port: String? = nil,
         serverProtocol: ServerProtocol = .https,
         apiKey: String? = nil,
+        subpath: String? = nil,
         defaultQuality: StreamingQuality = .fhd,
         reelsQuality: StreamingQuality = .sd
     ) {
@@ -119,6 +128,7 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         self.port = port
         self.serverProtocol = serverProtocol
         self.apiKey = apiKey
+        self.subpath = subpath
         self.defaultQuality = defaultQuality
         self.reelsQuality = reelsQuality
     }
@@ -140,6 +150,7 @@ struct ServerConfig: Codable, Identifiable, Equatable {
             self.serverAddress = serverAddress
             self.port = try container.decodeIfPresent(String.self, forKey: .port)
             self.serverProtocol = protocolValue
+            self.subpath = try container.decodeIfPresent(String.self, forKey: .subpath)
         } else {
             // Legacy format - migrate
             let connectionType = try container.decode(ConnectionType.self, forKey: .connectionType)
@@ -169,12 +180,13 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         try container.encodeIfPresent(port, forKey: .port)
         try container.encode(serverProtocol, forKey: .serverProtocol)
         try container.encodeIfPresent(apiKey, forKey: .apiKey)
+        try container.encodeIfPresent(subpath, forKey: .subpath)
         try container.encode(defaultQuality, forKey: .defaultQuality)
         try container.encode(reelsQuality, forKey: .reelsQuality)
     }
     
     enum CodingKeys: String, CodingKey {
-        case id, name, apiKey
+        case id, name, apiKey, subpath
         // New format keys
         case serverAddress, port, serverProtocol, defaultQuality, reelsQuality
         // Legacy format keys (for backward compatibility)
@@ -199,32 +211,39 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         return (nil, cleaned)
     }
 
-    /// Parses an input string (e.g. "1.2.3.4:9999" or "example.com") into host and port components
-    static func parseHostAndPort(_ input: String) -> (host: String, port: String?) {
+    /// Parses an input string (e.g. "1.2.3.4:9999/stash" or "example.com/api") into components
+    static func parseAddress(_ input: String) -> (host: String, port: String?, subpath: String?) {
         // First, strip protocol if present
         let detection = detectProtocol(from: input)
-        let safeInput = detection.address
+        var safeInput = detection.address
         
-        // Use URL parser to robustly handle parsing
-        // We prepend a dummy scheme to ensure URL recognizes it as a valid URL structure
-        let dummyUrlString = "http://\(safeInput)"
-        
-        guard let url = URL(string: dummyUrlString), let host = url.host else {
-            // Fallback: simple split on last colon if URL parsing fails
-            if let lastColonIndex = safeInput.lastIndex(of: ":") {
-                let hostPart = String(safeInput[..<lastColonIndex])
-                let portPart = String(safeInput[safeInput.index(after: lastColonIndex)...])
-                // Validate port is numeric
-                if Int(portPart) != nil {
-                    return (hostPart, portPart)
-                }
-            }
-            return (safeInput, nil)
+        // Ensure we have a valid structure for URL components
+        if !safeInput.contains("://") {
+            safeInput = "http://\(safeInput)"
         }
         
-        // port is an Int in URL, convert to String?
-        let portString = url.port.map { String($0) }
-        return (host, portString)
+        guard let url = URL(string: safeInput) else {
+            return (detection.address, nil, nil)
+        }
+        
+        let host = url.host ?? detection.address
+        let port = url.port.map { String($0) }
+        
+        // Extract subpath (excluding any trailing slash)
+        var path = url.path
+        if path == "/" {
+            path = ""
+        } else if path.hasSuffix("/") {
+            path = String(path.dropLast())
+        }
+        
+        return (host, port, path.isEmpty ? nil : path)
+    }
+
+    /// Backwards compatibility wrapper
+    static func parseHostAndPort(_ input: String) -> (host: String, port: String?) {
+        let result = parseAddress(input)
+        return (result.host, result.port)
     }
 }
 

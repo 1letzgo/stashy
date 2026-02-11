@@ -15,8 +15,9 @@ struct SceneDetailView: View {
     let scene: Scene
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @State private var activeScene: Scene
-    @StateObject private var viewModel = StashDBViewModel()
+    @ObservedObject var viewModel = StashDBViewModel()
     @ObservedObject var handyManager = HandyManager.shared
+    @ObservedObject var buttplugManager = ButtplugManager.shared
     
     init(scene: Scene) {
         self.scene = scene
@@ -204,25 +205,37 @@ struct SceneDetailView: View {
             isFullscreen = false
             
             // 1. Fetch Transcoded Streams in background (Fast Start)
-            viewModel.fetchSceneStreams(sceneId: activeScene.id) { streams in
-                if !streams.isEmpty {
-                    DispatchQueue.main.async {
-                        self.activeScene = self.activeScene.withStreams(streams)
-                        print("✅ Transcoded streams loaded in background: \(streams.count) options")
-                        self.updatePlayerStream()
+            // Only fetch if we don't have streams yet to avoid UI flicker on back navigation
+            if activeScene.streams?.isEmpty ?? true {
+                viewModel.fetchSceneStreams(sceneId: activeScene.id) { streams in
+                    if !streams.isEmpty {
+                        DispatchQueue.main.async {
+                            self.activeScene = self.activeScene.withStreams(streams)
+                            print("✅ Transcoded streams loaded in background: \(streams.count) options")
+                            self.updatePlayerStream()
+                        }
                     }
                 }
             }
             
             // 2. Refresh main scene details (stable query)
-            viewModel.fetchSceneDetails(sceneId: activeScene.id) { updatedScene in
-                if let updated = updatedScene {
-                    DispatchQueue.main.async {
-                        // Preserve existing streams if they were already loaded
-                        self.activeScene = updated.withStreams(self.activeScene.streams)
-                        print("✅ Scene data refreshed: ResumeTime=\(updated.resumeTime ?? 0)")
+            // Only refresh if details are missing or it's potentially needed
+            // We'll check if we have performers/tags as a proxy for "full details"
+            if activeScene.performers.isEmpty || (activeScene.tags?.isEmpty ?? true) {
+                viewModel.fetchSceneDetails(sceneId: activeScene.id) { updatedScene in
+                    if let updated = updatedScene {
+                        DispatchQueue.main.async {
+                            // Preserve existing streams if they were already loaded
+                            self.activeScene = updated.withStreams(self.activeScene.streams)
+                            print("✅ Scene data refreshed: ResumeTime=\(updated.resumeTime ?? 0)")
+                        }
                     }
                 }
+            }
+            
+            // 3. Load Funscript for Buttplug.io if available
+            if let scriptURL = activeScene.funscriptURL {
+                buttplugManager.setupScene(funscriptURL: scriptURL)
             }
         }
         .onDisappear {
@@ -236,6 +249,9 @@ struct SceneDetailView: View {
                 player?.pause()
                 if handyManager.isSyncing {
                     handyManager.pause()
+                }
+                if buttplugManager.isConnected {
+                    buttplugManager.pause()
                 }
             }
             stopPreview()
@@ -321,6 +337,9 @@ struct SceneDetailView: View {
         player?.play()
         if handyManager.isSyncing {
             handyManager.play(at: player?.currentTime().seconds ?? 0)
+        }
+        if buttplugManager.isConnected {
+            buttplugManager.play(at: player?.currentTime().seconds ?? 0)
         }
         player?.rate = Float(playbackSpeed)
         
@@ -416,6 +435,9 @@ struct SceneDetailView: View {
         player?.play()
         if handyManager.isSyncing {
             handyManager.play(at: seconds)
+        }
+        if buttplugManager.isConnected {
+            buttplugManager.play(at: seconds)
         }
     }
 

@@ -360,9 +360,11 @@ struct ScenesView: View {
             // Fetch filters - onChange will handle loading scenes with correct sort
             viewModel.fetchSavedFilters()
             
-            // If no default filter is set, fetch immediately
+            // If no default filter is set, fetch immediately ONLY if we don't have scenes yet
             if TabManager.shared.getDefaultFilterId(for: .scenes) == nil {
-                viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: selectedFilter)
+                if viewModel.scenes.isEmpty {
+                    viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: selectedFilter)
+                }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
@@ -404,15 +406,20 @@ struct ScenesView: View {
                 if let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes),
                    let filter = newValue[defaultId] {
                     selectedFilter = filter
-                    viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: filter)
+                    // Only fetch if we don't have scenes yet (e.g., initial app load)
+                    if viewModel.scenes.isEmpty {
+                        viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: filter)
+                    }
                     // Reset flag after using injected sort with default filter
                     if hasInjectedSort {
                         hasInjectedSort = false
                     }
                 } else if !viewModel.isLoadingSavedFilters {
                     // Default filter was set but NO filters were found on server, or filters finished loading and defaultId is missing
-                    // Trigger fetch without filter to avoid being stuck in loading state
-                    viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: nil)
+                    // Trigger fetch without filter to avoid being stuck in loading state (only if empty)
+                    if viewModel.scenes.isEmpty {
+                        viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: nil)
+                    }
                 }
             }
         }

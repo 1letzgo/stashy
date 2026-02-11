@@ -39,9 +39,9 @@ struct SceneHeatmapCard: View {
                             }
                             .font(.caption)
                             .fontWeight(.bold)
-                            .foregroundColor(handyManager.isSyncing ? .green : appearanceManager.tintColor)
+                            .foregroundColor(handyManager.isSyncing ? .white : appearanceManager.tintColor)
                             .frame(width: 90, height: 28)
-                            .background(handyManager.isSyncing ? Color.green.opacity(0.15) : appearanceManager.tintColor.opacity(0.1))
+                            .background(handyManager.isSyncing ? Color.green : appearanceManager.tintColor.opacity(0.1))
                             .clipShape(Capsule())
                         }
                         
@@ -56,9 +56,9 @@ struct SceneHeatmapCard: View {
                             }
                             .font(.caption)
                             .fontWeight(.bold)
-                            .foregroundColor(buttplugManager.isConnected ? .green : appearanceManager.tintColor)
+                            .foregroundColor(buttplugManager.isConnected ? .white : appearanceManager.tintColor)
                             .frame(width: 90, height: 28)
-                            .background(buttplugManager.isConnected ? Color.green.opacity(0.15) : appearanceManager.tintColor.opacity(0.1))
+                            .background(buttplugManager.isConnected ? Color.green : appearanceManager.tintColor.opacity(0.1))
                             .clipShape(Capsule())
                         }
                     }

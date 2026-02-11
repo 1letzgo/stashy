@@ -129,6 +129,7 @@ struct TVDashboardView: View {
                     Text(title)
                         .font(.title2)
                         .fontWeight(.bold)
+                        .foregroundColor(.white)
                     
                     Image(systemName: "chevron.right")
                         .font(.title3)
@@ -159,6 +160,7 @@ struct TVDashboardView: View {
             Text(title)
                 .font(.title2)
                 .fontWeight(.bold)
+                .foregroundColor(.white)
                 .padding(.horizontal, 60)
 
             ScrollView(.horizontal, showsIndicators: false) {

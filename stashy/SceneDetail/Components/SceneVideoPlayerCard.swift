@@ -17,6 +17,8 @@ struct SceneVideoPlayerCard: View {
     
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject var handyManager = HandyManager.shared
+    @ObservedObject var buttplugManager = ButtplugManager.shared
     
     // Preview state
     @State private var previewPlayer: AVPlayer?
@@ -286,6 +288,13 @@ struct SceneVideoPlayerCard: View {
                     infoPill(icon: "checkmark.circle.fill", text: "Downloaded", color: .green)
                 }
                 
+                if activeScene.interactive == true {
+                    let isConnected = handyManager.isSyncing || buttplugManager.isConnected
+                    infoPill(icon: isConnected ? "link.circle.fill" : "link.circle", 
+                             text: "Interactive", 
+                             color: isConnected ? .green : .secondary)
+                }
+
                 if activeScene.organized == true {
                     infoPill(icon: "checkmark.seal.fill", text: "Organized", color: .green)
                 }

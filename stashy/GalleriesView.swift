@@ -337,10 +337,16 @@ struct GalleriesView: View {
                 if let defaultId = TabManager.shared.getDefaultFilterId(for: .galleries),
                    let filter = newValue[defaultId] {
                     selectedFilter = filter
-                    performSearch()
+                    // Only fetch if empty to avoid resetting scroll
+                    if viewModel.galleries.isEmpty {
+                        performSearch()
+                    }
                 } else if !viewModel.isLoadingSavedFilters {
                     // Default filter was set but not found, or filters finished loading and none match
-                    performSearch()
+                    // Only fetch if empty
+                    if viewModel.galleries.isEmpty {
+                        performSearch()
+                    }
                 }
             }
         }

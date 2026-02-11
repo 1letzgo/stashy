@@ -16,6 +16,15 @@ struct TVScenesView: View {
         _sortBy = State(initialValue: sortBy)
     }
 
+    private var navigationTitle: String {
+        switch sortBy {
+        case .lastPlayedAtDesc: return "Recently Played"
+        case .dateDesc: return "Recently Released"
+        case .createdAtDesc: return "Recently Added"
+        default: return "Scenes - \(sortBy.displayName)"
+        }
+    }
+
     // 3-column grid sized for TV (roughly 350pt wide cards)
     private let columns = [
         GridItem(.adaptive(minimum: 380, maximum: 500), spacing: 48)
@@ -73,22 +82,7 @@ struct TVScenesView: View {
                 }
             }
         }
-        .navigationTitle("Scenes")
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Menu {
-                    Picker("Sort By", selection: $sortBy) {
-                        Text("Released").tag(StashDBViewModel.SceneSortOption.dateDesc)
-                        Text("Added").tag(StashDBViewModel.SceneSortOption.createdAtDesc)
-                        Text("Played").tag(StashDBViewModel.SceneSortOption.lastPlayedAtDesc)
-                        Text("Title").tag(StashDBViewModel.SceneSortOption.titleAsc)
-                        Text("Rating").tag(StashDBViewModel.SceneSortOption.ratingDesc)
-                    }
-                } label: {
-                    Label("Sort", systemImage: "line.3.horizontal.decrease.circle")
-                }
-            }
-        }
+        .navigationTitle(navigationTitle)
         .onChange(of: sortBy) { _, newValue in
             viewModel.fetchScenes(sortBy: newValue, isInitialLoad: true)
         }

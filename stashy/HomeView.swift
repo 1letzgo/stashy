@@ -46,7 +46,11 @@ struct HomeView: View {
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
             if configManager.activeConfig != nil {
-                viewModel.initializeServerConnection()
+                // Only initialize if we don't have statistics yet (initial load)
+                // This prevents clearing home rows and losing scroll position on back navigation
+                if viewModel.statistics == nil {
+                    viewModel.initializeServerConnection()
+                }
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in

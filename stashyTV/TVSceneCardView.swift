@@ -13,19 +13,22 @@ struct TVSceneCardView: View {
     var body: some View {
         // Thumbnail Card (16:9)
         ZStack(alignment: .bottomLeading) {
+            // Background for the inset
+            RoundedRectangle(cornerRadius: 12)
+                .fill(.ultraThinMaterial)
+
             CustomAsyncImage(url: scene.thumbnailURL) { loader in
                 if loader.isLoading {
                     Rectangle()
-                        .fill(Color.gray.opacity(0.2))
+                        .fill(Color.gray.opacity(0.1))
                         .overlay(ProgressView())
                 } else if let image = loader.image {
                     image
                         .resizable()
                         .scaledToFill()
-                        .frame(width: 380)
                 } else {
                     Rectangle()
-                        .fill(Color.gray.opacity(0.2))
+                        .fill(Color.gray.opacity(0.1))
                         .overlay(
                             Image(systemName: "film")
                                 .font(.system(size: 48))
@@ -33,16 +36,20 @@ struct TVSceneCardView: View {
                         )
                 }
             }
-            .frame(width: 380, height: 213.75) // Standard 16:9 for 380 width
+            .frame(width: 380 - 16, height: 213.75 - 16)
+            .cornerRadius(8)
+            .padding(8)
             .clipped()
 
-            // Gradient for text readability
+            // Gradient for text readability (adjusted for inset)
             LinearGradient(
                 gradient: Gradient(colors: [.clear, .black.opacity(0.8)]),
                 startPoint: .center,
                 endPoint: .bottom
             )
-            .frame(height: 120)
+            .padding(8)
+            .cornerRadius(8)
+            .allowsHitTesting(false)
 
             // Info overlay
             VStack(alignment: .leading, spacing: 2) {

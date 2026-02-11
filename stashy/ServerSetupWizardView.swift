@@ -136,7 +136,7 @@ struct ServerSetupWizardView: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                         
-                        TextField("192.168.1.100:9999 or stash.example.com", text: $serverAddress)
+                        TextField("192.168.1.100:9999 or stash.example.com/stash", text: $serverAddress)
                             .keyboardType(.URL)
                             .autocapitalization(.none)
                             .autocorrectionDisabled()
@@ -158,7 +158,7 @@ struct ServerSetupWizardView: View {
                                 }
                             }
                         
-                        Text("Enter address (e.g. timeout.com:9999)")
+                        Text("Enter address (e.g. timeout.com:9999 or example.com/stash)")
                             .font(.caption2)
                             .foregroundColor(.secondary.opacity(0.8))
                     }
@@ -379,13 +379,14 @@ struct ServerSetupWizardView: View {
     }
     
     private func buildConfig() -> ServerConfig {
-        let parsed = ServerConfig.parseHostAndPort(serverAddress)
+        let parsed = ServerConfig.parseAddress(serverAddress)
         return ServerConfig(
             name: serverName,
             serverAddress: parsed.host,
             port: parsed.port,
             serverProtocol: serverProtocol,
-            apiKey: apiKey.isEmpty ? nil : apiKey
+            apiKey: apiKey.isEmpty ? nil : apiKey,
+            subpath: parsed.subpath
         )
     }
     

@@ -1008,6 +1008,7 @@ class StashDBViewModel: ObservableObject {
         currentMarkerFilter = filter
         hasMoreMarkers = true
         sceneMarkers = []
+        isLoading = true // Set global loading for initial markers load
         
         loadMarkersPage(page: currentMarkerPage, sortBy: sortBy, searchQuery: searchQuery)
     }
@@ -1419,7 +1420,7 @@ class StashDBViewModel: ObservableObject {
                 
                 // 5. Special handling for specific Boolean Criterion keys that should be a simple Bool
                 let booleanFlags = [
-                    "organized", "performer_favorite", "studio_favorite", // Scenes (removed duplicated, has_markers)
+                    "organized", "interactive", "performer_favorite", "studio_favorite", // Scenes (removed duplicated, has_markers)
                     "filter_favorites", "is_favorite", "ignore_auto_tag", "favorite",   // Performers & Tags & Studios
                     "has_birthdate", "has_height_cm", "has_weight", "has_measurements",
                     "has_career_length", "has_tattoos", "has_piercings", "has_alias_list"
@@ -2523,6 +2524,7 @@ class StashDBViewModel: ObservableObject {
             hasMoreClips = true
             currentClipSortOption = sortBy
             currentClipFilter = filter
+            isLoading = true // Set global loading for initial clips load
         } else {
             isLoadingClips = true
         }
@@ -5473,6 +5475,14 @@ class ButtplugManager: ObservableObject {
     private var webSocket: URLSessionWebSocketTask?
     private var messageId: Int = 1
     
+    // Funscript Sync
+    private var currentScript: Funscript?
+    private var syncTimer: CADisplayLink?
+    private var lastPlaybackTime: Double = 0
+    private var lastCommandSentAt: Double = 0
+    private var isPlayingScript: Bool = false
+    @Published var isSyncing: Bool = false
+    
     private init() {
         // Optional: Auto-connect if desirable
     }
@@ -5483,7 +5493,13 @@ class ButtplugManager: ObservableObject {
             return
         }
         
-        statusMessage = "Connecting..."
+        // Reset state
+        DispatchQueue.main.async {
+            self.isConnected = false
+            self.devices.removeAll()
+            self.statusMessage = "Connecting..."
+        }
+        
         let request = URLRequest(url: url)
         webSocket = URLSession.shared.webSocketTask(with: request)
         webSocket?.resume()
@@ -5504,7 +5520,7 @@ class ButtplugManager: ObservableObject {
     
     private func sendHandshake() {
         let handshake: [[String: Any]] = [
-            ["ServerInfo": [
+            ["RequestServerInfo": [
                 "Id": getNextMessageId(),
                 "ClientName": "Stashy",
                 "MessageVersion": 3
@@ -5531,11 +5547,118 @@ class ButtplugManager: ObservableObject {
         webSocket?.send(.string(string)) { error in
             if let error = error {
                 print("❌ Buttplug: Send failed: \(error)")
+                // Do not disconnect immediately on send failure to avoid UI flickering during sync
+            }
+        }
+    }
+    
+    // MARK: - Funscript Sync Logic
+    
+    func setupScene(funscriptURL: URL) {
+        guard isConnected else { return }
+        
+        statusMessage = "Loading Script..."
+        URLSession.shared.dataTask(with: funscriptURL) { [weak self] data, response, error in
+            guard let self = self, let data = data else { return }
+            
+            do {
+                let script = try JSONDecoder().decode(Funscript.self, from: data)
                 DispatchQueue.main.async {
-                    self.isConnected = false
-                    self.statusMessage = "Send Error"
+                    self.currentScript = script
+                    self.isSyncing = true
+                    self.statusMessage = "Script Loaded"
+                    print("✅ Buttplug: Loaded script with \(script.actions?.count ?? 0) actions")
+                }
+            } catch {
+                print("❌ Buttplug: Failed to parse Funscript: \(error)")
+                DispatchQueue.main.async {
+                    self.statusMessage = "Script Error"
                 }
             }
+        }.resume()
+    }
+    
+    func play(at seconds: Double) {
+        guard isConnected, isSyncing, currentScript != nil else { return }
+        
+        lastPlaybackTime = seconds
+        lastCommandSentAt = 0 // Reset to force immediate command
+        isPlayingScript = true
+        
+        // Use CADisplayLink for high-precision sync
+        syncTimer?.invalidate()
+        syncTimer = CADisplayLink(target: self, selector: #selector(updateSync))
+        syncTimer?.add(to: .main, forMode: .common)
+    }
+    
+    func pause() {
+        isPlayingScript = false
+        syncTimer?.invalidate()
+        syncTimer = nil
+    }
+    
+    @objc private func updateSync() {
+        guard isPlayingScript, let script = currentScript, let actions = script.actions, !actions.isEmpty else { return }
+        
+        // We assume the DisplayLink fires roughly every 16ms. 
+        // We increment our local track of playback time.
+        let frameDuration = 1.0 / 60.0 // Approximated
+        lastPlaybackTime += frameDuration
+        
+        let currentMs = Int(lastPlaybackTime * 1000)
+        
+        // Find the index of the next action after currentMs
+        // Simplified search:
+        guard let nextIndex = actions.firstIndex(where: { $0.at > currentMs }) else {
+            // End of script reached
+            pause()
+            return
+        }
+        
+        // Only send a new command if we haven't sent one for this segment yet
+        // A segment is defined by its target time 'at'
+        let nextAction = actions[nextIndex]
+        if Double(nextAction.at) != lastCommandSentAt {
+            let prevAction = nextIndex > 0 ? actions[nextIndex - 1] : FunscriptAction(at: 0, pos: 50)
+            
+            // Calculate duration from NOW to the next point
+            let duration = nextAction.at - currentMs
+            if duration > 0 {
+                print("🎬 Buttplug Sync: Target \(nextAction.pos)% in \(duration)ms (Index: \(nextIndex))")
+                sendLinearCmd(position: Double(nextAction.pos), duration: duration)
+                lastCommandSentAt = Double(nextAction.at)
+            }
+        }
+    }
+    
+    private func sendLinearCmd(position: Double, duration: Int) {
+        guard isConnected else { return }
+        
+        if devices.isEmpty {
+            print("⚠️ Buttplug: No devices found to receive LinearCmd")
+            return
+        }
+        
+        var messages: [[String: Any]] = []
+        for device in devices {
+            messages.append([
+                "LinearCmd": [
+                    "Id": getNextMessageId(),
+                    "DeviceIndex": device.id,
+                    "Vectors": [
+                        [
+                            "Index": 0,
+                            "Duration": duration,
+                            "Position": position / 100.0
+                        ]
+                    ]
+                ]
+            ])
+        }
+        
+        if !messages.isEmpty {
+            print("📡 Buttplug: Sending movement to \(devices.count) devices")
+            sendMessage(messages)
         }
     }
     
@@ -5572,6 +5695,23 @@ class ButtplugManager: ObservableObject {
                     self.startScanning()
                     self.requestDeviceList()
                 }
+            } else if let deviceAdded = dict["DeviceAdded"] as? [String: Any] {
+                DispatchQueue.main.async {
+                    if let id = deviceAdded["DeviceIndex"] as? Int,
+                       let name = deviceAdded["DeviceName"] as? String {
+                        if !self.devices.contains(where: { $0.id == id }) {
+                            self.devices.append(ButtplugDevice(id: id, name: name))
+                            print("📱 Buttplug: Device Added: \(name)")
+                        }
+                    }
+                }
+            } else if let deviceRemoved = dict["DeviceRemoved"] as? [String: Any] {
+                DispatchQueue.main.async {
+                    if let id = deviceRemoved["DeviceIndex"] as? Int {
+                        self.devices.removeAll(where: { $0.id == id })
+                        print("📱 Buttplug: Device Removed (ID: \(id))")
+                    }
+                }
             } else if let deviceList = dict["DeviceList"] as? [String: Any],
                       let list = deviceList["Devices"] as? [[String: Any]] {
                 DispatchQueue.main.async {
@@ -5600,6 +5740,20 @@ class ButtplugManager: ObservableObject {
 struct ButtplugDevice: Identifiable, Equatable {
     let id: Int
     let name: String
+}
+
+// MARK: - Funscript Models
+
+struct Funscript: Codable {
+    let actions: [FunscriptAction]?
+    let inverted: Bool?
+    let range: Int?
+    let version: String?
+}
+
+struct FunscriptAction: Codable {
+    let at: Int // Time in milliseconds
+    let pos: Int // Position 0-100
 }
 #endif
 

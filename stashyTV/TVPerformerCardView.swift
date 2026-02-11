@@ -12,10 +12,14 @@ struct TVPerformerCardView: View {
         VStack(alignment: .leading, spacing: 12) {
             // Profile image (portrait 2:3)
             ZStack(alignment: .bottomTrailing) {
+                // Background for the inset
+                RoundedRectangle(cornerRadius: 12)
+                    .fill(.ultraThinMaterial)
+
                 CustomAsyncImage(url: performer.thumbnailURL) { loader in
                     if loader.isLoading {
                         Rectangle()
-                            .fill(Color.gray.opacity(0.2))
+                            .fill(Color.gray.opacity(0.1))
                             .overlay(ProgressView())
                     } else if let image = loader.image {
                         image
@@ -23,7 +27,7 @@ struct TVPerformerCardView: View {
                             .scaledToFill()
                     } else {
                         Rectangle()
-                            .fill(Color.gray.opacity(0.2))
+                            .fill(Color.gray.opacity(0.1))
                             .overlay(
                                 Image(systemName: "person.fill")
                                     .font(.system(size: 48))
@@ -31,10 +35,10 @@ struct TVPerformerCardView: View {
                             )
                     }
                 }
-                .aspectRatio(2/3, contentMode: .fill)
-                .frame(width: 200)
+                .frame(width: 200 - 12, height: 300 - 12) // 2:3 aspect with 6pt inset each side
+                .cornerRadius(8)
+                .padding(6)
                 .clipped()
-                .cornerRadius(12)
 
                 // Scene count badge
                 if performer.sceneCount > 0 {
@@ -46,7 +50,7 @@ struct TVPerformerCardView: View {
                         .background(AppearanceManager.shared.tintColor.opacity(0.9))
                         .foregroundColor(.white)
                         .cornerRadius(8)
-                        .padding(10)
+                        .padding(14) // Offset for inset
                 }
             }
 

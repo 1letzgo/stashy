@@ -65,9 +65,9 @@ struct ReelsView: View {
         
         var id: String {
             switch self {
-            case .scene(let s): return s.id
-            case .marker(let m): return m.id
-            case .clip(let c): return c.id
+            case .scene(let s): return "scene-\(s.id)"
+            case .marker(let m): return "marker-\(m.id)"
+            case .clip(let c): return "clip-\(c.id)"
             }
         }
         
@@ -240,6 +240,7 @@ struct ReelsView: View {
 
     private func applySettings(sortBy: StashDBViewModel.SceneSortOption? = nil, markerSortBy: StashDBViewModel.SceneMarkerSortOption? = nil, clipSortBy: StashDBViewModel.ImageSortOption? = nil, filter: StashDBViewModel.SavedFilter?, clipFilter: StashDBViewModel.SavedFilter? = nil, performer: ScenePerformer? = nil, tags: [Tag] = [], mode: ReelsMode? = nil) {
         if let mode = mode { reelsMode = mode }
+        currentVisibleSceneId = nil // Reset to allow onAppear to pick up the new first item
         
         // Update local state and persist to Mode-Specific Config
         if let sortBy = sortBy {
@@ -254,6 +255,7 @@ struct ReelsView: View {
         
         if let clipSortBy = clipSortBy {
             selectedClipSortOption = clipSortBy
+            TabManager.shared.setReelsDefaultSort(for: .clips, option: clipSortBy.rawValue)
         }
         
         if let clipFilter = clipFilter {
@@ -695,6 +697,7 @@ struct ReelsView: View {
                 ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
                     ReelItemView(
                         item: item,
+                        isActive: item.id == currentVisibleSceneId,
                         isMuted: $isMuted,
                         onPerformerTap: { performer in
                             applySettings(sortBy: selectedSortOption, filter: selectedFilter, performer: performer, tags: selectedTags)
@@ -749,13 +752,18 @@ struct ReelsView: View {
             }
             return nil
         } action: { old, new in
-            if let newId = new {
+            if let newId = new, currentVisibleSceneId != newId {
                 currentVisibleSceneId = newId
+                print("📱 ReelsView: Visible item changed to \(newId)")
             }
         }
         .background(Color.black)
         .ignoresSafeArea()
         .onAppear {
+            if currentVisibleSceneId == nil, let firstId = items.first?.id {
+                currentVisibleSceneId = firstId
+            }
+            
             // 1. Initialize reelsMode ONLY if current mode is disabled in settings
             let enabledTypes = tabManager.enabledReelsModes
             if !enabledTypes.contains(reelsMode.toModeType) {
@@ -1258,6 +1266,27 @@ struct ReelsView: View {
                 if selectedClipSortOption == .ratingAsc || selectedClipSortOption == .ratingDesc { Image(systemName: "checkmark") }
             }
         }
+
+        // Created
+        Menu {
+            Button(action: { applySettings(clipSortBy: .createdAtDesc, filter: nil, clipFilter: selectedClipFilter, performer: selectedPerformer, tags: selectedTags) }) {
+                HStack {
+                    Text("Newest First")
+                    if selectedClipSortOption == .createdAtDesc { Image(systemName: "checkmark") }
+                }
+            }
+            Button(action: { applySettings(clipSortBy: .createdAtAsc, filter: nil, clipFilter: selectedClipFilter, performer: selectedPerformer, tags: selectedTags) }) {
+                HStack {
+                    Text("Oldest First")
+                    if selectedClipSortOption == .createdAtAsc { Image(systemName: "checkmark") }
+                }
+            }
+        } label: {
+            HStack {
+                Text("Created")
+                if selectedClipSortOption == .createdAtAsc || selectedClipSortOption == .createdAtDesc { Image(systemName: "checkmark") }
+            }
+        }
     }
 
     @ViewBuilder
@@ -1330,6 +1359,7 @@ struct ReelsView: View {
 
 struct ReelItemView: View {
     let item: ReelsView.ReelItemData
+    let isActive: Bool
     @State private var player: AVPlayer?
     @State private var looper: Any?
     
@@ -1611,6 +1641,15 @@ struct ReelItemView: View {
         .onChange(of: isMuted) { _, newValue in
             player?.isMuted = newValue
         }
+        .onChange(of: isActive) { _, newValue in
+            if newValue {
+                print("▶️ Reels: Item \(item.id) became active, resuming...")
+                if isPlaying { player?.play() }
+            } else {
+                print("⏸ Reels: Item \(item.id) became inactive, pausing...")
+                player?.pause()
+            }
+        }
     }
     
     // Helper View
@@ -1699,8 +1738,10 @@ struct ReelItemView: View {
         guard let player = self.player else { return }
         
         player.isMuted = isMuted
-        if isPlaying { 
+        if isPlaying && isActive { 
             player.play() 
+        } else {
+            player.pause()
         }
         
         if startTime > 0 {
