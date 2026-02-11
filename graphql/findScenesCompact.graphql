@@ -29,6 +29,7 @@ query FindScenesCompact(
       title
       updated_at
       urls
+      interactive
       studio {
         id
         name
@@ -79,6 +80,7 @@ query FindScenesCompact(
         vtt
         webp
         caption
+        funscript
       }
       captions {
         language_code

@@ -5,6 +5,7 @@
 //  Filter view for studios
 //
 
+#if !os(tvOS)
 import SwiftUI
 
 struct StudioFiltersView: View {
@@ -96,4 +97,4 @@ struct StudioFiltersView: View {
 #Preview {
     StudioFiltersView(filters: .constant(StudioFilters()))
 }
-
+#endif

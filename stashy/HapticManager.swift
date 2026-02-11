@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 07.02.26.
 //
 
+#if !os(tvOS)
 import UIKit
 
 enum HapticManager {
@@ -57,3 +58,4 @@ enum HapticManager {
         generator.selectionChanged()
     }
 }
+#endif

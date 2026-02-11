@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 29.09.25.
 //
 
+#if !os(tvOS)
 import SwiftUI
 
 
@@ -428,6 +429,15 @@ struct ScenesView: View {
                 viewModel.removeScene(id: sceneId)
             }
         }
+        .onChange(of: viewModel.isLoadingSavedFilters) { oldValue, isLoading in
+            // Fallback: If filters finished loading, we have no active filter, and no scenes yet, trigger fetch
+            if oldValue == true && isLoading == false {
+                if viewModel.scenes.isEmpty && !viewModel.isLoadingScenes && selectedFilter == nil {
+                    print("🔄 Fallback: Filters loaded (empty), triggering initial scene fetch")
+                    viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: nil)
+                }
+            }
+        }
     }
 
     private var loadingView: some View {
@@ -514,3 +524,4 @@ struct ScenesView: View {
 #Preview {
     ScenesView()
 }
+#endif

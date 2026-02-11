@@ -30,11 +30,11 @@ class TagsViewModel: ObservableObject {
     init(tagRepository: TagRepositoryProtocol = TagRepository()) {
         self.tagRepository = tagRepository
         
-        // Initialize with default loader
-        self.tagsLoader = PaginatedLoader.tags(
+        // Initialize with default loader (use literal defaults to avoid accessing self before init)
+        self.tagsLoader = PaginatedLoader<Tag>.tags(
             repository: tagRepository,
-            searchQuery: searchQuery,
-            filter: currentFilter
+            searchQuery: "",
+            filter: nil
         )
         
         setupBindings()
@@ -62,7 +62,7 @@ class TagsViewModel: ObservableObject {
     }
     
     private func updateLoader() {
-        tagsLoader = PaginatedLoader.tags(
+        tagsLoader = PaginatedLoader<Tag>.tags(
             repository: tagRepository,
             searchQuery: searchQuery,
             filter: currentFilter

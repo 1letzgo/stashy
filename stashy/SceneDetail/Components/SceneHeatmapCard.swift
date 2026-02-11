@@ -4,103 +4,197 @@ import SwiftUI
 
 struct SceneHeatmapCard: View {
     let heatmapURL: URL
+    let funscriptURL: URL?
     let durationSeconds: Double
     let currentTimeSeconds: Double
     let onSeek: (Double) -> Void
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject var handyManager = HandyManager.shared
+    @ObservedObject var buttplugManager = ButtplugManager.shared
 
-    private let heatmapHeight: CGFloat = 120
-    private let contentPadding: CGFloat = 12
-    private let widthPerMinute: CGFloat = 40
-
-    @State private var didInitialScroll = false
-
+    private let cardHeight: CGFloat = 140
+    private let heatmapHeight: CGFloat = 80
+    
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Interactive Heatmap")
-                .font(.title3)
-                .fontWeight(.semibold)
-                .padding(.horizontal, contentPadding)
-                .padding(.top, 8)
-
-            GeometryReader { proxy in
-                let baseWidth = max(timelineWidth, 1)
-                ScrollViewReader { scrollProxy in
-                    ScrollView(.horizontal, showsIndicators: false) {
-                        HStack(spacing: 0) {
-                            Color.clear
-                                .frame(width: proxy.size.width / 2)
-
-                            ZStack(alignment: .topLeading) {
-                                heatmapLine(width: baseWidth, height: heatmapHeight)
-
-                                Rectangle()
-                                    .fill(appearanceManager.tintColor)
-                                    .frame(width: 2, height: heatmapHeight)
-                                    .position(x: markerX(baseWidth: baseWidth), y: heatmapHeight / 2)
-
-                                Circle()
-                                    .fill(appearanceManager.tintColor)
-                                    .frame(width: 8, height: 8)
-                                    .position(x: markerX(baseWidth: baseWidth), y: 8)
-
-                                Color.clear
-                                    .frame(width: 1, height: 1)
-                                    .position(x: markerX(baseWidth: baseWidth), y: heatmapHeight / 2)
-                                    .id("heatmap-marker")
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Interactive")
+                        .font(.title3)
+                        .fontWeight(.semibold)
+                }
+                
+                Spacer()
+                
+                if let funscriptURL = funscriptURL {
+                    HStack(spacing: 8) {
+                        // The Handy Button
+                        Button {
+                            handyManager.setupScene(funscriptURL: funscriptURL)
+                            HapticManager.medium()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: handyManager.isSyncing ? "hand.tap.fill" : "hand.tap")
+                                Text(handyManager.isSyncing ? "Ready" : "TheHandy")
                             }
-                            .frame(width: baseWidth, height: heatmapHeight)
-                            .contentShape(Rectangle())
-                            .gesture(
-                                SpatialTapGesture()
-                                    .onEnded { value in
-                                        guard durationSeconds > 0 else { return }
-                                        let x = min(max(0, value.location.x), baseWidth)
-                                        let fraction = baseWidth > 0 ? x / baseWidth : 0
-                                        onSeek(durationSeconds * fraction)
-                                    }
-                            )
-
-                            Color.clear
-                                .frame(width: proxy.size.width / 2)
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(handyManager.isSyncing ? .green : appearanceManager.tintColor)
+                            .frame(width: 90, height: 28)
+                            .background(handyManager.isSyncing ? Color.green.opacity(0.15) : appearanceManager.tintColor.opacity(0.1))
+                            .clipShape(Capsule())
                         }
-                        .padding(.horizontal, contentPadding)
-                    }
-                    .onAppear {
-                        if !didInitialScroll {
-                            scrollProxy.scrollTo("heatmap-marker", anchor: .center)
-                            didInitialScroll = true
+                        
+                        // Intiface Button
+                        Button {
+                            buttplugManager.connect()
+                            HapticManager.medium()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: buttplugManager.isConnected ? "cable.connector.fill" : "cable.connector")
+                                Text(buttplugManager.isConnected ? "Ready" : "Intiface")
+                            }
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(buttplugManager.isConnected ? .green : appearanceManager.tintColor)
+                            .frame(width: 90, height: 28)
+                            .background(buttplugManager.isConnected ? Color.green.opacity(0.15) : appearanceManager.tintColor.opacity(0.1))
+                            .clipShape(Capsule())
                         }
                     }
-                    .onChange(of: currentTimeSeconds) { _, _ in
-                        scrollProxy.scrollTo("heatmap-marker", anchor: .center)
-                    }
+                } else {
+                    Image(systemName: "waveform.path")
+                        .foregroundStyle(appearanceManager.tintColor)
+                        .font(.subheadline)
                 }
             }
-            .frame(height: heatmapHeight)
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, 0)
+
+            GeometryReader { proxy in
+                let width = proxy.size.width
+                
+                ZStack(alignment: .leading) {
+                    // Background Track
+                    Rectangle()
+                        .fill(Color(UIColor.systemGray6))
+                        .frame(height: heatmapHeight)
+                    
+                    // 1. Time Markers (Grid lines) - Background layer
+                    timeMarkers(width: width)
+                    
+                    // 2. Base Heatmap (Inactive part)
+                    heatmapLayer(width: width)
+                        .opacity(0.15)
+                    
+                    // 3. Highlighted Heatmap (Active part)
+                    heatmapLayer(width: width)
+                        .mask(
+                            HStack(spacing: 0) {
+                                Rectangle()
+                                    .frame(width: width * progress)
+                                Spacer(minLength: 0)
+                            }
+                        )
+                    
+                    // 4. Playhead
+                    playhead
+                        .offset(x: width * progress)
+                }
+                .frame(width: width, height: heatmapHeight)
+                .contentShape(Rectangle())
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            let fraction = value.location.x / width
+                            onSeek(durationSeconds * Double(min(max(fraction, 0), 1)))
+                        }
+                )
+            }
+            .frame(height: heatmapHeight + 30) // Extra space for labels at bottom
+            .padding(.horizontal, 12)
+            .padding(.bottom, 8)
         }
         .background(Color(UIColor.systemBackground))
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
     }
 
-    private var timelineWidth: CGFloat {
-        let minutes = max(durationSeconds / 60.0, 1)
-        return CGFloat(minutes) * widthPerMinute
-    }
-
-    private func markerX(baseWidth: CGFloat) -> CGFloat {
+    private var progress: CGFloat {
         guard durationSeconds > 0 else { return 0 }
-        let clampedTime = min(max(currentTimeSeconds, 0), durationSeconds)
-        return baseWidth * CGFloat(clampedTime / durationSeconds)
+        return CGFloat(min(max(currentTimeSeconds, 0), durationSeconds) / durationSeconds)
     }
 
-    private func heatmapLine(width: CGFloat, height: CGFloat) -> some View {
-        Path { path in
-            path.move(to: CGPoint(x: 0, y: height / 2))
-            path.addLine(to: CGPoint(x: width, y: height / 2))
+    @ViewBuilder
+    private func heatmapLayer(width: CGFloat) -> some View {
+        CustomAsyncImage(url: heatmapURL) { loader in
+            if let image = loader.image {
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: width, height: heatmapHeight)
+                    .clipped()
+            } else {
+                Color.clear
+            }
         }
-        .stroke(appearanceManager.tintColor.opacity(0.6), lineWidth: 3)
+    }
+
+    @ViewBuilder
+    private func timeMarkers(width: CGFloat) -> some View {
+        // Show start, end and 3 intermediate points
+        let positions: [Double] = [0.0, 0.25, 0.5, 0.75, 1.0]
+        
+        ZStack(alignment: .leading) {
+            ForEach(positions, id: \.self) { pos in
+                let x = width * CGFloat(pos)
+                let time = durationSeconds * pos
+                
+                VStack(alignment: .leading, spacing: 12) {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 1, height: heatmapHeight)
+                    
+                    Text(formatTime(time))
+                        .font(.system(size: 9, weight: .medium, design: .monospaced))
+                        .foregroundStyle(.secondary)
+                        // Align text so it doesn't go off screen
+                        .fixedSize()
+                        .offset(x: pos == 1.0 ? -25 : (pos == 0 ? 0 : -10))
+                }
+                .offset(x: x)
+            }
+        }
+    }
+
+    private var playhead: some View {
+        ZStack {
+            // Main line
+            Rectangle()
+                .fill(appearanceManager.tintColor)
+                .frame(width: 2, height: heatmapHeight + 4)
+            
+            // Indicator knob
+            Circle()
+                .fill(appearanceManager.tintColor)
+                .frame(width: 10, height: 10)
+                .offset(y: -(heatmapHeight/2 + 2))
+                .shadow(color: appearanceManager.tintColor.opacity(0.4), radius: 3)
+        }
+    }
+
+    private func formatTime(_ seconds: Double) -> String {
+        let seconds = max(seconds, 0)
+        let h = Int(seconds) / 3600
+        let m = (Int(seconds) % 3600) / 60
+        let s = Int(seconds) % 60
+        
+        if h > 0 {
+            return String(format: "%d:%02d:%02d", h, m, s)
+        } else {
+            return String(format: "%d:%02d", m, s)
+        }
     }
 }
 #endif

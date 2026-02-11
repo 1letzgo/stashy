@@ -31,12 +31,12 @@ class StudiosViewModel: ObservableObject {
     init(studioRepository: StudioRepositoryProtocol = StudioRepository()) {
         self.studioRepository = studioRepository
         
-        // Initialize with default loader
-        self.studiosLoader = PaginatedLoader.studios(
+        // Initialize with default loader (use literal defaults to avoid accessing self before init)
+        self.studiosLoader = PaginatedLoader<Studio>.studios(
             repository: studioRepository,
-            sortBy: currentSortOption,
-            searchQuery: searchQuery,
-            filter: currentFilter
+            sortBy: .nameAsc,
+            searchQuery: "",
+            filter: nil
         )
         
         setupBindings()
@@ -72,7 +72,7 @@ class StudiosViewModel: ObservableObject {
     }
     
     private func updateLoader() {
-        studiosLoader = PaginatedLoader.studios(
+        studiosLoader = PaginatedLoader<Studio>.studios(
             repository: studioRepository,
             sortBy: currentSortOption,
             searchQuery: searchQuery,

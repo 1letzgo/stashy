@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 29.09.25.
 //
 
+#if !os(tvOS)
 import SwiftUI
 
 
@@ -325,6 +326,13 @@ struct PerformersView: View {
                 }
             }
         }
+        .onChange(of: viewModel.isLoadingSavedFilters) { oldValue, isLoading in
+            if oldValue == true && isLoading == false {
+                if viewModel.performers.isEmpty && !viewModel.isLoadingPerformers && selectedFilter == nil {
+                    viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: nil)
+                }
+            }
+        }
         .navigationDestination(isPresented: Binding(
             get: { coordinator.performerToOpen != nil },
             set: { if !$0 { coordinator.performerToOpen = nil } }
@@ -526,3 +534,4 @@ struct PerformerRowView: View {
 #Preview {
     PerformersView()
 }
+#endif

@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 29.09.25.
 //
 
+#if !os(tvOS)
 import SwiftUI
 
 
@@ -134,9 +135,7 @@ struct PerformerDetailView: View {
             loadPerformerMetadata()
         }
         .navigationTitle("")
-#if !os(tvOS)
         .navigationBarTitleDisplayMode(.inline)
-        #endif
         .toolbar {
             ToolbarItem(placement: .principal) {
                 if showTabSwitcher {
@@ -597,3 +596,4 @@ struct PerformerDetailView: View {
     )
     PerformerDetailView(performer: samplePerformer)
 }
+#endif

@@ -1,0 +1,49 @@
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+
+
+# Xcode
+build/
+DerivedData/
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+!default.mode1v3
+*.mode2v3
+!default.mode2v3
+*.perspectivev3
+!default.perspectivev3
+xcuserdata/
+*.xccheckout
+*.moved-aside
+*.xcuserstate
+*.xcscmblueprint
+*.idscinfo
+*.xctestplan
+
+# Swift Package Manager
+.build/
+.swiftpm/
+
+# Dependency managers
+Pods/
+Carthage/Checkouts/
+Carthage/Build/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+
+# Local/Agent tools
+.agent/
+.claude/
+.gemini/
+build.log
+build_detailed.log
+build_log.txt

@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 class AppearanceManager: ObservableObject {
     static let shared = AppearanceManager()

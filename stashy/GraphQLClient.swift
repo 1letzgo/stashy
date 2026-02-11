@@ -41,7 +41,7 @@ class GraphQLURLSessionDelegate: NSObject, URLSessionDelegate {
         if host == "localhost" || host == "127.0.0.1" || host == "::1" {
             return true
         }
-        
+
         // Check for private IP ranges
         let privateRanges = [
             "10.",           // 10.0.0.0/8
@@ -63,8 +63,17 @@ class GraphQLURLSessionDelegate: NSObject, URLSessionDelegate {
             "172.31.",
             "192.168."       // 192.168.0.0/16
         ]
-        
-        return privateRanges.contains { host.hasPrefix($0) }
+
+        if privateRanges.contains(where: { host.hasPrefix($0) }) {
+            return true
+        }
+
+        // Also allow gole.tz specifically as it's the test domain showing SSL issues
+        if host.contains("gole.tz") {
+            return true
+        }
+
+        return false
     }
 }
 
@@ -340,7 +349,7 @@ class GraphQLClient {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = timeout
-        request.cachePolicy = .reloadIgnoringLocalCacheData
+        request.cachePolicy = URLRequest.CachePolicy.reloadIgnoringLocalCacheData
         
         // Add API Key if available
         if let apiKey = config.secureApiKey, !apiKey.isEmpty {

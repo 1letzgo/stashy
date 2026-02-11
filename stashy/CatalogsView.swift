@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 13.01.26.
 //
 
+#if !os(tvOS)
 import SwiftUI
 
 struct CatalogsView: View {
@@ -141,3 +142,4 @@ struct CatalogsView: View {
         }
     }
 }
+#endif

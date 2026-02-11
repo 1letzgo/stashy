@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 29.09.25.
 //
 
+#if !os(tvOS)
 import SwiftUI
 import WebKit
 
@@ -84,6 +85,13 @@ struct StudiosView: View {
         }
         .onChange(of: viewModel.savedFilters) { oldValue, newValue in
             onSavedFiltersChange(newValue)
+        }
+        .onChange(of: viewModel.isLoadingSavedFilters) { oldValue, isLoading in
+            if oldValue == true && isLoading == false {
+                if viewModel.studios.isEmpty && !viewModel.isLoadingStudios && selectedFilter == nil {
+                    viewModel.fetchStudios(sortBy: selectedSortOption, searchQuery: searchText, filter: nil)
+                }
+            }
         }
         .navigationDestination(isPresented: Binding(
             get: { coordinator.studioToOpen != nil },
@@ -616,3 +624,4 @@ struct SVGWebView: UIViewRepresentable {
 #Preview {
     StudiosView()
 }
+#endif

@@ -3,17 +3,64 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 54;
+	objectVersion = 70;
 	objects = {
 
 /* Begin PBXBuildFile section */
+		02B19A59AAFE4A16B45A861F /* DownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB172F16743C007C2090 /* DownloadsView.swift */; };
 		08FB7793FE84155DC02AAC07 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7794FE84155DC02AAC07 /* App.swift */; };
 		08FB7797FE84155DC02AAC07 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7798FE84155DC02AAC07 /* MainTabView.swift */; };
 		08FB779DFE84155DC02AAC07 /* ServerConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB779EFE84155DC02AAC07 /* ServerConfig.swift */; };
 		08FB77A1FE84155DC02AAC07 /* StashDBViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB77A2FE84155DC02AAC07 /* StashDBViewModel.swift */; };
+		0919B93E9C064D3AAF9A95C0 /* StudiosView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE504612E8A8C4000323FF0 /* StudiosView.swift */; };
+		0AD34A514F0B499FB1566E23 /* ScenesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045D2E8A8C2000323FF0 /* ScenesView.swift */; };
+		101EE38B25B74B1BBA920AEA /* NavigationCoordinator.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */; };
+		11A2D778BDD54ABE859A5F1D /* ServerSetupWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B7632F1ACEA3003ED852 /* ServerSetupWizardView.swift */; };
+		11F5E1EE280744C5928133CD /* SceneGalleriesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E732F2A6392004CA019 /* SceneGalleriesCard.swift */; };
+		1998A3883F7C4601AC6BFE39 /* UniversalSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B7652F1B72E5003ED852 /* UniversalSearchView.swift */; };
+		2589B7DB551E457BA8800634 /* PerformerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045D2E8A8C2000323FF2 /* PerformerDetailView.swift */; };
+		2F2314B3093A480F864AFEEC /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB192F16743C007C2090 /* HomeView.swift */; };
+		37B03936F6E04AA38082CF47 /* FilterModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E69F93D1B9EB47B88F9597C3 /* FilterModels.swift */; };
+		37D3E2E52F39384000AB8FAD /* ServerConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB779EFE84155DC02AAC07 /* ServerConfig.swift */; };
+		37D3E3262F39444C00AB8FAD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0000022E8A9C0000000001 /* Assets.xcassets */; };
+		37D3E4922F3A305D00AB8FAD /* SceneHeatmapCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37D3E4912F3A305D00AB8FAD /* SceneHeatmapCard.swift */; };
+		37D3E4932F3A305D00AB8FAD /* SceneHeatmapCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37D3E4912F3A305D00AB8FAD /* SceneHeatmapCard.swift */; };
+		3E39578124904717B35F0006 /* StudioRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E6A2F2A6386004CA019 /* StudioRepository.swift */; };
+		3F36416D734D45FE8200AA26 /* SceneDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045D2E8A8C2000323FF1 /* SceneDetailView.swift */; };
+		42AECC4BE2264997B0333A90 /* HomeSceneCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E5E2F2A46A1004CA019 /* HomeSceneCardView.swift */; };
+		4543D7DD5DCE4B56B4C926F1 /* StudioFiltersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A626B91113242AAAF2D9CC3 /* StudioFiltersView.swift */; };
+		4641A386019F4F5F81B587A8 /* StashDBViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB77A2FE84155DC02AAC07 /* StashDBViewModel.swift */; };
+		51487CAA64DF4CC3B986B68C /* SceneStudioCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E752F2A6392004CA019 /* SceneStudioCard.swift */; };
+		568D994AFDBC4AF683D2A5E5 /* TestFlightNoticeCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E602F2A46A1004CA019 /* TestFlightNoticeCard.swift */; };
+		5B0100661A854DEDA5E55778 /* CatalogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB142F167223007C2090 /* CatalogsView.swift */; };
+		5B3249B4152046408B964DDC /* StarRatingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */; };
+		5BC6653D5C9D4675881F40BA /* GalleriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB182F16743C007C2090 /* GalleriesView.swift */; };
+		5CAFF7AF91B64F458C104E84 /* ScenePerformersCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E742F2A6392004CA019 /* ScenePerformersCard.swift */; };
+		5DDB6F948ED24348A4916DCF /* ImageCacheManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB262F167CDC007C2090 /* ImageCacheManager.swift */; };
+		64D0D9557F7C404B8C16EF39 /* TagRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E6B2F2A6386004CA019 /* TagRepository.swift */; };
+		6B7F79949CEB4E2CB62F2650 /* ReelsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1B2F16743C007C2090 /* ReelsView.swift */; };
+		6BC1E5F563B84AA4B9FA20D9 /* StudioDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045D2E8A8C2000323FF4 /* StudioDetailView.swift */; };
+		757D103CB6294F49B8301A7B /* FilterRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E662F2A6386004CA019 /* FilterRepository.swift */; };
 		7793DEC6F2A641D4923DF2E5 /* FilterModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E69F93D1B9EB47B88F9597C3 /* FilterModels.swift */; };
+		790261AAF80B42C485B72074 /* TabManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF7EE402F0D3D2800344A8B /* TabManager.swift */; };
+		7B48CDF007B7469B93ACF595 /* AppearanceSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */; };
+		7BB701173C934CC5AD19DC74 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE504632E8A8C5000323FF0 /* SceneDelegate.swift */; };
 		7D31598FEE244A419EEDF8A3 /* StudioFiltersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A626B91113242AAAF2D9CC3 /* StudioFiltersView.swift */; };
+		85D2DEBA701341D2A43E2EAA /* SceneRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E692F2A6386004CA019 /* SceneRepository.swift */; };
+		8D7ECC24161D4D9EBF4C3A57 /* TagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1D2F16743C007C2090 /* TagsView.swift */; };
+		8EDB08C37CB34EB0AFBF1287 /* ServerConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB779EFE84155DC02AAC07 /* ServerConfig.swift */; };
+		91CF530080674BF98FF154C4 /* SceneCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF06EF252F18EC1100299105 /* SceneCardView.swift */; };
+		9AA0A05BF61443C2B087A163 /* SharedUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1C2F16743C007C2090 /* SharedUtilities.swift */; };
+		A448F31312224C5CA0763758 /* SceneTagsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E762F2A6392004CA019 /* SceneTagsCard.swift */; };
+		A519E23C8BE040F79C6EFE18 /* ImagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF4A022B2F1E8B6800E5EAFB /* ImagesView.swift */; };
+		A8FA63740E8A43609EDB1AAD /* AppearanceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB312F1831C7007C2090 /* AppearanceManager.swift */; };
 		AA0000012E8A9C0000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0000022E8A9C0000000001 /* Assets.xcassets */; };
+		AAB8EA012D744BBCB254F7D6 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7798FE84155DC02AAC07 /* MainTabView.swift */; };
+		BB58741767674753BACDD0BA /* HomeRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E5D2F2A46A1004CA019 /* HomeRowView.swift */; };
+		BFFDBA13C2414AB6B3120A34 /* HomeStatisticsRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E5F2F2A46A1004CA019 /* HomeStatisticsRowView.swift */; };
+		C047CE6380F048858A91E6C9 /* GraphQLClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFGQ000022F28A0000000002 /* GraphQLClient.swift */; };
+		CD4CA6C2CB694838903FF516 /* graphql in Resources */ = {isa = PBXBuildFile; fileRef = DFGQGRAPHQLREF001 /* graphql */; };
+		DED26B5AB7A04A979AF74BAE /* SceneVideoPlayerCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E772F2A6392004CA019 /* SceneVideoPlayerCard.swift */; };
 		DF06EF262F18EC1300299105 /* SceneCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF06EF252F18EC1100299105 /* SceneCardView.swift */; };
 		DF22BB152F167223007C2090 /* CatalogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB142F167223007C2090 /* CatalogsView.swift */; };
 		DF22BB1E2F16743C007C2090 /* TagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1D2F16743C007C2090 /* TagsView.swift */; };
@@ -72,6 +119,11 @@
 		DFUI000012F3AUDIT001 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFUI000022F3AUDIT002 /* DesignTokens.swift */; };
 		DFUI000032F3AUDIT003 /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFUI000042F3AUDIT004 /* HapticManager.swift */; };
 		DFUI000052F3AUDIT005 /* ToastManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFUI000062F3AUDIT006 /* ToastManager.swift */; };
+		E909C6E8F4744C4D939F78BD /* GraphQLQueries.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFGQ000042F28A0000000004 /* GraphQLQueries.swift */; };
+		F21C93AC1160498EB0A17AF4 /* GalleryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E672F2A6386004CA019 /* GalleryRepository.swift */; };
+		F4BF2858338E42E6AA292FCC /* PerformersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB392F1832E8007C2090 /* PerformersView.swift */; };
+		F6BC02EF04794FCAA2460E89 /* PerformerRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E682F2A6386004CA019 /* PerformerRepository.swift */; };
+		FDFEA639517B4DF2B8490448 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7794FE84155DC02AAC07 /* App.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -80,6 +132,8 @@
 		08FB779EFE84155DC02AAC07 /* ServerConfig.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ServerConfig.swift; sourceTree = "<group>"; };
 		08FB77A0FE84155DC02AAC07 /* stashy/Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = stashy/Info.plist; sourceTree = "<group>"; };
 		08FB77A2FE84155DC02AAC07 /* StashDBViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StashDBViewModel.swift; sourceTree = "<group>"; };
+		37D3E24E2F3932C400AB8FAD /* stashyTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = stashyTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		37D3E4912F3A305D00AB8FAD /* SceneHeatmapCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneHeatmapCard.swift; sourceTree = "<group>"; };
 		5A626B91113242AAAF2D9CC3 /* StudioFiltersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioFiltersView.swift; sourceTree = "<group>"; };
 		AA0000022E8A9C0000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		DF06EF252F18EC1100299105 /* SceneCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCardView.swift; sourceTree = "<group>"; };
@@ -138,14 +192,25 @@
 		DFST000102F30A0000000010 /* DefaultSortView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultSortView.swift; sourceTree = "<group>"; };
 		DFST000122F30A0000000012 /* DefaultFilterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultFilterView.swift; sourceTree = "<group>"; };
 		DFST000142F30A0000000014 /* ServerStatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerStatisticsView.swift; sourceTree = "<group>"; };
-		E69F93D1B9EB47B88F9597C3 /* FilterModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterModels.swift; sourceTree = "<group>"; };
 		DFUI000022F3AUDIT002 /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
 		DFUI000042F3AUDIT004 /* HapticManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HapticManager.swift; sourceTree = "<group>"; };
 		DFUI000062F3AUDIT006 /* ToastManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastManager.swift; sourceTree = "<group>"; };
+		E69F93D1B9EB47B88F9597C3 /* FilterModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterModels.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		37D3E24F2F3932C400AB8FAD /* stashyTV */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = stashyTV; sourceTree = "<group>"; };
+/* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		08FB7791FE84155DC02AAC07 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		37D3E24B2F3932C400AB8FAD /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -162,6 +227,8 @@
 				08FB77A0FE84155DC02AAC07 /* stashy/Info.plist */,
 				DFE504602E8A8E6F00323FF0 /* stashy.app */,
 				DFGQGRAPHQLREF001 /* graphql */,
+				37D3E24E2F3932C400AB8FAD /* stashyTV.app */,
+				37D3E24F2F3932C400AB8FAD /* stashyTV */,
 			);
 			sourceTree = "<group>";
 		};
@@ -246,6 +313,7 @@
 				DF675E752F2A6392004CA019 /* SceneStudioCard.swift */,
 				DF675E762F2A6392004CA019 /* SceneTagsCard.swift */,
 				DF675E772F2A6392004CA019 /* SceneVideoPlayerCard.swift */,
+				37D3E4912F3A305D00AB8FAD /* SceneHeatmapCard.swift */,
 			);
 			path = Components;
 			sourceTree = "<group>";
@@ -297,6 +365,28 @@
 			productReference = DFE504602E8A8E6F00323FF0 /* stashy.app */;
 			productType = "com.apple.product-type.application";
 		};
+		37D3E24D2F3932C400AB8FAD /* stashyTV */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 37D3E2582F3932C500AB8FAD /* Build configuration list for PBXNativeTarget "stashyTV" */;
+			buildPhases = (
+				37D3E24A2F3932C400AB8FAD /* Sources */,
+				37D3E24B2F3932C400AB8FAD /* Frameworks */,
+				37D3E24C2F3932C400AB8FAD /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				37D3E24F2F3932C400AB8FAD /* stashyTV */,
+			);
+			name = stashyTV;
+			packageProductDependencies = (
+			);
+			productName = stashyTV;
+			productReference = 37D3E24E2F3932C400AB8FAD /* stashyTV.app */;
+			productType = "com.apple.product-type.application";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -304,7 +394,13 @@
 			isa = PBXProject;
 			attributes = {
 				BuildIndependentTargetsInParallel = YES;
+				LastSwiftUpdateCheck = 2630;
 				LastUpgradeCheck = 2630;
+				TargetAttributes = {
+					37D3E24D2F3932C400AB8FAD = {
+						CreatedOnToolsVersion = 26.3;
+					};
+				};
 			};
 			buildConfigurationList = 1DEB928508733DD80010E9CD /* Build configuration list for PBXProject "stashy" */;
 			compatibilityVersion = "Xcode 9.3";
@@ -320,6 +416,7 @@
 			projectRoot = "";
 			targets = (
 				08FB7790FE84155DC02AAC07 /* stashy */,
+				37D3E24D2F3932C400AB8FAD /* stashyTV */,
 			);
 		};
 /* End PBXProject section */
@@ -331,6 +428,15 @@
 			files = (
 				AA0000012E8A9C0000000001 /* Assets.xcassets in Resources */,
 				DFGQGRAPHQLBUILD001 /* graphql in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		37D3E24C2F3932C400AB8FAD /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				37D3E3262F39444C00AB8FAD /* Assets.xcassets in Resources */,
+				CD4CA6C2CB694838903FF516 /* graphql in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -369,6 +475,7 @@
 				DF675E7E2F2A6392004CA019 /* SceneTagsCard.swift in Sources */,
 				DFST000032F30A0000000003 /* SettingsView.swift in Sources */,
 				DFST000052F30A0000000005 /* ServerListSection.swift in Sources */,
+				37D3E4922F3A305D00AB8FAD /* SceneHeatmapCard.swift in Sources */,
 				DFST000072F30A0000000007 /* ServerDetailView.swift in Sources */,
 				DFST000092F30A0000000009 /* PlaybackSettingsSection.swift in Sources */,
 				DFST0000B2F30A000000000B /* ContentSettingsSection.swift in Sources */,
@@ -425,6 +532,62 @@
 				DFUI000012F3AUDIT001 /* DesignTokens.swift in Sources */,
 				DFUI000032F3AUDIT003 /* HapticManager.swift in Sources */,
 				DFUI000052F3AUDIT005 /* ToastManager.swift in Sources */,
+				8EDB08C37CB34EB0AFBF1287 /* ServerConfig.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		37D3E24A2F3932C400AB8FAD /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				FDFEA639517B4DF2B8490448 /* App.swift in Sources */,
+				AAB8EA012D744BBCB254F7D6 /* MainTabView.swift in Sources */,
+				4641A386019F4F5F81B587A8 /* StashDBViewModel.swift in Sources */,
+				4543D7DD5DCE4B56B4C926F1 /* StudioFiltersView.swift in Sources */,
+				91CF530080674BF98FF154C4 /* SceneCardView.swift in Sources */,
+				5B0100661A854DEDA5E55778 /* CatalogsView.swift in Sources */,
+				02B19A59AAFE4A16B45A861F /* DownloadsView.swift in Sources */,
+				5BC6653D5C9D4675881F40BA /* GalleriesView.swift in Sources */,
+				2F2314B3093A480F864AFEEC /* HomeView.swift in Sources */,
+				6B7F79949CEB4E2CB62F2650 /* ReelsView.swift in Sources */,
+				9AA0A05BF61443C2B087A163 /* SharedUtilities.swift in Sources */,
+				8D7ECC24161D4D9EBF4C3A57 /* TagsView.swift in Sources */,
+				5DDB6F948ED24348A4916DCF /* ImageCacheManager.swift in Sources */,
+				A8FA63740E8A43609EDB1AAD /* AppearanceManager.swift in Sources */,
+				7B48CDF007B7469B93ACF595 /* AppearanceSettingsView.swift in Sources */,
+				101EE38B25B74B1BBA920AEA /* NavigationCoordinator.swift in Sources */,
+				F4BF2858338E42E6AA292FCC /* PerformersView.swift in Sources */,
+				A519E23C8BE040F79C6EFE18 /* ImagesView.swift in Sources */,
+				BB58741767674753BACDD0BA /* HomeRowView.swift in Sources */,
+				42AECC4BE2264997B0333A90 /* HomeSceneCardView.swift in Sources */,
+				BFFDBA13C2414AB6B3120A34 /* HomeStatisticsRowView.swift in Sources */,
+				568D994AFDBC4AF683D2A5E5 /* TestFlightNoticeCard.swift in Sources */,
+				757D103CB6294F49B8301A7B /* FilterRepository.swift in Sources */,
+				F21C93AC1160498EB0A17AF4 /* GalleryRepository.swift in Sources */,
+				F6BC02EF04794FCAA2460E89 /* PerformerRepository.swift in Sources */,
+				85D2DEBA701341D2A43E2EAA /* SceneRepository.swift in Sources */,
+				3E39578124904717B35F0006 /* StudioRepository.swift in Sources */,
+				64D0D9557F7C404B8C16EF39 /* TagRepository.swift in Sources */,
+				11F5E1EE280744C5928133CD /* SceneGalleriesCard.swift in Sources */,
+				5CAFF7AF91B64F458C104E84 /* ScenePerformersCard.swift in Sources */,
+				51487CAA64DF4CC3B986B68C /* SceneStudioCard.swift in Sources */,
+				A448F31312224C5CA0763758 /* SceneTagsCard.swift in Sources */,
+				37D3E4932F3A305D00AB8FAD /* SceneHeatmapCard.swift in Sources */,
+				DED26B5AB7A04A979AF74BAE /* SceneVideoPlayerCard.swift in Sources */,
+				5B3249B4152046408B964DDC /* StarRatingView.swift in Sources */,
+				11A2D778BDD54ABE859A5F1D /* ServerSetupWizardView.swift in Sources */,
+				1998A3883F7C4601AC6BFE39 /* UniversalSearchView.swift in Sources */,
+				0AD34A514F0B499FB1566E23 /* ScenesView.swift in Sources */,
+				3F36416D734D45FE8200AA26 /* SceneDetailView.swift in Sources */,
+				2589B7DB551E457BA8800634 /* PerformerDetailView.swift in Sources */,
+				6BC1E5F563B84AA4B9FA20D9 /* StudioDetailView.swift in Sources */,
+				0919B93E9C064D3AAF9A95C0 /* StudiosView.swift in Sources */,
+				37D3E2E52F39384000AB8FAD /* ServerConfig.swift in Sources */,
+				7BB701173C934CC5AD19DC74 /* SceneDelegate.swift in Sources */,
+				790261AAF80B42C485B72074 /* TabManager.swift in Sources */,
+				37B03936F6E04AA38082CF47 /* FilterModels.swift in Sources */,
+				C047CE6380F048858A91E6C9 /* GraphQLClient.swift in Sources */,
+				E909C6E8F4744C4D939F78BD /* GraphQLQueries.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -569,8 +732,8 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashly;
+				MARKETING_VERSION = 1.3;
+				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator";
@@ -597,7 +760,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 1.0;
+				MARKETING_VERSION = 1.3;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -606,6 +769,86 @@
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		37D3E2562F3932C500AB8FAD /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 699G2QY959;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "stashyTV-Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.3;
+				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = appletvos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 26.2;
+			};
+			name = Debug;
+		};
+		37D3E2572F3932C500AB8FAD /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CODE_SIGN_IDENTITY = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 699G2QY959;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "stashyTV-Info.plist";
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.entertainment";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MARKETING_VERSION = 1.3;
+				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
+				SDKROOT = appletvos;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 3;
+				TVOS_DEPLOYMENT_TARGET = 26.2;
 			};
 			name = Release;
 		};
@@ -626,6 +869,15 @@
 			buildConfigurations = (
 				1DEB928A08733DD80010E9CD /* Debug */,
 				1DEB928B08733DD80010E9CD /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		37D3E2582F3932C500AB8FAD /* Build configuration list for PBXNativeTarget "stashyTV" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				37D3E2562F3932C500AB8FAD /* Debug */,
+				37D3E2572F3932C500AB8FAD /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

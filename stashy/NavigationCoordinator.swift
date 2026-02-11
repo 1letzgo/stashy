@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 29.09.25.
 //
 
+#if !os(tvOS)
 import SwiftUI
 import Combine
 import AVKit
@@ -275,3 +276,4 @@ struct SharedEmptyStateView: View {
 // MARK: - Custom Async Image
 
 
+#endif

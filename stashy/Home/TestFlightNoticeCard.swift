@@ -1,4 +1,5 @@
 
+#if !os(tvOS)
 import SwiftUI
 
 struct TestFlightNoticeCard: View {
@@ -58,3 +59,4 @@ struct TestFlightNoticeCard: View {
         .padding(.top, 4)
     }
 }
+#endif

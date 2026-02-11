@@ -1,4 +1,5 @@
 
+#if !os(tvOS)
 import SwiftUI
 
 struct HomeRowView: View {
@@ -88,6 +89,12 @@ struct HomeRowView: View {
                 checkAndLoadScenes()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ScenePlayAdded"))) { _ in
+            guard config.type == .lastPlayed else { return }
+            // Force reload last played row to reflect updated ordering
+            viewModel.homeRowScenes[config.type] = nil
+            checkAndLoadScenes()
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
             // Clear cache and reload on server switch
             viewModel.homeRowScenes[config.type] = nil
@@ -143,3 +150,4 @@ struct HomeRowView: View {
         }
     }
 }
+#endif

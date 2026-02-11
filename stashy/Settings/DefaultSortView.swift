@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 06.02.26.
 //
 
+#if !os(tvOS)
 import SwiftUI
 
 struct DefaultSortView: View {
@@ -149,3 +150,4 @@ struct DefaultSortView: View {
         }
     }
 }
+#endif

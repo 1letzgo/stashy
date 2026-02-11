@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 19.01.26.
 //
 
+#if !os(tvOS)
 import SwiftUI
 
 struct ImagesView: View {
@@ -526,3 +527,4 @@ struct ImageThumbnailCard: View {
         .cardShadow()
     }
 }
+#endif

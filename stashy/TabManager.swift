@@ -434,12 +434,8 @@ class TabManager: ObservableObject {
     
     private func ensureStatisticsRow() {
          if !homeRows.contains(where: { $0.type == .statistics }) {
-             // Shift everyone else down
-             for i in 0..<homeRows.count {
-                 homeRows[i].sortOrder += 1
-             }
-             let statsRow = HomeRowConfig(id: UUID(), title: HomeRowType.statistics.defaultTitle, isEnabled: true, sortOrder: 0, type: .statistics)
-             homeRows.insert(statsRow, at: 0)
+             let statsRow = HomeRowConfig(id: UUID(), title: HomeRowType.statistics.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .statistics)
+             homeRows.append(statsRow)
              saveHomeRows()
          }
     }
@@ -777,7 +773,7 @@ class TabManager: ObservableObject {
         let filter: (TabConfig) -> Bool = {
             switch parent {
             case .catalogue:
-                return $0.id == .performers || $0.id == .studios || $0.id == .tags || $0.id == .scenes || $0.id == .galleries
+                return $0.id == .performers || $0.id == .studios || $0.id == .tags || $0.id == .scenes || $0.id == .galleries || $0.id == .images || $0.id == .dashboard
             case .media:
                 return false
             default:
@@ -788,15 +784,17 @@ class TabManager: ObservableObject {
         var subTabs = tabs.filter(filter).sorted { $0.sortOrder < $1.sortOrder }
         subTabs.move(fromOffsets: source, toOffset: destination)
         
-        // Dashboard is fixed at order 0. Other sub-tabs start at 1.
-        if let dashIdx = tabs.firstIndex(where: { $0.id == .dashboard }) {
-            tabs[dashIdx].sortOrder = 0
-            tabs[dashIdx].isVisible = true
+        // Ensure dashboard stays at index 0 for Statistic Card & Menu
+        if parent == .catalogue {
+            if let dashIdx = subTabs.firstIndex(where: { $0.id == .dashboard }) {
+                let dash = subTabs.remove(at: dashIdx)
+                subTabs.insert(dash, at: 0)
+            }
         }
         
         for (index, tab) in subTabs.enumerated() {
             if let originalIndex = tabs.firstIndex(where: { $0.id == tab.id }) {
-                tabs[originalIndex].sortOrder = index + 1
+                tabs[originalIndex].sortOrder = index
             }
         }
         

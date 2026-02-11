@@ -5,6 +5,7 @@
 //  Step-by-step wizard for first-time server setup
 //
 
+#if !os(tvOS)
 import SwiftUI
 
 struct ServerSetupWizardView: View {
@@ -400,3 +401,4 @@ struct ServerSetupWizardView: View {
         print("Config saved: \(config)")
     }
 }
+#endif

@@ -1,4 +1,6 @@
 
+
+#if !os(tvOS)
 import SwiftUI
 import AVKit
 
@@ -523,3 +525,4 @@ struct SceneVideoPlayerCard: View {
         previewPlayer?.seek(to: CMTime.zero)
     }
 }
+#endif

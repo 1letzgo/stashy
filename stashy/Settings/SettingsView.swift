@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 06.02.26.
 //
 
+#if !os(tvOS)
 import SwiftUI
 
 struct SettingsView: View {
@@ -193,3 +194,4 @@ struct SettingsView: View {
 #Preview {
     SettingsView()
 }
+#endif

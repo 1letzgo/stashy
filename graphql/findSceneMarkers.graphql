@@ -16,6 +16,8 @@ query FindSceneMarkers($filter: FindFilterType, $scene_marker_filter: SceneMarke
         rating100
         play_count
         o_counter
+        interactive
+        paths { screenshot preview stream webp vtt sprite funscript interactive_heatmap caption }
         files {
           id
           path

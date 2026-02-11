@@ -5,6 +5,7 @@
 //  Created by Antigravity on 16.01.26.
 //
 
+#if !os(tvOS)
 import SwiftUI
 
 struct StarRatingView: View {
@@ -71,7 +72,9 @@ struct StarRatingView: View {
                 .contentShape(Rectangle())
                 .onTapGesture {
                     guard isInteractive else { return }
+                    #if !os(tvOS)
                     HapticManager.selection()
+                    #endif
                     // Tapping the same star clears the rating
                     if index == stars {
                         onRatingChanged?(nil)
@@ -93,3 +96,4 @@ struct StarRatingView: View {
         StarRatingView(rating100: 100)
     }
 }
+#endif

@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 15.01.26.
 //
 
+#if !os(tvOS)
 import SwiftUI
 
 import AVKit
@@ -165,6 +166,7 @@ struct SceneCardView: View {
                         .background(Color.black.opacity(DesignTokens.Opacity.badge))
                         .clipShape(Capsule())
                     }
+
                 }
                 
                 // Resume Progress
@@ -240,3 +242,4 @@ struct AspectFillVideoPlayer: UIViewControllerRepresentable {
         uiViewController.player = player
     }
 }
+#endif

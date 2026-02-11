@@ -31,12 +31,12 @@ class PerformersViewModel: ObservableObject {
     init(performerRepository: PerformerRepositoryProtocol = PerformerRepository()) {
         self.performerRepository = performerRepository
         
-        // Initialize with default loader
-        self.performersLoader = PaginatedLoader.performers(
+        // Initialize with default loader (use literal defaults to avoid accessing self before init)
+        self.performersLoader = PaginatedLoader<Performer>.performers(
             repository: performerRepository,
-            sortBy: currentSortOption,
-            searchQuery: searchQuery,
-            filter: currentFilter
+            sortBy: .nameAsc,
+            searchQuery: "",
+            filter: nil
         )
         
         setupBindings()
@@ -72,7 +72,7 @@ class PerformersViewModel: ObservableObject {
     }
     
     private func updateLoader() {
-        performersLoader = PaginatedLoader.performers(
+        performersLoader = PaginatedLoader<Performer>.performers(
             repository: performerRepository,
             sortBy: currentSortOption,
             searchQuery: searchQuery,

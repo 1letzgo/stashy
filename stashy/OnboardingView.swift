@@ -5,6 +5,7 @@
 //  Welcome screen for first-time users
 //
 
+#if !os(tvOS)
 import SwiftUI
 
 struct OnboardingView: View {
@@ -145,3 +146,4 @@ struct FeatureRow: View {
 #Preview {
     OnboardingView(isPresented: .constant(true))
 }
+#endif

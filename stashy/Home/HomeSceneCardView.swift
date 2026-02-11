@@ -1,4 +1,5 @@
 
+#if !os(tvOS)
 import SwiftUI
 import AVKit
 
@@ -179,3 +180,4 @@ struct HomeSceneCardView: View {
         }
     }
 }
+#endif

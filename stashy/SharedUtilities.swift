@@ -8,7 +8,9 @@
 import Foundation
 import AVKit
 import AVFoundation
+#if !os(tvOS)
 import WebKit
+#endif
 import StoreKit
 
 // MARK: - Global Helper Functions
@@ -76,13 +78,17 @@ func createPlayer(for url: URL) -> AVPlayer {
         print("🎬 VIDEO PLAYER: Error setting up AVAudioSession: \(error)")
     }
     
+    // Use signed URL with API key as query parameter for maximum compatibility
+    let authenticatedURL = signedURL(url) ?? url
+    print("🎬 VIDEO PLAYER: Creating player for URL: \(authenticatedURL.absoluteString)")
+    
     var headers: [String: String] = [:]
     if let config = ServerConfigManager.shared.loadConfig(),
        let apiKey = config.secureApiKey, !apiKey.isEmpty {
         headers["ApiKey"] = apiKey
     }
     
-    let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+    let asset = AVURLAsset(url: authenticatedURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
     let playerItem = AVPlayerItem(asset: asset)
     let player = AVPlayer(playerItem: playerItem)
     player.allowsExternalPlayback = true
@@ -99,13 +105,16 @@ func createMutedPreviewPlayer(for url: URL) -> AVPlayer {
         print("🎬 PREVIEW PLAYER: Error setting up AVAudioSession: \(error)")
     }
     
+    // Use signed URL with API key
+    let authenticatedURL = signedURL(url) ?? url
+    
     var headers: [String: String] = [:]
     if let config = ServerConfigManager.shared.loadConfig(),
        let apiKey = config.secureApiKey, !apiKey.isEmpty {
         headers["ApiKey"] = apiKey
     }
     
-    let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+    let asset = AVURLAsset(url: authenticatedURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
     let playerItem = AVPlayerItem(asset: asset)
     let player = AVPlayer(playerItem: playerItem)
     player.isMuted = true
@@ -168,6 +177,7 @@ import SwiftUI
 extension View {
     /// Applies the .searchable modifier conditionally.
     /// Search field is only visible when isSearchVisible is true.
+    #if !os(tvOS)
     @ViewBuilder
     func conditionalSearchable(isVisible: Bool, text: Binding<String>, prompt: String = "Search") -> some View {
         if isVisible {
@@ -176,6 +186,7 @@ extension View {
             self
         }
     }
+    #endif
     
     /// Applies the standard app background color.
     func applyAppBackground() -> some View {
@@ -195,6 +206,7 @@ extension View {
 
 // MARK: - GIF / Zoom Components
 
+#if !os(tvOS)
 /// A view that plays animated GIFs using WKWebView for reliability and simple looping.
 struct GIFView: UIViewRepresentable {
     let data: Data
@@ -354,6 +366,7 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
 func isGIF(_ data: Data) -> Bool {
     return data.count >= 3 && data[0] == 0x47 && data[1] == 0x49 && data[2] == 0x46
 }
+#endif // !os(tvOS)
 
 struct ShimmerModifier: ViewModifier {
     @State private var phase: CGFloat = 0
@@ -424,7 +437,11 @@ struct InfoPill: View {
         .padding(.vertical, 4)
         .background(
             ZStack {
+                #if os(tvOS)
+                Color.black
+                #else
                 Color(UIColor.systemBackground)
+                #endif
                 activeColor.opacity(0.1)
             }
         )

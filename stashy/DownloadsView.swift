@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 13.01.26.
 //
 
+#if !os(tvOS)
 import SwiftUI
 import AVKit
 
@@ -554,3 +555,4 @@ struct OfflineWrappedHStack<Data: RandomAccessCollection, Content: View>: View w
         }
     }
 }
+#endif

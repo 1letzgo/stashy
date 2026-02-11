@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 29.09.25.
 //
 
+#if !os(tvOS)
 import SwiftUI
 import AVFoundation
 import AVKit
@@ -15,6 +16,7 @@ struct SceneDetailView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @State private var activeScene: Scene
     @StateObject private var viewModel = StashDBViewModel()
+    @ObservedObject var handyManager = HandyManager.shared
     
     init(scene: Scene) {
         self.scene = scene
@@ -38,6 +40,9 @@ struct SceneDetailView: View {
     @State private var capturedMarkerTime: Double = 0
     @State private var playbackSpeed: Double = 1.0
     private let timer = Timer.publish(every: 10, on: .main, in: .common).autoconnect()
+    private let playbackMarkerTimer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
+    @State private var currentPlaybackTime: Double = 0
+    @State private var timeObserverToken: Any?
     
     // Preview Video State
     @State private var previewPlayer: AVPlayer?
@@ -107,6 +112,16 @@ struct SceneDetailView: View {
                     onSeek: { seconds in seekTo(seconds) },
                     onStartPlayback: { resume in startPlayback(resume: resume) }
                 )
+                
+                if activeScene.interactive == true, let heatmapURL = activeScene.heatmapURL {
+                    SceneHeatmapCard(
+                        heatmapURL: heatmapURL,
+                        funscriptURL: activeScene.funscriptURL,
+                        durationSeconds: activeScene.sceneDuration ?? 0,
+                        currentTimeSeconds: currentPlaybackTime,
+                        onSeek: { seconds in seekTo(seconds) }
+                    )
+                }
                 
                 if !activeScene.performers.isEmpty || activeScene.studio != nil {
                     HStack(alignment: .top, spacing: 12) {
@@ -216,11 +231,15 @@ struct SceneDetailView: View {
                 stopPreview()
                 return
             }
-            
+
             if !isFullscreen {
                 player?.pause()
+                if handyManager.isSyncing {
+                    handyManager.pause()
+                }
             }
             stopPreview()
+            removeTimeObserver()
             
             // Determine current resume time
             let currentTime = player?.currentTime().seconds
@@ -264,18 +283,29 @@ struct SceneDetailView: View {
                 if currentTime > 0 {
                     viewModel.updateSceneResumeTime(sceneId: activeScene.id, resumeTime: currentTime)
                 }
+                if !hasAddedPlay, currentTime > 1 {
+                    registerScenePlay()
+                }
+            }
+        }
+        .onReceive(playbackMarkerTimer) { _ in
+            guard let player = player else { return }
+            let currentTime = player.currentTime().seconds
+            if currentTime >= 0 {
+                currentPlaybackTime = currentTime
             }
         }
     }
 
     private func startPlayback(resume: Bool) {
         guard let videoURL = activeScene.videoURL else { return }
-        
+
         if player == nil {
             print("🎬 Player initializing with URL: \(videoURL.absoluteString)")
             player = createPlayer(for: videoURL)
             player?.isMuted = isMuted
-            
+            addTimeObserverIfNeeded()
+
             if resume, let resumeTime = activeScene.resumeTime, resumeTime > 0 {
                 let targetTime = CMTime(seconds: resumeTime, preferredTimescale: 600)
                 player?.seek(to: targetTime)
@@ -289,12 +319,44 @@ struct SceneDetailView: View {
             isPlaybackStarted = true
         }
         player?.play()
+        if handyManager.isSyncing {
+            handyManager.play(at: player?.currentTime().seconds ?? 0)
+        }
         player?.rate = Float(playbackSpeed)
         
         if !hasAddedPlay {
-            viewModel.addScenePlay(sceneId: activeScene.id)
-            hasAddedPlay = true
+            registerScenePlay()
         }
+    }
+
+    private func addTimeObserverIfNeeded() {
+        guard timeObserverToken == nil, let player = player else { return }
+        let interval = CMTime(seconds: 0.25, preferredTimescale: 600)
+        timeObserverToken = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
+            let seconds = time.seconds
+            if seconds >= 0 {
+                currentPlaybackTime = seconds
+            }
+            if !hasAddedPlay, seconds > 1 {
+                registerScenePlay()
+            }
+        }
+    }
+
+    private func registerScenePlay() {
+        viewModel.addScenePlay(sceneId: activeScene.id)
+        hasAddedPlay = true
+        NotificationCenter.default.post(
+            name: NSNotification.Name("ScenePlayAdded"),
+            object: nil,
+            userInfo: ["sceneId": activeScene.id]
+        )
+    }
+
+    private func removeTimeObserver() {
+        guard let token = timeObserverToken, let player = player else { return }
+        player.removeTimeObserver(token)
+        timeObserverToken = nil
     }
 
     private func deleteSceneWithFiles() {
@@ -352,6 +414,9 @@ struct SceneDetailView: View {
         
         player?.seek(to: CMTime(seconds: seconds, preferredTimescale: 600))
         player?.play()
+        if handyManager.isSyncing {
+            handyManager.play(at: seconds)
+        }
     }
 
     private func infoPill(icon: String, text: String, color: Color? = nil) -> some View {
@@ -642,3 +707,4 @@ struct AddMarkerSheet: View {
         return formatter.string(from: seconds) ?? "00:00"
     }
 }
+#endif

@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 13.01.26.
 //
 
+#if !os(tvOS)
 import SwiftUI
 import AVKit
 
@@ -71,5 +72,6 @@ struct HomeView: View {
             }
         }
     }
-    
+
 }
+#endif

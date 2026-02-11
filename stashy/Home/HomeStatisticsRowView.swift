@@ -1,4 +1,5 @@
 
+#if !os(tvOS)
 import SwiftUI
 
 struct HomeStatisticsRowView: View {
@@ -17,7 +18,7 @@ struct HomeStatisticsRowView: View {
             if let stats = viewModel.statistics {
                 let sortedTabs = tabManager.tabs
                     .filter { tab in
-                        (tab.id == .scenes || tab.id == .galleries ||
+                        (tab.id == .scenes || tab.id == .galleries || tab.id == .images ||
                          tab.id == .performers || tab.id == .studios || tab.id == .tags) && tab.isVisible
                     }
                     .sorted { $0.sortOrder < $1.sortOrder }
@@ -33,7 +34,7 @@ struct HomeStatisticsRowView: View {
                                 case .galleries:
                                     StatCard(title: "Galleries", value: formatCount(stats.galleryCount), icon: "photo.stack", color: .green)
                                         .onTapGesture { coordinator.navigateToGalleries() }
-                                    // Binde images immer hinter galleries
+                                case .images:
                                     StatCard(title: "Images", value: formatCount(stats.imageCount), icon: "photo", color: .teal)
                                         .onTapGesture { coordinator.navigateToImages() }
                                 case .performers:
@@ -143,3 +144,4 @@ struct StatCard: View {
         .cornerRadius(DesignTokens.CornerRadius.card)
     }
 }
+#endif

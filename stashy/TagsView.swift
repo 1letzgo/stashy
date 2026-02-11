@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 13.01.26.
 //
 
+#if !os(tvOS)
 import SwiftUI
 
 struct TagsView: View {
@@ -49,9 +50,7 @@ struct TagsView: View {
             }
         }
         .navigationTitle(hideTitle ? "" : "Tags")
-#if !os(tvOS)
         .navigationBarTitleDisplayMode(.inline)
-        #endif
         .conditionalSearchable(isVisible: isSearchVisible, text: $searchText, prompt: "Search tags...")
         .onChange(of: searchText) { oldValue, newValue in
             // Debounce
@@ -303,6 +302,13 @@ struct TagsView: View {
                     performSearch()
                 } else if !viewModel.isLoadingSavedFilters {
                     // Default filter was set but not found, or filters finished loading and none match
+                    performSearch()
+                }
+            }
+        }
+        .onChange(of: viewModel.isLoadingSavedFilters) { oldValue, isLoading in
+            if oldValue == true && isLoading == false {
+                if viewModel.tags.isEmpty && !viewModel.isLoading && selectedFilter == nil {
                     performSearch()
                 }
             }
@@ -594,9 +600,7 @@ struct TagDetailView: View {
             }
         }
         .navigationTitle(selectedTag.name)
-#if !os(tvOS)
         .navigationBarTitleDisplayMode(.inline)
-        #endif
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack {
@@ -759,3 +763,5 @@ struct TagDetailView: View {
         }
     }
 }
+#endif
+

@@ -5,6 +5,7 @@
 //  Improved server form with live connection testing
 //
 
+#if !os(tvOS)
 import SwiftUI
 
 // MARK: - Improved Server Form View
@@ -358,3 +359,4 @@ struct ServerFormViewNew: View {
         ServerFormViewNew(configToEdit: nil, onSave: { _ in })
     }
 }
+#endif

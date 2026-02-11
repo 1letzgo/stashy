@@ -31,12 +31,12 @@ class GalleriesViewModel: ObservableObject {
     init(galleryRepository: GalleryRepositoryProtocol = GalleryRepository()) {
         self.galleryRepository = galleryRepository
         
-        // Initialize with default loader
-        self.galleriesLoader = PaginatedLoader.galleries(
+        // Initialize with default loader (use literal defaults to avoid accessing self before init)
+        self.galleriesLoader = PaginatedLoader<Gallery>.galleries(
             repository: galleryRepository,
-            sortBy: currentSortOption,
-            searchQuery: searchQuery,
-            filter: currentFilter
+            sortBy: .titleAsc,
+            searchQuery: "",
+            filter: nil
         )
         
         setupBindings()
@@ -72,7 +72,7 @@ class GalleriesViewModel: ObservableObject {
     }
     
     private func updateLoader() {
-        galleriesLoader = PaginatedLoader.galleries(
+        galleriesLoader = PaginatedLoader<Gallery>.galleries(
             repository: galleryRepository,
             sortBy: currentSortOption,
             searchQuery: searchQuery,

@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 13.01.26.
 //
 
+#if !os(tvOS)
 import SwiftUI
 
 struct AppearanceSettingsView: View {
@@ -84,3 +85,4 @@ struct AppearanceSettingsView: View {
         .navigationTitle("Appearance")
     }
 }
+#endif

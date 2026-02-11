@@ -1,4 +1,6 @@
 
+
+#if !os(tvOS)
 import SwiftUI
 
 struct SceneGalleriesCard: View {
@@ -86,3 +88,5 @@ struct SceneGalleriesCard: View {
         .cardShadow()
     }
 }
+#endif
+

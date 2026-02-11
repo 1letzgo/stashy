@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 13.01.26.
 //
 
+#if !os(tvOS)
 import SwiftUI
 import AVKit
 import AVFoundation
@@ -339,6 +340,13 @@ struct GalleriesView: View {
                     performSearch()
                 } else if !viewModel.isLoadingSavedFilters {
                     // Default filter was set but not found, or filters finished loading and none match
+                    performSearch()
+                }
+            }
+        }
+        .onChange(of: viewModel.isLoadingSavedFilters) { oldValue, isLoading in
+            if oldValue == true && isLoading == false {
+                if viewModel.galleries.isEmpty && !viewModel.isLoadingGalleries && selectedFilter == nil {
                     performSearch()
                 }
             }
@@ -999,3 +1007,4 @@ struct FullScreenImageView: View {
         }
     }
 }
+#endif

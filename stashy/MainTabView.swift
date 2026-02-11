@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 29.09.25.
 //
 
+#if !os(tvOS)
 import SwiftUI
 import AVKit
 
@@ -182,3 +183,4 @@ extension MainTabView {
 #Preview {
     MainTabView()
 }
+#endif

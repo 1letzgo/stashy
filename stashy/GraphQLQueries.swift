@@ -14,20 +14,20 @@ class GraphQLQueries {
     /// Serial queue for thread-safe cache access
     private static let cacheQueue = DispatchQueue(label: "com.stashy.graphql.cache", attributes: .concurrent)
     
-    // MARK: - Cache
-    
-    /// In-memory cache to avoid repeated disk reads
-    private static var _queryCache: [String: String] = [:]
+    // MARK: - Cache & Diagnostics
+    private static var cachedQueries: [String: String] = [:]
+    private static let cacheLock = NSLock()
+    private static var hasLoggedAllResources = false
     private static var _composedQueryCache: [String: String] = [:]
     private static var __sceneRelatedFragments: String?
     
     // Thread-safe accessors
     private static func getCachedQuery(_ key: String) -> String? {
-        cacheQueue.sync { _queryCache[key] }
+        cacheQueue.sync { cachedQueries[key] }
     }
     
     private static func setCachedQuery(_ key: String, value: String) {
-        cacheQueue.async(flags: .barrier) { _queryCache[key] = value }
+        cacheQueue.async(flags: .barrier) { cachedQueries[key] = value }
     }
     
     private static func getComposedQuery(_ key: String) -> String? {
@@ -55,24 +55,71 @@ class GraphQLQueries {
             return cached
         }
         
+        // DEBUG: Deep bundle inspection
+        if !hasLoggedAllResources {
+            hasLoggedAllResources = true
+            print("📁 --- BUNDLE INSPECTION START ---")
+            print("📁 Main Bundle Path: \(Bundle.main.bundlePath)")
+            
+            // List everything in the root
+            if let rootFiles = try? FileManager.default.contentsOfDirectory(atPath: Bundle.main.bundlePath) {
+                print("📁 Root files: \(rootFiles.joined(separator: ", "))")
+            }
+            
+            // Specifically list 'graphql' directory if it exists
+            let graphqlPath = (Bundle.main.bundlePath as NSString).appendingPathComponent("graphql")
+            if let gFiles = try? FileManager.default.contentsOfDirectory(atPath: graphqlPath) {
+                print("📁 'graphql' directory exists and contains: \(gFiles.joined(separator: ", "))")
+            } else {
+                print("❌ 'graphql' directory NOT found at \(graphqlPath)")
+            }
+            
+            // Try recursive scan for .graphql files
+            let enumerator = FileManager.default.enumerator(atPath: Bundle.main.bundlePath)
+            var foundGraphql: [String] = []
+            while let file = enumerator?.nextObject() as? String {
+                if file.hasSuffix(".graphql") {
+                    foundGraphql.append(file)
+                }
+            }
+            print("📁 Recursive scan found: \(foundGraphql.joined(separator: ", "))")
+            print("📁 --- BUNDLE INSPECTION END ---")
+        }
+
         // Load from bundle
         var content = ""
         
-        if let url = Bundle.main.url(forResource: fileName, withExtension: "graphql", subdirectory: "graphql") {
+        // Try multiple strategies
+        let strategies: [() -> URL?] = [
+            { Bundle.main.url(forResource: fileName, withExtension: "graphql", subdirectory: "graphql") },
+            { Bundle.main.url(forResource: fileName, withExtension: "graphql") },
+            { 
+                let path = (Bundle.main.bundlePath as NSString).appendingPathComponent("graphql/\(fileName).graphql")
+                return URL(fileURLWithPath: path)
+            },
+            {
+                let path = (Bundle.main.bundlePath as NSString).appendingPathComponent("\(fileName).graphql")
+                return URL(fileURLWithPath: path)
+            }
+        ]
+        
+        var foundUrl: URL? = nil
+        for strategy in strategies {
+            if let url = strategy(), FileManager.default.fileExists(atPath: url.path) {
+                foundUrl = url
+                break
+            }
+        }
+        
+        if let url = foundUrl {
             do {
                 content = try String(contentsOf: url, encoding: .utf8)
-            } catch {
-                print("❌ Critical: Failed to load GraphQL file: \(fileName).graphql - \(error)")
-            }
-        } else if let fallbackUrl = Bundle.main.url(forResource: fileName, withExtension: "graphql") {
-            // Fallback without subdirectory
-            do {
-                content = try String(contentsOf: fallbackUrl, encoding: .utf8)
+                print("✅ Found and loaded: \(fileName).graphql from \(url.lastPathComponent)")
             } catch {
                 print("❌ Critical: Failed to load GraphQL file: \(fileName).graphql - \(error)")
             }
         } else {
-            print("❌ Critical: Could not find GraphQL file: \(fileName).graphql")
+            print("❌ Critical: Could not find GraphQL file: \(fileName).graphql in ANY location")
         }
         
         // Cache the result (even if empty, to avoid repeated lookups)

@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 13.01.26.
 //
 
+#if !os(tvOS)
 import SwiftUI
 import AVKit
 import AVFoundation
@@ -232,6 +233,7 @@ struct ReelsView: View {
             case .marker: return false
             }
         }
+
     }
 
     
@@ -546,7 +548,7 @@ struct ReelsView: View {
                     let defaultId = TabManager.shared.getDefaultClipFilterId(for: .reels)
                     let newFilter = defaultId != nil ? viewModel.savedFilters[defaultId!] : nil
                     selectedClipFilter = newFilter
-                    applySettings(clipSortBy: selectedClipSortOption, filter: nil, clipFilter: newFilter)
+                    applySettings(clipSortBy: selectedClipSortOption, filter: nil, clipFilter: newFilter, performer: selectedPerformer, tags: selectedTags)
                 }
             }
         }
@@ -560,7 +562,7 @@ struct ReelsView: View {
                 }
             }()
 
-            let noFilterSet = (reelsMode == .clips ? selectedClipFilter == nil : selectedFilter == nil)
+            let noFilterSet = (reelsMode == .clips ? selectedClipFilter == nil : selectedFilter == nil) && selectedPerformer == nil && selectedTags.isEmpty
 
             if noFilterSet && isCurrentlyEmpty {
                 let defaultId: String? = {
@@ -580,7 +582,7 @@ struct ReelsView: View {
                         applySettings(markerSortBy: selectedMarkerSortOption, filter: filter, performer: selectedPerformer, tags: selectedTags)
                     case .clips:
                         selectedClipFilter = filter
-                        applySettings(clipSortBy: selectedClipSortOption, filter: nil, clipFilter: filter)
+                        applySettings(clipSortBy: selectedClipSortOption, filter: nil, clipFilter: filter, performer: selectedPerformer, tags: selectedTags)
                     }
                 } else {
                     print("ℹ️ ReelsView: No default filter found on server, loading unfiltered \(reelsMode.rawValue)")
@@ -596,7 +598,7 @@ struct ReelsView: View {
                         applySettings(markerSortBy: savedSort, filter: nil, performer: selectedPerformer, tags: selectedTags)
                     case .clips:
                         let savedSort = StashDBViewModel.ImageSortOption(rawValue: savedSortStr ?? "") ?? .random
-                        applySettings(clipSortBy: savedSort, filter: nil, clipFilter: nil)
+                        applySettings(clipSortBy: savedSort, filter: nil, clipFilter: nil, performer: selectedPerformer, tags: selectedTags)
                     }
                 }
             }
@@ -610,7 +612,7 @@ struct ReelsView: View {
                     case .clips: return viewModel.clips.isEmpty
                     }
                 }()
-                let noFilterSet = (reelsMode == .clips ? selectedClipFilter == nil : selectedFilter == nil)
+                let noFilterSet = (reelsMode == .clips ? selectedClipFilter == nil : selectedFilter == nil) && selectedPerformer == nil && selectedTags.isEmpty
 
                 if noFilterSet && isCurrentlyEmpty {
                     print("ℹ️ ReelsView: Filter loading finished, ensuring content loads...")
@@ -630,7 +632,7 @@ struct ReelsView: View {
                             applySettings(markerSortBy: selectedMarkerSortOption, filter: filter, performer: selectedPerformer, tags: selectedTags)
                         case .clips:
                             selectedClipFilter = filter
-                            applySettings(clipSortBy: selectedClipSortOption, filter: nil, clipFilter: filter)
+                            applySettings(clipSortBy: selectedClipSortOption, filter: nil, clipFilter: filter, performer: selectedPerformer, tags: selectedTags)
                         }
                     } else {
                         let currentModeType = reelsMode.toModeType
@@ -645,7 +647,7 @@ struct ReelsView: View {
                             applySettings(markerSortBy: savedSort, filter: nil, performer: selectedPerformer, tags: selectedTags)
                         case .clips:
                             let savedSort = StashDBViewModel.ImageSortOption(rawValue: savedSortStr ?? "") ?? .random
-                            applySettings(clipSortBy: savedSort, filter: nil, clipFilter: nil)
+                            applySettings(clipSortBy: savedSort, filter: nil, clipFilter: nil, performer: selectedPerformer, tags: selectedTags)
                         }
                     }
                 }
@@ -927,7 +929,7 @@ struct ReelsView: View {
     @ViewBuilder
     private var sceneSortOptions: some View {
         // Random
-        Button(action: { applySettings(sortBy: .random, filter: selectedFilter, performer: selectedPerformer) }) {
+        Button(action: { applySettings(sortBy: .random, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
             HStack {
                 Text("Random")
                 if selectedSortOption == .random { Image(systemName: "checkmark") }
@@ -938,13 +940,13 @@ struct ReelsView: View {
         
         // Date
         Menu {
-            Button(action: { applySettings(sortBy: .dateDesc, filter: selectedFilter, performer: selectedPerformer) }) {
+            Button(action: { applySettings(sortBy: .dateDesc, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("Newest First")
                     if selectedSortOption == .dateDesc { Image(systemName: "checkmark") }
                 }
             }
-            Button(action: { applySettings(sortBy: .dateAsc, filter: selectedFilter, performer: selectedPerformer) }) {
+            Button(action: { applySettings(sortBy: .dateAsc, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("Oldest First")
                     if selectedSortOption == .dateAsc { Image(systemName: "checkmark") }
@@ -959,13 +961,13 @@ struct ReelsView: View {
         
         // Title
         Menu {
-            Button(action: { applySettings(sortBy: .titleAsc, filter: selectedFilter, performer: selectedPerformer) }) {
+            Button(action: { applySettings(sortBy: .titleAsc, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("A → Z")
                     if selectedSortOption == .titleAsc { Image(systemName: "checkmark") }
                 }
             }
-            Button(action: { applySettings(sortBy: .titleDesc, filter: selectedFilter, performer: selectedPerformer) }) {
+            Button(action: { applySettings(sortBy: .titleDesc, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("Z → A")
                     if selectedSortOption == .titleDesc { Image(systemName: "checkmark") }
@@ -980,13 +982,13 @@ struct ReelsView: View {
         
         // Duration
         Menu {
-            Button(action: { applySettings(sortBy: .durationDesc, filter: selectedFilter, performer: selectedPerformer) }) {
+            Button(action: { applySettings(sortBy: .durationDesc, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("Longest First")
                     if selectedSortOption == .durationDesc { Image(systemName: "checkmark") }
                 }
             }
-            Button(action: { applySettings(sortBy: .durationAsc, filter: selectedFilter, performer: selectedPerformer) }) {
+            Button(action: { applySettings(sortBy: .durationAsc, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("Shortest First")
                     if selectedSortOption == .durationAsc { Image(systemName: "checkmark") }
@@ -1043,13 +1045,13 @@ struct ReelsView: View {
         
         // Created
         Menu {
-            Button(action: { applySettings(sortBy: .createdAtDesc, filter: selectedFilter, performer: selectedPerformer) }) {
+            Button(action: { applySettings(sortBy: .createdAtDesc, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("Newest First")
                     if selectedSortOption == .createdAtDesc { Image(systemName: "checkmark") }
                 }
             }
-            Button(action: { applySettings(sortBy: .createdAtAsc, filter: selectedFilter, performer: selectedPerformer) }) {
+            Button(action: { applySettings(sortBy: .createdAtAsc, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("Oldest First")
                     if selectedSortOption == .createdAtAsc { Image(systemName: "checkmark") }
@@ -1064,13 +1066,13 @@ struct ReelsView: View {
         
         // Counter (O-Counter)
         Menu {
-            Button(action: { applySettings(sortBy: .oCounterDesc, filter: selectedFilter, performer: selectedPerformer) }) {
+            Button(action: { applySettings(sortBy: .oCounterDesc, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("High → Low")
                     if selectedSortOption == .oCounterDesc { Image(systemName: "checkmark") }
                 }
             }
-            Button(action: { applySettings(sortBy: .oCounterAsc, filter: selectedFilter, performer: selectedPerformer) }) {
+            Button(action: { applySettings(sortBy: .oCounterAsc, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("Low → High")
                     if selectedSortOption == .oCounterAsc { Image(systemName: "checkmark") }
@@ -1085,13 +1087,13 @@ struct ReelsView: View {
         
         // Rating
         Menu {
-            Button(action: { applySettings(sortBy: .ratingDesc, filter: selectedFilter, performer: selectedPerformer) }) {
+            Button(action: { applySettings(sortBy: .ratingDesc, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("High → Low")
                     if selectedSortOption == .ratingDesc { Image(systemName: "checkmark") }
                 }
             }
-            Button(action: { applySettings(sortBy: .ratingAsc, filter: selectedFilter, performer: selectedPerformer) }) {
+            Button(action: { applySettings(sortBy: .ratingAsc, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("Low → High")
                     if selectedSortOption == .ratingAsc { Image(systemName: "checkmark") }
@@ -1108,7 +1110,7 @@ struct ReelsView: View {
     @ViewBuilder
     private var markerSortOptions: some View {
         // Random
-        Button(action: { applySettings(markerSortBy: .random, filter: selectedFilter, performer: selectedPerformer) }) {
+        Button(action: { applySettings(markerSortBy: .random, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
             HStack {
                 Text("Random")
                 if selectedMarkerSortOption == .random { Image(systemName: "checkmark") }
@@ -1119,13 +1121,13 @@ struct ReelsView: View {
         
         // Created
         Menu {
-            Button(action: { applySettings(markerSortBy: .createdAtDesc, filter: selectedFilter, performer: selectedPerformer) }) {
+            Button(action: { applySettings(markerSortBy: .createdAtDesc, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("Newest First")
                     if selectedMarkerSortOption == .createdAtDesc { Image(systemName: "checkmark") }
                 }
             }
-            Button(action: { applySettings(markerSortBy: .createdAtAsc, filter: selectedFilter, performer: selectedPerformer) }) {
+            Button(action: { applySettings(markerSortBy: .createdAtAsc, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("Oldest First")
                     if selectedMarkerSortOption == .createdAtAsc { Image(systemName: "checkmark") }
@@ -1140,13 +1142,13 @@ struct ReelsView: View {
         
         // Title
         Menu {
-            Button(action: { applySettings(markerSortBy: .titleAsc, filter: selectedFilter, performer: selectedPerformer) }) {
+            Button(action: { applySettings(markerSortBy: .titleAsc, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("A → Z")
                     if selectedMarkerSortOption == .titleAsc { Image(systemName: "checkmark") }
                 }
             }
-            Button(action: { applySettings(markerSortBy: .titleDesc, filter: selectedFilter, performer: selectedPerformer) }) {
+            Button(action: { applySettings(markerSortBy: .titleDesc, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("Z → A")
                     if selectedMarkerSortOption == .titleDesc { Image(systemName: "checkmark") }
@@ -1161,13 +1163,13 @@ struct ReelsView: View {
         
         // Time
         Menu {
-            Button(action: { applySettings(markerSortBy: .secondsAsc, filter: selectedFilter, performer: selectedPerformer) }) {
+            Button(action: { applySettings(markerSortBy: .secondsAsc, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("Start Time")
                     if selectedMarkerSortOption == .secondsAsc { Image(systemName: "checkmark") }
                 }
             }
-            Button(action: { applySettings(markerSortBy: .secondsDesc, filter: selectedFilter, performer: selectedPerformer) }) {
+            Button(action: { applySettings(markerSortBy: .secondsDesc, filter: selectedFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("End Time")
                     if selectedMarkerSortOption == .secondsDesc { Image(systemName: "checkmark") }
@@ -1179,12 +1181,13 @@ struct ReelsView: View {
                 if selectedMarkerSortOption == .secondsAsc || selectedMarkerSortOption == .secondsDesc { Image(systemName: "checkmark") }
             }
         }
+
     }
 
     @ViewBuilder
     private var clipSortOptions: some View {
         // Random
-        Button(action: { applySettings(clipSortBy: .random, filter: nil, clipFilter: selectedClipFilter) }) {
+        Button(action: { applySettings(clipSortBy: .random, filter: nil, clipFilter: selectedClipFilter, performer: selectedPerformer, tags: selectedTags) }) {
             HStack {
                 Text("Random")
                 if selectedClipSortOption == .random { Image(systemName: "checkmark") }
@@ -1195,13 +1198,13 @@ struct ReelsView: View {
         
         // Date
         Menu {
-            Button(action: { applySettings(clipSortBy: .dateDesc, filter: nil, clipFilter: selectedClipFilter) }) {
+            Button(action: { applySettings(clipSortBy: .dateDesc, filter: nil, clipFilter: selectedClipFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("Newest First")
                     if selectedClipSortOption == .dateDesc { Image(systemName: "checkmark") }
                 }
             }
-            Button(action: { applySettings(clipSortBy: .dateAsc, filter: nil, clipFilter: selectedClipFilter) }) {
+            Button(action: { applySettings(clipSortBy: .dateAsc, filter: nil, clipFilter: selectedClipFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("Oldest First")
                     if selectedClipSortOption == .dateAsc { Image(systemName: "checkmark") }
@@ -1216,13 +1219,13 @@ struct ReelsView: View {
         
         // Title
         Menu {
-            Button(action: { applySettings(clipSortBy: .titleAsc, filter: nil, clipFilter: selectedClipFilter) }) {
+            Button(action: { applySettings(clipSortBy: .titleAsc, filter: nil, clipFilter: selectedClipFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("A → Z")
                     if selectedClipSortOption == .titleAsc { Image(systemName: "checkmark") }
                 }
             }
-            Button(action: { applySettings(clipSortBy: .titleDesc, filter: nil, clipFilter: selectedClipFilter) }) {
+            Button(action: { applySettings(clipSortBy: .titleDesc, filter: nil, clipFilter: selectedClipFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("Z → A")
                     if selectedClipSortOption == .titleDesc { Image(systemName: "checkmark") }
@@ -1237,13 +1240,13 @@ struct ReelsView: View {
         
         // Rating
         Menu {
-            Button(action: { applySettings(clipSortBy: .ratingDesc, filter: nil, clipFilter: selectedClipFilter) }) {
+            Button(action: { applySettings(clipSortBy: .ratingDesc, filter: nil, clipFilter: selectedClipFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("Highest First")
                     if selectedClipSortOption == .ratingDesc { Image(systemName: "checkmark") }
                 }
             }
-            Button(action: { applySettings(clipSortBy: .ratingAsc, filter: nil, clipFilter: selectedClipFilter) }) {
+            Button(action: { applySettings(clipSortBy: .ratingAsc, filter: nil, clipFilter: selectedClipFilter, performer: selectedPerformer, tags: selectedTags) }) {
                 HStack {
                     Text("Lowest First")
                     if selectedClipSortOption == .ratingAsc { Image(systemName: "checkmark") }
@@ -1264,7 +1267,7 @@ struct ReelsView: View {
                 // Clips uses image filters
                 Button(action: {
                     selectedClipFilter = nil
-                    applySettings(filter: nil, clipFilter: nil, mode: .clips)
+                    applySettings(filter: nil, clipFilter: nil, performer: selectedPerformer, tags: selectedTags, mode: .clips)
                 }) {
                     HStack {
                         Text("No Filter")
@@ -1279,7 +1282,7 @@ struct ReelsView: View {
                 ForEach(imageFilters) { filter in
                     Button(action: {
                         selectedClipFilter = filter
-                        applySettings(filter: nil, clipFilter: filter, mode: .clips)
+                        applySettings(filter: nil, clipFilter: filter, performer: selectedPerformer, tags: selectedTags, mode: .clips)
                     }) {
                         HStack {
                             Text(filter.name)
@@ -1376,7 +1379,11 @@ struct ReelItemView: View {
                                 resetUITimer()
                             } else {
                                 isPlaying.toggle()
-                                if isPlaying { player.play() } else { player.pause() }
+                                if isPlaying {
+                                    player.play()
+                                } else {
+                                    player.pause()
+                                }
                                 resetUITimer()
                             }
                         }
@@ -1471,6 +1478,7 @@ struct ReelItemView: View {
                         color: .white
                     ) { }
                 }
+
 
                 // Mute Button
                 SidebarButton(
@@ -1691,7 +1699,9 @@ struct ReelItemView: View {
         guard let player = self.player else { return }
         
         player.isMuted = isMuted
-        if isPlaying { player.play() }
+        if isPlaying { 
+            player.play() 
+        }
         
         if startTime > 0 {
             player.seek(to: CMTime(seconds: startTime, preferredTimescale: 600))
@@ -1870,3 +1880,4 @@ struct CustomVideoScrubber: View {
         .frame(height: 10) // Small height container
     }
 }
+#endif

@@ -3,6 +3,7 @@
 //  stashy
 //
 
+#if !os(tvOS)
 import SwiftUI
 
 struct UniversalSearchView: View {
@@ -49,9 +50,7 @@ struct UniversalSearchView: View {
                 }
             }
             .navigationTitle("Search")
-#if !os(tvOS)
-        .navigationBarTitleDisplayMode(.inline)
-        #endif
+            .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "Search everything...")
             .onChange(of: searchText) { oldValue, newValue in
                 performSearch()
@@ -509,3 +508,4 @@ struct FlowLayout: Layout {
         }
     }
 }
+#endif

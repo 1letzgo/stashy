@@ -38,12 +38,12 @@ class ScenesViewModel: ObservableObject {
         self.sceneRepository = sceneRepository
         self.filterRepository = filterRepository
         
-        // Initialize with default loader
-        self.scenesLoader = PaginatedLoader.scenes(
+        // Initialize with default loader (use literal defaults to avoid accessing self before init)
+        self.scenesLoader = PaginatedLoader<Scene>.scenes(
             repository: sceneRepository,
-            sortBy: currentSortOption,
-            searchQuery: searchQuery,
-            filter: currentFilter
+            sortBy: .dateDesc,
+            searchQuery: "",
+            filter: nil
         )
         
         setupBindings()
@@ -79,7 +79,7 @@ class ScenesViewModel: ObservableObject {
     }
     
     private func updateLoader() {
-        scenesLoader = PaginatedLoader.scenes(
+        scenesLoader = PaginatedLoader<Scene>.scenes(
             repository: sceneRepository,
             sortBy: currentSortOption,
             searchQuery: searchQuery,
@@ -138,9 +138,7 @@ class ScenesViewModel: ObservableObject {
     
     func updateSceneResumeTime(id: String, newResumeTime: Double) {
         if let index = scenesLoader.items.firstIndex(where: { $0.id == id }) {
-            var updatedScene = scenesLoader.items[index]
-            updatedScene.resume_time = newResumeTime
-            scenesLoader.items[index] = updatedScene
+            scenesLoader.items[index] = scenesLoader.items[index].withResumeTime(newResumeTime)
         }
     }
     

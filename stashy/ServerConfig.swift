@@ -6,6 +6,8 @@
 //
 
 import Foundation
+import SwiftUI
+import Combine
 
 enum ServerProtocol: String, Codable, CaseIterable {
     case http = "HTTP"
@@ -90,10 +92,12 @@ struct ServerConfig: Codable, Identifiable, Equatable {
     
     /// API key from Keychain (preferred) or stored value (migration fallback)
     var secureApiKey: String? {
+        #if !os(tvOS)
         // First try Keychain
         if let keychainKey = KeychainManager.shared.loadAPIKey(forServerID: id) {
             return keychainKey
         }
+        #endif
         // Fallback to stored value (for migration)
         return apiKey
     }
@@ -258,8 +262,10 @@ class ServerConfigManager: ObservableObject {
         if let data = UserDefaults.standard.data(forKey: activeConfigKey) {
             let decoder = JSONDecoder()
             if let config = try? decoder.decode(ServerConfig.self, from: data) {
+                #if !os(tvOS)
                 // Auto-migrate API key to Keychain if needed
                 KeychainManager.shared.migrateAPIKeyIfNeeded(from: config)
+                #endif
                 return config
             }
         }

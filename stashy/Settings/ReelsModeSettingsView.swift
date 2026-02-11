@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 06.02.26.
 //
 
+#if !os(tvOS)
 import SwiftUI
 
 struct ReelsModeSettingsView: View {
@@ -200,3 +201,4 @@ struct ReelsModeSettingsView: View {
         }
     }
 }
+#endif

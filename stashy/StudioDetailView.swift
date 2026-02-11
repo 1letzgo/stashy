@@ -5,6 +5,7 @@
 //  Created by Daniel Goletz on 29.09.25.
 //
 
+#if !os(tvOS)
 import SwiftUI
 
 
@@ -139,9 +140,7 @@ struct StudioDetailView: View {
             viewModel.fetchStudioScenes(studioId: studio.id, sortBy: selectedSortOption, isInitialLoad: true)
         }
         .navigationTitle("")
-#if !os(tvOS)
         .navigationBarTitleDisplayMode(.inline)
-        #endif
         .toolbar {
             ToolbarItem(placement: .principal) {
                 if showTabSwitcher {
@@ -570,4 +569,4 @@ struct StudioDetailView: View {
     )
     StudioDetailView(studio: sampleStudio)
 }
-
+#endif
