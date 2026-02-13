@@ -54,8 +54,15 @@ struct StudioDetailView: View {
         viewModel.fetchStudioScenes(studioId: studio.id, sortBy: newOption, isInitialLoad: true)
     }
     
+    @Environment(\.verticalSizeClass) var verticalSizeClass
+    
     private var columns: [GridItem] {
-        if horizontalSizeClass == .regular {
+        if verticalSizeClass == .compact {
+             return [
+                 GridItem(.flexible(), spacing: 12),
+                 GridItem(.flexible(), spacing: 12)
+             ]
+        } else if horizontalSizeClass == .regular {
             return Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
         } else {
             return [GridItem(.flexible(), spacing: 12)]

@@ -34,9 +34,18 @@ struct ScenesView: View {
     }
 
 
+    @Environment(\.verticalSizeClass) var verticalSizeClass
+    
     // Dynamische Spalten basierend auf adaptivem Grid
     private var columns: [GridItem] {
-        [GridItem(.adaptive(minimum: 300), spacing: 12)]
+        if verticalSizeClass == .compact {
+             return [
+                 GridItem(.flexible(), spacing: 12),
+                 GridItem(.flexible(), spacing: 12)
+             ]
+        } else {
+             return [GridItem(.adaptive(minimum: 300), spacing: 12)]
+        }
     }
 
     // Safe sort change function

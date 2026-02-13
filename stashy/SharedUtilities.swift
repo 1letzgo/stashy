@@ -70,12 +70,15 @@ func isHeadphonesConnected() -> Bool {
 }
 
 func createPlayer(for url: URL) -> AVPlayer {
-    // Enable audio even in silent mode
-    do {
-        try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
-        try AVAudioSession.sharedInstance().setActive(true)
-    } catch {
-        print("🎬 VIDEO PLAYER: Error setting up AVAudioSession: \(error)")
+    // Enable audio even in silent mode - Optimization: only set if needed
+    let session = AVAudioSession.sharedInstance()
+    if session.category != .playback {
+        do {
+            try session.setCategory(.playback, mode: .moviePlayback, options: [])
+            try session.setActive(true)
+        } catch {
+            print("🎬 VIDEO PLAYER: Error setting up AVAudioSession: \(error)")
+        }
     }
     
     // Use signed URL with API key as query parameter for maximum compatibility
@@ -210,6 +213,7 @@ extension View {
 /// A view that plays animated GIFs using WKWebView for reliability and simple looping.
 struct GIFView: UIViewRepresentable {
     let data: Data
+    var fillMode: Bool = false
     
     func makeCoordinator() -> Coordinator {
         Coordinator()
@@ -241,6 +245,8 @@ struct GIFView: UIViewRepresentable {
         context.coordinator.lastDataHash = currentHash
         
         let base64 = data.base64EncodedString()
+        let objectFit = fillMode ? "cover" : "contain"
+        
         let html = """
         <!DOCTYPE html>
         <html>
@@ -258,12 +264,10 @@ struct GIFView: UIViewRepresentable {
                     overflow: hidden;
                 }
                 img {
-                    width: 100%;
-                    height: auto;
-                    max-height: 100%;
+                    width: 100vw;
+                    height: 100vh;
+                    object-fit: \(objectFit);
                     display: block;
-                    object-fit: contain;
-                    margin: 0 auto;
                 }
             </style>
         </head>
@@ -283,8 +287,12 @@ struct GIFView: UIViewRepresentable {
 /// A wrapper around UIScrollView that provides pinch-to-zoom and panning for any SwiftUI view.
 struct ZoomableScrollView<Content: View>: UIViewRepresentable {
     private var content: Content
+    private var onTap: (() -> Void)?
+    @Binding var isZoomed: Bool
     
-    init(@ViewBuilder content: () -> Content) {
+    init(isZoomed: Binding<Bool> = .constant(false), onTap: (() -> Void)? = nil, @ViewBuilder content: () -> Content) {
+        self._isZoomed = isZoomed
+        self.onTap = onTap
         self.content = content()
     }
     
@@ -318,26 +326,56 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         doubleTap.numberOfTapsRequired = 2
         scrollView.addGestureRecognizer(doubleTap)
         
+        // Add single tap for UI toggle
+        let singleTap = UITapGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleSingleTap(_:)))
+        singleTap.numberOfTapsRequired = 1
+        singleTap.require(toFail: doubleTap) // Ensure double tap takes precedence
+        scrollView.addGestureRecognizer(singleTap)
+        
         return scrollView
     }
     
     func updateUIView(_ uiView: UIScrollView, context: Context) {
         context.coordinator.hostingController.rootView = content
+        context.coordinator.onTap = onTap
+        context.coordinator.isZoomed = $isZoomed
     }
     
     func makeCoordinator() -> Coordinator {
-        Coordinator(hostingController: UIHostingController(rootView: content))
+        Coordinator(hostingController: UIHostingController(rootView: content), isZoomed: $isZoomed, onTap: onTap)
     }
     
     class Coordinator: NSObject, UIScrollViewDelegate {
         var hostingController: UIHostingController<Content>
+        var isZoomed: Binding<Bool>
+        var onTap: (() -> Void)?
         
-        init(hostingController: UIHostingController<Content>) {
+        init(hostingController: UIHostingController<Content>, isZoomed: Binding<Bool>, onTap: (() -> Void)? = nil) {
             self.hostingController = hostingController
+            self.isZoomed = isZoomed
+            self.onTap = onTap
         }
         
         func viewForZooming(in scrollView: UIScrollView) -> UIView? {
             return hostingController.view
+        }
+        
+        func scrollViewDidZoom(_ scrollView: UIScrollView) {
+            let zoomed = scrollView.zoomScale > scrollView.minimumZoomScale
+            if isZoomed.wrappedValue != zoomed {
+                isZoomed.wrappedValue = zoomed
+            }
+        }
+        
+        func scrollViewDidEndZooming(_ scrollView: UIScrollView, with view: UIView?, atScale scale: CGFloat) {
+            let zoomed = scale > scrollView.minimumZoomScale
+            if isZoomed.wrappedValue != zoomed {
+                isZoomed.wrappedValue = zoomed
+            }
+        }
+        
+        @objc func handleSingleTap(_ gesture: UITapGestureRecognizer) {
+            onTap?()
         }
         
         @objc func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
@@ -345,11 +383,13 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
             
             if scrollView.zoomScale > scrollView.minimumZoomScale {
                 scrollView.setZoomScale(scrollView.minimumZoomScale, animated: true)
+                isZoomed.wrappedValue = false
             } else {
                 // Zoom to localized point
                 let pointInView = gesture.location(in: hostingController.view)
                 let zoomRect = calculateRectFor(scale: 2.5, center: pointInView, in: scrollView)
                 scrollView.zoom(to: zoomRect, animated: true)
+                isZoomed.wrappedValue = true
             }
         }
         

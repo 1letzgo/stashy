@@ -197,6 +197,11 @@ class TabManager: ObservableObject {
     @Published var detailViews: [DetailViewConfig] = []
     @Published var homeRows: [HomeRowConfig] = []
     @Published var reelsModes: [ReelsModeConfig] = []
+    @Published var reelsFillHeight: Bool = true {
+        didSet {
+            UserDefaults.standard.set(reelsFillHeight, forKey: reelsFillHeightKey)
+        }
+    }
     
     // Session-only sort options (not persisted)
     private var sessionSortOptions: [AppTab: String] = [:]
@@ -206,6 +211,7 @@ class TabManager: ObservableObject {
     private let detailSortKey = "DetailViewsSortConfig"
     private let homeRowsKey = "HomeRowsConfig"
     private let reelsModesKey = "ReelsModesConfig"
+    private let reelsFillHeightKey = "ReelsFillHeight"
     
     init() {
         // Initial load based on currently active server
@@ -225,6 +231,7 @@ class TabManager: ObservableObject {
         loadDetailConfigs()
         loadHomeRows()
         loadReelsModes()
+        self.reelsFillHeight = UserDefaults.standard.object(forKey: reelsFillHeightKey) as? Bool ?? true
     }
     
     private var currentServerSuffix: String {

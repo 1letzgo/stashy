@@ -3488,7 +3488,7 @@ struct Scene: Codable, Identifiable {
     
     
     enum CodingKeys: String, CodingKey {
-        case id, title, details, date, duration, studio, performers, files, tags, galleries, organized, rating100, paths, interactive
+        case id, title, details, date, duration, studio, performers, files, tags, galleries, organized, rating100, paths, interactive, streams
         case resumeTime = "resume_time"
         case playCount = "play_count"
         case oCounter = "o_counter"
@@ -3545,7 +3545,7 @@ struct Scene: Codable, Identifiable {
         paths = try container.decodeIfPresent(ScenePaths.self, forKey: .paths)
         sceneMarkers = try container.decodeIfPresent([SceneMarker].self, forKey: .sceneMarkers)
         interactive = try container.decodeIfPresent(Bool.self, forKey: .interactive)
-        streams = nil // Not in default scene query
+        streams = try container.decodeIfPresent([SceneStream].self, forKey: .streams)
     }
     
     
@@ -3997,10 +3997,9 @@ struct MarkerScene: Codable, Identifiable {
     let streams: [SceneStream]?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, date, files, performers, rating100
+        case id, title, date, files, performers, rating100, interactive, paths, streams
         case playCount = "play_count"
         case oCounter = "o_counter"
-        case interactive, paths, streams
     }
 
     func withRating(_ rating: Int?) -> MarkerScene {
@@ -4573,6 +4572,7 @@ struct ImageFile: Codable {
     let path: String
     let height: Int?
     let width: Int?
+    let duration: Double?
 }
 
 struct ImageGallery: Codable, Identifiable {
@@ -4630,6 +4630,10 @@ struct StashImage: Codable, Identifiable {
              return videoExtensions.contains(ext)
         }
         return false
+    }
+
+    var isGIF: Bool {
+        return fileExtension?.uppercased() == "GIF"
     }
     
     var fileExtension: String? {
@@ -5315,12 +5319,16 @@ class HandyManager: ObservableObject {
     static let shared = HandyManager()
     
     @AppStorage("handy_connection_key") var connectionKey: String = ""
+    @AppStorage("handy_public_url") var publicUrl: String = ""
     @Published var isConnected: Bool = false
     @Published var isSyncing: Bool = false
     @Published var statusMessage: String = "Not Configured"
     
     private let baseURL = "https://www.handyfeeling.com/api/handy/v2"
     private var cancellables = Set<AnyCancellable>()
+    
+    private var serverTimeOffset: Int64 = 0
+    private var lastSyncTime: Date?
     
     private init() {
         if !connectionKey.isEmpty {
@@ -5353,15 +5361,32 @@ class HandyManager: ObservableObject {
             }, receiveValue: { response in
                 self.isConnected = response.connected
                 self.statusMessage = response.connected ? "Connected" : "Device Offline"
+                if response.connected {
+                    self.syncServerTime { _ in }
+                }
                 completion?(response.connected)
             })
             .store(in: &cancellables)
     }
     
     func setupScene(funscriptURL: URL) {
+        print("📲 Handy: Setting up scene with URL: \(funscriptURL.absoluteString)")
+        
+        // Check if URL is local
+        let urlString = funscriptURL.absoluteString
+        if urlString.contains("127.0.0.1") || urlString.contains("localhost") || urlString.contains("192.168.") || urlString.contains("10.") {
+            print("⚠️ Handy: Warning - Funscript URL appears to be local. The Handy Cloud API may not be able to reach it.")
+            statusMessage = "Local URL Warning"
+        }
+
         guard isConnected else { 
+            print("📲 Handy: Device not connected, checking connection first...")
             checkConnection { [weak self] connected in
-                if connected { self?.setupScene(funscriptURL: funscriptURL) }
+                if connected { 
+                    self?.setupScene(funscriptURL: funscriptURL) 
+                } else {
+                    self?.statusMessage = "Connect Device First"
+                }
             }
             return 
         }
@@ -5369,14 +5394,19 @@ class HandyManager: ObservableObject {
         isSyncing = false
         statusMessage = "Setting up sync..."
         
-        // 1. Ensure mode is HSSP (1)
-        setMode(mode: 1) { [weak self] success in
+        // Always sync time before HSSP setup to ensure offset is fresh
+        syncServerTime { [weak self] _ in
             guard let self = self else { return }
-            if success {
-                // 2. Setup HSSP with script
-                self.setupHSSP(url: funscriptURL)
-            } else {
-                self.statusMessage = "Mode Error"
+            
+            // 1. Ensure mode is HSSP (1)
+            self.setMode(mode: 1) { [weak self] success in
+                guard let self = self else { return }
+                if success {
+                    // 2. Setup HSSP with script
+                    self.setupHSSP(url: funscriptURL)
+                } else {
+                    self.statusMessage = "Mode Error"
+                }
             }
         }
     }
@@ -5399,6 +5429,49 @@ class HandyManager: ObservableObject {
     }
     
     private func setupHSSP(url: URL) {
+        // 1. If URL is local, we must use the Upload Bridge
+        let urlString = url.absoluteString
+        if urlString.contains("127.0.0.1") || urlString.contains("localhost") || urlString.contains("192.168.") || urlString.contains("10.") {
+            print("📲 Handy: Local URL detected. Initiating Direct Upload Bridge...")
+            statusMessage = "Uploading script..."
+            
+            uploadToHandyCloud(localUrl: url) { [weak self] publicUrl in
+                guard let self = self else { return }
+                if let publicUrl = publicUrl {
+                    print("📲 Handy: Upload bridge successful. Public URL: \(publicUrl.absoluteString)")
+                    self.executeHSSPSetup(url: publicUrl)
+                } else {
+                    print("❌ Handy: Upload bridge failed.")
+                    DispatchQueue.main.async {
+                        self.statusMessage = "Upload Failed"
+                    }
+                }
+            }
+            return
+        }
+        
+        // 2. If we have a public URL override, use it (fallback)
+        if !publicUrl.isEmpty {
+            if let publicBase = URL(string: publicUrl),
+               var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) {
+                comps.host = publicBase.host
+                comps.scheme = publicBase.scheme
+                comps.port = publicBase.port
+                
+                if let newUrl = comps.url {
+                    print("📲 Handy: Swapping for public override: \(newUrl.absoluteString)")
+                    executeHSSPSetup(url: newUrl)
+                    return
+                }
+            }
+        }
+
+        // 3. Normal public URL
+        executeHSSPSetup(url: url)
+    }
+    
+    private func executeHSSPSetup(url: URL) {
+        print("📲 Handy: Sending HSSP setup request for URL: \(url.absoluteString)")
         var request = URLRequest(url: URL(string: "\(baseURL)/hssp/setup")!)
         request.httpMethod = "PUT"
         request.setValue(connectionKey, forHTTPHeaderField: "X-Connection-Key")
@@ -5408,41 +5481,142 @@ class HandyManager: ObservableObject {
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)
         
         URLSession.shared.dataTask(with: request) { data, response, error in
-            let success = (response as? HTTPURLResponse)?.statusCode == 200
+            let httpResponse = response as? HTTPURLResponse
+            let success = httpResponse?.statusCode == 200
+            
+            if let data = data, let responseString = String(data: data, encoding: .utf8) {
+                print("📲 Handy: HSSP Setup Response (\(httpResponse?.statusCode ?? 0)): \(responseString)")
+            }
+
             DispatchQueue.main.async {
                 self.isSyncing = success
-                self.statusMessage = success ? "Synced & Ready" : "Sync Failed"
+                self.statusMessage = success ? "Synced & Ready" : "Sync Failed (\(httpResponse?.statusCode ?? 0))"
+                if success {
+                    print("✅ Handy: HSSP Setup Successful")
+                } else {
+                    print("❌ Handy: HSSP Setup Failed")
+                }
             }
         }.resume()
     }
     
+    private func uploadToHandyCloud(localUrl: URL, completion: @escaping (URL?) -> Void) {
+        // Phase 1: Download from Stash
+        print("📲 Handy Bridge: Downloading script from \(localUrl.absoluteString)...")
+        URLSession.shared.dataTask(with: localUrl) { [weak self] data, response, error in
+            guard let data = data, error == nil else {
+                print("❌ Handy Bridge: Failed to download script: \(error?.localizedDescription ?? "no data")")
+                completion(nil)
+                return
+            }
+            
+            // Phase 2: Upload to Handy Cloud
+            // The API v2 endpoint for CSV/JSON upload is https://www.handfeeling.com/api/sync/upload
+            // It expects a multipart form-data request
+            print("📲 Handy Bridge: Uploading \(data.count) bytes to Handy Cloud...")
+            
+            let boundary = "Boundary-\(UUID().uuidString)"
+            var request = URLRequest(url: URL(string: "https://www.handyfeeling.com/api/sync/upload")!)
+            request.httpMethod = "POST"
+            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            
+            var body = Data()
+            body.append("--\(boundary)\r\n".data(using: .utf8)!)
+            body.append("Content-Disposition: form-data; name=\"syncFile\"; filename=\"script.funscript\"\r\n".data(using: .utf8)!)
+            body.append("Content-Type: application/json\r\n\r\n".data(using: .utf8)!)
+            body.append(data)
+            body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+            
+            request.httpBody = body
+            
+            URLSession.shared.dataTask(with: request) { data, response, error in
+                guard let data = data, let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+                    print("❌ Handy Bridge: Upload failed (\((response as? HTTPURLResponse)?.statusCode ?? 0))")
+                    completion(nil)
+                    return
+                }
+                
+                // Response is usually JSON with "url"
+                if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                   let remoteUrlString = json["url"] as? String,
+                   let remoteUrl = URL(string: remoteUrlString) {
+                    completion(remoteUrl)
+                } else {
+                    print("❌ Handy Bridge: Could not parse remote URL from response")
+                    completion(nil)
+                }
+            }.resume()
+        }.resume()
+    }
+    
     func play(at seconds: Double) {
-        guard isConnected && isSyncing else { return }
+        guard isConnected && isSyncing else { 
+            print("📲 Handy: Play ignored - Connected: \(isConnected), Syncing: \(isSyncing)")
+            return 
+        }
         
+        let serverTime = estimatedServerTime
+        var request = URLRequest(url: URL(string: "\(self.baseURL)/hssp/play")!)
+        request.httpMethod = "PUT"
+        request.setValue(self.connectionKey, forHTTPHeaderField: "X-Connection-Key")
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        
+        let startTimeMs = Int(seconds * 1000)
+        let body: [String: Any] = [
+            "estimatedServerTime": serverTime,
+            "startTime": startTimeMs
+        ]
+        
+        print("📲 Handy: Sending Play - estimatedServerTime: \(serverTime), startTime: \(startTimeMs)ms")
+        
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
+                let errorData = data != nil ? String(data: data!, encoding: .utf8) ?? "" : ""
+                print("❌ Handy: Play failed (\(httpResponse.statusCode)): \(errorData)")
+            } else if error != nil {
+                print("❌ Handy: Play network error: \(error?.localizedDescription ?? "unknown")")
+            } else {
+                print("✅ Handy: Play command acknowledged")
+            }
+        }.resume()
+    }
+    
+    private var estimatedServerTime: Int64 {
+        return Int64(Date().timeIntervalSince1970 * 1000) + serverTimeOffset
+    }
+    
+    private func syncServerTime(completion: @escaping (Bool) -> Void) {
+        let startTime = Date()
         fetchServerTime { [weak self] serverTime in
-            guard let self = self, let serverTime = serverTime else { return }
-            
-            var request = URLRequest(url: URL(string: "\(self.baseURL)/hssp/play")!)
-            request.httpMethod = "PUT"
-            request.setValue(self.connectionKey, forHTTPHeaderField: "X-Connection-Key")
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            
-            let body: [String: Any] = [
-                "estimatedServerTime": serverTime,
-                "startTime": Int(seconds * 1000)
-            ]
-            request.httpBody = try? JSONSerialization.data(withJSONObject: body)
-            URLSession.shared.dataTask(with: request).resume()
+            guard let self = self, let serverTime = serverTime else {
+                completion(false)
+                return
+            }
+            let endTime = Date()
+            let rtt = Int64(endTime.timeIntervalSince(startTime) * 1000) / 2
+            let localTimeAtServerTime = Int64(endTime.timeIntervalSince1970 * 1000) - rtt
+            self.serverTimeOffset = serverTime - localTimeAtServerTime
+            self.lastSyncTime = Date()
+            print("📲 Handy: Server time synced. Offset: \(self.serverTimeOffset)ms, RTT: \(rtt*2)ms")
+            completion(true)
         }
     }
     
     func pause() {
         guard isConnected && isSyncing else { return }
         
+        print("📲 Handy: Pause command")
         var request = URLRequest(url: URL(string: "\(baseURL)/hssp/stop")!)
         request.httpMethod = "PUT"
         request.setValue(connectionKey, forHTTPHeaderField: "X-Connection-Key")
-        URLSession.shared.dataTask(with: request).resume()
+        URLSession.shared.dataTask(with: request) { data, response, error in
+            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode != 200 {
+                 print("❌ Handy: Pause failed (\(httpResponse.statusCode))")
+            } else {
+                 print("✅ Handy: Pause command acknowledged")
+            }
+        }.resume()
     }
     
     private func fetchServerTime(completion: @escaping (Int64?) -> Void) {
@@ -5595,6 +5769,12 @@ class ButtplugManager: ObservableObject {
         isPlayingScript = false
         syncTimer?.invalidate()
         syncTimer = nil
+        stopAllDevices()
+    }
+    
+    func stopAllDevices() {
+        guard isConnected else { return }
+        sendMessage([["StopAllDevices": ["Id": getNextMessageId()]]])
     }
     
     @objc private func updateSync() {
@@ -5625,39 +5805,39 @@ class ButtplugManager: ObservableObject {
             let duration = nextAction.at - currentMs
             if duration > 0 {
                 print("🎬 Buttplug Sync: Target \(nextAction.pos)% in \(duration)ms (Index: \(nextIndex))")
-                sendLinearCmd(position: Double(nextAction.pos), duration: duration)
+                sendMovement(position: Double(nextAction.pos), duration: duration)
                 lastCommandSentAt = Double(nextAction.at)
             }
         }
     }
     
-    private func sendLinearCmd(position: Double, duration: Int) {
+    private func sendMovement(position: Double, duration: Int) {
         guard isConnected else { return }
-        
-        if devices.isEmpty {
-            print("⚠️ Buttplug: No devices found to receive LinearCmd")
-            return
-        }
+        if devices.isEmpty { return }
         
         var messages: [[String: Any]] = []
         for device in devices {
-            messages.append([
-                "LinearCmd": [
-                    "Id": getNextMessageId(),
-                    "DeviceIndex": device.id,
-                    "Vectors": [
-                        [
-                            "Index": 0,
-                            "Duration": duration,
-                            "Position": position / 100.0
-                        ]
+            if device.supportsLinear {
+                messages.append([
+                    "LinearCmd": [
+                        "Id": getNextMessageId(),
+                        "DeviceIndex": device.id,
+                        "Vectors": [["Index": 0, "Duration": duration, "Position": position / 100.0]]
                     ]
-                ]
-            ])
+                ])
+            }
+            if device.supportsScalar {
+                messages.append([
+                    "ScalarCmd": [
+                        "Id": getNextMessageId(),
+                        "DeviceIndex": device.id,
+                        "Scalars": [["Index": 0, "Scalar": position / 100.0, "ActuatorType": "Vibrate"]]
+                    ]
+                ])
+            }
         }
         
         if !messages.isEmpty {
-            print("📡 Buttplug: Sending movement to \(devices.count) devices")
             sendMessage(messages)
         }
     }
@@ -5698,10 +5878,13 @@ class ButtplugManager: ObservableObject {
             } else if let deviceAdded = dict["DeviceAdded"] as? [String: Any] {
                 DispatchQueue.main.async {
                     if let id = deviceAdded["DeviceIndex"] as? Int,
-                       let name = deviceAdded["DeviceName"] as? String {
+                       let name = deviceAdded["DeviceName"] as? String,
+                       let messages = deviceAdded["DeviceMessages"] as? [String: Any] {
                         if !self.devices.contains(where: { $0.id == id }) {
-                            self.devices.append(ButtplugDevice(id: id, name: name))
-                            print("📱 Buttplug: Device Added: \(name)")
+                            let supportsLinear = messages["LinearCmd"] != nil
+                            let supportsScalar = messages["ScalarCmd"] != nil || messages["VibrateCmd"] != nil
+                            self.devices.append(ButtplugDevice(id: id, name: name, supportsScalar: supportsScalar, supportsLinear: supportsLinear))
+                            print("📱 Buttplug: Device Added: \(name) (Scalar: \(supportsScalar), Linear: \(supportsLinear))")
                         }
                     }
                 }
@@ -5717,8 +5900,11 @@ class ButtplugManager: ObservableObject {
                 DispatchQueue.main.async {
                     self.devices = list.compactMap { d -> ButtplugDevice? in
                         guard let id = d["DeviceIndex"] as? Int,
-                              let name = d["DeviceName"] as? String else { return nil }
-                        return ButtplugDevice(id: id, name: name)
+                              let name = d["DeviceName"] as? String,
+                              let messages = d["DeviceMessages"] as? [String: Any] else { return nil }
+                        let supportsLinear = messages["LinearCmd"] != nil
+                        let supportsScalar = messages["ScalarCmd"] != nil || messages["VibrateCmd"] != nil
+                        return ButtplugDevice(id: id, name: name, supportsScalar: supportsScalar, supportsLinear: supportsLinear)
                     }
                     print("📱 Buttplug: Found \(self.devices.count) devices")
                 }
@@ -5740,6 +5926,8 @@ class ButtplugManager: ObservableObject {
 struct ButtplugDevice: Identifiable, Equatable {
     let id: Int
     let name: String
+    let supportsScalar: Bool
+    let supportsLinear: Bool
 }
 
 // MARK: - Funscript Models

@@ -324,9 +324,16 @@ struct StudiosView: View {
         )
     }
 
+    @Environment(\.verticalSizeClass) var verticalSizeClass
+
     private var columns: [GridItem] {
         if horizontalSizeClass == .regular {
             return Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
+        } else if verticalSizeClass == .compact {
+             return [
+                 GridItem(.flexible(), spacing: 12),
+                 GridItem(.flexible(), spacing: 12)
+             ]
         } else {
             return [
                 GridItem(.flexible(), spacing: 12),

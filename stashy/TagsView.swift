@@ -21,9 +21,15 @@ struct TagsView: View {
     var hideTitle: Bool = false
     
     // Grid Setup: Flexible Columns
-    private let columns = [
-        GridItem(.adaptive(minimum: 150), spacing: 12)
-    ]
+    @Environment(\.verticalSizeClass) var verticalSizeClass
+    
+    private var columns: [GridItem] {
+        if verticalSizeClass == .compact {
+            return Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
+        } else {
+            return [GridItem(.adaptive(minimum: 150), spacing: 12)]
+        }
+    }
 
     // Search function
     private func performSearch(isInitialLoad: Bool = true) {
@@ -415,6 +421,7 @@ struct TagDetailView: View {
     @ObservedObject var configManager = ServerConfigManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @EnvironmentObject var coordinator: NavigationCoordinator
+    @Environment(\.verticalSizeClass) var verticalSizeClass
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var selectedSortOption: StashDBViewModel.SceneSortOption = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getDetailSortOption(for: "tag_detail") ?? "") ?? .dateDesc
     @State private var isChangingSort = false
@@ -448,7 +455,12 @@ struct TagDetailView: View {
     }
     
     private var columns: [GridItem] {
-        if horizontalSizeClass == .regular {
+        if verticalSizeClass == .compact {
+             return [
+                 GridItem(.flexible(), spacing: 12),
+                 GridItem(.flexible(), spacing: 12)
+             ]
+        } else if horizontalSizeClass == .regular {
             // iPad: 4 columns
             return Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
         } else {

@@ -120,10 +120,15 @@ struct HandySettingsView: View {
 
     var body: some View {
         Form {
-            Section(header: Text("Handy Connection")) {
+            Section(header: Text("Handy Connection"), footer: Text("Stashy now automatically uploads local funscripts to Handy Cloud. The Public URL is only needed for advanced setups.")) {
                 TextField("Connection Key", text: HandyManager.shared.$connectionKey)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
+                
+                TextField("Public URL Override (Optional)", text: HandyManager.shared.$publicUrl)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+                    .keyboardType(.URL)
                 
                 HStack {
                     Text("Status")

@@ -27,6 +27,42 @@ struct ReelsView: View {
     @State private var selectedMarkerSortOption: StashDBViewModel.SceneMarkerSortOption = StashDBViewModel.SceneMarkerSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .markers) ?? "") ?? .random
     @State private var selectedClipSortOption: StashDBViewModel.ImageSortOption = StashDBViewModel.ImageSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .clips) ?? "") ?? .random
     @State private var selectedClipFilter: StashDBViewModel.SavedFilter?
+    @State private var orientationID = UUID() // Force parent refresh on rotation
+    @State private var showUI = true
+    @State private var uiHideTask: Task<Void, Never>? = nil
+    @State private var isMenuOpen = false
+    @State private var isMediaZoomed = false
+
+    private func resetUITimer() {
+        showUI = true
+        uiHideTask?.cancel()
+
+        // Disable auto-hide for static images (Clips that are not GIFs)
+        if reelsMode == .clips, let currentId = currentVisibleSceneId {
+            if let clip = viewModel.clips.first(where: { "clip-\($0.id)" == currentId }) {
+                // Check if it's a GIF
+                let isGIF = clip.fileExtension?.uppercased() == "GIF"
+                if !isGIF {
+                    return 
+                }
+            }
+        }
+
+        uiHideTask = Task {
+            try? await Task.sleep(nanoseconds: 5 * 1_000_000_000)
+            guard !Task.isCancelled else { return }
+            
+            // Do not hide if a menu or overlay is open
+            if isMenuOpen {
+                resetUITimer() // Check again in 5s
+                return
+            }
+            
+            withAnimation(.easeInOut(duration: 0.4)) {
+                showUI = false
+            }
+        }
+    }
 
     enum ReelsMode: String, CaseIterable {
         case scenes = "Scenes"
@@ -165,7 +201,7 @@ struct ReelsView: View {
             switch self {
             case .scene(let s): return s.duration
             case .marker(let m): return m.scene?.files?.first?.duration
-            case .clip: return nil  // Images don't have duration in Stash
+            case .clip(let c): return c.visual_files?.first?.duration
             }
         }
         
@@ -277,6 +313,36 @@ struct ReelsView: View {
             viewModel.fetchSceneMarkers(sortBy: selectedMarkerSortOption, filter: mergedFilter)
         case .clips:
             viewModel.fetchClips(sortBy: selectedClipSortOption, filter: mergedClipFilter, isInitialLoad: true)
+        }
+    }
+    
+    private func autoSelectFirstItem() {
+        // Only auto-select if nothing is selected OR if the selected ID belongs to another mode
+        let currentPrefix = currentVisibleSceneId?.split(separator: "-").first.map(String.init)
+        let expectedPrefix: String
+        switch reelsMode {
+        case .scenes: expectedPrefix = "scene"
+        case .markers: expectedPrefix = "marker"
+        case .clips: expectedPrefix = "clip"
+        }
+
+        if currentVisibleSceneId == nil || currentPrefix != expectedPrefix {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                switch reelsMode {
+                case .scenes:
+                    if let firstId = viewModel.scenes.first?.id {
+                        currentVisibleSceneId = "scene-\(firstId)"
+                    }
+                case .markers:
+                    if let firstId = viewModel.sceneMarkers.first?.id {
+                        currentVisibleSceneId = "marker-\(firstId)"
+                    }
+                case .clips:
+                    if let firstId = viewModel.clips.first?.id {
+                        currentVisibleSceneId = "clip-\(firstId)"
+                    }
+                }
+            }
         }
     }
 
@@ -425,6 +491,14 @@ struct ReelsView: View {
         }
     }
 
+    private var isListEmpty: Bool {
+        switch reelsMode {
+        case .scenes: return viewModel.scenes.isEmpty
+        case .markers: return viewModel.sceneMarkers.isEmpty
+        case .clips: return viewModel.clips.isEmpty
+        }
+    }
+
     var body: some View {
         premiumContent
     }
@@ -435,18 +509,11 @@ struct ReelsView: View {
         ZStack {
             Color.black.ignoresSafeArea()
             
-            let isEmpty: Bool = {
-                switch reelsMode {
-                case .scenes: return viewModel.scenes.isEmpty
-                case .markers: return viewModel.sceneMarkers.isEmpty
-                case .clips: return viewModel.clips.isEmpty
-                }
-            }()
-            let isLoading = viewModel.isLoading && isEmpty
+            let isLoading = viewModel.isLoading && isListEmpty
 
             if isLoading {
                 loadingStateView
-            } else if isEmpty && viewModel.errorMessage != nil {
+            } else if isListEmpty && viewModel.errorMessage != nil {
                 errorStateView
             } else {
                 reelsListView
@@ -457,17 +524,57 @@ struct ReelsView: View {
         // Toolbar Background Logic
         .toolbarBackground(
             viewModel.scenes.isEmpty && viewModel.errorMessage != nil ? .visible : .hidden,
-            for: .navigationBar, .tabBar
+            for: .navigationBar
         )
+        .toolbar(.hidden, for: .tabBar)
         .toolbarBackground(
             viewModel.scenes.isEmpty && viewModel.errorMessage != nil ? Color.black : Color.clear,
-            for: .navigationBar, .tabBar
+            for: .navigationBar
         )
-        .toolbarColorScheme(.dark, for: .navigationBar, .tabBar)
+        .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar {
             reelsToolbar
         }
+        .onChange(of: reelsMode) { _, newValue in
+            switch newValue {
+            case .markers:
+                if let defaultId = TabManager.shared.getDefaultMarkerFilterId(for: .reels),
+                   let filter = viewModel.savedFilters[defaultId] {
+                    applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+                } else {
+                    applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+                }
+            case .scenes:
+                if let defaultId = TabManager.shared.getDefaultFilterId(for: .reels),
+                   let filter = viewModel.savedFilters[defaultId] {
+                    applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+                } else {
+                    applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+                }
+            case .clips:
+                if let defaultId = TabManager.shared.getDefaultClipFilterId(for: .reels),
+                   let filter = viewModel.savedFilters[defaultId] {
+                    selectedClipFilter = filter
+                    applySettings(filter: nil, clipFilter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+                } else {
+                    applySettings(filter: nil, clipFilter: selectedClipFilter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+                }
+            }
+        }
+        .onChange(of: viewModel.scenes.first?.id) { _, _ in autoSelectFirstItem() }
+        .onChange(of: viewModel.sceneMarkers.first?.id) { _, _ in autoSelectFirstItem() }
+        .onChange(of: viewModel.clips.first?.id) { _, _ in autoSelectFirstItem() }
         .onAppear {
+            UIApplication.shared.isIdleTimerDisabled = true
+            
+            // Audio Optimization: Ensure session is active once for Reels
+            do {
+                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
+                try AVAudioSession.sharedInstance().setActive(true)
+            } catch {
+                print("🎬 Reels: Audio setup error: \(error)")
+            }
+
             if viewModel.savedFilters.isEmpty {
                 viewModel.fetchSavedFilters()
             }
@@ -534,6 +641,19 @@ struct ReelsView: View {
                     }
                 }
             }
+        }
+        .onChange(of: showUI) { _, newValue in
+            if !newValue {
+                uiHideTask?.cancel()
+            }
+        }
+        .onChange(of: isMenuOpen) { _, newValue in
+            if !newValue {
+                resetUITimer()
+            }
+        }
+        .onDisappear {
+            UIApplication.shared.isIdleTimerDisabled = false
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
             if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.reels.rawValue {
@@ -715,9 +835,17 @@ struct ReelsView: View {
                         onOCounterChanged: { newCount in
                             handleOCounterChange(item: item, newCount: newCount)
                         },
-                        viewModel: viewModel
+                        viewModel: viewModel,
+                        showUI: $showUI,
+                        isMenuOpen: $isMenuOpen,
+                        isZoomed: $isMediaZoomed,
+                        onInteraction: {
+                            resetUITimer()
+                        }
                     )
+                    .scrollDisabled(isMediaZoomed)
                     .containerRelativeFrame([.horizontal, .vertical])
+                    .background(Color.black)
                     .id(item.id)
                     .onAppear {
                         if index == items.count - 2 {
@@ -731,38 +859,41 @@ struct ReelsView: View {
                 }
             }
             .scrollTargetLayout()
+            .focusable(false)
+            .focusEffectDisabled()
         }
+        .focusable(false)
+        .focusEffectDisabled()
         .scrollTargetBehavior(.paging)
-        .onScrollGeometryChange(for: String?.self) { geo in
-            // Find the ID of the scene/item that is closest to the center or top of the visible area
-            let offsetY = geo.contentOffset.y
-            let height = geo.containerSize.height
-            if height > 0 {
-                let index = Int(round(offsetY / height))
-                let currentItems: [ReelItemData] = {
-                    switch reelsMode {
-                    case .scenes: return viewModel.scenes.map { .scene($0) }
-                    case .markers: return viewModel.sceneMarkers.map { .marker($0) }
-                    case .clips: return viewModel.clips.map { .clip($0) }
-                    }
-                }()
-                if index >= 0 && index < currentItems.count {
-                    return currentItems[index].id
+        .scrollPosition(id: $currentVisibleSceneId)
+        .toolbar(showUI ? .visible : .hidden, for: .navigationBar)
+        .scrollContentBackground(.hidden)
+        .background(Color.black)
+        .ignoresSafeArea()
+        .onScrollPhaseChange { oldPhase, newPhase in
+            if newPhase.isScrolling {
+                // Pause timer during scroll
+                uiHideTask?.cancel()
+            } else {
+                // Restart timer ONLY if UI is currently shown
+                if showUI {
+                    resetUITimer()
                 }
-            }
-            return nil
-        } action: { old, new in
-            if let newId = new, currentVisibleSceneId != newId {
-                currentVisibleSceneId = newId
-                print("📱 ReelsView: Visible item changed to \(newId)")
             }
         }
         .background(Color.black)
         .ignoresSafeArea()
-        .onAppear {
-            if currentVisibleSceneId == nil, let firstId = items.first?.id {
-                currentVisibleSceneId = firstId
+        .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
+            // Force scroll position estimate on rotation
+            if let id = currentVisibleSceneId {
+                // Small delay to allow layout to settle
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    currentVisibleSceneId = id
+                }
             }
+        }
+        .onAppear {
+            autoSelectFirstItem()
             
             // 1. Initialize reelsMode ONLY if current mode is disabled in settings
             let enabledTypes = tabManager.enabledReelsModes
@@ -791,130 +922,113 @@ struct ReelsView: View {
                 }
             }
         }
+        .onDisappear {
+            uiHideTask?.cancel()
+            uiHideTask = nil
+            showUI = true
+        }
     }
 
     @ToolbarContentBuilder
     private var reelsToolbar: some ToolbarContent {
         ToolbarItem(placement: .navigationBarLeading) {
-            Menu {
-                Picker("Mode", selection: $reelsMode) {
-                    ForEach(tabManager.enabledReelsModes, id: \.self) { modeType in
-                        let mode = ReelsMode(from: modeType)
-                        Label(mode.rawValue, systemImage: mode.icon).tag(mode)
-                    }
+            Button(action: {
+                // Navigate back to the first visible tab (home)
+                if let firstTab = TabManager.shared.visibleTabs.first {
+                    coordinator.selectedTab = firstTab
                 }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: reelsMode.icon)
-                        .fontWeight(.semibold)
-                    Image(systemName: "chevron.down")
-                        .font(.system(size: 8, weight: .bold))
-                }
-                .foregroundColor(.primary)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .background(Color.secondary.opacity(0.1))
-                .clipShape(Capsule())
-            }
-            .onChange(of: reelsMode) { _, newValue in
-                switch newValue {
-                case .markers:
-                    // Load default MARKER filter if available
-                    if let defaultId = TabManager.shared.getDefaultMarkerFilterId(for: .reels),
-                       let filter = viewModel.savedFilters[defaultId] {
-                        applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                    } else {
-                        applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                    }
-                    
-                case .scenes:
-                    // Load default SCENE filter if available
-                    if let defaultId = TabManager.shared.getDefaultFilterId(for: .reels),
-                       let filter = viewModel.savedFilters[defaultId] {
-                        applySettings(filter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                    } else {
-                        applySettings(filter: nil, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                    }
-                    
-                case .clips:
-                    // Load default clip filter if available
-                    if let defaultId = TabManager.shared.getDefaultClipFilterId(for: .reels),
-                       let filter = viewModel.savedFilters[defaultId] {
-                        selectedClipFilter = filter
-                        applySettings(filter: nil, clipFilter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                    } else {
-                        applySettings(filter: nil, clipFilter: selectedClipFilter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-                    }
-                }
+            }) {
+                Image(systemName: "chevron.left")
+                    .fontWeight(.semibold)
+                    .foregroundColor(.white)
+                    .padding(12)
+                    .background(Color.black.opacity(0.01)) // Ensure hit area is detected
+                    .contentShape(Rectangle())
             }
         }
-        
-        let isEmpty: Bool = {
-            switch reelsMode {
-            case .scenes: return viewModel.scenes.isEmpty
-            case .markers: return viewModel.sceneMarkers.isEmpty
-            case .clips: return viewModel.clips.isEmpty
-            }
-        }()
-        
-        if !(isEmpty && viewModel.errorMessage != nil) {
-            ToolbarItem(placement: .principal) {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 8) {
-                        if let performer = selectedPerformer {
-                            Button(action: {
-                                applySettings(sortBy: selectedSortOption, filter: selectedFilter, performer: nil, tags: selectedTags)
-                            }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "xmark")
-                                        .font(.system(size: 10, weight: .bold))
-                                    Text(performer.name)
-                                        .font(.system(size: 12, weight: .bold))
-                                        .lineLimit(1)
+            
+            if !(isListEmpty && viewModel.errorMessage != nil) {
+                ToolbarItem(placement: .principal) {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            if let performer = selectedPerformer {
+                                Button(action: {
+                                    applySettings(sortBy: selectedSortOption, filter: selectedFilter, performer: nil, tags: selectedTags)
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "xmark")
+                                            .font(.system(size: 10, weight: .bold))
+                                        Text(performer.name)
+                                            .font(.system(size: 12, weight: .bold))
+                                            .lineLimit(1)
+                                    }
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 8)
+                                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
+                                    .clipShape(Capsule())
                                 }
-                                .foregroundColor(.white.opacity(0.9))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 8)
-                                .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                                .clipShape(Capsule())
                             }
-                        }
-                        
-                        ForEach(selectedTags) { tag in
-                            Button(action: {
-                                var newTags = selectedTags
-                                newTags.removeAll { $0.id == tag.id }
-                                applySettings(sortBy: selectedSortOption, filter: selectedFilter, performer: selectedPerformer, tags: newTags)
-                            }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "xmark")
-                                        .font(.system(size: 10, weight: .bold))
-                                    Text("#\(tag.name)")
-                                        .font(.system(size: 12, weight: .bold))
-                                        .lineLimit(1)
+                            
+                            ForEach(selectedTags) { tag in
+                                Button(action: {
+                                    var newTags = selectedTags
+                                    newTags.removeAll { $0.id == tag.id }
+                                    applySettings(sortBy: selectedSortOption, filter: selectedFilter, performer: selectedPerformer, tags: newTags)
+                                }) {
+                                    HStack(spacing: 4) {
+                                        Image(systemName: "xmark")
+                                            .font(.system(size: 10, weight: .bold))
+                                        Text("#\(tag.name)")
+                                            .font(.system(size: 12, weight: .bold))
+                                            .lineLimit(1)
+                                    }
+                                    .foregroundColor(.white.opacity(0.9))
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 8)
+                                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
+                                    .clipShape(Capsule())
                                 }
-                                .foregroundColor(.white.opacity(0.9))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 8)
-                                .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                                .clipShape(Capsule())
                             }
                         }
                     }
                 }
             }
-        }
-        
-        ToolbarItem(placement: .navigationBarTrailing) {
-            HStack(spacing: 12) {
-                sortMenu
-                filterMenu
+            
+            ToolbarItem(placement: .navigationBarTrailing) {
+                HStack(spacing: 12) {
+                    modeMenu
+                        .simultaneousGesture(TapGesture().onEnded { isMenuOpen = true })
+                    sortMenu
+                        .simultaneousGesture(TapGesture().onEnded { isMenuOpen = true })
+                    filterMenu
+                        .simultaneousGesture(TapGesture().onEnded { isMenuOpen = true })
+                }
             }
         }
-    }
 
     private var filterColor: Color {
         selectedFilter != nil ? appearanceManager.tintColor : .white
+    }
+
+    @ViewBuilder
+    private var modeMenu: some View {
+        Menu {
+            Picker("Mode", selection: $reelsMode) {
+                ForEach(tabManager.enabledReelsModes, id: \.self) { modeType in
+                    let mode = ReelsMode(from: modeType)
+                    Label(mode.rawValue, systemImage: mode.icon).tag(mode)
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: reelsMode.icon)
+                    .fontWeight(.semibold)
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 8, weight: .bold))
+            }
+            .foregroundColor(.white)
+        }
     }
 
     @ViewBuilder
@@ -1362,6 +1476,7 @@ struct ReelItemView: View {
     let isActive: Bool
     @State private var player: AVPlayer?
     @State private var looper: Any?
+    @ObservedObject var tabManager = TabManager.shared
     
     // Playback State
     @Binding var isMuted: Bool
@@ -1370,266 +1485,54 @@ struct ReelItemView: View {
     var onRatingChanged: (Int?) -> Void
     var onOCounterChanged: (Int) -> Void
     @ObservedObject var viewModel: StashDBViewModel
+    @Environment(\.verticalSizeClass) var verticalSizeClass
     @State private var isPlaying = true
     @State private var currentTime: Double = 0.0
     @State private var duration: Double = 1.0
     @State private var isSeeking = false
     @State private var timeObserver: Any?
     @State private var showRatingOverlay = false
-    @State private var showUI = true
-    @State private var uiHideTask: Task<Void, Never>? = nil
+    @State private var showTagsOverlay = false
+    @Binding var showUI: Bool
+    @Binding var isMenuOpen: Bool
+    @Binding var isZoomed: Bool
+    var onInteraction: () -> Void
+
+    private var shouldFill: Bool {
+        // Only fill if the setting is enabled
+        guard tabManager.reelsFillHeight else { return false }
+        
+        let isPortraitDevice = UIScreen.main.bounds.height > UIScreen.main.bounds.width
+        if isPortraitDevice {
+            // In portrait device: fill if item is portrait
+            return item.isPortrait
+        } else {
+            // In landscape device: fill if item is landscape (exclude GIFs which might look bad stretched too much)
+            return !item.isPortrait
+        }
+    }
+
+    
     
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            // Video / Thumbnail layer
-            Group {
-                if item.isGIF {
-                    ZoomableScrollView {
-                        CustomAsyncImage(url: item.videoURL) { loader in
-                            if let data = loader.imageData, isGIF(data) {
-                                GIFView(data: data)
-                                    .frame(maxWidth: .infinity)
-                            } else if let img = loader.image {
-                                img
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                            } else if loader.isLoading {
-                                ProgressView()
-                                    .tint(.white)
-                            } else {
-                                Image(systemName: "exclamationmark.triangle")
-                                    .foregroundColor(.white)
-                            }
-                        }
-                    }
-                } else if let player = player {
-                    FullScreenVideoPlayer(player: player, videoGravity: item.isPortrait ? .resizeAspectFill : .resizeAspect)
-                        .onTapGesture {
-                            if !showUI {
-                                resetUITimer()
-                            } else {
-                                isPlaying.toggle()
-                                if isPlaying {
-                                    player.play()
-                                } else {
-                                    player.pause()
-                                }
-                                resetUITimer()
-                            }
-                        }
-                } else {
-                     if let url = item.thumbnailURL {
-                         AsyncImage(url: url) { image in
-                             image
-                                 .resizable()
-                                 .aspectRatio(contentMode: item.isPortrait ? .fill : .fit)
-                         } placeholder: {
-                             ProgressView()
-                         }
-                     }
-                }
-            }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .ignoresSafeArea()
+        ZStack(alignment: .bottom) {
+            mediaLayer
             
-            
-            // Center Play Icon
-            if !isPlaying {
+            // Center Play Icon (only for videos, not GIFs)
+            if !item.isGIF && !isPlaying {
                 CenterPlayIcon()
             }
             
-            // Sidebar layer (Right side)
-            VStack(alignment: .trailing, spacing: 20) {
-                Spacer()
-                
-                // Rating Button (Scenes & Markers)
-                let rating = item.rating100 ?? 0
-                let hasRating = item.rating100 != nil
-                    if hasRating || true { // Always show button
-                    SidebarButton(
-                        icon: rating > 0 ? "star" : "star",
-                        label: "Rating",
-                        count: rating > 0 ? (rating / 20) : 0,
-                        color: .white
-                    ) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            showRatingOverlay.toggle()
-                        }
-                        resetUITimer()
-                    }
-                    .overlay(alignment: .top) {
-                        if showRatingOverlay {
-                            VStack {
-                                StarRatingView(
-                                    rating100: rating,
-                                    isInteractive: true,
-                                    size: 25,
-                                    spacing: 8,
-                                    isVertical: true
-                                ) { newRating in
-                                    onRatingChanged(newRating)
-                                    resetUITimer()
-                                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-                                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                            showRatingOverlay = false
-                                        }
-                                    }
-                                }
-                            }
-                            .padding(.vertical, 12)
-                            .padding(.horizontal, 8)
-                            .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                            .clipShape(Capsule())
-                            .offset(y: -220)
-                            .transition(.scale(scale: 0, anchor: .top).combined(with: .opacity))
-                        }
-                    }
-                }
-                
-
-                // O-Counter (Available for scenes, markers & clips)
-                let oCounter = item.oCounter ?? 0
-                SidebarButton(
-                    icon: AppearanceManager.shared.oCounterIcon,
-                    label: "Counter",
-                    count: oCounter,
-                    color: .white
-                ) {
-                    onOCounterChanged(oCounter + 1)
-                }
-                .contentShape(Rectangle()) // Ensure good hit target
-                
-                // View Counter (Available for scenes & markers)
-                if let playCount = item.playCount {
-                    SidebarButton(
-                        icon: "stopwatch",
-                        label: "Views",
-                        count: playCount,
-                        color: .white
-                    ) { }
-                }
-
-
-                // Mute Button
-                SidebarButton(
-                    icon: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                    label: isMuted ? "Muted" : "Mute",
-                    count: 0,
-                    hideCount: true,
-                    color: .white
-                ) {
-                    isMuted.toggle()
-                    resetUITimer()
-                }
-
-                Spacer()
-                    .frame(height: 0)
-            }
-            .frame(maxWidth: .infinity, alignment: .bottomTrailing)
-            .padding(.trailing, 12)
-            .padding(.bottom, 135)
-            .opacity(showUI ? 1 : 0)
-            .animation(.easeInOut(duration: 0.3), value: showUI)
             
-            // Interaction overlay (Labels + Scrubber)
-            VStack(alignment: .leading, spacing: 6) {
-                Spacer()
-                
-                VStack(alignment: .leading, spacing: 8) {
-                    // Row 1: Performer Name (Primary)
-                    if let performer = item.performers.first {
-                        Button(action: { onPerformerTap(performer) }) {
-                            Text(performer.name)
-                                .font(.system(size: 17, weight: .bold))
-                                .foregroundColor(.white)
-                                .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                    
-                    // Row 2: Title / Date (Secondary)
-                    if let title = item.title, !title.isEmpty {
-                        HStack(spacing: 8) {
-                            Text(title)
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(.white.opacity(0.9))
-                                .lineLimit(2)
-                                .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
-                            
-                            // Download Indicator
-                            let sceneId: String? = {
-                                if case .scene(let s) = item { return s.id }
-                                if case .marker(let m) = item { return m.scene?.id }
-                                return nil
-                            }()
-                            
-                            if let sId = sceneId, DownloadManager.shared.isDownloaded(id: sId) {
-                                Image(systemName: "checkmark.circle.fill")
-                                    .font(.system(size: 12))
-                                    .foregroundColor(.white)
-                                    .padding(3)
-                                    .background(Color.green)
-                                    .clipShape(Circle())
-                                    .shadow(radius: 2)
-                            }
-                        }
-                    }
-                    
-                    // Row 3: Tags (Tertiary) - Horizontal Scroll
-                    let tags = item.tags
-                    if !tags.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(tags) { tag in
-                                    Button(action: {
-                                        let fullTag = Tag(id: tag.id, name: tag.name, imagePath: nil, sceneCount: nil, galleryCount: nil, favorite: nil, createdAt: nil, updatedAt: nil)
-                                        onTagTap(fullTag)
-                                    }) {
-                                        Text("#\(tag.name)")
-                                            .font(.system(size: 13, weight: .semibold))
-                                            .foregroundColor(.white)
-                                            .padding(.horizontal, 10)
-                                            .padding(.vertical, 5)
-                                            .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                                            .clipShape(Capsule())
-                                            .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
-                                    }
-                                    .buttonStyle(.plain)
-                                }
-                            }
-                        }
-                        .padding(.top, 4)
-                    }
-                }
-                .padding(.horizontal, 16)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                
-                CustomVideoScrubber(
-                    value: Binding(get: { currentTime }, set: { val in
-                        currentTime = val
-                        seek(to: val)
-                    }),
-                    total: duration,
-                    onEditingChanged: { editing in
-                        isSeeking = editing
-                        if editing {
-                            player?.pause()
-                        } else {
-                            if isPlaying { player?.play() }
-                            resetUITimer()
-                        }
-                    }
-                )
-                .padding(.bottom, 0)
+            bottomOverlay
         }
-        .padding(.bottom, 95)
-        .opacity(showUI ? 1 : 0)
-        .animation(.easeInOut(duration: 0.3), value: showUI)
-        }
+        .buttonStyle(.plain)
         .background(Color.black)
         .onAppear {
             setupPlayer()
-            resetUITimer()
+            if isActive {
+                onInteraction()
+            }
         }
         .onDisappear {
             player?.pause()
@@ -1641,13 +1544,295 @@ struct ReelItemView: View {
         .onChange(of: isMuted) { _, newValue in
             player?.isMuted = newValue
         }
+        .focusable(false)
+        .focusEffectDisabled()
         .onChange(of: isActive) { _, newValue in
             if newValue {
-                print("▶️ Reels: Item \(item.id) became active, resuming...")
                 if isPlaying { player?.play() }
+                onInteraction()
             } else {
-                print("⏸ Reels: Item \(item.id) became inactive, pausing...")
                 player?.pause()
+            }
+        }
+        .onChange(of: showRatingOverlay) { _, newValue in
+            isMenuOpen = newValue || showTagsOverlay
+        }
+        .onChange(of: showTagsOverlay) { _, newValue in
+            isMenuOpen = newValue || showRatingOverlay
+        }
+    }
+
+    @ViewBuilder
+    private var mediaLayer: some View {
+        ZoomableScrollView(isZoomed: $isZoomed, onTap: handleMediaTap) {
+            ZStack {
+                Group {
+                    if item.isGIF {
+                        CustomAsyncImage(url: item.videoURL) { loader in
+                            if let data = loader.imageData, isGIF(data) {
+                                GIFView(data: data, fillMode: shouldFill)
+                            } else if let img = loader.image {
+                                img
+                                    .resizable()
+                                    .aspectRatio(contentMode: shouldFill ? .fill : .fit)
+                            } else if loader.isLoading {
+                                ProgressView()
+                                    .tint(.white)
+                            } else {
+                                Image(systemName: "exclamationmark.triangle")
+                                    .foregroundColor(.white)
+                            }
+                        }
+                    } else if let player = player {
+                        FullScreenVideoPlayer(player: player, videoGravity: shouldFill ? .resizeAspectFill : .resizeAspect)
+                    } else {
+                        thumbnailPlaceholder
+                    }
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea()
+        .focusable(false)
+        .focusEffectDisabled()
+    }
+
+    @ViewBuilder
+    private var thumbnailPlaceholder: some View {
+        if let url = item.thumbnailURL {
+            AsyncImage(url: url) { image in
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: shouldFill ? .fill : .fit)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } placeholder: {
+                ProgressView()
+                    .tint(.white)
+            }
+        }
+    }
+
+    private func handleMediaTap() {
+        withAnimation(.easeInOut(duration: 0.3)) {
+            showUI.toggle()
+        }
+        
+        // If we revealed the UI, reset the timer to hide it again
+        if showUI {
+            onInteraction()
+        }
+    }
+
+    @ViewBuilder
+    private var bottomOverlay: some View {
+        VStack(spacing: 0) {
+            if showUI {
+                // Tags overlay (toggled by button)
+                if showTagsOverlay {
+                    let tags = item.tags
+                    if !tags.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 8) {
+                                ForEach(tags) { tag in
+                                    Button(action: {
+                                        let fullTag = Tag(id: tag.id, name: tag.name, imagePath: nil, sceneCount: nil, galleryCount: nil, favorite: nil, createdAt: nil, updatedAt: nil)
+                                        onTagTap(fullTag)
+                                        onInteraction()
+                                    }) {
+                                        Text("#\(tag.name)")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 8)
+                                            .padding(.vertical, 4)
+                                            .background(Color.black.opacity(DesignTokens.Opacity.badge))
+                                            .clipShape(Capsule())
+                                            .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
+                            .padding(.horizontal, 16)
+                        }
+                        .padding(.bottom, 5)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                    }
+                }
+                
+                // Rating overlay (expands upward)
+                if showRatingOverlay {
+                    let rating = item.rating100 ?? 0
+                    HStack {
+                        StarRatingView(
+                            rating100: rating,
+                            isInteractive: true,
+                            size: 28,
+                            spacing: 10,
+                            isVertical: false
+                        ) { newRating in
+                            onRatingChanged(newRating)
+                            onInteraction()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                    showRatingOverlay = false
+                                }
+                            }
+                        }
+                    }
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 16)
+                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
+                    .clipShape(Capsule())
+                    .padding(.bottom, 8)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+                
+                // Full-width progress bar
+                if !item.isGIF {
+                    CustomVideoScrubber(
+                        value: Binding(get: { currentTime }, set: { val in
+                            currentTime = val
+                            seek(to: val)
+                        }),
+                        total: duration,
+                        onEditingChanged: { editing in
+                            isSeeking = editing
+                            if editing {
+                                player?.pause()
+                            } else {
+                                if isPlaying { player?.play() }
+                                onInteraction()
+                            }
+                        }
+                    )
+                    .padding(.horizontal, 0)
+                }
+            }
+            
+            // Bottom row: Left = Performer/Title, Right = Buttons
+            Spacer().frame(height: 10)
+            HStack(alignment: .center, spacing: 0) {
+                // Left half: Performer + Title
+                VStack(alignment: .leading, spacing: 4) {
+                    performerLabel(for: item)
+                    titleLabel(for: item)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.leading, 16)
+                
+                // Right half: Action buttons (horizontal)
+                HStack(spacing: 8) {
+                    // Tags button
+                    let tags = item.tags
+                    if !tags.isEmpty {
+                        BottomBarButton(icon: "tag.fill", count: tags.count) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                showTagsOverlay.toggle()
+                                showRatingOverlay = false
+                            }
+                            onInteraction()
+                        }
+                    }
+                    
+                    // Rating
+                    let rating = item.rating100 ?? 0
+                    BottomBarButton(icon: "star", count: rating > 0 ? (rating / 20) : 0) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            showRatingOverlay.toggle()
+                            showTagsOverlay = false
+                        }
+                        onInteraction()
+                    }
+                    
+                    // O-Counter
+                    let oCounter = item.oCounter ?? 0
+                    BottomBarButton(icon: AppearanceManager.shared.oCounterIcon, count: oCounter) {
+                        onOCounterChanged(oCounter + 1)
+                        onInteraction()
+                    }
+                    
+                    // View Counter
+                    if let playCount = item.playCount {
+                        BottomBarButton(icon: "stopwatch", count: playCount) { }
+                    }
+                    
+                    // Mute Button (only for videos)
+                    if !item.isGIF {
+                        BottomBarButton(
+                            icon: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                            count: 0,
+                            hideCount: true
+                        ) {
+                            isMuted.toggle()
+                            onInteraction()
+                        }
+
+                        // Play/Pause Button
+                        BottomBarButton(
+                            icon: isPlaying ? "pause.fill" : "play.fill",
+                            count: 0,
+                            hideCount: true
+                        ) {
+                            isPlaying.toggle()
+                            if isPlaying {
+                                player?.play()
+                            } else {
+                                player?.pause()
+                            }
+                            onInteraction()
+                        }
+                    }
+                }
+                .padding(.trailing, 16)
+            }
+            .frame(height: 50)
+        }
+        .padding(.bottom, 30) // Safe area spacing
+        .opacity(showUI ? 1 : 0)
+        .animation(.easeInOut(duration: 0.3), value: showUI)
+    }
+    
+
+
+    @ViewBuilder
+    private func performerLabel(for item: ReelsView.ReelItemData) -> some View {
+        if let performer = item.performers.first {
+            Button(action: { onPerformerTap(performer) }) {
+                Text(performer.name)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundColor(.white)
+                    .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder
+    private func titleLabel(for item: ReelsView.ReelItemData) -> some View {
+        if let title = item.title, !title.isEmpty {
+            HStack(spacing: 8) {
+                Text(title)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineLimit(2)
+                    .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                
+                // Download Indicator
+                let sceneId: String? = {
+                    if case .scene(let s) = item { return s.id }
+                    if case .marker(let m) = item { return m.scene?.id }
+                    return nil
+                }()
+                
+                if let sId = sceneId, DownloadManager.shared.isDownloaded(id: sId) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.system(size: 12))
+                        .foregroundColor(.white)
+                        .padding(3)
+                        .background(Color.green)
+                        .clipShape(Circle())
+                        .shadow(radius: 2)
+                }
             }
         }
     }
@@ -1670,11 +1855,14 @@ struct ReelItemView: View {
         .onTapGesture {
             isPlaying = true
             player?.play()
-            resetUITimer()
+            onInteraction()
         }
     }
     
     func setupPlayer() {
+        // GIFs don't need AVPlayer
+        guard !item.isGIF else { return }
+        
         guard let sid = item.sceneID else {
             if let url = item.videoURL { initPlayer(with: url) }
             return
@@ -1685,7 +1873,21 @@ struct ReelItemView: View {
             initPlayer(with: url)
         }
         
-        // 2. Background fetch for the "best" stream (MP4/HLS)
+        // 2. Performance: Fetch best stream immediately (optimized for preloading)
+        updateBestStream()
+    }
+    
+    private func updateBestStream() {
+        guard let sid = item.sceneID else { return }
+        
+        // Optimization: If we are already using a local file, don't bother fetching streams
+        // Local files are already the "best" possible quality/performance.
+        if let currentURL = item.videoURL, !currentURL.absoluteString.hasPrefix("http") {
+            print("📂 Reels: Scene \(sid) is local, skipping best stream fetch.")
+            return
+        }
+        
+        // Background fetch for the "best" stream (MP4/HLS)
         viewModel.fetchSceneStreams(sceneId: sid) { streams in
             guard !streams.isEmpty else { return }
             
@@ -1707,7 +1909,6 @@ struct ReelItemView: View {
                 let currentURL = (player?.currentItem?.asset as? AVURLAsset)?.url
                 if currentURL?.path != targetURL.path {
                     // Priority: Upgrade to MP4 if current is legacy, or better HLS if current is HLS
-                    print("⚡ Reels: Optimization found (\(targetURL.pathExtension)). Switching to improved stream.")
                     initPlayer(with: targetURL)
                 }
             }
@@ -1722,6 +1923,10 @@ struct ReelItemView: View {
         let startTime = item.startTime
         
         if let existingPlayer = self.player {
+            // Smooth Upgrade: Preserve state for active items
+            let wasPlaying = existingPlayer.timeControlStatus == .playing
+            let currentTime = existingPlayer.currentTime()
+            
             // Reuse existing player for smoothness and to prevent VideoPlayer re-renders
             if let observer = timeObserver {
                 existingPlayer.removeTimeObserver(observer)
@@ -1730,6 +1935,12 @@ struct ReelItemView: View {
             NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: existingPlayer.currentItem)
             
             existingPlayer.replaceCurrentItem(with: newItem)
+            
+            // If this is the active item and it was already playing, ensure it continues smoothly
+            if isActive && wasPlaying {
+                existingPlayer.seek(to: currentTime, toleranceBefore: .zero, toleranceAfter: .zero)
+                existingPlayer.play()
+            }
         } else {
             // First time player creation
             self.player = createPlayer(for: streamURL) // createPlayer handles AVAudioSession
@@ -1766,6 +1977,10 @@ struct ReelItemView: View {
             } else if case .clip = self.item {
                 player.seek(to: .zero)
                 player.play()
+            } else if case .marker = self.item {
+                let start = self.item.startTime
+                player.seek(to: CMTime(seconds: start, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+                player.play()
             }
         }
         
@@ -1782,7 +1997,7 @@ struct ReelItemView: View {
                  let start = self.item.startTime
                  let end = self.item.endTime ?? (start + 20.0)
                  if time.seconds >= end {
-                     player.seek(to: CMTime(seconds: start, preferredTimescale: 600))
+                     player.seek(to: CMTime(seconds: start, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
                      player.play()
                  }
             } else {
@@ -1813,35 +2028,11 @@ struct ReelItemView: View {
         }
     }
     
-    func resetUITimer() {
-        withAnimation(.easeInOut(duration: 0.3)) {
-            showUI = true
-        }
-        
-        uiHideTask?.cancel()
-        uiHideTask = Task {
-            try? await Task.sleep(nanoseconds: 5 * 1_000_000_000)
-            guard !Task.isCancelled else { return }
-            
-            if !showRatingOverlay && !isSeeking {
-                withAnimation(.easeInOut(duration: 0.8)) {
-                    showUI = false
-                }
-            } else if !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 2 * 1_000_000_000)
-                if !Task.isCancelled {
-                    resetUITimer()
-                }
-            }
-        }
-    }
-    
     func seek(to time: Double) {
         let cmTime = CMTime(seconds: time, preferredTimescale: 600)
         player?.seek(to: cmTime)
     }
 }
-
 struct SidebarButton: View {
     let icon: String
     let label: String
@@ -1876,6 +2067,44 @@ struct SidebarButton: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+}
+
+struct BottomBarButton: View {
+    let icon: String
+    var count: Int = 0
+    var hideCount: Bool = false
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: {
+            HapticManager.light()
+            action()
+        }) {
+            Image(systemName: icon)
+                .font(.system(size: 26, weight: .bold))
+                .foregroundColor(.white)
+                .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
+                .overlay(alignment: .topTrailing) {
+                    if !hideCount && count > 0 {
+                        Text("\(count)")
+                            .font(.system(size: 10, weight: .black))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(Color.black)
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(Color.white.opacity(0.5), lineWidth: 0.5))
+                            .offset(x: 10, y: -8)
+                            .shadow(color: .black.opacity(0.3), radius: 2)
+                    }
+                }
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .focusEffectDisabled()
     }
 }
 
@@ -1919,6 +2148,8 @@ struct CustomVideoScrubber: View {
             .frame(maxHeight: .infinity, alignment: .bottom)
         }
         .frame(height: 10) // Small height container
+        .focusable(false)
+        .focusEffectDisabled()
     }
 }
 #endif

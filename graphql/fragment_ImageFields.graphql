@@ -1,7 +1,7 @@
 fragment ImageFields on Image {
   id title rating100 organized o_counter date created_at updated_at
   paths { thumbnail preview image }
-  visual_files { ... on BaseFile { path } ... on ImageFile { height width } ... on VideoFile { height width } }
+  visual_files { ... on BaseFile { path } ... on ImageFile { height width } ... on VideoFile { height width duration } }
   galleries { id title }
   performers { id name }
   studio { id name }

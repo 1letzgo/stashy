@@ -231,10 +231,14 @@ class PlayerView: UIView {
         super.init(frame: .zero)
         self.player = player
         self.playerLayer.videoGravity = gravity
+        self.isUserInteractionEnabled = false
     }
     
     required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
+    }
+    override var canBecomeFocused: Bool {
+        return false
     }
 }
 

@@ -482,6 +482,10 @@ struct GalleryItemView: View {
     @Binding var isMuted: Bool
     @ObservedObject var viewModel: StashDBViewModel
     @Binding var images: [StashImage]
+    @Environment(\.verticalSizeClass) var verticalSizeClass
+    @Binding var showUI: Bool
+    @Binding var isZoomed: Bool
+    var onInteraction: () -> Void
 
     // Playback State
     @State private var player: AVPlayer?
@@ -491,8 +495,7 @@ struct GalleryItemView: View {
     @State private var isSeeking = false
     @State private var timeObserver: Any?
     @State private var showRatingOverlay = false
-    @State private var showUI = true
-    @State private var uiHideTask: Task<Void, Never>? = nil
+
 
     private var isGIFImage: Bool {
         image.fileExtension?.uppercased() == "GIF"
@@ -505,113 +508,118 @@ struct GalleryItemView: View {
         return false
     }
 
-    var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            // Media layer — matches ReelItemView pattern exactly
-            Group {
-                if isGIFImage {
-                    ZoomableScrollView {
-                        if let url = image.imageURL {
-                            CustomAsyncImage(url: url) { loader in
-                                if let data = loader.imageData, isGIF(data) {
-                                    GIFView(data: data)
-                                        .frame(maxWidth: .infinity)
-                                } else if let img = loader.image {
-                                    img
-                                        .resizable()
-                                        .aspectRatio(contentMode: .fit)
-                                } else if loader.isLoading {
-                                    ProgressView()
-                                        .tint(.white)
-                                } else {
-                                    Image(systemName: "exclamationmark.triangle")
-                                        .foregroundColor(.white)
-                                }
-                            }
+    @ViewBuilder
+    private var mediaLayer: some View {
+        Group {
+            if image.isGIF {
+                ZoomableScrollView(isZoomed: $isZoomed, onTap: {
+                    withAnimation(.easeInOut(duration: 0.4)) { showUI.toggle() }
+                    if showUI { onInteraction() }
+                }) {
+                if let url = image.imageURL {
+                    CustomAsyncImage(url: url) { loader in
+                        if let data = loader.imageData, isGIF(data) {
+                            GIFView(data: data, fillMode: false)
+                        } else if let img = loader.image {
+                            img
+                                .resizable()
+                                .aspectRatio(contentMode: .fit)
+                        } else if loader.isLoading {
+                            ProgressView().tint(.white)
+                        } else {
+                            Image(systemName: "exclamationmark.triangle").foregroundColor(.white)
                         }
                     }
-                } else if image.isVideo {
+                } else {
+                    ProgressView().tint(.white)
+                }
+                }
+            } else if image.isVideo {
+                ZoomableScrollView(isZoomed: $isZoomed, onTap: {
+                    withAnimation(.easeInOut(duration: 0.4)) { showUI.toggle() }
+                    if showUI { onInteraction() }
+                }) {
                     if let player = player {
-                        FullScreenVideoPlayer(player: player, videoGravity: isPortrait ? .resizeAspectFill : .resizeAspect)
-                            .onTapGesture {
-                                if !showUI {
-                                    resetUITimer()
-                                } else {
-                                    isPlaying.toggle()
-                                    if isPlaying { player.play() } else { player.pause() }
-                                    resetUITimer()
-                                }
-                            }
+                        FullScreenVideoPlayer(player: player, videoGravity: .resizeAspect)
                     } else {
                         if let url = image.thumbnailURL {
                             AsyncImage(url: url) { img in
                                 img
                                     .resizable()
-                                    .aspectRatio(contentMode: isPortrait ? .fill : .fit)
+                                    .aspectRatio(contentMode: .fit)
                             } placeholder: {
-                                ProgressView()
-                                    .tint(.white)
+                                ProgressView().tint(.white)
                             }
-                        } else {
-                            ProgressView()
-                                .tint(.white)
                         }
                     }
-                } else {
-                    // Static image
-                    ZoomableScrollView {
-                        if let url = image.imageURL {
-                            CustomAsyncImage(url: url) { loader in
-                                if let img = loader.image {
-                                    img
-                                        .resizable()
-                                        .scaledToFit()
-                                } else if loader.isLoading {
-                                    ProgressView()
-                                        .tint(.white)
-                                } else {
-                                    VStack(spacing: 12) {
-                                        Image(systemName: "exclamationmark.triangle")
-                                            .font(.largeTitle)
-                                            .foregroundColor(.white)
-                                        Text("Failed to load image")
-                                            .foregroundColor(.white)
-                                    }
+                }
+            } else {
+                // Static image
+                ZoomableScrollView(isZoomed: $isZoomed, onTap: {
+                    withAnimation(.easeInOut(duration: 0.4)) { showUI.toggle() }
+                    if showUI { onInteraction() }
+                }) {
+                    if let url = image.imageURL {
+                        CustomAsyncImage(url: url) { loader in
+                            if let img = loader.image {
+                                img
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                            } else if loader.isLoading {
+                                ProgressView()
+                                    .tint(.white)
+                            } else {
+                                VStack(spacing: 12) {
+                                    Image(systemName: "exclamationmark.triangle")
+                                        .font(.largeTitle)
+                                        .foregroundColor(.white)
+                                    Text("Failed to load image")
+                                        .foregroundColor(.white)
                                 }
                             }
                         }
                     }
                 }
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-            .ignoresSafeArea()
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .ignoresSafeArea()
+    }
 
-            // Center Play Icon
-            if image.isVideo && !isPlaying {
-                VStack {
+    @ViewBuilder
+    private var centerPlayIcon: some View {
+        if !isGIFImage && image.isVideo && !isPlaying {
+            VStack {
+                Spacer()
+                HStack {
                     Spacer()
-                    HStack {
-                        Spacer()
-                        Image(systemName: "play.fill")
-                            .font(.system(size: 60))
-                            .foregroundColor(.white.opacity(0.7))
-                            .shadow(radius: 10)
-                        Spacer()
-                    }
+                    Image(systemName: "play.fill")
+                        .font(.system(size: 60))
+                        .foregroundColor(.white.opacity(0.7))
+                        .shadow(radius: 10)
                     Spacer()
                 }
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    isPlaying = true
-                    player?.play()
-                    resetUITimer()
+                Spacer()
+            }
+            .contentShape(Rectangle())
+            .onTapGesture {
+                withAnimation(.easeInOut(duration: 0.4)) {
+                    showUI.toggle()
+                }
+                if showUI {
+                    onInteraction()
                 }
             }
+        }
+    }
 
-            // Sidebar layer (Right side)
+    @ViewBuilder
+    private var sidebarLayer: some View {
+        VStack(alignment: .trailing, spacing: 20) {
+            Spacer()
+
             VStack(alignment: .trailing, spacing: 20) {
-                Spacer()
-
                 // Rating Button
                 let rating = image.rating100 ?? 0
                 SidebarButton(
@@ -623,7 +631,7 @@ struct GalleryItemView: View {
                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                         showRatingOverlay.toggle()
                     }
-                    resetUITimer()
+                    onInteraction()
                 }
                 .overlay(alignment: .top) {
                     if showRatingOverlay {
@@ -649,7 +657,7 @@ struct GalleryItemView: View {
                                         }
                                     }
                                 }
-                                resetUITimer()
+                                onInteraction()
                                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
                                     withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
                                         showRatingOverlay = false
@@ -668,19 +676,15 @@ struct GalleryItemView: View {
                 }
 
                 // O-Counter
-                // O-Counter
                 SidebarButton(
                     icon: AppearanceManager.shared.oCounterIcon,
                     label: "Counter",
                     count: image.o_counter ?? 0,
                     color: .white
                 ) {
-                    // Direct update to the binding array
                     if let index = images.firstIndex(where: { $0.id == image.id }) {
                         let originalCount = images[index].o_counter ?? 0
                         let newCount = originalCount + 1
-                        
-                        // Optimistic UI update
                         images[index] = images[index].withOCounter(newCount)
                         
                         viewModel.incrementImageOCounter(imageId: image.id) { returnedCount in
@@ -698,113 +702,92 @@ struct GalleryItemView: View {
                             }
                         }
                     }
-                    resetUITimer()
+                    onInteraction()
                 }
-                .contentShape(Rectangle()) // Ensure good hit target
+                .contentShape(Rectangle())
 
-                // Mute Button (video only)
+                // Mute and Play/Pause Buttons (video only)
                 if image.isVideo {
-                    SidebarButton(
-                        icon: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                        label: isMuted ? "Muted" : "Mute",
-                        count: 0,
-                        hideCount: true,
-                        color: .white
-                    ) {
-                        isMuted.toggle()
-                        resetUITimer()
+                    HStack(spacing: 12) {
+                        SidebarButton(
+                            icon: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                            label: isMuted ? "Muted" : "Mute",
+                            count: 0,
+                            hideCount: true,
+                            color: .white
+                        ) {
+                            isMuted.toggle()
+                            onInteraction()
+                        }
+
+                        SidebarButton(
+                            icon: isPlaying ? "pause.fill" : "play.fill",
+                            label: isPlaying ? "Pause" : "Play",
+                            count: 0,
+                            hideCount: true,
+                            color: .white
+                        ) {
+                            isPlaying.toggle()
+                            if isPlaying {
+                                player?.play()
+                            } else {
+                                player?.pause()
+                            }
+                            onInteraction()
+                        }
                     }
                 }
 
-                Spacer()
-                    .frame(height: 0)
+                // Remove the bottom spacer in landscape to allow buttons to sit lower
+                if verticalSizeClass != .compact {
+                    Spacer()
+                        .frame(height: 0)
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .bottomTrailing)
-            .padding(.trailing, 12)
-            .padding(.bottom, 135)
-            .opacity(showUI ? 1 : 0)
-            .animation(.easeInOut(duration: 0.3), value: showUI)
+            .padding(.bottom, verticalSizeClass == .compact ? 95 : 135)
+        }
+        .frame(maxWidth: .infinity, alignment: (verticalSizeClass == .compact ? .trailing : .bottomTrailing))
+        .padding(.trailing, verticalSizeClass == .compact ? 60 : 12)
+        .opacity(showUI ? 1 : 0)
+        .animation(showUI ? nil : .easeInOut(duration: 0.4), value: showUI)
+    }
 
-            // Metadata + Scrubber overlay
+    @ViewBuilder
+    private var metadataOverlay: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Spacer()
+
             VStack(alignment: .leading, spacing: 6) {
-                Spacer()
-
-                VStack(alignment: .leading, spacing: 8) {
-                    // Row 1: Performer • Gallery
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        if let performers = image.performers, let firstPerf = performers.first {
-                            let performerObj = Performer(
-                                id: firstPerf.id, name: firstPerf.name, disambiguation: nil, birthdate: nil, country: nil, imagePath: nil, sceneCount: 0, galleryCount: nil, gender: nil, ethnicity: nil, height: nil, weight: nil, measurements: nil, fakeTits: nil, careerLength: nil, tattoos: nil, piercings: nil, aliasList: nil, favorite: nil, rating100: nil, createdAt: nil, updatedAt: nil
-                            )
-                            NavigationLink(destination: PerformerDetailView(performer: performerObj)) {
-                                Text(firstPerf.name)
-                                    .font(.system(size: 17, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
-                            }
-                            .buttonStyle(.plain)
-
-                            if let galleries = image.galleries, let gallery = galleries.first {
-                                Text("•")
-                                    .font(.system(size: 17, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
-
-                                let galleryObj = Gallery(id: gallery.id, title: gallery.title ?? "Gallery", date: nil, details: nil, imageCount: nil, organized: nil, createdAt: nil, updatedAt: nil, studio: nil, performers: nil, cover: nil)
-
-                                NavigationLink(destination: ImagesView(gallery: galleryObj)) {
-                                    Text(gallery.title ?? "Unknown Gallery")
-                                        .font(.system(size: 17, weight: .bold))
-                                        .foregroundColor(.white)
-                                        .lineLimit(1)
-                                        .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
-                                }
-                                .buttonStyle(.plain)
-                            }
-                        } else if let galleries = image.galleries, let gallery = galleries.first {
-                            let galleryObj = Gallery(id: gallery.id, title: gallery.title ?? "Gallery", date: nil, details: nil, imageCount: nil, organized: nil, createdAt: nil, updatedAt: nil, studio: nil, performers: nil, cover: nil)
-
-                            NavigationLink(destination: ImagesView(gallery: galleryObj)) {
-                                Text(gallery.title ?? "Unknown Gallery")
-                                    .font(.system(size: 17, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                                    .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
-                            }
-                            .buttonStyle(.plain)
-                        }
+                if verticalSizeClass == .compact {
+                    HStack(alignment: .bottom, spacing: 12) {
+                        performerLabel
+                        titleLabel
                     }
-
-                    // Row 2: Title
-                    if let title = image.title, !title.isEmpty {
-                        Text(title)
-                            .font(.system(size: 15, weight: .medium))
-                            .foregroundColor(.white.opacity(0.9))
-                            .lineLimit(2)
-                            .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
-                    }
-
-                    // Row 3: Tags
-                    if let tags = image.tags, !tags.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 8) {
-                                ForEach(tags) { tag in
-                                    Text("#\(tag.name)")
-                                        .font(.system(size: 13, weight: .semibold))
-                                        .foregroundColor(.white)
-                                        .padding(.horizontal, 10)
-                                        .padding(.vertical, 5)
-                                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                                        .clipShape(Capsule())
-                                        .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
-                                }
-                            }
-                        }
-                        .padding(.top, 4)
+                } else {
+                    VStack(alignment: .leading, spacing: 4) {
+                        performerLabel
+                        titleLabel
                     }
                 }
-                .padding(.horizontal, 16)
-                .frame(maxWidth: .infinity, alignment: .leading)
+
+                // Row 3: Tags
+                if let tags = image.tags, !tags.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(tags) { tag in
+                                Text("#\(tag.name)")
+                                    .font(.system(size: 13, weight: .semibold))
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 5)
+                                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
+                                    .clipShape(Capsule())
+                                    .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
+                            }
+                        }
+                    }
+                    .padding(.top, 4)
+                }
 
                 // Video scrubber
                 if image.isVideo {
@@ -820,7 +803,7 @@ struct GalleryItemView: View {
                                 player?.pause()
                             } else {
                                 if isPlaying { player?.play() }
-                                resetUITimer()
+                                onInteraction()
                             }
                         }
                     )
@@ -828,15 +811,29 @@ struct GalleryItemView: View {
                 }
             }
             .padding(.bottom, 95)
-            .opacity(showUI ? 1 : 0)
-            .animation(.easeInOut(duration: 0.3), value: showUI)
+        }
+        .padding(.horizontal, 16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .opacity(showUI ? 1 : 0)
+        .animation(showUI ? nil : .easeInOut(duration: 0.4), value: showUI)
+    }
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            mediaLayer
+            
+            centerPlayIcon
+
+            sidebarLayer
+
+            metadataOverlay
         }
         .background(Color.black)
         .onAppear {
             if image.isVideo {
                 setupPlayer()
             }
-            resetUITimer()
+            onInteraction()
         }
         .onDisappear {
             player?.pause()
@@ -850,6 +847,46 @@ struct GalleryItemView: View {
         }
     }
 
+    @ViewBuilder
+    private var performerLabel: some View {
+        if let performers = image.performers, let firstPerf = performers.first {
+            let performerObj = Performer(
+                id: firstPerf.id, name: firstPerf.name, disambiguation: nil, birthdate: nil, country: nil, imagePath: nil, sceneCount: 0, galleryCount: nil, gender: nil, ethnicity: nil, height: nil, weight: nil, measurements: nil, fakeTits: nil, careerLength: nil, tattoos: nil, piercings: nil, aliasList: nil, favorite: nil, rating100: nil, createdAt: nil, updatedAt: nil
+            )
+            NavigationLink(destination: PerformerDetailView(performer: performerObj)) {
+                Text(firstPerf.name)
+                    .font(.system(size: 17, weight: .bold))
+                    .foregroundColor(.white)
+                    .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    @ViewBuilder
+    private var titleLabel: some View {
+        HStack(spacing: 6) {
+            if let title = image.title, !title.isEmpty {
+                Text(title)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(.white.opacity(0.9))
+                    .lineLimit(1)
+                    .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+            } else if let galleries = image.galleries, let gallery = galleries.first {
+                let galleryObj = Gallery(id: gallery.id, title: gallery.title ?? "Gallery", date: nil, details: nil, imageCount: nil, organized: nil, createdAt: nil, updatedAt: nil, studio: nil, performers: nil, cover: nil)
+
+                NavigationLink(destination: ImagesView(gallery: galleryObj)) {
+                    Text(gallery.title ?? "Unknown Gallery")
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.white.opacity(0.9))
+                        .lineLimit(1)
+                        .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+    
     // MARK: - Player Setup (matches ReelItemView.initPlayer)
 
     private func initPlayer(with streamURL: URL) {
@@ -902,31 +939,7 @@ struct GalleryItemView: View {
         let cmTime = CMTime(seconds: time, preferredTimescale: 600)
         player?.seek(to: cmTime)
     }
-
-    private func resetUITimer() {
-        withAnimation(.easeInOut(duration: 0.3)) {
-            showUI = true
-        }
-
-        uiHideTask?.cancel()
-        uiHideTask = Task {
-            try? await Task.sleep(nanoseconds: 5 * 1_000_000_000)
-            guard !Task.isCancelled else { return }
-
-            if !showRatingOverlay && !isSeeking {
-                withAnimation(.easeInOut(duration: 0.8)) {
-                    showUI = false
-                }
-            } else if !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 2 * 1_000_000_000)
-                if !Task.isCancelled {
-                    resetUITimer()
-                }
-            }
-        }
-    }
 }
-
 // MARK: - Full Screen Image View (StashTok-style vertical paging)
 
 struct FullScreenImageView: View {
@@ -936,9 +949,19 @@ struct FullScreenImageView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @Environment(\.dismiss) var dismiss
+    @State private var isMediaZoomed = false
     @State private var showingDeleteConfirmation = false
     @State private var isMuted: Bool = !isHeadphonesConnected()
     @State private var currentVisibleId: String?
+
+    @State private var showUI = true
+    @State private var uiHideTask: Task<Void, Never>? = nil
+
+    private func resetUITimer() {
+        showUI = true
+        uiHideTask?.cancel()
+        uiHideTask = nil
+    }
 
     var body: some View {
         ZStack {
@@ -951,9 +974,16 @@ struct FullScreenImageView: View {
                             image: image,
                             isMuted: $isMuted,
                             viewModel: viewModel,
-                            images: $images
+                            images: $images,
+                            showUI: $showUI,
+                            isZoomed: $isMediaZoomed,
+                            onInteraction: {
+                                resetUITimer()
+                            }
                         )
+                        .scrollDisabled(isMediaZoomed)
                         .containerRelativeFrame([.horizontal, .vertical])
+                        .background(Color.black)
                         .id(image.id)
                         .onAppear {
                             if image.id == images.last?.id {
@@ -964,15 +994,38 @@ struct FullScreenImageView: View {
                 }
                 .scrollTargetLayout()
             }
+            .scrollDisabled(isMediaZoomed)
             .scrollTargetBehavior(.paging)
             .scrollPosition(id: $currentVisibleId)
+            .scrollContentBackground(.hidden)
+            .background(Color.black)
+            .onScrollPhaseChange { oldPhase, newPhase in
+                if newPhase.isScrolling {
+                    uiHideTask?.cancel()
+                } else if showUI {
+                    resetUITimer()
+                }
+            }
+            .onChange(of: showUI) { _, newValue in
+                if !newValue {
+                    uiHideTask?.cancel()
+                }
+            }
             .ignoresSafeArea()
         }
         .background(Color.black.ignoresSafeArea())
+        .ignoresSafeArea()
         .navigationTitle("")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbarBackground(.hidden, for: .navigationBar)
+        .ignoresSafeArea()
+        .onDisappear {
+            uiHideTask?.cancel()
+            uiHideTask = nil
+            showUI = true
+        }
         .toolbarColorScheme(.dark, for: .navigationBar)
+        .toolbar(showUI ? .visible : .hidden, for: .navigationBar)
+        .toolbar(showUI ? .visible : .hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(role: .destructive) {
@@ -993,6 +1046,7 @@ struct FullScreenImageView: View {
         }
         .onAppear {
             currentVisibleId = selectedImageId
+            resetUITimer()
         }
     }
 

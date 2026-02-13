@@ -10,6 +10,7 @@ import SwiftUI
 import AVFoundation
 import AVKit
 import WebKit
+import Combine
 
 struct SceneDetailView: View {
     let scene: Scene
@@ -18,6 +19,8 @@ struct SceneDetailView: View {
     @ObservedObject var viewModel = StashDBViewModel()
     @ObservedObject var handyManager = HandyManager.shared
     @ObservedObject var buttplugManager = ButtplugManager.shared
+    
+    @ObservedObject private var downloadManager = DownloadManager.shared
     
     init(scene: Scene) {
         self.scene = scene
@@ -40,8 +43,6 @@ struct SceneDetailView: View {
     @State private var showingAddMarkerSheet = false
     @State private var capturedMarkerTime: Double = 0
     @State private var playbackSpeed: Double = 1.0
-    private let timer = Timer.publish(every: 10, on: .main, in: .common).autoconnect()
-    private let playbackMarkerTimer = Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()
     @State private var currentPlaybackTime: Double = 0
     @State private var timeObserverToken: Any?
     
@@ -95,6 +96,8 @@ struct SceneDetailView: View {
     }
 
 
+    @Environment(\.verticalSizeClass) var verticalSizeClass
+
     // Extracted main content to use modular components
     private var mainContentView: some View {
         ScrollView {
@@ -124,192 +127,238 @@ struct SceneDetailView: View {
                     )
                 }
                 
-                if !activeScene.performers.isEmpty || activeScene.studio != nil {
-                    HStack(alignment: .top, spacing: 12) {
-                        if !activeScene.performers.isEmpty {
-                            ScenePerformersCard(performers: activeScene.performers)
+                if verticalSizeClass == .compact {
+                    // Landscape Mode: Grid Layout for Metadata
+                    LazyVGrid(columns: [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)], spacing: 12) {
+                        
+                        // Item 1: Performers & Studio
+                        if !activeScene.performers.isEmpty || activeScene.studio != nil {
+                            VStack(spacing: 12) {
+                                if !activeScene.performers.isEmpty {
+                                    ScenePerformersCard(performers: activeScene.performers)
+                                }
+                                if let studio = activeScene.studio {
+                                    SceneStudioCard(studio: studio)
+                                }
+                            }
                         }
                         
-                        if let studio = activeScene.studio {
-                            SceneStudioCard(studio: studio)
+                        // Item 2: Galleries
+                        if let galleries = activeScene.galleries, !galleries.isEmpty {
+                            SceneGalleriesCard(galleries: galleries)
+                        }
+                        
+                        // Item 3: Tags
+                        if let tags = activeScene.tags, !tags.isEmpty {
+                            SceneTagsCard(
+                                tags: tags,
+                                isTagsExpanded: $isTagsExpanded,
+                                tagsTotalHeight: $tagsTotalHeight
+                            )
+                        }
+                        
+                        // Item 4: Delete Button
+                        Button(role: .destructive) {
+                            showDeleteWithFilesConfirmation = true
+                        } label: {
+                            HStack {
+                                Image(systemName: "trash")
+                                Text("Delete Scene")
+                            }
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                            .background(appearanceManager.tintColor.opacity(0.1))
+                            .foregroundColor(appearanceManager.tintColor)
+                            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                         }
                     }
-                }
-
-                if let galleries = activeScene.galleries, !galleries.isEmpty {
-                    SceneGalleriesCard(galleries: galleries)
-                }
-                
-                if let tags = activeScene.tags, !tags.isEmpty {
-                    SceneTagsCard(
-                        tags: tags,
-                        isTagsExpanded: $isTagsExpanded,
-                        tagsTotalHeight: $tagsTotalHeight
-                    )
-                }
-                
-                // Delete Scene Button (Card Style)
-                Button(role: .destructive) {
-                    showDeleteWithFilesConfirmation = true
-                } label: {
-                    HStack {
-                        Image(systemName: "trash")
-                        Text("Delete Scene")
+                } else {
+                    // Portrait Mode: Vertical Stack
+                    if !activeScene.performers.isEmpty || activeScene.studio != nil {
+                        HStack(alignment: .top, spacing: 12) {
+                            if !activeScene.performers.isEmpty {
+                                ScenePerformersCard(performers: activeScene.performers)
+                            }
+                            
+                            if let studio = activeScene.studio {
+                                SceneStudioCard(studio: studio)
+                            }
+                        }
                     }
-                    .frame(maxWidth: .infinity)
-                    .padding()
-                    .background(appearanceManager.tintColor.opacity(0.1))
-                    .foregroundColor(appearanceManager.tintColor)
-                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+
+                    if let galleries = activeScene.galleries, !galleries.isEmpty {
+                        SceneGalleriesCard(galleries: galleries)
+                    }
+                    
+                    if let tags = activeScene.tags, !tags.isEmpty {
+                        SceneTagsCard(
+                            tags: tags,
+                            isTagsExpanded: $isTagsExpanded,
+                            tagsTotalHeight: $tagsTotalHeight
+                        )
+                    }
+                    
+                    // Delete Scene Button (Card Style)
+                    Button(role: .destructive) {
+                        showDeleteWithFilesConfirmation = true
+                    } label: {
+                        HStack {
+                            Image(systemName: "trash")
+                            Text("Delete Scene")
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding()
+                        .background(appearanceManager.tintColor.opacity(0.1))
+                        .foregroundColor(appearanceManager.tintColor)
+                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                    }
+                    .padding(.top, 10)
                 }
-                .padding(.top, 10)
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 16)
         }
     }
 
-    @ObservedObject private var downloadManager = DownloadManager.shared
-
     var body: some View {
         mainContentView
             .background(Color.appBackground)
             .navigationTitle(scene.title ?? "Scene")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                sceneToolbarContent
+            .toolbar { sceneToolbarContent }
+            .toolbar(.visible, for: .navigationBar)
+            .alert("Really delete scene and files?", isPresented: $showDeleteWithFilesConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) { deleteSceneWithFiles() }
+            } message: {
+                Text("The scene '\(activeScene.title ?? "Unknown Title")' and all associated files will be permanently deleted. This action cannot be undone.")
             }
-        .alert("Really delete scene and files?", isPresented: $showDeleteWithFilesConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
-                deleteSceneWithFiles()
-            }
-        } message: {
-            Text("The scene '\(activeScene.title ?? "Unknown Title")' and all associated files will be permanently deleted. This action cannot be undone.")
-        }
-        .sheet(isPresented: $showingAddMarkerSheet) {
-            AddMarkerSheet(sceneId: activeScene.id, seconds: capturedMarkerTime, viewModel: viewModel) {
-                // Refresh scene details to show the new marker
-                viewModel.fetchSceneDetails(sceneId: activeScene.id) { updatedScene in
-                    if let updated = updatedScene {
-                        DispatchQueue.main.async {
-                            self.activeScene = updated
-                        }
-                    }
+            .sheet(isPresented: $showingAddMarkerSheet) {
+                AddMarkerSheet(sceneId: activeScene.id, seconds: capturedMarkerTime, viewModel: viewModel) {
+                    refreshSceneDetails()
                 }
             }
-        }
-        .onAppear {
-            // Ensure state is reset when view appears
-            print("🔍 Scene Detail: ID=\(activeScene.id), PlayCount=\(activeScene.playCount ?? -1)")
-            isFullscreen = false
-            
-            // 1. Fetch Transcoded Streams in background (Fast Start)
-            // Only fetch if we don't have streams yet to avoid UI flicker on back navigation
-            if activeScene.streams?.isEmpty ?? true {
-                viewModel.fetchSceneStreams(sceneId: activeScene.id) { streams in
-                    if !streams.isEmpty {
-                        DispatchQueue.main.async {
-                            self.activeScene = self.activeScene.withStreams(streams)
-                            print("✅ Transcoded streams loaded in background: \(streams.count) options")
-                            self.updatePlayerStream()
-                        }
-                    }
-                }
+            .onAppear { handleOnAppear() }
+            .onDisappear { handleOnDisappear() }
+            .onChange(of: isMuted) { _, newValue in
+                player?.isMuted = newValue
             }
-            
-            // 2. Refresh main scene details (stable query)
-            // Only refresh if details are missing or it's potentially needed
-            // We'll check if we have performers/tags as a proxy for "full details"
-            if activeScene.performers.isEmpty || (activeScene.tags?.isEmpty ?? true) {
-                viewModel.fetchSceneDetails(sceneId: activeScene.id) { updatedScene in
-                    if let updated = updatedScene {
-                        DispatchQueue.main.async {
-                            // Preserve existing streams if they were already loaded
-                            self.activeScene = updated.withStreams(self.activeScene.streams)
-                            print("✅ Scene data refreshed: ResumeTime=\(updated.resumeTime ?? 0)")
-                        }
-                    }
-                }
+            .onReceive(Timer.publish(every: 10, on: .main, in: .common).autoconnect()) { _ in
+                handlePeriodicSync()
             }
-            
-            // 3. Load Funscript for Buttplug.io if available
-            if let scriptURL = activeScene.funscriptURL {
-                buttplugManager.setupScene(funscriptURL: scriptURL)
+            .onReceive(Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()) { _ in
+                handlePlaybackMarkerUpdate()
             }
-        }
-        .onDisappear {
-            if isDeleting {
-                player?.pause()
-                stopPreview()
-                return
+            .onReceive(player?.publisher(for: \.timeControlStatus).eraseToAnyPublisher() ?? Empty<AVPlayer.TimeControlStatus, Never>().eraseToAnyPublisher()) { status in
+                handleTimeControlStatusChange(status)
             }
+    }
 
-            if !isFullscreen {
-                player?.pause()
-                if handyManager.isSyncing {
-                    handyManager.pause()
-                }
-                if buttplugManager.isConnected {
-                    buttplugManager.pause()
+    private func refreshSceneDetails() {
+        viewModel.fetchSceneDetails(sceneId: activeScene.id) { updatedScene in
+            if let updated = updatedScene {
+                DispatchQueue.main.async {
+                    self.activeScene = updated
                 }
             }
+        }
+    }
+
+    private func handleOnAppear() {
+        print("🔍 Scene Detail: ID=\(activeScene.id), PlayCount=\(activeScene.playCount ?? -1)")
+        isFullscreen = false
+        
+        if activeScene.streams?.isEmpty ?? true {
+            viewModel.fetchSceneStreams(sceneId: activeScene.id) { streams in
+                if !streams.isEmpty {
+                    DispatchQueue.main.async {
+                        self.activeScene = self.activeScene.withStreams(streams)
+                        self.updatePlayerStream()
+                    }
+                }
+            }
+        }
+        
+        if activeScene.performers.isEmpty || (activeScene.tags?.isEmpty ?? true) {
+            viewModel.fetchSceneDetails(sceneId: activeScene.id) { updatedScene in
+                if let updated = updatedScene {
+                    DispatchQueue.main.async {
+                        self.activeScene = updated.withStreams(self.activeScene.streams)
+                    }
+                }
+            }
+        }
+        
+        if let scriptURL = activeScene.funscriptURL {
+            buttplugManager.setupScene(funscriptURL: scriptURL)
+        }
+    }
+
+    private func handleOnDisappear() {
+        if isDeleting {
+            player?.pause()
             stopPreview()
-            removeTimeObserver()
-            
-            // Determine current resume time
-            let currentTime = player?.currentTime().seconds
-            let effectiveResumeTime = (currentTime != nil && currentTime! > 0) ? currentTime! : activeScene.resumeTime
-            
-            // Save and notify parent views if we have a resume time
-            if let resumeTime = effectiveResumeTime, resumeTime > 0 {
-                let sceneId = activeScene.id
-                
-                // Only save to server if player was used
-                if currentTime != nil && currentTime! > 0 {
-                    viewModel.updateSceneResumeTime(sceneId: sceneId, resumeTime: resumeTime) { success in
-                        if success {
-                            DispatchQueue.main.async {
-                                NotificationCenter.default.post(
-                                    name: NSNotification.Name("SceneResumeTimeUpdated"),
-                                    object: nil,
-                                    userInfo: ["sceneId": sceneId, "resumeTime": resumeTime]
-                                )
-                            }
+            return
+        }
+
+        if !isFullscreen {
+            player?.pause()
+            if handyManager.isSyncing { handyManager.pause() }
+            if buttplugManager.isConnected { buttplugManager.pause() }
+        }
+        stopPreview()
+        removeTimeObserver()
+        
+        let currentTime = player?.currentTime().seconds
+        let effectiveResumeTime = (currentTime != nil && currentTime! > 0) ? currentTime! : activeScene.resumeTime
+        
+        if let resumeTime = effectiveResumeTime, resumeTime > 0 {
+            let sceneId = activeScene.id
+            if currentTime != nil && currentTime! > 0 {
+                viewModel.updateSceneResumeTime(sceneId: sceneId, resumeTime: resumeTime) { success in
+                    if success {
+                        DispatchQueue.main.async {
+                            NotificationCenter.default.post(name: NSNotification.Name("SceneResumeTimeUpdated"), object: nil, userInfo: ["sceneId": sceneId, "resumeTime": resumeTime])
                         }
                     }
-                } else {
-                    // Just notify with existing resume time (no save needed)
-                    NotificationCenter.default.post(
-                        name: NSNotification.Name("SceneResumeTimeUpdated"),
-                        object: nil,
-                        userInfo: ["sceneId": sceneId, "resumeTime": resumeTime]
-                    )
                 }
+            } else {
+                NotificationCenter.default.post(name: NSNotification.Name("SceneResumeTimeUpdated"), object: nil, userInfo: ["sceneId": sceneId, "resumeTime": resumeTime])
             }
         }
-        .onChange(of: isMuted) { _, newValue in
-            player?.isMuted = newValue
-        }
-        .onReceive(timer) { _ in
-            // Periodically save progress while playing
-            if isDeleting { return }
-            if let player = player, player.timeControlStatus == .playing {
-                let currentTime = player.currentTime().seconds
-                if currentTime > 0 {
-                    viewModel.updateSceneResumeTime(sceneId: activeScene.id, resumeTime: currentTime)
-                }
-                if !hasAddedPlay, currentTime > 1 {
-                    registerScenePlay()
-                }
-            }
-        }
-        .onReceive(playbackMarkerTimer) { _ in
-            guard let player = player else { return }
+    }
+
+    private func handlePeriodicSync() {
+        if isDeleting { return }
+        if let player = player, player.timeControlStatus == .playing {
             let currentTime = player.currentTime().seconds
-            if currentTime >= 0 {
-                currentPlaybackTime = currentTime
+            if currentTime > 0 {
+                viewModel.updateSceneResumeTime(sceneId: activeScene.id, resumeTime: currentTime)
             }
+            if !hasAddedPlay, currentTime > 1 {
+                registerScenePlay()
+            }
+        }
+    }
+
+    private func handlePlaybackMarkerUpdate() {
+        guard let player = player else { return }
+        let currentTime = player.currentTime().seconds
+        if currentTime >= 0 {
+            currentPlaybackTime = currentTime
+        }
+    }
+
+    private func handleTimeControlStatusChange(_ status: AVPlayer.TimeControlStatus) {
+        guard let player = player else { return }
+        let currentTime = player.currentTime().seconds
+        
+        if status == .paused {
+            if handyManager.isSyncing { handyManager.pause() }
+            if buttplugManager.isConnected { buttplugManager.pause() }
+        } else if status == .playing {
+            if handyManager.isSyncing { handyManager.play(at: currentTime) }
+            if buttplugManager.isConnected { buttplugManager.play(at: currentTime) }
         }
     }
 

@@ -16,6 +16,13 @@ struct ReelsModeSettingsView: View {
     var body: some View {
         List {
             Section {
+                Toggle("Immersive Video Scaling", isOn: $tabManager.reelsFillHeight)
+                    .tint(appearanceManager.tintColor)
+            } footer: {
+                Text("Content will stretch to fill the full screen when the device orientation matches the video orientation (Portrait/Portrait or Landscape/Landscape).")
+            }
+            
+            Section {
                 ForEach(tabManager.reelsModes) { modeConfig in
                     VStack(alignment: .leading, spacing: 0) {
                         // Header
