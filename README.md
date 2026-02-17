@@ -1,33 +1,23 @@
-# README.md
+# stashy
 
-## Features
-- Feature 1
-- Feature 2
-
-## Catalogviews
 ### Dashboard
 - Dashboard content goes here
 
 ### Downloads
 - Downloads content goes here
 
-### Scenes
+### Catalogviews
 - Scenes content goes here
 
 ### Performers
-- Performers content goes here
-
-### Studios
-- Studios content goes here
-
-### Tags
-- Tags content goes here
-
-### Galleries
-- Galleries content goes here
+- Performers 
+- Studios 
+- Tags 
+- Images
 
 ### Interactive Toys
-- Interactive Toys content goes here
+- TheHandy
+- Intiface
 
 ## Platforms
 - **iOS** (Production ready - [App Store link](#) and [TestFlight link](#))
