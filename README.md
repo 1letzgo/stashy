@@ -1,4 +1,4 @@
-# stashy
+# stashy - a STASH Media Server App for iOS / tvOS
 
 ### Dashboard
 - Dashboard content goes here
