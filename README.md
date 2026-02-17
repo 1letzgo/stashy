@@ -3,6 +3,8 @@
 ## Features
 Stashy integrates with GraphQL APIs to fetch data efficiently. This allows for more flexible queries and efficient data retrieval compared to traditional REST APIs. The implementation is designed to be robust, offering error handling and caching mechanisms for a seamless user experience.
 
+## Catalogviews
+
 ### Dashboard
 The Dashboard serves as the main interface for users, providing an overview of key functionalities and data at a glance. It is designed for user-friendly navigation and displays important metrics and information dynamically.
 
