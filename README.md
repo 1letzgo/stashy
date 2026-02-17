@@ -1,14 +1,19 @@
-# Stashy iOS App Documentation
+# Catalog Sections
 
-## Features
-Stashy integrates with GraphQL APIs to fetch data efficiently. This allows for more flexible queries and efficient data retrieval compared to traditional REST APIs. The implementation is designed to be robust, offering error handling and caching mechanisms for a seamless user experience.
+## Scenes
+Descriptive content about various scenes featured in the catalog.
 
-## Catalogviews
+## Performers
+Information and details about the performers involved.
 
-### Dashboard
-The Dashboard serves as the main interface for users, providing an overview of key functionalities and data at a glance. It is designed for user-friendly navigation and displays important metrics and information dynamically.
+## Studios
+Descriptions and highlights of the studios represented.
 
-### Downloads
-The app supports background downloads, allowing users to continue using the app while files download in the background. This feature is essential for ensuring that larger files do not interrupt the user’s experience.
+## Tags
+A comprehensive list of tags used for categorization.
 
+## Galleries
+Details about the galleries associated with the catalog.
 
+## Interactive Toys
+Information about the interactive toys included in the catalog.
