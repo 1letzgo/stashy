@@ -1064,7 +1064,10 @@ class StashDBViewModel: ObservableObject {
                         self.sceneMarkers = result.scene_markers
                         self.totalSceneMarkers = result.count
                     } else {
-                        self.sceneMarkers.append(contentsOf: result.scene_markers)
+                        // Deduplicate: Only add markers that aren't already in the list
+                        let existingIds = Set(self.sceneMarkers.map { $0.id })
+                        let newMarkers = result.scene_markers.filter { !existingIds.contains($0.id) }
+                        self.sceneMarkers.append(contentsOf: newMarkers)
                     }
                     
                     self.hasMoreMarkers = result.scene_markers.count == self.markersPerPage
@@ -1150,7 +1153,10 @@ class StashDBViewModel: ObservableObject {
                         self.scenes = scenesResult.scenes
                         self.totalScenes = scenesResult.count
                     } else {
-                        self.scenes.append(contentsOf: scenesResult.scenes)
+                        // Deduplicate: Only add scenes that aren't already in the list
+                        let existingIds = Set(self.scenes.map { $0.id })
+                        let newScenes = scenesResult.scenes.filter { !existingIds.contains($0.id) }
+                        self.scenes.append(contentsOf: newScenes)
                     }
                     
                     // Check if there are more pages
@@ -1342,7 +1348,10 @@ class StashDBViewModel: ObservableObject {
             for item in criteria {
                 if let key = item["id"] as? String {
                     var outputItem = item
-                    outputItem.removeValue(forKey: "id")
+                    // Remove UI-only keys that don't belong in any GraphQL criterion input
+                    for uiKey in ["id", "type", "inputType", "criterionOption"] {
+                        outputItem.removeValue(forKey: uiKey)
+                    }
                     
                     // For markers, move scene-specific criteria to nested scene_filter
                     if isMarker && (key == "orientation" || key == "duration" || key == "rating" || key == "organized" || key == "performers" || key == "tags") {
@@ -1358,9 +1367,9 @@ class StashDBViewModel: ObservableObject {
             newDict.removeValue(forKey: "c")
         }
         
-        // 1. Clean up known invalid top-level keys
-        let invalidKeys = ["sort", "direction", "mode"]
-        for key in invalidKeys {
+        // 1. Clean up known invalid top-level keys (UI-only metadata, not API fields)
+        let invalidTopKeys = ["sort", "direction", "mode", "displayMode", "zoomIndex", "sortDirection"]
+        for key in invalidTopKeys {
             newDict.removeValue(forKey: key)
         }
         
@@ -1377,131 +1386,279 @@ class StashDBViewModel: ObservableObject {
             }
         }
         
-        // 2. Iterate over all keys to handle nested structures recursively
+        // --- Define field sets based on GraphQL schema ---
+        
+        let nestedFilterKeys: Set<String> = [
+            "performers_filter", "studios_filter", "tags_filter", "groups_filter",
+            "galleries_filter", "scenes_filter", "images_filter", "markers_filter",
+            "movies_filter", "files_filter", "folders_filter", "scene_filter",
+            "AND", "OR", "NOT"
+        ]
+        
+        let stringValueKeys: Set<String> = ["is_missing", "has_markers", "has_chapters"]
+        
+        let booleanFlags: Set<String> = [
+            "organized", "interactive", "performer_favorite",
+            "filter_favorites", "ignore_auto_tag", "favorite", "is_zip"
+        ]
+        
+        let intFields: Set<String> = [
+            "rating", "rating100", "play_count", "resume_time", "scene_count",
+            "gallery_count", "performer_count", "tag_count", "duration", "framerate",
+            "bitrate", "interactive_speed", "play_duration", "performer_age",
+            "o_counter", "stash_id_count", "file_count", "id",
+            "image_count", "marker_count", "child_count", "parent_count",
+            "sub_group_count", "containing_group_count", "movie_count", "group_count",
+            "studio_count", "height_cm", "weight", "birth_year", "age", "death_year"
+        ]
+        
+        let floatFields: Set<String> = ["penis_length"]
+        
+        let dateFields: Set<String> = [
+            "date", "birthdate", "death_date", "created_at", "updated_at",
+            "last_played_at", "scene_date", "scene_created_at", "scene_updated_at",
+            "mod_time"
+        ]
+        
+        let multiSelectFields: Set<String> = [
+            "performers", "studios", "tags", "galleries", "scenes", "groups",
+            "movies", "performer_tags", "scene_tags", "parents", "children",
+            "containing_groups", "sub_groups"
+        ]
+        
+        // Standard valid keys for most criterion input types
+        let stdKeys: Set<String> = ["value", "value2", "modifier"]
+        let multiKeys: Set<String> = ["value", "modifier", "depth", "excludes"]
+        
+        // UI-only keys that can appear inside criterion dicts from the "c" array format
+        let uiCriterionKeys: Set<String> = ["type", "inputType", "criterionOption"]
+        
+        // 2. Iterate over all keys to handle nested structures
         for (key, value) in newDict {
+            // --- Nested sub-filter types ---
+            if nestedFilterKeys.contains(key) {
+                if let subFilterDict = value as? [String: Any] {
+                    newDict[key] = sanitizeFilter(subFilterDict, isMarker: false)
+                }
+                continue
+            }
+            
             if var subDict = value as? [String: Any] {
-                // Perform Recursive call first on sub-elements
-                // IMPORTANT: Pass isMarker: false to recursive calls to avoid infinite recursion 
-                // into scene_filter if the subDict is already a scene_filter.
-                subDict = sanitizeFilter(subDict, isMarker: false)
-                
-                // 3. Special handling for has_markers - Stash expects string "true"/"false", not boolean
-                if key == "has_markers" {
-                    var finalString: String? = nil
-                    if let val = subDict["value"] as? Bool {
-                        finalString = val ? "true" : "false"
-                    } else if let valStr = subDict["value"] as? String {
-                        finalString = valStr
-                    }
-                    if let strVal = finalString {
-                        newDict[key] = strVal
-                        continue
-                    }
+                // Strip UI-only keys from criterion objects
+                for uiKey in uiCriterionKeys {
+                    subDict.removeValue(forKey: uiKey)
                 }
                 
+                // --- String value keys (has_markers, is_missing, has_chapters) ---
+                if stringValueKeys.contains(key) {
+                    if let val = subDict["value"] as? Bool {
+                        newDict[key] = val ? "true" : "false"
+                    } else if let valStr = subDict["value"] as? String {
+                        newDict[key] = valStr
+                    }
+                    continue
+                }
                 
-                // 4. Special handling for duplicated - convert to PHashDuplicationCriterionInput
-                // UI format: {"duplicated": {"modifier": "EQUALS", "value": "true"}}
-                // API format: {"duplicated": {"duplicated": true}}
+                // --- Duplicated: DuplicationCriterionInput ---
                 if key == "duplicated" {
-                    var duplicatedBool: Bool? = nil
-                    if let val = subDict["value"] as? Bool {
-                        duplicatedBool = val
-                    } else if let valStr = subDict["value"] as? String {
-                        duplicatedBool = (valStr == "true")
+                    var result: [String: Any] = [:]
+                    for boolKey in ["duplicated", "phash", "url", "stash_id", "title"] {
+                        if let val = subDict[boolKey] as? Bool { result[boolKey] = val }
+                        else if let s = subDict[boolKey] as? String { result[boolKey] = (s == "true") }
                     }
-                    
-                    if let isDuplicated = duplicatedBool {
-                        // API expects: {"duplicated": true/false} (not value/modifier)
-                        newDict[key] = ["duplicated": isDuplicated]
-                        continue
+                    if let dist = subDict["distance"] as? Int { result["distance"] = dist }
+                    if result.isEmpty {
+                        if let val = subDict["value"] as? Bool { result["duplicated"] = val }
+                        else if let s = subDict["value"] as? String { result["duplicated"] = (s == "true") }
                     }
+                    newDict[key] = result
+                    continue
                 }
                 
-                // 5. Special handling for specific Boolean Criterion keys that should be a simple Bool
-                let booleanFlags = [
-                    "organized", "interactive", "performer_favorite", "studio_favorite", // Scenes (removed duplicated, has_markers)
-                    "filter_favorites", "is_favorite", "ignore_auto_tag", "favorite",   // Performers & Tags & Studios
-                    "has_birthdate", "has_height_cm", "has_weight", "has_measurements",
-                    "has_career_length", "has_tattoos", "has_piercings", "has_alias_list"
-                ]
+                // --- Boolean flags ---
                 if booleanFlags.contains(key) {
-                    var finalBool: Bool? = nil
-                    if let val = subDict["value"] as? Bool {
-                        finalBool = val
-                    } else if let valStr = subDict["value"] as? String {
-                        if valStr == "true" { finalBool = true }
-                        else if valStr == "false" { finalBool = false }
-                    }
-                    if let val = finalBool {
-                        // Stash API expects boolean filters as actual boolean values
-                        newDict[key] = val
-                        continue
-                    }
+                    if let val = subDict["value"] as? Bool { newDict[key] = val }
+                    else if let s = subDict["value"] as? String { newDict[key] = (s == "true") }
+                    continue
                 }
                 
-                // 4. Handle Multi-Select / ID Arrays (Performers, Studios, Tags, etc.)
-                var itemsArray: [Any]? = nil
-                if let valArray = subDict["value"] as? [Any] {
-                    itemsArray = valArray
-                } else if let valMap = subDict["value"] as? [String: Any], let items = valMap["items"] as? [Any] {
-                    itemsArray = items
+                // --- Universal value unwrapping ---
+                // Stash UI stores values as {"value": {"value": X}} or {"value": {"id": X}}
+                if let valueDict = subDict["value"] as? [String: Any] {
+                    if let inner = valueDict["value"] { subDict["value"] = inner }
+                    else if let inner = valueDict["id"] { subDict["value"] = inner }
+                    else if let items = valueDict["items"] as? [Any] { subDict["value"] = items }
+                }
+                if let vd2 = subDict["value2"] as? [String: Any], let iv2 = vd2["value"] {
+                    subDict["value2"] = iv2
                 }
                 
-                if let items = itemsArray {
-                    let ids = items.compactMap { item -> String? in
-                        if let idStr = item as? String { return idStr }
-                        if let idInt = item as? Int { return String(idInt) }
-                        if let obj = item as? [String: Any] {
-                            if let id = obj["id"] as? String { return id }
-                            if let id = obj["id"] as? Int { return String(id) }
+                // --- Multi-Select / ID Arrays ---
+                if multiSelectFields.contains(key) {
+                    if let valArray = subDict["value"] as? [Any] {
+                        subDict["value"] = valArray.compactMap { item -> String? in
+                            if let s = item as? String { return s }
+                            if let i = item as? Int { return String(i) }
+                            if let obj = item as? [String: Any] {
+                                if let id = obj["id"] as? String { return id }
+                                if let id = obj["id"] as? Int { return String(id) }
+                            }
+                            return nil
                         }
-                        return nil
                     }
-                    
-                    if key == "orientation" {
-                        subDict["value"] = ids.map { $0.uppercased() }
-                    } else {
-                        subDict["value"] = ids
+                    if let exArr = subDict["excludes"] as? [Any] {
+                        subDict["excludes"] = exArr.compactMap { item -> String? in
+                            if let s = item as? String { return s }
+                            if let i = item as? Int { return String(i) }
+                            if let obj = item as? [String: Any] {
+                                if let id = obj["id"] as? String { return id }
+                                if let id = obj["id"] as? Int { return String(id) }
+                            }
+                            return nil
+                        }
                     }
-                    
-                    // Modifiers like EQUALS don't work well with arrays in Stash GraphQL for some fields
-                    if let mod = subDict["modifier"] as? String, (mod == "EQUALS" || mod == "CONTAINS") {
-                        subDict.removeValue(forKey: "modifier")
+                    for k in subDict.keys where !multiKeys.contains(k) { subDict.removeValue(forKey: k) }
+                    newDict[key] = subDict
+                    continue
+                }
+                
+                // --- Integer criterion fields ---
+                if intFields.contains(key) || (key.contains("count") && !floatFields.contains(key)) {
+                    func castInt(_ val: Any?) -> Any? {
+                        if let i = val as? Int { return i }
+                        if let d = val as? Double { return Int(d) }
+                        if let s = val as? String, let i = Int(s) { return i }
+                        return val
                     }
+                    if let v = subDict["value"] { subDict["value"] = castInt(v) }
+                    if let v = subDict["value2"] { subDict["value2"] = castInt(v) }
+                    for k in subDict.keys where !stdKeys.contains(k) { subDict.removeValue(forKey: k) }
+                    newDict[key] = subDict
+                    continue
                 }
                 
-                // 5. Generic Value Unwrapping / Range Support
-                // Stash stores range filter as: "rating": { "value": 4, "value2": 5, "modifier": "BETWEEN" }
-                // Ensure value and value2 are correctly typed if they should be numbers
-                let numericFields = ["rating", "play_count", "resume_time", "scene_count", "gallery_count", "performer_count", "tag_count", "duration", "framerate", "bitrate"]
-                
-                func castToNumeric(_ val: Any?) -> Any? {
-                    if let i = val as? Int { return i }
-                    if let d = val as? Double { return Int(d) }
-                    if let s = val as? String, let i = Int(s) { return i }
-                    return val
+                // --- Float criterion fields ---
+                if floatFields.contains(key) {
+                    func castFloat(_ val: Any?) -> Any? {
+                        if let d = val as? Double { return d }
+                        if let i = val as? Int { return Double(i) }
+                        if let s = val as? String, let d = Double(s) { return d }
+                        return val
+                    }
+                    if let v = subDict["value"] { subDict["value"] = castFloat(v) }
+                    if let v = subDict["value2"] { subDict["value2"] = castFloat(v) }
+                    for k in subDict.keys where !stdKeys.contains(k) { subDict.removeValue(forKey: k) }
+                    newDict[key] = subDict
+                    continue
                 }
                 
-                if numericFields.contains(key) || key.contains("count") {
-                    if let v1 = subDict["value"] { subDict["value"] = castToNumeric(v1) }
-                    if let v2 = subDict["value2"] { subDict["value2"] = castToNumeric(v2) }
+                // --- Date/Timestamp fields ---
+                if dateFields.contains(key) {
+                    for k in subDict.keys where !stdKeys.contains(k) { subDict.removeValue(forKey: k) }
+                    newDict[key] = subDict
+                    continue
                 }
                 
-                // Generic unwrap of single value dicts
-                if let valueDict = subDict["value"] as? [String: Any], let innerValue = valueDict["value"] {
-                    subDict["value"] = innerValue
+                // --- Orientation: OrientationCriterionInput { value: [OrientationEnum!]! } (NO modifier) ---
+                if key == "orientation" {
+                    if let arr = subDict["value"] as? [Any] {
+                        subDict["value"] = arr.compactMap { item -> String? in
+                            if let s = item as? String { return s.uppercased() }
+                            if let obj = item as? [String: Any], let id = obj["id"] as? String { return id.uppercased() }
+                            return nil
+                        }
+                    } else if let s = subDict["value"] as? String {
+                        subDict["value"] = [s.uppercased()]
+                    }
+                    // OrientationCriterionInput only has "value", no modifier
+                    for k in subDict.keys where k != "value" { subDict.removeValue(forKey: k) }
+                    newDict[key] = subDict
+                    continue
                 }
                 
+                // --- Resolution: ResolutionCriterionInput { value: ResolutionEnum!, modifier } ---
+                if key == "resolution" || key == "average_resolution" {
+                    if let s = subDict["value"] as? String { subDict["value"] = s.uppercased() }
+                    for k in subDict.keys where !stdKeys.contains(k) { subDict.removeValue(forKey: k) }
+                    newDict[key] = subDict
+                    continue
+                }
+                
+                // --- Gender: GenderCriterionInput { value: GenderEnum, value_list: [GenderEnum!], modifier } ---
+                if key == "gender" {
+                    // value can arrive as a string ("MALE") or an array (["Male"])
+                    if let s = subDict["value"] as? String {
+                        subDict["value"] = s.uppercased()
+                    } else if let arr = subDict["value"] as? [Any] {
+                        // Array of gender values → move to value_list, remove value
+                        let uppercased = arr.compactMap { item -> String? in
+                            if let s = item as? String { return s.uppercased() }
+                            if let obj = item as? [String: Any], let id = obj["id"] as? String { return id.uppercased() }
+                            return nil
+                        }
+                        subDict["value_list"] = uppercased
+                        subDict.removeValue(forKey: "value")
+                    }
+                    if let vl = subDict["value_list"] as? [Any] {
+                        subDict["value_list"] = vl.compactMap { ($0 as? String)?.uppercased() }
+                    }
+                    let genderKeys: Set<String> = ["value", "value_list", "modifier"]
+                    for k in subDict.keys where !genderKeys.contains(k) { subDict.removeValue(forKey: k) }
+                    newDict[key] = subDict
+                    continue
+                }
+                
+                // --- Circumcised: CircumcisionCriterionInput { value: [CircumisedEnum!], modifier } ---
+                if key == "circumcised" {
+                    if let arr = subDict["value"] as? [Any] {
+                        subDict["value"] = arr.compactMap { item -> String? in
+                            if let s = item as? String { return s.uppercased() }
+                            if let obj = item as? [String: Any], let id = obj["id"] as? String { return id.uppercased() }
+                            return nil
+                        }
+                    } else if let s = subDict["value"] as? String {
+                        subDict["value"] = [s.uppercased()]
+                    }
+                    for k in subDict.keys where !stdKeys.contains(k) { subDict.removeValue(forKey: k) }
+                    newDict[key] = subDict
+                    continue
+                }
+                
+                // --- StashID criterion types ---
+                if key == "stash_id_endpoint" {
+                    let valid: Set<String> = ["endpoint", "stash_id", "modifier"]
+                    for k in subDict.keys where !valid.contains(k) { subDict.removeValue(forKey: k) }
+                    newDict[key] = subDict
+                    continue
+                }
+                if key == "stash_ids_endpoint" {
+                    let valid: Set<String> = ["endpoint", "stash_ids", "modifier"]
+                    for k in subDict.keys where !valid.contains(k) { subDict.removeValue(forKey: k) }
+                    newDict[key] = subDict
+                    continue
+                }
+                
+                // --- PhashDistance ---
+                if key == "phash_distance" {
+                    let valid: Set<String> = ["value", "modifier", "distance"]
+                    for k in subDict.keys where !valid.contains(k) { subDict.removeValue(forKey: k) }
+                    newDict[key] = subDict
+                    continue
+                }
+                
+                // --- Default: StringCriterionInput { value, modifier } and other types ---
+                for k in subDict.keys where !stdKeys.contains(k) { subDict.removeValue(forKey: k) }
                 newDict[key] = subDict
+                
             } else if key == "orientation", let valArray = value as? [String] {
-                newDict[key] = valArray.map { $0.uppercased() }
+                // orientation as flat string array
+                newDict[key] = ["value": valArray.map { $0.uppercased() }]
             }
         }
         
         return newDict
     }
-    
+
     func fetchPerformerGalleries(performerId: String, sortBy: GallerySortOption = .dateDesc, isInitialLoad: Bool = true) {
         if isInitialLoad {
             currentPerformerGalleryPage = 1
@@ -1901,9 +2058,14 @@ class StashDBViewModel: ObservableObject {
         if let savedFilter = currentPerformerFilter {
             if let dict = savedFilter.filterDict {
                 let sanitized = sanitizeFilter(dict)
+                print("🔍 PERFORMER filterDict raw: \(dict)")
+                print("🔍 PERFORMER filterDict sanitized: \(sanitized)")
                 variables["performer_filter"] = sanitized
-            } else if let obj = savedFilter.object_filter {
-                variables["performer_filter"] = obj.value
+            } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
+                print("🔍 PERFORMER object_filter raw: \(objDict)")
+                let sanitized = sanitizeFilter(objDict)
+                print("🔍 PERFORMER object_filter sanitized: \(sanitized)")
+                variables["performer_filter"] = sanitized
             }
         }
         
@@ -2023,8 +2185,8 @@ class StashDBViewModel: ObservableObject {
         if let savedFilter = filter {
             if let dict = savedFilter.filterDict {
                 studioFilter = sanitizeFilter(dict)
-            } else if let obj = savedFilter.object_filter {
-                studioFilter = obj.value as? [String: Any] ?? [:]
+            } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
+                studioFilter = sanitizeFilter(objDict)
             }
         }
         
@@ -2141,8 +2303,8 @@ class StashDBViewModel: ObservableObject {
         if let savedFilter = filter {
             if let dict = savedFilter.filterDict {
                 tagFilter = sanitizeFilter(dict)
-            } else if let obj = savedFilter.object_filter {
-                tagFilter = obj.value as? [String: Any] ?? [:]
+            } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
+                tagFilter = sanitizeFilter(objDict)
             }
         }
         
@@ -2311,8 +2473,8 @@ class StashDBViewModel: ObservableObject {
         if let savedFilter = filter {
             if let dict = savedFilter.filterDict {
                 galleryFilter = sanitizeFilter(dict)
-            } else if let obj = savedFilter.object_filter {
-                galleryFilter = obj.value as? [String: Any] ?? [:]
+            } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
+                galleryFilter = sanitizeFilter(objDict)
             }
         }
         
@@ -2587,7 +2749,10 @@ class StashDBViewModel: ObservableObject {
                         self.clips = result.images
                         self.totalClips = result.count
                     } else {
-                        self.clips.append(contentsOf: result.images)
+                        // Deduplicate: Only add clips that aren't already in the list
+                        let existingIds = Set(self.clips.map { $0.id })
+                        let newClips = result.images.filter { !existingIds.contains($0.id) }
+                        self.clips.append(contentsOf: newClips)
                     }
                     
                     self.hasMoreClips = result.images.count == 20
@@ -2934,7 +3099,7 @@ struct GenerateData: Codable {
         let variables: [String: Any] = [
             "input": [
                 "id": imageId,
-                "rating100": rating100
+                "rating100": rating100 as Any
             ]
         ]
         
@@ -2989,7 +3154,7 @@ struct GenerateData: Codable {
         let variables: [String: Any] = [
             "input": [
                 "id": imageId,
-                "o_counter": oCounter
+                "o_counter": oCounter as Any
             ]
         ]
         
@@ -4826,7 +4991,7 @@ class DownloadManager: NSObject, ObservableObject {
     private let downloadsFolder: URL
     private let metadataFile = "downloads_metadata.json"
     
-    private nonisolated let taskMap = DownloadTaskMap()
+    private let taskMap = DownloadTaskMap()
     private var progressHandlers: [String: (Double, Int64, Int64) -> Void] = [:]
     private var completionHandlers: [String: (Bool) -> Void] = [:]
     
@@ -5503,7 +5668,7 @@ class HandyManager: ObservableObject {
     private func uploadToHandyCloud(localUrl: URL, completion: @escaping (URL?) -> Void) {
         // Phase 1: Download from Stash
         print("📲 Handy Bridge: Downloading script from \(localUrl.absoluteString)...")
-        URLSession.shared.dataTask(with: localUrl) { [weak self] data, response, error in
+        URLSession.shared.dataTask(with: localUrl) { data, response, error in
             guard let data = data, error == nil else {
                 print("❌ Handy Bridge: Failed to download script: \(error?.localizedDescription ?? "no data")")
                 completion(nil)
@@ -5799,7 +5964,6 @@ class ButtplugManager: ObservableObject {
         // A segment is defined by its target time 'at'
         let nextAction = actions[nextIndex]
         if Double(nextAction.at) != lastCommandSentAt {
-            let prevAction = nextIndex > 0 ? actions[nextIndex - 1] : FunscriptAction(at: 0, pos: 50)
             
             // Calculate duration from NOW to the next point
             let duration = nextAction.at - currentMs

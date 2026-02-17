@@ -2,7 +2,7 @@
 //  TVSceneDetailView.swift
 //  stashyTV
 //
-//  Created for tvOS on 08.02.26.
+//  Scene detail for tvOS — Netflix/Prime style
 //
 
 import SwiftUI
@@ -25,52 +25,44 @@ struct TVSceneDetailView: View {
             if isLoadingDetail {
                 VStack {
                     Spacer(minLength: 200)
-                    ProgressView("Loading scene details...")
-                        .font(.title2)
+                    ProgressView()
+                        .scaleEffect(1.5)
                     Spacer(minLength: 200)
                 }
                 .frame(maxWidth: .infinity)
             } else if let scene = sceneDetail {
                 VStack(spacing: 40) {
-                    // MARK: - Hero Image / Poster
                     heroSection(scene: scene)
 
-                    // MARK: - Markers Section
                     if let markers = scene.sceneMarkers, !markers.isEmpty {
                         markersSection(markers: markers, scene: scene)
                     }
 
-                    // MARK: - Details Text
                     if let details = scene.details, !details.isEmpty {
                         detailsSection(details: details)
                     }
 
-                    // MARK: - Metadata Row
                     metadataRow(scene: scene)
 
-                    // MARK: - Performers & Studio Section
                     if !scene.performers.isEmpty || scene.studio != nil {
                         performersAndStudioSection(performers: scene.performers, studio: scene.studio)
                     }
 
-                    // MARK: - Tags Section
                     if let tags = scene.tags, !tags.isEmpty {
                         tagsSection(tags: tags)
                     }
-
-
                 }
                 .padding(.horizontal, 60)
                 .padding(.vertical, 40)
             } else {
-                VStack(spacing: 20) {
+                VStack(spacing: 24) {
                     Spacer(minLength: 200)
                     Image(systemName: "exclamationmark.triangle")
-                        .font(.system(size: 64))
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 56))
+                        .foregroundColor(.white.opacity(0.12))
                     Text("Failed to load scene details")
                         .font(.title2)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(.white.opacity(0.4))
                     Button("Retry") {
                         loadData()
                     }
@@ -80,12 +72,22 @@ struct TVSceneDetailView: View {
                 .frame(maxWidth: .infinity)
             }
         }
+        .background(Color.black)
+        .navigationTitle("Scene")
         .onAppear {
             loadData()
         }
+        .onPlayPauseCommand {
+            if sceneDetail != nil {
+                if playerViewModel.player?.rate == 0 {
+                    playerViewModel.player?.play()
+                } else {
+                    playerViewModel.player?.pause()
+                }
+            }
+        }
         .fullScreenCover(isPresented: $playerViewModel.isShowingPlayer, onDismiss: {
             playerViewModel.clear()
-            // Refresh detail to show updated resume progress
             loadData()
         }) {
             if let player = playerViewModel.player {
@@ -122,20 +124,20 @@ struct TVSceneDetailView: View {
             startPlayback(for: scene)
         } label: {
             ZStack(alignment: .bottomLeading) {
-                // Large poster / thumbnail
+                // Poster thumbnail
                 if let thumbnailURL = scene.thumbnailURL {
                     CustomAsyncImage(url: thumbnailURL) { loader in
                         if loader.isLoading {
                             Rectangle()
-                                .fill(Color.gray.opacity(0.15))
+                                .fill(Color.gray.opacity(0.08))
                                 .aspectRatio(16/9, contentMode: .fit)
-                                .overlay(ProgressView())
+                                .overlay(ProgressView().scaleEffect(1.2))
                         } else if let image = loader.image {
                             image
                                 .resizable()
                                 .scaledToFill()
                                 .frame(maxWidth: .infinity)
-                                .frame(height: 450)
+                                .frame(height: 500)
                                 .clipped()
                         } else {
                             placeholderPoster
@@ -145,24 +147,30 @@ struct TVSceneDetailView: View {
                     placeholderPoster
                 }
 
-                // Progress bar for resume time (absolute bottom)
+                // Resume progress bar
                 if let resumeTime = scene.resumeTime, resumeTime > 0, let duration = scene.sceneDuration, duration > 0 {
-                    ProgressView(value: resumeTime, total: duration)
-                        .progressViewStyle(LinearProgressViewStyle(tint: AppearanceManager.shared.tintColor))
-                        .frame(height: 6)
-                        .frame(maxHeight: .infinity, alignment: .bottom)
+                    VStack {
+                        Spacer()
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Rectangle().fill(Color.white.opacity(0.2)).frame(height: 4)
+                                Rectangle().fill(AppearanceManager.shared.tintColor).frame(width: geo.size.width * CGFloat(resumeTime / duration), height: 4)
+                            }
+                        }
+                        .frame(height: 4)
+                    }
                 }
 
                 // Gradient overlay
                 LinearGradient(
-                    gradient: Gradient(colors: [.clear, .black.opacity(0.8)]),
-                    startPoint: .center,
+                    colors: [.clear, .clear, .black.opacity(0.7), .black.opacity(0.9)],
+                    startPoint: .top,
                     endPoint: .bottom
                 )
-                .frame(height: 250)
+                .frame(height: 280)
                 .allowsHitTesting(false)
 
-                // Title overlay
+                // Title + play info
                 VStack(alignment: .leading, spacing: 8) {
                     Text(scene.title ?? "Untitled Scene")
                         .font(.system(size: 38, weight: .bold))
@@ -173,7 +181,7 @@ struct TVSceneDetailView: View {
                         if let date = scene.date {
                             Text(date)
                                 .font(.title3)
-                                .foregroundColor(.white.opacity(0.8))
+                                .foregroundColor(.white.opacity(0.6))
                         }
                         
                         if isWaiting && !hasStream {
@@ -181,7 +189,7 @@ struct TVSceneDetailView: View {
                                 .progressViewStyle(CircularProgressViewStyle(tint: .white))
                                 .scaleEffect(0.8)
                         } else if hasStream {
-                            HStack(spacing: 12) {
+                            HStack(spacing: 10) {
                                 Image(systemName: "play.fill")
                                 if let resumeTime = scene.resumeTime, resumeTime > 0 {
                                     Text("Resume from \(formattedDuration(resumeTime))")
@@ -194,7 +202,7 @@ struct TVSceneDetailView: View {
                         } else {
                             Text("No Stream")
                                 .font(.headline)
-                                .foregroundColor(.white.opacity(0.6))
+                                .foregroundColor(.white.opacity(0.4))
                         }
                     }
                 }
@@ -203,18 +211,18 @@ struct TVSceneDetailView: View {
             }
         }
         .buttonStyle(.card)
-        .padding(.horizontal, -60) // Let it span wider
+        .padding(.horizontal, -60)
         .disabled(!hasStream || (isWaiting && !hasStream))
     }
 
     private var placeholderPoster: some View {
         Rectangle()
-            .fill(Color.gray.opacity(0.15))
-            .frame(height: 450)
+            .fill(Color.gray.opacity(0.08))
+            .frame(height: 500)
             .overlay(
                 Image(systemName: "film")
-                    .font(.system(size: 72))
-                    .foregroundColor(.secondary)
+                    .font(.system(size: 64))
+                    .foregroundColor(.white.opacity(0.12))
             )
     }
 
@@ -222,44 +230,46 @@ struct TVSceneDetailView: View {
 
     @ViewBuilder
     private func metadataRow(scene: Scene) -> some View {
-        HStack(spacing: 40) {
-            // Duration
-            if let duration = scene.sceneDuration, duration > 0 {
-                metadataPill(icon: "clock", text: formattedDuration(duration))
-            }
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 20) {
+                // Duration
+                if let duration = scene.sceneDuration, duration > 0 {
+                    metadataPill(icon: "clock", text: formattedDuration(duration))
+                }
 
-            // Rating
-            if let rating100 = scene.rating100, rating100 > 0 {
-                HStack(spacing: 6) {
-                    ForEach(0..<5, id: \.self) { index in
-                        let starValue = Double(index + 1) * 20.0
-                        let rating = Double(rating100)
-                        Image(systemName: rating >= starValue ? "star.fill" :
-                              (rating >= starValue - 10 ? "star.leadinghalf.filled" : "star"))
-                            .font(.title2)
-                            .foregroundColor(.yellow)
+                // Rating
+                if let rating100 = scene.rating100, rating100 > 0 {
+                    HStack(spacing: 6) {
+                        ForEach(0..<5, id: \.self) { index in
+                            let starValue = Double(index + 1) * 20.0
+                            let rating = Double(rating100)
+                            Image(systemName: rating >= starValue ? "star.fill" :
+                                  (rating >= starValue - 10 ? "star.leadinghalf.filled" : "star"))
+                                .font(.title3)
+                                .foregroundColor(.yellow)
+                        }
                     }
-                    Text("(\(rating100)/100)")
-                        .font(.title3)
-                        .foregroundColor(.secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .background(Color.white.opacity(0.06))
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                }
+
+                // Play Count
+                if let playCount = scene.playCount, playCount > 0 {
+                    metadataPill(icon: "play.circle", text: "\(playCount) views")
+                }
+
+                // O-Counter
+                if let oCounter = scene.oCounter, oCounter > 0 {
+                    metadataPill(icon: "heart.circle", text: "\(oCounter)")
+                }
+
+                // Resolution
+                if let file = scene.files?.first, let w = file.width, let h = file.height {
+                    metadataPill(icon: "aspectratio", text: "\(w)×\(h)")
                 }
             }
-
-            // Play Count
-            if let playCount = scene.playCount, playCount > 0 {
-                metadataPill(icon: "play.circle", text: "\(playCount) views")
-            }
-
-            // O-Counter
-            if let oCounter = scene.oCounter, oCounter > 0 {
-                metadataPill(icon: "heart.circle", text: "\(oCounter)")
-            }
-
-            // Resolution
-            if let file = scene.files?.first, let w = file.width, let h = file.height {
-                metadataPill(icon: "aspectratio", text: "\(w)x\(h)")
-            }
-
         }
     }
 
@@ -267,27 +277,27 @@ struct TVSceneDetailView: View {
         HStack(spacing: 8) {
             Image(systemName: icon)
                 .font(.title3)
+                .foregroundColor(AppearanceManager.shared.tintColor)
             Text(text)
                 .font(.title3)
+                .foregroundColor(.white.opacity(0.7))
         }
-        .foregroundColor(.secondary)
-        .padding(.horizontal, 20)
-        .padding(.vertical, 12)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .background(Color.white.opacity(0.06))
+        .clipShape(RoundedRectangle(cornerRadius: 10))
     }
 
+    // MARK: - Playback
 
     private func startPlayback(for scene: Scene, at timestamp: Double? = nil) {
         let startTime = timestamp ?? scene.resumeTime ?? 0
         print("🎬 TV: Starting playback for scene: \(scene.title ?? "Untitled") (ID: \(scene.id)) at \(startTime)s")
         
-        // Increment play count (only once per view session)
         if !hasAddedPlay {
             viewModel.addScenePlay(sceneId: scene.id) { newCount in
                 if let count = newCount {
                     DispatchQueue.main.async {
-                        // Reflect the new count in the UI immediately
                         if var updatedScene = sceneDetail {
                             updatedScene = updatedScene.withPlayCount(count)
                             self.sceneDetail = updatedScene
@@ -298,19 +308,19 @@ struct TVSceneDetailView: View {
             hasAddedPlay = true
         }
         
-        // Prefer HLS stream (Best for tvOS)
+        // Prefer HLS stream
         if let hlsStream = sceneStreams.first(where: { $0.mime_type == "application/vnd.apple.mpegurl" }) {
             playerViewModel.setupPlayer(url: URL(string: hlsStream.url)!, sceneId: scene.id, viewModel: viewModel, startAt: startTime)
             return
         }
 
-        // Fallback to first MP4 transcode stream
+        // Fallback to MP4
         if let mp4Stream = sceneStreams.first(where: { $0.mime_type == "video/mp4" }) {
             playerViewModel.setupPlayer(url: URL(string: mp4Stream.url)!, sceneId: scene.id, viewModel: viewModel, startAt: startTime)
             return
         }
 
-        // Fallback to direct stream path
+        // Fallback to direct stream
         if let directPath = scene.paths?.stream {
             if directPath.starts(with: "http://") || directPath.starts(with: "https://") {
                 playerViewModel.setupPlayer(url: URL(string: directPath)!, sceneId: scene.id, viewModel: viewModel, startAt: startTime)
@@ -325,15 +335,16 @@ struct TVSceneDetailView: View {
 
     @ViewBuilder
     private func markersSection(markers: [SceneMarker], scene: Scene) -> some View {
-        VStack(alignment: .leading, spacing: 0) {
+        VStack(alignment: .leading, spacing: 16) {
+            sectionHeading(icon: "bookmark.fill", title: "Markers", count: markers.count)
+
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 24) {
                     ForEach(markers.sorted { $0.seconds < $1.seconds }) { marker in
                         Button {
                             startPlayback(for: scene, at: marker.seconds)
                         } label: {
-                            VStack(alignment: .leading, spacing: 12) {
-                                // Marker Thumbnail
+                            VStack(alignment: .leading, spacing: 8) {
                                 ZStack(alignment: .bottomTrailing) {
                                     if let url = marker.thumbnailURL {
                                         CustomAsyncImage(url: url) { loader in
@@ -341,50 +352,49 @@ struct TVSceneDetailView: View {
                                                 image
                                                     .resizable()
                                                     .scaledToFill()
-                                                    .frame(width: 240, height: 135) // 16:9 aspect ratio
+                                                    .frame(width: 260, height: 146)
                                                     .clipped()
                                             } else {
                                                 Rectangle()
-                                                    .fill(Color.gray.opacity(0.15))
-                                                    .frame(width: 240, height: 135)
-                                                    .overlay(ProgressView())
+                                                    .fill(Color.gray.opacity(0.08))
+                                                    .frame(width: 260, height: 146)
+                                                    .overlay(ProgressView().scaleEffect(0.8))
                                             }
                                         }
                                     } else {
                                         Rectangle()
-                                            .fill(Color.gray.opacity(0.15))
-                                            .frame(width: 240, height: 135)
+                                            .fill(Color.gray.opacity(0.08))
+                                            .frame(width: 260, height: 146)
                                             .overlay(Image(systemName: "bookmark")
                                                 .font(.largeTitle)
-                                                .foregroundColor(.secondary))
+                                                .foregroundColor(.white.opacity(0.12)))
                                     }
                                 
-                                    // Timestamp Badge
+                                    // Timestamp
                                     Text(formattedDuration(marker.seconds))
-                                        .font(.caption2)
-                                        .fontWeight(.bold)
-                                        .padding(.horizontal, 6)
+                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 7)
                                         .padding(.vertical, 3)
                                         .background(Color.black.opacity(0.7))
-                                        .foregroundColor(.white)
-                                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                                        .padding(6)
+                                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                                        .padding(8)
                                 }
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
                                 
-                                // Marker Title
                                 Text(marker.title ?? "Untitled Marker")
                                     .font(.callout)
-                                    .foregroundColor(.primary)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.white.opacity(0.7))
                                     .lineLimit(1)
-                                    .frame(width: 240, alignment: .leading)
+                                    .frame(width: 260, alignment: .leading)
                             }
                         }
                         .buttonStyle(.card)
                     }
                 }
                 .padding(.horizontal, 4)
-                .padding(.vertical, 30) // Increased padding for focus expansion
+                .padding(.vertical, 20)
             }
         }
     }
@@ -393,147 +403,102 @@ struct TVSceneDetailView: View {
 
     @ViewBuilder
     private func performersAndStudioSection(performers: [ScenePerformer], studio: SceneStudio?) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Text("Performers & Studio")
-                .font(.title3)
-                .fontWeight(.bold)
-                .foregroundColor(.secondary)
+        VStack(alignment: .leading, spacing: 16) {
+            let totalCount = performers.count + (studio != nil ? 1 : 0)
+            sectionHeading(icon: "person.2.fill", title: "Cast & Studio", count: totalCount)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 40) {
-                    // Studio (Optional)
+                HStack(spacing: 30) {
+                    // Studio
                     if let studio = studio {
                         NavigationLink(destination: TVStudioDetailView(studioId: studio.id, studioName: studio.name)) {
-                            StudioButtonContent(studio: studio)
+                            VStack(alignment: .leading, spacing: 8) {
+                                Rectangle()
+                                    .fill(Color.gray.opacity(0.08))
+                                    .frame(width: 280, height: 158)
+                                    .overlay(
+                                        Image(systemName: "building.2.fill")
+                                            .font(.system(size: 36))
+                                            .foregroundColor(.white.opacity(0.12))
+                                    )
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                                Text(studio.name)
+                                    .font(.callout)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                    .frame(width: 280, alignment: .leading)
+                            }
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.card)
                         
                         if !performers.isEmpty {
-                            Divider()
-                                .frame(height: 120)
-                                .background(Color.secondary.opacity(0.3))
+                            Rectangle()
+                                .fill(Color.white.opacity(0.06))
+                                .frame(width: 1, height: 120)
                         }
                     }
 
                     // Performers
                     ForEach(performers) { performer in
                         NavigationLink(destination: TVPerformerDetailView(performerId: performer.id, performerName: performer.name)) {
-                            PerformerButtonContent(performer: performer)
+                            VStack(alignment: .leading, spacing: 8) {
+                                performerThumbnail(performer: performer)
+                                    .frame(width: 160, height: 240)
+                                    .clipped()
+                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+
+                                Text(performer.name)
+                                    .font(.callout)
+                                    .fontWeight(.semibold)
+                                    .foregroundColor(.white)
+                                    .lineLimit(1)
+                                    .frame(width: 160, alignment: .leading)
+                            }
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.card)
                     }
                 }
-                .padding(.vertical, 20)
                 .padding(.horizontal, 4)
+                .padding(.vertical, 20)
             }
         }
     }
 
-    struct StudioButtonContent: View {
-        let studio: SceneStudio
-        @Environment(\.isFocused) var isFocused
-        
-        var body: some View {
-            VStack(alignment: .leading, spacing: 12) {
-                ZStack(alignment: .bottomTrailing) {
-                    // Background for the inset
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(isFocused ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(.ultraThinMaterial))
-                        .scaleEffect(isFocused ? 1.1 : 1.0)
-
-                    CustomAsyncImage(url: studio.thumbnailURL) { loader in
-                        if let image = loader.image {
-                            image.resizable().scaledToFill()
-                        } else {
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.1))
-                                .overlay(Image(systemName: "building.2.fill").font(.system(size: 40)).foregroundColor(.secondary))
-                        }
-                    }
-                    .frame(width: 320 - 16, height: 180 - 16)
-                    .cornerRadius(8)
-                    .padding(8)
-                    .scaleEffect(isFocused ? 1.1 : 1.0)
-                    .clipped()
-                }
-                .frame(width: 320, height: 180)
-                .shadow(color: .black.opacity(isFocused ? 0.3 : 0), radius: 10, y: 10)
-                
-                Text(studio.name)
-                    .font(.headline)
-                    .foregroundColor(isFocused ? .primary : .secondary)
-                    .lineLimit(1)
-                    .frame(width: 320, alignment: .leading)
-                    .scaleEffect(isFocused ? 1.05 : 1.0)
-            }
-            .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.3), value: isFocused)
-        }
-    }
-
-    struct PerformerButtonContent: View {
-        let performer: ScenePerformer
-        @Environment(\.isFocused) var isFocused
-        
-        var body: some View {
-            VStack(alignment: .leading, spacing: 12) {
-                ZStack(alignment: .bottomTrailing) {
-                    // Background for the inset
-                    RoundedRectangle(cornerRadius: 12)
-                        .fill(isFocused ? AnyShapeStyle(.thinMaterial) : AnyShapeStyle(.ultraThinMaterial))
-                        .scaleEffect(isFocused ? 1.1 : 1.0)
-
-                    CustomAsyncImage(url: performer.thumbnailURL) { loader in
-                        if let image = loader.image {
-                            image.resizable().scaledToFill()
-                        } else {
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.1))
-                                .overlay(Image(systemName: "person.fill").font(.system(size: 40)).foregroundColor(.secondary))
-                        }
-                    }
-                    .frame(width: 200 - 12, height: 300 - 12)
-                    .cornerRadius(8)
-                    .padding(6)
-                    .scaleEffect(isFocused ? 1.1 : 1.0)
-                    .clipped()
-                }
-                .frame(width: 200, height: 300)
-                .shadow(color: .black.opacity(isFocused ? 0.3 : 0), radius: 10, y: 10)
-
-                Text(performer.name)
-                    .font(.headline)
-                    .foregroundColor(isFocused ? .primary : .secondary)
-                    .lineLimit(1)
-                    .frame(width: 200, alignment: .leading)
-                    .scaleEffect(isFocused ? 1.05 : 1.0)
-            }
-            .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.7, blendDuration: 0.3), value: isFocused)
-        }
+    private func performerThumbnail(performer: ScenePerformer) -> some View {
+        // ScenePerformer only has id/name — no thumbnail URL
+        // Full image loads on the performer detail page
+        Rectangle()
+            .fill(Color.gray.opacity(0.08))
+            .overlay(
+                Image(systemName: "person.fill")
+                    .font(.system(size: 32))
+                    .foregroundColor(.white.opacity(0.12))
+            )
     }
 
     // MARK: - Tags Section
 
     @ViewBuilder
     private func tagsSection(tags: [Tag]) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text("Tags")
-                .font(.title2)
-                .fontWeight(.bold)
+        VStack(alignment: .leading, spacing: 16) {
+            sectionHeading(icon: "tag.fill", title: "Tags", count: tags.count)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 16) {
+                HStack(spacing: 12) {
                     ForEach(tags) { tag in
                         Text(tag.name)
                             .font(.headline)
-                            .foregroundColor(.primary)
-                            .padding(.horizontal, 20)
-                            .padding(.vertical, 12)
-                            .background(.thinMaterial)
+                            .foregroundColor(.white.opacity(0.75))
+                            .padding(.horizontal, 18)
+                            .padding(.vertical, 10)
+                            .background(Color.white.opacity(0.06))
                             .clipShape(Capsule())
                     }
                 }
                 .padding(.horizontal, 4)
-                .padding(.vertical, 30) // Increased padding for focus expansion
+                .padding(.vertical, 20)
             }
         }
     }
@@ -542,25 +507,44 @@ struct TVSceneDetailView: View {
 
     @ViewBuilder
     private func detailsSection(details: String) -> some View {
-        VStack(alignment: .leading, spacing: 16) {
-            Text("Details")
-                .font(.title2)
-                .fontWeight(.bold)
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeading(icon: "text.alignleft", title: "Details")
 
             Text(details)
                 .font(.body)
-                .foregroundColor(.secondary)
+                .foregroundColor(.white.opacity(0.5))
+                .lineSpacing(4)
                 .lineLimit(nil)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .padding(24)
-        .background(.ultraThinMaterial)
-        .clipShape(RoundedRectangle(cornerRadius: 16))
+        .background(Color.white.opacity(0.04))
+        .clipShape(RoundedRectangle(cornerRadius: 14))
     }
 
+    // MARK: - Reusable Section Heading
 
-
-
+    private func sectionHeading(icon: String, title: String, count: Int? = nil) -> some View {
+        HStack(spacing: 10) {
+            Image(systemName: icon)
+                .font(.title3)
+                .foregroundColor(AppearanceManager.shared.tintColor)
+            Text(title)
+                .font(.title3)
+                .fontWeight(.bold)
+                .foregroundColor(.white)
+            if let count = count {
+                Text("\(count)")
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white.opacity(0.4))
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 3)
+                    .background(Color.white.opacity(0.06))
+                    .clipShape(Capsule())
+            }
+        }
+    }
 
     // MARK: - Helpers
 
@@ -601,7 +585,6 @@ class TVPlayerViewModel: ObservableObject {
             newPlayer.seek(to: CMTime(seconds: timestamp, preferredTimescale: 600))
         }
         
-        // Observe player item status for errors
         statusObserver = newPlayer.currentItem?.observe(\.status, options: [.new, .initial]) { [weak self] item, change in
             DispatchQueue.main.async {
                 if item.status == .failed {
@@ -620,7 +603,6 @@ class TVPlayerViewModel: ObservableObject {
         self.player = newPlayer
         self.isShowingPlayer = true
         
-        // Setup periodic progress updates
         progressTimer = Timer.publish(every: 10, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
@@ -673,6 +655,3 @@ struct TVVideoPlayerView: View {
         }
     }
 }
-
-// Note: TVPerformerDetailView is in TVPerformerDetailView.swift
-// Note: TVStudioDetailView is in TVStudioDetailView.swift

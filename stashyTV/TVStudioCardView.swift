@@ -2,6 +2,8 @@
 //  TVStudioCardView.swift
 //  stashyTV
 //
+//  Studio card for tvOS — Netflix style
+//
 
 import SwiftUI
 
@@ -9,71 +11,76 @@ struct TVStudioCardView: View {
     let studio: Studio
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Studio thumbnail
+        VStack(alignment: .leading, spacing: 10) {
             ZStack(alignment: .bottomTrailing) {
-                // Background for the inset
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.ultraThinMaterial)
+                thumbnailView
+                    .frame(width: 320, height: 180)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
 
-                CustomAsyncImage(url: studio.thumbnailURL) { loader in
-                    if loader.isLoading {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                            .overlay(ProgressView())
-                    } else if let image = loader.image {
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    } else {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                            .overlay(
-                                Image(systemName: "building.2.fill")
-                                    .font(.system(size: 48))
-                                    .foregroundColor(.secondary)
-                            )
-                    }
-                }
-                .frame(width: 320 - 16, height: 180 - 16) // 16:9 aspect with 8pt inset each side
-                .cornerRadius(8)
-                .padding(8)
-                .clipped()
-
-                // Scene count badge
                 if studio.sceneCount > 0 {
                     Text("\(studio.sceneCount)")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(AppearanceManager.shared.tintColor.opacity(0.9))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.white)
-                        .cornerRadius(8)
-                        .padding(14) // Offset for inset
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.black.opacity(0.7))
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                        .padding(8)
                 }
             }
 
-            // Studio name
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(studio.name)
-                    .font(.headline)
+                    .font(.callout)
+                    .fontWeight(.semibold)
                     .lineLimit(2)
-                    .foregroundColor(.primary)
+                    .foregroundColor(.white)
 
                 if let rating = studio.rating100 {
                     HStack(spacing: 4) {
                         Image(systemName: "star.fill")
-                            .font(.caption2)
+                            .font(.system(size: 10))
                             .foregroundColor(.yellow)
                         Text(String(format: "%.1f", Double(rating) / 20.0))
                             .font(.caption)
-                            .foregroundColor(.secondary)
+                            .foregroundColor(.white.opacity(0.5))
                     }
                 }
             }
-            .padding(.horizontal, 4)
         }
         .frame(width: 320)
+    }
+
+    @ViewBuilder
+    private var thumbnailView: some View {
+        if let thumbnailURL = studio.thumbnailURL {
+            AsyncImage(url: thumbnailURL) { phase in
+                switch phase {
+                case .empty:
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.08))
+                        .overlay(ProgressView().scaleEffect(0.8))
+                case .success(let image):
+                    image.resizable().scaledToFill()
+                case .failure:
+                    placeholderView
+                @unknown default:
+                    placeholderView
+                }
+            }
+        } else {
+            placeholderView
+        }
+    }
+
+    private var placeholderView: some View {
+        Rectangle()
+            .fill(Color.gray.opacity(0.08))
+            .overlay(
+                Image(systemName: "building.2.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(.white.opacity(0.12))
+            )
     }
 }

@@ -47,3 +47,7 @@ venv/
 build.log
 build_detailed.log
 build_log.txt
+
+CLAUDE.md
+gemini.md
+.gitignore

@@ -2,7 +2,7 @@
 //  TVDashboardView.swift
 //  stashyTV
 //
-//  Created for stashy tvOS.
+//  Dashboard for tvOS — Netflix/Prime style rows
 //
 
 import SwiftUI
@@ -10,6 +10,7 @@ import SwiftUI
 struct TVDashboardView: View {
     @StateObject private var viewModel = StashDBViewModel()
     @ObservedObject private var configManager = ServerConfigManager.shared
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     @State private var recentlyPlayedScenes: [Scene] = []
     @State private var recentlyReleasedScenes: [Scene] = []
@@ -25,45 +26,103 @@ struct TVDashboardView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 60) {
-                    // MARK: - Recently Played Row
-                    if !recentlyPlayedScenes.isEmpty {
-                        sceneRow(title: "Recently Played", scenes: recentlyPlayedScenes, sortBy: .lastPlayedAtDesc)
-                    } else if isLoadingPlayed {
-                        placeholderRow(title: "Recently Played")
-                    }
+        ScrollView([.vertical], showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 0) {
+                // Greeting header
+                headerSection
+                    .padding(.horizontal, 50)
+                    .padding(.top, 60)
+                    .padding(.bottom, 44)
 
-                    // MARK: - Recently Released Row
-                    if !recentlyReleasedScenes.isEmpty {
-                        sceneRow(title: "Recently Released", scenes: recentlyReleasedScenes, sortBy: .dateDesc)
-                    } else if isLoadingReleased {
-                        placeholderRow(title: "Recently Released")
-                    }
-
-                    // MARK: - Recently Added Row
-                    if !recentlyAddedScenes.isEmpty {
-                        sceneRow(title: "Recently Added", scenes: recentlyAddedScenes, sortBy: .createdAtDesc)
-                    } else if isLoadingAdded {
-                        placeholderRow(title: "Recently Added")
-                    }
-                }
-                .padding(.vertical, 40)
+                contentRows
             }
-            .navigationDestination(for: DashboardDestination.self) { destination in
-                switch destination {
-                case .scene(let id):
-                    TVSceneDetailView(sceneId: id)
-                case .sceneList(let sort):
-                    TVScenesView(sortBy: sort)
-                }
+        }
+        .background(Color.black)
+        .navigationBarHidden(true)
+        .navigationDestination(for: DashboardDestination.self) { destination in
+            switch destination {
+            case .scene(let id):
+                TVSceneDetailView(sceneId: id)
+            case .sceneList(let sort):
+                TVScenesView(sortBy: sort)
             }
+        }
         .onAppear {
             loadData()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
             loadData()
         }
+    }
+    
+    // MARK: - Header
+    
+    private var headerSection: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(greetingText)
+                .font(.system(size: 42, weight: .bold))
+                .foregroundColor(.white)
+            
+            if let serverName = configManager.activeConfig?.name, !serverName.isEmpty {
+                Text(serverName)
+                    .font(.title3)
+                    .foregroundColor(.white.opacity(0.35))
+            }
+        }
+    }
+    
+    private var greetingText: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        switch hour {
+        case 5..<12: return "Good Morning"
+        case 12..<17: return "Good Afternoon"
+        case 17..<22: return "Good Evening"
+        default: return "Good Night"
+        }
+    }
+    
+    // MARK: - Content Rows
+    
+    private var contentRows: some View {
+        VStack(alignment: .leading, spacing: 60) {
+            if isLoadingPlayed && isLoadingReleased && isLoadingAdded {
+                HStack {
+                    Spacer()
+                    ProgressView()
+                        .scaleEffect(1.5)
+                    Spacer()
+                }
+                .padding(.top, 100)
+            } else {
+                if !recentlyPlayedScenes.isEmpty {
+                    sceneRow(
+                        title: "Continue Watching",
+                        icon: "play.circle.fill",
+                        scenes: recentlyPlayedScenes,
+                        sortBy: .lastPlayedAtDesc
+                    )
+                }
+
+                if !recentlyReleasedScenes.isEmpty {
+                    sceneRow(
+                        title: "New Releases",
+                        icon: "sparkles.tv.fill",
+                        scenes: recentlyReleasedScenes,
+                        sortBy: .dateDesc
+                    )
+                }
+
+                if !recentlyAddedScenes.isEmpty {
+                    sceneRow(
+                        title: "Recently Added",
+                        icon: "plus.rectangle.on.folder.fill",
+                        scenes: recentlyAddedScenes,
+                        sortBy: .createdAtDesc
+                    )
+                }
+            }
+        }
+        .padding(.bottom, 80)
     }
 
     // MARK: - Data Loading
@@ -74,7 +133,6 @@ struct TVDashboardView: View {
     }
 
     private func fetchHomeRows() {
-        // Recently Played
         isLoadingPlayed = true
         let playedConfig = HomeRowConfig(
             id: UUID(),
@@ -88,7 +146,6 @@ struct TVDashboardView: View {
             isLoadingPlayed = false
         }
 
-        // Recently Released
         isLoadingReleased = true
         let releasedConfig = HomeRowConfig(
             id: UUID(),
@@ -102,7 +159,6 @@ struct TVDashboardView: View {
             isLoadingReleased = false
         }
 
-        // Recently Added
         isLoadingAdded = true
         let addedConfig = HomeRowConfig(
             id: UUID(),
@@ -117,30 +173,41 @@ struct TVDashboardView: View {
         }
     }
 
-    // MARK: - Statistics Section
-
     // MARK: - Scene Row
 
     @ViewBuilder
-    private func sceneRow(title: String, scenes: [Scene], sortBy: StashDBViewModel.SceneSortOption) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
+    private func sceneRow(title: String, icon: String, scenes: [Scene], sortBy: StashDBViewModel.SceneSortOption) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            // Section heading
             NavigationLink(value: DashboardDestination.sceneList(sortBy)) {
-                HStack {
+                HStack(spacing: 12) {
+                    Image(systemName: icon)
+                        .font(.title3)
+                        .foregroundColor(appearanceManager.tintColor)
+                    
                     Text(title)
-                        .font(.title2)
+                        .font(.title3)
                         .fontWeight(.bold)
                         .foregroundColor(.white)
                     
-                    Image(systemName: "chevron.right")
-                        .font(.title3)
-                        .foregroundColor(.secondary)
+                    Spacer()
+                    
+                    HStack(spacing: 6) {
+                        Text("See All")
+                            .font(.callout)
+                            .foregroundColor(.white.opacity(0.35))
+                        Image(systemName: "chevron.right")
+                            .font(.caption2)
+                            .foregroundColor(.white.opacity(0.25))
+                    }
                 }
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 60)
+            .padding(.horizontal, 50)
 
+            // Horizontal card scroll
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 40) {
+                HStack(spacing: 30) {
                     ForEach(scenes) { scene in
                         NavigationLink(value: DashboardDestination.scene(scene.id)) {
                             TVSceneCardView(scene: scene)
@@ -148,52 +215,9 @@ struct TVDashboardView: View {
                         .buttonStyle(.card)
                     }
                 }
-                .padding(.horizontal, 60)
-                .padding(.vertical, 30)
+                .padding(.horizontal, 50)
+                .padding(.vertical, 20)
             }
         }
-    }
-
-    @ViewBuilder
-    private func placeholderRow(title: String) -> some View {
-        VStack(alignment: .leading, spacing: 20) {
-            Text(title)
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(.white)
-                .padding(.horizontal, 60)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 40) {
-                    ForEach(0..<5, id: \.self) { _ in
-                        RoundedRectangle(cornerRadius: 12)
-                            .fill(Color(UIColor.systemGray.withAlphaComponent(0.2)))
-                            .frame(width: 380, height: 213.75)
-                            .overlay(ProgressView())
-                    }
-                }
-                .padding(.horizontal, 60)
-                .padding(.vertical, 30)
-            }
-        }
-    }
-
-    // MARK: - Helpers
-
-    private func formattedDuration(_ seconds: Float) -> String {
-        let totalSeconds = Int(seconds)
-        let hours = totalSeconds / 3600
-        let minutes = (totalSeconds % 3600) / 60
-        return "\(hours)h \(minutes)m"
-    }
-
-    private func formattedSize(_ bytes: Int64) -> String {
-        let gb = Double(bytes) / 1_073_741_824.0
-        if gb >= 1000 {
-            return String(format: "%.1f TB", gb / 1024.0)
-        }
-        return String(format: "%.1f GB", gb)
     }
 }
-
-// Note: TVSceneDetailView is in TVSceneDetailView.swift

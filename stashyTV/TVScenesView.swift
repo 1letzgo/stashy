@@ -2,16 +2,16 @@
 //  TVScenesView.swift
 //  stashyTV
 //
-//  Created for tvOS on 08.02.26.
+//  Scenes grid for tvOS — 4-column layout
 //
 
 import SwiftUI
 
 struct TVScenesView: View {
     @StateObject private var viewModel = StashDBViewModel()
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
     @State private var sortBy: StashDBViewModel.SceneSortOption
     
-    // Support initialization with a specific sort option
     init(sortBy: StashDBViewModel.SceneSortOption = .dateDesc) {
         _sortBy = State(initialValue: sortBy)
     }
@@ -21,68 +21,85 @@ struct TVScenesView: View {
         case .lastPlayedAtDesc: return "Recently Played"
         case .dateDesc: return "Recently Released"
         case .createdAtDesc: return "Recently Added"
-        default: return "Scenes - \(sortBy.displayName)"
+        default: return "Scenes – \(sortBy.displayName)"
+        }
+    }
+    
+    private var navigationIcon: String {
+        switch sortBy {
+        case .lastPlayedAtDesc: return "play.circle.fill"
+        case .dateDesc: return "sparkles.tv.fill"
+        case .createdAtDesc: return "plus.rectangle.on.folder.fill"
+        default: return "film.fill"
         }
     }
 
-    // 3-column grid sized for TV (roughly 350pt wide cards)
     private let columns = [
-        GridItem(.adaptive(minimum: 380, maximum: 500), spacing: 48)
+        GridItem(.adaptive(minimum: 380, maximum: 420), spacing: 30)
     ]
 
     var body: some View {
         VStack(spacing: 0) {
-            // MARK: - Content
             if viewModel.isLoadingScenes && viewModel.scenes.isEmpty {
                 Spacer()
-                ProgressView("Loading scenes...")
-                    .font(.title2)
+                VStack(spacing: 20) {
+                    ProgressView()
+                        .scaleEffect(1.5)
+                    Text("Loading scenes…")
+                        .font(.title3)
+                        .foregroundColor(.white.opacity(0.4))
+                }
                 Spacer()
             } else if viewModel.scenes.isEmpty {
                 Spacer()
-                VStack(spacing: 20) {
+                VStack(spacing: 24) {
                     Image(systemName: "film")
-                        .font(.system(size: 72))
-                        .foregroundColor(.secondary)
+                        .font(.system(size: 56))
+                        .foregroundColor(.white.opacity(0.12))
                     Text("No scenes found")
-                        .font(.title)
-                        .foregroundColor(.secondary)
-                    Button("Load Scenes") {
+                        .font(.title2)
+                        .fontWeight(.medium)
+                        .foregroundColor(.white.opacity(0.4))
+                    Button {
                         viewModel.fetchScenes(sortBy: sortBy, isInitialLoad: true)
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "arrow.clockwise")
+                            Text("Retry")
+                        }
+                        .font(.title3)
                     }
-                    .font(.title3)
                 }
                 Spacer()
             } else {
                 ScrollView {
-                    LazyVGrid(columns: columns, spacing: 48) {
+                    LazyVGrid(columns: columns, spacing: 40) {
                         ForEach(viewModel.scenes) { scene in
                             NavigationLink(destination: TVSceneDetailView(sceneId: scene.id)) {
                                 TVSceneCardView(scene: scene)
                             }
                             .buttonStyle(.card)
                             .onAppear {
-                                // Pagination: load more when the last item appears
                                 if scene.id == viewModel.scenes.last?.id && viewModel.hasMoreScenes {
                                     viewModel.loadMoreScenes()
                                 }
                             }
                         }
 
-                        // Loading more indicator
                         if viewModel.isLoadingMoreScenes {
                             ProgressView()
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 40)
                         }
                     }
-                    .padding(.horizontal, 48)
+                    .padding(.horizontal, 50)
                     .padding(.top, 40)
                     .padding(.bottom, 80)
                 }
             }
         }
         .navigationTitle(navigationTitle)
+        .background(Color.black)
         .onChange(of: sortBy) { _, newValue in
             viewModel.fetchScenes(sortBy: newValue, isInitialLoad: true)
         }
@@ -96,4 +113,3 @@ struct TVScenesView: View {
         }
     }
 }
-

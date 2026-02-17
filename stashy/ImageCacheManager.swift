@@ -133,15 +133,25 @@ class ImageCache {
             memoryCache.setObject(image, forKey: stableKey)
         }
         
+        // Compute file URL on the current context (before detaching)
+        let fileURL = cacheFileURL(for: key)
+        let shouldCleanup: Bool
+        if let lastCleanup = lastCleanupDate {
+            shouldCleanup = Date().timeIntervalSince(lastCleanup) > 60 * 60 * 4
+        } else {
+            shouldCleanup = true
+        }
+        
+        if shouldCleanup {
+            lastCleanupDate = Date()
+        }
+        
         // Store on Disk
-        Task.detached(priority: .background) {
-            let fileURL = self.cacheFileURL(for: key)
+        Task.detached(priority: .background) { [weak self] in
             try? data.write(to: fileURL)
             
-            // Only cleanup once every 4 hours to avoid heavy disk IO
-            if self.lastCleanupDate == nil || Date().timeIntervalSince(self.lastCleanupDate!) > 60 * 60 * 4 {
-                self.cleanupOldFiles()
-                self.lastCleanupDate = Date()
+            if shouldCleanup {
+                self?.cleanupOldFiles()
             }
         }
     }

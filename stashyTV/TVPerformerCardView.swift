@@ -2,6 +2,8 @@
 //  TVPerformerCardView.swift
 //  stashyTV
 //
+//  Performer card for tvOS — Netflix style
+//
 
 import SwiftUI
 
@@ -9,67 +11,72 @@ struct TVPerformerCardView: View {
     let performer: Performer
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Profile image (portrait 2:3)
+        VStack(alignment: .leading, spacing: 10) {
             ZStack(alignment: .bottomTrailing) {
-                // Background for the inset
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(.ultraThinMaterial)
+                thumbnailView
+                    .frame(width: 200, height: 300)
+                    .clipped()
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
 
-                CustomAsyncImage(url: performer.thumbnailURL) { loader in
-                    if loader.isLoading {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                            .overlay(ProgressView())
-                    } else if let image = loader.image {
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    } else {
-                        Rectangle()
-                            .fill(Color.gray.opacity(0.1))
-                            .overlay(
-                                Image(systemName: "person.fill")
-                                    .font(.system(size: 48))
-                                    .foregroundColor(.secondary)
-                            )
-                    }
-                }
-                .frame(width: 200 - 12, height: 300 - 12) // 2:3 aspect with 6pt inset each side
-                .cornerRadius(8)
-                .padding(6)
-                .clipped()
-
-                // Scene count badge
                 if performer.sceneCount > 0 {
                     Text("\(performer.sceneCount)")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(AppearanceManager.shared.tintColor.opacity(0.9))
+                        .font(.system(size: 11, weight: .bold))
                         .foregroundColor(.white)
-                        .cornerRadius(8)
-                        .padding(14) // Offset for inset
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.black.opacity(0.7))
+                        .clipShape(RoundedRectangle(cornerRadius: 5))
+                        .padding(8)
                 }
             }
 
-            // Name
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 3) {
                 Text(performer.name)
-                    .font(.headline)
+                    .font(.callout)
+                    .fontWeight(.semibold)
                     .lineLimit(1)
-                    .foregroundColor(.primary)
+                    .foregroundColor(.white)
 
                 if let disambiguation = performer.disambiguation, !disambiguation.isEmpty {
                     Text(disambiguation)
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.4))
                         .lineLimit(1)
                 }
             }
-            .padding(.horizontal, 4)
         }
         .frame(width: 200)
+    }
+
+    @ViewBuilder
+    private var thumbnailView: some View {
+        if let thumbnailURL = performer.thumbnailURL {
+            AsyncImage(url: thumbnailURL) { phase in
+                switch phase {
+                case .empty:
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.08))
+                        .overlay(ProgressView().scaleEffect(0.8))
+                case .success(let image):
+                    image.resizable().scaledToFill()
+                case .failure:
+                    placeholderView
+                @unknown default:
+                    placeholderView
+                }
+            }
+        } else {
+            placeholderView
+        }
+    }
+
+    private var placeholderView: some View {
+        Rectangle()
+            .fill(Color.gray.opacity(0.08))
+            .overlay(
+                Image(systemName: "person.fill")
+                    .font(.system(size: 40))
+                    .foregroundColor(.white.opacity(0.12))
+            )
     }
 }
