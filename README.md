@@ -1,9 +1,6 @@
 # Stashy iOS App Documentation
 
-## Overview
-This documentation provides a comprehensive overview of the Stashy iOS app, detailing its features and underlying Swift code structure.
-
-## Features
+# Features
 
 ### Dashboard
 The Dashboard serves as the main interface for users, providing an overview of key functionalities and data at a glance. It is designed for user-friendly navigation and displays important metrics and information dynamically.
