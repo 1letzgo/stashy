@@ -3,17 +3,15 @@
 ### Dashboard
 - Dashboard content goes here
 
-### Downloads
-- Downloads content goes here
-
 ### Catalogviews
-- Scenes content goes here
-
-### Performers
+- Scenes 
 - Performers 
 - Studios 
 - Tags 
 - Images
+- 
+### StashTok
+- SocialMedia like Videostream
 
 ### Interactive Toys
 - TheHandy
