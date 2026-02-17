@@ -1,19 +1,34 @@
-# Catalog Sections
+# README.md
 
-## Scenes
-Descriptive content about various scenes featured in the catalog.
+## Features
+- Feature 1
+- Feature 2
 
-## Performers
-Information and details about the performers involved.
+## Catalogviews
+### Dashboard
+- Dashboard content goes here
 
-## Studios
-Descriptions and highlights of the studios represented.
+### Downloads
+- Downloads content goes here
 
-## Tags
-A comprehensive list of tags used for categorization.
+### Scenes
+- Scenes content goes here
 
-## Galleries
-Details about the galleries associated with the catalog.
+### Performers
+- Performers content goes here
 
-## Interactive Toys
-Information about the interactive toys included in the catalog.
+### Studios
+- Studios content goes here
+
+### Tags
+- Tags content goes here
+
+### Galleries
+- Galleries content goes here
+
+### Interactive Toys
+- Interactive Toys content goes here
+
+## Platforms
+- **iOS** (Production ready - [App Store link](#) and [TestFlight link](#))
+- **tvOS** (Early Alpha - [TestFlight link](#))
