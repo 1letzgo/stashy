@@ -1,27 +1,56 @@
-# stashy - a STASH Media Server App for iOS / tvOS
+Stashy
+A native Stash Media Server client for iOS and tvOS.
+Stashy is a fast, privacy-focused, fully native SwiftUI app designed to give you a seamless Stash experience on iPhone, iPad, and Apple TV.
 
-### Dashboard
-- Dashboard content goes here
+✨ Features
+- Native & Fast
+Built entirely with SwiftUI for smooth scrolling, fluid animations, and responsive video playback.
+-  Dashboard
+Access your Stash dashboard content directly within the app.
+- Full Catalog Access
+  - Scenes
+  - Performers
+  - Studios
+  - Tags
+  - Images
+  - Galleries
+  - 
+📱 StashTok Mode
+A social-media-style, infinite scrolling video feed for quickly exploring your clips and scenes.
 
-### Catalogviews
-- Scenes 
-- Performers 
-- Studios 
-- Tags 
-- Images
-- 
-### StashTok
-- SocialMedia like Videostream
+⬇️ Download
+Download your favorite movies and scenes for offline viewing.
 
-### Interactive Toys
-- TheHandy
-- Intiface
+🌐 Stream
+Stream in original quality or adjust playback quality depending on your network conditions.
 
-## Platforms
-- **iOS** (Production ready - [App Store link](#) and [TestFlight link](#))
-- **tvOS** (Early Alpha - [TestFlight link](#))
+🔌 Interactive Devices
+Integrated support for:
+  - TheHandy
+  - Intiface (including FunScripts integration directly inside the player)
+    
+🔒 Privacy First
+Stashy collects zero data.
+No analytics, no tracking, no user IDs, no logs.
 
-## ToDo's
+📺 Platforms
+iOS
+Production ready
+App Store: [Link]
+TestFlight: [Link]
+tvOS
+Early Alpha (fully usable, actively improving)
+TestFlight: [Link]
 
-## Known Bugs
-- Filter
+💬 Community
+Stashy has its own Discord server to discuss development, coordinate features, and report bugs:
+https://discord.gg/NBkUpUYJ
+
+🛠 Roadmap / ToDos
+- Improve filtering system
+- Expand tvOS feature parity
+- Performance optimizations
+- UI refinements
+
+Known Issues
+- Filtering system needs refinement
