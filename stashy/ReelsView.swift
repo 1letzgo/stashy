@@ -30,6 +30,7 @@ struct ReelsView: View {
     @State private var isMenuOpen = false
     @State private var isMediaZoomed = false
     @State private var isRotating = false
+    @State private var isUIVisible = true
 
     // Extracted binding to help the Swift compiler with type-checking
     // Native scroll binding
@@ -261,35 +262,7 @@ struct ReelsView: View {
     
 
     private func applySettings(sortBy: StashDBViewModel.SceneSortOption? = nil, markerSortBy: StashDBViewModel.SceneMarkerSortOption? = nil, clipSortBy: StashDBViewModel.ImageSortOption? = nil, filter: StashDBViewModel.SavedFilter?, clipFilter: StashDBViewModel.SavedFilter? = nil, performer: ScenePerformer? = nil, tags: [Tag] = [], mode: ReelsMode? = nil) {
-        // Prevent redundant fetching if nothing substantial changed and we're already loading
-        let newMode = mode ?? reelsMode
-        let isSameMode = (newMode == reelsMode)
-        let isSameFilter = (filter?.id == selectedFilter?.id)
-        let isSameClipFilter = (clipFilter?.id == selectedClipFilter?.id)
-        let isSamePerformer = (performer?.id == selectedPerformer?.id)
-        let isSameTags = (tags.map { $0.id } == selectedTags.map { $0.id })
-        
-        let isSameSort: Bool = {
-            if let s = sortBy, s != selectedSortOption { return false }
-            if let m = markerSortBy, m != selectedMarkerSortOption { return false }
-            if let c = clipSortBy, c != selectedClipSortOption { return false }
-            return true
-        }()
-        
-        let isModeEmpty: Bool = {
-            switch newMode {
-            case .scenes: return viewModel.scenes.isEmpty
-            case .markers: return viewModel.sceneMarkers.isEmpty
-            case .clips: return viewModel.clips.isEmpty
-            }
-        }()
-        
-        if isSameMode && isSameFilter && isSameClipFilter && isSamePerformer && isSameTags && isSameSort && !isModeEmpty {
-            print("ℹ️ ReelsView: Skipping redundant applySettings call (Data already present for \(newMode.rawValue))")
-            return
-        }
-
-        if let mode = mode { reelsMode = mode }
+        if let providedMode = mode { reelsMode = providedMode }
         currentVisibleSceneId = nil // Reset to allow onAppear to pick up the new first item
         
         // Update local state only (session-scoped, does NOT persist to settings default)
@@ -305,17 +278,17 @@ struct ReelsView: View {
             selectedClipSortOption = clipSortBy
         }
         
-        if let clipFilter = clipFilter {
-            selectedClipFilter = clipFilter
-        }
-        
+        // Pass NIL explicitly to clear filters
+        selectedClipFilter = clipFilter
         selectedFilter = filter
         selectedPerformer = performer
         selectedTags = tags
         
         // Merge performer and tags into filter if needed
-        let mergedFilter = viewModel.mergeFilterWithCriteria(filter: filter, performer: performer, tags: tags)
-        let mergedClipFilter = viewModel.mergeFilterWithCriteria(filter: selectedClipFilter, performer: performer, tags: tags)
+        // IMPORTANT: Use the arguments (filter/clipFilter) instead of @State (selectedFilter/selectedClipFilter)
+        // because @State might not have propagated yet.
+        let mergedFilter = viewModel.mergeFilterWithCriteria(filter: filter, performer: performer, tags: tags, mode: .scenes)
+        let mergedClipFilter = viewModel.mergeFilterWithCriteria(filter: clipFilter, performer: performer, tags: tags, mode: .images)
 
         switch reelsMode {
         case .scenes:
@@ -502,6 +475,65 @@ struct ReelsView: View {
         }
     }
 
+    private func handlePlayCountChange(item: ReelItemData, newCount: Int) {
+        var targetSceneId: String?
+        if case .scene(let scene) = item { targetSceneId = scene.id }
+        else if case .marker(let marker) = item { targetSceneId = marker.scene?.id }
+        
+        if let sceneId = targetSceneId {
+            // 1. Scene List Update
+            if let index = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
+                let originalCount = viewModel.scenes[index].playCount ?? 0
+                viewModel.scenes[index] = viewModel.scenes[index].withPlayCount(newCount)
+                
+                viewModel.addScenePlay(sceneId: sceneId) { returnedCount in
+                    if let count = returnedCount {
+                        DispatchQueue.main.async {
+                            viewModel.scenes[index] = viewModel.scenes[index].withPlayCount(count)
+                        }
+                    } else {
+                        DispatchQueue.main.async {
+                            viewModel.scenes[index] = viewModel.scenes[index].withPlayCount(originalCount)
+                            ToastManager.shared.show("View count update failed", icon: "exclamationmark.triangle", style: .error)
+                        }
+                    }
+                }
+            }
+            
+            // 2. Scene Markers Update
+            let markerIndices = viewModel.sceneMarkers.enumerated().compactMap { index, marker in
+                marker.scene?.id == sceneId ? index : nil
+            }
+            
+            for index in markerIndices {
+                if let markerScene = viewModel.sceneMarkers[index].scene {
+                    let originalCount = markerScene.playCount ?? 0
+                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withPlayCount(newCount))
+                    
+                    // If NOT already handled by scene list update
+                    if !viewModel.scenes.contains(where: { $0.id == sceneId }) {
+                         viewModel.addScenePlay(sceneId: sceneId) { returnedCount in
+                            if let count = returnedCount {
+                                DispatchQueue.main.async {
+                                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withPlayCount(count))
+                                }
+                            } else {
+                                DispatchQueue.main.async {
+                                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withPlayCount(originalCount))
+                                }
+                            }
+                         }
+                    }
+                }
+            }
+            
+            // 3. Fallback (if not in any list)
+            if !viewModel.scenes.contains(where: { $0.id == sceneId }) && markerIndices.isEmpty {
+                viewModel.addScenePlay(sceneId: sceneId) { _ in }
+            }
+        }
+    }
+
     private var isListEmpty: Bool {
         switch reelsMode {
         case .scenes: return viewModel.scenes.isEmpty
@@ -566,9 +598,9 @@ struct ReelsView: View {
             case .clips:
                 if let defaultId = TabManager.shared.getDefaultClipFilterId(for: .reels),
                    let filter = viewModel.savedFilters[defaultId] {
-                    selectedClipFilter = filter
                     applySettings(filter: nil, clipFilter: filter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
                 } else {
+                    // Maintain current selectedClipFilter when switching modes if no default
                     applySettings(filter: nil, clipFilter: selectedClipFilter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
                 }
             }
@@ -684,6 +716,14 @@ struct ReelsView: View {
         .onChange(of: isMenuOpen) { _, _ in }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
+            
+            // Deactivate audio session to release focus immediately
+            do {
+                try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+                print("🎬 Reels: Audio session deactivated")
+            } catch {
+                print("🎬 Reels: Audio deactivation error: \(error)")
+            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
             if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.reels.rawValue {
@@ -788,6 +828,7 @@ struct ReelsView: View {
             item: item,
             isActive: item.id == currentVisibleSceneId,
             isMuted: $isMuted,
+            isUIVisible: $isUIVisible,
             onPerformerTap: { performer in
                 applySettings(sortBy: selectedSortOption, filter: selectedFilter, performer: performer, tags: selectedTags)
             },
@@ -795,28 +836,13 @@ struct ReelsView: View {
                 applySettings(sortBy: selectedSortOption, filter: selectedFilter, performer: selectedPerformer, tags: [tag])
             },
             onRatingChanged: { rating in
-                switch item {
-                case .scene(let s):
-                    self.viewModel.updateSceneRating(sceneId: s.id, rating100: rating, completion: { _ in })
-                case .marker(let m):
-                    if let sid = m.scene?.id {
-                        self.viewModel.updateSceneRating(sceneId: sid, rating100: rating, completion: { _ in })
-                    }
-                case .clip(let c):
-                    self.viewModel.updateImageRating(imageId: c.id, rating100: rating, completion: { _ in })
-                }
+                self.handleRatingChange(item: item, newRating: rating)
             },
-            onOCounterChanged: { _ in
-                switch item {
-                case .scene(let s):
-                    self.viewModel.incrementOCounter(sceneId: s.id)
-                case .marker(let m):
-                    if let sid = m.scene?.id {
-                        self.viewModel.incrementOCounter(sceneId: sid)
-                    }
-                case .clip(let c):
-                    self.viewModel.incrementImageOCounter(imageId: c.id)
-                }
+            onOCounterChanged: { newCount in
+                self.handleOCounterChange(item: item, newCount: newCount)
+            },
+            onPlayCountChanged: { newCount in
+                self.handlePlayCountChange(item: item, newCount: newCount)
             },
             viewModel: viewModel,
             isMenuOpen: $isMenuOpen,
@@ -857,7 +883,7 @@ struct ReelsView: View {
         .focusEffectDisabled()
         .scrollTargetBehavior(.paging)
         .scrollPosition(id: scrollPositionBinding)
-        .toolbar(.visible, for: .navigationBar)
+        .toolbar(isUIVisible ? .visible : .hidden, for: .navigationBar)
         .scrollContentBackground(.hidden)
         .background(Color.black)
         .onScrollPhaseChange { _, _ in }
@@ -874,9 +900,6 @@ struct ReelsView: View {
                     isRotating = false
                 }
             }
-        }
-        .onDisappear {
-            UIApplication.shared.isIdleTimerDisabled = false
         }
     }
 
@@ -1431,10 +1454,12 @@ struct ReelItemView: View {
     
     // Playback State
     @Binding var isMuted: Bool
+    @Binding var isUIVisible: Bool
     var onPerformerTap: (ScenePerformer) -> Void
     var onTagTap: (Tag) -> Void
     var onRatingChanged: (Int?) -> Void
     var onOCounterChanged: (Int) -> Void
+    var onPlayCountChanged: (Int) -> Void
     @ObservedObject var viewModel: StashDBViewModel
     @Environment(\.verticalSizeClass) var verticalSizeClass
     @State private var isPlaying = true
@@ -1470,12 +1495,15 @@ struct ReelItemView: View {
             mediaLayer
             
             // Center Play Icon (only for videos, not GIFs)
-            if !item.isGIF && !isPlaying {
+            if !item.isGIF && !isPlaying && isUIVisible {
                 CenterPlayIcon()
             }
             
             
-            bottomOverlay
+            if isUIVisible {
+                bottomOverlay
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
         }
         .buttonStyle(.plain)
         .background(Color.black)
@@ -1486,11 +1514,7 @@ struct ReelItemView: View {
             }
         }
         .onDisappear {
-            player?.pause()
-            if let timeObserver = timeObserver {
-                player?.removeTimeObserver(timeObserver)
-                self.timeObserver = nil
-            }
+            cleanupPlayer()
         }
         .onChange(of: isMuted) { _, newValue in
             player?.isMuted = newValue
@@ -1499,10 +1523,11 @@ struct ReelItemView: View {
         .focusEffectDisabled()
         .onChange(of: isActive) { _, newValue in
             if newValue {
+                if player == nil { setupPlayer() }
                 if isPlaying && !isRotating { player?.play() }
                 onInteraction()
             } else {
-                player?.pause()
+                cleanupPlayer()
             }
         }
         .onChange(of: isRotating) { _, newValue in
@@ -1574,8 +1599,9 @@ struct ReelItemView: View {
     }
 
     private func handleMediaTap() {
-        // No-op or specialized action (e.g. play/pause)
-        // We no longer toggle UI visibility
+        withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
+            isUIVisible.toggle()
+        }
         onInteraction()
     }
 
@@ -1641,6 +1667,15 @@ struct ReelItemView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 
+                // Performer and Title labels moved here
+                VStack(alignment: .leading, spacing: 4) {
+                    performerLabel(for: item)
+                    titleLabel(for: item)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 8)
+
                 // Full-width progress bar
                 if !item.isGIF {
                     CustomVideoScrubber(
@@ -1660,21 +1695,13 @@ struct ReelItemView: View {
                         }
                     )
                     .padding(.horizontal, 0)
+                    .padding(.bottom, 15) // Restore padding after progress bar
                 }
                 
-                // Bottom row: Left = Performer/Title, Right = Buttons
-            Spacer().frame(height: 10)
-            HStack(alignment: .center, spacing: 0) {
-                // Left half: Performer + Title
-                VStack(alignment: .leading, spacing: 4) {
-                    performerLabel(for: item)
-                    titleLabel(for: item)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.leading, 16)
-                
-                // Right half: Action buttons (horizontal)
-                HStack(spacing: 8) {
+                // Bottom row: Action buttons distributed across full width
+                HStack(alignment: .center, spacing: 0) {
+                    Spacer()
+                    
                     // Tags button
                     let tags = item.tags
                     if !tags.isEmpty {
@@ -1685,6 +1712,7 @@ struct ReelItemView: View {
                             }
                             onInteraction()
                         }
+                        Spacer()
                     }
                     
                     // Rating
@@ -1697,6 +1725,8 @@ struct ReelItemView: View {
                         onInteraction()
                     }
                     
+                    Spacer()
+                    
                     // O-Counter
                     let oCounter = item.oCounter ?? 0
                     BottomBarButton(icon: AppearanceManager.shared.oCounterIcon, count: oCounter) {
@@ -1704,9 +1734,14 @@ struct ReelItemView: View {
                         onInteraction()
                     }
                     
+                    Spacer()
+                    
                     // View Counter
                     if let playCount = item.playCount {
-                        BottomBarButton(icon: "stopwatch", count: playCount) { }
+                        BottomBarButton(icon: "stopwatch", count: playCount) {
+                             onInteraction()
+                        }
+                        Spacer()
                     }
                     
                     // Mute Button (only for videos)
@@ -1719,6 +1754,8 @@ struct ReelItemView: View {
                             isMuted.toggle()
                             onInteraction()
                         }
+
+                        Spacer()
 
                         // Play/Pause Button
                         BottomBarButton(
@@ -1734,10 +1771,10 @@ struct ReelItemView: View {
                             }
                             onInteraction()
                         }
+                        Spacer()
                     }
                 }
-                .padding(.trailing, 16)
-            }
+                .padding(.horizontal, 16)
             .frame(height: 50)
         }
         .padding(.bottom, 30) // Safe area spacing
@@ -1966,19 +2003,27 @@ struct ReelItemView: View {
     }
     
     func incrementPlayCount() {
-        if case .scene(let scene) = item {
-            viewModel.addScenePlay(sceneId: scene.id) { newCount in
-                if let count = newCount {
-                    if let index = viewModel.scenes.firstIndex(where: { $0.id == scene.id }) {
-                        DispatchQueue.main.async {
-                            viewModel.scenes[index] = viewModel.scenes[index].withPlayCount(count)
-                        }
-                    }
-                }
-            }
+        if let currentCount = item.playCount {
+            onPlayCountChanged(currentCount + 1)
         }
     }
     
+    func cleanupPlayer() {
+        player?.pause()
+        if let timeObserver = timeObserver {
+            player?.removeTimeObserver(timeObserver)
+            self.timeObserver = nil
+        }
+        
+        // Remove end of time observer
+        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: player?.currentItem)
+        
+        // Aggressively release resources
+        player?.replaceCurrentItem(with: nil)
+        player = nil
+        print("🎬 Reels: Player cleaned up for item \(item.id)")
+    }
+
     func seek(to time: Double) {
         let cmTime = CMTime(seconds: time, preferredTimescale: 600)
         player?.seek(to: cmTime)

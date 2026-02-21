@@ -125,7 +125,7 @@ enum GraphQLNetworkError: LocalizedError {
 
 // MARK: - GraphQL Client
 
-class GraphQLClient {
+actor GraphQLClient {
     static let shared = GraphQLClient()
     
     private var session: URLSession
@@ -258,7 +258,7 @@ class GraphQLClient {
     // MARK: - Completion Handler API (For existing code)
     
     /// Execute a GraphQL query with completion handler (for gradual migration)
-    func execute<T: Decodable>(
+    nonisolated func execute<T: Decodable>(
         query: String,
         variables: [String: Any]? = nil,
         completion: @escaping (Result<T, GraphQLNetworkError>) -> Void
@@ -298,7 +298,7 @@ class GraphQLClient {
     }
     
     /// Execute a GraphQL mutation with completion handler (for gradual migration)
-    func performMutation(
+    nonisolated func performMutation(
         mutation: String,
         variables: [String: Any],
         completion: @escaping (Result<[String: StashJSONValue], GraphQLNetworkError>) -> Void
@@ -319,7 +319,7 @@ class GraphQLClient {
     
     // MARK: - Private Helpers
     
-    private func isDatabaseLocked(data: Data) -> Bool {
+    private nonisolated func isDatabaseLocked(data: Data) -> Bool {
         guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
               let errors = json["errors"] as? [[String: Any]] else {
             return false
@@ -378,7 +378,7 @@ class GraphQLClient {
         return request
     }
     
-    private func validateResponse(_ response: URLResponse, data: Data) throws {
+    private nonisolated func validateResponse(_ response: URLResponse, data: Data) throws {
         guard let httpResponse = response as? HTTPURLResponse else {
             return
         }

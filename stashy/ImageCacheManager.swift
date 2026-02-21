@@ -146,28 +146,21 @@ class ImageCache {
             lastCleanupDate = Date()
         }
         
+        let serverDir = currentServerCacheDirectory
+        
         // Store on Disk
-        Task.detached(priority: .background) { [weak self] in
+        Task.detached(priority: .background) {
             try? data.write(to: fileURL)
             
             if shouldCleanup {
-                self?.cleanupOldFiles()
+                Self.performCleanup(at: serverDir)
             }
         }
     }
     
-    func data(forKey key: NSURL) -> Data? {
-        let fileURL = cacheFileURL(for: key)
-        if fileManager.fileExists(atPath: fileURL.path) {
-            return try? Data(contentsOf: fileURL)
-        }
-        return nil
-    }
-    
-    private func cleanupOldFiles() {
-        // Simple periodic cleanup: remove files older than 30 days
+    private static func performCleanup(at serverDir: URL) {
+        let fileManager = FileManager.default
         let thirtyDays: TimeInterval = 60 * 60 * 24 * 30
-        let serverDir = currentServerCacheDirectory
         
         guard let files = try? fileManager.contentsOfDirectory(at: serverDir, includingPropertiesForKeys: [.contentModificationDateKey]) else { return }
         
@@ -178,7 +171,17 @@ class ImageCache {
                 try? fileManager.removeItem(at: file)
             }
         }
+        print("清理: Disk cleanup completed for \(serverDir.lastPathComponent)")
     }
+    
+    func data(forKey key: NSURL) -> Data? {
+        let fileURL = cacheFileURL(for: key)
+        if fileManager.fileExists(atPath: fileURL.path) {
+            return try? Data(contentsOf: fileURL)
+        }
+        return nil
+    }
+    
     
     func clearCache() {
         memoryCache.removeAllObjects()

@@ -146,7 +146,9 @@ class StashDBViewModel: ObservableObject {
     }
     
     @objc private func handleServerChange() {
-        GraphQLClient.shared.cancelAllRequests()
+        Task {
+            await GraphQLClient.shared.cancelAllRequests()
+        }
         DispatchQueue.main.async {
             self.isLoading = true // Show loading immediately
             self.resetData()
@@ -1289,7 +1291,7 @@ class StashDBViewModel: ObservableObject {
         }
     }
     
-    func mergeFilterWithCriteria(filter: SavedFilter?, performer: ScenePerformer? = nil, tags: [Tag] = []) -> SavedFilter {
+    func mergeFilterWithCriteria(filter: SavedFilter?, performer: ScenePerformer? = nil, tags: [Tag] = [], mode: FilterMode = .scenes) -> SavedFilter {
         var baseDict: [String: Any] = [:]
         
         // 1. Recover filter data
@@ -1334,27 +1336,33 @@ class StashDBViewModel: ObservableObject {
         return SavedFilter(
             id: filter?.id ?? "merged_temp",
             name: filter?.name ?? "Merged Filter",
-            mode: .scenes,
+            mode: mode,
             filter: nil,
             object_filter: jsonValue
         )
     }
 
     private func sanitizeFilter(_ dict: [String: Any], isMarker: Bool = false) -> [String: Any] {
+        print("🔍 sanitizeFilter INPUT: \(dict)")
         var newDict = dict
         
         // 0. Convert "c" array (UI Format) to top-level keys (API Format)
         if let criteria = newDict["c"] as? [[String: Any]] {
             for item in criteria {
-                if let key = item["id"] as? String {
+                if var key = item["id"] as? String {
                     var outputItem = item
                     // Remove UI-only keys that don't belong in any GraphQL criterion input
                     for uiKey in ["id", "type", "inputType", "criterionOption"] {
                         outputItem.removeValue(forKey: uiKey)
                     }
                     
+                    // Map "rating" to "rating100" for GraphQL compatibility if needed
+                    if key == "rating" {
+                        key = "rating100"
+                    }
+                    
                     // For markers, move scene-specific criteria to nested scene_filter
-                    if isMarker && (key == "orientation" || key == "duration" || key == "rating" || key == "organized" || key == "performers" || key == "tags") {
+                    if isMarker && (key == "orientation" || key == "duration" || key == "rating100" || key == "organized" || key == "performers" || key == "tags") {
                         var sceneFilter = newDict["scene_filter"] as? [String: Any] ?? [:]
                         sceneFilter[key] = outputItem
                         newDict["scene_filter"] = sceneFilter
@@ -1375,7 +1383,7 @@ class StashDBViewModel: ObservableObject {
         
         // Marker specific: move top-level orientation/duration to scene_filter if they exist
         if isMarker {
-            let sceneSpecificKeys = ["orientation", "duration", "rating", "organized", "performers", "tags"]
+            let sceneSpecificKeys = ["orientation", "duration", "rating100", "organized", "performers", "tags"]
             for key in sceneSpecificKeys {
                 if let val = newDict[key] {
                     var sceneFilter = newDict["scene_filter"] as? [String: Any] ?? [:]
@@ -1656,6 +1664,7 @@ class StashDBViewModel: ObservableObject {
             }
         }
         
+        print("🔍 sanitizeFilter OUTPUT: \(newDict)")
         return newDict
     }
 
@@ -2737,10 +2746,15 @@ class StashDBViewModel: ObservableObject {
             "image_filter": imageFilter
         ]
         
-        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
+        print("🔍 fetchClips: Variables = \(variables)")
+        
+        guard let dataRequest = ["query": query, "variables": variables] as [String: Any]?,
+              let bodyData = try? JSONSerialization.data(withJSONObject: dataRequest),
               let bodyString = String(data: bodyData, encoding: .utf8) else {
             return
         }
+        
+        print("🔍 fetchClips: Raw Body = \(bodyString)")
         
         performGraphQLQuery(query: bodyString) { (response: GalleryImagesResponse?) in
             if let result = response?.data?.findImages {
@@ -4176,6 +4190,9 @@ struct MarkerScene: Codable, Identifiable {
     func withStreams(_ newStreams: [SceneStream]?) -> MarkerScene {
         MarkerScene(id: id, title: title, date: date, files: files, performers: performers, rating100: rating100, playCount: playCount, oCounter: oCounter, interactive: interactive, paths: paths, streams: newStreams)
     }
+    func withPlayCount(_ count: Int?) -> MarkerScene {
+        MarkerScene(id: id, title: title, date: date, files: files, performers: performers, rating100: rating100, playCount: count, oCounter: oCounter, interactive: interactive, paths: paths, streams: streams)
+    }
 
     // Computed property to determine if scene is truly interactive (has funscript)
     var hasInteractive: Bool {
@@ -4991,7 +5008,7 @@ class DownloadManager: NSObject, ObservableObject {
     private let downloadsFolder: URL
     private let metadataFile = "downloads_metadata.json"
     
-    private let taskMap = DownloadTaskMap()
+    nonisolated private let taskMap = DownloadTaskMap()
     private var progressHandlers: [String: (Double, Int64, Int64) -> Void] = [:]
     private var completionHandlers: [String: (Bool) -> Void] = [:]
     
