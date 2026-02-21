@@ -1188,13 +1188,15 @@ class StashDBViewModel: ObservableObject {
     
     // MARK: - Home Tab Support
     
-    func fetchScenesForHomeRow(config: HomeRowConfig, limit: Int = 10, completion: @escaping ([Scene]) -> Void) {
+    func fetchScenesForHomeRow(config: HomeRowConfig, limit: Int = 10, forceRefresh: Bool = false, completion: @escaping ([Scene]) -> Void) {
         let rowType = config.type
         
         // Return cached data immediately if available
-        if let cached = homeRowScenes[rowType], !cached.isEmpty {
-            completion(cached)
-            return
+        if !forceRefresh {
+            if let cached = homeRowScenes[rowType], !cached.isEmpty {
+                completion(cached)
+                return
+            }
         }
         
         // Already loading this row? Don't start another request

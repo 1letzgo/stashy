@@ -39,6 +39,10 @@ struct HomeView: View {
                     .padding(.vertical, 16)
                     .padding(.bottom, 80) // Floating bar space
                 }
+                .refreshable {
+                    viewModel.homeRowScenes.removeAll()
+                    viewModel.initializeServerConnection()
+                }
             }
         }
 
@@ -50,6 +54,14 @@ struct HomeView: View {
                 // This prevents clearing home rows and losing scroll position on back navigation
                 if viewModel.statistics == nil {
                     viewModel.initializeServerConnection()
+                } else {
+                    // Refresh invisibly without clearing caches on returning to the tab
+                    viewModel.fetchStatistics()
+                    let firstSceneRowId = tabManager.homeRows.first(where: { $0.isEnabled && $0.type != .statistics })?.id
+                    for row in tabManager.homeRows where row.isEnabled && row.type != .statistics {
+                        let limit = row.id == firstSceneRowId ? 20 : 5
+                        viewModel.fetchScenesForHomeRow(config: row, limit: limit, forceRefresh: true) { _ in }
+                    }
                 }
             }
         }
