@@ -1,4 +1,4 @@
-Stashy
+#Stashy
 A native Stash Media Server client for iOS and tvOS.
 Stashy is a fast, privacy-focused, fully native SwiftUI app designed to give you a seamless Stash experience on iPhone, iPad, and Apple TV.
 
