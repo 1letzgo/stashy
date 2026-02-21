@@ -170,11 +170,24 @@ struct SettingsView: View {
     // MARK: - About
 
     private var aboutSection: some View {
-        Text("🚧 crafted by letzgo")
-            .font(.caption)
-            .foregroundColor(.secondary)
-            .frame(maxWidth: .infinity)
-            .listRowBackground(Color.clear)
+        Group {
+            Section("Links") {
+                Link(destination: URL(string: "https://github.com/1letzgo/stashy")!) {
+                    Label("GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
+                        .foregroundColor(appearanceManager.tintColor)
+                }
+                Link(destination: URL(string: "https://discord.gg/hYWBxY7P")!) {
+                    Label("Discord", systemImage: "bubble.left.and.bubble.right.fill")
+                        .foregroundColor(appearanceManager.tintColor)
+                }
+            }
+            
+            Text("🚧 crafted by letzgo")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .frame(maxWidth: .infinity)
+                .listRowBackground(Color.clear)
+        }
     }
 
     // MARK: - Actions
