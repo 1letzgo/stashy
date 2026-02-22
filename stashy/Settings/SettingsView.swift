@@ -7,6 +7,7 @@
 
 #if !os(tvOS)
 import SwiftUI
+import StoreKit
 
 struct SettingsView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
@@ -20,6 +21,9 @@ struct SettingsView: View {
     @State private var scanAlertMessage: String = ""
     @State private var showingAddServerSheet = false
     @State private var editingServer: ServerConfig?
+    
+    // IAP
+    @StateObject private var storeManager = StoreManager()
 
     var body: some View {
         Form {
@@ -79,6 +83,7 @@ struct SettingsView: View {
             }
 
             // MARK: - About
+            tipSection
             aboutSection
         }
         .navigationTitle("Settings")
@@ -167,6 +172,50 @@ struct SettingsView: View {
         )
     }
 
+    // MARK: - Tip Jar
+
+    private var tipSection: some View {
+        Section(header: Text("Tipp"), footer: Text("Support the development of stashy!")) {
+            if storeManager.products.isEmpty {
+                // Fallback / Loading state
+                tipRow(icon: "💝", title: "Small", price: "2,99 €")
+                tipRow(icon: "💖", title: "Medium", price: "4,99 €")
+                tipRow(icon: "💎", title: "Large", price: "9,99 €")
+            } else {
+                ForEach(storeManager.products) { product in
+                    Button {
+                        Task {
+                            do {
+                                try await storeManager.purchase(product)
+                            } catch {
+                                print("Purchase failed: \(error)")
+                            }
+                        }
+                    } label: {
+                        HStack {
+                            Text(storeManager.productDict[product.id] ?? product.displayName)
+                                .foregroundColor(.primary)
+                            Spacer()
+                            Text(product.displayPrice)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private func tipRow(icon: String, title: String, price: String) -> some View {
+        HStack {
+            Text("\(icon) \(title)")
+                .foregroundColor(.primary)
+            Spacer()
+            Text(price)
+                .foregroundColor(.secondary)
+        }
+        .opacity(0.5) // disabled look since products aren't loaded yet
+    }
+
     // MARK: - About
 
     private var aboutSection: some View {
@@ -200,6 +249,63 @@ struct SettingsView: View {
                 scanAlertMessage = message
                 showScanAlert = true
             }
+        }
+    }
+}
+
+// MARK: - StoreManager
+
+public enum StoreError: Error {
+    case failedVerification
+}
+
+@MainActor
+class StoreManager: ObservableObject {
+    @Published var products: [Product] = []
+    
+    let productDict: [String: String] = [
+        "de.stashy.tip1": "💝 Small",
+        "de.stashy.tip2": "💖 Medium",
+        "de.stashy.tip3": "💎 Large"
+    ]
+    
+    init() {
+        Task {
+            await fetchProducts()
+        }
+    }
+    
+    func fetchProducts() async {
+        do {
+            let products = try await Product.products(for: productDict.keys)
+            // Sort by price
+            self.products = products.sorted(by: { $0.price < $1.price })
+        } catch {
+            print("Failed product request from the App Store server: \(error)")
+        }
+    }
+    
+    func purchase(_ product: Product) async throws {
+        let result = try await product.purchase()
+        
+        switch result {
+        case .success(let verification):
+            let transaction = try checkVerified(verification)
+            await transaction.finish()
+            
+        case .userCancelled, .pending:
+            break
+        @unknown default:
+            break
+        }
+    }
+    
+    func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
+        switch result {
+        case .unverified:
+            throw StoreError.failedVerification
+        case .verified(let safe):
+            return safe
         }
     }
 }

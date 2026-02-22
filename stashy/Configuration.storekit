@@ -1,0 +1,127 @@
+{
+  "identifier" : "E1C8C08A",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "0F8AE55B",
+      "localizations" : [
+        {
+          "description" : "A small tip to support development.",
+          "displayName" : "Small Tip",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Ein kleines Trinkgeld für die Entwicklung.",
+          "displayName" : "Kleiner Tipp",
+          "locale" : "de"
+        }
+      ],
+      "productID" : "de.stashy.tip1",
+      "referenceName" : "Tip Small",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "C680ECA0",
+      "localizations" : [
+        {
+          "description" : "A medium tip to support development.",
+          "displayName" : "Medium Tip",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Unterstütze die Entwicklung von Stashy.",
+          "displayName" : "Mittlerer Tipp",
+          "locale" : "de"
+        }
+      ],
+      "productID" : "de.stashy.tip2",
+      "referenceName" : "Tip Medium",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : false,
+      "internalID" : "3FCAC410",
+      "localizations" : [
+        {
+          "description" : "A large tip to support development.",
+          "displayName" : "Large Tip",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Große Unterstützung für die Weiterentwicklung.",
+          "displayName" : "Großer Tipp",
+          "locale" : "de"
+        }
+      ],
+      "productID" : "de.stashy.tip3",
+      "referenceName" : "Tip Large",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

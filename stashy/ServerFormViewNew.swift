@@ -47,18 +47,26 @@ struct ServerFormViewNew: View {
     }
     
     var currentBaseURL: String {
-        let parsed = ServerConfig.parseHostAndPort(serverAddress)
+        let parsed = ServerConfig.parseAddress(serverAddress)
         let effectivePort = parsed.port ?? serverProtocol.defaultPort
         let scheme = serverProtocol == .https ? "https" : "http"
         
         let needsPort = (serverProtocol == .https && effectivePort != "443") || 
                        (serverProtocol == .http && effectivePort != "80")
         
+        let url: String
         if needsPort {
-            return "\(scheme)://\(parsed.host):\(effectivePort)"
+            url = "\(scheme)://\(parsed.host):\(effectivePort)"
         } else {
-            return "\(scheme)://\(parsed.host)"
+            url = "\(scheme)://\(parsed.host)"
         }
+        
+        if let subpath = parsed.subpath, !subpath.isEmpty {
+            let cleanSub = subpath.hasPrefix("/") ? subpath : "/\(subpath)"
+            return url + cleanSub
+        }
+        
+        return url
     }
     
     var body: some View {
@@ -209,7 +217,16 @@ struct ServerFormViewNew: View {
         .onAppear {
             if let config = configToEdit {
                 name = config.name
-                serverAddress = config.serverAddress + (config.port != nil ? ":\(config.port!)" : "")
+                
+                var address = config.serverAddress
+                if let port = config.port {
+                    address += ":\(port)"
+                }
+                if let subpath = config.subpath, !subpath.isEmpty {
+                    address += subpath.hasPrefix("/") ? subpath : "/\(subpath)"
+                }
+                serverAddress = address
+                
                 serverProtocol = config.serverProtocol
                 
                 // Load API key from Keychain first, fallback to config
@@ -341,14 +358,15 @@ struct ServerFormViewNew: View {
             KeychainManager.shared.deleteAPIKey(forServerID: serverID)
         }
         
-        let parsed = ServerConfig.parseHostAndPort(serverAddress)
+        let parsed = ServerConfig.parseAddress(serverAddress)
         let newConfig = ServerConfig(
             id: serverID,
             name: name,
             serverAddress: parsed.host,
             port: parsed.port,
             serverProtocol: serverProtocol,
-            apiKey: nil // API key now stored in Keychain
+            apiKey: nil, // API key now stored in Keychain
+            subpath: parsed.subpath
         )
         onSave(newConfig)
     }
