@@ -73,15 +73,6 @@ struct SettingsView: View {
                 }
             }
 
-            // MARK: - Downloads
-            if configManager.activeConfig != nil {
-                Section("Downloads") {
-                    NavigationLink(destination: DownloadsView()) {
-                        Label("Downloads", systemImage: "square.and.arrow.down")
-                    }
-                }
-            }
-
             // MARK: - About
             tipSection
             aboutSection
