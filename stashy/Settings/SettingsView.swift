@@ -169,9 +169,9 @@ struct SettingsView: View {
         Section(header: Text("Tipp"), footer: Text("Support the development of stashy!")) {
             if storeManager.products.isEmpty {
                 // Fallback / Loading state
-                tipRow(icon: "💝", title: "Small", price: "2,99 €")
-                tipRow(icon: "💖", title: "Medium", price: "4,99 €")
-                tipRow(icon: "💎", title: "Large", price: "9,99 €")
+                tipRow(icon: "heart", title: "Small", price: "2,99 €")
+                tipRow(icon: "heart.fill", title: "Medium", price: "4,99 €")
+                tipRow(icon: "bolt.heart.fill", title: "Large", price: "9,99 €")
             } else {
                 ForEach(storeManager.products) { product in
                     Button {
@@ -184,8 +184,9 @@ struct SettingsView: View {
                         }
                     } label: {
                         HStack {
-                            Text(storeManager.productDict[product.id] ?? product.displayName)
-                                .foregroundColor(.primary)
+                            let title = storeManager.productDict[product.id] ?? product.displayName
+                            Label(title, systemImage: iconFor(productID: product.id))
+                                .foregroundColor(appearanceManager.tintColor)
                             Spacer()
                             Text(product.displayPrice)
                                 .foregroundColor(.secondary)
@@ -198,13 +199,22 @@ struct SettingsView: View {
 
     private func tipRow(icon: String, title: String, price: String) -> some View {
         HStack {
-            Text("\(icon) \(title)")
-                .foregroundColor(.primary)
+            Label(title, systemImage: icon)
+                .foregroundColor(appearanceManager.tintColor)
             Spacer()
             Text(price)
                 .foregroundColor(.secondary)
         }
         .opacity(0.5) // disabled look since products aren't loaded yet
+    }
+    
+    private func iconFor(productID: String) -> String {
+        switch productID {
+        case "de.stashy.tip1": return "heart"
+        case "de.stashy.tip2": return "heart.fill"
+        case "de.stashy.tip3": return "bolt.heart.fill"
+        default: return "heart"
+        }
     }
 
     // MARK: - About
@@ -255,9 +265,9 @@ class StoreManager: ObservableObject {
     @Published var products: [Product] = []
     
     let productDict: [String: String] = [
-        "de.stashy.tip1": "💝 Small",
-        "de.stashy.tip2": "💖 Medium",
-        "de.stashy.tip3": "💎 Large"
+        "de.stashy.tip1": "Small",
+        "de.stashy.tip2": "Medium",
+        "de.stashy.tip3": "Large"
     ]
     
     init() {
