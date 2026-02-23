@@ -98,7 +98,7 @@ struct TVScenesView: View {
                 }
             }
         }
-        .navigationTitle(navigationTitle)
+        .navigationTitle("")
         .background(Color.black)
         .onChange(of: sortBy) { _, newValue in
             viewModel.fetchScenes(sortBy: newValue, isInitialLoad: true)

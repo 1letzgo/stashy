@@ -63,7 +63,7 @@ struct TVPerformersView: View {
                 }
             }
         }
-        .navigationTitle("Performers")
+        .navigationTitle("")
         .background(Color.black)
         .onAppear {
             if viewModel.performers.isEmpty {

@@ -63,7 +63,7 @@ struct TVTagsView: View {
                 }
             }
         }
-        .navigationTitle("Tags")
+        .navigationTitle("")
         .background(Color.black)
         .onAppear {
             if viewModel.tags.isEmpty {
@@ -153,7 +153,7 @@ struct TVTagDetailView: View {
             }
             .padding(.bottom, 80)
         }
-        .navigationTitle(tagName)
+        .navigationTitle("")
         .background(Color.black)
         .onAppear {
             viewModel.fetchTagScenes(tagId: tagId, isInitialLoad: true)

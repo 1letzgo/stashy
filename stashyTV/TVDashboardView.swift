@@ -28,12 +28,10 @@ struct TVDashboardView: View {
     var body: some View {
         ScrollView([.vertical], showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
-                // Greeting header
-                headerSection
-                    .padding(.horizontal, 50)
-                    .padding(.top, 60)
-                    .padding(.bottom, 44)
+                Spacer()
+                    .frame(height: 60)
 
+                // MARK: Content Rows
                 contentRows
             }
         }
@@ -55,36 +53,10 @@ struct TVDashboardView: View {
         }
     }
     
-    // MARK: - Header
-    
-    private var headerSection: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text(greetingText)
-                .font(.system(size: 42, weight: .bold))
-                .foregroundColor(.white)
-            
-            if let serverName = configManager.activeConfig?.name, !serverName.isEmpty {
-                Text(serverName)
-                    .font(.title3)
-                    .foregroundColor(.white.opacity(0.35))
-            }
-        }
-    }
-    
-    private var greetingText: String {
-        let hour = Calendar.current.component(.hour, from: Date())
-        switch hour {
-        case 5..<12: return "Good Morning"
-        case 12..<17: return "Good Afternoon"
-        case 17..<22: return "Good Evening"
-        default: return "Good Night"
-        }
-    }
-    
     // MARK: - Content Rows
     
     private var contentRows: some View {
-        VStack(alignment: .leading, spacing: 60) {
+        VStack(alignment: .leading, spacing: 50) {
             if isLoadingPlayed && isLoadingReleased && isLoadingAdded {
                 HStack {
                     Spacer()
@@ -92,12 +64,11 @@ struct TVDashboardView: View {
                         .scaleEffect(1.5)
                     Spacer()
                 }
-                .padding(.top, 100)
+                .padding(.top, 40)
             } else {
                 if !recentlyPlayedScenes.isEmpty {
                     sceneRow(
                         title: "Continue Watching",
-                        icon: "play.circle.fill",
                         scenes: recentlyPlayedScenes,
                         sortBy: .lastPlayedAtDesc
                     )
@@ -106,7 +77,6 @@ struct TVDashboardView: View {
                 if !recentlyReleasedScenes.isEmpty {
                     sceneRow(
                         title: "New Releases",
-                        icon: "sparkles.tv.fill",
                         scenes: recentlyReleasedScenes,
                         sortBy: .dateDesc
                     )
@@ -115,7 +85,6 @@ struct TVDashboardView: View {
                 if !recentlyAddedScenes.isEmpty {
                     sceneRow(
                         title: "Recently Added",
-                        icon: "plus.rectangle.on.folder.fill",
                         scenes: recentlyAddedScenes,
                         sortBy: .createdAtDesc
                     )
@@ -176,15 +145,11 @@ struct TVDashboardView: View {
     // MARK: - Scene Row
 
     @ViewBuilder
-    private func sceneRow(title: String, icon: String, scenes: [Scene], sortBy: StashDBViewModel.SceneSortOption) -> some View {
+    private func sceneRow(title: String, scenes: [Scene], sortBy: StashDBViewModel.SceneSortOption) -> some View {
         VStack(alignment: .leading, spacing: 18) {
             // Section heading
             NavigationLink(value: DashboardDestination.sceneList(sortBy)) {
                 HStack(spacing: 12) {
-                    Image(systemName: icon)
-                        .font(.title3)
-                        .foregroundColor(appearanceManager.tintColor)
-                    
                     Text(title)
                         .font(.title3)
                         .fontWeight(.bold)

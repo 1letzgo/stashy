@@ -65,8 +65,8 @@ struct ServerConfig: Codable, Identifiable, Equatable {
     var serverProtocol: ServerProtocol
     var apiKey: String?        // Optional API Key for authentication
     var subpath: String?       // Optional subpath (e.g. "/stash")
-    var defaultQuality: StreamingQuality = .fhd
-    var reelsQuality: StreamingQuality = .sd
+    var defaultQuality: StreamingQuality = .original
+    var reelsQuality: StreamingQuality = .original
 
     var baseURL: String {
         let effectivePort = port ?? serverProtocol.defaultPort
@@ -119,8 +119,8 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         serverProtocol: ServerProtocol = .https,
         apiKey: String? = nil,
         subpath: String? = nil,
-        defaultQuality: StreamingQuality = .fhd,
-        reelsQuality: StreamingQuality = .sd
+        defaultQuality: StreamingQuality = .original,
+        reelsQuality: StreamingQuality = .original
     ) {
         self.id = id
         self.name = name
@@ -140,8 +140,8 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         name = try container.decodeIfPresent(String.self, forKey: .name) ?? "My Stash"
         apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey)
-        defaultQuality = try container.decodeIfPresent(StreamingQuality.self, forKey: .defaultQuality) ?? .fhd
-        reelsQuality = try container.decodeIfPresent(StreamingQuality.self, forKey: .reelsQuality) ?? .sd
+        defaultQuality = try container.decodeIfPresent(StreamingQuality.self, forKey: .defaultQuality) ?? .original
+        reelsQuality = try container.decodeIfPresent(StreamingQuality.self, forKey: .reelsQuality) ?? .original
         
         // Try to decode new format first
         if let serverAddress = try? container.decode(String.self, forKey: .serverAddress),
@@ -263,17 +263,30 @@ class ServerConfigManager: ObservableObject {
 
     // MARK: - Active Server Management
     func saveConfig(_ config: ServerConfig) {
+        let oldConfig = self.activeConfig
         let encoder = JSONEncoder()
+        
         if let encoded = try? encoder.encode(config) {
             UserDefaults.standard.set(encoded, forKey: activeConfigKey)
             self.activeConfig = config
             print("✅ Active server updated: \(config.name)")
             
-            // Clear system URL cache to avoid using stale data/auth for the new server
-            URLCache.shared.removeAllCachedResponses()
+            let coreSettingsChanged = oldConfig == nil ||
+                oldConfig?.baseURL != config.baseURL ||
+                oldConfig?.secureApiKey != config.secureApiKey ||
+                oldConfig?.id != config.id
             
-            // Notify all ViewModels to reset their data
-            NotificationCenter.default.post(name: NSNotification.Name("ServerConfigChanged"), object: nil)
+            if coreSettingsChanged {
+                // Clear system URL cache to avoid using stale data/auth for the new server
+                URLCache.shared.removeAllCachedResponses()
+                
+                // Notify all ViewModels to reset their data
+                NotificationCenter.default.post(name: NSNotification.Name("ServerConfigChanged"), object: nil)
+            } else {
+                // Settings like StreamingQuality changed. Emit a minor notification if needed,
+                // but do not nuke the URLSession.
+                NotificationCenter.default.post(name: NSNotification.Name("ServerConfigPropertiesChanged"), object: nil)
+            }
         }
     }
 

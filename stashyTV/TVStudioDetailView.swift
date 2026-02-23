@@ -130,7 +130,7 @@ struct TVStudioDetailView: View {
                 .padding(.bottom, 80)
             }
         }
-        .navigationTitle(studioName)
+        .navigationTitle("")
         .background(Color.black)
         .onAppear {
             loadStudioData()

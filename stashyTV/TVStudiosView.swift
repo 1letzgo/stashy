@@ -63,7 +63,7 @@ struct TVStudiosView: View {
                 }
             }
         }
-        .navigationTitle("Studios")
+        .navigationTitle("")
         .background(Color.black)
         .onAppear {
             if viewModel.studios.isEmpty {

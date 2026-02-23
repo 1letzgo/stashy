@@ -140,7 +140,7 @@ struct TVPerformerDetailView: View {
                 .padding(.bottom, 80)
             }
         }
-        .navigationTitle(performerName)
+        .navigationTitle("")
         .background(Color.black)
         .onAppear {
             loadPerformerData()

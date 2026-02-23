@@ -3880,7 +3880,7 @@ struct Scene: Codable, Identifiable {
             }
         }
 
-        let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .fhd
+        let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original
         
         // 1. Try best stream (transcoded)
         if let streamURL = bestStream(for: quality) {
@@ -4276,7 +4276,7 @@ struct MarkerScene: Codable, Identifiable {
                 return localURL
             }
         }
-        let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .fhd
+        let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original
         if let streamURL = bestStream(for: quality) {
             return signedURL(streamURL)
         }
@@ -4364,7 +4364,7 @@ struct SceneMarker: Codable, Identifiable {
             }
         }
 
-        let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .fhd
+        let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original
         
         // 1. Try best stream from associated scene (transcoded)
         if let scene = scene, let streamURL = scene.bestStream(for: quality) {
@@ -4427,6 +4427,11 @@ struct SceneFile: Codable, Identifiable {
 struct SceneStudio: Codable {
     let id: String
     let name: String
+
+    var thumbnailURL: URL? {
+        guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
+        return signedURL(URL(string: "\(config.baseURL)/studio/\(id)/image"))
+    }
 }
 
 struct ScenePerformer: Codable, Identifiable {
@@ -4439,6 +4444,11 @@ struct ScenePerformer: Codable, Identifiable {
         case id, name
         case sceneCount = "scene_count"
         case galleryCount = "gallery_count"
+    }
+
+    var thumbnailURL: URL? {
+        guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
+        return signedURL(URL(string: "\(config.baseURL)/performer/\(id)/image"))
     }
 }
 

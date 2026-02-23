@@ -252,7 +252,7 @@ struct TVGalleryDetailView: View {
                 .padding(.vertical, 32)
             }
         }
-        .navigationTitle(galleryTitle)
+        .navigationTitle("")
         .onAppear {
             if viewModel.galleryImages.isEmpty {
                 viewModel.fetchGalleryImages(galleryId: galleryId)

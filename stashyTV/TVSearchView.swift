@@ -72,7 +72,7 @@ struct TVSearchView: View {
             }
             .padding(.vertical, 60)
         }
-        .navigationTitle("Search")
+        .navigationTitle("")
         .background(Color.black)
         .searchable(text: $searchQuery, placement: .automatic, prompt: "Search scenes, performers…")
         .onChange(of: searchQuery) { _, newValue in

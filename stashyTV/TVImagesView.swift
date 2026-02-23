@@ -218,7 +218,7 @@ struct TVFullscreenImageView: View {
                 }
             }
         }
-        .navigationTitle(title)
+        .navigationTitle("")
         .toolbarBackground(.hidden, for: .navigationBar)
         .toolbarColorScheme(.dark, for: .navigationBar)
     }

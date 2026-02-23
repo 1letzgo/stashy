@@ -554,11 +554,6 @@ struct SceneDetailView: View {
 
 // Extension to convert ScenePerformer to Performer for navigation
 extension ScenePerformer {
-    var thumbnailURL: URL? {
-        guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
-        return URL(string: "\(config.baseURL)/performer/\(id)/image")
-    }
-
     func toPerformer() -> Performer {
         return Performer(
             id: self.id,

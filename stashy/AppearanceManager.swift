@@ -102,14 +102,14 @@ class AppearanceManager: ObservableObject {
 
     // Preset Colors
     let presets: [ColorOption] = [
-        ColorOption(nameKey: "appearance.presets.stashy_brown", color: .appAccent),
-        ColorOption(nameKey: "appearance.presets.blue", color: .blue),
-        ColorOption(nameKey: "appearance.presets.red", color: .red),
-        ColorOption(nameKey: "appearance.presets.orange", color: .orange),
-        ColorOption(nameKey: "appearance.presets.green", color: .green),
-        ColorOption(nameKey: "appearance.presets.purple", color: .purple),
-        ColorOption(nameKey: "appearance.presets.pink", color: .pink),
-        ColorOption(nameKey: "appearance.presets.gray", color: .gray)
+        ColorOption(nameKey: "Stashy Brown", color: .appAccent),
+        ColorOption(nameKey: "Blue", color: .blue),
+        ColorOption(nameKey: "Red", color: .red),
+        ColorOption(nameKey: "Orange", color: .orange),
+        ColorOption(nameKey: "Green", color: .green),
+        ColorOption(nameKey: "Purple", color: .purple),
+        ColorOption(nameKey: "Pink", color: .pink),
+        ColorOption(nameKey: "Gray", color: .gray)
     ]
 }
 
@@ -125,6 +125,6 @@ struct ColorOption: Identifiable, Hashable {
     let color: Color
 
     var localizedName: String {
-        NSLocalizedString(nameKey, comment: "Preset color name")
+        return nameKey // We are currently using strings directly, no localizations detected yet.
     }
 }

@@ -105,20 +105,7 @@ struct TVSettingsView: View {
                                     Button {
                                         appearanceManager.tintColor = preset.color
                                     } label: {
-                                        VStack(spacing: 8) {
-                                            Circle()
-                                                .fill(preset.color)
-                                                .frame(width: 60, height: 60)
-                                                .overlay(
-                                                    Circle()
-                                                        .stroke(Color.white, lineWidth: preset.color == appearanceManager.tintColor ? 3 : 0)
-                                                )
-                                                .shadow(color: preset.color.opacity(0.4), radius: preset.color == appearanceManager.tintColor ? 8 : 0)
-
-                                            Text(preset.localizedName)
-                                                .font(.caption)
-                                                .foregroundStyle(.secondary)
-                                        }
+                                        TVColorPresetButton(preset: preset, isSelected: preset.color == appearanceManager.tintColor)
                                     }
                                     .buttonStyle(.plain)
                                 }
@@ -156,7 +143,7 @@ struct TVSettingsView: View {
                     Text("About")
                 }
             }
-            .navigationTitle("Settings")
+            .navigationTitle("")
             .sheet(isPresented: $showingAddServer) {
                 TVServerFormView(server: nil) { newServer in
                     configManager.addOrUpdateServer(newServer)
@@ -299,5 +286,34 @@ struct TVServerFormView: View {
         )
 
         onSave(config)
+    }
+}
+
+// MARK: - Color Preset Button
+
+struct TVColorPresetButton: View {
+    let preset: ColorOption
+    let isSelected: Bool
+    @Environment(\.isFocused) var isFocused
+
+    var body: some View {
+        VStack(spacing: 12) {
+            Circle()
+                .fill(preset.color)
+                .frame(width: 60, height: 60)
+                .overlay(
+                    Circle()
+                        .stroke(isSelected ? Color.white : (isFocused ? Color.white.opacity(0.5) : Color.clear), lineWidth: 4)
+                )
+                .scaleEffect(isFocused ? 1.2 : 1.0)
+                .shadow(color: preset.color.opacity(isFocused ? 0.8 : 0.4), radius: isFocused ? 12 : (isSelected ? 8 : 0))
+
+            Text(preset.localizedName)
+                .font(.caption)
+                .foregroundStyle(isFocused ? .primary : .secondary)
+        }
+        .padding(16) // Padding to avoid clipping the scale effect
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isFocused)
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
     }
 }
