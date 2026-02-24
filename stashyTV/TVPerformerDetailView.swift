@@ -25,14 +25,23 @@ struct TVPerformerDetailView: View {
                 // Header: photo + info
                 HStack(alignment: .top, spacing: 50) {
                     // Profile image
-                    CustomAsyncImage(url: performer?.thumbnailURL) { loader in
-                        if loader.isLoading {
+                    AsyncImage(url: performer?.thumbnailURL) { phase in
+                        switch phase {
+                        case .empty:
                             Rectangle()
                                 .fill(Color.gray.opacity(0.08))
                                 .overlay(ProgressView())
-                        } else if let image = loader.image {
+                        case .success(let image):
                             image.resizable().scaledToFill()
-                        } else {
+                        case .failure:
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.08))
+                                .overlay(
+                                    Image(systemName: "person.fill")
+                                        .font(.system(size: 56))
+                                        .foregroundColor(.white.opacity(0.12))
+                                )
+                        @unknown default:
                             Rectangle()
                                 .fill(Color.gray.opacity(0.08))
                                 .overlay(
@@ -123,10 +132,15 @@ struct TVPerformerDetailView: View {
                     } else {
                         LazyVGrid(columns: sceneColumns, spacing: 40) {
                             ForEach(viewModel.performerScenes) { scene in
-                                NavigationLink(destination: TVSceneDetailView(sceneId: scene.id)) {
-                                    TVSceneCardView(scene: scene)
+                                VStack(alignment: .leading, spacing: 10) {
+                                    NavigationLink(destination: TVSceneDetailView(sceneId: scene.id)) {
+                                        TVSceneCardView(scene: scene)
+                                    }
+                                    .buttonStyle(.card)
+                                    
+                                    TVSceneCardTitleView(scene: scene)
                                 }
-                                .buttonStyle(.card)
+                                .frame(width: 400)
                                 .onAppear {
                                     if scene.id == viewModel.performerScenes.last?.id && viewModel.hasMorePerformerScenes {
                                         viewModel.fetchPerformerScenes(performerId: performerId, isInitialLoad: false)
@@ -152,7 +166,7 @@ struct TVPerformerDetailView: View {
     @ViewBuilder
     private func detailInfoGrid(performer: Performer) -> some View {
         LazyVGrid(columns: [
-            GridItem(.fixed(180), alignment: .leading),
+            GridItem(.fixed(240), alignment: .leading),
             GridItem(.flexible(), alignment: .leading)
         ], alignment: .leading, spacing: 12) {
             if let gender = performer.gender, !gender.isEmpty {

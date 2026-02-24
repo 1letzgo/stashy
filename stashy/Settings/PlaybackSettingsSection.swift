@@ -9,10 +9,11 @@ import SwiftUI
 
 struct PlaybackSettingsSection: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject var configManager = ServerConfigManager.shared
 
     var body: some View {
         Section(header: Text("Playback")) {
-            if let config = ServerConfigManager.shared.activeConfig {
+            if let config = configManager.activeConfig {
                 Picker("Library Quality", selection: Binding(
                     get: { config.defaultQuality },
                     set: { newValue in

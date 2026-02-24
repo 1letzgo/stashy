@@ -16,6 +16,7 @@ struct ImagesView: View {
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     
     @State private var selectedSortOption: StashDBViewModel.ImageSortOption = .dateDesc
+    @State private var selectedFilter: StashDBViewModel.SavedFilter? = nil
 
     // Multi-Select State
     @State private var isSelectionMode = false
@@ -52,7 +53,7 @@ struct ImagesView: View {
         if let gallery = gallery {
              viewModel.fetchGalleryImages(galleryId: gallery.id)
         } else {
-             viewModel.fetchImages(sortBy: newOption)
+             viewModel.fetchImages(sortBy: newOption, filter: selectedFilter)
         }
     }
 
@@ -66,7 +67,7 @@ struct ImagesView: View {
             if let gallery = gallery {
                 viewModel.fetchGalleryImages(galleryId: gallery.id)
             } else {
-                viewModel.fetchImages(sortBy: selectedSortOption)
+                viewModel.fetchImages(sortBy: selectedSortOption, filter: selectedFilter)
             }
         }
         .navigationTitle(gallery?.title ?? "Images")
@@ -93,13 +94,45 @@ struct ImagesView: View {
                  viewModel.currentImageSortOption = defaultSort
             }
 
+            // Fetch filters
+            viewModel.fetchSavedFilters()
+
             if let gallery = gallery {
                 if viewModel.galleryImages.isEmpty {
                     viewModel.fetchGalleryImages(galleryId: gallery.id)
                 }
             } else {
-                if viewModel.allImages.isEmpty {
-                    viewModel.fetchImages(sortBy: selectedSortOption)
+                // If no default filter is set, fetch immediately ONLY if we don't have images yet
+                if TabManager.shared.getDefaultFilterId(for: .images) == nil {
+                    if viewModel.allImages.isEmpty {
+                        viewModel.fetchImages(sortBy: selectedSortOption, filter: selectedFilter)
+                    }
+                }
+            }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
+            if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.images.rawValue {
+                if let defaultId = TabManager.shared.getDefaultFilterId(for: .images),
+                   let newFilter = viewModel.savedFilters[defaultId] {
+                    selectedFilter = newFilter
+                } else {
+                    selectedFilter = nil
+                }
+                viewModel.fetchImages(sortBy: selectedSortOption, filter: selectedFilter)
+            }
+        }
+        .onChange(of: viewModel.savedFilters) { oldValue, newValue in
+            if selectedFilter == nil && gallery == nil {
+                if let defaultId = TabManager.shared.getDefaultFilterId(for: .images),
+                   let filter = newValue[defaultId] {
+                    selectedFilter = filter
+                    if viewModel.allImages.isEmpty {
+                        viewModel.fetchImages(sortBy: selectedSortOption, filter: filter)
+                    }
+                } else if !viewModel.isLoadingSavedFilters {
+                    if viewModel.allImages.isEmpty {
+                        viewModel.fetchImages(sortBy: selectedSortOption, filter: nil)
+                    }
                 }
             }
         }
@@ -394,6 +427,38 @@ struct ImagesView: View {
             } label: {
                 Image(systemName: "arrow.up.arrow.down.circle")
                     .foregroundColor(.appAccent)
+            }
+            
+            // Filter Menu
+            Menu {
+                Button(action: {
+                    selectedFilter = nil
+                    viewModel.fetchImages(sortBy: selectedSortOption, filter: nil)
+                }) {
+                    HStack {
+                        Text("No Filter")
+                        if selectedFilter == nil { Image(systemName: "checkmark") }
+                    }
+                }
+
+                let activeImageFilters = viewModel.savedFilters.values
+                    .filter { $0.mode == .images }
+                    .sorted { $0.name < $1.name }
+                
+                ForEach(activeImageFilters) { filter in
+                    Button(action: {
+                        selectedFilter = filter
+                        viewModel.fetchImages(sortBy: selectedSortOption, filter: filter)
+                    }) {
+                        HStack {
+                            Text(filter.name)
+                            if selectedFilter?.id == filter.id { Image(systemName: "checkmark") }
+                        }
+                    }
+                }
+            } label: {
+                Image(systemName: selectedFilter != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
+                    .foregroundColor(appearanceManager.tintColor)
             }
             }
         }

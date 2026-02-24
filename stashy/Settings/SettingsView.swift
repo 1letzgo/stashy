@@ -166,7 +166,19 @@ struct SettingsView: View {
     // MARK: - Tip Jar
 
     private var tipSection: some View {
-        Section(header: Text("Tipp"), footer: Text("Support the development of stashy!")) {
+        Section(
+            header: Text("Tipp"),
+            footer: VStack(alignment: .leading, spacing: 4) {
+                if storeManager.totalTipsCount > 0 {
+                    Text("You have tipped \(storeManager.totalTipsCount) times. Thank you! 💖")
+                        .foregroundColor(appearanceManager.tintColor)
+                        .fontWeight(.medium)
+                        .padding(.top, 2)
+                } else {
+                    Text("Support the development of stashy!")
+                }
+            }
+        ) {
             if storeManager.products.isEmpty {
                 // Fallback / Loading state
                 tipRow(icon: "heart", title: "Small", price: "2,99 €")
@@ -263,6 +275,7 @@ public enum StoreError: Error {
 @MainActor
 class StoreManager: ObservableObject {
     @Published var products: [Product] = []
+    @AppStorage("totalTipsCount") var totalTipsCount: Int = 0
     
     let productDict: [String: String] = [
         "de.stashy.tip1": "Small",
@@ -293,6 +306,9 @@ class StoreManager: ObservableObject {
         case .success(let verification):
             let transaction = try checkVerified(verification)
             await transaction.finish()
+            
+            // Increment total tips locally
+            totalTipsCount += 1
             
         case .userCancelled, .pending:
             break

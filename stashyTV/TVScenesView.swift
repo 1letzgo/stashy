@@ -75,15 +75,20 @@ struct TVScenesView: View {
                 ScrollView {
                     LazyVGrid(columns: columns, spacing: 40) {
                         ForEach(viewModel.scenes) { scene in
-                            NavigationLink(destination: TVSceneDetailView(sceneId: scene.id)) {
-                                TVSceneCardView(scene: scene)
-                            }
-                            .buttonStyle(.card)
-                            .onAppear {
-                                if scene.id == viewModel.scenes.last?.id && viewModel.hasMoreScenes {
-                                    viewModel.loadMoreScenes()
+                            VStack(alignment: .leading, spacing: 10) {
+                                NavigationLink(destination: TVSceneDetailView(sceneId: scene.id)) {
+                                    TVSceneCardView(scene: scene)
                                 }
+                                .buttonStyle(.card)
+                                .onAppear {
+                                    if scene.id == viewModel.scenes.last?.id && viewModel.hasMoreScenes {
+                                        viewModel.loadMoreScenes()
+                                    }
+                                }
+                                
+                                TVSceneCardTitleView(scene: scene)
                             }
+                            .frame(width: 400)
                         }
 
                         if viewModel.isLoadingMoreScenes {

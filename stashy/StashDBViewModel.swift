@@ -297,6 +297,7 @@ class StashDBViewModel: ObservableObject {
     @Published var isLoadingImages: Bool = false
     @Published var hasMoreImages: Bool = false
     @Published var currentImagePage: Int = 1
+    @Published var currentImageFilter: SavedFilter? = nil
     var currentImageSortOption: ImageSortOption = .dateDesc
 
     // Image Sort Options
@@ -2619,7 +2620,7 @@ class StashDBViewModel: ObservableObject {
         }
     }
     
-    func fetchImages(sortBy: ImageSortOption = .dateDesc, isInitialLoad: Bool = true) {
+    func fetchImages(sortBy: ImageSortOption = .dateDesc, isInitialLoad: Bool = true, filter: SavedFilter? = nil) {
         print("🖼️ fetchImages called, sortBy: \(sortBy.rawValue), isInitialLoad: \(isInitialLoad)")
         
         if isInitialLoad {
@@ -2627,6 +2628,7 @@ class StashDBViewModel: ObservableObject {
             allImages = []
             totalImages = 0
             isLoadingImages = true
+            currentImageFilter = filter
         } else {
             isLoadingImages = true
         }
@@ -2636,14 +2638,32 @@ class StashDBViewModel: ObservableObject {
         
         let query = GraphQLQueries.queryWithFragments("findImages")
         
-        let variables: [String: Any] = [
-            "filter": [
-                "page": page,
-                "per_page": 40,
-                "sort": sortBy.sortField,
-                "direction": sortBy.direction
-            ]
+        var filterDict: [String: Any] = [
+            "page": page,
+            "per_page": 40,
+            "sort": sortBy.sortField,
+            "direction": sortBy.direction
         ]
+        
+        var variables: [String: Any] = [
+            "filter": filterDict
+        ]
+        
+        if let savedFilter = currentImageFilter {
+            if let dict = savedFilter.filterDict {
+                let sanitized = sanitizeFilter(dict)
+                print("🔍 Image Filter sanitized: \(sanitized)")
+                variables["image_filter"] = sanitized
+            } else if let obj = savedFilter.object_filter {
+                if let objDict = obj.value as? [String: Any] {
+                    let sanitized = sanitizeFilter(objDict)
+                    print("🔍 Image Object Filter sanitized: \(sanitized)")
+                    variables["image_filter"] = sanitized
+                } else {
+                    variables["image_filter"] = obj.value
+                }
+            }
+        }
         
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
               let bodyString = String(data: bodyData, encoding: .utf8) else {
@@ -2674,7 +2694,7 @@ class StashDBViewModel: ObservableObject {
     
     func loadMoreImages() {
         if !isLoadingImages && hasMoreImages {
-            fetchImages(sortBy: currentImageSortOption, isInitialLoad: false)
+            fetchImages(sortBy: currentImageSortOption, isInitialLoad: false, filter: currentImageFilter)
         }
     }
     
@@ -4990,21 +5010,23 @@ struct ActiveDownload {
     var downloadedSize: Int64
 }
 
-private final class DownloadTaskMap: @unchecked Sendable {
+final class DownloadTaskMap: @unchecked Sendable {
     private var tasks: [Int: (String, URL)] = [:]
     private let lock = NSLock()
     
-    func set(_ taskId: Int, info: (String, URL)) {
+    nonisolated init() {}
+    
+    nonisolated func set(_ taskId: Int, info: (String, URL)) {
         lock.lock(); defer { lock.unlock() }
         tasks[taskId] = info
     }
     
-    func get(_ taskId: Int) -> (String, URL)? {
+    nonisolated func get(_ taskId: Int) -> (String, URL)? {
         lock.lock(); defer { lock.unlock() }
         return tasks[taskId]
     }
     
-    func remove(_ taskId: Int) -> (String, URL)? {
+    nonisolated func remove(_ taskId: Int) -> (String, URL)? {
         lock.lock(); defer { lock.unlock() }
         return tasks.removeValue(forKey: taskId)
     }

@@ -11,45 +11,56 @@ struct TVStudioCardView: View {
     let studio: Studio
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ZStack(alignment: .bottomTrailing) {
-                thumbnailView
-                    .frame(width: 320, height: 180)
-                    .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+        ZStack(alignment: .topTrailing) {
+            thumbnailView
+                .frame(width: 320, height: 180)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 10))
 
-                if studio.sceneCount > 0 {
-                    Text("\(studio.sceneCount)")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.black.opacity(0.7))
-                        .clipShape(RoundedRectangle(cornerRadius: 5))
-                        .padding(8)
-                }
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.3), .black.opacity(0.8)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+            if studio.sceneCount > 0 {
+                Text("\(studio.sceneCount)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.black.opacity(0.6))
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                    .padding(12)
             }
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(studio.name)
-                    .font(.callout)
-                    .fontWeight(.semibold)
-                    .lineLimit(2)
-                    .foregroundColor(.white)
+            VStack {
+                Spacer()
+                HStack(alignment: .bottom) {
+                    Text(studio.name)
+                        .font(.body)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
+                        .lineLimit(1)
 
-                if let rating = studio.rating100 {
-                    HStack(spacing: 4) {
-                        Image(systemName: "star.fill")
-                            .font(.system(size: 10))
-                            .foregroundColor(.yellow)
-                        Text(String(format: "%.1f", Double(rating) / 20.0))
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.5))
+                    Spacer(minLength: 12)
+
+                    if let rating = studio.rating100 {
+                        HStack(spacing: 3) {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: 10))
+                                .foregroundColor(.yellow)
+                            Text(String(format: "%.1f", Double(rating) / 20.0))
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundColor(.white)
+                        }
                     }
                 }
+                .padding(12)
             }
         }
-        .frame(width: 320)
+        .frame(width: 320, height: 180)
     }
 
     @ViewBuilder

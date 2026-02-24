@@ -405,10 +405,10 @@ struct TVSceneDetailView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 24) {
                     ForEach(markers.sorted { $0.seconds < $1.seconds }) { marker in
-                        Button {
-                            startPlayback(for: scene, at: marker.seconds)
-                        } label: {
-                            VStack(alignment: .leading, spacing: 8) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Button {
+                                startPlayback(for: scene, at: marker.seconds)
+                            } label: {
                                 ZStack(alignment: .bottomTrailing) {
                                     if let url = marker.thumbnailURL {
                                         CustomAsyncImage(url: url) { loader in
@@ -445,20 +445,20 @@ struct TVSceneDetailView: View {
                                         .padding(8)
                                 }
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
-                                
-                                Text(marker.title ?? "Untitled Marker")
-                                    .font(.callout)
-                                    .fontWeight(.medium)
-                                    .foregroundColor(.white.opacity(0.7))
-                                    .lineLimit(1)
-                                    .frame(width: 260, alignment: .leading)
                             }
+                            .buttonStyle(.card)
+                            
+                            Text(marker.title ?? "Untitled Marker")
+                                .font(.callout)
+                                .fontWeight(.medium)
+                                .foregroundColor(.white.opacity(0.7))
+                                .lineLimit(1)
+                                .frame(width: 260, alignment: .leading)
                         }
-                        .buttonStyle(.card)
                     }
                 }
-                .padding(.horizontal, 4)
-                .padding(.vertical, 20)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 30)
             }
         }
     }
@@ -534,8 +534,8 @@ struct TVSceneDetailView: View {
                         .buttonStyle(.card)
                     }
                 }
-                .padding(.horizontal, 4)
-                .padding(.vertical, 20)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 30)
             }
         }
     }

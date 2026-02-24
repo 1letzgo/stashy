@@ -11,41 +11,51 @@ struct TVPerformerCardView: View {
     let performer: Performer
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            ZStack(alignment: .bottomTrailing) {
-                thumbnailView
-                    .frame(width: 200, height: 300)
-                    .clipped()
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
+        ZStack(alignment: .topTrailing) {
+            thumbnailView
+                .frame(width: 200, height: 300)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 10))
 
-                if performer.sceneCount > 0 {
-                    Text("\(performer.sceneCount)")
-                        .font(.system(size: 11, weight: .bold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.black.opacity(0.7))
-                        .clipShape(RoundedRectangle(cornerRadius: 5))
-                        .padding(8)
-                }
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.3), .black.opacity(0.8)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+
+            if performer.sceneCount > 0 {
+                Text("\(performer.sceneCount)")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Color.black.opacity(0.6))
+                    .clipShape(RoundedRectangle(cornerRadius: 5))
+                    .padding(12)
             }
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(performer.name)
-                    .font(.callout)
-                    .fontWeight(.semibold)
-                    .lineLimit(1)
-                    .foregroundColor(.white)
-
-                if let disambiguation = performer.disambiguation, !disambiguation.isEmpty {
-                    Text(disambiguation)
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.4))
+            VStack {
+                Spacer()
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(performer.name)
+                        .font(.body)
+                        .fontWeight(.bold)
+                        .foregroundColor(.white)
                         .lineLimit(1)
+
+                    if let disambiguation = performer.disambiguation, !disambiguation.isEmpty {
+                        Text(disambiguation)
+                            .font(.caption)
+                            .foregroundColor(.white.opacity(0.8))
+                            .lineLimit(1)
+                    }
                 }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
             }
         }
-        .frame(width: 200)
+        .frame(width: 200, height: 300)
     }
 
     @ViewBuilder

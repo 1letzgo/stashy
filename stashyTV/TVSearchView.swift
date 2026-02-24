@@ -118,10 +118,15 @@ struct TVSearchView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 30) {
                     ForEach(viewModel.scenes) { scene in
-                        NavigationLink(destination: TVSceneDetailView(sceneId: scene.id)) {
-                            TVSceneCardView(scene: scene)
+                        VStack(alignment: .leading, spacing: 10) {
+                            NavigationLink(destination: TVSceneDetailView(sceneId: scene.id)) {
+                                TVSceneCardView(scene: scene)
+                            }
+                            .buttonStyle(.card)
+                            
+                            TVSceneCardTitleView(scene: scene)
                         }
-                        .buttonStyle(.card)
+                        .frame(width: 400)
                     }
                 }
                 .padding(.horizontal, 50)

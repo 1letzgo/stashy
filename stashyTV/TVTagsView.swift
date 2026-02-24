@@ -11,7 +11,7 @@ struct TVTagsView: View {
     @StateObject private var viewModel = StashDBViewModel()
 
     private let columns = [
-        GridItem(.adaptive(minimum: 180, maximum: 220), spacing: 30)
+        GridItem(.adaptive(minimum: 200, maximum: 240), spacing: 40)
     ]
 
     var body: some View {
@@ -39,7 +39,7 @@ struct TVTagsView: View {
                 Spacer()
             } else {
                 ScrollView {
-                    LazyVGrid(columns: columns, spacing: 36) {
+                    LazyVGrid(columns: columns, spacing: 40) {
                         ForEach(viewModel.tags) { tag in
                             NavigationLink(destination: TVTagDetailView(tagId: tag.id, tagName: tag.name)) {
                                 TVTagCardView(tag: tag)
@@ -84,6 +84,12 @@ struct TVTagDetailView: View {
 
     @StateObject private var viewModel = StashDBViewModel()
 
+    private var tagColor: Color {
+        let hash = abs(tagName.hashValue)
+        let hue = Double(hash % 360) / 360.0
+        return Color(hue: hue, saturation: 0.35, brightness: 0.3)
+    }
+
     private let sceneColumns = [
         GridItem(.adaptive(minimum: 380, maximum: 420), spacing: 30)
     ]
@@ -92,23 +98,40 @@ struct TVTagDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: 30) {
                 // Header
-                HStack(spacing: 14) {
-                    Image(systemName: "tag.fill")
-                        .font(.title2)
-                        .foregroundColor(AppearanceManager.shared.tintColor)
+                HStack(alignment: .top, spacing: 50) {
+                    // Tag thumbnail (generated color or specific image if it had one)
+                    Rectangle()
+                        .fill(tagColor)
+                        .overlay(
+                            Image(systemName: "tag.fill")
+                                .font(.system(size: 56))
+                                .foregroundColor(.white.opacity(0.4))
+                        )
+                        .frame(width: 320, height: 180)
+                        .clipShape(RoundedRectangle(cornerRadius: 14))
+                        
+                    // Info
+                    VStack(alignment: .leading, spacing: 16) {
+                        Text(tagName)
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            
+                        Divider()
+                            .background(Color.white.opacity(0.1))
 
-                    Text(tagName)
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-
-                    if viewModel.totalTagScenes > 0 {
-                        Text("\(viewModel.totalTagScenes) scenes")
-                            .font(.title3)
-                            .foregroundColor(.white.opacity(0.4))
+                        if viewModel.totalTagScenes > 0 {
+                            HStack(spacing: 12) {
+                                Text("Scenes")
+                                    .font(.title3)
+                                    .foregroundColor(.white.opacity(0.4))
+                                Text("\(viewModel.totalTagScenes)")
+                                    .font(.title3)
+                                    .foregroundColor(.white)
+                            }
+                        }
                     }
-
-                    Spacer()
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .padding(.horizontal, 50)
                 .padding(.top, 40)
@@ -137,10 +160,15 @@ struct TVTagDetailView: View {
                 } else {
                     LazyVGrid(columns: sceneColumns, spacing: 40) {
                         ForEach(viewModel.tagScenes) { scene in
-                            NavigationLink(destination: TVSceneDetailView(sceneId: scene.id)) {
-                                TVSceneCardView(scene: scene)
+                            VStack(alignment: .leading, spacing: 10) {
+                                NavigationLink(destination: TVSceneDetailView(sceneId: scene.id)) {
+                                    TVSceneCardView(scene: scene)
+                                }
+                                .buttonStyle(.card)
+                                
+                                TVSceneCardTitleView(scene: scene)
                             }
-                            .buttonStyle(.card)
+                            .frame(width: 400)
                             .onAppear {
                                 if scene.id == viewModel.tagScenes.last?.id && viewModel.hasMoreTagScenes {
                                     viewModel.fetchTagScenes(tagId: tagId, isInitialLoad: false)

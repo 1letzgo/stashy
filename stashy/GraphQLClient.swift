@@ -186,7 +186,7 @@ actor GraphQLClient {
         variables: [String: Any]? = nil,
         retryCount: Int = 0
     ) async throws -> T {
-        let request = try buildRequest(query: query, variables: variables)
+        let request = try await buildRequest(query: query, variables: variables)
         
         let (data, response) = try await session.data(for: request)
         
@@ -217,7 +217,7 @@ actor GraphQLClient {
     
     /// Execute a GraphQL query and return raw data
     func executeRaw(query: String, variables: [String: Any]? = nil) async throws -> Data {
-        let request = try buildRequest(query: query, variables: variables)
+        let request = try await buildRequest(query: query, variables: variables)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data)
         return data
@@ -230,29 +230,19 @@ actor GraphQLClient {
         query: String,
         variables: [String: Any]? = nil
     ) -> AnyPublisher<T, GraphQLNetworkError> {
-        do {
-            let request = try buildRequest(query: query, variables: variables)
-            
-            return session.dataTaskPublisher(for: request)
-                .tryMap { [weak self] data, response in
-                    try self?.validateResponse(response, data: data)
-                    return data
+        return Future { promise in
+            Task {
+                do {
+                    let result: T = try await self.execute(query: query, variables: variables)
+                    promise(.success(result))
+                } catch let error as GraphQLNetworkError {
+                    promise(.failure(error))
+                } catch {
+                    promise(.failure(.networkError(error)))
                 }
-                .decode(type: T.self, decoder: JSONDecoder())
-                .mapError { error -> GraphQLNetworkError in
-                    if let networkError = error as? GraphQLNetworkError {
-                        return networkError
-                    } else if error is DecodingError {
-                        return .decodingError(error)
-                    } else {
-                        return .networkError(error)
-                    }
-                }
-                .eraseToAnyPublisher()
-        } catch {
-            return Fail(error: error as? GraphQLNetworkError ?? .networkError(error))
-                .eraseToAnyPublisher()
+            }
         }
+        .eraseToAnyPublisher()
     }
     
     // MARK: - Completion Handler API (For existing code)
@@ -290,7 +280,7 @@ actor GraphQLClient {
             throw GraphQLNetworkError.decodingError(NSError(domain: "JSONEncoding", code: -1))
         }
         
-        let request = try buildRequest(query: bodyString, variables: nil)
+        let request = try await buildRequest(query: bodyString, variables: nil)
         let (data, response) = try await session.data(for: request)
         try validateResponse(response, data: data)
         
@@ -333,16 +323,17 @@ actor GraphQLClient {
         return false
     }
 
-    private func buildRequest(query: String, variables: [String: Any]?) throws -> URLRequest {
-        guard let config = ServerConfigManager.shared.loadConfig(),
-              config.hasValidConfig else {
-            throw GraphQLNetworkError.noServerConfig
+    private func buildRequest(query: String, variables: [String: Any]?) async throws -> URLRequest {
+        let (urlString, apiKey) = await MainActor.run { () -> (String?, String?) in
+            guard let config = ServerConfigManager.shared.loadConfig(),
+                  config.hasValidConfig else {
+                return (nil, nil)
+            }
+            return ("\(config.baseURL)/graphql", config.secureApiKey)
         }
         
-        let urlString = "\(config.baseURL)/graphql"
-        
-        guard let url = URL(string: urlString) else {
-            throw GraphQLNetworkError.invalidURL
+        guard let urlString = urlString, let url = URL(string: urlString) else {
+            throw GraphQLNetworkError.noServerConfig
         }
         
         var request = URLRequest(url: url)
@@ -352,7 +343,7 @@ actor GraphQLClient {
         request.cachePolicy = URLRequest.CachePolicy.reloadIgnoringLocalCacheData
         
         // Add API Key if available
-        if let apiKey = config.secureApiKey, !apiKey.isEmpty {
+        if let apiKey = apiKey, !apiKey.isEmpty {
             request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
             #if DEBUG
             print("📱 GraphQL: Using API key (first 8 chars): \(String(apiKey.prefix(8)))...")

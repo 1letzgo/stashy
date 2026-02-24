@@ -158,7 +158,7 @@ class ImageCache {
         }
     }
     
-    private static func performCleanup(at serverDir: URL) {
+    nonisolated private static func performCleanup(at serverDir: URL) {
         let fileManager = FileManager.default
         let thirtyDays: TimeInterval = 60 * 60 * 24 * 30
         

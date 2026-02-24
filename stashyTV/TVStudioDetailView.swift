@@ -25,14 +25,23 @@ struct TVStudioDetailView: View {
                 // Header
                 HStack(alignment: .top, spacing: 50) {
                     // Studio thumbnail
-                    CustomAsyncImage(url: studio?.thumbnailURL) { loader in
-                        if loader.isLoading {
+                    AsyncImage(url: studio?.thumbnailURL) { phase in
+                        switch phase {
+                        case .empty:
                             Rectangle()
                                 .fill(Color.gray.opacity(0.08))
                                 .overlay(ProgressView())
-                        } else if let image = loader.image {
-                            image.resizable().scaledToFit()
-                        } else {
+                        case .success(let image):
+                            image.resizable().scaledToFill()
+                        case .failure:
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.08))
+                                .overlay(
+                                    Image(systemName: "building.2.fill")
+                                        .font(.system(size: 56))
+                                        .foregroundColor(.white.opacity(0.12))
+                                )
+                        @unknown default:
                             Rectangle()
                                 .fill(Color.gray.opacity(0.08))
                                 .overlay(
@@ -42,6 +51,7 @@ struct TVStudioDetailView: View {
                                 )
                         }
                     }
+                    .aspectRatio(16/9, contentMode: .fill)
                     .frame(width: 400, height: 225)
                     .clipped()
                     .clipShape(RoundedRectangle(cornerRadius: 14))
@@ -113,10 +123,15 @@ struct TVStudioDetailView: View {
                     } else {
                         LazyVGrid(columns: sceneColumns, spacing: 40) {
                             ForEach(viewModel.studioScenes) { scene in
-                                NavigationLink(destination: TVSceneDetailView(sceneId: scene.id)) {
-                                    TVSceneCardView(scene: scene)
+                                VStack(alignment: .leading, spacing: 10) {
+                                    NavigationLink(destination: TVSceneDetailView(sceneId: scene.id)) {
+                                        TVSceneCardView(scene: scene)
+                                    }
+                                    .buttonStyle(.card)
+                                    
+                                    TVSceneCardTitleView(scene: scene)
                                 }
-                                .buttonStyle(.card)
+                                .frame(width: 400)
                                 .onAppear {
                                     if scene.id == viewModel.studioScenes.last?.id && viewModel.hasMoreStudioScenes {
                                         viewModel.fetchStudioScenes(studioId: studioId, isInitialLoad: false)
@@ -153,7 +168,7 @@ struct TVStudioDetailView: View {
                 .background(Color.white.opacity(0.1))
 
             LazyVGrid(columns: [
-                GridItem(.fixed(180), alignment: .leading),
+                GridItem(.fixed(240), alignment: .leading),
                 GridItem(.flexible(), alignment: .leading)
             ], alignment: .leading, spacing: 12) {
                 Text("Scenes").font(.title3).foregroundColor(.white.opacity(0.4))
