@@ -32,11 +32,12 @@ xcodebuild test -project stashy.xcodeproj -scheme stashy -destination 'platform=
 ### Core Patterns
 
 **Singleton Managers**: The app uses shared singleton instances for cross-cutting concerns:
-- `AppearanceManager.shared` - Manages theme/tint colors, persists to UserDefaults
+- `AppearanceManager.shared` - Manages theme/tint colors and O-counter icon selection, persists to UserDefaults
 - `ServerConfigManager.shared` - Multi-server config storage, active server selection
-- `TabManager.shared` - Tab visibility and ordering configuration
+- `TabManager.shared` - Tab visibility, ordering, dashboard rows, and reels mode configuration
 - `KeychainManager.shared` - Secure API key storage (iOS only, not tvOS)
 - `GraphQLClient.shared` - Centralized network client with SSL handling for local servers
+- `ImageCacheManager.shared` - Dual-tier image cache (memory + disk, server-scoped)
 
 **Navigation**: `NavigationCoordinator` is passed as an `@EnvironmentObject` throughout the app. It manages:
 - Tab selection and deep linking
@@ -44,12 +45,12 @@ xcodebuild test -project stashy.xcodeproj -scheme stashy -destination 'platform=
 - Cross-tab navigation (e.g., opening a performer from a scene detail)
 - Remote state injection for filters/sorts
 
-**Main ViewModel**: `StashDBViewModel` is a large (~2900 lines) `@MainActor` class that handles:
-- Server connectivity and status
-- Statistics fetching
-- Saved filters from Stash server
+**Main ViewModel**: `StashDBViewModel` is a large (~6000 lines) `@MainActor` class that handles:
+- Server connectivity and status (staggered init: Filters → Statistics → Ready)
+- Statistics fetching and saved filters from Stash server
 - Scene metadata (performers, studios, tags, galleries)
-- O-counter (play count) tracking
+- O-counter (play count) tracking with optimistic updates
+- Nested managers: `DownloadManager`, `HandyManager` (TheHandy device), `ButtplugManager` (Intiface/funscript)
 
 **Domain ViewModels**: Specialized view models in `stashy/ViewModels/`:
 - `ScenesViewModel` - Scene browsing, filtering, sorting
@@ -62,26 +63,37 @@ xcodebuild test -project stashy.xcodeproj -scheme stashy -destination 'platform=
 - `SceneRepository`, `PerformerRepository`, `StudioRepository`, `GalleryRepository`, `TagRepository`, `FilterRepository`
 - These encapsulate GraphQL queries and data fetching logic
 
+**Pagination**: `stashy/Utilities/PaginatedLoader.swift` provides a generic `PaginatedLoader<T>` with `loadInitial()`, `loadMore()`, `refresh()`, and `reset()` methods. Includes convenience static builders for each content type.
+
 ### Data Flow
 
 1. **Network Layer**: `GraphQLClient` handles all GraphQL requests
+   - Actor-based design for thread safety
    - Custom `URLSessionDelegate` for self-signed SSL certificates on local networks
    - Automatic retry logic for "database is locked" errors (common with SQLite-backed Stash)
    - Supports async/await, Combine, and completion handler APIs
 
-2. **GraphQL Queries**: Stored as `.graphql` files in `graphql/` directory
-   - Loaded at runtime via `GraphQLQueries.loadQuery(named:)`
-   - Cached in-memory after first load
-   - Contains fragments for reusable field sets
+2. **Image Loading**: `ImageCacheManager` provides dual-tier caching:
+   - Memory cache: 300 MB, 300 items max
+   - Disk cache: ~30-day TTL, server-scoped (separate cache per server ID to prevent data leakage on server switch)
+   - Stable cache key normalization: strips timestamp params but retains `width`/`height`/`size` params
+   - `CustomAsyncImage` view component for easy image loading with fallbacks
+   - Auto-cleanup runs every 4 hours
 
-3. **Server Configuration**:
+3. **GraphQL Queries**: Stored as `.graphql` files in `graphql/` directory
+   - Loaded at runtime via `GraphQLQueries.loadQuery(named:)`
+   - Thread-safe in-memory caching after first load (concurrent DispatchQueue)
+   - Contains fragment files (`fragment_*.graphql`) for reusable field sets
+   - `queryWithFragments` method for composing queries with fragments
+
+4. **Server Configuration**:
    - Multi-server support via `ServerConfig` (Codable, persisted in UserDefaults)
    - Each server has: name, address, port, protocol (HTTP/HTTPS), streaming quality settings
    - API keys stored in Keychain (iOS) with UserDefaults fallback
    - Server-specific settings use suffix pattern: `"key_\(serverID)"`
    - Switching servers posts `"ServerConfigChanged"` notification, triggering app-wide data reset
 
-4. **Settings Architecture** (refactored 2026-02-06):
+5. **Settings Architecture** (refactored 2026-02-06):
    - All settings views live in `stashy/Settings/`
    - Main entry point: `SettingsView.swift` (replaces old ServerConfigView)
    - Modular sections: `ServerListSection`, `PlaybackSettingsSection`, `ContentSettingsSection`
@@ -92,6 +104,7 @@ xcodebuild test -project stashy.xcodeproj -scheme stashy -destination 'platform=
 **iOS vs tvOS**: Most code is shared with `#if !os(tvOS)` guards for iOS-only features:
 - Keychain access (tvOS uses UserDefaults for API keys)
 - UIKit integrations (SceneDelegate, AppDelegate)
+- Haptic feedback (`HapticManager`)
 - Certain UI components (e.g., complex gestures)
 
 **tvOS-specific**: Separate target (`stashyTV`) with:
@@ -111,14 +124,21 @@ xcodebuild test -project stashy.xcodeproj -scheme stashy -destination 'platform=
 - Each row can show: Recent scenes, Performers, Studios, or filtered scene lists
 - Backed by `HomeRowView` which fetches data based on row configuration
 
+### StashTok / Reels (`ReelsView.swift`, ~2100 lines)
+- Supports 3 modes: Scenes, Markers (bookmarks), Clips (images)
+- Infinite scroll with native `ScrollViewReader`
+- Mute state tied to headphone detection (`isHeadphonesConnected()`)
+- Per-mode sort options; full-screen media zoom with rotation support
+
 ### Video Playback
 - Custom `FullScreenVideoPlayer` (UIViewRepresentable wrapping AVPlayerLayer)
 - Supports quality selection (Original, 4K, 1080p, 720p, 480p, 240p)
 - Separate quality settings for normal playback vs StashTok (reels)
 
 ### Design System
-- `DesignTokens.swift` defines spacing, corner radius, shadows
+- `DesignTokens.swift` defines spacing, corner radius, shadows, and animation presets
 - Consistent card styling with `DesignTokens.CornerRadius.card` (12pt)
+- View extensions: `.cardShadow()`, `.subtleShadow()`, `.floatingShadow()`
 - Haptic feedback via `HapticManager`
 - Toast notifications via `ToastManager`
 
@@ -133,7 +153,7 @@ When modifying Xcode project structure, update `project.pbxproj` in 4 sections:
 
 ### Server Config Changes
 When ServerConfigManager saves a new active config:
-1. Clears URLCache to prevent auth/data leakage
+1. Clears URLCache and `ImageCacheManager` disk cache to prevent auth/data leakage
 2. Posts `"ServerConfigChanged"` notification
 3. ViewModels observe this and call `GraphQLClient.shared.cancelAllRequests()`
 4. UI resets to clean state
@@ -173,9 +193,9 @@ When ServerConfigManager saves a new active config:
 
 ## SSL and Local Servers
 
-GraphQLClient includes custom URLSession delegate that:
-- Accepts self-signed certificates for localhost/private IP ranges
-- Whitelists `gole.tz` domain (test server)
+Both `GraphQLClient` and `ImageCacheManager` include custom URLSession delegates that:
+- Accept self-signed certificates for localhost/private IP ranges
+- Whitelist `gole.tz` domain (test server)
 - Essential for local Stash server connectivity
 
 ## Migration and Backward Compatibility

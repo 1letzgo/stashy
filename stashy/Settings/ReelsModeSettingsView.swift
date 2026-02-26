@@ -18,8 +18,10 @@ struct ReelsModeSettingsView: View {
             Section {
                 Toggle("Immersive Video Scaling", isOn: $tabManager.reelsFillHeight)
                     .tint(appearanceManager.tintColor)
+                Toggle("Continuous Play", isOn: $tabManager.reelsContinuousPlay)
+                    .tint(appearanceManager.tintColor)
             } footer: {
-                Text("Content will stretch to fill the full screen when the device orientation matches the video orientation (Portrait/Portrait or Landscape/Landscape).")
+                Text("Immersive Scaling stretches content to fill the full screen when orientation matches the video. Continuous Play automatically advances to the next video instead of looping.")
             }
             
             Section {

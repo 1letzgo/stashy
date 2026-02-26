@@ -822,6 +822,14 @@ struct ReelsView: View {
         .background(Color.black)
     }
 
+    private func advanceToNextItem(from item: ReelItemData) {
+        let items = currentReelItems
+        guard let currentIndex = items.firstIndex(where: { $0.id == item.id }) else { return }
+        let nextIndex = currentIndex + 1
+        guard nextIndex < items.count else { return }
+        currentVisibleSceneId = items[nextIndex].id
+    }
+
     @ViewBuilder
     private func reelItemRow(index: Int, item: ReelItemData, itemCount: Int) -> some View {
         ReelItemView(
@@ -843,6 +851,9 @@ struct ReelsView: View {
             },
             onPlayCountChanged: { newCount in
                 self.handlePlayCountChange(item: item, newCount: newCount)
+            },
+            onVideoEnded: {
+                self.advanceToNextItem(from: item)
             },
             viewModel: viewModel,
             isMenuOpen: $isMenuOpen,
@@ -1450,6 +1461,7 @@ struct ReelItemView: View {
     let isActive: Bool
     @State private var player: AVPlayer?
     @State private var looper: Any?
+    @State private var gifAdvanceTimer: Timer?
     @ObservedObject var tabManager = TabManager.shared
     
     // Playback State
@@ -1460,6 +1472,7 @@ struct ReelItemView: View {
     var onRatingChanged: (Int?) -> Void
     var onOCounterChanged: (Int) -> Void
     var onPlayCountChanged: (Int) -> Void
+    var onVideoEnded: () -> Void = {}
     @ObservedObject var viewModel: StashDBViewModel
     @Environment(\.verticalSizeClass) var verticalSizeClass
     @State private var isPlaying = true
@@ -1511,10 +1524,12 @@ struct ReelItemView: View {
             setupPlayer()
             if isActive {
                 onInteraction()
+                if item.isGIF { startGIFAdvanceTimer() }
             }
         }
         .onDisappear {
             cleanupPlayer()
+            cancelGIFAdvanceTimer()
         }
         .onChange(of: isMuted) { _, newValue in
             player?.isMuted = newValue
@@ -1526,8 +1541,19 @@ struct ReelItemView: View {
                 if player == nil { setupPlayer() }
                 if isPlaying && !isRotating { player?.play() }
                 onInteraction()
+                if item.isGIF { startGIFAdvanceTimer() }
             } else {
                 cleanupPlayer()
+                cancelGIFAdvanceTimer()
+            }
+        }
+        .onChange(of: tabManager.reelsContinuousPlay) { _, enabled in
+            if item.isGIF {
+                if enabled && isActive {
+                    startGIFAdvanceTimer()
+                } else {
+                    cancelGIFAdvanceTimer()
+                }
             }
         }
         .onChange(of: isRotating) { _, newValue in
@@ -1954,8 +1980,12 @@ struct ReelItemView: View {
             self.duration = d
         }
         
-        // Loop (Scenes and Clips)
+        // Loop or Auto-Advance (Scenes and Clips)
         NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { _ in
+            if TabManager.shared.reelsContinuousPlay {
+                self.onVideoEnded()
+                return
+            }
             if case .scene = self.item {
                 if startTime > 0 {
                     player.seek(to: CMTime(seconds: startTime, preferredTimescale: 600))
@@ -1987,8 +2017,12 @@ struct ReelItemView: View {
                  let start = self.item.startTime
                  let end = self.item.endTime ?? (start + 20.0)
                  if time.seconds >= end {
-                     player.seek(to: CMTime(seconds: start, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
-                     player.play()
+                     if TabManager.shared.reelsContinuousPlay {
+                         self.onVideoEnded()
+                     } else {
+                         player.seek(to: CMTime(seconds: start, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
+                         player.play()
+                     }
                  }
             } else {
                  // Scene duration update
@@ -2029,6 +2063,20 @@ struct ReelItemView: View {
     func seek(to time: Double) {
         let cmTime = CMTime(seconds: time, preferredTimescale: 600)
         player?.seek(to: cmTime)
+    }
+
+    private func startGIFAdvanceTimer() {
+        guard tabManager.reelsContinuousPlay else { return }
+        cancelGIFAdvanceTimer()
+        let duration = item.duration ?? 5.0
+        gifAdvanceTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { _ in
+            onVideoEnded()
+        }
+    }
+
+    private func cancelGIFAdvanceTimer() {
+        gifAdvanceTimer?.invalidate()
+        gifAdvanceTimer = nil
     }
 }
 struct SidebarButton: View {

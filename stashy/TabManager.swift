@@ -202,16 +202,22 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(reelsFillHeight, forKey: reelsFillHeightKey)
         }
     }
-    
+    @Published var reelsContinuousPlay: Bool = false {
+        didSet {
+            UserDefaults.standard.set(reelsContinuousPlay, forKey: reelsContinuousPlayKey)
+        }
+    }
+
     // Session-only sort options (not persisted)
     private var sessionSortOptions: [AppTab: String] = [:]
     private var sessionDetailSortOptions: [String: String] = [:]
-    
+
     private let userDefaultsKey = "AppTabsConfig"
     private let detailSortKey = "DetailViewsSortConfig"
     private let homeRowsKey = "HomeRowsConfig"
     private let reelsModesKey = "ReelsModesConfig"
     private let reelsFillHeightKey = "ReelsFillHeight"
+    private let reelsContinuousPlayKey = "ReelsContinuousPlay"
     
     init() {
         // Initial load based on currently active server
@@ -232,6 +238,7 @@ class TabManager: ObservableObject {
         loadHomeRows()
         loadReelsModes()
         self.reelsFillHeight = UserDefaults.standard.object(forKey: reelsFillHeightKey) as? Bool ?? true
+        self.reelsContinuousPlay = UserDefaults.standard.bool(forKey: reelsContinuousPlayKey)
     }
     
     private var currentServerSuffix: String {
