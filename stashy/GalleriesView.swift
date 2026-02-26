@@ -543,12 +543,14 @@ struct GalleryItemView: View {
                         FullScreenVideoPlayer(player: player, videoGravity: .resizeAspect)
                     } else {
                         if let url = image.thumbnailURL {
-                            AsyncImage(url: url) { img in
-                                img
-                                    .resizable()
-                                    .aspectRatio(contentMode: .fit)
-                            } placeholder: {
-                                ProgressView().tint(.white)
+                            CustomAsyncImage(url: url) { loader in
+                                if let img = loader.image {
+                                    img
+                                        .resizable()
+                                        .aspectRatio(contentMode: .fit)
+                                } else {
+                                    ProgressView().tint(.white)
+                                }
                             }
                         }
                     }
@@ -891,7 +893,8 @@ struct GalleryItemView: View {
 
     private func initPlayer(with streamURL: URL) {
         let headers = ["ApiKey": ServerConfigManager.shared.activeConfig?.secureApiKey ?? ""]
-        let asset = AVURLAsset(url: streamURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+        let authenticatedURL = signedURL(streamURL) ?? streamURL
+        let asset = AVURLAsset(url: authenticatedURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
         let newItem = AVPlayerItem(asset: asset)
 
         if let existingPlayer = self.player {

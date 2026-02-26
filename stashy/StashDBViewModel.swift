@@ -2638,7 +2638,7 @@ class StashDBViewModel: ObservableObject {
         
         let query = GraphQLQueries.queryWithFragments("findImages")
         
-        var filterDict: [String: Any] = [
+        let filterDict: [String: Any] = [
             "page": page,
             "per_page": 40,
             "sort": sortBy.sortField,

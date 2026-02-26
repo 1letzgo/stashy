@@ -387,7 +387,8 @@ struct SceneVideoPlayerCard: View {
                         if let url = URL(string: stream.url) {
                             let currentTime = player?.currentTime() ?? .zero
                             let wasPlaying = player?.rate ?? 0 > 0
-                            let asset = AVURLAsset(url: url, options: ["AVURLAssetHTTPHeaderFieldsKey": ["ApiKey": ServerConfigManager.shared.activeConfig?.secureApiKey ?? ""]])
+                            let authenticatedURL = signedURL(url) ?? url
+                            let asset = AVURLAsset(url: authenticatedURL, options: ["AVURLAssetHTTPHeaderFieldsKey": ["ApiKey": ServerConfigManager.shared.activeConfig?.secureApiKey ?? ""]])
                             let newItem = AVPlayerItem(asset: asset)
                             player?.replaceCurrentItem(with: newItem)
                             player?.seek(to: currentTime)

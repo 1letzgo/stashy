@@ -1586,14 +1586,15 @@ struct ReelItemView: View {
     @ViewBuilder
     private var thumbnailPlaceholder: some View {
         if let url = item.thumbnailURL {
-            AsyncImage(url: url) { image in
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: shouldFill ? .fill : .fit)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } placeholder: {
-                ProgressView()
-                    .tint(.white)
+            CustomAsyncImage(url: url) { loader in
+                if let image = loader.image {
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: shouldFill ? .fill : .fit)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                } else {
+                    ProgressView().tint(.white)
+                }
             }
         }
     }
@@ -1905,7 +1906,8 @@ struct ReelItemView: View {
     
     private func initPlayer(with streamURL: URL) {
         let headers = ["ApiKey": ServerConfigManager.shared.activeConfig?.secureApiKey ?? ""]
-        let asset = AVURLAsset(url: streamURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+        let authenticatedURL = signedURL(streamURL) ?? streamURL
+        let asset = AVURLAsset(url: authenticatedURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
         let newItem = AVPlayerItem(asset: asset)
         
         let startTime = item.startTime

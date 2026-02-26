@@ -316,7 +316,8 @@ class ImageLoader: ObservableObject {
     }
 
     private func loadImage(from url: URL) async throws -> Data {
-        var request = URLRequest(url: url)
+        let authenticatedURL = signedURL(url) ?? url
+        var request = URLRequest(url: authenticatedURL)
         request.timeoutInterval = 10.0 // Reduced timeout for faster failure
         request.cachePolicy = .reloadIgnoringLocalCacheData // Force check with server if not in own cache
 
