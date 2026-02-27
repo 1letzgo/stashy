@@ -51,6 +51,7 @@ struct SceneDetailView: View {
     @State private var previewPlayer: AVPlayer?
     @State private var isPreviewing = false
     @State private var isPressing = false
+    @State private var hasInitializedDevices = false
     
     // Extracted toolbar content to reduce body complexity
     @ToolbarContentBuilder
@@ -118,7 +119,13 @@ struct SceneDetailView: View {
                     onStartPlayback: { resume in startPlayback(resume: resume) }
                 )
                 
-                if activeScene.interactive == true && activeScene.funscriptURL != nil {
+                let isAnyAudioModeActive = handyManager.isAudioMode || buttplugManager.isAudioMode || loveSpouseManager.isAudioMode
+                
+                if isAnyAudioModeActive {
+                    AudioVibeCard()
+                }
+                
+                if activeScene.interactive == true && activeScene.funscriptURL != nil && !isAnyAudioModeActive {
                     SceneHeatmapCard(
                         heatmapURL: activeScene.heatmapURL,
                         funscriptURL: activeScene.funscriptURL,
@@ -257,9 +264,36 @@ struct SceneDetailView: View {
                             .onReceive(player.publisher(for: \.timeControlStatus)) { status in
                                 handleTimeControlStatusChange(status)
                             }
+                                .onReceive(player.publisher(for: \.status)) { _ in
+                                    ensureAudioAnalysis(for: player.currentItem)
+                                }
+                                .onChange(of: player.currentItem) { _, newItem in
+                                    ensureAudioAnalysis(for: newItem)
+                                }
+                                .onChange(of: handyManager.isAudioMode) { _, isAudio in
+                                    if isAudio { ensureAudioAnalysis(for: player.currentItem) }
+                                }
+                                .onChange(of: buttplugManager.isAudioMode) { _, isAudio in
+                                    if isAudio { ensureAudioAnalysis(for: player.currentItem) }
+                                }
+                                .onChange(of: loveSpouseManager.isAudioMode) { _, isAudio in
+                                    if isAudio { ensureAudioAnalysis(for: player.currentItem) }
+                                }
                     }
                 }
             )
+            .onChange(of: handyManager.isSyncing) { _, isSyncing in
+                // Standard HSSP handling
+            }
+    }
+
+    private func ensureAudioAnalysis(for item: AVPlayerItem?) {
+        guard let item = item else { return }
+        // Only setup if at least one manager is in audio mode
+        if handyManager.isAudioMode || buttplugManager.isAudioMode || loveSpouseManager.isAudioMode {
+            print("🎙️ SceneDetail: Ensuring Audio Analysis is setup for current item")
+            AudioAnalysisManager.shared.setup(for: item)
+        }
     }
 
     private func refreshSceneDetails() {
@@ -275,6 +309,17 @@ struct SceneDetailView: View {
     private func handleOnAppear() {
         print("🔍 Scene Detail: ID=\(activeScene.id), PlayCount=\(activeScene.playCount ?? -1)")
         isFullscreen = false
+        
+        // Reset all SYNC states only on very first appear - WE WANT MANUAL ACTIVATION
+        if !hasInitializedDevices {
+            handyManager.isSyncing = false
+            handyManager.isAudioMode = false // In case we ever bring it back
+            buttplugManager.isAudioMode = false
+            buttplugManager.isSyncing = false
+            loveSpouseManager.isAudioMode = false
+            loveSpouseManager.isSyncing = false
+            hasInitializedDevices = true
+        }
         
         if activeScene.streams?.isEmpty ?? true {
             viewModel.fetchSceneStreams(sceneId: activeScene.id) { streams in
@@ -297,10 +342,7 @@ struct SceneDetailView: View {
             }
         }
         
-        if let scriptURL = activeScene.funscriptURL {
-            buttplugManager.setupScene(funscriptURL: scriptURL)
-            loveSpouseManager.setupScene(funscriptURL: scriptURL)
-        }
+        // Removed automatic setupScene to enforce manual activation
     }
 
     private func handleOnDisappear() {
@@ -370,6 +412,7 @@ struct SceneDetailView: View {
             print("🔵 SceneDetailView: Video Paused - Sending Love Spouse Stop")
             loveSpouseManager.pause()
         } else if status == .playing {
+            ensureAudioAnalysis(for: player.currentItem)
             if handyManager.isSyncing { handyManager.play(at: currentTime) }
             if buttplugManager.isConnected { buttplugManager.play(at: currentTime) }
             if loveSpouseManager.isConnected { loveSpouseManager.play(at: currentTime) }
@@ -791,6 +834,177 @@ struct AddMarkerSheet: View {
         formatter.unitsStyle = .positional
         formatter.zeroFormattingBehavior = .pad
         return formatter.string(from: seconds) ?? "00:00"
+    }
+}
+
+// MARK: - AudioVibeCard Component
+struct AudioVibeCard: View {
+    @ObservedObject var audioManager = AudioAnalysisManager.shared
+    @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject var handyManager = HandyManager.shared
+    @ObservedObject var buttplugManager = ButtplugManager.shared
+    @ObservedObject var loveSpouseManager = LoveSpouseManager.shared
+    
+    @State private var isSettingsExpanded = false
+    
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .center) {
+                Text("Audio Sync")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                
+                Spacer()
+                
+                    if buttplugManager.isEnabled {
+                        Button {
+                            if !buttplugManager.isAudioMode && !buttplugManager.isConnected {
+                                buttplugManager.connect()
+                            }
+                            withAnimation { buttplugManager.isAudioMode.toggle() }
+                            HapticManager.medium()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: buttplugManager.isAudioMode ? "waveform.and.mic" : "waveform")
+                                Text("Intiface")
+                            }
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(buttplugManager.isAudioMode ? .white : appearanceManager.tintColor)
+                            .padding(.horizontal, 8)
+                            .frame(minWidth: 80, minHeight: 28)
+                            .background(buttplugManager.isAudioMode ? Color.purple : appearanceManager.tintColor.opacity(0.1))
+                            .clipShape(Capsule())
+                        }
+                    }
+                    
+                    // Love Spouse Button
+                    if loveSpouseManager.isEnabled {
+                        Button {
+                            withAnimation { loveSpouseManager.isAudioMode.toggle() }
+                            HapticManager.medium()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: loveSpouseManager.isAudioMode ? "waveform.and.mic" : "waveform")
+                                Text("LoveSpouse")
+                            }
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(loveSpouseManager.isAudioMode ? .white : appearanceManager.tintColor)
+                            .padding(.horizontal, 8)
+                            .frame(minWidth: 80, minHeight: 28)
+                            .background(loveSpouseManager.isAudioMode ? Color.purple : appearanceManager.tintColor.opacity(0.1))
+                            .clipShape(Capsule())
+                        }
+                    }
+                }
+            
+            VStack(spacing: 8) {
+                // VU Meter
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.2))
+                            .frame(height: 8)
+                        
+                        Rectangle()
+                            .fill(LinearGradient(
+                                colors: [.green, .yellow, .red],
+                                startPoint: .leading,
+                                endPoint: .trailing
+                            ))
+                            .frame(width: geo.size.width * CGFloat(audioManager.currentLevel), height: 8)
+                            .animation(.linear(duration: 0.1), value: audioManager.currentLevel)
+                    }
+                    .clipShape(Capsule())
+                }
+                .frame(height: 8)
+                
+                HStack {
+                    Text("Live Audio Level")
+                        .font(.caption2)
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Text("\(Int(audioManager.currentLevel * 100))%")
+                        .font(.caption2)
+                        .monospacedDigit()
+                        .foregroundColor(.secondary)
+                }
+            }
+            
+            VStack(alignment: .trailing, spacing: 4) {
+                ZStack(alignment: .topLeading) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        // Sensitivity
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Sensitivity")
+                                    .font(.subheadline)
+                                Spacer()
+                                Text("\(Int(audioManager.sensitivity * 100))%")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Slider(value: $audioManager.sensitivity, in: 0...1)
+                                .tint(appearanceManager.tintColor)
+                        }
+                        
+                        // Intensity
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Max Intensity")
+                                    .font(.subheadline)
+                                Spacer()
+                                Text("\(Int(audioManager.maxIntensity * 100))%")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Slider(value: $audioManager.maxIntensity, in: 0.1...1)
+                                .tint(appearanceManager.tintColor)
+                        }
+                        
+                        // Latency (Delay)
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack {
+                                Text("Latency Compensation")
+                                    .font(.subheadline)
+                                Spacer()
+                                Text("\(Int(audioManager.delayMs))ms")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                            Slider(value: $audioManager.delayMs, in: 0...1000, step: 10)
+                                .tint(appearanceManager.tintColor)
+                            Text("Signal will be sent \(Int(audioManager.delayMs))ms before the sound.")
+                                .font(.caption2)
+                                .foregroundColor(.secondary)
+                                .italic()
+                        }
+                    }
+                    .padding(.top, 12)
+                }
+                .frame(maxHeight: isSettingsExpanded ? .none : 0, alignment: .topLeading)
+                .clipped()
+                
+                Button(action: {
+                    withAnimation(.spring()) {
+                        isSettingsExpanded.toggle()
+                    }
+                }) {
+                    Image(systemName: isSettingsExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(appearanceManager.tintColor)
+                        .padding(6)
+                        .background(appearanceManager.tintColor.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .padding(.top, 4)
+            }
+        }
+        .padding(12)
+        .background(Color(UIColor.systemBackground))
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .cardShadow()
     }
 }
 #endif

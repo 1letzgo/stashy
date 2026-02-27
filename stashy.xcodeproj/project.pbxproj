@@ -21,6 +21,7 @@
 		2589B7DB551E457BA8800634 /* PerformerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045D2E8A8C2000323FF2 /* PerformerDetailView.swift */; };
 		2F2314B3093A480F864AFEEC /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB192F16743C007C2090 /* HomeView.swift */; };
 		37B03936F6E04AA38082CF47 /* FilterModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = E69F93D1B9EB47B88F9597C3 /* FilterModels.swift */; };
+		37BE5B4E2F51718500107960 /* AudioAnalysisManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37BE5B4C2F51718500107960 /* AudioAnalysisManager.swift */; };
 		37D3E2E52F39384000AB8FAD /* ServerConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB779EFE84155DC02AAC07 /* ServerConfig.swift */; };
 		37D3E3262F39444C00AB8FAD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0000022E8A9C0000000001 /* Assets.xcassets */; };
 		37D3E4922F3A305D00AB8FAD /* SceneHeatmapCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37D3E4912F3A305D00AB8FAD /* SceneHeatmapCard.swift */; };
@@ -131,6 +132,7 @@
 		08FB779EFE84155DC02AAC07 /* ServerConfig.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ServerConfig.swift; sourceTree = "<group>"; };
 		08FB77A0FE84155DC02AAC07 /* stashy/Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = stashy/Info.plist; sourceTree = "<group>"; };
 		08FB77A2FE84155DC02AAC07 /* StashDBViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StashDBViewModel.swift; sourceTree = "<group>"; };
+		37BE5B4C2F51718500107960 /* AudioAnalysisManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioAnalysisManager.swift; sourceTree = "<group>"; };
 		37D3E24E2F3932C400AB8FAD /* stashyTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = stashyTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		37D3E4912F3A305D00AB8FAD /* SceneHeatmapCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneHeatmapCard.swift; sourceTree = "<group>"; };
 		5A626B91113242AAAF2D9CC3 /* StudioFiltersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioFiltersView.swift; sourceTree = "<group>"; };
@@ -251,6 +253,7 @@
 				DFGQ000042F28A0000000004 /* GraphQLQueries.swift */,
 				DF22BB192F16743C007C2090 /* HomeView.swift */,
 				DF22BB262F167CDC007C2090 /* ImageCacheManager.swift */,
+				37BE5B4D2F51718500107960 /* Managers */,
 				DFSM000022F2NEWFILE002 /* KeychainManager.swift */,
 				08FB7798FE84155DC02AAC07 /* MainTabView.swift */,
 				DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */,
@@ -278,6 +281,14 @@
 				DF90B7652F1B72E5003ED852 /* UniversalSearchView.swift */,
 			);
 			path = stashy;
+			sourceTree = "<group>";
+		};
+		37BE5B4D2F51718500107960 /* Managers */ = {
+			isa = PBXGroup;
+			children = (
+				37BE5B4C2F51718500107960 /* AudioAnalysisManager.swift */,
+			);
+			path = Managers;
 			sourceTree = "<group>";
 		};
 		DF675E612F2A46A1004CA019 /* Home */ = {
@@ -476,6 +487,7 @@
 				DFST000052F30A0000000005 /* ServerListSection.swift in Sources */,
 				37D3E4922F3A305D00AB8FAD /* SceneHeatmapCard.swift in Sources */,
 				DFST000072F30A0000000007 /* ServerDetailView.swift in Sources */,
+				37BE5B4E2F51718500107960 /* AudioAnalysisManager.swift in Sources */,
 				DFST000092F30A0000000009 /* PlaybackSettingsSection.swift in Sources */,
 				DFST0000B2F30A000000000B /* ContentSettingsSection.swift in Sources */,
 				DFST0000D2F30A000000000D /* DashboardSettingsView.swift in Sources */,

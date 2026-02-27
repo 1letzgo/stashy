@@ -249,24 +249,11 @@ class TabManager: ObservableObject {
     }
     
     var visibleTabs: [AppTab] {
-        // Fixed order: Home, StashTok, Downloads, Search
+        // Fixed order: Home, StashTok, Downloads, Settings
         // Dashboard, Studios, Tags, Performers, Scenes, Galleries are now sub-tabs of Home
-        var result: [AppTab] = [.catalogue]
-        
-        if tabs.first(where: { $0.id == .reels })?.isVisible ?? true {
-            result.append(.reels)
-        }
-        
-        if tabs.first(where: { $0.id == .downloads })?.isVisible ?? true {
-            result.append(.downloads)
-        }
-        
-        if tabs.first(where: { $0.id == .settings })?.isVisible ?? true {
-            result.append(.settings)
-        }
-        
-        return result
+        return [.catalogue, .reels, .downloads, .settings]
     }
+
     
     // Settings is always available, technically, but we render it manually at the end or manage it
     // The user wants to toggle visibility of Studios, Performers, Scenes, Tags.

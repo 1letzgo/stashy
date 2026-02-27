@@ -32,7 +32,11 @@ struct SceneHeatmapCard: View {
                         // The Handy Button
                         if handyManager.isEnabled {
                             Button {
-                                handyManager.setupScene(funscriptURL: funscriptURL)
+                                if handyManager.isSyncing {
+                                    handyManager.stop()
+                                } else {
+                                    handyManager.setupScene(funscriptURL: funscriptURL, at: currentTimeSeconds)
+                                }
                                 HapticManager.medium()
                             } label: {
                                 HStack(spacing: 4) {
@@ -52,19 +56,23 @@ struct SceneHeatmapCard: View {
                         // Intiface Button
                         if buttplugManager.isEnabled {
                             Button {
-                                buttplugManager.connect()
+                                if buttplugManager.isSyncing {
+                                    buttplugManager.stop()
+                                } else {
+                                    buttplugManager.setupScene(funscriptURL: funscriptURL, at: currentTimeSeconds)
+                                }
                                 HapticManager.medium()
                             } label: {
                                 HStack(spacing: 4) {
-                                    Image(systemName: buttplugManager.isConnected ? "cable.connector.fill" : "cable.connector")
-                                    Text(buttplugManager.isConnected ? "Ready" : "Intiface")
+                                    Image(systemName: buttplugManager.isSyncing ? "cable.connector.fill" : "cable.connector")
+                                    Text(buttplugManager.isSyncing ? "Ready" : "Intiface")
                                 }
                                 .font(.caption)
                                 .fontWeight(.bold)
-                                .foregroundColor(buttplugManager.isConnected ? .white : appearanceManager.tintColor)
+                                .foregroundColor(buttplugManager.isSyncing ? .white : appearanceManager.tintColor)
                                 .padding(.horizontal, 8)
                                 .frame(minWidth: 92, minHeight: 28)
-                                .background(buttplugManager.isConnected ? Color.green : appearanceManager.tintColor.opacity(0.1))
+                                .background(buttplugManager.isSyncing ? Color.green : appearanceManager.tintColor.opacity(0.1))
                                 .clipShape(Capsule())
                             }
                         }
@@ -75,7 +83,7 @@ struct SceneHeatmapCard: View {
                                 if loveSpouseManager.isSyncing {
                                     loveSpouseManager.stop()
                                 } else {
-                                    loveSpouseManager.setupScene(funscriptURL: funscriptURL)
+                                    loveSpouseManager.setupScene(funscriptURL: funscriptURL, at: currentTimeSeconds)
                                 }
                                 HapticManager.medium()
                             } label: {

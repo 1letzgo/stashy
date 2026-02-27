@@ -281,6 +281,9 @@ struct SceneVideoPlayerCard: View {
                 }
                 .buttonStyle(.plain)
                 
+                // Audio Sync - Always shown to allow manual override
+                audioSyncButton
+                
                 ratingMenu
                 playbackSpeedMenu
                 qualityMenu
@@ -289,48 +292,6 @@ struct SceneVideoPlayerCard: View {
                     infoPill(icon: "checkmark.circle.fill", text: "Downloaded", color: .green)
                 }
                 
-                if activeScene.interactive == true && activeScene.funscriptURL != nil {
-                    Menu {
-                        Section("Devices") {
-                            HStack {
-                                Text("The Handy")
-                                Spacer()
-                                Image(systemName: handyManager.isSyncing ? "checkmark.circle.fill" : "circle")
-                                    .foregroundColor(handyManager.isSyncing ? .green : .secondary)
-                            }
-                            HStack {
-                                Text("Buttplug/Intiface")
-                                Spacer()
-                                Image(systemName: buttplugManager.isConnected ? "checkmark.circle.fill" : "circle")
-                                    .foregroundColor(buttplugManager.isConnected ? .green : .secondary)
-                            }
-                            HStack {
-                                Text("Love Spouse")
-                                Spacer()
-                                Image(systemName: loveSpouseManager.isConnected ? (loveSpouseManager.isSyncing ? "checkmark.circle.fill" : "hourglass.circle") : "circle")
-                                    .foregroundColor(loveSpouseManager.isConnected ? .green : .secondary)
-                            }
-                        }
-                        
-                        if let scriptURL = activeScene.funscriptURL {
-                            Button(action: {
-                                loveSpouseManager.setupScene(funscriptURL: scriptURL)
-                                buttplugManager.setupScene(funscriptURL: scriptURL)
-                            }) {
-                                Label("Re-sync Scripts", systemImage: "arrow.clockwise")
-                            }
-                        }
-                        
-                        NavigationLink(destination: PlaybackSettingsSection()) {
-                            Label("Device Settings", systemImage: "gearshape")
-                        }
-                    } label: {
-                        let isConnected = handyManager.isSyncing || buttplugManager.isConnected || (loveSpouseManager.isConnected && loveSpouseManager.isSyncing)
-                        infoPill(icon: isConnected ? "link.circle.fill" : "link.circle", 
-                                 text: "Interactive", 
-                                 color: isConnected ? .green : .secondary)
-                    }
-                }
 
                 if activeScene.organized == true {
                     infoPill(icon: "checkmark.seal.fill", text: "Organized", color: .green)
@@ -480,7 +441,6 @@ struct SceneVideoPlayerCard: View {
     @ViewBuilder
     private func markerThumbnail(_ marker: SceneMarker) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            // Marker Image
             ZStack(alignment: .bottomTrailing) {
                 if let url = marker.thumbnailURL {
                     CustomAsyncImage(url: url) { @MainActor loader in
@@ -570,6 +530,30 @@ struct SceneVideoPlayerCard: View {
         }
         previewPlayer?.pause()
         previewPlayer?.seek(to: CMTime.zero)
+    }
+
+    private var audioSyncButton: some View {
+        Button {
+            withAnimation {
+                let targetState = !handyManager.isAudioMode
+                handyManager.isAudioMode = targetState
+                buttplugManager.isAudioMode = targetState
+                loveSpouseManager.isAudioMode = targetState
+                
+                // Automatically activate analysis when showing the card
+                if targetState {
+                    AudioAnalysisManager.shared.isActive = true
+                } else {
+                    AudioAnalysisManager.shared.stop()
+                }
+            }
+            HapticManager.medium()
+        } label: {
+            let isAudioActive = handyManager.isAudioMode
+            infoPill(icon: isAudioActive ? "waveform.and.mic" : "waveform", 
+                     text: isAudioActive ? "Sync ON" : "Audio Sync", 
+                     color: isAudioActive ? .purple : .secondary)
+        }
     }
 }
 #endif

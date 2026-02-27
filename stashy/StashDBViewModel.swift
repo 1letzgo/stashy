@@ -3939,6 +3939,11 @@ struct Scene: Codable, Identifiable {
         return comps?.url ?? url
     }
 
+    var hasFunscript: Bool {
+        guard let f = paths?.funscript else { return false }
+        return !f.isEmpty && f != "null"
+    }
+
     var funscriptURL: URL? {
         guard let path = paths?.funscript, let url = URL(string: path) else { return nil }
         guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty else { return url }
@@ -5546,11 +5551,15 @@ class HandyManager: ObservableObject {
         }
     }
     @Published var isConnected: Bool = false
+    @Published var isAudioMode: Bool = false
     @Published var isSyncing: Bool = false
     @Published var statusMessage: String = "Not Configured"
     
     private let baseURL = "https://www.handyfeeling.com/api/handy/v2"
     private var cancellables = Set<AnyCancellable>()
+    private var audioCancellable: AnyCancellable?
+    
+    private var lastAudioCommandTime: Date = .distantPast
     
     private var serverTimeOffset: Int64 = 0
     private var lastSyncTime: Date?
@@ -5560,6 +5569,9 @@ class HandyManager: ObservableObject {
             checkConnection()
         }
     }
+    
+    private var lastHandyOscillation = false
+    
     
     func checkConnection(completion: ((Bool) -> Void)? = nil) {
         guard !connectionKey.isEmpty else {
@@ -5593,8 +5605,8 @@ class HandyManager: ObservableObject {
             })
             .store(in: &cancellables)
     }
-    
-    func setupScene(funscriptURL: URL) {
+
+    func setupScene(funscriptURL: URL, at seconds: Double? = nil) {
         print("📲 Handy: Setting up scene with URL: \(funscriptURL.absoluteString)")
         
         // Check if URL is local
@@ -5608,7 +5620,7 @@ class HandyManager: ObservableObject {
             print("📲 Handy: Device not connected, checking connection first...")
             checkConnection { [weak self] connected in
                 if connected { 
-                    self?.setupScene(funscriptURL: funscriptURL) 
+                    self?.setupScene(funscriptURL: funscriptURL, at: seconds) 
                 } else {
                     self?.statusMessage = "Connect Device First"
                 }
@@ -5628,7 +5640,7 @@ class HandyManager: ObservableObject {
                 guard let self = self else { return }
                 if success {
                     // 2. Setup HSSP with script
-                    self.setupHSSP(url: funscriptURL)
+                    self.setupHSSP(url: funscriptURL, at: seconds)
                 } else {
                     self.statusMessage = "Mode Error"
                 }
@@ -5653,7 +5665,7 @@ class HandyManager: ObservableObject {
         }.resume()
     }
     
-    private func setupHSSP(url: URL) {
+    private func setupHSSP(url: URL, at seconds: Double?) {
         // 1. If URL is local, we must use the Upload Bridge
         let urlString = url.absoluteString
         if urlString.contains("127.0.0.1") || urlString.contains("localhost") || urlString.contains("192.168.") || urlString.contains("10.") {
@@ -5664,7 +5676,7 @@ class HandyManager: ObservableObject {
                 guard let self = self else { return }
                 if let publicUrl = publicUrl {
                     print("📲 Handy: Upload bridge successful. Public URL: \(publicUrl.absoluteString)")
-                    self.executeHSSPSetup(url: publicUrl)
+                    self.executeHSSPSetup(url: publicUrl, at: seconds)
                 } else {
                     print("❌ Handy: Upload bridge failed.")
                     DispatchQueue.main.async {
@@ -5685,17 +5697,17 @@ class HandyManager: ObservableObject {
                 
                 if let newUrl = comps.url {
                     print("📲 Handy: Swapping for public override: \(newUrl.absoluteString)")
-                    executeHSSPSetup(url: newUrl)
+                    executeHSSPSetup(url: newUrl, at: seconds)
                     return
                 }
             }
         }
 
         // 3. Normal public URL
-        executeHSSPSetup(url: url)
+        executeHSSPSetup(url: url, at: seconds)
     }
     
-    private func executeHSSPSetup(url: URL) {
+    private func executeHSSPSetup(url: URL, at seconds: Double?) {
         print("📲 Handy: Sending HSSP setup request for URL: \(url.absoluteString)")
         var request = URLRequest(url: URL(string: "\(baseURL)/hssp/setup")!)
         request.httpMethod = "PUT"
@@ -5715,12 +5727,15 @@ class HandyManager: ObservableObject {
 
             DispatchQueue.main.async {
                 self.isSyncing = success
-                self.statusMessage = success ? "Synced & Ready" : "Sync Failed (\(httpResponse?.statusCode ?? 0))"
                 if success {
                     print("✅ Handy: HSSP Setup Successful")
+                    if let seconds = seconds {
+                        self.play(at: seconds)
+                    }
                 } else {
                     print("❌ Handy: HSSP Setup Failed")
                 }
+                self.statusMessage = success ? "Synced & Ready" : "Sync Failed (\(httpResponse?.statusCode ?? 0))"
             }
         }.resume()
     }
@@ -5844,6 +5859,11 @@ class HandyManager: ObservableObject {
         }.resume()
     }
     
+    func stop() {
+        pause()
+        isSyncing = false
+    }
+    
     private func fetchServerTime(completion: @escaping (Int64?) -> Void) {
         let request = URLRequest(url: URL(string: "\(baseURL)/servertime")!)
         URLSession.shared.dataTask(with: request) { data, response, error in
@@ -5881,6 +5901,20 @@ class ButtplugManager: ObservableObject {
     private var webSocket: URLSessionWebSocketTask?
     private var messageId: Int = 1
     
+    @Published var isAudioMode: Bool = false {
+        didSet {
+            if isAudioMode {
+                isSyncing = false // EXCLUSIVITY
+                setupAudioSync()
+            } else {
+                audioCancellable = nil
+                stopAllDevices()
+            }
+        }
+    }
+    private var audioCancellable: AnyCancellable?
+    private var lastAudioCommandTime: Date = .distantPast
+    
     // Funscript Sync
     private var currentScript: Funscript?
     private var syncTimer: CADisplayLink?
@@ -5891,6 +5925,30 @@ class ButtplugManager: ObservableObject {
     
     private init() {
         // Optional: Auto-connect if desirable
+    }
+    
+    private func setupAudioSync() {
+        print("📱 Buttplug: setupAudioSync() initiated with currentLevel subscription")
+        audioCancellable = AudioAnalysisManager.shared.$currentLevel
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] level in
+                guard let self = self, self.isAudioMode, self.isConnected, self.isEnabled, !self.devices.isEmpty else { return }
+                
+                let threshold = Float(0.32 * pow(0.04, AudioAnalysisManager.shared.sensitivity))
+                let isActive = level > threshold
+                
+                // Intiface can handle higher frequency, let's do 20Hz
+                if Date().timeIntervalSince(self.lastAudioCommandTime) < 0.05 { return }
+                
+                if isActive {
+                    let intensity = level * Float(AudioAnalysisManager.shared.maxIntensity)
+                    self.sendMovement(position: Double(intensity * 100), duration: 50)
+                    self.lastAudioCommandTime = Date()
+                } else if Date().timeIntervalSince(self.lastAudioCommandTime) > 0.3 {
+                    self.stopAllDevices()
+                    self.lastAudioCommandTime = Date()
+                }
+            }
     }
     
     func connect() {
@@ -5960,8 +6018,12 @@ class ButtplugManager: ObservableObject {
     
     // MARK: - Funscript Sync Logic
     
-    func setupScene(funscriptURL: URL) {
-        guard isConnected else { return }
+    func setupScene(funscriptURL: URL, at seconds: Double? = nil) {
+        if !isConnected {
+            connect()
+            // We'll return and wait for connection, user can tap again or we could improve this later
+            return
+        }
         
         statusMessage = "Loading Script..."
         URLSession.shared.dataTask(with: funscriptURL) { [weak self] data, response, error in
@@ -5972,8 +6034,12 @@ class ButtplugManager: ObservableObject {
                 DispatchQueue.main.async {
                     self.currentScript = script
                     self.isSyncing = true
+                    self.isAudioMode = false // EXCLUSIVITY
                     self.statusMessage = "Script Loaded"
                     print("✅ Buttplug: Loaded script with \(script.actions?.count ?? 0) actions")
+                    if let seconds = seconds {
+                        self.play(at: seconds)
+                    }
                 }
             } catch {
                 print("❌ Buttplug: Failed to parse Funscript: \(error)")
@@ -6007,6 +6073,12 @@ class ButtplugManager: ObservableObject {
     func stopAllDevices() {
         guard isConnected else { return }
         sendMessage([["StopAllDevices": ["Id": getNextMessageId()]]])
+    }
+    
+    func stop() {
+        pause()
+        isSyncing = false
+        currentScript = nil
     }
     
     @objc private func updateSync() {
@@ -6048,6 +6120,17 @@ class ButtplugManager: ObservableObject {
         
         var messages: [[String: Any]] = []
         for device in devices {
+            // Filter LoveSpouse devices from Buttplug if native is handling them or they are deactivated
+            if device.name.lowercased().contains("lovespouse") {
+                if isAudioMode {
+                    // In Audio mode, check if LoveSpouse card button is ON
+                    if !LoveSpouseManager.shared.isAudioMode { continue }
+                } else {
+                    // In Funscript mode, check if LoveSpouse global toggle is ON
+                    if !LoveSpouseManager.shared.isEnabled { continue }
+                }
+            }
+            
             if device.supportsLinear {
                 messages.append([
                     "LinearCmd": [
@@ -6174,10 +6257,39 @@ class LoveSpouseManager: NSObject, ObservableObject {
         }
     }
     /// Currently active program (0 = stopped, 1–3 = speeds, 4–9 = patterns)
-    @Published var activeProgram: Int = 0
-    @Published var isSyncing: Bool = false
+    @Published var activeProgram: Int = 0 {
+        didSet {
+            // Ensure we never have an active program if disabled
+            if !isEnabled && activeProgram != 0 {
+                activeProgram = 0
+            }
+        }
+    }
+    @Published var isSyncing: Bool = false {
+        didSet {
+            if isSyncing {
+                isConnected = true
+            }
+        }
+    }
     @Published var statusMessage: String = "Not Connected"
     @Published var isAdvertising: Bool = false
+    
+    @Published var isAudioMode: Bool = false {
+        didSet {
+            if isAudioMode {
+                isSyncing = false // EXCLUSIVITY
+                setupAudioSync()
+            } else {
+                audioCancellable = nil
+                // Force immediate stop
+                selectProgram(0)
+                print("📱 LoveSpouse: Audio Mode Disabled, sending STOP")
+            }
+        }
+    }
+    private var audioCancellable: AnyCancellable?
+    private var lastAudioCommandTime: Date = .distantPast
 
     // MARK: - Funscript Sync
     private var currentScript: Funscript?
@@ -6191,6 +6303,33 @@ class LoveSpouseManager: NSObject, ObservableObject {
     private var burstTimer: Timer?
     private let bleQueue = DispatchQueue(label: "com.stashy.lovespouse", qos: .userInitiated)
     private var isAdvertisingActive = false
+    
+    private func setupAudioSync() {
+        print("📱 LoveSpouse: setupAudioSync() initiated with currentLevel subscription")
+        audioCancellable = AudioAnalysisManager.shared.$currentLevel
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] level in
+                guard let self = self, self.isAudioMode, self.isConnected, self.isEnabled else { return }
+                
+                let threshold = Float(0.32 * pow(0.04, AudioAnalysisManager.shared.sensitivity))
+                let isActive = level > threshold
+                
+                // Love Spouse has high latency, limit to 2Hz
+                if Date().timeIntervalSince(self.lastAudioCommandTime) < 0.4 { return }
+                
+                if isActive {
+                    let intensity = level * Float(AudioAnalysisManager.shared.maxIntensity)
+                    // Map intensity 0-1 to speed 1-3
+                    let speed = Int(ceil(intensity * 3))
+                    let cappedSpeed = min(3, max(1, speed))
+                    self.selectProgram(cappedSpeed)
+                    self.lastAudioCommandTime = Date()
+                } else if Date().timeIntervalSince(self.lastAudioCommandTime) > 0.8 {
+                    self.selectProgram(0)
+                    self.lastAudioCommandTime = Date()
+                }
+            }
+    }
     
     // Extracted UUID pairs [UUID5, UUID6] mapped to 0-9
     // Order based on binary sequence 0x6E down to 0x66 observed in PacketLogger
@@ -6214,7 +6353,8 @@ class LoveSpouseManager: NSObject, ObservableObject {
 
     // MARK: - Funscript Integration
 
-    func setupScene(funscriptURL: URL) {
+    func setupScene(funscriptURL: URL, at seconds: Double? = nil) {
+        guard isEnabled else { return }
         statusMessage = "Loading Script..."
         URLSession.shared.dataTask(with: funscriptURL) { [weak self] data, response, error in
             guard let self = self, let data = data else { return }
@@ -6224,8 +6364,12 @@ class LoveSpouseManager: NSObject, ObservableObject {
                 DispatchQueue.main.async {
                     self.currentScript = script
                     self.isSyncing = true
+                    self.isAudioMode = false // EXCLUSIVITY
                     self.statusMessage = "Script Loaded"
                     print("✅ LoveSpouse: Loaded script with \(script.actions?.count ?? 0) actions")
+                    if let seconds = seconds {
+                        self.play(at: seconds)
+                    }
                 }
             } catch {
                 print("❌ LoveSpouse: Failed to parse Funscript: \(error)")
@@ -6267,7 +6411,7 @@ class LoveSpouseManager: NSObject, ObservableObject {
     }
 
     @objc private func updateSync() {
-        guard isPlayingScript, let script = currentScript, let actions = script.actions, !actions.isEmpty else { return }
+        guard isEnabled, isPlayingScript, let script = currentScript, let actions = script.actions, !actions.isEmpty else { return }
         
         let frameDuration = 1.0 / 60.0 // Approximated
         lastPlaybackTime += frameDuration
@@ -6294,6 +6438,7 @@ class LoveSpouseManager: NSObject, ObservableObject {
 
     /// Direct program selection. Sends a 500ms burst.
     func selectProgram(_ index: Int, force: Bool = false) {
+        guard isEnabled else { return }
         if !force && activeProgram == index && isAdvertisingActive {
             return
         }
@@ -6311,6 +6456,7 @@ class LoveSpouseManager: NSObject, ObservableObject {
 
     /// Helper for legacy level control (0-100)
     func setLevel(_ level: Double) {
+        guard isEnabled else { return }
         let clamped = max(0, min(100, level))
         let targetProgram: Int
         
@@ -6359,7 +6505,7 @@ class LoveSpouseManager: NSObject, ObservableObject {
 
     private func startBurst(u5: String, u6: String) {
         bleQueue.async { [weak self] in
-            guard let self = self else { return }
+            guard let self = self, self.isEnabled else { return }
             
             self.pendingBurst?.cancel()
             
@@ -6431,7 +6577,7 @@ extension LoveSpouseManager: CBPeripheralManagerDelegate {
             self.isConnected = isPoweredOn
             self.statusMessage = isPoweredOn ? "Ready" : "Radio Off"
             
-            if isPoweredOn {
+            if isPoweredOn && self.isEnabled {
                 self.selectProgram(self.activeProgram)
             }
         }
