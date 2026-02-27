@@ -19,6 +19,7 @@ struct SceneVideoPlayerCard: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var handyManager = HandyManager.shared
     @ObservedObject var buttplugManager = ButtplugManager.shared
+    @ObservedObject var loveSpouseManager = LoveSpouseManager.shared
     
     // Preview state
     @State private var previewPlayer: AVPlayer?
@@ -288,11 +289,47 @@ struct SceneVideoPlayerCard: View {
                     infoPill(icon: "checkmark.circle.fill", text: "Downloaded", color: .green)
                 }
                 
-                if activeScene.interactive == true {
-                    let isConnected = handyManager.isSyncing || buttplugManager.isConnected
-                    infoPill(icon: isConnected ? "link.circle.fill" : "link.circle", 
-                             text: "Interactive", 
-                             color: isConnected ? .green : .secondary)
+                if activeScene.interactive == true && activeScene.funscriptURL != nil {
+                    Menu {
+                        Section("Devices") {
+                            HStack {
+                                Text("The Handy")
+                                Spacer()
+                                Image(systemName: handyManager.isSyncing ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(handyManager.isSyncing ? .green : .secondary)
+                            }
+                            HStack {
+                                Text("Buttplug/Intiface")
+                                Spacer()
+                                Image(systemName: buttplugManager.isConnected ? "checkmark.circle.fill" : "circle")
+                                    .foregroundColor(buttplugManager.isConnected ? .green : .secondary)
+                            }
+                            HStack {
+                                Text("Love Spouse")
+                                Spacer()
+                                Image(systemName: loveSpouseManager.isConnected ? (loveSpouseManager.isSyncing ? "checkmark.circle.fill" : "hourglass.circle") : "circle")
+                                    .foregroundColor(loveSpouseManager.isConnected ? .green : .secondary)
+                            }
+                        }
+                        
+                        if let scriptURL = activeScene.funscriptURL {
+                            Button(action: {
+                                loveSpouseManager.setupScene(funscriptURL: scriptURL)
+                                buttplugManager.setupScene(funscriptURL: scriptURL)
+                            }) {
+                                Label("Re-sync Scripts", systemImage: "arrow.clockwise")
+                            }
+                        }
+                        
+                        NavigationLink(destination: PlaybackSettingsSection()) {
+                            Label("Device Settings", systemImage: "gearshape")
+                        }
+                    } label: {
+                        let isConnected = handyManager.isSyncing || buttplugManager.isConnected || (loveSpouseManager.isConnected && loveSpouseManager.isSyncing)
+                        infoPill(icon: isConnected ? "link.circle.fill" : "link.circle", 
+                                 text: "Interactive", 
+                                 color: isConnected ? .green : .secondary)
+                    }
                 }
 
                 if activeScene.organized == true {

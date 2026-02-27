@@ -10,6 +10,7 @@ import Combine
 import AVFoundation
 import AVKit
 import Foundation
+import CoreBluetooth
 
 // MARK: - App Colors
 
@@ -5536,6 +5537,14 @@ class HandyManager: ObservableObject {
     
     @AppStorage("handy_connection_key") var connectionKey: String = ""
     @AppStorage("handy_public_url") var publicUrl: String = ""
+    @AppStorage("handy_enabled") var isEnabled: Bool = false {
+        didSet {
+            if !isEnabled && isConnected {
+                pause()
+                isConnected = false
+            }
+        }
+    }
     @Published var isConnected: Bool = false
     @Published var isSyncing: Bool = false
     @Published var statusMessage: String = "Not Configured"
@@ -5857,6 +5866,13 @@ class ButtplugManager: ObservableObject {
     static let shared = ButtplugManager()
     
     @AppStorage("intiface_server_address") var serverAddress: String = "ws://127.0.0.1:12345"
+    @AppStorage("intiface_enabled") var isEnabled: Bool = false {
+        didSet {
+            if !isEnabled && isConnected {
+                disconnect()
+            }
+        }
+    }
     @Published var isConnected: Bool = false
     @Published var isScanning: Bool = false
     @Published var statusMessage: String = "Not Connected"
@@ -6143,6 +6159,289 @@ struct ButtplugDevice: Identifiable, Equatable {
     let name: String
     let supportsScalar: Bool
     let supportsLinear: Bool
+}
+
+class LoveSpouseManager: NSObject, ObservableObject {
+    static let shared = LoveSpouseManager()
+
+    // MARK: - Published State
+    @Published var isConnected: Bool = false
+    @AppStorage("lovespouse_enabled") var isEnabled: Bool = false {
+        didSet {
+            if !isEnabled {
+                stop()
+            }
+        }
+    }
+    /// Currently active program (0 = stopped, 1–3 = speeds, 4–9 = patterns)
+    @Published var activeProgram: Int = 0
+    @Published var isSyncing: Bool = false
+    @Published var statusMessage: String = "Not Connected"
+    @Published var isAdvertising: Bool = false
+
+    // MARK: - Funscript Sync
+    private var currentScript: Funscript?
+    private var syncTimer: CADisplayLink?
+    private var lastPlaybackTime: Double = 0
+    private var lastCommandSentAt: Double = 0
+    private var isPlayingScript: Bool = false
+
+    // MARK: - Private
+    private var peripheralManager: CBPeripheralManager!
+    private var burstTimer: Timer?
+    private let bleQueue = DispatchQueue(label: "com.stashy.lovespouse", qos: .userInitiated)
+    private var isAdvertisingActive = false
+    
+    // Extracted UUID pairs [UUID5, UUID6] mapped to 0-9
+    // Order based on binary sequence 0x6E down to 0x66 observed in PacketLogger
+    private let commandUUIDs: [Int: (String, String)] = [
+        0: ("9C6E", "0B3D"), // Stop
+        1: ("156F", "0B2C"), // Speed 1
+        2: ("8E6C", "0B1E"), // Speed 2
+        3: ("076D", "0B0F"), // Speed 3
+        4: ("B86A", "0B7B"), // Pattern 1 (Button 4)
+        5: ("316B", "0B6A"), // Pattern 2 (Button 5)
+        6: ("AA68", "0B58"), // Pattern 3 (Button 6)
+        7: ("2369", "0B49"), // Pattern 4 (Button 7)
+        8: ("D466", "0BB1"), // Pattern 5 (Button 8)
+        9: ("5D67", "0BA0")  // Pattern 6 (Button 9)
+    ]
+
+    private override init() {
+        super.init()
+        peripheralManager = CBPeripheralManager(delegate: self, queue: bleQueue)
+    }
+
+    // MARK: - Funscript Integration
+
+    func setupScene(funscriptURL: URL) {
+        statusMessage = "Loading Script..."
+        URLSession.shared.dataTask(with: funscriptURL) { [weak self] data, response, error in
+            guard let self = self, let data = data else { return }
+            
+            do {
+                let script = try JSONDecoder().decode(Funscript.self, from: data)
+                DispatchQueue.main.async {
+                    self.currentScript = script
+                    self.isSyncing = true
+                    self.statusMessage = "Script Loaded"
+                    print("✅ LoveSpouse: Loaded script with \(script.actions?.count ?? 0) actions")
+                }
+            } catch {
+                print("❌ LoveSpouse: Failed to parse Funscript: \(error)")
+                DispatchQueue.main.async {
+                    self.statusMessage = "Script Error"
+                }
+            }
+        }.resume()
+    }
+
+    func play(at seconds: Double) {
+        guard isConnected, isSyncing, currentScript != nil else { return }
+        
+        lastPlaybackTime = seconds
+        lastCommandSentAt = 0 // Reset to force immediate command
+        isPlayingScript = true
+        
+        // Use CADisplayLink for high-precision sync
+        syncTimer?.invalidate()
+        syncTimer = CADisplayLink(target: self, selector: #selector(updateSync))
+        syncTimer?.add(to: .main, forMode: .common)
+    }
+
+    func pause() {
+        isPlayingScript = false
+        syncTimer?.invalidate()
+        syncTimer = nil
+        // We pause the script logic, but often we want the radio to stop too
+        stopAll()
+    }
+    
+    func stop() {
+        isPlayingScript = false
+        syncTimer?.invalidate()
+        syncTimer = nil
+        isSyncing = false
+        currentScript = nil
+        stopAll()
+    }
+
+    @objc private func updateSync() {
+        guard isPlayingScript, let script = currentScript, let actions = script.actions, !actions.isEmpty else { return }
+        
+        let frameDuration = 1.0 / 60.0 // Approximated
+        lastPlaybackTime += frameDuration
+        
+        let currentMs = Int(lastPlaybackTime * 1000)
+        
+        // Find the index of the next action after currentMs
+        guard let nextIndex = actions.firstIndex(where: { $0.at > currentMs }) else {
+            // End of script reached
+            pause()
+            return
+        }
+        
+        // Only send a new command if we haven't sent one for this segment yet
+        let nextAction = actions[nextIndex]
+        if Double(nextAction.at) != lastCommandSentAt {
+            // Map 0-100 position to speed bucket
+            setLevel(Double(nextAction.pos))
+            lastCommandSentAt = Double(nextAction.at)
+        }
+    }
+
+    // MARK: - Public API
+
+    /// Direct program selection. Sends a 500ms burst.
+    func selectProgram(_ index: Int, force: Bool = false) {
+        if !force && activeProgram == index && isAdvertisingActive {
+            return
+        }
+
+        guard let uuids = commandUUIDs[index] else { return }
+        
+        DispatchQueue.main.async {
+            self.activeProgram = index
+            self.isConnected = true
+        }
+        
+        NSLog("🔵 LoveSpouseManager: Selecting program \(index)")
+        startBurst(u5: uuids.0, u6: uuids.1)
+    }
+
+    /// Helper for legacy level control (0-100)
+    func setLevel(_ level: Double) {
+        let clamped = max(0, min(100, level))
+        let targetProgram: Int
+        
+        if clamped == 0 {
+            targetProgram = 0
+        } else if clamped < 34 {
+            targetProgram = 1
+        } else if clamped < 67 {
+            targetProgram = 2
+        } else {
+            targetProgram = 3
+        }
+        
+        // Only send if the program bucket changed
+        if targetProgram != activeProgram {
+            selectProgram(targetProgram)
+        }
+    }
+
+    func stopAll() {
+        NSLog("🔵 LoveSpouseManager: Ultra-Aggressive Stop Sequence Start")
+        isPlayingScript = false
+        syncTimer?.invalidate()
+        syncTimer = nil
+        
+        selectProgram(0, force: true) 
+        
+        // Repeated bursts over a longer period to ensure delivery
+        // The toy might be busy or in a state where it missed the first pulse
+        let delays = [0.2, 0.5, 1.0, 2.0, 4.0, 6.0, 8.0]
+        for delay in delays {
+            bleQueue.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self = self, !self.isPlayingScript else { return }
+                self.selectProgram(0, force: true)
+            }
+        }
+    }
+
+    func checkConnection(completion: @escaping (Bool) -> Void) {
+        completion(peripheralManager.state == .poweredOn)
+    }
+
+    // MARK: - Private Burst Logic
+
+    private var pendingBurst: DispatchWorkItem?
+
+    private func startBurst(u5: String, u6: String) {
+        bleQueue.async { [weak self] in
+            guard let self = self else { return }
+            
+            self.pendingBurst?.cancel()
+            
+            if self.burstTimer != nil {
+                self.burstTimer?.invalidate()
+                self.burstTimer = nil
+            }
+
+            if self.isAdvertisingActive {
+                self.peripheralManager.stopAdvertising()
+                self.isAdvertisingActive = false
+                DispatchQueue.main.async { self.isAdvertising = false }
+            }
+
+            let workItem = DispatchWorkItem { [weak self] in
+                guard let self = self, !(self.pendingBurst?.isCancelled ?? true) else { return }
+
+                let services: [CBUUID] = [
+                    CBUUID(string: "08F9"),
+                    CBUUID(string: "2349"),
+                    CBUUID(string: "CBAE"),
+                    CBUUID(string: "D1C1"),
+                    CBUUID(string: u5),
+                    CBUUID(string: u6),
+                    // Constant Padding
+                    CBUUID(string: "0D0C"), CBUUID(string: "0F0E"), CBUUID(string: "1110"),
+                    CBUUID(string: "1312"), CBUUID(string: "1514"), CBUUID(string: "1716"),
+                    CBUUID(string: "1918")
+                ]
+
+                self.peripheralManager.startAdvertising([CBAdvertisementDataServiceUUIDsKey: services])
+                self.isAdvertisingActive = true
+                DispatchQueue.main.async { self.isAdvertising = true }
+
+                if self.activeProgram == 0 {
+                    // For "Stop", we advertise for a much longer period (10s) to be safe
+                    DispatchQueue.main.async {
+                        self.burstTimer = Timer.scheduledTimer(withTimeInterval: 10.0, repeats: false) { [weak self] _ in
+                            self?.bleQueue.async {
+                                guard let self = self else { return }
+                                if self.isAdvertisingActive && self.activeProgram == 0 {
+                                    self.peripheralManager.stopAdvertising()
+                                    self.isAdvertisingActive = false
+                                    DispatchQueue.main.async { self.isAdvertising = false }
+                                    NSLog("🔵 LoveSpouseManager: Ultra stop burst finished, radio off")
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    NSLog("🔵 LoveSpouseManager: Continuous advertising on (Keep-Alive)")
+                }
+            }
+
+            self.pendingBurst = workItem
+            self.bleQueue.asyncAfter(deadline: .now() + 0.05, execute: workItem)
+        }
+    }
+}
+
+// MARK: - CBPeripheralManagerDelegate
+
+extension LoveSpouseManager: CBPeripheralManagerDelegate {
+    func peripheralManagerDidUpdateState(_ peripheral: CBPeripheralManager) {
+        let isPoweredOn = (peripheral.state == .poweredOn)
+        NSLog("🔵 LoveSpouseManager: BLE State – \(peripheral.state.rawValue)")
+        
+        DispatchQueue.main.async {
+            self.isConnected = isPoweredOn
+            self.statusMessage = isPoweredOn ? "Ready" : "Radio Off"
+            
+            if isPoweredOn {
+                self.selectProgram(self.activeProgram)
+            }
+        }
+    }
+
+    func peripheralManagerDidStartAdvertising(_ peripheral: CBPeripheralManager, error: Error?) {
+        if let error = error {
+            NSLog("🔵 LoveSpouseManager: ADV Failed – \(error.localizedDescription)")
+        }
+    }
 }
 
 // MARK: - Funscript Models

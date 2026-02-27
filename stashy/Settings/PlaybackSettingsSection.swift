@@ -56,6 +56,9 @@ struct PlaybackSettingsSection: View {
             NavigationLink(destination: IntifaceSettingsView()) {
                 Label("Intiface", systemImage: "cable.connector")
             }
+            NavigationLink(destination: LoveSpouseSettingsView()) {
+                Label("Love Spouse", systemImage: "antenna.radiowaves.left.and.right")
+            }
         }
         #endif
     }
@@ -68,10 +71,16 @@ struct IntifaceSettingsView: View {
     
     var body: some View {
         Form {
+            Section {
+                Toggle("Enable Intiface", isOn: $buttplugManager.isEnabled)
+                    .tint(appearanceManager.tintColor)
+            }
+            
             Section(header: Text("Intiface Server")) {
                 TextField("Server Address", text: $buttplugManager.serverAddress)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
+                    .disabled(!buttplugManager.isEnabled)
                 
                 HStack {
                     Text("Status")
@@ -88,6 +97,7 @@ struct IntifaceSettingsView: View {
                     Button("Connect") {
                         buttplugManager.connect()
                     }
+                    .disabled(!buttplugManager.isEnabled)
                 }
             }
             
@@ -121,15 +131,22 @@ struct HandySettingsView: View {
 
     var body: some View {
         Form {
+            Section {
+                Toggle("Enable The Handy", isOn: $handyManager.isEnabled)
+                    .tint(appearanceManager.tintColor)
+            }
+            
             Section(header: Text("Handy Connection"), footer: Text("Stashy now automatically uploads local funscripts to Handy Cloud. The Public URL is only needed for advanced setups.")) {
                 TextField("Connection Key", text: HandyManager.shared.$connectionKey)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
+                    .disabled(!handyManager.isEnabled)
                 
                 TextField("Public URL Override (Optional)", text: HandyManager.shared.$publicUrl)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
                     .keyboardType(.URL)
+                    .disabled(!handyManager.isEnabled)
                 
                 HStack {
                     Text("Status")
@@ -141,9 +158,40 @@ struct HandySettingsView: View {
                 Button("Check Connection") {
                     handyManager.checkConnection()
                 }
+                .disabled(!handyManager.isEnabled)
             }
         }
         .navigationTitle("The Handy")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+#endif
+
+#if !os(tvOS)
+struct LoveSpouseSettingsView: View {
+    @ObservedObject var loveSpouseManager = LoveSpouseManager.shared
+    @ObservedObject var appearanceManager = AppearanceManager.shared
+    
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Enable Love Spouse", isOn: $loveSpouseManager.isEnabled)
+                    .tint(appearanceManager.tintColor)
+            }
+            
+            Section(header: Text("Connection Status")) {
+                HStack {
+                    Text("Bluetooth")
+                    Spacer()
+                    Text(loveSpouseManager.statusMessage)
+                        .foregroundColor(loveSpouseManager.isConnected ? .green : .secondary)
+                }
+            }
+            
+            Section(footer: Text("Love Spouse 2.4g toys use BLE advertising. Ensure Bluetooth is enabled and the toy is in pairing/scan mode. Both toys in range will react simultaneously.")) {
+            }
+        }
+        .navigationTitle("Love Spouse")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

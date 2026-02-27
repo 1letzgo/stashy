@@ -19,6 +19,7 @@ struct SceneDetailView: View {
     @ObservedObject var viewModel = StashDBViewModel()
     @ObservedObject var handyManager = HandyManager.shared
     @ObservedObject var buttplugManager = ButtplugManager.shared
+    @ObservedObject var loveSpouseManager = LoveSpouseManager.shared
     
     @ObservedObject private var downloadManager = DownloadManager.shared
     
@@ -117,9 +118,9 @@ struct SceneDetailView: View {
                     onStartPlayback: { resume in startPlayback(resume: resume) }
                 )
                 
-                if activeScene.interactive == true, let heatmapURL = activeScene.heatmapURL {
+                if activeScene.interactive == true && activeScene.funscriptURL != nil {
                     SceneHeatmapCard(
-                        heatmapURL: heatmapURL,
+                        heatmapURL: activeScene.heatmapURL,
                         funscriptURL: activeScene.funscriptURL,
                         durationSeconds: activeScene.sceneDuration ?? 0,
                         currentTimeSeconds: currentPlaybackTime,
@@ -249,9 +250,16 @@ struct SceneDetailView: View {
             .onReceive(Timer.publish(every: 0.5, on: .main, in: .common).autoconnect()) { _ in
                 handlePlaybackMarkerUpdate()
             }
-            .onReceive(player?.publisher(for: \.timeControlStatus).eraseToAnyPublisher() ?? Empty<AVPlayer.TimeControlStatus, Never>().eraseToAnyPublisher()) { status in
-                handleTimeControlStatusChange(status)
-            }
+            .overlay(
+                Group {
+                    if let player = player {
+                        Color.clear
+                            .onReceive(player.publisher(for: \.timeControlStatus)) { status in
+                                handleTimeControlStatusChange(status)
+                            }
+                    }
+                }
+            )
     }
 
     private func refreshSceneDetails() {
@@ -291,6 +299,7 @@ struct SceneDetailView: View {
         
         if let scriptURL = activeScene.funscriptURL {
             buttplugManager.setupScene(funscriptURL: scriptURL)
+            loveSpouseManager.setupScene(funscriptURL: scriptURL)
         }
     }
 
@@ -305,6 +314,7 @@ struct SceneDetailView: View {
             player?.pause()
             if handyManager.isSyncing { handyManager.pause() }
             if buttplugManager.isConnected { buttplugManager.pause() }
+            if loveSpouseManager.isConnected { loveSpouseManager.pause() }
         }
         stopPreview()
         removeTimeObserver()
@@ -356,9 +366,13 @@ struct SceneDetailView: View {
         if status == .paused {
             if handyManager.isSyncing { handyManager.pause() }
             if buttplugManager.isConnected { buttplugManager.pause() }
+            
+            print("🔵 SceneDetailView: Video Paused - Sending Love Spouse Stop")
+            loveSpouseManager.pause()
         } else if status == .playing {
             if handyManager.isSyncing { handyManager.play(at: currentTime) }
             if buttplugManager.isConnected { buttplugManager.play(at: currentTime) }
+            if loveSpouseManager.isConnected { loveSpouseManager.play(at: currentTime) }
         }
     }
 
@@ -389,6 +403,9 @@ struct SceneDetailView: View {
         }
         if buttplugManager.isConnected {
             buttplugManager.play(at: player?.currentTime().seconds ?? 0)
+        }
+        if loveSpouseManager.isConnected {
+            loveSpouseManager.play(at: player?.currentTime().seconds ?? 0)
         }
         player?.rate = Float(playbackSpeed)
         
@@ -487,6 +504,9 @@ struct SceneDetailView: View {
         }
         if buttplugManager.isConnected {
             buttplugManager.play(at: seconds)
+        }
+        if loveSpouseManager.isConnected {
+            loveSpouseManager.play(at: seconds)
         }
     }
 

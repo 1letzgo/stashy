@@ -3,7 +3,7 @@
 import SwiftUI
 
 struct SceneHeatmapCard: View {
-    let heatmapURL: URL
+    let heatmapURL: URL?
     let funscriptURL: URL?
     let durationSeconds: Double
     let currentTimeSeconds: Double
@@ -11,6 +11,7 @@ struct SceneHeatmapCard: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var handyManager = HandyManager.shared
     @ObservedObject var buttplugManager = ButtplugManager.shared
+    @ObservedObject var loveSpouseManager = LoveSpouseManager.shared
 
     private let cardHeight: CGFloat = 140
     private let heatmapHeight: CGFloat = 80
@@ -29,37 +30,68 @@ struct SceneHeatmapCard: View {
                 if let funscriptURL = funscriptURL {
                     HStack(spacing: 8) {
                         // The Handy Button
-                        Button {
-                            handyManager.setupScene(funscriptURL: funscriptURL)
-                            HapticManager.medium()
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: handyManager.isSyncing ? "hand.tap.fill" : "hand.tap")
-                                Text(handyManager.isSyncing ? "Ready" : "TheHandy")
+                        if handyManager.isEnabled {
+                            Button {
+                                handyManager.setupScene(funscriptURL: funscriptURL)
+                                HapticManager.medium()
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: handyManager.isSyncing ? "hand.tap.fill" : "hand.tap")
+                                    Text(handyManager.isSyncing ? "Ready" : "TheHandy")
+                                }
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(handyManager.isSyncing ? .white : appearanceManager.tintColor)
+                                .padding(.horizontal, 8)
+                                .frame(minWidth: 92, minHeight: 28)
+                                .background(handyManager.isSyncing ? Color.green : appearanceManager.tintColor.opacity(0.1))
+                                .clipShape(Capsule())
                             }
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundColor(handyManager.isSyncing ? .white : appearanceManager.tintColor)
-                            .frame(width: 90, height: 28)
-                            .background(handyManager.isSyncing ? Color.green : appearanceManager.tintColor.opacity(0.1))
-                            .clipShape(Capsule())
                         }
                         
                         // Intiface Button
-                        Button {
-                            buttplugManager.connect()
-                            HapticManager.medium()
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: buttplugManager.isConnected ? "cable.connector.fill" : "cable.connector")
-                                Text(buttplugManager.isConnected ? "Ready" : "Intiface")
+                        if buttplugManager.isEnabled {
+                            Button {
+                                buttplugManager.connect()
+                                HapticManager.medium()
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: buttplugManager.isConnected ? "cable.connector.fill" : "cable.connector")
+                                    Text(buttplugManager.isConnected ? "Ready" : "Intiface")
+                                }
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(buttplugManager.isConnected ? .white : appearanceManager.tintColor)
+                                .padding(.horizontal, 8)
+                                .frame(minWidth: 92, minHeight: 28)
+                                .background(buttplugManager.isConnected ? Color.green : appearanceManager.tintColor.opacity(0.1))
+                                .clipShape(Capsule())
                             }
-                            .font(.caption)
-                            .fontWeight(.bold)
-                            .foregroundColor(buttplugManager.isConnected ? .white : appearanceManager.tintColor)
-                            .frame(width: 90, height: 28)
-                            .background(buttplugManager.isConnected ? Color.green : appearanceManager.tintColor.opacity(0.1))
-                            .clipShape(Capsule())
+                        }
+                        
+                        // Love Spouse Button
+                        if loveSpouseManager.isEnabled {
+                            Button {
+                                if loveSpouseManager.isSyncing {
+                                    loveSpouseManager.stop()
+                                } else {
+                                    loveSpouseManager.setupScene(funscriptURL: funscriptURL)
+                                }
+                                HapticManager.medium()
+                            } label: {
+                                let isSyncing = loveSpouseManager.isSyncing
+                                HStack(spacing: 4) {
+                                    Image(systemName: isSyncing ? "antenna.radiowaves.left.and.right.circle.fill" : "antenna.radiowaves.left.and.right")
+                                    Text(isSyncing ? "SYNC ON" : "Love Spouse")
+                                }
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(isSyncing ? .white : appearanceManager.tintColor)
+                                .padding(.horizontal, 8)
+                                .frame(minWidth: 92, minHeight: 28)
+                                .background(isSyncing ? Color.green : appearanceManager.tintColor.opacity(0.1))
+                                .clipShape(Capsule())
+                            }
                         }
                     }
                 } else {
@@ -128,16 +160,27 @@ struct SceneHeatmapCard: View {
 
     @ViewBuilder
     private func heatmapLayer(width: CGFloat) -> some View {
-        CustomAsyncImage(url: heatmapURL) { loader in
-            if let image = loader.image {
-                image
-                    .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: width, height: heatmapHeight)
-                    .clipped()
-            } else {
-                Color.clear
+        if let url = heatmapURL {
+            CustomAsyncImage(url: url) { loader in
+                if let image = loader.image {
+                    image
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: width, height: heatmapHeight)
+                        .clipped()
+                } else {
+                    Color.clear
+                }
             }
+        } else {
+            // Placeholder when no heatmap is available
+            ZStack {
+                Rectangle().fill(Color.gray.opacity(0.1))
+                Text("No Heatmap")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+            .frame(width: width, height: heatmapHeight)
         }
     }
 
