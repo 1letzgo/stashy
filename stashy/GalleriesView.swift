@@ -497,8 +497,9 @@ struct GalleryItemView: View {
     @State private var showRatingOverlay = false
 
 
-    private var isGIFImage: Bool {
-        image.fileExtension?.uppercased() == "GIF"
+    private var isAnimatedImage: Bool {
+        let ext = image.fileExtension?.uppercased()
+        return ext == "GIF" || ext == "WEBP"
     }
 
     private var isPortrait: Bool {
@@ -511,28 +512,26 @@ struct GalleryItemView: View {
     @ViewBuilder
     private var mediaLayer: some View {
         Group {
-            if image.isGIF {
+            if image.isAnimated {
                 ZoomableScrollView(isZoomed: $isZoomed, onTap: {
                     withAnimation(.easeInOut(duration: 0.4)) { showUI.toggle() }
                     if showUI { onInteraction() }
                 }) {
-                if let url = image.imageURL {
-                    CustomAsyncImage(url: url) { loader in
-                        if let data = loader.imageData, isGIF(data) {
-                            GIFView(data: data, fillMode: false)
-                        } else if let img = loader.image {
-                            img
-                                .resizable()
-                                .aspectRatio(contentMode: .fit)
-                        } else if loader.isLoading {
-                            ProgressView().tint(.white)
-                        } else {
-                            Image(systemName: "exclamationmark.triangle").foregroundColor(.white)
+                    GeometryReader { _ in
+                        CustomAsyncImage(url: image.imageURL) { loader in
+                            if let data = loader.imageData, isAnimatedData(data) {
+                                AnimatedWebView(data: data, fillMode: false)
+                            } else if let img = loader.image {
+                                img
+                                    .resizable()
+                                    .aspectRatio(contentMode: .fit)
+                            } else if loader.isLoading {
+                                ProgressView().tint(.white)
+                            } else {
+                                Image(systemName: "exclamationmark.triangle").foregroundColor(.white)
+                            }
                         }
                     }
-                } else {
-                    ProgressView().tint(.white)
-                }
                 }
             } else if image.isVideo {
                 ZoomableScrollView(isZoomed: $isZoomed, onTap: {
@@ -591,7 +590,7 @@ struct GalleryItemView: View {
 
     @ViewBuilder
     private var centerPlayIcon: some View {
-        if !isGIFImage && image.isVideo && !isPlaying {
+        if !isAnimatedImage && image.isVideo && !isPlaying {
             VStack {
                 Spacer()
                 HStack {

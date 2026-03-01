@@ -283,7 +283,12 @@ struct SceneVideoPlayerCard: View {
                 
                 // Audio Sync - Always shown to allow manual override
                 audioSyncButton
-                
+
+                // Love Spouse - shown when enabled and scene has funscript
+                if loveSpouseManager.isEnabled, activeScene.funscriptURL != nil {
+                    loveSpouseButton
+                }
+
                 ratingMenu
                 playbackSpeedMenu
                 qualityMenu
@@ -530,6 +535,22 @@ struct SceneVideoPlayerCard: View {
         }
         previewPlayer?.pause()
         previewPlayer?.seek(to: CMTime.zero)
+    }
+
+    private var loveSpouseButton: some View {
+        Button {
+            HapticManager.light()
+            if loveSpouseManager.isSyncing {
+                loveSpouseManager.stop()
+            } else if let url = activeScene.funscriptURL {
+                loveSpouseManager.setupScene(funscriptURL: url, at: player?.currentTime().seconds)
+            }
+        } label: {
+            let color: Color = loveSpouseManager.isSyncing ? .green : (loveSpouseManager.isConnected ? .orange : .gray)
+            let icon = loveSpouseManager.isSyncing ? "antenna.radiowaves.left.and.right" : "antenna.radiowaves.left.and.right.slash"
+            infoPill(icon: icon, text: "LoveSpouse", color: color)
+        }
+        .buttonStyle(.plain)
     }
 
     private var audioSyncButton: some View {

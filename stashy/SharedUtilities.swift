@@ -210,8 +210,8 @@ extension View {
 // MARK: - GIF / Zoom Components
 
 #if !os(tvOS)
-/// A view that plays animated GIFs using WKWebView for reliability and simple looping.
-struct GIFView: UIViewRepresentable {
+/// A view that plays animated GIFs and WebP images using WKWebView for reliability and simple looping.
+struct AnimatedWebView: UIViewRepresentable {
     let data: Data
     var fillMode: Bool = false
     
@@ -244,6 +244,9 @@ struct GIFView: UIViewRepresentable {
         }
         context.coordinator.lastDataHash = currentHash
         
+        // Determine MIME type
+        let mimeType = isWebP(data) ? "image/webp" : "image/gif"
+        
         let base64 = data.base64EncodedString()
         let objectFit = fillMode ? "cover" : "contain"
         
@@ -272,7 +275,7 @@ struct GIFView: UIViewRepresentable {
             </style>
         </head>
         <body>
-            <img src="data:image/gif;base64,\(base64)">
+            <img src="data:\(mimeType);base64,\(base64)">
         </body>
         </html>
         """
@@ -405,6 +408,17 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
 
 func isGIF(_ data: Data) -> Bool {
     return data.count >= 3 && data[0] == 0x47 && data[1] == 0x49 && data[2] == 0x46
+}
+
+func isWebP(_ data: Data) -> Bool {
+    guard data.count >= 12 else { return false }
+    // RIFF....WEBP (bytes 0-3 are "RIFF", bytes 8-11 are "WEBP")
+    return data[0] == 0x52 && data[1] == 0x49 && data[2] == 0x46 && data[3] == 0x46 &&
+           data[8] == 0x57 && data[9] == 0x45 && data[10] == 0x42 && data[11] == 0x50
+}
+
+func isAnimatedData(_ data: Data) -> Bool {
+    return isGIF(data) || isWebP(data)
 }
 #endif // !os(tvOS)
 

@@ -156,7 +156,7 @@ struct ReelsView: View {
                 return m.videoURL
                 
             case .clip(let c):
-                // For clips (images that are videos), the imagePath IS the video path
+                // For clips (images that are videos or animations), the imagePath IS the video path
                 return c.imageURL
             }
         }
@@ -240,10 +240,11 @@ struct ReelsView: View {
             }
         }
         
-        var isGIF: Bool {
+        var isAnimated: Bool {
             switch self {
             case .clip(let c):
-                return c.fileExtension?.uppercased() == "GIF"
+                let ext = c.fileExtension?.uppercased()
+                return ext == "GIF" || ext == "WEBP"
             case .scene: return false
             case .marker: return false
             }
@@ -716,6 +717,12 @@ struct ReelsView: View {
         .onChange(of: isMenuOpen) { _, _ in }
         .onDisappear {
             UIApplication.shared.isIdleTimerDisabled = false
+            
+            // Stop all audio & interactive sync
+            AudioAnalysisManager.shared.stop()
+            HandyManager.shared.stop()
+            ButtplugManager.shared.stopAllDevices()
+            LoveSpouseManager.shared.stop()
             
             // Deactivate audio session to release focus immediately
             do {
@@ -1461,7 +1468,7 @@ struct ReelItemView: View {
     let isActive: Bool
     @State private var player: AVPlayer?
     @State private var looper: Any?
-    @State private var gifAdvanceTimer: Timer?
+    @State private var animationAdvanceTimer: Timer?
     @ObservedObject var tabManager = TabManager.shared
     
     // Playback State
@@ -1485,6 +1492,7 @@ struct ReelItemView: View {
     @Binding var isMenuOpen: Bool
     @Binding var isZoomed: Bool
     @Binding var isRotating: Bool
+    @State private var showAudioSyncSheet = false
     var onInteraction: () -> Void
 
     private var shouldFill: Bool {
@@ -1507,8 +1515,8 @@ struct ReelItemView: View {
         ZStack(alignment: .bottom) {
             mediaLayer
             
-            // Center Play Icon (only for videos, not GIFs)
-            if !item.isGIF && !isPlaying && isUIVisible {
+            // Center Play Icon (only for videos, not animations)
+            if !item.isAnimated && !isPlaying && isUIVisible {
                 CenterPlayIcon()
             }
             
@@ -1524,12 +1532,12 @@ struct ReelItemView: View {
             setupPlayer()
             if isActive {
                 onInteraction()
-                if item.isGIF { startGIFAdvanceTimer() }
+                if item.isAnimated { startAnimationAdvanceTimer() }
             }
         }
         .onDisappear {
             cleanupPlayer()
-            cancelGIFAdvanceTimer()
+            cancelAnimationAdvanceTimer()
         }
         .onChange(of: isMuted) { _, newValue in
             player?.isMuted = newValue
@@ -1541,18 +1549,18 @@ struct ReelItemView: View {
                 if player == nil { setupPlayer() }
                 if isPlaying && !isRotating { player?.play() }
                 onInteraction()
-                if item.isGIF { startGIFAdvanceTimer() }
+                if item.isAnimated { startAnimationAdvanceTimer() }
             } else {
                 cleanupPlayer()
-                cancelGIFAdvanceTimer()
+                cancelAnimationAdvanceTimer()
             }
         }
         .onChange(of: tabManager.reelsContinuousPlay) { _, enabled in
-            if item.isGIF {
+            if item.isAnimated {
                 if enabled && isActive {
-                    startGIFAdvanceTimer()
+                    startAnimationAdvanceTimer()
                 } else {
-                    cancelGIFAdvanceTimer()
+                    cancelAnimationAdvanceTimer()
                 }
             }
         }
@@ -1571,6 +1579,41 @@ struct ReelItemView: View {
         .onChange(of: showTagsOverlay) { _, newValue in
             isMenuOpen = newValue || showRatingOverlay
         }
+        .onChange(of: player?.currentItem) { _, newItem in
+            ensureAudioAnalysis(for: newItem)
+        }
+        .onChange(of: HandyManager.shared.isAudioMode) { _, isAudio in
+            if isAudio { ensureAudioAnalysis(for: player?.currentItem) }
+            else { checkAndStopAudioAnalysis() }
+        }
+        .onChange(of: ButtplugManager.shared.isAudioMode) { _, isAudio in
+            if isAudio { ensureAudioAnalysis(for: player?.currentItem) }
+            else { checkAndStopAudioAnalysis() }
+        }
+        .onChange(of: LoveSpouseManager.shared.isAudioMode) { _, isAudio in
+            if isAudio { ensureAudioAnalysis(for: player?.currentItem) }
+            else { checkAndStopAudioAnalysis() }
+        }
+        .onAppear {
+            if HandyManager.shared.isAudioMode || ButtplugManager.shared.isAudioMode || LoveSpouseManager.shared.isAudioMode {
+                 AudioAnalysisManager.shared.isActive = true
+            }
+        }
+    }
+    
+    private func ensureAudioAnalysis(for item: AVPlayerItem?) {
+        guard let item = item else { return }
+        if HandyManager.shared.isAudioMode || ButtplugManager.shared.isAudioMode || LoveSpouseManager.shared.isAudioMode {
+            print("🎙️ ReelsView: Ensuring Audio Analysis is setup for current item")
+            AudioAnalysisManager.shared.setup(for: item)
+            AudioAnalysisManager.shared.isActive = true 
+        }
+    }
+    
+    private func checkAndStopAudioAnalysis() {
+        if !HandyManager.shared.isAudioMode && !ButtplugManager.shared.isAudioMode && !LoveSpouseManager.shared.isAudioMode {
+            AudioAnalysisManager.shared.stop()
+        }
     }
 
     @ViewBuilder
@@ -1578,10 +1621,10 @@ struct ReelItemView: View {
         ZoomableScrollView(isZoomed: $isZoomed, onTap: handleMediaTap) {
             ZStack {
                 Group {
-                    if item.isGIF {
+                    if item.isAnimated {
                         CustomAsyncImage(url: item.videoURL) { loader in
-                            if let data = loader.imageData, isGIF(data) {
-                                GIFView(data: data, fillMode: shouldFill)
+                            if let data = loader.imageData, isAnimatedData(data) {
+                                AnimatedWebView(data: data, fillMode: shouldFill)
                             } else if let img = loader.image {
                                 img
                                     .resizable()
@@ -1704,7 +1747,7 @@ struct ReelItemView: View {
                 .padding(.bottom, 8)
 
                 // Full-width progress bar
-                if !item.isGIF {
+                if !item.isAnimated {
                     CustomVideoScrubber(
                         value: Binding(get: { currentTime }, set: { val in
                             currentTime = val
@@ -1771,8 +1814,23 @@ struct ReelItemView: View {
                         Spacer()
                     }
                     
-                    // Mute Button (only for videos)
-                    if !item.isGIF {
+                    // Mute & Audio Sync (only for videos)
+                    if !item.isAnimated {
+                        // Audio Sync Button
+                        let isAnyAudioModeActive = HandyManager.shared.isAudioMode || ButtplugManager.shared.isAudioMode || LoveSpouseManager.shared.isAudioMode
+                        BottomBarButton(
+                            icon: isAnyAudioModeActive ? "waveform.and.mic" : "waveform",
+                            count: 0,
+                            hideCount: true
+                        ) {
+                            showAudioSyncSheet = true
+                            onInteraction()
+                        }
+                        .foregroundColor(isAnyAudioModeActive ? .purple : .white)
+                        
+                        Spacer()
+                        
+                        // Mute Button
                         BottomBarButton(
                             icon: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
                             count: 0,
@@ -1805,12 +1863,17 @@ struct ReelItemView: View {
             .frame(height: 50)
         }
         .padding(.bottom, 30) // Safe area spacing
+        .sheet(isPresented: $showAudioSyncSheet) {
+            AudioSyncSheet()
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
     }
     
 
-
     @ViewBuilder
     private func performerLabel(for item: ReelsView.ReelItemData) -> some View {
+
         if let performer = item.performers.first {
             Button(action: { onPerformerTap(performer) }) {
                 Text(performer.name)
@@ -1875,8 +1938,8 @@ struct ReelItemView: View {
     }
     
     func setupPlayer() {
-        // GIFs don't need AVPlayer
-        guard !item.isGIF else { return }
+        // Animations don't need AVPlayer
+        guard !item.isAnimated else { return }
         
         guard item.sceneID != nil else {
             if let url = item.videoURL { initPlayer(with: url) }
@@ -2065,18 +2128,19 @@ struct ReelItemView: View {
         player?.seek(to: cmTime)
     }
 
-    private func startGIFAdvanceTimer() {
+    private func startAnimationAdvanceTimer() {
+        // Only advance if continuous play is enabled
         guard tabManager.reelsContinuousPlay else { return }
-        cancelGIFAdvanceTimer()
+        cancelAnimationAdvanceTimer()
         let duration = item.duration ?? 5.0
-        gifAdvanceTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { _ in
+        animationAdvanceTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { _ in
             onVideoEnded()
         }
     }
 
-    private func cancelGIFAdvanceTimer() {
-        gifAdvanceTimer?.invalidate()
-        gifAdvanceTimer = nil
+    private func cancelAnimationAdvanceTimer() {
+        animationAdvanceTimer?.invalidate()
+        animationAdvanceTimer = nil
     }
 }
 struct SidebarButton: View {
@@ -2196,6 +2260,130 @@ struct CustomVideoScrubber: View {
         .frame(height: 10) // Small height container
         .focusable(false)
         .focusEffectDisabled()
+    }
+}
+#endif
+
+// MARK: - Audio Sync Sheet for Reels
+#if !os(tvOS)
+struct AudioSyncSheet: View {
+    @ObservedObject var audioManager = AudioAnalysisManager.shared
+    @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject var handyManager = HandyManager.shared
+    @ObservedObject var buttplugManager = ButtplugManager.shared
+    @ObservedObject var loveSpouseManager = LoveSpouseManager.shared
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Device Audio Sync")) {
+                    if buttplugManager.isEnabled {
+                        Toggle(isOn: $buttplugManager.isAudioMode) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "waveform.and.mic")
+                                    .foregroundColor(buttplugManager.isAudioMode ? .purple : .secondary)
+                                Text("Intiface")
+                            }
+                        }
+                    }
+                    
+                    if loveSpouseManager.isEnabled {
+                        Toggle(isOn: $loveSpouseManager.isAudioMode) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "waveform.and.mic")
+                                    .foregroundColor(loveSpouseManager.isAudioMode ? .purple : .secondary)
+                                Text("LoveSpouse")
+                            }
+                        }
+                    }
+                    
+                    if !buttplugManager.isEnabled && !loveSpouseManager.isEnabled {
+                         Text("No audio-sync capable devices enabled. Turn them on in Settings.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Section(header: Text("Live Level")) {
+                    // VU Meter
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(height: 8)
+                            
+                            Rectangle()
+                                .fill(LinearGradient(
+                                    colors: [.green, .yellow, .red],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ))
+                                .frame(width: max(0, geo.size.width * CGFloat(audioManager.visualLevel)), height: 8)
+                                .animation(.linear(duration: 0.1), value: audioManager.visualLevel)
+                        }
+                        .clipShape(Capsule())
+                    }
+                    .frame(height: 8)
+                    .padding(.vertical, 8)
+                    
+                    HStack {
+                        Spacer()
+                        Text("\(Int(audioManager.visualLevel * 100))%")
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Section(header: Text("Configuration")) {
+                    // Sensitivity
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Sensitivity")
+                            Spacer()
+                            Text("\(Int(audioManager.sensitivity * 100))%")
+                                .foregroundColor(.secondary)
+                        }
+                        Slider(value: $audioManager.sensitivity, in: 0...1)
+                            .tint(appearanceManager.tintColor)
+                    }
+                    .padding(.vertical, 4)
+                    
+                    // Intensity
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Max Intensity")
+                            Spacer()
+                            Text("\(Int(audioManager.maxIntensity * 100))%")
+                                .foregroundColor(.secondary)
+                        }
+                        Slider(value: $audioManager.maxIntensity, in: 0.1...1)
+                            .tint(appearanceManager.tintColor)
+                    }
+                    .padding(.vertical, 4)
+                    
+                    // Latency
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Latency Compensation")
+                            Spacer()
+                            Text("\(Int(audioManager.delayMs))ms")
+                                .foregroundColor(.secondary)
+                        }
+                        Slider(value: $audioManager.delayMs, in: 0...1000, step: 10)
+                            .tint(appearanceManager.tintColor)
+                        
+                        Text("Signal sent \(Int(audioManager.delayMs))ms early")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .italic()
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            .navigationTitle("Audio Sync")
+            .navigationBarTitleDisplayMode(.inline)
+        }
     }
 }
 #endif

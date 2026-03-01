@@ -408,14 +408,12 @@ struct SceneDetailView: View {
         if status == .paused {
             if handyManager.isSyncing { handyManager.pause() }
             if buttplugManager.isConnected { buttplugManager.pause() }
-            
-            print("🔵 SceneDetailView: Video Paused - Sending Love Spouse Stop")
-            loveSpouseManager.pause()
+            if loveSpouseManager.isSyncing { loveSpouseManager.pause() }
         } else if status == .playing {
             ensureAudioAnalysis(for: player.currentItem)
             if handyManager.isSyncing { handyManager.play(at: currentTime) }
             if buttplugManager.isConnected { buttplugManager.play(at: currentTime) }
-            if loveSpouseManager.isConnected { loveSpouseManager.play(at: currentTime) }
+            if loveSpouseManager.isSyncing { loveSpouseManager.play(at: currentTime) }
         }
     }
 
@@ -447,7 +445,7 @@ struct SceneDetailView: View {
         if buttplugManager.isConnected {
             buttplugManager.play(at: player?.currentTime().seconds ?? 0)
         }
-        if loveSpouseManager.isConnected {
+        if loveSpouseManager.isSyncing {
             loveSpouseManager.play(at: player?.currentTime().seconds ?? 0)
         }
         player?.rate = Float(playbackSpeed)
@@ -548,7 +546,7 @@ struct SceneDetailView: View {
         if buttplugManager.isConnected {
             buttplugManager.play(at: seconds)
         }
-        if loveSpouseManager.isConnected {
+        if loveSpouseManager.isSyncing {
             loveSpouseManager.play(at: seconds)
         }
     }
@@ -913,8 +911,8 @@ struct AudioVibeCard: View {
                                 startPoint: .leading,
                                 endPoint: .trailing
                             ))
-                            .frame(width: geo.size.width * CGFloat(audioManager.currentLevel), height: 8)
-                            .animation(.linear(duration: 0.1), value: audioManager.currentLevel)
+                            .frame(width: geo.size.width * CGFloat(audioManager.visualLevel), height: 8)
+                            .animation(.linear(duration: 0.1), value: audioManager.visualLevel)
                     }
                     .clipShape(Capsule())
                 }
@@ -925,7 +923,7 @@ struct AudioVibeCard: View {
                         .font(.caption2)
                         .foregroundColor(.secondary)
                     Spacer()
-                    Text("\(Int(audioManager.currentLevel * 100))%")
+                    Text("\(Int(audioManager.visualLevel * 100))%")
                         .font(.caption2)
                         .monospacedDigit()
                         .foregroundColor(.secondary)

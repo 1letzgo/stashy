@@ -2725,10 +2725,10 @@ class StashDBViewModel: ObservableObject {
         
         let page = isInitialLoad ? 1 : currentClipsPage + 1
         
-        // Filter for video-like extensions
-        // Regex: .*\.(mp4|gif|mov|webm|m4v)$ (case insensitive usually requires flags, but Stash regex is Go-flavor? or PCRE?)
+        // Filter for video-like and animated extensions
+        // Regex: .*\.(mp4|gif|mov|webm|m4v|mkv|webp)$ (case insensitive usually requires flags, but Stash regex is Go-flavor? or PCRE?)
         // Stash uses Go regex. (?i) is case insensitive.
-        let videoRegex = "(?i).*\\.(mp4|gif|mov|webm|m4v|mkv)$"
+        let videoRegex = "(?i).*\\.(mp4|gif|webp|mov|webm|m4v|mkv)$"
         
         let query = GraphQLQueries.queryWithFragments("findImages")
         
@@ -4852,10 +4852,18 @@ struct StashImage: Codable, Identifiable {
         return false
     }
 
-    var isGIF: Bool {
-        return fileExtension?.uppercased() == "GIF"
+    var isAnimated: Bool {
+        if let ext = fileExtension?.uppercased() {
+            return ext == "GIF" || ext == "WEBP"
+        }
+        return false
     }
     
+    @available(*, deprecated, message: "Use isAnimated instead to support both GIF and WebP")
+    var isGIF: Bool {
+        return isAnimated
+    }
+
     var fileExtension: String? {
         // Primary: Use 'visual_files' array if available
         if let path = visual_files?.first?.path {
@@ -6508,8 +6516,8 @@ class LoveSpouseManager: NSObject, ObservableObject {
             guard let self = self, self.isEnabled else { return }
             
             self.pendingBurst?.cancel()
-            
-            if self.burstTimer != nil {
+
+            DispatchQueue.main.async {
                 self.burstTimer?.invalidate()
                 self.burstTimer = nil
             }
