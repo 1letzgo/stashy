@@ -13,6 +13,14 @@ struct AppearanceSettingsView: View {
     
     var body: some View {
         List {
+            Section(header: Text("App Theme"), footer: Text("Choose the appearance of the app.")) {
+                Picker("Theme", selection: $appearanceManager.preferredTheme) {
+                    ForEach(AppTheme.allCases) { theme in
+                        Text(theme.rawValue).tag(theme)
+                    }
+                }
+                .pickerStyle(.segmented)
+            }
             
             Section(header: Text("App Accent Color"), footer: Text("This color will be applied to the tab bar, navigation bar buttons, and other interactive elements throughout the app.")) {
                 // Color Picker

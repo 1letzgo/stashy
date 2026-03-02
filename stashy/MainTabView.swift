@@ -119,6 +119,7 @@ struct MainTabView: View {
                 return Alert(title: Text("Error"))
             }
         }
+        .preferredColorScheme(appearanceManager.preferredTheme.colorScheme)
     }
 
     private func checkConfiguration() {

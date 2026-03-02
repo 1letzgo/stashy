@@ -5,7 +5,6 @@
 //  Created by Daniel Goletz on 13.01.26.
 //
 
-#if !os(tvOS)
 import SwiftUI
 import AVKit
 import AVFoundation
@@ -131,7 +130,7 @@ struct GalleriesView: View {
                                 .lineLimit(1)
                         }
                         .foregroundColor(.white.opacity(0.9))
-                        .padding(.horizontal, 10)
+                        .padding(Edge.Set.horizontal, 10)
                         .padding(.vertical, 8)
                         .background(Color.black.opacity(DesignTokens.Opacity.badge))
                         .clipShape(Capsule())
@@ -414,7 +413,7 @@ struct GalleryCardView: View {
                                         .font(.system(size: 9, weight: .bold))
                                         .lineLimit(1)
                                         .foregroundColor(.white)
-                                        .padding(.horizontal, 6)
+                                        .padding(Edge.Set.horizontal, 6)
                                         .padding(.vertical, 3)
                                         .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                         .clipShape(Capsule())
@@ -428,7 +427,7 @@ struct GalleryCardView: View {
                                         .font(.system(size: 9, weight: .bold))
                                         .lineLimit(1)
                                         .foregroundColor(.white)
-                                        .padding(.horizontal, 6)
+                                        .padding(Edge.Set.horizontal, 6)
                                         .padding(.vertical, 3)
                                         .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                         .clipShape(Capsule())
@@ -457,7 +456,7 @@ struct GalleryCardView: View {
                                             .font(.system(size: 10, weight: .bold))
                                     }
                                     .foregroundColor(.white)
-                                    .padding(.horizontal, 8)
+                                    .padding(Edge.Set.horizontal, 8)
                                     .padding(.vertical, 4)
                                     .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                     .clipShape(Capsule())
@@ -495,7 +494,8 @@ struct GalleryItemView: View {
     @State private var isSeeking = false
     @State private var timeObserver: Any?
     @State private var showRatingOverlay = false
-
+    @State private var showTagsOverlay = false
+    @State private var showAudioSyncSheet = false
 
     private var isAnimatedImage: Bool {
         let ext = image.fileExtension?.uppercased()
@@ -588,253 +588,217 @@ struct GalleryItemView: View {
         .ignoresSafeArea()
     }
 
-    @ViewBuilder
-    private var centerPlayIcon: some View {
-        if !isAnimatedImage && image.isVideo && !isPlaying {
-            VStack {
-                Spacer()
-                HStack {
-                    Spacer()
-                    Image(systemName: "play.fill")
-                        .font(.system(size: 60))
-                        .foregroundColor(.white.opacity(0.7))
-                        .shadow(radius: 10)
-                    Spacer()
-                }
-                Spacer()
-            }
-            .contentShape(Rectangle())
-            .onTapGesture {
-                withAnimation(.easeInOut(duration: 0.4)) {
-                    showUI.toggle()
-                }
-                if showUI {
-                    onInteraction()
-                }
-            }
-        }
-    }
 
     @ViewBuilder
-    private var sidebarLayer: some View {
-        VStack(alignment: .trailing, spacing: 20) {
-            Spacer()
-
-            VStack(alignment: .trailing, spacing: 20) {
-                // Rating Button
-                let rating = image.rating100 ?? 0
-                SidebarButton(
-                    icon: "star",
-                    label: "Rating",
-                    count: rating > 0 ? (rating / 20) : 0,
-                    color: .white
-                ) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        showRatingOverlay.toggle()
-                    }
-                    onInteraction()
-                }
-                .overlay(alignment: .top) {
-                    if showRatingOverlay {
-                        VStack {
-                            StarRatingView(
-                                rating100: rating,
-                                isInteractive: true,
-                                size: 25,
-                                spacing: 8,
-                                isVertical: true
-                            ) { newRating in
-                                // Optimistic update
-                                if let index = images.firstIndex(where: { $0.id == image.id }) {
-                                    let original = images[index].rating100
-                                    images[index] = images[index].withRating(newRating)
-
-                                    viewModel.updateImageRating(imageId: image.id, rating100: newRating) { success in
-                                        if !success {
-                                            DispatchQueue.main.async {
-                                                images[index] = images[index].withRating(original)
-                                                ToastManager.shared.show("Failed to save rating", icon: "exclamationmark.triangle", style: .error)
-                                            }
-                                        }
-                                    }
-                                }
-                                onInteraction()
-                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-                                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                        showRatingOverlay = false
-                                    }
-                                }
-                            }
-                        }
-                        .padding(.vertical, 12)
-                        .padding(.horizontal, 8)
-                        .background(Color.black.opacity(DesignTokens.Opacity.strong))
-                        .clipShape(Capsule())
-                        .overlay(Capsule().stroke(Color.white.opacity(0.3), lineWidth: 1))
-                        .offset(y: -150)
-                        .transition(.scale(scale: 0, anchor: .top).combined(with: .opacity))
-                    }
-                }
-
-                // O-Counter
-                SidebarButton(
-                    icon: AppearanceManager.shared.oCounterIcon,
-                    label: "Counter",
-                    count: image.o_counter ?? 0,
-                    color: .white
-                ) {
-                    if let index = images.firstIndex(where: { $0.id == image.id }) {
-                        let originalCount = images[index].o_counter ?? 0
-                        let newCount = originalCount + 1
-                        images[index] = images[index].withOCounter(newCount)
-                        
-                        viewModel.incrementImageOCounter(imageId: image.id) { returnedCount in
-                            if let count = returnedCount {
-                                DispatchQueue.main.async {
-                                    images[index] = images[index].withOCounter(count)
-                                }
-                            } else {
-                                DispatchQueue.main.async {
-                                    if let revertIndex = images.firstIndex(where: { $0.id == image.id }) {
-                                        images[revertIndex] = images[revertIndex].withOCounter(originalCount)
-                                    }
-                                    ToastManager.shared.show("Counter update failed", icon: "exclamationmark.triangle", style: .error)
-                                }
-                            }
-                        }
-                    }
-                    onInteraction()
-                }
-                .contentShape(Rectangle())
-
-                // Mute and Play/Pause Buttons (video only)
-                if image.isVideo {
-                    HStack(spacing: 12) {
-                        SidebarButton(
-                            icon: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                            label: isMuted ? "Muted" : "Mute",
-                            count: 0,
-                            hideCount: true,
-                            color: .white
-                        ) {
-                            isMuted.toggle()
-                            onInteraction()
-                        }
-
-                        SidebarButton(
-                            icon: isPlaying ? "pause.fill" : "play.fill",
-                            label: isPlaying ? "Pause" : "Play",
-                            count: 0,
-                            hideCount: true,
-                            color: .white
-                        ) {
-                            isPlaying.toggle()
-                            if isPlaying {
-                                player?.play()
-                            } else {
-                                player?.pause()
-                            }
-                            onInteraction()
-                        }
-                    }
-                }
-
-                // Remove the bottom spacer in landscape to allow buttons to sit lower
-                if verticalSizeClass != .compact {
-                    Spacer()
-                        .frame(height: 0)
-                }
-            }
-            .padding(.bottom, verticalSizeClass == .compact ? 95 : 135)
-        }
-        .frame(maxWidth: .infinity, alignment: (verticalSizeClass == .compact ? .trailing : .bottomTrailing))
-        .padding(.trailing, verticalSizeClass == .compact ? 60 : 12)
-        .opacity(showUI ? 1 : 0)
-        .animation(showUI ? nil : .easeInOut(duration: 0.4), value: showUI)
-    }
-
-    @ViewBuilder
-    private var metadataOverlay: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Spacer()
-
-            VStack(alignment: .leading, spacing: 6) {
-                if verticalSizeClass == .compact {
-                    HStack(alignment: .bottom, spacing: 12) {
-                        performerLabel
-                        titleLabel
-                    }
-                } else {
-                    VStack(alignment: .leading, spacing: 4) {
-                        performerLabel
-                        titleLabel
-                    }
-                }
-
-                // Row 3: Tags
+    private var bottomOverlay: some View {
+        VStack(spacing: 0) {
+            // Tags overlay (toggled by button)
+            if showTagsOverlay {
                 if let tags = image.tags, !tags.isEmpty {
-                    ScrollView(.horizontal, showsIndicators: false) {
+                    ScrollView(Axis.Set.horizontal, showsIndicators: false) {
                         HStack(spacing: 8) {
                             ForEach(tags) { tag in
                                 Text("#\(tag.name)")
-                                    .font(.system(size: 13, weight: .semibold))
+                                    .font(.system(size: 12, weight: .semibold))
                                     .foregroundColor(.white)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 5)
+                                    .padding(Edge.Set.horizontal, 8)
+                                    .padding(.vertical, 4)
                                     .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                     .clipShape(Capsule())
                                     .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
                             }
                         }
+                        .padding(Edge.Set.horizontal, 16)
                     }
-                    .padding(.top, 4)
-                }
-
-                // Video scrubber
-                if image.isVideo {
-                    CustomVideoScrubber(
-                        value: Binding(get: { currentTime }, set: { val in
-                            currentTime = val
-                            seek(to: val)
-                        }),
-                        total: duration,
-                        onEditingChanged: { editing in
-                            isSeeking = editing
-                            if editing {
-                                player?.pause()
-                            } else {
-                                if isPlaying { player?.play() }
-                                onInteraction()
-                            }
-                        }
-                    )
-                    .padding(.bottom, 0)
+                    .padding(Edge.Set.bottom, 5)
+                    .transition(AnyTransition.move(edge: Edge.bottom).combined(with: .opacity))
                 }
             }
-            .padding(.bottom, 95)
+            
+            // Rating overlay (expands upward)
+            if showRatingOverlay {
+                let rating = image.rating100 ?? 0
+                HStack {
+                    StarRatingView(
+                        rating100: rating,
+                        isInteractive: true,
+                        size: 28,
+                        spacing: 10,
+                        isVertical: false
+                    ) { newRating in
+                        if let index = images.firstIndex(where: { $0.id == image.id }) {
+                            images[index] = images[index].withRating(newRating)
+                            viewModel.updateImageRating(imageId: image.id, rating100: newRating) { _ in }
+                        }
+                        onInteraction()
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
+                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                                showRatingOverlay = false
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 10)
+                .padding(Edge.Set.horizontal, 16)
+                .background(Color.black.opacity(DesignTokens.Opacity.badge))
+                .clipShape(Capsule())
+                .padding(Edge.Set.bottom, 8)
+                .transition(AnyTransition.move(edge: Edge.bottom).combined(with: .opacity))
+            }
+            
+            // Performer and Title labels
+            VStack(alignment: .leading, spacing: 4) {
+                performerLabel
+                titleLabel
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Edge.Set.horizontal, 16)
+            .padding(Edge.Set.bottom, 8)
+
+            // Full-width progress bar
+            if image.isVideo {
+                CustomVideoScrubber(
+                    value: Binding(get: { currentTime }, set: { val in
+                        currentTime = val
+                        seek(to: val)
+                    }),
+                    total: duration,
+                    onEditingChanged: { editing in
+                        isSeeking = editing
+                        if editing {
+                            player?.pause()
+                        } else {
+                            if isPlaying { player?.play() }
+                            onInteraction()
+                        }
+                    }
+                )
+                .padding(Edge.Set.horizontal, 0)
+                .padding(Edge.Set.bottom, 15)
+            }
+            
+            // Bottom row: Action buttons
+            HStack(alignment: .center, spacing: 0) {
+                Spacer()
+                
+                // Tags button
+                if let tags = image.tags, !tags.isEmpty {
+                    BottomBarButton(icon: "tag.fill", count: tags.count) {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                            showTagsOverlay.toggle()
+                            showRatingOverlay = false
+                        }
+                        onInteraction()
+                    }
+                    Spacer()
+                }
+                
+                // Rating
+                let rating = image.rating100 ?? 0
+                BottomBarButton(icon: "star", count: rating > 0 ? (rating / 20) : 0) {
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
+                        showRatingOverlay.toggle()
+                        showTagsOverlay = false
+                    }
+                    onInteraction()
+                }
+                
+                Spacer()
+                
+                // O-Counter
+                BottomBarButton(icon: AppearanceManager.shared.oCounterIcon, count: image.o_counter ?? 0) {
+                    if let index = images.firstIndex(where: { $0.id == image.id }) {
+                        viewModel.incrementImageOCounter(imageId: image.id) { returnedCount in
+                            if let count = returnedCount {
+                                images[index] = images[index].withOCounter(count)
+                            }
+                        }
+                    }
+                    onInteraction()
+                }
+                
+                Spacer()
+                
+                // Video Controls
+                if image.isVideo {
+                    // Audio Sync
+                    let isAnyAudioModeActive = HandyManager.shared.isAudioMode || ButtplugManager.shared.isAudioMode || LoveSpouseManager.shared.isAudioMode
+                    #if !os(tvOS)
+                    BottomBarButton(
+                        icon: isAnyAudioModeActive ? "waveform.and.mic" : "waveform",
+                        count: 0,
+                        hideCount: true
+                    ) {
+                        showAudioSyncSheet = true
+                        onInteraction()
+                    }
+                    .foregroundColor(isAnyAudioModeActive ? .purple : .white)
+                    
+                    Spacer()
+                    #endif
+                    
+                    // Mute
+                    BottomBarButton(
+                        icon: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                        count: 0,
+                        hideCount: true
+                    ) {
+                        isMuted.toggle()
+                        onInteraction()
+                    }
+                    
+                    Spacer()
+                    
+                    // Play/Pause
+                    BottomBarButton(
+                        icon: isPlaying ? "pause.fill" : "play.fill",
+                        count: 0,
+                        hideCount: true
+                    ) {
+                        isPlaying.toggle()
+                        if isPlaying { player?.play() }
+                        else { player?.pause() }
+                        onInteraction()
+                    }
+                    Spacer()
+                }
+            }
+            .padding(Edge.Set.horizontal, 16)
+            .frame(height: 50)
         }
-        .padding(.horizontal, 16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .opacity(showUI ? 1 : 0)
-        .animation(showUI ? nil : .easeInOut(duration: 0.4), value: showUI)
+        .padding(.bottom, 30)
+        .sheet(isPresented: $showAudioSyncSheet) {
+            #if !os(tvOS)
+            AudioSyncSheet()
+                .presentationDetents([PresentationDetent.medium, PresentationDetent.large])
+                .presentationDragIndicator(Visibility.visible)
+            #endif
+        }
     }
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
+        ZStack(alignment: .bottom) {
             mediaLayer
             
-            centerPlayIcon
-
-            sidebarLayer
-
-            metadataOverlay
+            // Center Play Icon (only for videos, not animations)
+            if !isAnimatedImage && image.isVideo && !isPlaying && showUI {
+                CenterPlayButton {
+                    isPlaying = true
+                    player?.play()
+                    onInteraction()
+                }
+            }
+            
+            if showUI {
+                bottomOverlay
+                    .transition(AnyTransition.move(edge: Edge.bottom).combined(with: .opacity))
+            }
         }
         .background(Color.black)
         .onAppear {
             if image.isVideo {
                 setupPlayer()
             }
-            onInteraction()
         }
         .onDisappear {
             player?.pause()
@@ -955,15 +919,8 @@ struct FullScreenImageView: View {
     @State private var showingDeleteConfirmation = false
     @State private var isMuted: Bool = !isHeadphonesConnected()
     @State private var currentVisibleId: String?
-
     @State private var showUI = true
-    @State private var uiHideTask: Task<Void, Never>? = nil
 
-    private func resetUITimer() {
-        showUI = true
-        uiHideTask?.cancel()
-        uiHideTask = nil
-    }
 
     var body: some View {
         ZStack {
@@ -979,9 +936,7 @@ struct FullScreenImageView: View {
                             images: $images,
                             showUI: $showUI,
                             isZoomed: $isMediaZoomed,
-                            onInteraction: {
-                                resetUITimer()
-                            }
+                            onInteraction: { }
                         )
                         .scrollDisabled(isMediaZoomed)
                         .containerRelativeFrame([.horizontal, .vertical])
@@ -1002,16 +957,10 @@ struct FullScreenImageView: View {
             .scrollContentBackground(.hidden)
             .background(Color.black)
             .onScrollPhaseChange { oldPhase, newPhase in
-                if newPhase.isScrolling {
-                    uiHideTask?.cancel()
-                } else if showUI {
-                    resetUITimer()
-                }
+                // Scrolling no longer affects UI visibility
             }
             .onChange(of: showUI) { _, newValue in
-                if !newValue {
-                    uiHideTask?.cancel()
-                }
+                // UI state changes are now purely manual
             }
             .ignoresSafeArea()
         }
@@ -1021,13 +970,11 @@ struct FullScreenImageView: View {
         .navigationBarTitleDisplayMode(.inline)
         .ignoresSafeArea()
         .onDisappear {
-            uiHideTask?.cancel()
-            uiHideTask = nil
             showUI = true
         }
         .toolbarColorScheme(.dark, for: .navigationBar)
         .toolbar(showUI ? .visible : .hidden, for: .navigationBar)
-        .toolbar(showUI ? .visible : .hidden, for: .tabBar)
+        .toolbar(.hidden, for: .tabBar)
         .toolbar {
             ToolbarItem(placement: .navigationBarTrailing) {
                 Button(role: .destructive) {
@@ -1048,7 +995,6 @@ struct FullScreenImageView: View {
         }
         .onAppear {
             currentVisibleId = selectedImageId
-            resetUITimer()
         }
     }
 
@@ -1069,4 +1015,3 @@ struct FullScreenImageView: View {
         }
     }
 }
-#endif

@@ -5,7 +5,6 @@
 //  Created by Daniel Goletz on 13.01.26.
 //
 
-#if !os(tvOS)
 import SwiftUI
 import AVKit
 import AVFoundation
@@ -955,7 +954,7 @@ struct ReelsView: View {
                                             .lineLimit(1)
                                     }
                                     .foregroundColor(.white.opacity(0.9))
-                                    .padding(.horizontal, 10)
+                                    .padding(Edge.Set.horizontal, 10)
                                     .padding(.vertical, 8)
                                     .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                     .clipShape(Capsule())
@@ -976,7 +975,7 @@ struct ReelsView: View {
                                             .lineLimit(1)
                                     }
                                     .foregroundColor(.white.opacity(0.9))
-                                    .padding(.horizontal, 10)
+                                    .padding(Edge.Set.horizontal, 10)
                                     .padding(.vertical, 8)
                                     .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                     .clipShape(Capsule())
@@ -1517,7 +1516,11 @@ struct ReelItemView: View {
             
             // Center Play Icon (only for videos, not animations)
             if !item.isAnimated && !isPlaying && isUIVisible {
-                CenterPlayIcon()
+                CenterPlayButton {
+                    isPlaying = true
+                    if !isRotating { player?.play() }
+                    onInteraction()
+                }
             }
             
             
@@ -1693,7 +1696,7 @@ struct ReelItemView: View {
                                         Text("#\(tag.name)")
                                             .font(.system(size: 12, weight: .semibold))
                                             .foregroundColor(.white)
-                                            .padding(.horizontal, 8)
+                                            .padding(Edge.Set.horizontal, 8)
                                             .padding(.vertical, 4)
                                             .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                             .clipShape(Capsule())
@@ -1702,9 +1705,9 @@ struct ReelItemView: View {
                                     .buttonStyle(.plain)
                                 }
                             }
-                            .padding(.horizontal, 16)
+                            .padding(Edge.Set.horizontal, 16)
                         }
-                        .padding(.bottom, 5)
+                        .padding(Edge.Set.bottom, 5)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                     }
                 }
@@ -1730,10 +1733,10 @@ struct ReelItemView: View {
                         }
                     }
                     .padding(.vertical, 10)
-                    .padding(.horizontal, 16)
+                    .padding(Edge.Set.horizontal, 16)
                     .background(Color.black.opacity(DesignTokens.Opacity.badge))
                     .clipShape(Capsule())
-                    .padding(.bottom, 8)
+                    .padding(Edge.Set.bottom, 8)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
                 
@@ -1743,8 +1746,8 @@ struct ReelItemView: View {
                     titleLabel(for: item)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.bottom, 8)
+                .padding(Edge.Set.horizontal, 16)
+                .padding(Edge.Set.bottom, 8)
 
                 // Full-width progress bar
                 if !item.isAnimated {
@@ -1765,7 +1768,7 @@ struct ReelItemView: View {
                         }
                     )
                     .padding(.horizontal, 0)
-                    .padding(.bottom, 15) // Restore padding after progress bar
+                    .padding(Edge.Set.bottom, 15) // Restore padding after progress bar
                 }
                 
                 // Bottom row: Action buttons distributed across full width
@@ -1818,6 +1821,7 @@ struct ReelItemView: View {
                     if !item.isAnimated {
                         // Audio Sync Button
                         let isAnyAudioModeActive = HandyManager.shared.isAudioMode || ButtplugManager.shared.isAudioMode || LoveSpouseManager.shared.isAudioMode
+                        #if !os(tvOS)
                         BottomBarButton(
                             icon: isAnyAudioModeActive ? "waveform.and.mic" : "waveform",
                             count: 0,
@@ -1829,6 +1833,7 @@ struct ReelItemView: View {
                         .foregroundColor(isAnyAudioModeActive ? .purple : .white)
                         
                         Spacer()
+                        #endif
                         
                         // Mute Button
                         BottomBarButton(
@@ -1859,14 +1864,16 @@ struct ReelItemView: View {
                         Spacer()
                     }
                 }
-                .padding(.horizontal, 16)
+                .padding(Edge.Set.horizontal, 16)
             .frame(height: 50)
         }
-        .padding(.bottom, 30) // Safe area spacing
+        .padding(Edge.Set.bottom, 30) // Safe area spacing
         .sheet(isPresented: $showAudioSyncSheet) {
+            #if !os(tvOS)
             AudioSyncSheet()
                 .presentationDetents([.medium, .large])
                 .presentationDragIndicator(.visible)
+            #endif
         }
     }
     
@@ -1915,27 +1922,6 @@ struct ReelItemView: View {
         }
     }
     
-    // Helper View
-    func CenterPlayIcon() -> some View {
-        VStack {
-            Spacer()
-            HStack {
-                Spacer()
-                Image(systemName: "play.fill")
-                    .font(.system(size: 60))
-                    .foregroundColor(.white.opacity(0.7))
-                    .shadow(radius: 10)
-                Spacer()
-            }
-            Spacer()
-        }
-        .contentShape(Rectangle())
-        .onTapGesture {
-            isPlaying = true
-            if !isRotating { player?.play() }
-            onInteraction()
-        }
-    }
     
     func setupPlayer() {
         // Animations don't need AVPlayer
@@ -2143,247 +2129,3 @@ struct ReelItemView: View {
         animationAdvanceTimer = nil
     }
 }
-struct SidebarButton: View {
-    let icon: String
-    let label: String
-    let count: Int
-    var hideCount: Bool = false
-    let color: Color
-    var action: () -> Void
-
-    var body: some View {
-        Button(action: {
-            HapticManager.light()
-            action()
-        }) {
-            VStack(spacing: 2) {
-                Image(systemName: icon)
-                    .font(.system(size: 24, weight: .bold))
-                    .foregroundColor(color)
-                    .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
-                
-                // Fixed height container for the count to prevent shifting
-                ZStack {
-                    if !hideCount && count > 0 {
-                        Text("\(count)")
-                            .font(.system(size: 10, weight: .heavy))
-                            .foregroundColor(.white)
-                            .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
-                    }
-                }
-                .frame(height: 12)
-            }
-            .frame(width: 45, height: 45) // Fixed total height for the button
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-struct BottomBarButton: View {
-    let icon: String
-    var count: Int = 0
-    var hideCount: Bool = false
-    var action: () -> Void
-
-    var body: some View {
-        Button(action: {
-            HapticManager.light()
-            action()
-        }) {
-            Image(systemName: icon)
-                .font(.system(size: 26, weight: .bold))
-                .foregroundColor(.white)
-                .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
-                .overlay(alignment: .topTrailing) {
-                    if !hideCount && count > 0 {
-                        Text("\(count)")
-                            .font(.system(size: 10, weight: .black))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
-                            .background(Color.black)
-                            .clipShape(Capsule())
-                            .overlay(Capsule().stroke(Color.white.opacity(0.5), lineWidth: 0.5))
-                            .offset(x: 10, y: -8)
-                            .shadow(color: .black.opacity(0.3), radius: 2)
-                    }
-                }
-            .frame(width: 44, height: 44)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .focusable(false)
-        .focusEffectDisabled()
-    }
-}
-
-// MARK: - Custom Edge-to-Edge Video Scrubber
-
-struct CustomVideoScrubber: View {
-    @Binding var value: Double
-    var total: Double
-    var onEditingChanged: (Bool) -> Void
-    
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .bottomLeading) {
-                // Background Track (Interactive Area)
-                Rectangle()
-                    .fill(Color.white.opacity(0.3)) // Slight visible track
-                    .frame(height: 2) // Very thin default
-                
-                // Progress Bar
-                Rectangle()
-                    .fill(Color.white)
-                    .frame(width: max(0, min(geometry.size.width, geometry.size.width * (value / total))), height: 2)
-                
-                // Expanded Touch Area (Invisible) for easier scrubbing
-                Rectangle()
-                    .fill(Color.clear)
-                    .frame(height: 20)
-                    .contentShape(Rectangle())
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                onEditingChanged(true)
-                                let percentage = min(max(0, value.location.x / geometry.size.width), 1)
-                                self.value = percentage * total
-                            }
-                            .onEnded { _ in
-                                onEditingChanged(false)
-                            }
-                    )
-            }
-            .frame(maxHeight: .infinity, alignment: .bottom)
-        }
-        .frame(height: 10) // Small height container
-        .focusable(false)
-        .focusEffectDisabled()
-    }
-}
-#endif
-
-// MARK: - Audio Sync Sheet for Reels
-#if !os(tvOS)
-struct AudioSyncSheet: View {
-    @ObservedObject var audioManager = AudioAnalysisManager.shared
-    @ObservedObject var appearanceManager = AppearanceManager.shared
-    @ObservedObject var handyManager = HandyManager.shared
-    @ObservedObject var buttplugManager = ButtplugManager.shared
-    @ObservedObject var loveSpouseManager = LoveSpouseManager.shared
-    
-    var body: some View {
-        NavigationView {
-            Form {
-                Section(header: Text("Device Audio Sync")) {
-                    if buttplugManager.isEnabled {
-                        Toggle(isOn: $buttplugManager.isAudioMode) {
-                            HStack(spacing: 12) {
-                                Image(systemName: "waveform.and.mic")
-                                    .foregroundColor(buttplugManager.isAudioMode ? .purple : .secondary)
-                                Text("Intiface")
-                            }
-                        }
-                    }
-                    
-                    if loveSpouseManager.isEnabled {
-                        Toggle(isOn: $loveSpouseManager.isAudioMode) {
-                            HStack(spacing: 12) {
-                                Image(systemName: "waveform.and.mic")
-                                    .foregroundColor(loveSpouseManager.isAudioMode ? .purple : .secondary)
-                                Text("LoveSpouse")
-                            }
-                        }
-                    }
-                    
-                    if !buttplugManager.isEnabled && !loveSpouseManager.isEnabled {
-                         Text("No audio-sync capable devices enabled. Turn them on in Settings.")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                Section(header: Text("Live Level")) {
-                    // VU Meter
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Rectangle()
-                                .fill(Color.gray.opacity(0.2))
-                                .frame(height: 8)
-                            
-                            Rectangle()
-                                .fill(LinearGradient(
-                                    colors: [.green, .yellow, .red],
-                                    startPoint: .leading,
-                                    endPoint: .trailing
-                                ))
-                                .frame(width: max(0, geo.size.width * CGFloat(audioManager.visualLevel)), height: 8)
-                                .animation(.linear(duration: 0.1), value: audioManager.visualLevel)
-                        }
-                        .clipShape(Capsule())
-                    }
-                    .frame(height: 8)
-                    .padding(.vertical, 8)
-                    
-                    HStack {
-                        Spacer()
-                        Text("\(Int(audioManager.visualLevel * 100))%")
-                            .font(.caption)
-                            .monospacedDigit()
-                            .foregroundColor(.secondary)
-                    }
-                }
-                
-                Section(header: Text("Configuration")) {
-                    // Sensitivity
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Sensitivity")
-                            Spacer()
-                            Text("\(Int(audioManager.sensitivity * 100))%")
-                                .foregroundColor(.secondary)
-                        }
-                        Slider(value: $audioManager.sensitivity, in: 0...1)
-                            .tint(appearanceManager.tintColor)
-                    }
-                    .padding(.vertical, 4)
-                    
-                    // Intensity
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Max Intensity")
-                            Spacer()
-                            Text("\(Int(audioManager.maxIntensity * 100))%")
-                                .foregroundColor(.secondary)
-                        }
-                        Slider(value: $audioManager.maxIntensity, in: 0.1...1)
-                            .tint(appearanceManager.tintColor)
-                    }
-                    .padding(.vertical, 4)
-                    
-                    // Latency
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack {
-                            Text("Latency Compensation")
-                            Spacer()
-                            Text("\(Int(audioManager.delayMs))ms")
-                                .foregroundColor(.secondary)
-                        }
-                        Slider(value: $audioManager.delayMs, in: 0...1000, step: 10)
-                            .tint(appearanceManager.tintColor)
-                        
-                        Text("Signal sent \(Int(audioManager.delayMs))ms early")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .italic()
-                    }
-                    .padding(.vertical, 4)
-                }
-            }
-            .navigationTitle("Audio Sync")
-            .navigationBarTitleDisplayMode(.inline)
-        }
-    }
-}
-#endif

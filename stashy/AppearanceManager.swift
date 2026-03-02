@@ -8,6 +8,22 @@
 import SwiftUI
 import Combine
 
+enum AppTheme: String, CaseIterable, Identifiable {
+    case system = "System"
+    case light = "Light"
+    case dark = "Dark"
+    
+    var id: String { self.rawValue }
+    
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+}
+
 class AppearanceManager: ObservableObject {
     static let shared = AppearanceManager()
     
@@ -23,6 +39,12 @@ class AppearanceManager: ObservableObject {
             UserDefaults.standard.set(oCounterIcon, forKey: kOCounterIcon)
         }
     }
+    
+    @Published var preferredTheme: AppTheme {
+        didSet {
+            UserDefaults.standard.set(preferredTheme.rawValue, forKey: kPreferredTheme)
+        }
+    }
 
     var oCounterIconFilled: String {
         return oCounterIcon.hasSuffix(".fill") ? oCounterIcon : oCounterIcon + ".fill"
@@ -33,11 +55,16 @@ class AppearanceManager: ObservableObject {
     private let kTintColorBlue = "kTintColorBlue"
     private let kTintColorAlpha = "kTintColorAlpha"
     private let kOCounterIcon = "kOCounterIcon"
+    private let kPreferredTheme = "kPreferredTheme"
 
     private init() {
         // Load from UserDefaults or use default
         self.tintColor = .appAccent
         self.oCounterIcon = UserDefaults.standard.string(forKey: "kOCounterIcon") ?? "heart"
+        
+        let savedTheme = UserDefaults.standard.string(forKey: kPreferredTheme) ?? AppTheme.system.rawValue
+        self.preferredTheme = AppTheme(rawValue: savedTheme) ?? .system
+        
         self.loadColor()
     }
     

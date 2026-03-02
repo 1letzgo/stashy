@@ -562,3 +562,280 @@ struct WrappedHStack<Data: RandomAccessCollection, Content: View>: View where Da
         }
     }
 }
+
+// MARK: - Shared Reels Components
+
+struct SidebarButton: View {
+    let icon: String
+    let label: String
+    let count: Int
+    var hideCount: Bool = false
+    let color: Color
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: {
+            #if !os(tvOS)
+            HapticManager.light()
+            #endif
+            action()
+        }) {
+            VStack(spacing: 2) {
+                Image(systemName: icon)
+                    .font(.system(size: 24, weight: .bold))
+                    .foregroundColor(color)
+                    .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
+                
+                // Fixed height container for the count to prevent shifting
+                ZStack {
+                    if !hideCount && count > 0 {
+                        Text("\(count)")
+                            .font(.system(size: 10, weight: .heavy))
+                            .foregroundColor(.white)
+                            .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
+                    }
+                }
+                .frame(height: 12)
+            }
+            .frame(width: 45, height: 45) // Fixed total height for the button
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+struct BottomBarButton: View {
+    let icon: String
+    var count: Int = 0
+    var hideCount: Bool = false
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: {
+            #if !os(tvOS)
+            HapticManager.light()
+            #endif
+            action()
+        }) {
+            Image(systemName: icon)
+                .font(.system(size: 26, weight: .bold))
+                .foregroundColor(.white)
+                .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
+                .overlay(alignment: .topTrailing) {
+                    if !hideCount && count > 0 {
+                        Text("\(count)")
+                            .font(.system(size: 10, weight: .black))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 4)
+                            .padding(.vertical, 2)
+                            .background(Color.black)
+                            .clipShape(Capsule())
+                            .overlay(Capsule().stroke(Color.white.opacity(0.5), lineWidth: 0.5))
+                            .offset(x: 10, y: -8)
+                            .shadow(color: .black.opacity(0.3), radius: 2)
+                    }
+                }
+            .frame(width: 44, height: 44)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        #if !os(tvOS)
+        .focusEffectDisabled()
+        #endif
+    }
+}
+
+struct CustomVideoScrubber: View {
+    @Binding var value: Double
+    var total: Double
+    var onEditingChanged: (Bool) -> Void
+    
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .bottomLeading) {
+                // Background Track (Interactive Area)
+                Rectangle()
+                    .fill(Color.white.opacity(0.3)) // Slight visible track
+                    .frame(height: 2) // Very thin default
+                
+                // Progress Bar
+                Rectangle()
+                    .fill(Color.white)
+                    .frame(width: max(0, min(geometry.size.width, geometry.size.width * (value / total))), height: 2)
+                
+                // Expanded Touch Area (Invisible) for easier scrubbing
+                Rectangle()
+                    .fill(Color.clear)
+                    .frame(height: 20)
+                    .contentShape(Rectangle())
+                    #if !os(tvOS)
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                onEditingChanged(true)
+                                let percentage = min(max(0, value.location.x / geometry.size.width), 1)
+                                self.value = percentage * total
+                            }
+                            .onEnded { _ in
+                                onEditingChanged(false)
+                            }
+                    )
+                    #endif
+            }
+            .frame(maxHeight: .infinity, alignment: .bottom)
+        }
+        .frame(height: 10) // Small height container
+        .focusable(false)
+        #if !os(tvOS)
+        .focusEffectDisabled()
+        #endif
+    }
+}
+
+#if !os(tvOS)
+struct AudioSyncSheet: View {
+    @ObservedObject var audioManager = AudioAnalysisManager.shared
+    @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject var handyManager = HandyManager.shared
+    @ObservedObject var buttplugManager = ButtplugManager.shared
+    @ObservedObject var loveSpouseManager = LoveSpouseManager.shared
+    
+    var body: some View {
+        NavigationView {
+            Form {
+                Section(header: Text("Device Audio Sync")) {
+                    if buttplugManager.isEnabled {
+                        Toggle(isOn: $buttplugManager.isAudioMode) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "waveform.and.mic")
+                                    .foregroundColor(buttplugManager.isAudioMode ? .purple : .secondary)
+                                Text("Intiface")
+                            }
+                        }
+                    }
+                    
+                    if loveSpouseManager.isEnabled {
+                        Toggle(isOn: $loveSpouseManager.isAudioMode) {
+                            HStack(spacing: 12) {
+                                Image(systemName: "waveform.and.mic")
+                                    .foregroundColor(loveSpouseManager.isAudioMode ? .purple : .secondary)
+                                Text("LoveSpouse")
+                            }
+                        }
+                    }
+                    
+                    if !buttplugManager.isEnabled && !loveSpouseManager.isEnabled {
+                         Text("No audio-sync capable devices enabled. Turn them on in Settings.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Section(header: Text("Live Level")) {
+                    // VU Meter
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Rectangle()
+                                .fill(Color.gray.opacity(0.2))
+                                .frame(height: 8)
+                            
+                            Rectangle()
+                                .fill(LinearGradient(
+                                    colors: [.green, .yellow, .red],
+                                    startPoint: .leading,
+                                    endPoint: .trailing
+                                ))
+                                .frame(width: max(0, geo.size.width * CGFloat(audioManager.visualLevel)), height: 8)
+                                .animation(.linear(duration: 0.1), value: audioManager.visualLevel)
+                        }
+                        .clipShape(Capsule())
+                    }
+                    .frame(height: 8)
+                    .padding(.vertical, 8)
+                    
+                    HStack {
+                        Spacer()
+                        Text("\(Int(audioManager.visualLevel * 100))%")
+                            .font(.caption)
+                            .monospacedDigit()
+                            .foregroundColor(.secondary)
+                    }
+                }
+                
+                Section(header: Text("Configuration")) {
+                    // Sensitivity
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Sensitivity")
+                            Spacer()
+                            Text("\(Int(audioManager.sensitivity * 100))%")
+                                .foregroundColor(.secondary)
+                        }
+                        Slider(value: $audioManager.sensitivity, in: 0...1)
+                            .tint(appearanceManager.tintColor)
+                    }
+                    .padding(.vertical, 4)
+                    
+                    // Intensity
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Max Intensity")
+                            Spacer()
+                            Text("\(Int(audioManager.maxIntensity * 100))%")
+                                .foregroundColor(.secondary)
+                        }
+                        Slider(value: $audioManager.maxIntensity, in: 0.1...1)
+                            .tint(appearanceManager.tintColor)
+                    }
+                    .padding(.vertical, 4)
+                    
+                    // Latency
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack {
+                            Text("Latency Compensation")
+                            Spacer()
+                            Text("\(Int(audioManager.delayMs))ms")
+                                .foregroundColor(.secondary)
+                        }
+                        Slider(value: $audioManager.delayMs, in: 0...1000, step: 10)
+                            .tint(appearanceManager.tintColor)
+                        
+                        Text("Signal sent \(Int(audioManager.delayMs))ms early")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                            .italic()
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+            .navigationTitle("Audio Sync")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+#endif
+
+// MARK: - Center Play Button
+struct CenterPlayButton: View {
+    var action: () -> Void
+    
+    var body: some View {
+        VStack {
+            Spacer()
+            HStack {
+                Spacer()
+                Image(systemName: "play.fill")
+                    .font(.system(size: 60))
+                    .foregroundColor(.white.opacity(0.7))
+                    .shadow(radius: 10)
+                Spacer()
+            }
+            Spacer()
+        }
+        .contentShape(Rectangle())
+        .onTapGesture {
+            action()
+        }
+    }
+}
