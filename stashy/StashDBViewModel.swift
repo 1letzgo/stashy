@@ -5321,23 +5321,33 @@ extension DownloadManager: URLSessionDownloadDelegate {
 struct VideoPlayerView: UIViewControllerRepresentable {
     let player: AVPlayer
     @Binding var isFullscreen: Bool
+    @ObservedObject var tabManager = TabManager.shared
 
     func makeCoordinator() -> Coordinator {
         Coordinator(player: player, isFullscreen: $isFullscreen)
     }
-
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let playerViewController = AVPlayerViewController()
         playerViewController.player = player
         playerViewController.delegate = context.coordinator
         playerViewController.showsPlaybackControls = true
         playerViewController.videoGravity = .resizeAspect
+        playerViewController.allowsPictureInPicturePlayback = TabManager.shared.isPiPEnabled
+        playerViewController.canStartPictureInPictureAutomaticallyFromInline = TabManager.shared.isPiPEnabled
         return playerViewController
     }
 
     func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
         if uiViewController.player != player {
             uiViewController.player = player
+        }
+        
+        // Update PiP settings reactively
+        if uiViewController.allowsPictureInPicturePlayback != tabManager.isPiPEnabled {
+            uiViewController.allowsPictureInPicturePlayback = tabManager.isPiPEnabled
+        }
+        if uiViewController.canStartPictureInPictureAutomaticallyFromInline != tabManager.isPiPEnabled {
+            uiViewController.canStartPictureInPictureAutomaticallyFromInline = tabManager.isPiPEnabled
         }
     }
 

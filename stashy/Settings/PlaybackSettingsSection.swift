@@ -10,6 +10,7 @@ import SwiftUI
 struct PlaybackSettingsSection: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
+    @ObservedObject var tabManager = TabManager.shared
 
     var body: some View {
         Section(header: Text("Playback")) {
@@ -46,6 +47,11 @@ struct PlaybackSettingsSection: View {
                     .foregroundColor(.secondary)
                     .font(.caption)
             }
+            
+            #if !os(tvOS)
+            Toggle("Picture-in-Picture", isOn: $tabManager.isPiPEnabled)
+                .tint(appearanceManager.tintColor)
+            #endif
         }
 
         #if !os(tvOS)

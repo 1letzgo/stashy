@@ -207,6 +207,11 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(reelsContinuousPlay, forKey: reelsContinuousPlayKey)
         }
     }
+    @Published var isPiPEnabled: Bool = true {
+        didSet {
+            UserDefaults.standard.set(isPiPEnabled, forKey: isPiPEnabledKey)
+        }
+    }
 
     // Session-only sort options (not persisted)
     private var sessionSortOptions: [AppTab: String] = [:]
@@ -218,6 +223,7 @@ class TabManager: ObservableObject {
     private let reelsModesKey = "ReelsModesConfig"
     private let reelsFillHeightKey = "ReelsFillHeight"
     private let reelsContinuousPlayKey = "ReelsContinuousPlay"
+    private let isPiPEnabledKey = "isPiPEnabled"
     
     init() {
         // Initial load based on currently active server
@@ -239,6 +245,7 @@ class TabManager: ObservableObject {
         loadReelsModes()
         self.reelsFillHeight = UserDefaults.standard.object(forKey: reelsFillHeightKey) as? Bool ?? true
         self.reelsContinuousPlay = UserDefaults.standard.bool(forKey: reelsContinuousPlayKey)
+        self.isPiPEnabled = UserDefaults.standard.object(forKey: isPiPEnabledKey) as? Bool ?? true
     }
     
     private var currentServerSuffix: String {
