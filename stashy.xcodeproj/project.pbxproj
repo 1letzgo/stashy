@@ -10,6 +10,9 @@
 		02B19A59AAFE4A16B45A861F /* DownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB172F16743C007C2090 /* DownloadsView.swift */; };
 		08FB7793FE84155DC02AAC07 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7794FE84155DC02AAC07 /* App.swift */; };
 		08FB7797FE84155DC02AAC07 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7798FE84155DC02AAC07 /* MainTabView.swift */; };
+		DFSEC0012F2A000100000001 /* SecurityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSEC0022F2A000100000002 /* SecurityManager.swift */; };
+		DFSEC0032F2A000100000003 /* PasscodeEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSEC0042F2A000100000004 /* PasscodeEntryView.swift */; };
+		DFSEC0052F2A000100000005 /* SecuritySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSEC0062F2A000100000006 /* SecuritySettingsView.swift */; };
 		08FB779DFE84155DC02AAC07 /* ServerConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB779EFE84155DC02AAC07 /* ServerConfig.swift */; };
 		08FB77A1FE84155DC02AAC07 /* StashDBViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB77A2FE84155DC02AAC07 /* StashDBViewModel.swift */; };
 		0919B93E9C064D3AAF9A95C0 /* StudiosView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE504612E8A8C4000323FF0 /* StudiosView.swift */; };
@@ -133,6 +136,9 @@
 		08FB77A0FE84155DC02AAC07 /* stashy/Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = stashy/Info.plist; sourceTree = "<group>"; };
 		08FB77A2FE84155DC02AAC07 /* StashDBViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StashDBViewModel.swift; sourceTree = "<group>"; };
 		37BE5B4C2F51718500107960 /* AudioAnalysisManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioAnalysisManager.swift; sourceTree = "<group>"; };
+		DFSEC0022F2A000100000002 /* SecurityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityManager.swift; sourceTree = "<group>"; };
+		DFSEC0042F2A000100000004 /* PasscodeEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasscodeEntryView.swift; sourceTree = "<group>"; };
+		DFSEC0062F2A000100000006 /* SecuritySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecuritySettingsView.swift; sourceTree = "<group>"; };
 		37D3E24E2F3932C400AB8FAD /* stashyTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = stashyTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		37D3E4912F3A305D00AB8FAD /* SceneHeatmapCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneHeatmapCard.swift; sourceTree = "<group>"; };
 		5A626B91113242AAAF2D9CC3 /* StudioFiltersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioFiltersView.swift; sourceTree = "<group>"; };
@@ -250,6 +256,7 @@
 				DF675E6C2F2A6386004CA019 /* Repositories */,
 				DFGQ000022F28A0000000002 /* GraphQLClient.swift */,
 				DF675E792F2A6392004CA019 /* SceneDetail */,
+				DFSEC0072F2A000100000007 /* Components */,
 				DFGQ000042F28A0000000004 /* GraphQLQueries.swift */,
 				DF22BB192F16743C007C2090 /* HomeView.swift */,
 				DF22BB262F167CDC007C2090 /* ImageCacheManager.swift */,
@@ -287,6 +294,7 @@
 			isa = PBXGroup;
 			children = (
 				37BE5B4C2F51718500107960 /* AudioAnalysisManager.swift */,
+				DFSEC0022F2A000100000002 /* SecurityManager.swift */,
 			);
 			path = Managers;
 			sourceTree = "<group>";
@@ -340,6 +348,7 @@
 			isa = PBXGroup;
 			children = (
 				DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */,
+				DFSEC0062F2A000100000006 /* SecuritySettingsView.swift */,
 				DFST0000A2F30A000000000A /* ContentSettingsSection.swift */,
 				DFST0000C2F30A000000000C /* DashboardSettingsView.swift */,
 				DFST000122F30A0000000012 /* DefaultFilterView.swift */,
@@ -352,6 +361,14 @@
 				DFST000022F30A0000000002 /* SettingsView.swift */,
 			);
 			path = Settings;
+			sourceTree = "<group>";
+		};
+		DFSEC0072F2A000100000007 /* Components */ = {
+			isa = PBXGroup;
+			children = (
+				DFSEC0042F2A000100000004 /* PasscodeEntryView.swift */,
+			);
+			path = Components;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -543,6 +560,9 @@
 				DFUI000012F3AUDIT001 /* DesignTokens.swift in Sources */,
 				DFUI000032F3AUDIT003 /* HapticManager.swift in Sources */,
 				DFUI000052F3AUDIT005 /* ToastManager.swift in Sources */,
+				DFSEC0012F2A000100000001 /* SecurityManager.swift in Sources */,
+				DFSEC0032F2A000100000003 /* PasscodeEntryView.swift in Sources */,
+				DFSEC0052F2A000100000005 /* SecuritySettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

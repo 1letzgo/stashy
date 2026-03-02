@@ -82,6 +82,57 @@ class KeychainManager {
         return status == errSecSuccess || status == errSecItemNotFound
     }
     
+    // MARK: - App Passcode Management
+    
+    func saveAppPasscode(_ passcode: String) -> Bool {
+        let key = "app_passcode"
+        deleteAppPasscode()
+        
+        guard let data = passcode.data(using: .utf8) else { return false }
+        
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleWhenUnlocked
+        ]
+        
+        let status = SecItemAdd(query as CFDictionary, nil)
+        return status == errSecSuccess
+    }
+    
+    func loadAppPasscode() -> String? {
+        let key = "app_passcode"
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key,
+            kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitOne
+        ]
+        
+        var result: AnyObject?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        
+        if status == errSecSuccess, let data = result as? Data {
+            return String(data: data, encoding: .utf8)
+        }
+        return nil
+    }
+    
+    @discardableResult
+    func deleteAppPasscode() -> Bool {
+        let key = "app_passcode"
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecAttrAccount as String: key
+        ]
+        let status = SecItemDelete(query as CFDictionary)
+        return status == errSecSuccess || status == errSecItemNotFound
+    }
+    
     // MARK: - Migration
     
     /// Migrate API key from ServerConfig (UserDefaults) to Keychain

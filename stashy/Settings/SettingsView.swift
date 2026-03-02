@@ -47,9 +47,14 @@ struct SettingsView: View {
             if configManager.activeConfig != nil {
                 PlaybackSettingsSection()
             }
-
-            // MARK: - Appearance
-            Section("Appearance") {
+            
+            Section(header: Text("Security")) {
+                NavigationLink(destination: SecuritySettingsView()) {
+                    Label("Security", systemImage: "lock.shield")
+                }
+            }
+            
+            Section(header: Text("Appearance")) {
                 NavigationLink(destination: AppearanceSettingsView()) {
                     Label("Appearance", systemImage: "paintbrush")
                 }

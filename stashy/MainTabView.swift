@@ -13,6 +13,7 @@ struct MainTabView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject var securityManager = SecurityManager.shared
     @State private var hasValidConfig = false
     @State private var showConfigWarning = false
     @State private var showOnboarding = false
@@ -26,51 +27,60 @@ struct MainTabView: View {
     }
 
     var body: some View {
-        TabView(selection: Binding(
-            get: { coordinator.selectedTab },
-            set: { newValue in
-                if newValue == coordinator.selectedTab && newValue == .catalogue {
-                    let now = Date()
-                    if let lastTap = coordinator.lastHomeTapTime, now.timeIntervalSince(lastTap) < 0.5 {
-                        // Double tap detected -> Go to Dashboard
-                        coordinator.catalogueSubTab = CatalogsView.CatalogsTab.dashboard.rawValue
-                        coordinator.lastHomeTapTime = nil
+        ZStack {
+            TabView(selection: Binding(
+                get: { coordinator.selectedTab },
+                set: { newValue in
+                    if newValue == coordinator.selectedTab && newValue == .catalogue {
+                        let now = Date()
+                        if let lastTap = coordinator.lastHomeTapTime, now.timeIntervalSince(lastTap) < 0.5 {
+                            // Double tap detected -> Go to Dashboard
+                            coordinator.catalogueSubTab = CatalogsView.CatalogsTab.dashboard.rawValue
+                            coordinator.lastHomeTapTime = nil
+                        } else {
+                            // Single tap -> Just record time and let system pop/scroll
+                            coordinator.lastHomeTapTime = now
+                        }
                     } else {
-                        // Single tap -> Just record time and let system pop/scroll
-                        coordinator.lastHomeTapTime = now
+                        coordinator.selectedTab = newValue
+                        coordinator.lastHomeTapTime = nil
                     }
-                } else {
-                    coordinator.selectedTab = newValue
-                    coordinator.lastHomeTapTime = nil
+                }
+            )) {
+                // Dynamic Configurable Tabs using new Tab API
+                ForEach(tabManager.visibleTabs) { tab in
+                    Tab(tab.title, systemImage: tab.icon, value: tab) {
+                        view(for: tab)
+                            .tint(appearanceManager.tintColor)
+                    }
+                }
+                
+                // iOS 18+ Search tab with dedicated role
+                Tab("Search", systemImage: "magnifyingglass", value: AppTab.search, role: .search) {
+                    UniversalSearchView()
+                        .applyAppBackground()
                 }
             }
-        )) {
-            // Dynamic Configurable Tabs using new Tab API
-            ForEach(tabManager.visibleTabs) { tab in
-                Tab(tab.title, systemImage: tab.icon, value: tab) {
-                    view(for: tab)
-                        .tint(appearanceManager.tintColor)
-                }
+            .id(coordinator.serverSwitchID)
+            .tint(appearanceManager.tintColor)
+            .withToasts()
+            .onAppear {
+                checkConfiguration()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AuthError401"))) { _ in
+                // Navigate to Home on 401 errors
+                coordinator.selectedTab = .catalogue
+                warningType = .authExpired
+                showConfigWarning = true
             }
             
-            // iOS 18+ Search tab with dedicated role
-            Tab("Search", systemImage: "magnifyingglass", value: AppTab.search, role: .search) {
-                UniversalSearchView()
-                    .applyAppBackground()
+            if securityManager.isAppLocked {
+                PasscodeEntryView()
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(100)
             }
         }
-        .id(coordinator.serverSwitchID)
-        .tint(appearanceManager.tintColor)
-        .withToasts()
-        .onAppear {
-            checkConfiguration()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AuthError401"))) { _ in
-            // Navigate to Home on 401 errors
-            coordinator.selectedTab = .catalogue
-            warningType = .authExpired
-            showConfigWarning = true
-        }
+        .animation(.snappy(duration: 0.3, extraBounce: 0), value: securityManager.isAppLocked)
         .sheet(isPresented: $showOnboarding) {
             ServerSetupWizardView { newConfig in
                 ServerConfigManager.shared.addOrUpdateServer(newConfig)
