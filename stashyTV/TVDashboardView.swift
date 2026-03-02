@@ -36,7 +36,7 @@ struct TVDashboardView: View {
             }
         }
         .background(Color.black)
-        .navigationBarHidden(true)
+        .navigationTitle("")
         .navigationDestination(for: DashboardDestination.self) { destination in
             switch destination {
             case .scene(let id):

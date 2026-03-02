@@ -5428,7 +5428,7 @@ struct ActiveDownload {
 }
 
 final class DownloadTaskMap: @unchecked Sendable {
-    private var tasks: [Int: (String, URL)] = [:]
+    nonisolated(unsafe) private var tasks: [Int: (String, URL)] = [:]
     private let lock = NSLock()
     
     nonisolated init() {}
@@ -5768,9 +5768,11 @@ struct VideoPlayerView: UIViewControllerRepresentable {
         }
 
         func playerViewController(_ playerViewController: AVPlayerViewController, willEndFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
-            let wasPlaying = self.player.rate > 0
+            let wasPlaying = player.timeControlStatus == .playing
+            
             coordinator.animate(alongsideTransition: nil) { _ in
-                // Standard behavior might pause, so we force play if we intend to keep playing
+                // Only force play if it was playing before the transition started
+                // This prevents paused videos from auto-resuming on minimize
                 if wasPlaying {
                     self.player.play()
                 }
@@ -5786,7 +5788,7 @@ struct VideoPlayerView: UIViewControllerRepresentable {
             SecurityManager.shared.isPiPActive = true
         }
 
-        func playerViewControllerDidEndPictureInPicture(_ playerViewController: AVPlayerViewController) {
+        func playerViewControllerDidStopPictureInPicture(_ playerViewController: AVPlayerViewController) {
             SecurityManager.shared.isPiPActive = false
         }
     }

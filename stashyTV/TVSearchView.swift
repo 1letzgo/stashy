@@ -79,8 +79,17 @@ struct TVSearchView: View {
             if newValue.isEmpty {
                 viewModel.clearSearchResults()
                 hasSearched = false
-            } else {
-                performSearch()
+            } else if newValue.count >= 3 {
+                // Debounce search to prevent freezing during fast typing
+                Task {
+                    // Give the user time to type more
+                    try? await Task.sleep(nanoseconds: 300_000_000) // 300ms
+                    
+                    // Verify the query hasn't changed since we started sleeping
+                    if searchQuery == newValue {
+                        performSearch()
+                    }
+                }
             }
         }
         .onSubmit(of: .search) {

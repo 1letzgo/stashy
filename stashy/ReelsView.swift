@@ -1,3 +1,4 @@
+#if !os(tvOS)
 //
 //  ReelsView.swift
 //  stashy
@@ -2129,3 +2130,4 @@ struct ReelItemView: View {
         animationAdvanceTimer = nil
     }
 }
+#endif

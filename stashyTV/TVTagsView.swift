@@ -181,7 +181,7 @@ struct TVTagDetailView: View {
             }
             .padding(.bottom, 80)
         }
-        .navigationTitle("")
+        .navigationTitle(tagName)
         .background(Color.black)
         .onAppear {
             viewModel.fetchTagScenes(tagId: tagId, isInitialLoad: true)

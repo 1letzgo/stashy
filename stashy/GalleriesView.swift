@@ -1,3 +1,4 @@
+#if !os(tvOS)
 //
 //  GalleriesView.swift
 //  stashy
@@ -1015,3 +1016,4 @@ struct FullScreenImageView: View {
         }
     }
 }
+#endif
