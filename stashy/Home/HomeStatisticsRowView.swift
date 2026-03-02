@@ -19,7 +19,7 @@ struct HomeStatisticsRowView: View {
                 let sortedTabs = tabManager.tabs
                     .filter { tab in
                         (tab.id == .scenes || tab.id == .galleries || tab.id == .images ||
-                         tab.id == .performers || tab.id == .studios || tab.id == .tags) && tab.isVisible
+                         tab.id == .performers || tab.id == .studios || tab.id == .tags || tab.id == .groups) && tab.isVisible
                     }
                     .sorted { $0.sortOrder < $1.sortOrder }
 
@@ -46,6 +46,9 @@ struct HomeStatisticsRowView: View {
                                 case .tags:
                                     StatCard(title: "Tags", value: formatCount(stats.tagCount), icon: "tag", color: .pink)
                                         .onTapGesture { coordinator.navigateToTags() }
+                                case .groups:
+                                    StatCard(title: "Groups", value: formatCount(stats.movieCount), icon: "rectangle.stack.fill", color: Color(red: 0.1, green: 0.7, blue: 0.9))
+                                        .onTapGesture { coordinator.navigateToGroups() }
                                 default:
                                     EmptyView()
                                 }

@@ -57,6 +57,7 @@ class StashDBViewModel: ObservableObject {
         case galleries = "GALLERIES"
         case images = "IMAGES"
         case tags = "TAGS"
+        case groups = "GROUPS"
         case sceneMarkers = "SCENE_MARKERS"
         case unknown = "UNKNOWN"
         
@@ -185,6 +186,18 @@ class StashDBViewModel: ObservableObject {
     private let scenesPerPage = 20
     @Published var currentSceneFilter: SavedFilter? = nil
     
+    // Groups properties
+    @Published var groups: [StashGroup] = []
+    @Published var totalGroups: Int = 0
+    @Published var isLoadingGroups = false
+    @Published var isLoadingMoreGroups = false
+    @Published var hasMoreGroups = true
+    private var currentGroupPage = 1
+    private var currentGroupSortOption: GroupSortOption = .nameAsc
+    private let groupsPerPage = 20
+    @Published var currentGroupFilter: SavedFilter? = nil
+    private var currentGroupSearchQuery: String = ""
+
     // Pagination properties for markers
     @Published var sceneMarkers: [SceneMarker] = []
     @Published var totalSceneMarkers: Int = 0
@@ -597,15 +610,93 @@ class StashDBViewModel: ObservableObject {
         }
     }
 
+    enum GroupSortOption: String, CaseIterable {
+        case random
+        case nameAsc
+        case nameDesc
+        case sceneCountDesc
+        case sceneCountAsc
+        case galleryCountDesc
+        case galleryCountAsc
+        case performerCountDesc
+        case performerCountAsc
+        case dateDesc
+        case dateAsc
+        case ratingDesc
+        case ratingAsc
+        case updatedAtDesc
+        case updatedAtAsc
+        case createdAtDesc
+        case createdAtAsc
+
+        var displayName: String {
+            switch self {
+            case .nameAsc: return "Name (A-Z)"
+            case .nameDesc: return "Name (Z-A)"
+            case .sceneCountDesc: return "Scene Count (High-Low)"
+            case .sceneCountAsc: return "Scene Count (Low-High)"
+            case .galleryCountDesc: return "Gallery Count (High-Low)"
+            case .galleryCountAsc: return "Gallery Count (Low-High)"
+            case .performerCountDesc: return "Performer Count (High-Low)"
+            case .performerCountAsc: return "Performer Count (Low-High)"
+            case .dateDesc: return "Date (Newest First)"
+            case .dateAsc: return "Date (Oldest First)"
+            case .ratingDesc: return "Rating (High-Low)"
+            case .ratingAsc: return "Rating (Low-High)"
+            case .updatedAtDesc: return "Updated (Newest First)"
+            case .updatedAtAsc: return "Updated (Oldest First)"
+            case .createdAtDesc: return "Created (Newest First)"
+            case .createdAtAsc: return "Created (Oldest First)"
+            case .random: return "Random"
+            }
+        }
+
+        var direction: String {
+            switch self {
+            case .nameAsc, .sceneCountAsc, .galleryCountAsc, .performerCountAsc, .dateAsc, .ratingAsc, .updatedAtAsc, .createdAtAsc: return "ASC"
+            case .nameDesc, .sceneCountDesc, .galleryCountDesc, .performerCountDesc, .dateDesc, .ratingDesc, .updatedAtDesc, .createdAtDesc, .random: return "DESC"
+            }
+        }
+
+        var sortField: String {
+            switch self {
+            case .nameAsc, .nameDesc: return "name"
+            case .sceneCountAsc, .sceneCountDesc: return "scenes_count"
+            case .galleryCountAsc, .galleryCountDesc: return "galleries_count"
+            case .performerCountAsc, .performerCountDesc: return "performer_count"
+            case .dateAsc, .dateDesc: return "date"
+            case .ratingAsc, .ratingDesc: return "rating"
+            case .updatedAtAsc, .updatedAtDesc: return "updated_at"
+            case .createdAtAsc, .createdAtDesc: return "created_at"
+            case .random: return "random"
+            }
+        }
+    }
+
+    // Detail View: Group Scenes
+    @Published var groupScenes: [Scene] = []
+    @Published var totalGroupScenes: Int = 0
+    @Published var isLoadingGroupScenes = false
+    @Published var hasMoreGroupScenes = true
+    private var currentGroupDetailPage = 1
+    private let groupDetailPerPage = 20
+    private var currentGroupDetailFilter: SavedFilter? = nil
+
     // Detail View: Performer Galleries
     @Published var performerGalleries: [Gallery] = []
-    @Published var totalPerformerGalleries: Int = 0
-    @Published var isLoadingPerformerGalleries: Bool = false
-    @Published var isLoadingMorePerformerGalleries: Bool = false
-    @Published var hasMorePerformerGalleries: Bool = false
-    @Published var currentPerformerGalleryPage: Int = 1
+    @Published var groupGalleries: [Gallery] = []
+    @Published var isLoadingPerformerGalleries = false
+    @Published var isLoadingGroupGalleries = false
+    @Published var isLoadingMorePerformerGalleries = false
+    @Published var isLoadingMoreGroupGalleries = false
+    @Published var hasMorePerformerGalleries = true
+    @Published var hasMoreGroupGalleries = true
+    private var currentPerformerGalleryPage = 1
+    private var currentGroupGalleryPage = 1
     private var currentPerformerGallerySortOption: GallerySortOption = .dateDesc
-
+    private var currentGroupGallerySortOption: GallerySortOption = .dateDesc
+    @Published var totalPerformerGalleries: Int = 0
+    @Published var totalGroupGalleries: Int = 0
     // Detail View: Studio Galleries
     @Published var studioGalleries: [Gallery] = []
     @Published var totalStudioGalleries: Int = 0
@@ -2374,6 +2465,254 @@ class StashDBViewModel: ObservableObject {
             }
         }
     }
+
+    // MARK: - Group Fetching
+    func fetchGroups(sortBy: GroupSortOption = .nameAsc, searchQuery: String = "", isInitialLoad: Bool = true, filter: SavedFilter? = nil) {
+        if isInitialLoad {
+            currentGroupPage = 1
+            groups = []
+        }
+        currentGroupSortOption = sortBy
+        currentGroupSearchQuery = searchQuery
+        currentGroupFilter = filter
+        hasMoreGroups = true
+        
+        loadGroupsPage(page: currentGroupPage, sortBy: sortBy, searchQuery: searchQuery, isInitialLoad: isInitialLoad, filter: filter)
+    }
+    
+    func loadMoreGroups() {
+        guard !isLoadingMoreGroups && hasMoreGroups else { return }
+        currentGroupPage += 1
+        loadGroupsPage(page: currentGroupPage, sortBy: currentGroupSortOption, searchQuery: currentGroupSearchQuery, isInitialLoad: false, filter: currentGroupFilter)
+    }
+    
+    private func loadGroupsPage(page: Int, sortBy: GroupSortOption, searchQuery: String = "", isInitialLoad: Bool = true, filter: SavedFilter? = nil) {
+        if isInitialLoad {
+            isLoadingGroups = true
+        } else {
+            isLoadingMoreGroups = true
+        }
+        
+        var groupFilter: [String: Any] = [:]
+        
+        // Use saved filter if provided
+        if let savedFilter = filter {
+            if let dict = savedFilter.filterDict {
+                groupFilter = sanitizeFilter(dict)
+            } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
+                groupFilter = sanitizeFilter(objDict)
+            }
+        }
+        
+        // Add search query to the filter
+        if !searchQuery.isEmpty {
+            groupFilter["name"] = [
+                "value": searchQuery,
+                "modifier": "INCLUDES"
+            ]
+        }
+        
+        // Variables for GraphQL
+        let variables: [String: Any] = [
+            "filter": [
+                "page": page,
+                "per_page": groupsPerPage,
+                "sort": sortBy.sortField,
+                "direction": sortBy.direction
+            ],
+            "group_filter": groupFilter
+        ]
+        
+        let query = GraphQLQueries.queryWithFragments("findGroups")
+        
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            return
+        }
+        
+        performGraphQLQuery(query: bodyString) { (response: GroupsResponse?) in
+            if let groupsResult = response?.data?.findGroups {
+                DispatchQueue.main.async {
+                    if isInitialLoad {
+                        self.groups = groupsResult.groups
+                        self.totalGroups = groupsResult.count
+                    } else {
+                        self.groups.append(contentsOf: groupsResult.groups)
+                    }
+                    
+                    self.hasMoreGroups = groupsResult.groups.count == self.groupsPerPage
+                    
+                    if isInitialLoad {
+                        self.isLoadingGroups = false
+                        self.errorMessage = nil
+                    } else {
+                        self.isLoadingMoreGroups = false
+                    }
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.isLoadingGroups = false
+                    self.isLoadingMoreGroups = false
+                }
+            }
+        }
+    }
+    
+    func fetchGroupScenes(groupId: String, sortBy: SceneSortOption = .dateDesc, isInitialLoad: Bool = true, filter: SavedFilter? = nil) {
+        if isInitialLoad {
+            currentGroupDetailPage = 1
+            groupScenes = []
+        }
+        currentGroupDetailFilter = filter
+        hasMoreGroupScenes = true
+        
+        loadGroupScenesPage(groupId: groupId, page: currentGroupDetailPage, sortBy: sortBy, isInitialLoad: isInitialLoad, filter: filter)
+    }
+    
+    func loadMoreGroupScenes(groupId: String) {
+        guard !isLoadingGroupScenes && hasMoreGroupScenes else { return }
+        currentGroupDetailPage += 1
+        loadGroupScenesPage(groupId: groupId, page: currentGroupDetailPage, sortBy: .dateDesc, isInitialLoad: false, filter: currentGroupDetailFilter)
+    }
+    
+    func fetchGroupGalleries(groupId: String, sortBy: GallerySortOption = .dateDesc, isInitialLoad: Bool = true) {
+        if isInitialLoad {
+            currentGroupGalleryPage = 1
+            currentGroupGallerySortOption = sortBy
+            groupGalleries = []
+            totalGroupGalleries = 0
+            isLoadingGroupGalleries = true
+            hasMoreGroupGalleries = true
+        } else {
+            isLoadingMoreGroupGalleries = true
+        }
+        
+        let page = isInitialLoad ? 1 : currentGroupGalleryPage + 1
+        
+        let variables: [String: Any] = [
+            "filter": [
+                "page": page,
+                "per_page": 20,
+                "sort": sortBy.sortField,
+                "direction": sortBy.direction
+            ],
+            "gallery_filter": [
+                "groups": [
+                    "value": [groupId],
+                    "modifier": "INCLUDES"
+                ]
+            ]
+        ]
+        
+        let query = GraphQLQueries.queryWithFragments("findGalleries")
+        
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            return
+        }
+        
+        performGraphQLQuery(query: bodyString) { (response: GalleriesResponse?) in
+            if let result = response?.data?.findGalleries {
+                DispatchQueue.main.async {
+                    if isInitialLoad {
+                        self.groupGalleries = result.galleries
+                        self.totalGroupGalleries = result.count
+                        self.isLoadingGroupGalleries = false
+                    } else {
+                        self.groupGalleries.append(contentsOf: result.galleries)
+                        self.isLoadingMoreGroupGalleries = false
+                    }
+                    self.hasMoreGroupGalleries = result.galleries.count == 20
+                    self.currentGroupGalleryPage = page
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.isLoadingGroupGalleries = false
+                    self.isLoadingMoreGroupGalleries = false
+                }
+            }
+        }
+    }
+    
+    func loadMoreGroupGalleries(groupId: String) {
+        guard !isLoadingMoreGroupGalleries && hasMoreGroupGalleries else { return }
+        fetchGroupGalleries(groupId: groupId, sortBy: currentGroupGallerySortOption, isInitialLoad: false)
+    }
+    
+    private func loadGroupScenesPage(groupId: String, page: Int, sortBy: SceneSortOption, isInitialLoad: Bool = true, filter: SavedFilter? = nil) {
+        if isInitialLoad {
+            isLoadingGroupScenes = true
+        }
+        
+        var sceneFilter: [String: Any] = [:]
+        
+        // Use saved filter if provided
+        if let savedFilter = filter {
+            if let dict = savedFilter.filterDict {
+                sceneFilter = sanitizeFilter(dict)
+            }
+        }
+        
+        // Add group filter
+        sceneFilter["groups"] = [
+            "value": [groupId],
+            "modifier": "INCLUDES"
+        ]
+        
+        let variables: [String: Any] = [
+            "filter": [
+                "page": page,
+                "per_page": groupDetailPerPage,
+                "sort": sortBy.sortField,
+                "direction": sortBy.direction
+            ],
+            "scene_filter": sceneFilter
+        ]
+        
+        let query = GraphQLQueries.queryWithFragments("findScenes")
+        
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            return
+        }
+        
+        performGraphQLQuery(query: bodyString) { (response: ScenesResponse?) in
+            if let scenesResult = response?.data?.findScenes {
+                DispatchQueue.main.async {
+                    if isInitialLoad {
+                        self.groupScenes = scenesResult.scenes
+                        self.totalGroupScenes = scenesResult.count
+                    } else {
+                        self.groupScenes.append(contentsOf: scenesResult.scenes)
+                    }
+                    
+                    self.hasMoreGroupScenes = scenesResult.scenes.count == self.groupDetailPerPage
+                    self.isLoadingGroupScenes = false
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.isLoadingGroupScenes = false
+                }
+            }
+        }
+    }
+    
+    func fetchGroup(groupId: String, completion: @escaping (StashGroup?) -> Void) {
+        let variables: [String: Any] = ["id": groupId]
+        let query = GraphQLQueries.queryWithFragments("findGroup")
+        
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(nil)
+            return
+        }
+        
+        performGraphQLQuery(query: bodyString) { (response: SingleGroupResponse?) in
+            DispatchQueue.main.async {
+                completion(response?.data?.findGroup)
+            }
+        }
+    }
     
     func fetchTagScenes(tagId: String, sortBy: SceneSortOption = .dateDesc, isInitialLoad: Bool = true, filter: SavedFilter? = nil) {
         if isInitialLoad {
@@ -3644,6 +3983,19 @@ struct AltFindScenesResult: Codable {
     let scenes: [Scene]
 }
 
+struct ScenesResponse: Codable {
+    let data: ScenesData?
+}
+
+struct ScenesData: Codable {
+    let findScenes: FindScenesResult
+}
+
+struct FindScenesResult: Codable {
+    let count: Int
+    let scenes: [Scene]
+}
+
 struct MarkersResponse: Codable {
     let data: MarkersData?
 }
@@ -4714,6 +5066,61 @@ struct Tag: Codable, Identifiable {
     }
 }
 
+// MARK: - Group Models
+struct GroupsResponse: Codable {
+    let data: GroupsData?
+}
+
+struct GroupsData: Codable {
+    let findGroups: FindGroupsResult
+}
+
+struct FindGroupsResult: Codable {
+    let count: Int
+    let groups: [StashGroup]
+}
+
+struct SingleGroupResponse: Codable {
+    let data: SingleGroupData?
+}
+
+struct SingleGroupData: Codable {
+    let findGroup: StashGroup?
+}
+
+struct StashGroup: Codable, Identifiable {
+    let id: String
+    let name: String
+    let synopsis: String?
+    let date: String?
+    let scene_count: Int?
+    let gallery_count: Int?
+    let rating100: Int?
+    let front_image_path: String?
+    let back_image_path: String?
+    let studio: GroupStudio?
+    
+    enum CodingKeys: String, CodingKey {
+        case id, name, synopsis, date, scene_count, gallery_count, rating100, front_image_path, back_image_path, studio
+    }
+    
+    // Computed property for thumbnail URL (using front image)
+    var thumbnailURL: URL? {
+        if let path = front_image_path, let url = URL(string: path) {
+            return signedURL(url)
+        }
+        
+        guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
+        // Fallback: /group/[ID]/frontimage
+        return signedURL(URL(string: "\(config.baseURL)/group/\(id)/frontimage"))
+    }
+}
+
+struct GroupStudio: Codable, Identifiable {
+    let id: String
+    let name: String
+}
+
 // MARK: - Galleries Models
 struct GalleriesResponse: Codable {
     let data: GalleriesData?
@@ -4741,13 +5148,9 @@ struct Gallery: Codable, Identifiable {
     let performers: [GalleryPerformer]?
     let cover: GalleryCover?
 
-    
     enum CodingKeys: String, CodingKey {
         case id, title, date, details, imageCount = "image_count", organized, createdAt = "created_at", updatedAt = "updated_at", studio, performers, cover
     }
-    
-
-    
     var thumbnailURL: URL? {
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
         guard let thumbnailPath = cover?.paths.thumbnail else { return nil }
@@ -5365,15 +5768,26 @@ struct VideoPlayerView: UIViewControllerRepresentable {
         }
 
         func playerViewController(_ playerViewController: AVPlayerViewController, willEndFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
+            let wasPlaying = self.player.rate > 0
             coordinator.animate(alongsideTransition: nil) { _ in
                 // Standard behavior might pause, so we force play if we intend to keep playing
-                self.player.play()
+                if wasPlaying {
+                    self.player.play()
+                }
 
                 // Delay setting isFullscreen to false to prevent race condition
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     self.isFullscreen = false
                 }
             }
+        }
+
+        func playerViewControllerWillStartPictureInPicture(_ playerViewController: AVPlayerViewController) {
+            SecurityManager.shared.isPiPActive = true
+        }
+
+        func playerViewControllerDidEndPictureInPicture(_ playerViewController: AVPlayerViewController) {
+            SecurityManager.shared.isPiPActive = false
         }
     }
 }
@@ -5438,6 +5852,35 @@ extension StashDBViewModel {
             
             performGraphQLQuery(query: bodyString) { (response: StudiosResponse?) in
                 continuation.resume(returning: response?.data?.findStudios.studios ?? [])
+            }
+        }
+    }
+    
+    func searchGroupsAsync(query: String, limit: Int = 5) async -> [StashGroup] {
+        await withCheckedContinuation { continuation in
+            let graphqlQuery = GraphQLQueries.queryWithFragments("findGroups")
+            
+            let body: [String: Any] = [
+                "query": graphqlQuery,
+                "variables": [
+                    "filter": [
+                        "q": query,
+                        "per_page": limit,
+                        "page": 1,
+                        "sort": "name",
+                        "direction": "ASC"
+                    ]
+                ]
+            ]
+            
+            guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
+                  let bodyString = String(data: bodyData, encoding: .utf8) else {
+                continuation.resume(returning: [])
+                return
+            }
+            
+            performGraphQLQuery(query: bodyString) { (response: GroupsResponse?) in
+                continuation.resume(returning: response?.data?.findGroups.groups ?? [])
             }
         }
     }

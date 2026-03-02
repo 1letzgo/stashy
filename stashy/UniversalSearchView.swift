@@ -22,6 +22,7 @@ struct UniversalSearchView: View {
     @State private var tags: [Tag] = []
     @State private var scenes: [Scene] = []
     @State private var galleries: [Gallery] = []
+    @State private var groups: [StashGroup] = []
     
     // Per-category result limits
     private let scenesLimit = 20
@@ -29,11 +30,12 @@ struct UniversalSearchView: View {
     private let galleriesLimit = 20
     private let tagsLimit = 50
     private let studiosLimit = 50
+    private let groupsLimit = 20
     
     // Get ordered content types based on TabManager
     private var orderedSections: [AppTab] {
         tabManager.tabs
-            .filter { [.scenes, .performers, .studios, .tags, .galleries].contains($0.id) && $0.isVisible }
+            .filter { [.scenes, .performers, .studios, .tags, .galleries, .groups].contains($0.id) && $0.isVisible }
             .sorted { $0.sortOrder < $1.sortOrder }
             .map { $0.id }
     }
@@ -73,7 +75,7 @@ struct UniversalSearchView: View {
                     .font(.title2)
                     .fontWeight(.bold)
                 
-                Text("Find scenes, performers, studios, tags, and galleries")
+                Text("Find scenes, performers, studios, tags, galleries and groups")
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
@@ -103,7 +105,7 @@ struct UniversalSearchView: View {
                     }
                     
                     // Show no results message if all empty
-                    if performers.isEmpty && studios.isEmpty && tags.isEmpty && scenes.isEmpty && galleries.isEmpty {
+                    if performers.isEmpty && studios.isEmpty && tags.isEmpty && scenes.isEmpty && galleries.isEmpty && groups.isEmpty {
                         VStack(spacing: 16) {
                             Image(systemName: "doc.text.magnifyingglass")
                                 .font(.system(size: 50))
@@ -146,6 +148,10 @@ struct UniversalSearchView: View {
         case .galleries:
             if !galleries.isEmpty {
                 galleriesSection
+            }
+        case .groups:
+            if !groups.isEmpty {
+                groupsSection
             }
         default:
             EmptyView()
@@ -372,6 +378,68 @@ struct UniversalSearchView: View {
                     .foregroundColor(.secondary)
             )
     }
+
+    private var groupsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader(title: "Groups", count: groups.count, limit: groupsLimit) {
+                coordinator.navigateToGroups(search: searchText)
+            }
+            
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(groups) { group in
+                        NavigationLink(destination: GroupDetailView(selectedGroup: group)) {
+                            groupCard(group)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+            }
+        }
+    }
+    
+    private func groupCard(_ group: StashGroup) -> some View {
+        ZStack(alignment: .bottom) {
+            // Cover Image
+            if let thumbnailURL = group.thumbnailURL {
+                CustomAsyncImage(url: thumbnailURL) { loader in
+                    if loader.isLoading {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.2))
+                            .overlay(ProgressView())
+                    } else if let image = loader.image {
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        groupPlaceholder
+                    }
+                }
+            } else {
+                groupPlaceholder
+            }
+        }
+        .frame(width: 100, height: 133) // 3:4 aspect ratio for groups
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .overlay(
+            InfoPill(icon: "rectangle.stack.fill", text: group.name)
+                .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                .offset(y: 8)
+            , alignment: .bottom
+        )
+        .zIndex(1)
+    }
+    
+    private var groupPlaceholder: some View {
+        Rectangle()
+            .fill(Color.gray.opacity(0.2))
+            .overlay(
+                Image(systemName: "rectangle.stack.fill")
+                    .foregroundColor(.secondary)
+            )
+    }
     
     // MARK: - Helpers
     
@@ -435,14 +503,16 @@ struct UniversalSearchView: View {
             async let tagsTask = viewModel.searchTagsAsync(query: query, limit: tagsLimit)
             async let scenesTask = viewModel.searchScenesAsync(query: query, limit: scenesLimit)
             async let galleriesTask = viewModel.searchGalleriesAsync(query: query, limit: galleriesLimit)
+            async let groupsTask = viewModel.searchGroupsAsync(query: query, limit: groupsLimit)
             
             // Await all results
-            let (performersResult, studiosResult, tagsResult, scenesResult, galleriesResult) = await (
+            let (performersResult, studiosResult, tagsResult, scenesResult, galleriesResult, groupsResult) = await (
                 performersTask,
                 studiosTask,
                 tagsTask,
                 scenesTask,
-                galleriesTask
+                galleriesTask,
+                groupsTask
             )
             
             // Update state on main actor
@@ -451,6 +521,7 @@ struct UniversalSearchView: View {
             tags = tagsResult
             scenes = scenesResult
             galleries = galleriesResult
+            groups = groupsResult
             isSearching = false
         }
     }
@@ -461,6 +532,7 @@ struct UniversalSearchView: View {
         tags = []
         scenes = []
         galleries = []
+        groups = []
     }
 }
 

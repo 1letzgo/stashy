@@ -21,6 +21,7 @@ struct DefaultFilterView: View {
                 filterPicker(for: .images, title: "Images", icon: "photo")
                 filterPicker(for: .performers, title: "Performers", icon: "person.3")
                 filterPicker(for: .studios, title: "Studios", icon: "building.2")
+                filterPicker(for: .groups, title: "Groups", icon: "rectangle.stack.fill")
                 filterPicker(for: .tags, title: "Tags", icon: "tag")
             } header: {
                 Text("Default Filters")
@@ -54,6 +55,7 @@ struct DefaultFilterView: View {
             case .galleries: return .galleries
             case .images: return .images
             case .tags: return .tags
+            case .groups: return .groups
             default: return nil
             }
         }()

@@ -171,6 +171,10 @@ class GraphQLQueries {
         case "findSceneMarkers":
             fragments = loadQuery(named: "fragment_PerformerFields")
             
+        case "findGroups", "findGroup":
+            // Groups don't have a dedicated fragment yet, they use inline fields in findGroups.graphql
+            fragments = ""
+            
         default:
             print("⚠️ Warning: No explicit fragment mapping for \(queryName)")
         }

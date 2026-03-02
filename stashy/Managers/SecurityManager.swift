@@ -19,6 +19,7 @@ class SecurityManager: ObservableObject {
     
     @Published var isAppLocked: Bool = false
     @Published var isPasscodeSet: Bool = false
+    @Published var isPiPActive: Bool = false
     
     private let kBiometricsEnabled = "kBiometricsEnabled"
     private let kAutoLockOnBackground = "kAutoLockOnBackground"

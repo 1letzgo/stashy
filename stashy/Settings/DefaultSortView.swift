@@ -113,6 +113,18 @@ struct DefaultSortView: View {
                 .pickerStyle(.menu)
                 .labelsHidden()
 
+            case .groups:
+                Picker("", selection: Binding(
+                    get: { StashDBViewModel.GroupSortOption(rawValue: tabManager.getPersistentSortOption(for: tab) ?? "") ?? .nameAsc },
+                    set: { tabManager.setPersistentSortOption(for: tab, option: $0.rawValue) }
+                )) {
+                    ForEach(StashDBViewModel.GroupSortOption.allCases, id: \.self) { option in
+                        Text(option.displayName).tag(option)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+
             default:
                 EmptyView()
             }

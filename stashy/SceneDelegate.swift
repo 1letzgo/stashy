@@ -56,7 +56,7 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 
     func sceneDidEnterBackground(_ scene: UIScene) {
-        if SecurityManager.shared.autoLockOnBackground {
+        if SecurityManager.shared.autoLockOnBackground && !SecurityManager.shared.isPiPActive {
             SecurityManager.shared.lock()
         }
     }

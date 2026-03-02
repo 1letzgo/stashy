@@ -82,8 +82,8 @@ struct PasscodeEntryView: View {
             
             Spacer()
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground.ignoresSafeArea())
         .onChange(of: passcode) { _, newValue in
             if newValue.count == 4 {

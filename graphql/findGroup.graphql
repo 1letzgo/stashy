@@ -37,6 +37,7 @@ query FindGroup($id: ID!) {
     front_image_path
     back_image_path
     scene_count
+    gallery_count
     performer_count
     sub_group_count
   }

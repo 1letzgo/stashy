@@ -19,6 +19,7 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
     case search
     case settings
     case images
+    case groups
     
     var id: String { rawValue }
     
@@ -37,6 +38,7 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
         case .reels: return "StashTok"
         case .search: return "Search"
         case .settings: return "Settings"
+        case .groups: return "Groups"
 
         }
     }
@@ -56,6 +58,7 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
         case .reels: return "play.rectangle.on.rectangle"
         case .search: return "magnifyingglass"
         case .settings: return "gear"
+        case .groups: return "rectangle.stack.fill"
 
         }
     }
@@ -67,6 +70,7 @@ enum DetailViewContext: String, CaseIterable, Codable, Identifiable {
     case studio = "studio_detail"
     case tag = "tag_detail"
     case gallery = "gallery_detail"
+    case group = "group_detail"
     
     var id: String { rawValue }
     
@@ -76,6 +80,7 @@ enum DetailViewContext: String, CaseIterable, Codable, Identifiable {
         case .studio: return "Studio Scenes"
         case .tag: return "Tag Scenes"
         case .gallery: return "Gallery Images"
+        case .group: return "Group Scenes"
         }
     }
     
@@ -85,6 +90,7 @@ enum DetailViewContext: String, CaseIterable, Codable, Identifiable {
         case .studio: return "building.fill"
         case .tag: return "tag.fill"
         case .gallery: return "photo.on.rectangle.angled"
+        case .group: return "rectangle.stack.fill"
         }
     }
 }
@@ -345,7 +351,8 @@ class TabManager: ObservableObject {
                 TabConfig(id: .catalogue, isVisible: true, sortOrder: 7, defaultSortOption: nil),
                 TabConfig(id: .downloads, isVisible: true, sortOrder: 8, defaultSortOption: nil),
                 TabConfig(id: .reels, isVisible: true, sortOrder: 10, defaultSortOption: "random"),
-                TabConfig(id: .settings, isVisible: true, sortOrder: 9, defaultSortOption: nil)
+                TabConfig(id: .settings, isVisible: true, sortOrder: 9, defaultSortOption: nil),
+                TabConfig(id: .groups, isVisible: true, sortOrder: 11, defaultSortOption: "nameAsc", defaultFilterId: nil, defaultFilterName: nil)
             ]
             
             var hasChanges = false
@@ -375,7 +382,8 @@ class TabManager: ObservableObject {
                 TabConfig(id: .catalogue, isVisible: true, sortOrder: 7, defaultSortOption: nil),
                 TabConfig(id: .downloads, isVisible: true, sortOrder: 8, defaultSortOption: nil),
                 TabConfig(id: .reels, isVisible: true, sortOrder: 10, defaultSortOption: "random"),
-                TabConfig(id: .settings, isVisible: true, sortOrder: 9, defaultSortOption: nil)
+                TabConfig(id: .settings, isVisible: true, sortOrder: 9, defaultSortOption: nil),
+                TabConfig(id: .groups, isVisible: true, sortOrder: 11, defaultSortOption: "nameAsc", defaultFilterId: nil, defaultFilterName: nil)
             ]
             saveConfig()
         }
@@ -781,7 +789,7 @@ class TabManager: ObservableObject {
         let filter: (TabConfig) -> Bool = {
             switch parent {
             case .catalogue:
-                return $0.id == .performers || $0.id == .studios || $0.id == .tags || $0.id == .scenes || $0.id == .galleries || $0.id == .images || $0.id == .dashboard
+                return $0.id == .performers || $0.id == .studios || $0.id == .tags || $0.id == .scenes || $0.id == .galleries || $0.id == .images || $0.id == .dashboard || $0.id == .groups
             case .media:
                 return false
             default:
