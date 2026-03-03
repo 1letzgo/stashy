@@ -76,20 +76,12 @@ struct TVSearchView: View {
         .background(Color.black)
         .searchable(text: $searchQuery, placement: .automatic, prompt: "Search scenes, performers…")
         .onChange(of: searchQuery) { _, newValue in
-            if newValue.isEmpty {
+            let query = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+            if query.count < 2 {
                 viewModel.clearSearchResults()
                 hasSearched = false
-            } else if newValue.count >= 3 {
-                // Debounce search to prevent freezing during fast typing
-                Task {
-                    // Give the user time to type more
-                    try? await Task.sleep(nanoseconds: 300_000_000) // 300ms
-                    
-                    // Verify the query hasn't changed since we started sleeping
-                    if searchQuery == newValue {
-                        performSearch()
-                    }
-                }
+            } else {
+                performSearch()
             }
         }
         .onSubmit(of: .search) {
@@ -100,10 +92,15 @@ struct TVSearchView: View {
     // MARK: - Search
 
     private func performSearch() {
-        guard !searchQuery.trimmingCharacters(in: CharacterSet.whitespaces).isEmpty else { return }
+        let query = searchQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard query.count >= 2 else {
+            viewModel.clearSearchResults()
+            hasSearched = false
+            return
+        }
         hasSearched = true
-        viewModel.fetchScenes(sortBy: StashDBViewModel.SceneSortOption.dateDesc, searchQuery: searchQuery)
-        viewModel.fetchPerformers(sortBy: StashDBViewModel.PerformerSortOption.nameAsc, searchQuery: searchQuery)
+        viewModel.fetchScenes(sortBy: StashDBViewModel.SceneSortOption.dateDesc, searchQuery: query)
+        viewModel.fetchPerformers(sortBy: StashDBViewModel.PerformerSortOption.nameAsc, searchQuery: query)
     }
 
     // MARK: - Scenes Results
@@ -128,7 +125,7 @@ struct TVSearchView: View {
                 HStack(spacing: 30) {
                     ForEach(viewModel.scenes) { scene in
                         VStack(alignment: .leading, spacing: 10) {
-                            NavigationLink(destination: TVSceneDetailView(sceneId: scene.id)) {
+                            NavigationLink(value: TVSceneLink(sceneId: scene.id)) {
                                 TVSceneCardView(scene: scene)
                             }
                             .buttonStyle(.card)
@@ -165,7 +162,7 @@ struct TVSearchView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 30) {
                     ForEach(viewModel.performers) { performer in
-                        NavigationLink(destination: TVPerformerDetailView(performerId: performer.id, performerName: performer.name)) {
+                        NavigationLink(value: TVPerformerLink(id: performer.id, name: performer.name)) {
                             TVPerformerCardView(performer: performer)
                         }
                         .buttonStyle(.card)

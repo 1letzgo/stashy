@@ -9,6 +9,8 @@ import SwiftUI
 
 struct TVSceneCardView: View {
     let scene: Scene
+    var width: CGFloat = 410
+    var height: CGFloat = 230
     @Environment(\.isFocused) var isFocused
 
     var body: some View {
@@ -16,7 +18,7 @@ struct TVSceneCardView: View {
         ZStack(alignment: .bottomLeading) {
             thumbnailView
                 .aspectRatio(16/9, contentMode: .fill)
-                .frame(width: 400, height: 225)
+                .frame(width: width, height: height)
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
@@ -106,7 +108,7 @@ struct TVSceneCardView: View {
                 }
             }
         }
-        .frame(width: 400, height: 225)
+        .frame(width: width, height: height)
     }
 
     // MARK: - Thumbnail

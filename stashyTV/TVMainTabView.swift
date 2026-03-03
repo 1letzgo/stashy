@@ -2,72 +2,70 @@
 //  TVMainTabView.swift
 //  stashyTV
 //
-//  Netflix/Amazon Prime style navigation with proper focus handling
+//  Standard tvOS top-tab navigation using the Tab API (tvOS 18+).
+//  Each tab gets its own NavigationStack with all destinations registered
+//  at the stack root via withTVDestinations().
 //
 
 import SwiftUI
 
 struct TVMainTabView: View {
-    @ObservedObject private var appearanceManager = AppearanceManager.shared
-    @State private var selectedTab: MenuTab = .dashboard
-    
-    enum MenuTab: String, CaseIterable, Identifiable {
-        case dashboard = "Dashboard"
-        case performers = "Performers"
-        case studios = "Studios"
-        case tags = "Tags"
-        case search = "Search"
-        case settings = "Settings"
-        
-        var id: String { rawValue }
-        
-        var icon: String {
-            switch self {
-            case .dashboard: return "house.fill"
-            case .performers: return "person.3.fill"
-            case .studios: return "building.2.fill"
-            case .tags: return "tag.fill"
-            case .search: return "magnifyingglass"
-            case .settings: return "gear"
-            }
-        }
-    }
-    
     var body: some View {
-        TabView(selection: $selectedTab) {
-            ForEach(MenuTab.allCases) { tab in
+        TabView {
+            Tab("Home", systemImage: "house.fill") {
                 NavigationStack {
-                    contentArea(for: tab)
+                    TVDashboardView()
+                        .withTVDestinations()
                 }
-                .tabItem {
-                    Label(tab.rawValue, systemImage: tab.icon)
+            }
+
+            Tab("Search", systemImage: "magnifyingglass") {
+                NavigationStack {
+                    TVSearchView()
+                        .withTVDestinations()
                 }
-                .tag(tab)
+            }
+
+            Tab("Scenes", systemImage: "film.fill") {
+                NavigationStack {
+                    TVScenesView(sortBy: .dateDesc)
+                        .withTVDestinations()
+                }
+            }
+
+            Tab("Performers", systemImage: "person.3.fill") {
+                NavigationStack {
+                    TVPerformersView()
+                        .withTVDestinations()
+                }
+            }
+
+            Tab("Studios", systemImage: "building.2.fill") {
+                NavigationStack {
+                    TVStudiosView()
+                        .withTVDestinations()
+                }
+            }
+
+            Tab("Tags", systemImage: "tag.fill") {
+                NavigationStack {
+                    TVTagsView()
+                        .withTVDestinations()
+                }
+            }
+
+            Tab("Groups", systemImage: "rectangle.stack.fill") {
+                NavigationStack {
+                    TVGroupsView()
+                        .withTVDestinations()
+                }
+            }
+
+            Tab("Settings", systemImage: "gear") {
+                NavigationStack {
+                    TVSettingsView()
+                }
             }
         }
-    }
-    
-    @ViewBuilder
-    private func contentArea(for tab: MenuTab) -> some View {
-        switch tab {
-        case .dashboard:
-            TVDashboardView()
-        case .performers:
-            TVPerformersView()
-        case .studios:
-            TVStudiosView()
-        case .tags:
-            TVTagsView()
-        case .search:
-            TVSearchView()
-        case .settings:
-            TVSettingsView()
-        }
-    }
-}
-
-struct TVMainTabView_Previews: PreviewProvider {
-    static var previews: some View {
-        TVMainTabView()
     }
 }

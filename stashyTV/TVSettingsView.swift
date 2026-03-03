@@ -143,7 +143,7 @@ struct TVSettingsView: View {
                     Text("About")
                 }
             }
-            .navigationTitle("")
+            .navigationTitle("Settings")
             .sheet(isPresented: $showingAddServer) {
                 TVServerFormView(server: nil) { newServer in
                     configManager.addOrUpdateServer(newServer)

@@ -1,17 +1,17 @@
 //
-//  TVTagCardView.swift
+//  TVGroupCardView.swift
 //  stashyTV
 //
-//  Tag card for tvOS — Netflix style
+//  Group card for tvOS — Unified style
 //
 
 import SwiftUI
 
-struct TVTagCardView: View {
-    let tag: Tag
+struct TVGroupCardView: View {
+    let group: StashGroup
 
-    private var tagColor: Color {
-        let hash = abs(tag.name.hashValue)
+    private var groupColor: Color {
+        let hash = abs(group.name.hashValue)
         let hue = Double(hash % 360) / 360.0
         return Color(hue: hue, saturation: 0.35, brightness: 0.3)
     }
@@ -30,8 +30,8 @@ struct TVTagCardView: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: 10))
 
-            if let sceneCount = tag.sceneCount, sceneCount > 0 {
-                Text("\(sceneCount)")
+            if group.sceneCountDisplay > 0 {
+                Text("\(group.sceneCountDisplay)")
                     .font(.system(size: 11, weight: .bold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 8)
@@ -43,7 +43,7 @@ struct TVTagCardView: View {
 
             VStack {
                 Spacer()
-                Text(tag.name)
+                Text(group.name)
                     .font(.body)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
@@ -57,11 +57,11 @@ struct TVTagCardView: View {
 
     @ViewBuilder
     private var thumbnailView: some View {
-        if let thumbnailURL = tag.thumbnailURL {
+        if let thumbnailURL = group.thumbnailURL {
             AsyncImage(url: thumbnailURL) { phase in
                 switch phase {
                 case .empty:
-                    Rectangle().fill(tagColor).overlay(ProgressView().scaleEffect(0.8))
+                    Rectangle().fill(groupColor).overlay(ProgressView().scaleEffect(0.8))
                 case .success(let image):
                     image.resizable().scaledToFill()
                 case .failure:
@@ -77,9 +77,9 @@ struct TVTagCardView: View {
 
     private var placeholderView: some View {
         Rectangle()
-            .fill(tagColor)
+            .fill(groupColor)
             .overlay(
-                Image(systemName: "tag.fill")
+                Image(systemName: "rectangle.stack.fill")
                     .font(.system(size: 32))
                     .foregroundColor(.white.opacity(0.4))
             )

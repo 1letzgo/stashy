@@ -13,7 +13,7 @@ struct TVPerformerCardView: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             thumbnailView
-                .frame(width: 200, height: 300)
+                .frame(width: 260, height: 390)
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
@@ -55,7 +55,7 @@ struct TVPerformerCardView: View {
                 .padding(12)
             }
         }
-        .frame(width: 200, height: 300)
+        .frame(width: 260, height: 390)
     }
 
     @ViewBuilder

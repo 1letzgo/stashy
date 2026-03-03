@@ -44,28 +44,28 @@ struct TVSceneDetailView: View {
                         heroContent(scene: scene)
                             .padding(.top, 120) // Push content down over the background
                         
-                        // Details and tags
-                        VStack(alignment: .leading, spacing: 40) {
-                            if let details = scene.details, !details.isEmpty {
-                                detailsSection(details: details)
-                            }
-                            
-                            if let tags = scene.tags, !tags.isEmpty {
-                                tagsSection(tags: tags)
-                            }
-                        }
-                        
                         // Markers
                         if let markers = scene.sceneMarkers, !markers.isEmpty {
                             markersSection(markers: markers, scene: scene)
                         }
 
-                        // Cast & Studio
-                        if !scene.performers.isEmpty || scene.studio != nil {
-                            performersAndStudioSection(performers: scene.performers, studio: scene.studio)
+                        // Metadata Tags
+                        if let tags = scene.tags, !tags.isEmpty {
+                            tagsSection(tags: tags)
+                        }
+
+                        // Performers (Cast)
+                        if !scene.performers.isEmpty {
+                            performersSection(performers: scene.performers)
+                        }
+
+                        // Studio
+                        if let studio = scene.studio {
+                            studioSection(studio: studio)
                         }
                     }
-                    .padding(.horizontal, 80)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 60)
                     .padding(.bottom, 100)
                 } else {
                     errorView
@@ -139,18 +139,16 @@ struct TVSceneDetailView: View {
                         image
                             .resizable()
                             .scaledToFill()
-                            .frame(maxWidth: .infinity)
-                            .frame(height: 800)
-                            .clipped()
                     } else {
-                        Color.gray.opacity(0.1)
-                            .frame(height: 800)
+                        Color.black
                     }
                 }
             } else {
-                 Color.gray.opacity(0.1)
-                    .frame(height: 800)
+                 Color.black
             }
+
+            // Subtle overall darkening
+            Color.black.opacity(0.2)
 
             // Complex Gradient Overlay to fade into the black background and side
             LinearGradient(
@@ -159,26 +157,27 @@ struct TVSceneDetailView: View {
                 endPoint: .trailing
             )
             
+            // Large radial-like or bottom linear gradient to ground the content
             LinearGradient(
-                colors: [.black, .black.opacity(0.8), .clear],
+                colors: [.black, .black.opacity(0.7), .clear],
                 startPoint: .bottom,
                 endPoint: .center
             )
         }
-        .frame(height: 800)
-        .ignoresSafeArea(edges: .top)
+        .ignoresSafeArea()
     }
 
     @ViewBuilder
     private func heroContent(scene: Scene) -> some View {
         let hasStream = !sceneStreams.isEmpty || scene.paths?.stream != nil
         let isWaiting = isLoadingDetail || isLoadingStreams
+        let hasProgress = (scene.resumeTime ?? 0) > 0
         
         VStack(alignment: .leading, spacing: 24) {
             
             if let studio = scene.studio {
                 Text(studio.name.uppercased())
-                    .font(.system(size: 16, weight: .bold, design: .rounded))
+                    .font(.system(size: 18, weight: .bold, design: .rounded))
                     .foregroundColor(AppearanceManager.shared.tintColor)
                     .tracking(2)
             }
@@ -186,11 +185,21 @@ struct TVSceneDetailView: View {
             Text(scene.title ?? "Untitled Scene")
                 .font(.system(size: 80, weight: .bold))
                 .foregroundColor(.white)
-                .lineLimit(3)
+                .lineLimit(2)
                 .shadow(color: .black.opacity(0.6), radius: 10, x: 0, y: 5)
-                .frame(maxWidth: 1000, alignment: .leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Inline Metadata (Netflix style)
+            // Synopsis / Details (Moved here for immediate visibility)
+            if let details = scene.details, !details.isEmpty {
+                Text(details)
+                    .font(.title3)
+                    .foregroundColor(.white.opacity(0.6))
+                    .lineLimit(4)
+                    .frame(maxWidth: 800, alignment: .leading)
+                    .padding(.bottom, 8)
+            }
+
+            // Inline Metadata
             HStack(spacing: 24) {
                 if let rating = scene.rating100, rating > 0 {
                     HStack(spacing: 6) {
@@ -198,88 +207,108 @@ struct TVSceneDetailView: View {
                         Text(String(format: "%.1f", Double(rating) / 20.0))
                             .fontWeight(.bold)
                     }
-                    .font(.title3)
+                    .font(.headline)
                 }
 
                 if let date = scene.date {
-                    Text(date.prefix(4)) // Just show the year for cinematic feel, or full date
-                        .font(.title3)
+                    Text(date.prefix(4))
+                        .font(.headline)
                         .fontWeight(.medium)
                 }
 
                 if let duration = scene.sceneDuration, duration > 0 {
                     Text(formattedDuration(duration))
-                        .font(.title3)
+                        .font(.headline)
                         .fontWeight(.medium)
                 }
 
                 if let resolution = resolutionString(for: scene) {
                     Text(resolution)
-                        .font(.headline)
-                        .padding(.horizontal, 8)
+                        .font(.subheadline)
+                        .fontWeight(.bold)
+                        .padding(.horizontal, 10)
                         .padding(.vertical, 4)
-                        .background(Color.white.opacity(0.2))
+                        .background(Color.white.opacity(0.15))
                         .clipShape(RoundedRectangle(cornerRadius: 6))
                 }
             }
             .foregroundColor(.white.opacity(0.9))
 
             // Playback Actions
-            HStack(spacing: 20) {
-                Button {
-                    startPlayback(for: scene)
-                } label: {
-                    HStack(spacing: 12) {
-                        if isWaiting && !hasStream {
-                            ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .black))
-                            Text("Loading")
-                        } else if hasStream {
-                            Image(systemName: "play.fill")
-                            if let resumeTime = scene.resumeTime, resumeTime > 0 {
-                                Text("Resume")
+            VStack(alignment: .leading, spacing: 20) {
+                HStack(spacing: 24) {
+                    // Resume/Play Button
+                    Button {
+                        startPlayback(for: scene)
+                    } label: {
+                        HStack(spacing: 12) {
+                            if isWaiting && !hasStream {
+                                ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .black))
+                                Text("Loading")
+                            } else if hasStream {
+                                Image(systemName: hasProgress ? "play.fill" : "play.fill")
+                                Text(hasProgress ? "Resume" : "Play")
                             } else {
-                                Text("Play")
+                                Image(systemName: "xmark.circle")
+                                Text("No Stream")
                             }
-                        } else {
-                            Image(systemName: "xmark.circle")
-                            Text("No Stream")
                         }
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundColor(hasStream ? .black : .white)
+                        .padding(.horizontal, 40)
+                        .padding(.vertical, 16)
+                        .frame(minWidth: 240)
+                        .background(hasStream ? Color.white : Color.white.opacity(0.2))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
-                    .font(.title2)
-                    .fontWeight(.bold)
-                    .foregroundColor(hasStream ? .black : .white)
-                    .padding(.horizontal, 40)
-                    .padding(.vertical, 16)
-                    .frame(minWidth: 200)
-                    .background(hasStream ? Color.white : Color.white.opacity(0.2))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                }
-                .buttonStyle(.card)
-                .disabled(!hasStream || (isWaiting && !hasStream))
+                    .buttonStyle(.card)
+                    .disabled(!hasStream || (isWaiting && !hasStream))
 
-                // Resume Progress Bar below play button if applicable
+                    // Restart Button (Only if progress exists)
+                    if hasProgress {
+                        Button {
+                            startPlayback(for: scene, at: 0)
+                        } label: {
+                            HStack(spacing: 12) {
+                                Image(systemName: "arrow.counterclockwise")
+                                Text("Restart")
+                            }
+                            .font(.title3)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 40)
+                            .padding(.vertical, 16)
+                            .background(Color.white.opacity(0.15))
+                            .clipShape(RoundedRectangle(cornerRadius: 12))
+                        }
+                        .buttonStyle(.card)
+                    }
+                }
+                
+                // Progress Bar
+                if let resumeTime = scene.resumeTime, resumeTime > 0, let duration = scene.sceneDuration, duration > 0 {
+                    HStack(spacing: 15) {
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Rectangle().fill(Color.white.opacity(0.15))
+                                Rectangle().fill(AppearanceManager.shared.tintColor)
+                                    .frame(width: geo.size.width * CGFloat(resumeTime / duration))
+                            }
+                        }
+                        .frame(width: 400, height: 8)
+                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        
+                        Text("\(Int(resumeTime / duration * 100))% complete")
+                            .font(.headline)
+                            .foregroundColor(.white.opacity(0.5))
+                    }
+                    .frame(height: 20)
+                }
             }
             .padding(.top, 16)
-            
-            if let resumeTime = scene.resumeTime, resumeTime > 0, let duration = scene.sceneDuration, duration > 0 {
-                VStack(alignment: .leading, spacing: 8) {
-                    GeometryReader { geo in
-                        ZStack(alignment: .leading) {
-                            Rectangle().fill(Color.white.opacity(0.2))
-                            Rectangle().fill(AppearanceManager.shared.tintColor)
-                                .frame(width: geo.size.width * CGFloat(resumeTime / duration))
-                        }
-                    }
-                    .frame(width: 280, height: 4)
-                    .clipShape(RoundedRectangle(cornerRadius: 2))
-                    
-                    Text("\(Int(resumeTime / duration * 100))% complete")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.6))
-                }
-                .padding(.top, 4)
-            }
         }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private func resolutionString(for scene: Scene) -> String? {
@@ -466,70 +495,28 @@ struct TVSceneDetailView: View {
     // MARK: - Performers & Studio Section
 
     @ViewBuilder
-    private func performersAndStudioSection(performers: [ScenePerformer], studio: SceneStudio?) -> some View {
+    private func performersSection(performers: [ScenePerformer]) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            let totalCount = performers.count + (studio != nil ? 1 : 0)
-            sectionHeading(icon: "person.2.fill", title: "Cast & Studio", count: totalCount)
+            sectionHeading(icon: "person.2.fill", title: "Cast", count: performers.count)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 30) {
-                    // Studio
-                    if let studio = studio {
-                        NavigationLink(destination: TVStudioDetailView(studioId: studio.id, studioName: studio.name)) {
-                            VStack(alignment: .leading, spacing: 8) {
-                                Group {
-                                    if let url = studio.thumbnailURL {
-                                        CustomAsyncImage(url: url) { loader in
-                                            if let image = loader.image {
-                                                image
-                                                    .resizable()
-                                                    .scaledToFit()
-                                                    .padding(20)
-                                            } else {
-                                                studioPlaceholder
-                                            }
-                                        }
-                                    } else {
-                                        studioPlaceholder
-                                    }
-                                }
-                                .frame(width: 280, height: 158)
-                                .background(Color.white.opacity(0.8)) // White background for studio logos which are often transparent with dark text
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                                Text(studio.name)
-                                    .font(.callout)
-                                    .fontWeight(.semibold)
-                                    .foregroundColor(.white)
-                                    .lineLimit(1)
-                                    .frame(width: 280, alignment: .leading)
-                            }
-                        }
-                        .buttonStyle(.card)
-                        
-                        if !performers.isEmpty {
-                            Rectangle()
-                                .fill(Color.white.opacity(0.06))
-                                .frame(width: 1, height: 120)
-                        }
-                    }
-
-                    // Performers
                     ForEach(performers) { performer in
-                        NavigationLink(destination: TVPerformerDetailView(performerId: performer.id, performerName: performer.name)) {
-                            VStack(alignment: .leading, spacing: 8) {
+                        NavigationLink(value: TVPerformerLink(id: performer.id, name: performer.name)) {
+                            VStack(alignment: .leading, spacing: 12) {
                                 performerThumbnail(performer: performer)
-                                    .frame(width: 160, height: 240)
+                                    .frame(width: 180, height: 270)
                                     .clipped()
-                                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                                    .clipShape(RoundedRectangle(cornerRadius: 12))
 
                                 Text(performer.name)
-                                    .font(.callout)
+                                    .font(.headline)
                                     .fontWeight(.semibold)
                                     .foregroundColor(.white)
                                     .lineLimit(1)
-                                    .frame(width: 160, alignment: .leading)
+                                    .padding(.top, 4)
                             }
+                            .frame(width: 180)
                         }
                         .buttonStyle(.card)
                     }
@@ -537,6 +524,47 @@ struct TVSceneDetailView: View {
                 .padding(.horizontal, 20)
                 .padding(.vertical, 30)
             }
+        }
+    }
+
+    @ViewBuilder
+    private func studioSection(studio: SceneStudio) -> some View {
+        VStack(alignment: .leading, spacing: 16) {
+            sectionHeading(icon: "building.2.fill", title: "Studio")
+
+            NavigationLink(value: TVStudioLink(id: studio.id, name: studio.name)) {
+                VStack(alignment: .leading, spacing: 12) {
+                    ZStack {
+                        if let url = studio.thumbnailURL {
+                            CustomAsyncImage(url: url) { loader in
+                                if let image = loader.image {
+                                    image
+                                        .resizable()
+                                        .scaledToFit()
+                                        .padding(25)
+                                } else {
+                                    studioPlaceholder
+                                }
+                            }
+                        } else {
+                            studioPlaceholder
+                        }
+                    }
+                    .frame(width: 320, height: 180)
+                    .background(Color.white.opacity(0.85))
+                    .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                    Text(studio.name)
+                        .font(.headline)
+                        .fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .padding(.top, 4)
+                }
+                .frame(width: 320)
+            }
+            .buttonStyle(.card)
+            .padding(.horizontal, 20)
+            .padding(.vertical, 20)
         }
     }
 
@@ -585,41 +613,23 @@ struct TVSceneDetailView: View {
             sectionHeading(icon: "tag.fill", title: "Tags", count: tags.count)
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
+                HStack(spacing: 30) {
                     ForEach(tags) { tag in
-                        Text(tag.name)
-                            .font(.headline)
-                            .foregroundColor(.white.opacity(0.75))
-                            .padding(.horizontal, 18)
-                            .padding(.vertical, 10)
-                            .background(Color.white.opacity(0.06))
-                            .clipShape(Capsule())
+                        NavigationLink(value: TVTagLink(id: tag.id, name: tag.name)) {
+                            Text(tag.name)
+                                .font(.headline)
+                                .padding(.horizontal, 24)
+                                .padding(.vertical, 12)
+                        }
+                        .buttonStyle(.card)
                     }
                 }
-                .padding(.horizontal, 4)
-                .padding(.vertical, 20)
+                .padding(.horizontal, 20)
+                .padding(.vertical, 40)
             }
         }
     }
 
-    // MARK: - Details Section
-
-    @ViewBuilder
-    private func detailsSection(details: String) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            sectionHeading(icon: "text.alignleft", title: "Details")
-
-            Text(details)
-                .font(.body)
-                .foregroundColor(.white.opacity(0.5))
-                .lineSpacing(4)
-                .lineLimit(nil)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(24)
-        .background(Color.white.opacity(0.04))
-        .clipShape(RoundedRectangle(cornerRadius: 14))
-    }
 
     // MARK: - Reusable Section Heading
 

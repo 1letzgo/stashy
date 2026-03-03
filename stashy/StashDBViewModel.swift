@@ -678,7 +678,7 @@ class StashDBViewModel: ObservableObject {
     @Published var totalGroupScenes: Int = 0
     @Published var isLoadingGroupScenes = false
     @Published var hasMoreGroupScenes = true
-    private var currentGroupDetailPage = 1
+    private var currentGroupScenePage = 1
     private let groupDetailPerPage = 20
     private var currentGroupDetailFilter: SavedFilter? = nil
 
@@ -714,6 +714,7 @@ class StashDBViewModel: ObservableObject {
     private var currentPerformerScenePage = 1
     private var currentPerformerSceneSortOption: SceneSortOption = .dateDesc
     private var currentPerformerDetailFilter: SavedFilter? = nil
+    
 
     // Studio scenes
     @Published var studioScenes: [Scene] = []
@@ -724,7 +725,7 @@ class StashDBViewModel: ObservableObject {
     private var currentStudioSceneSortOption: SceneSortOption = .dateDesc
     private var currentStudioDetailFilter: SavedFilter? = nil
     
-    // Tag Scenes (Adding property here as it seems missing/implicit in other parts or I missed it)
+    // Tag Scenes
     @Published var tagScenes: [Scene] = []
     @Published var totalTagScenes: Int = 0
     @Published var isLoadingTagScenes = false
@@ -732,6 +733,7 @@ class StashDBViewModel: ObservableObject {
     private var currentTagScenePage = 1
     private var currentTagSceneSortOption: SceneSortOption = .dateDesc
     private var currentTagDetailFilter: SavedFilter? = nil
+
 
     private var cancellables = Set<AnyCancellable>()
     
@@ -755,11 +757,12 @@ class StashDBViewModel: ObservableObject {
         isFetchingFilters = false
         isFetchingHomeRows.removeAll()
         
-        performerGalleries = []
-        studioGalleries = []
         performerScenes = []
         studioScenes = []
         tagScenes = []
+        groupScenes = []
+        
+        groupGalleries = []
         
         savedFilters = [:]
         statistics = nil
@@ -770,9 +773,9 @@ class StashDBViewModel: ObservableObject {
         totalTags = 0
         totalGalleries = 0
         totalImages = 0
-        totalPerformerScenes = 0
-        totalStudioScenes = 0
         totalTagScenes = 0
+        totalGroupScenes = 0
+        totalGroupGalleries = 0
         
         currentScenePage = 1
         currentPerformerPage = 1
@@ -780,6 +783,9 @@ class StashDBViewModel: ObservableObject {
         currentTagPage = 1
         currentGalleryPage = 1
         currentImagePage = 1
+        currentGroupPage = 1
+        currentGroupScenePage = 1
+        currentGroupGalleryPage = 1
         
         hasMoreScenes = true
         hasMorePerformers = true
@@ -787,6 +793,9 @@ class StashDBViewModel: ObservableObject {
         hasMoreTags = true
         hasMoreGalleries = true
         hasMoreImages = true
+        hasMoreGroups = true
+        hasMoreGroupScenes = true
+        hasMoreGroupGalleries = true
         
         currentSceneSortOption = .dateDesc
         currentSceneFilter = nil
@@ -817,6 +826,8 @@ class StashDBViewModel: ObservableObject {
         currentPerformerDetailFilter = nil
         currentStudioDetailFilter = nil
         currentTagDetailFilter = nil
+        currentGroupDetailFilter = nil
+        currentGroupFilter = nil
         
         serverStatus = "Connecting..."
         errorMessage = nil
@@ -2560,19 +2571,72 @@ class StashDBViewModel: ObservableObject {
     
     func fetchGroupScenes(groupId: String, sortBy: SceneSortOption = .dateDesc, isInitialLoad: Bool = true, filter: SavedFilter? = nil) {
         if isInitialLoad {
-            currentGroupDetailPage = 1
+            currentGroupScenePage = 1
             groupScenes = []
         }
         currentGroupDetailFilter = filter
         hasMoreGroupScenes = true
         
-        loadGroupScenesPage(groupId: groupId, page: currentGroupDetailPage, sortBy: sortBy, isInitialLoad: isInitialLoad, filter: filter)
+        loadGroupScenesPage(groupId: groupId, page: currentGroupScenePage, sortBy: sortBy, isInitialLoad: isInitialLoad, filter: filter)
     }
     
     func loadMoreGroupScenes(groupId: String) {
         guard !isLoadingGroupScenes && hasMoreGroupScenes else { return }
-        currentGroupDetailPage += 1
-        loadGroupScenesPage(groupId: groupId, page: currentGroupDetailPage, sortBy: .dateDesc, isInitialLoad: false, filter: currentGroupDetailFilter)
+        currentGroupScenePage += 1
+        loadGroupScenesPage(groupId: groupId, page: currentGroupScenePage, sortBy: .dateDesc, isInitialLoad: false, filter: currentGroupDetailFilter)
+    }
+
+    private func loadGroupScenesPage(groupId: String, page: Int, sortBy: SceneSortOption, isInitialLoad: Bool = true, filter: SavedFilter? = nil) {
+        if isInitialLoad {
+            isLoadingGroupScenes = true
+        }
+        
+        var sceneFilter: [String: Any] = [:]
+        if let savedFilter = filter, let dict = savedFilter.filterDict {
+            sceneFilter = sanitizeFilter(dict)
+        }
+        
+        // Add group restriction
+        sceneFilter["groups"] = [
+            "value": [groupId],
+            "modifier": "INCLUDES"
+        ]
+        
+        let variables: [String: Any] = [
+            "filter": [
+                "page": page,
+                "per_page": groupDetailPerPage,
+                "sort": sortBy.sortField,
+                "direction": sortBy.direction
+            ],
+            "scene_filter": sceneFilter
+        ]
+        
+        let query = GraphQLQueries.queryWithFragments("findScenes")
+        
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            return
+        }
+        
+        performGraphQLQuery(query: bodyString) { (response: AltScenesResponse?) in
+            if let result = response?.data?.findScenes {
+                DispatchQueue.main.async {
+                    if isInitialLoad {
+                        self.groupScenes = result.scenes
+                        self.totalGroupScenes = result.count
+                        self.isLoadingGroupScenes = false
+                    } else {
+                        self.groupScenes.append(contentsOf: result.scenes)
+                    }
+                    self.hasMoreGroupScenes = result.scenes.count == self.groupDetailPerPage
+                }
+            } else {
+                DispatchQueue.main.async {
+                    self.isLoadingGroupScenes = false
+                }
+            }
+        }
     }
     
     func fetchGroupGalleries(groupId: String, sortBy: GallerySortOption = .dateDesc, isInitialLoad: Bool = true) {
@@ -2637,64 +2701,6 @@ class StashDBViewModel: ObservableObject {
     func loadMoreGroupGalleries(groupId: String) {
         guard !isLoadingMoreGroupGalleries && hasMoreGroupGalleries else { return }
         fetchGroupGalleries(groupId: groupId, sortBy: currentGroupGallerySortOption, isInitialLoad: false)
-    }
-    
-    private func loadGroupScenesPage(groupId: String, page: Int, sortBy: SceneSortOption, isInitialLoad: Bool = true, filter: SavedFilter? = nil) {
-        if isInitialLoad {
-            isLoadingGroupScenes = true
-        }
-        
-        var sceneFilter: [String: Any] = [:]
-        
-        // Use saved filter if provided
-        if let savedFilter = filter {
-            if let dict = savedFilter.filterDict {
-                sceneFilter = sanitizeFilter(dict)
-            }
-        }
-        
-        // Add group filter
-        sceneFilter["groups"] = [
-            "value": [groupId],
-            "modifier": "INCLUDES"
-        ]
-        
-        let variables: [String: Any] = [
-            "filter": [
-                "page": page,
-                "per_page": groupDetailPerPage,
-                "sort": sortBy.sortField,
-                "direction": sortBy.direction
-            ],
-            "scene_filter": sceneFilter
-        ]
-        
-        let query = GraphQLQueries.queryWithFragments("findScenes")
-        
-        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
-              let bodyString = String(data: bodyData, encoding: .utf8) else {
-            return
-        }
-        
-        performGraphQLQuery(query: bodyString) { (response: ScenesResponse?) in
-            if let scenesResult = response?.data?.findScenes {
-                DispatchQueue.main.async {
-                    if isInitialLoad {
-                        self.groupScenes = scenesResult.scenes
-                        self.totalGroupScenes = scenesResult.count
-                    } else {
-                        self.groupScenes.append(contentsOf: scenesResult.scenes)
-                    }
-                    
-                    self.hasMoreGroupScenes = scenesResult.scenes.count == self.groupDetailPerPage
-                    self.isLoadingGroupScenes = false
-                }
-            } else {
-                DispatchQueue.main.async {
-                    self.isLoadingGroupScenes = false
-                }
-            }
-        }
     }
     
     func fetchGroup(groupId: String, completion: @escaping (StashGroup?) -> Void) {
@@ -4017,7 +4023,7 @@ struct SingleSceneData: Codable {
     let findScene: Scene?
 }
 
-struct Scene: Codable, Identifiable {
+struct Scene: Codable, Identifiable, Equatable {
     let id: String
     let title: String?
     let details: String?
@@ -4515,7 +4521,7 @@ struct Scene: Codable, Identifiable {
     
 }
 
-struct SceneStream: Codable {
+struct SceneStream: Codable, Equatable {
     let label: String
     let mime_type: String
     let url: String
@@ -4530,7 +4536,7 @@ struct SceneStreamsData: Codable {
 }
 
 
-struct ScenePaths: Codable {
+struct ScenePaths: Codable, Equatable {
     let screenshot: String?
     let preview: String?
     let stream: String?
@@ -4542,7 +4548,7 @@ struct ScenePaths: Codable {
     let caption: String?
 }
 
-struct MarkerScene: Codable, Identifiable {
+struct MarkerScene: Codable, Identifiable, Equatable {
     let id: String
     let title: String?
     let date: String?
@@ -4678,7 +4684,7 @@ struct MarkerScene: Codable, Identifiable {
     }
 }
 
-struct SceneMarker: Codable, Identifiable {
+struct SceneMarker: Codable, Identifiable, Equatable {
     let id: String
     let title: String?
     let seconds: Double
@@ -4781,7 +4787,7 @@ struct SceneMarker: Codable, Identifiable {
     }
 }
 
-struct SceneFile: Codable, Identifiable {
+struct SceneFile: Codable, Identifiable, Equatable {
     let id: String
     let path: String?
     let format: String?
@@ -4802,7 +4808,7 @@ struct SceneFile: Codable, Identifiable {
     }
 }
 
-struct SceneStudio: Codable {
+struct SceneStudio: Codable, Equatable {
     let id: String
     let name: String
 
@@ -4812,7 +4818,7 @@ struct SceneStudio: Codable {
     }
 }
 
-struct ScenePerformer: Codable, Identifiable {
+struct ScenePerformer: Codable, Identifiable, Equatable {
     let id: String
     let name: String
     let sceneCount: Int?
@@ -4865,6 +4871,8 @@ struct PerformersByIdsData: Codable {
 }
 
 struct Performer: Codable, Identifiable, Equatable {
+    var sceneCountDisplay: Int { sceneCount }
+    var details: String? { nil } // Performers don't have a large details text in the same way
     let id: String
     let name: String
     let disambiguation: String?
@@ -4965,7 +4973,8 @@ struct FindStudiosResult: Codable {
     let studios: [Studio]
 }
 
-struct Studio: Codable, Identifiable {
+struct Studio: Codable, Identifiable, Equatable {
+    var sceneCountDisplay: Int { sceneCount }
     let id: String
     let name: String
     let url: String?
@@ -5039,7 +5048,10 @@ struct FindTagsResult: Codable {
     let tags: [Tag]
 }
 
-struct Tag: Codable, Identifiable {
+struct Tag: Codable, Identifiable, Equatable {
+    var sceneCountDisplay: Int { sceneCount ?? 0 }
+    var details: String? { nil }
+    var rating100: Int? { nil }
     let id: String
     let name: String
     let imagePath: String?
@@ -5088,7 +5100,7 @@ struct SingleGroupData: Codable {
     let findGroup: StashGroup?
 }
 
-struct StashGroup: Codable, Identifiable {
+struct StashGroup: Codable, Identifiable, Equatable {
     let id: String
     let name: String
     let synopsis: String?
@@ -5100,14 +5112,27 @@ struct StashGroup: Codable, Identifiable {
     let back_image_path: String?
     let studio: GroupStudio?
     
+    var details: String? { synopsis }
+    var favorite: Bool? { nil }
+    var sceneCountDisplay: Int { scene_count ?? 0 }
+
     enum CodingKeys: String, CodingKey {
         case id, name, synopsis, date, scene_count, gallery_count, rating100, front_image_path, back_image_path, studio
     }
     
     // Computed property for thumbnail URL (using front image)
     var thumbnailURL: URL? {
-        if let path = front_image_path, let url = URL(string: path) {
-            return signedURL(url)
+        if var path = front_image_path {
+            let separator = path.contains("?") ? "&" : "?"
+            path = "\(path)\(separator)width=640"
+            
+            if let url = URL(string: path) {
+                if path.starts(with: "http") {
+                    return signedURL(url)
+                }
+                guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
+                return signedURL(URL(string: config.baseURL + path))
+            }
         }
         
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
@@ -5116,10 +5141,17 @@ struct StashGroup: Codable, Identifiable {
     }
 }
 
-struct GroupStudio: Codable, Identifiable {
+struct GroupStudio: Codable, Identifiable, Equatable {
     let id: String
     let name: String
 }
+
+#if os(tvOS)
+extension Performer: TVDetailItem {}
+extension Studio: TVDetailItem {}
+extension Tag: TVDetailItem {}
+extension StashGroup: TVDetailItem {}
+#endif
 
 // MARK: - Galleries Models
 struct GalleriesResponse: Codable {
@@ -5135,7 +5167,7 @@ struct FindGalleriesResult: Codable {
     let galleries: [Gallery]
 }
 
-struct Gallery: Codable, Identifiable {
+struct Gallery: Codable, Identifiable, Equatable {
     let id: String
     let title: String
     let date: String?
@@ -5177,12 +5209,12 @@ struct Gallery: Codable, Identifiable {
     }
 }
 
-struct GalleryStudio: Codable {
+struct GalleryStudio: Codable, Equatable {
     let id: String
     let name: String
 }
 
-struct GalleryPerformer: Codable, Identifiable {
+struct GalleryPerformer: Codable, Identifiable, Equatable {
     let id: String
     let name: String
 }
@@ -5191,24 +5223,24 @@ struct GalleryPerformer: Codable, Identifiable {
 //     let `extension`: String?
 // }
 
-struct ImageFile: Codable {
+struct ImageFile: Codable, Equatable {
     let path: String
     let height: Int?
     let width: Int?
     let duration: Double?
 }
 
-struct ImageGallery: Codable, Identifiable {
+struct ImageGallery: Codable, Identifiable, Equatable {
     let id: String
     let title: String?
 }
 
-struct GalleryCover: Codable {
+struct GalleryCover: Codable, Equatable {
     let id: String
     let paths: GalleryCoverPaths
 }
 
-struct GalleryCoverPaths: Codable {
+struct GalleryCoverPaths: Codable, Equatable {
     let thumbnail: String?
     let preview: String?
     let image: String?
@@ -5228,7 +5260,7 @@ struct FindImagesResult: Codable {
     let images: [StashImage]
 }
 
-struct StashImage: Codable, Identifiable {
+struct StashImage: Codable, Identifiable, Equatable {
     let id: String
     let title: String?
     let rating100: Int?
@@ -5376,7 +5408,7 @@ struct StashImage: Codable, Identifiable {
 
 
 
-struct ImagePaths: Codable {
+struct ImagePaths: Codable, Equatable {
     let thumbnail: String?
     let preview: String?
     let image: String?
@@ -5768,28 +5800,15 @@ struct VideoPlayerView: UIViewControllerRepresentable {
         }
 
         func playerViewController(_ playerViewController: AVPlayerViewController, willEndFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
-            let wasPlaying = player.timeControlStatus == .playing
-            
             coordinator.animate(alongsideTransition: nil) { _ in
-                // Only force play if it was playing before the transition started
-                // This prevents paused videos from auto-resuming on minimize
-                if wasPlaying {
-                    self.player.play()
-                }
+                // Standard behavior might pause, so we force play if we intend to keep playing
+                self.player.play()
 
                 // Delay setting isFullscreen to false to prevent race condition
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     self.isFullscreen = false
                 }
             }
-        }
-
-        func playerViewControllerWillStartPictureInPicture(_ playerViewController: AVPlayerViewController) {
-            SecurityManager.shared.isPiPActive = true
-        }
-
-        func playerViewControllerDidStopPictureInPicture(_ playerViewController: AVPlayerViewController) {
-            SecurityManager.shared.isPiPActive = false
         }
     }
 }
@@ -7067,5 +7086,3 @@ struct FunscriptAction: Codable {
     let pos: Int // Position 0-100
 }
 #endif
-
-

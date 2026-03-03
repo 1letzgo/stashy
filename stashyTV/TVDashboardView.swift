@@ -20,11 +20,6 @@ struct TVDashboardView: View {
     @State private var isLoadingReleased: Bool = true
     @State private var isLoadingAdded: Bool = true
 
-    enum DashboardDestination: Hashable {
-        case scene(String)
-        case sceneList(StashDBViewModel.SceneSortOption)
-    }
-
     var body: some View {
         ScrollView([.vertical], showsIndicators: false) {
             VStack(alignment: .leading, spacing: 0) {
@@ -36,15 +31,7 @@ struct TVDashboardView: View {
             }
         }
         .background(Color.black)
-        .navigationTitle("")
-        .navigationDestination(for: DashboardDestination.self) { destination in
-            switch destination {
-            case .scene(let id):
-                TVSceneDetailView(sceneId: id)
-            case .sceneList(let sort):
-                TVScenesView(sortBy: sort)
-            }
-        }
+        .navigationBarHidden(true)
         .onAppear {
             loadData()
         }
@@ -70,7 +57,9 @@ struct TVDashboardView: View {
                     sceneRow(
                         title: "Continue Watching",
                         scenes: recentlyPlayedScenes,
-                        sortBy: .lastPlayedAtDesc
+                        sortBy: .lastPlayedAtDesc,
+                        cardWidth: 560,
+                        cardHeight: 315
                     )
                 }
 
@@ -145,80 +134,50 @@ struct TVDashboardView: View {
     // MARK: - Scene Row
 
     @ViewBuilder
-    private func sceneRow(title: String, scenes: [Scene], sortBy: StashDBViewModel.SceneSortOption) -> some View {
+    private func sceneRow(title: String, scenes: [Scene], sortBy: StashDBViewModel.SceneSortOption, cardWidth: CGFloat = 400, cardHeight: CGFloat = 225) -> some View {
         VStack(alignment: .leading, spacing: 18) {
-            // Section heading
-            DashboardSectionHeading(title: title, sortBy: sortBy)
+            // Section heading (Static)
+            Text(title)
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundColor(.white.opacity(0.6))
+                .padding(.horizontal, 50)
 
             // Horizontal card scroll
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 30) {
                     ForEach(scenes) { scene in
                         VStack(alignment: .leading, spacing: 10) {
-                            NavigationLink(value: DashboardDestination.scene(scene.id)) {
-                                TVSceneCardView(scene: scene)
+                            NavigationLink(value: TVSceneLink(sceneId: scene.id)) {
+                                TVSceneCardView(scene: scene, width: cardWidth + 10, height: cardHeight + 5)
                             }
                             .buttonStyle(.card)
                             
                             TVSceneCardTitleView(scene: scene)
                         }
-                        .frame(width: 400)
+                        .frame(width: cardWidth)
                     }
+
+                    // See All Card at the end
+                    NavigationLink(value: TVSceneListLink(sortBy: sortBy)) {
+                        VStack(spacing: 20) {
+                            Image(systemName: "arrow.right.circle.fill")
+                                .font(.system(size: 60))
+                                .foregroundColor(.white.opacity(0.8))
+                            
+                            Text("See All")
+                                .font(.headline)
+                                .fontWeight(.bold)
+                        }
+                        .frame(width: cardWidth, height: cardHeight)
+                        .background(Color.white.opacity(0.05))
+                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                    }
+                    .buttonStyle(.card)
                 }
                 .padding(.horizontal, 50)
                 .padding(.vertical, 20)
             }
         }
-    }
-}
-
-struct DashboardSectionHeading: View {
-    let title: String
-    let sortBy: StashDBViewModel.SceneSortOption
-
-    var body: some View {
-        NavigationLink(value: TVDashboardView.DashboardDestination.sceneList(sortBy)) {
-            HStack(spacing: 12) {
-                Text(title)
-                    .font(.title3)
-                    .fontWeight(.bold)
-                    .foregroundColor(.white)
-                
-                Spacer()
-                
-                HStack(spacing: 6) {
-                    Text("See All")
-                        .font(.callout)
-                    Image(systemName: "chevron.right")
-                        .font(.caption2)
-                }
-            }
-            .padding(.vertical, 8)
-            .padding(.horizontal, 16)
-        }
-        .buttonStyle(DashboardHeaderButtonStyle())
-        .padding(.horizontal, 34)
-    }
-}
-
-struct DashboardHeaderButtonStyle: ButtonStyle {
-    func makeBody(configuration: Configuration) -> some View {
-        configuration.label
-            .foregroundColor(configuration.isPressed ? .white.opacity(0.5) : .white)
-            // On tvOS, checking if a button is focused can be tricky inside a ButtonStyle directly
-            // but we can use an overlay or environment
-            .modifier(DashboardHeaderFocusModifier())
-    }
-}
-
-struct DashboardHeaderFocusModifier: ViewModifier {
-    @Environment(\.isFocused) private var isFocused
-    
-    func body(content: Content) -> some View {
-        content
-            .background(isFocused ? AppearanceManager.shared.tintColor : Color.clear)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .scaleEffect(isFocused ? 1.05 : 1.0)
-            .animation(.easeOut(duration: 0.2), value: isFocused)
     }
 }

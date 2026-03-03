@@ -1,17 +1,17 @@
 //
-//  TVTagsView.swift
+//  TVGroupsView.swift
 //  stashyTV
 //
-//  Tags grid + tag detail for tvOS
+//  Groups and Group Detail views for tvOS — Netflix style
 //
 
 import SwiftUI
 
-struct TVTagsView: View {
+struct TVGroupsView: View {
     @StateObject private var viewModel = StashDBViewModel()
-    @State private var sortBy: StashDBViewModel.TagSortOption = .nameAsc
+    @State private var sortBy: StashDBViewModel.GroupSortOption = .nameAsc
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
-    @FocusState private var focusedTagID: String?
+    @FocusState private var focusedGroupID: String?
 
     private let columns = [
         GridItem(.fixed(260), spacing: 40),
@@ -24,9 +24,9 @@ struct TVTagsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if viewModel.isLoadingTags && viewModel.tags.isEmpty {
+            if viewModel.isLoadingGroups && viewModel.groups.isEmpty {
                 loadingView
-            } else if viewModel.tags.isEmpty {
+            } else if viewModel.groups.isEmpty {
                 emptyView
             } else {
                 contentGrid
@@ -34,31 +34,31 @@ struct TVTagsView: View {
         }
         .navigationTitle("")
         .background(Color.black)
-        .onChange(of: viewModel.tags.first?.id) { oldID, newID in
+        .onChange(of: viewModel.groups.first?.id) { oldID, newID in
             if oldID != newID {
-                focusedTagID = newID
+                focusedGroupID = newID
             }
         }
         .onChange(of: sortBy) { _, newValue in
-            viewModel.fetchTags(sortBy: newValue, isInitialLoad: true, filter: selectedFilter)
+            viewModel.fetchGroups(sortBy: newValue, isInitialLoad: true, filter: selectedFilter)
         }
         .onChange(of: selectedFilter) { _, newValue in
-            viewModel.fetchTags(sortBy: sortBy, isInitialLoad: true, filter: newValue)
+            viewModel.fetchGroups(sortBy: sortBy, isInitialLoad: true, filter: newValue)
         }
         .onAppear {
             viewModel.fetchSavedFilters()
-            if viewModel.tags.isEmpty {
-                viewModel.fetchTags(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
+            if viewModel.groups.isEmpty {
+                viewModel.fetchGroups(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
             selectedFilter = nil
-            viewModel.fetchTags(sortBy: sortBy, isInitialLoad: true, filter: nil)
+            viewModel.fetchGroups(sortBy: sortBy, isInitialLoad: true, filter: nil)
         }
     }
 
 
-    private func sortButton(option: StashDBViewModel.TagSortOption) -> some View {
+    private func sortButton(option: StashDBViewModel.GroupSortOption) -> some View {
         Button {
             sortBy = option
         } label: {
@@ -72,7 +72,7 @@ struct TVTagsView: View {
         }
     }
 
-    private func label(for option: StashDBViewModel.TagSortOption) -> String {
+    private func label(for option: StashDBViewModel.GroupSortOption) -> String {
         switch option {
         case .nameAsc: return "Name (A-Z)"
         case .nameDesc: return "Name (Z-A)"
@@ -89,7 +89,7 @@ struct TVTagsView: View {
         Spacer()
         VStack(spacing: 20) {
             ProgressView().scaleEffect(1.5)
-            Text("Loading tags…")
+            Text("Loading groups…")
                 .font(.title3)
                 .foregroundColor(.white.opacity(0.4))
         }
@@ -100,12 +100,12 @@ struct TVTagsView: View {
     @ViewBuilder
     private var emptyView: some View {
         Spacer()
-        VStack(spacing: 24) {
-            Image(systemName: "tag")
+        VStack(spacing: 32) {
+            Image(systemName: "rectangle.stack")
                 .font(.system(size: 80))
                 .foregroundColor(.white.opacity(0.1))
             
-            Text("No Tags Found")
+            Text("No Groups Found")
                 .font(.title2)
                 .fontWeight(.semibold)
                 .foregroundColor(.white.opacity(0.3))
@@ -123,21 +123,21 @@ struct TVTagsView: View {
                 )
 
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 40) {
-                    ForEach(viewModel.tags) { tag in
-                        NavigationLink(value: TVTagLink(id: tag.id, name: tag.name)) {
-                            TVTagCardView(tag: tag)
+                    ForEach(viewModel.groups) { group in
+                        NavigationLink(value: TVGroupLink(id: group.id, name: group.name)) {
+                            TVGroupCardView(group: group)
                         }
                         .buttonStyle(.card)
-                        .focused($focusedTagID, equals: tag.id)
+                        .focused($focusedGroupID, equals: group.id)
                         .frame(width: 260) // Fixed width for item container
                         .onAppear {
-                            if tag.id == viewModel.tags.last?.id && viewModel.hasMoreTags {
-                                viewModel.loadMoreTags()
+                            if group.id == viewModel.groups.last?.id && viewModel.hasMoreGroups {
+                                viewModel.loadMoreGroups()
                             }
                         }
                     }
 
-                    if viewModel.isLoadingMoreTags {
+                    if viewModel.isLoadingMoreGroups {
                         ProgressView()
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 40)
@@ -187,13 +187,13 @@ struct TVTagsView: View {
                 }
             }
             
-            let tagFilters = viewModel.savedFilters.values
-                .filter { $0.mode == .tags }
+            let groupFilters = viewModel.savedFilters.values
+                .filter { $0.mode == .groups }
                 .sorted { $0.name < $1.name }
             
-            if !tagFilters.isEmpty {
+            if !groupFilters.isEmpty {
                 Divider()
-                ForEach(tagFilters) { filter in
+                ForEach(groupFilters) { filter in
                     Button {
                         selectedFilter = filter
                     } label: {
@@ -220,19 +220,13 @@ struct TVTagsView: View {
     }
 }
 
-// MARK: - Tag Detail View
+// MARK: - Group Detail View
 
-struct TVTagDetailView: View {
-    let tagId: String
-    let tagName: String
+struct TVGroupDetailView: View {
+    let groupId: String
+    let groupName: String
 
     @StateObject private var viewModel = StashDBViewModel()
-
-    private var tagColor: Color {
-        let hash = abs(tagName.hashValue)
-        let hue = Double(hash % 360) / 360.0
-        return Color(hue: hue, saturation: 0.35, brightness: 0.3)
-    }
 
     private let sceneColumns = [
         GridItem(.fixed(410), spacing: 40),
@@ -242,11 +236,11 @@ struct TVTagDetailView: View {
     ]
 
     var body: some View {
-        Group {
-            if let tag = viewModel.tags.first(where: { $0.id == tagId }) {
-                renderDetail(item: tag)
+        SwiftUI.Group {
+            if let group = viewModel.groups.first(where: { $0.id == groupId }) {
+                renderDetail(item: group)
             } else {
-                renderDetail(item: StubTagDetailItem(id: tagId, name: tagName))
+                renderDetail(item: StubGroupDetailItem(id: groupId, name: groupName))
             }
         }
     }
@@ -255,34 +249,34 @@ struct TVTagDetailView: View {
     private func renderDetail<T: TVDetailItem>(item: T) -> some View {
         TVGenericDetailView(
             item: item,
-            isLoading: viewModel.isLoadingTags && viewModel.tags.isEmpty,
+            isLoading: viewModel.isLoadingGroups && viewModel.groups.isEmpty,
             heroAspectRatio: 16/9,
-            placeholderSystemImage: "tag.fill",
-            scenes: viewModel.tagScenes,
-            isLoadingScenes: viewModel.isLoadingTagScenes,
-            totalScenes: viewModel.totalTagScenes,
-            hasMoreScenes: viewModel.hasMoreTagScenes,
-            loadMoreScenes: { viewModel.fetchTagScenes(tagId: tagId, isInitialLoad: false) },
+            placeholderSystemImage: "rectangle.stack.fill",
+            scenes: viewModel.groupScenes,
+            isLoadingScenes: viewModel.isLoadingGroupScenes,
+            totalScenes: viewModel.totalGroupScenes,
+            hasMoreScenes: viewModel.hasMoreGroupScenes,
+            loadMoreScenes: { viewModel.fetchGroupScenes(groupId: groupId, isInitialLoad: false) },
             infoGrid: { _ in
                 LazyVGrid(columns: [
                     GridItem(.fixed(240), alignment: .leading),
                     GridItem(.flexible(), alignment: .leading)
                 ], alignment: .leading, spacing: 12) {
-                    if viewModel.totalTagScenes > 0 {
+                    if viewModel.totalGroupScenes > 0 {
                         Text("Scenes").font(.title3).foregroundColor(.white.opacity(0.4))
-                        Text("\(viewModel.totalTagScenes)").font(.title3).foregroundColor(.white)
+                        Text("\(viewModel.totalGroupScenes)").font(.title3).foregroundColor(.white)
                     }
                 }
             },
             additionalContent: { EmptyView() }
         )
         .onAppear {
-            viewModel.fetchTagScenes(tagId: tagId, isInitialLoad: true)
+            viewModel.fetchGroupScenes(groupId: groupId, isInitialLoad: true)
         }
     }
 }
 
-private struct StubTagDetailItem: TVDetailItem {
+private struct StubGroupDetailItem: TVDetailItem {
     let id: String
     let name: String
     let thumbnailURL: URL? = nil

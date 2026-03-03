@@ -55,7 +55,12 @@ struct UniversalSearchView: View {
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $searchText, prompt: "Search everything...")
             .onChange(of: searchText) { oldValue, newValue in
-                performSearch()
+                let query = newValue.trimmingCharacters(in: .whitespacesAndNewlines)
+                if query.count < 2 {
+                    clearResults()
+                } else {
+                    performSearch()
+                }
             }
         }
     }
@@ -492,7 +497,10 @@ struct UniversalSearchView: View {
         }
         
         let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard query.count >= 2 else { return }
+        guard query.count >= 2 else {
+            clearResults()
+            return
+        }
         
         isSearching = true
         
