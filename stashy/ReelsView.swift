@@ -1493,6 +1493,7 @@ struct ReelItemView: View {
     @Binding var isZoomed: Bool
     @Binding var isRotating: Bool
     @State private var showAudioSyncSheet = false
+    @State private var isFastForwarding = false
     var onInteraction: () -> Void
 
     private var shouldFill: Bool {
@@ -1514,21 +1515,9 @@ struct ReelItemView: View {
     var body: some View {
         ZStack(alignment: .bottom) {
             mediaLayer
-            
-            // Center Play Icon (only for videos, not animations)
-            if !item.isAnimated && !isPlaying && isUIVisible {
-                CenterPlayButton {
-                    isPlaying = true
-                    if !isRotating { player?.play() }
-                    onInteraction()
-                }
-            }
-            
-            
-            if isUIVisible {
-                bottomOverlay
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-            }
+            fastForwardOverlay
+            playButtonOverlay
+            bottomBarOverlay
         }
         .buttonStyle(.plain)
         .background(Color.black)
@@ -1622,7 +1611,7 @@ struct ReelItemView: View {
 
     @ViewBuilder
     private var mediaLayer: some View {
-        ZoomableScrollView(isZoomed: $isZoomed, onTap: handleMediaTap) {
+        ZoomableScrollView(isZoomed: $isZoomed, onTap: handleMediaTap, onLongPress: handleLongPress) {
             ZStack {
                 Group {
                     if item.isAnimated {
@@ -1677,6 +1666,64 @@ struct ReelItemView: View {
             isUIVisible.toggle()
         }
         onInteraction()
+    }
+
+    private func handleLongPress(_ isPressed: Bool) {
+        guard !item.isAnimated, let player = player else { return }
+        
+        if isPressed {
+            #if !os(tvOS)
+            HapticManager.selection()
+            #endif
+            player.rate = 2.0
+            withAnimation {
+                isFastForwarding = true
+            }
+        } else {
+            player.rate = 1.0
+            withAnimation {
+                isFastForwarding = false
+            }
+        }
+        onInteraction()
+    }
+
+    @ViewBuilder
+    private var fastForwardOverlay: some View {
+        if isFastForwarding {
+            VStack {
+                Image(systemName: "chevron.right.2")
+                    .font(.system(size: 32, weight: .black))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 14)
+                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
+                    .clipShape(Capsule())
+                    .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
+                    .padding(.top, 130)
+                Spacer()
+            }
+            .transition(.opacity)
+        }
+    }
+
+    @ViewBuilder
+    private var playButtonOverlay: some View {
+        if !item.isAnimated && !isPlaying && isUIVisible {
+            CenterPlayButton {
+                isPlaying = true
+                if !isRotating { player?.play() }
+                onInteraction()
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var bottomBarOverlay: some View {
+        if isUIVisible {
+            bottomOverlay
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+        }
     }
 
     @ViewBuilder

@@ -22,6 +22,12 @@ struct GalleriesView: View {
     @State private var shouldRestoreScroll = false
     var hideTitle: Bool = false
     
+    init(initialSort: StashDBViewModel.GallerySortOption? = nil, hideTitle: Bool = false) {
+        self.hideTitle = hideTitle
+        let savedSort = StashDBViewModel.GallerySortOption(rawValue: TabManager.shared.getSortOption(for: .galleries) ?? "")
+        _selectedSortOption = State(initialValue: initialSort ?? savedSort ?? .dateDesc)
+    }
+    
     // Grid Setup
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     
@@ -421,18 +427,6 @@ struct GalleryCardView: View {
                                 }
                                 
                                 Spacer()
-                                
-                                // Date Badge (Top Right)
-                                if let date = gallery.date {
-                                    Text(date)
-                                        .font(.system(size: 9, weight: .bold))
-                                        .lineLimit(1)
-                                        .foregroundColor(.white)
-                                        .padding(Edge.Set.horizontal, 6)
-                                        .padding(.vertical, 3)
-                                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                                        .clipShape(Capsule())
-                                }
                             }
                             .padding(6)
                             
@@ -447,21 +441,6 @@ struct GalleryCardView: View {
                                    .shadow(radius: 2)
                                 
                                 Spacer()
-                                
-                                // Image Count Badge (Bottom Right)
-                                if let count = gallery.imageCount {
-                                    HStack(spacing: 3) {
-                                        Image(systemName: "photo")
-                                            .font(.system(size: 10, weight: .bold))
-                                        Text("\(count)")
-                                            .font(.system(size: 10, weight: .bold))
-                                    }
-                                    .foregroundColor(.white)
-                                    .padding(Edge.Set.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                                    .clipShape(Capsule())
-                                }
                             }
                             .padding(8)
                         }

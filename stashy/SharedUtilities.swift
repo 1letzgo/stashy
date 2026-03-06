@@ -291,11 +291,13 @@ struct AnimatedWebView: UIViewRepresentable {
 struct ZoomableScrollView<Content: View>: UIViewRepresentable {
     private var content: Content
     private var onTap: (() -> Void)?
+    private var onLongPress: ((Bool) -> Void)?
     @Binding var isZoomed: Bool
     
-    init(isZoomed: Binding<Bool> = .constant(false), onTap: (() -> Void)? = nil, @ViewBuilder content: () -> Content) {
+    init(isZoomed: Binding<Bool> = .constant(false), onTap: (() -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil, @ViewBuilder content: () -> Content) {
         self._isZoomed = isZoomed
         self.onTap = onTap
+        self.onLongPress = onLongPress
         self.content = content()
     }
     
@@ -335,28 +337,36 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         singleTap.require(toFail: doubleTap) // Ensure double tap takes precedence
         scrollView.addGestureRecognizer(singleTap)
         
+        // Add long press
+        let longPress = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleLongPress(_:)))
+        longPress.minimumPressDuration = 0.3
+        scrollView.addGestureRecognizer(longPress)
+        
         return scrollView
     }
     
     func updateUIView(_ uiView: UIScrollView, context: Context) {
         context.coordinator.hostingController.rootView = content
         context.coordinator.onTap = onTap
+        context.coordinator.onLongPress = onLongPress
         context.coordinator.isZoomed = $isZoomed
     }
     
     func makeCoordinator() -> Coordinator {
-        Coordinator(hostingController: UIHostingController(rootView: content), isZoomed: $isZoomed, onTap: onTap)
+        Coordinator(hostingController: UIHostingController(rootView: content), isZoomed: $isZoomed, onTap: onTap, onLongPress: onLongPress)
     }
     
     class Coordinator: NSObject, UIScrollViewDelegate {
         var hostingController: UIHostingController<Content>
         var isZoomed: Binding<Bool>
         var onTap: (() -> Void)?
+        var onLongPress: ((Bool) -> Void)?
         
-        init(hostingController: UIHostingController<Content>, isZoomed: Binding<Bool>, onTap: (() -> Void)? = nil) {
+        init(hostingController: UIHostingController<Content>, isZoomed: Binding<Bool>, onTap: (() -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil) {
             self.hostingController = hostingController
             self.isZoomed = isZoomed
             self.onTap = onTap
+            self.onLongPress = onLongPress
         }
         
         func viewForZooming(in scrollView: UIScrollView) -> UIView? {
@@ -379,6 +389,17 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         
         @objc func handleSingleTap(_ gesture: UITapGestureRecognizer) {
             onTap?()
+        }
+        
+        @objc func handleLongPress(_ gesture: UILongPressGestureRecognizer) {
+            switch gesture.state {
+            case .began:
+                onLongPress?(true)
+            case .ended, .cancelled, .failed:
+                onLongPress?(false)
+            default:
+                break
+            }
         }
         
         @objc func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
@@ -700,6 +721,7 @@ struct AudioSyncSheet: View {
     @ObservedObject var handyManager = HandyManager.shared
     @ObservedObject var buttplugManager = ButtplugManager.shared
     @ObservedObject var loveSpouseManager = LoveSpouseManager.shared
+    @Environment(\.dismiss) var dismiss
     
     var body: some View {
         NavigationView {
@@ -798,19 +820,34 @@ struct AudioSyncSheet: View {
                             Text("\(Int(audioManager.delayMs))ms")
                                 .foregroundColor(.secondary)
                         }
-                        Slider(value: $audioManager.delayMs, in: 0...1000, step: 10)
-                            .tint(appearanceManager.tintColor)
-                        
-                        Text("Signal sent \(Int(audioManager.delayMs))ms early")
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                            .italic()
+                        Slider(value: Binding(get: {
+                            audioManager.delayMs
+                        }, set: {
+                            audioManager.delayMs = $0
+                        }), in: -500...500, step: 10)
+                        .tint(appearanceManager.tintColor)
                     }
                     .padding(.vertical, 4)
+                }
+                
+                Section(header: Text("Manual Control")) {
+                    Button(action: {
+                        audioManager.resetToDefaults()
+                    }) {
+                        Text("Reset to Defaults")
+                            .foregroundColor(.red)
+                    }
                 }
             }
             .navigationTitle("Audio Sync")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Done") {
+                        dismiss()
+                    }
+                }
+            }
         }
     }
 }

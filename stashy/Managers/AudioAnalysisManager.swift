@@ -177,6 +177,12 @@ class AudioAnalysisManager: ObservableObject {
         }
     }
     
+    func resetToDefaults() {
+        sensitivity = 0.15
+        maxIntensity = 1.0
+        delayMs = 230.0
+    }
+    
     func stop() {
         DispatchQueue.main.async {
             self.isActive = false

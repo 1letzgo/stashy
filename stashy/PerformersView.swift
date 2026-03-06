@@ -14,7 +14,7 @@ struct PerformersView: View {
     @ObservedObject var configManager = ServerConfigManager.shared
     @State private var scrollPosition: String? = nil
     @State private var shouldRestoreScroll = false
-    @State private var selectedSortOption: StashDBViewModel.PerformerSortOption = StashDBViewModel.PerformerSortOption(rawValue: TabManager.shared.getSortOption(for: .performers) ?? "") ?? .sceneCountDesc
+    @State private var selectedSortOption: StashDBViewModel.PerformerSortOption
     @State private var isChangingSort = false
     @State private var searchText = ""
     @State private var selectedFilter: StashDBViewModel.SavedFilter? = nil
@@ -22,6 +22,11 @@ struct PerformersView: View {
     @State private var isSearchVisible = false
     @EnvironmentObject var coordinator: NavigationCoordinator
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    
+    init(initialSort: StashDBViewModel.PerformerSortOption? = nil) {
+        let savedSort = StashDBViewModel.PerformerSortOption(rawValue: TabManager.shared.getSortOption(for: .performers) ?? "")
+        _selectedSortOption = State(initialValue: initialSort ?? savedSort ?? .sceneCountDesc)
+    }
     
     private var columns: [GridItem] {
         if horizontalSizeClass == .regular {

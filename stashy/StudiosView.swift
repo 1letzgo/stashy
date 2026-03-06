@@ -12,7 +12,7 @@ import WebKit
 struct StudiosView: View {
     @StateObject private var viewModel = StashDBViewModel()
     @ObservedObject var configManager = ServerConfigManager.shared
-    @State private var selectedSortOption: StashDBViewModel.StudioSortOption = StashDBViewModel.StudioSortOption(rawValue: TabManager.shared.getSortOption(for: .studios) ?? "") ?? .nameAsc
+    @State private var selectedSortOption: StashDBViewModel.StudioSortOption
     @State private var isChangingSort = false
     @State private var searchText = ""
     @State private var isSearchVisible = false
@@ -20,6 +20,12 @@ struct StudiosView: View {
     var hideTitle: Bool = false
     @EnvironmentObject var coordinator: NavigationCoordinator
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+
+    init(initialSort: StashDBViewModel.StudioSortOption? = nil, hideTitle: Bool = false) {
+        let savedSort = StashDBViewModel.StudioSortOption(rawValue: TabManager.shared.getSortOption(for: .studios) ?? "")
+        _selectedSortOption = State(initialValue: initialSort ?? savedSort ?? .nameAsc)
+        self.hideTitle = hideTitle
+    }
 
     // Safe sort change function
     private func changeSortOption(to newOption: StashDBViewModel.StudioSortOption) {

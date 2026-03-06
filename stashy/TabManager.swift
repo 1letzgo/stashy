@@ -149,6 +149,12 @@ enum HomeRowType: String, Codable {
     case topRating3Min
     case random
     case statistics
+    case newPerformers
+    case performersHighestSceneCount
+    case newStudios
+    case studiosHighestSceneCount
+    case newGalleries
+    case recentlyUpdatedGalleries
     
     var defaultTitle: String {
         switch self {
@@ -160,6 +166,12 @@ enum HomeRowType: String, Codable {
         case .topRating3Min: return "Top Rated"
         case .random: return "Random Scenes"
         case .statistics: return "Statistics"
+        case .newPerformers: return "New Performers"
+        case .performersHighestSceneCount: return "Top Performers"
+        case .newStudios: return "New Studios"
+        case .studiosHighestSceneCount: return "Top Studios"
+        case .newGalleries: return "New Galleries"
+        case .recentlyUpdatedGalleries: return "Recently Updated Galleries"
         }
     }
 }
@@ -425,17 +437,28 @@ class TabManager: ObservableObject {
             ensureRandomRow()
             ensureTopCounterRow()
             ensureTopRatingRow()
+            ensureNewPerformersRow()
+            ensureHighestSceneCountPerformersRow()
+            ensureNewStudiosRow()
+            ensureHighestSceneCountStudiosRow()
+            ensureRecentlyUpdatedGalleriesRow()
         } else {
             // Default Home Rows
             self.homeRows = [
                 HomeRowConfig(id: UUID(), title: HomeRowType.statistics.defaultTitle, isEnabled: true, sortOrder: 0, type: .statistics),
                 HomeRowConfig(id: UUID(), title: HomeRowType.lastPlayed.defaultTitle, isEnabled: true, sortOrder: 1, type: .lastPlayed),
                 HomeRowConfig(id: UUID(), title: HomeRowType.lastAdded3Min.defaultTitle, isEnabled: true, sortOrder: 2, type: .lastAdded3Min),
-                HomeRowConfig(id: UUID(), title: HomeRowType.newest3Min.defaultTitle, isEnabled: true, sortOrder: 3, type: .newest3Min),
-                HomeRowConfig(id: UUID(), title: HomeRowType.mostViewed3Min.defaultTitle, isEnabled: true, sortOrder: 4, type: .mostViewed3Min),
-                HomeRowConfig(id: UUID(), title: HomeRowType.random.defaultTitle, isEnabled: true, sortOrder: 5, type: .random),
-                HomeRowConfig(id: UUID(), title: HomeRowType.topCounter3Min.defaultTitle, isEnabled: false, sortOrder: 6, type: .topCounter3Min),
-                HomeRowConfig(id: UUID(), title: HomeRowType.topRating3Min.defaultTitle, isEnabled: false, sortOrder: 7, type: .topRating3Min)
+                HomeRowConfig(id: UUID(), title: HomeRowType.newPerformers.defaultTitle, isEnabled: true, sortOrder: 3, type: .newPerformers),
+                HomeRowConfig(id: UUID(), title: HomeRowType.performersHighestSceneCount.defaultTitle, isEnabled: true, sortOrder: 4, type: .performersHighestSceneCount),
+                HomeRowConfig(id: UUID(), title: HomeRowType.newStudios.defaultTitle, isEnabled: true, sortOrder: 5, type: .newStudios),
+                HomeRowConfig(id: UUID(), title: HomeRowType.studiosHighestSceneCount.defaultTitle, isEnabled: true, sortOrder: 6, type: .studiosHighestSceneCount),
+                HomeRowConfig(id: UUID(), title: HomeRowType.newGalleries.defaultTitle, isEnabled: true, sortOrder: 7, type: .newGalleries),
+                HomeRowConfig(id: UUID(), title: HomeRowType.recentlyUpdatedGalleries.defaultTitle, isEnabled: true, sortOrder: 8, type: .recentlyUpdatedGalleries),
+                HomeRowConfig(id: UUID(), title: HomeRowType.newest3Min.defaultTitle, isEnabled: true, sortOrder: 9, type: .newest3Min),
+                HomeRowConfig(id: UUID(), title: HomeRowType.mostViewed3Min.defaultTitle, isEnabled: true, sortOrder: 10, type: .mostViewed3Min),
+                HomeRowConfig(id: UUID(), title: HomeRowType.random.defaultTitle, isEnabled: true, sortOrder: 11, type: .random),
+                HomeRowConfig(id: UUID(), title: HomeRowType.topCounter3Min.defaultTitle, isEnabled: false, sortOrder: 12, type: .topCounter3Min),
+                HomeRowConfig(id: UUID(), title: HomeRowType.topRating3Min.defaultTitle, isEnabled: false, sortOrder: 13, type: .topRating3Min)
             ]
             saveHomeRows()
         }
@@ -483,6 +506,54 @@ class TabManager: ObservableObject {
     private func ensureTopRatingRow() {
          if !homeRows.contains(where: { $0.type == .topRating3Min }) {
              let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.topRating3Min.defaultTitle, isEnabled: false, sortOrder: homeRows.count, type: .topRating3Min)
+             homeRows.append(newRow)
+             saveHomeRows()
+         }
+    }
+    
+    private func ensureNewPerformersRow() {
+         if !homeRows.contains(where: { $0.type == .newPerformers }) {
+             let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.newPerformers.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .newPerformers)
+             homeRows.append(newRow)
+             saveHomeRows()
+         }
+    }
+    
+    private func ensureHighestSceneCountPerformersRow() {
+         if !homeRows.contains(where: { $0.type == .performersHighestSceneCount }) {
+             let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.performersHighestSceneCount.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .performersHighestSceneCount)
+             homeRows.append(newRow)
+             saveHomeRows()
+         }
+    }
+
+    private func ensureNewStudiosRow() {
+         if !homeRows.contains(where: { $0.type == .newStudios }) {
+             let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.newStudios.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .newStudios)
+             homeRows.append(newRow)
+             saveHomeRows()
+         }
+    }
+    
+    private func ensureHighestSceneCountStudiosRow() {
+         if !homeRows.contains(where: { $0.type == .studiosHighestSceneCount }) {
+             let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.studiosHighestSceneCount.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .studiosHighestSceneCount)
+             homeRows.append(newRow)
+             saveHomeRows()
+         }
+    }
+    
+    private func ensureNewGalleriesRow() {
+         if !homeRows.contains(where: { $0.type == .newGalleries }) {
+             let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.newGalleries.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .newGalleries)
+             homeRows.append(newRow)
+             saveHomeRows()
+         }
+    }
+    
+    private func ensureRecentlyUpdatedGalleriesRow() {
+         if !homeRows.contains(where: { $0.type == .recentlyUpdatedGalleries }) {
+             let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.recentlyUpdatedGalleries.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .recentlyUpdatedGalleries)
              homeRows.append(newRow)
              saveHomeRows()
          }

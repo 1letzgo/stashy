@@ -161,7 +161,11 @@ class StashDBViewModel: ObservableObject {
     
     // Home Row Caching - prevents reload on view recreation
     @Published var homeRowScenes: [HomeRowType: [Scene]] = [:]
+    @Published var homeRowPerformers: [HomeRowType: [Performer]] = [:]
+    @Published var homeRowStudios: [HomeRowType: [Studio]] = [:]
+    @Published var homeRowGalleries: [HomeRowType: [Gallery]] = [:]
     @Published var homeRowLoadingState: [HomeRowType: Bool] = [:]
+    private var isFetchingHomeRows: Set<HomeRowType> = []
 
     // Connection Status
     @Published var isServerConnected: Bool = false
@@ -174,7 +178,6 @@ class StashDBViewModel: ObservableObject {
     
     // Throttling states
     private var isFetchingFilters = false
-    private var isFetchingHomeRows: Set<HomeRowType> = []
 
     // Pagination properties for scenes
     @Published var totalScenes: Int = 0
@@ -256,6 +259,8 @@ class StashDBViewModel: ObservableObject {
         case createdAtAsc
         case updatedAtDesc
         case updatedAtAsc
+        case imageCountDesc
+        case imageCountAsc
         case random
 
         var displayName: String {
@@ -270,14 +275,16 @@ class StashDBViewModel: ObservableObject {
             case .createdAtAsc: return "Created (Oldest)"
             case .updatedAtDesc: return "Updated (Newest)"
             case .updatedAtAsc: return "Updated (Oldest)"
+            case .imageCountDesc: return "Image Count (High-Low)"
+            case .imageCountAsc: return "Image Count (Low-High)"
             case .random: return "Random"
             }
         }
 
         var direction: String {
             switch self {
-            case .titleAsc, .dateAsc, .ratingAsc, .createdAtAsc, .updatedAtAsc: return "ASC"
-            case .titleDesc, .dateDesc, .ratingDesc, .createdAtDesc, .updatedAtDesc, .random: return "DESC"
+            case .titleAsc, .dateAsc, .ratingAsc, .createdAtAsc, .updatedAtAsc, .imageCountAsc: return "ASC"
+            case .titleDesc, .dateDesc, .ratingDesc, .createdAtDesc, .updatedAtDesc, .imageCountDesc, .random: return "DESC"
             }
         }
 
@@ -288,6 +295,7 @@ class StashDBViewModel: ObservableObject {
             case .ratingDesc, .ratingAsc: return "rating"
             case .createdAtDesc, .createdAtAsc: return "created_at"
             case .updatedAtDesc, .updatedAtAsc: return "updated_at"
+            case .imageCountDesc, .imageCountAsc: return "image_count"
             case .random: return "random"
             }
         }
@@ -747,6 +755,9 @@ class StashDBViewModel: ObservableObject {
         allImages = []
         
         homeRowScenes = [:]
+        homeRowPerformers = [:]
+        homeRowStudios = [:]
+        homeRowGalleries = [:]
         homeRowLoadingState = [:]
         isServerConnected = false
         isInitializing = false // Reset initialization guard
@@ -1351,7 +1362,7 @@ class StashDBViewModel: ObservableObject {
             setSort(.ratingDesc)
         case .random:
             setSort(.random)
-        case .statistics:
+        case .statistics, .newPerformers, .performersHighestSceneCount, .newStudios, .studiosHighestSceneCount, .newGalleries, .recentlyUpdatedGalleries:
             homeRowLoadingState[rowType] = false
             completion([])
             return
@@ -1393,6 +1404,239 @@ class StashDBViewModel: ObservableObject {
                 // Cache the result
                 self?.homeRowScenes[rowType] = scenes
                 completion(scenes)
+            }
+        }
+    }
+    
+    func fetchPerformersForHomeRow(config: HomeRowConfig, limit: Int = 10, forceRefresh: Bool = false, completion: @escaping ([Performer]) -> Void) {
+        let rowType = config.type
+        
+        // Return cached data immediately if available
+        if !forceRefresh {
+            if let cached = homeRowPerformers[rowType], !cached.isEmpty {
+                completion(cached)
+                return
+            }
+        }
+        
+        // Already loading this row? Don't start another request
+        if isFetchingHomeRows.contains(rowType) || homeRowLoadingState[rowType] == true {
+            return
+        }
+        
+        isFetchingHomeRows.insert(rowType)
+        homeRowLoadingState[rowType] = true
+        
+        let performerFilter: [String: Any] = [:]
+        var sortField = "name"
+        var sortDirection = "ASC"
+        
+        func setSort(_ option: PerformerSortOption) {
+            sortField = option.sortField
+            sortDirection = option.direction
+        }
+        
+        switch config.type {
+        case .newPerformers:
+            setSort(.createdAtDesc)
+        case .performersHighestSceneCount:
+            setSort(.sceneCountDesc)
+        default:
+            homeRowLoadingState[rowType] = false
+            completion([])
+            return
+        }
+        
+        // Construct the query
+        let perPage = limit
+        
+        let queryVariables: [String: Any] = [
+            "filter": [
+                "page": 1,
+                "per_page": perPage,
+                "sort": sortField,
+                "direction": sortDirection
+            ],
+            "performer_filter": performerFilter
+        ]
+        
+        let gqlQuery = GraphQLQueries.queryWithFragments("findPerformers")
+        
+        let body: [String: Any] = [
+            "query": gqlQuery,
+            "variables": queryVariables
+        ]
+        
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            homeRowLoadingState[rowType] = false
+            isFetchingHomeRows.remove(rowType)
+            completion([])
+            return
+        }
+        
+        performGraphQLQuery(query: bodyString) { [weak self] (response: PerformersResponse?) in
+            DispatchQueue.main.async {
+                self?.homeRowLoadingState[rowType] = false
+                self?.isFetchingHomeRows.remove(rowType)
+                let performers = response?.data?.findPerformers.performers ?? []
+                // Cache the result
+                self?.homeRowPerformers[rowType] = performers
+                completion(performers)
+            }
+        }
+    }
+    
+    func fetchStudiosForHomeRow(config: HomeRowConfig, limit: Int = 10, forceRefresh: Bool = false, completion: @escaping ([Studio]) -> Void) {
+        let rowType = config.type
+        
+        // Return cached data immediately if available
+        if !forceRefresh {
+            if let cached = homeRowStudios[rowType], !cached.isEmpty {
+                completion(cached)
+                return
+            }
+        }
+        
+        // Already loading this row? Don't start another request
+        if isFetchingHomeRows.contains(rowType) || homeRowLoadingState[rowType] == true {
+            return
+        }
+        
+        isFetchingHomeRows.insert(rowType)
+        homeRowLoadingState[rowType] = true
+        
+        var sortField = "name"
+        var sortDirection = "ASC"
+        
+        func setSort(_ option: StudioSortOption) {
+            sortField = option.sortField
+            sortDirection = option.direction
+        }
+        
+        switch config.type {
+        case .newStudios:
+            setSort(.createdAtDesc)
+        case .studiosHighestSceneCount:
+            setSort(.sceneCountDesc)
+        default:
+            homeRowLoadingState[rowType] = false
+            completion([])
+            return
+        }
+        
+        // Construct the query
+        let perPage = limit
+        
+        let queryVariables: [String: Any] = [
+            "filter": [
+                "page": 1,
+                "per_page": perPage,
+                "sort": sortField,
+                "direction": sortDirection
+            ]
+        ]
+        
+        let gqlQuery = GraphQLQueries.queryWithFragments("findStudios")
+        
+        let body: [String: Any] = [
+            "query": gqlQuery,
+            "variables": queryVariables
+        ]
+        
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            homeRowLoadingState[rowType] = false
+            isFetchingHomeRows.remove(rowType)
+            completion([])
+            return
+        }
+        
+        performGraphQLQuery(query: bodyString) { [weak self] (response: StudiosResponse?) in
+            DispatchQueue.main.async {
+                self?.homeRowLoadingState[rowType] = false
+                self?.isFetchingHomeRows.remove(rowType)
+                let studios = response?.data?.findStudios.studios ?? []
+                // Cache the result
+                self?.homeRowStudios[rowType] = studios
+                completion(studios)
+            }
+        }
+    }
+    
+    func fetchGalleriesForHomeRow(config: HomeRowConfig, limit: Int = 10, forceRefresh: Bool = false, completion: @escaping ([Gallery]) -> Void) {
+        let rowType = config.type
+        
+        // Return cached data immediately if available
+        if !forceRefresh {
+            if let cached = homeRowGalleries[rowType], !cached.isEmpty {
+                completion(cached)
+                return
+            }
+        }
+        
+        // Already loading this row? Don't start another request
+        if isFetchingHomeRows.contains(rowType) || homeRowLoadingState[rowType] == true {
+            return
+        }
+        
+        isFetchingHomeRows.insert(rowType)
+        homeRowLoadingState[rowType] = true
+        
+        var sortField = "title"
+        var sortDirection = "ASC"
+        
+        func setSort(_ option: GallerySortOption) {
+            sortField = option.sortField
+            sortDirection = option.direction
+        }
+        
+        switch config.type {
+        case .newGalleries:
+            setSort(.createdAtDesc)
+        case .recentlyUpdatedGalleries:
+            setSort(.updatedAtDesc)
+        default:
+            homeRowLoadingState[rowType] = false
+            completion([])
+            return
+        }
+        
+        // Construct the query
+        let perPage = limit
+        
+        let queryVariables: [String: Any] = [
+            "filter": [
+                "page": 1,
+                "per_page": perPage,
+                "sort": sortField,
+                "direction": sortDirection
+            ]
+        ]
+        
+        let gqlQuery = GraphQLQueries.queryWithFragments("findGalleries")
+        
+        let body: [String: Any] = [
+            "query": gqlQuery,
+            "variables": queryVariables
+        ]
+        
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            homeRowLoadingState[rowType] = false
+            isFetchingHomeRows.remove(rowType)
+            completion([])
+            return
+        }
+        
+        performGraphQLQuery(query: bodyString) { [weak self] (response: GalleriesResponse?) in
+            DispatchQueue.main.async {
+                self?.homeRowLoadingState[rowType] = false
+                self?.isFetchingHomeRows.remove(rowType)
+                let galleries = response?.data?.findGalleries.galleries ?? []
+                // Cache the result
+                self?.homeRowGalleries[rowType] = galleries
+                completion(galleries)
             }
         }
     }
@@ -5185,18 +5429,22 @@ struct Gallery: Codable, Identifiable, Equatable {
     }
     var thumbnailURL: URL? {
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
-        guard let thumbnailPath = cover?.paths.thumbnail else { return nil }
         
-        let separator = thumbnailPath.contains("?") ? "&" : "?"
-        let optimizedPath = "\(thumbnailPath)\(separator)width=640"
-        
-        // Check if the path is already an absolute URL
-        if optimizedPath.starts(with: "http://") || optimizedPath.starts(with: "https://") {
-            return signedURL(URL(string: optimizedPath))
-        } else {
-            // Relative path, prepend baseURL
-            return signedURL(URL(string: config.baseURL + optimizedPath))
+        if let thumbnailPath = cover?.paths.thumbnail {
+            let separator = thumbnailPath.contains("?") ? "&" : "?"
+            let optimizedPath = "\(thumbnailPath)\(separator)width=640"
+            
+            // Check if the path is already an absolute URL
+            if optimizedPath.starts(with: "http://") || optimizedPath.starts(with: "https://") {
+                return signedURL(URL(string: optimizedPath))
+            } else {
+                // Relative path, prepend baseURL
+                return signedURL(URL(string: config.baseURL + optimizedPath))
+            }
         }
+        
+        // Fallback: use gallery asset endpoint which handles coverless galleries (returns first image)
+        return signedURL(URL(string: "\(config.baseURL)/gallery/\(id)/asset/thumbnail?width=640"))
     }
     
     var coverURL: URL? {
