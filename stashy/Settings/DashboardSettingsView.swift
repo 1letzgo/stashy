@@ -15,6 +15,18 @@ struct DashboardSettingsView: View {
     var body: some View {
         List {
             Section {
+                Toggle("Big Hero Layout", isOn: Binding(
+                    get: { tabManager.dashboardHeroSize == .big },
+                    set: { tabManager.dashboardHeroSize = $0 ? .big : .small }
+                ))
+                .tint(appearanceManager.tintColor)
+            } header: {
+                Text("Hero Layout")
+            } footer: {
+                Text("Enable Big Hero to show one item at a time with full-width paging. If disabled, a standard carousel will be shown.")
+            }
+            
+            Section {
                 ForEach(tabManager.homeRows) { row in
                     Toggle(isOn: Binding(
                         get: { row.isEnabled },

@@ -5,8 +5,11 @@ import SwiftUI
 struct HomeRowView: View {
     let config: HomeRowConfig
     @ObservedObject var viewModel: StashDBViewModel
+    @ObservedObject var tabManager = TabManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
     var isLarge: Bool = false
+    
+    @State private var scrollID: String?
     
     // Use ViewModel cache instead of local @State
     private var scenes: [Scene] {
@@ -92,38 +95,55 @@ struct HomeRowView: View {
                     .padding(.horizontal, 12)
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
+                    HStack(spacing: (isLarge && tabManager.dashboardHeroSize == .big) ? 0 : 12) {
                         if config.type == .newPerformers || config.type == .performersHighestSceneCount {
                             ForEach(performers) { performer in
                                 NavigationLink(destination: PerformerDetailView(performer: performer)) {
                                     HomePerformerCardView(performer: performer, isLarge: isLarge)
+                                        .padding(.horizontal, (isLarge && tabManager.dashboardHeroSize == .big) ? 12 : 0)
                                 }
                                 .buttonStyle(.plain)
+                                .id(performer.id)
                             }
                         } else if config.type == .newStudios || config.type == .studiosHighestSceneCount {
                             ForEach(studios) { studio in
                                 NavigationLink(destination: StudioDetailView(studio: studio)) {
                                     HomeStudioCardView(studio: studio, isLarge: isLarge)
+                                        .padding(.horizontal, (isLarge && tabManager.dashboardHeroSize == .big) ? 12 : 0)
                                 }
                                 .buttonStyle(.plain)
+                                .id(studio.id)
                             }
                         } else if config.type == .newGalleries || config.type == .recentlyUpdatedGalleries {
                             ForEach(galleries) { gallery in
                                 NavigationLink(destination: ImagesView(gallery: gallery)) {
                                     HomeGalleryCardView(gallery: gallery, isLarge: isLarge)
+                                        .padding(.horizontal, (isLarge && tabManager.dashboardHeroSize == .big) ? 12 : 0)
                                 }
                                 .buttonStyle(.plain)
+                                .id(gallery.id)
                             }
                         } else {
                             ForEach(scenes) { scene in
                                 NavigationLink(destination: SceneDetailView(scene: scene)) {
                                     HomeSceneCardView(scene: scene, isLarge: isLarge)
+                                        .padding(.horizontal, (isLarge && tabManager.dashboardHeroSize == .big) ? 12 : 0)
                                 }
                                 .buttonStyle(.plain)
+                                .id(scene.id)
                             }
                         }
                     }
-                    .padding(.horizontal, 12)
+                    .padding(.horizontal, (isLarge && tabManager.dashboardHeroSize == .big) ? 0 : 12)
+                    .scrollTargetLayout()
+                }
+                .scrollPosition(id: $scrollID)
+                .scrollTargetBehavior((isLarge && tabManager.dashboardHeroSize == .big) ? .paging : .init())
+                .overlay(alignment: .bottom) {
+                    if isLarge && tabManager.dashboardHeroSize == .big {
+                        PageIndicator(itemCount: getItemCount(), selectedID: scrollID, items: getItems())
+                            .padding(.bottom, 8)
+                    }
                 }
             }
         }
@@ -169,7 +189,7 @@ struct HomeRowView: View {
     }
     
     private func loadScenes() {
-        let limit = isLarge ? 20 : 5
+        let limit = 10
         
         if config.type == .newPerformers || config.type == .performersHighestSceneCount {
             viewModel.fetchPerformersForHomeRow(config: config, limit: limit) { _ in }
@@ -202,19 +222,35 @@ struct HomeRowView: View {
     }
     
     private func getItemWidth() -> CGFloat {
-        let height = getItemHeight()
+        if isLarge {
+            if tabManager.dashboardHeroSize == .big {
+                return UIScreen.main.bounds.width - 24 // 12pt padding on each side
+            } else {
+                return 280 // Standard "Small Hero" width
+            }
+        }
+        
+        // Standard width for non-hero rows
+        let baseWidth: CGFloat = 200
+        
         if config.type == .newPerformers || config.type == .performersHighestSceneCount {
-            return height * 2 / 3
+            // Performers are portrait (2:3), but matched to the height of 16:9 scenes
+            let matchedHeight = baseWidth * 9 / 16
+            return matchedHeight * 2 / 3
         } else if config.type == .newGalleries || config.type == .recentlyUpdatedGalleries {
-            return height
+            // Galleries are square, matched to height
+            return baseWidth * 9 / 16
         } else {
-            return isLarge ? 280 : 200
+            return baseWidth
         }
     }
     
     private func getItemHeight() -> CGFloat {
-        let baseWidth: CGFloat = isLarge ? 280 : 200
-        return baseWidth * 9 / 16
+        if isLarge {
+            let width = getItemWidth()
+            return width * 9 / 16
+        }
+        return 200 * 9 / 16
     }
 
     private func getSortOption() -> StashDBViewModel.SceneSortOption? {
@@ -230,18 +266,78 @@ struct HomeRowView: View {
             return nil
         }
     }
+    
+    private func getItemCount() -> Int {
+        switch config.type {
+        case .newPerformers, .performersHighestSceneCount: return performers.count
+        case .newStudios, .studiosHighestSceneCount: return studios.count
+        case .newGalleries, .recentlyUpdatedGalleries: return galleries.count
+        default: return scenes.count
+        }
+    }
+    
+    private func getItems() -> [String] {
+        switch config.type {
+        case .newPerformers, .performersHighestSceneCount: return performers.map { $0.id }
+        case .newStudios, .studiosHighestSceneCount: return studios.map { $0.id }
+        case .newGalleries, .recentlyUpdatedGalleries: return galleries.map { $0.id }
+        default: return scenes.map { $0.id }
+        }
+    }
+}
+
+struct PageIndicator: View {
+    let itemCount: Int
+    let selectedID: String?
+    let items: [String]
+    
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(0..<itemCount, id: \.self) { index in
+                Circle()
+                    .fill((selectedID ?? items.first) == (items[safe: index] ?? "") ? Color.white : Color.white.opacity(0.4))
+                    .frame(width: 6, height: 6)
+            }
+        }
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.black.opacity(0.3))
+        .clipShape(Capsule())
+    }
+}
+
+extension Array {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
 }
 
 struct HomePerformerCardView: View {
     let performer: Performer
     var isLarge: Bool = false
+    @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var appearanceManager = AppearanceManager.shared
     
     // Calculate width based on fixed height to match Scene cards
     // HomeSceneCardView height = cardWidth * 9/16
     // isLarge ? 280 * 9/16 : 200 * 9/16  => 157.5 : 112.5
-    private var cardHeight: CGFloat { isLarge ? 280 * 9 / 16 : 200 * 9 / 16 }
-    private var cardWidth: CGFloat { cardHeight * 2 / 3 } // 2:3 Portrait ratio
+    private var cardWidth: CGFloat {
+        if isLarge {
+            if tabManager.dashboardHeroSize == .big {
+                return UIScreen.main.bounds.width - 24
+            } else {
+                return 280
+            }
+        } else {
+            // Standard height is 200 * 9/16 = 112.5
+            // Width is 2/3 of that for portrait
+            return (200 * 9 / 16) * 2 / 3
+        }
+    }
+    
+    private var cardHeight: CGFloat {
+        return cardWidth * (isLarge ? 9 / 16 : 3 / 2)
+    }
     
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -322,11 +418,21 @@ struct HomePerformerCardView: View {
 struct HomeStudioCardView: View {
     let studio: Studio
     var isLarge: Bool = false
+    @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var appearanceManager = AppearanceManager.shared
     
     // Use same height as scenes, but standard width (16:9 like scenes)
-    private var cardHeight: CGFloat { isLarge ? 280 * 9 / 16 : 200 * 9 / 16 }
-    private var cardWidth: CGFloat { isLarge ? 280 : 200 }
+    private var cardWidth: CGFloat { 
+        if isLarge {
+            if tabManager.dashboardHeroSize == .big {
+                return UIScreen.main.bounds.width - 24
+            } else {
+                return 280
+            }
+        }
+        return 200 
+    }
+    private var cardHeight: CGFloat { cardWidth * 9 / 16 }
     
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -387,12 +493,23 @@ struct HomeStudioCardView: View {
 struct HomeGalleryCardView: View {
     let gallery: Gallery
     var isLarge: Bool = false
+    @ObservedObject var tabManager = TabManager.shared
     
-    private var cardHeight: CGFloat { isLarge ? 280 * 9 / 16 : 200 * 9 / 16 }
+    private var cardWidth: CGFloat { 
+        if isLarge {
+            if tabManager.dashboardHeroSize == .big {
+                return UIScreen.main.bounds.width - 24
+            } else {
+                return 280
+            }
+        }
+        return 200 
+    }
+    private var cardHeight: CGFloat { cardWidth * 9 / 16 }
     
     var body: some View {
         GalleryCardView(gallery: gallery)
-            .frame(width: cardHeight, height: cardHeight)
+            .frame(width: isLarge ? cardWidth : cardHeight, height: cardHeight)
     }
 }
 

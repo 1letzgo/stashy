@@ -49,6 +49,14 @@ class StashDBViewModel: ObservableObject {
     @Published var isLoading = true
     @Published var errorMessage: String?
     @Published var serverStatus: String = "Nicht verbunden"
+    
+    /// Stable random seed for consistent sorting during a session
+    private var randomSeed: Int = Int.random(in: 1...1_000_000)
+    
+    // Refresh the random seed periodically or on explicit request
+    func refreshRandomSeed() {
+        randomSeed = Int.random(in: 1...1_000_000)
+    }
 
     enum FilterMode: String, Codable {
         case scenes = "SCENES"
@@ -1150,7 +1158,7 @@ class StashDBViewModel: ObservableObject {
         var filterDict: [String: Any] = [
             "page": page,
             "per_page": markersPerPage,
-            "sort": sortBy.sortField,
+            "sort": sortBy.sortField == "random" ? "random_\(randomSeed)" : sortBy.sortField,
             "direction": sortBy.direction
         ]
         if !searchQuery.isEmpty {
@@ -1220,7 +1228,7 @@ class StashDBViewModel: ObservableObject {
         var filterDict: [String: Any] = [
             "page": page,
             "per_page": scenesPerPage,
-            "sort": sortBy.sortField,
+            "sort": sortBy.sortField == "random" ? "random_\(randomSeed)" : sortBy.sortField,
             "direction": sortBy.direction
         ]
         if !searchQuery.isEmpty {
@@ -1371,16 +1379,18 @@ class StashDBViewModel: ObservableObject {
         // Construct the query
         let perPage = limit
         
+        // Apply stable random seed if sort is random
+        let finalSortField = sortField == "random" ? "random_\(randomSeed)" : sortField
+        
         let queryVariables: [String: Any] = [
             "filter": [
                 "page": 1,
                 "per_page": perPage,
-                "sort": sortField,
+                "sort": finalSortField,
                 "direction": sortDirection
             ],
             "scene_filter": sceneFilter
         ]
-        
         let gqlQuery = GraphQLQueries.queryWithFragments("findScenes")
         
         let body: [String: Any] = [
@@ -1691,332 +1701,11 @@ class StashDBViewModel: ObservableObject {
             object_filter: jsonValue
         )
     }
-
+    
     private func sanitizeFilter(_ dict: [String: Any], isMarker: Bool = false) -> [String: Any] {
-        print("🔍 sanitizeFilter INPUT: \(dict)")
-        var newDict = dict
-        
-        // 0. Convert "c" array (UI Format) to top-level keys (API Format)
-        if let criteria = newDict["c"] as? [[String: Any]] {
-            for item in criteria {
-                if var key = item["id"] as? String {
-                    var outputItem = item
-                    // Remove UI-only keys that don't belong in any GraphQL criterion input
-                    for uiKey in ["id", "type", "inputType", "criterionOption"] {
-                        outputItem.removeValue(forKey: uiKey)
-                    }
-                    
-                    // Map "rating" to "rating100" for GraphQL compatibility if needed
-                    if key == "rating" {
-                        key = "rating100"
-                    }
-                    
-                    // For markers, move scene-specific criteria to nested scene_filter
-                    if isMarker && (key == "orientation" || key == "duration" || key == "rating100" || key == "organized" || key == "performers" || key == "tags") {
-                        var sceneFilter = newDict["scene_filter"] as? [String: Any] ?? [:]
-                        sceneFilter[key] = outputItem
-                        newDict["scene_filter"] = sceneFilter
-                        continue
-                    }
-                    
-                    newDict[key] = outputItem
-                }
-            }
-            newDict.removeValue(forKey: "c")
-        }
-        
-        // 1. Clean up known invalid top-level keys (UI-only metadata, not API fields)
-        let invalidTopKeys = ["sort", "direction", "mode", "displayMode", "zoomIndex", "sortDirection"]
-        for key in invalidTopKeys {
-            newDict.removeValue(forKey: key)
-        }
-        
-        // Marker specific: move top-level orientation/duration to scene_filter if they exist
-        if isMarker {
-            let sceneSpecificKeys = ["orientation", "duration", "rating100", "organized", "performers", "tags"]
-            for key in sceneSpecificKeys {
-                if let val = newDict[key] {
-                    var sceneFilter = newDict["scene_filter"] as? [String: Any] ?? [:]
-                    sceneFilter[key] = val
-                    newDict["scene_filter"] = sceneFilter
-                    newDict.removeValue(forKey: key)
-                }
-            }
-        }
-        
-        // --- Define field sets based on GraphQL schema ---
-        
-        let nestedFilterKeys: Set<String> = [
-            "performers_filter", "studios_filter", "tags_filter", "groups_filter",
-            "galleries_filter", "scenes_filter", "images_filter", "markers_filter",
-            "movies_filter", "files_filter", "folders_filter", "scene_filter",
-            "AND", "OR", "NOT"
-        ]
-        
-        let stringValueKeys: Set<String> = ["is_missing", "has_markers", "has_chapters"]
-        
-        let booleanFlags: Set<String> = [
-            "organized", "interactive", "performer_favorite",
-            "filter_favorites", "ignore_auto_tag", "favorite", "is_zip"
-        ]
-        
-        let intFields: Set<String> = [
-            "rating", "rating100", "play_count", "resume_time", "scene_count",
-            "gallery_count", "performer_count", "tag_count", "duration", "framerate",
-            "bitrate", "interactive_speed", "play_duration", "performer_age",
-            "o_counter", "stash_id_count", "file_count", "id",
-            "image_count", "marker_count", "child_count", "parent_count",
-            "sub_group_count", "containing_group_count", "movie_count", "group_count",
-            "studio_count", "height_cm", "weight", "birth_year", "age", "death_year"
-        ]
-        
-        let floatFields: Set<String> = ["penis_length"]
-        
-        let dateFields: Set<String> = [
-            "date", "birthdate", "death_date", "created_at", "updated_at",
-            "last_played_at", "scene_date", "scene_created_at", "scene_updated_at",
-            "mod_time"
-        ]
-        
-        let multiSelectFields: Set<String> = [
-            "performers", "studios", "tags", "galleries", "scenes", "groups",
-            "movies", "performer_tags", "scene_tags", "parents", "children",
-            "containing_groups", "sub_groups"
-        ]
-        
-        // Standard valid keys for most criterion input types
-        let stdKeys: Set<String> = ["value", "value2", "modifier"]
-        let multiKeys: Set<String> = ["value", "modifier", "depth", "excludes"]
-        
-        // UI-only keys that can appear inside criterion dicts from the "c" array format
-        let uiCriterionKeys: Set<String> = ["type", "inputType", "criterionOption"]
-        
-        // 2. Iterate over all keys to handle nested structures
-        for (key, value) in newDict {
-            // --- Nested sub-filter types ---
-            if nestedFilterKeys.contains(key) {
-                if let subFilterDict = value as? [String: Any] {
-                    newDict[key] = sanitizeFilter(subFilterDict, isMarker: false)
-                }
-                continue
-            }
-            
-            if var subDict = value as? [String: Any] {
-                // Strip UI-only keys from criterion objects
-                for uiKey in uiCriterionKeys {
-                    subDict.removeValue(forKey: uiKey)
-                }
-                
-                // --- String value keys (has_markers, is_missing, has_chapters) ---
-                if stringValueKeys.contains(key) {
-                    if let val = subDict["value"] as? Bool {
-                        newDict[key] = val ? "true" : "false"
-                    } else if let valStr = subDict["value"] as? String {
-                        newDict[key] = valStr
-                    }
-                    continue
-                }
-                
-                // --- Duplicated: DuplicationCriterionInput ---
-                if key == "duplicated" {
-                    var result: [String: Any] = [:]
-                    for boolKey in ["duplicated", "phash", "url", "stash_id", "title"] {
-                        if let val = subDict[boolKey] as? Bool { result[boolKey] = val }
-                        else if let s = subDict[boolKey] as? String { result[boolKey] = (s == "true") }
-                    }
-                    if let dist = subDict["distance"] as? Int { result["distance"] = dist }
-                    if result.isEmpty {
-                        if let val = subDict["value"] as? Bool { result["duplicated"] = val }
-                        else if let s = subDict["value"] as? String { result["duplicated"] = (s == "true") }
-                    }
-                    newDict[key] = result
-                    continue
-                }
-                
-                // --- Boolean flags ---
-                if booleanFlags.contains(key) {
-                    if let val = subDict["value"] as? Bool { newDict[key] = val }
-                    else if let s = subDict["value"] as? String { newDict[key] = (s == "true") }
-                    continue
-                }
-                
-                // --- Universal value unwrapping ---
-                // Stash UI stores values as {"value": {"value": X}} or {"value": {"id": X}}
-                if let valueDict = subDict["value"] as? [String: Any] {
-                    if let inner = valueDict["value"] { subDict["value"] = inner }
-                    else if let inner = valueDict["id"] { subDict["value"] = inner }
-                    else if let items = valueDict["items"] as? [Any] { subDict["value"] = items }
-                }
-                if let vd2 = subDict["value2"] as? [String: Any], let iv2 = vd2["value"] {
-                    subDict["value2"] = iv2
-                }
-                
-                // --- Multi-Select / ID Arrays ---
-                if multiSelectFields.contains(key) {
-                    if let valArray = subDict["value"] as? [Any] {
-                        subDict["value"] = valArray.compactMap { item -> String? in
-                            if let s = item as? String { return s }
-                            if let i = item as? Int { return String(i) }
-                            if let obj = item as? [String: Any] {
-                                if let id = obj["id"] as? String { return id }
-                                if let id = obj["id"] as? Int { return String(id) }
-                            }
-                            return nil
-                        }
-                    }
-                    if let exArr = subDict["excludes"] as? [Any] {
-                        subDict["excludes"] = exArr.compactMap { item -> String? in
-                            if let s = item as? String { return s }
-                            if let i = item as? Int { return String(i) }
-                            if let obj = item as? [String: Any] {
-                                if let id = obj["id"] as? String { return id }
-                                if let id = obj["id"] as? Int { return String(id) }
-                            }
-                            return nil
-                        }
-                    }
-                    for k in subDict.keys where !multiKeys.contains(k) { subDict.removeValue(forKey: k) }
-                    newDict[key] = subDict
-                    continue
-                }
-                
-                // --- Integer criterion fields ---
-                if intFields.contains(key) || (key.contains("count") && !floatFields.contains(key)) {
-                    func castInt(_ val: Any?) -> Any? {
-                        if let i = val as? Int { return i }
-                        if let d = val as? Double { return Int(d) }
-                        if let s = val as? String, let i = Int(s) { return i }
-                        return val
-                    }
-                    if let v = subDict["value"] { subDict["value"] = castInt(v) }
-                    if let v = subDict["value2"] { subDict["value2"] = castInt(v) }
-                    for k in subDict.keys where !stdKeys.contains(k) { subDict.removeValue(forKey: k) }
-                    newDict[key] = subDict
-                    continue
-                }
-                
-                // --- Float criterion fields ---
-                if floatFields.contains(key) {
-                    func castFloat(_ val: Any?) -> Any? {
-                        if let d = val as? Double { return d }
-                        if let i = val as? Int { return Double(i) }
-                        if let s = val as? String, let d = Double(s) { return d }
-                        return val
-                    }
-                    if let v = subDict["value"] { subDict["value"] = castFloat(v) }
-                    if let v = subDict["value2"] { subDict["value2"] = castFloat(v) }
-                    for k in subDict.keys where !stdKeys.contains(k) { subDict.removeValue(forKey: k) }
-                    newDict[key] = subDict
-                    continue
-                }
-                
-                // --- Date/Timestamp fields ---
-                if dateFields.contains(key) {
-                    for k in subDict.keys where !stdKeys.contains(k) { subDict.removeValue(forKey: k) }
-                    newDict[key] = subDict
-                    continue
-                }
-                
-                // --- Orientation: OrientationCriterionInput { value: [OrientationEnum!]! } (NO modifier) ---
-                if key == "orientation" {
-                    if let arr = subDict["value"] as? [Any] {
-                        subDict["value"] = arr.compactMap { item -> String? in
-                            if let s = item as? String { return s.uppercased() }
-                            if let obj = item as? [String: Any], let id = obj["id"] as? String { return id.uppercased() }
-                            return nil
-                        }
-                    } else if let s = subDict["value"] as? String {
-                        subDict["value"] = [s.uppercased()]
-                    }
-                    // OrientationCriterionInput only has "value", no modifier
-                    for k in subDict.keys where k != "value" { subDict.removeValue(forKey: k) }
-                    newDict[key] = subDict
-                    continue
-                }
-                
-                // --- Resolution: ResolutionCriterionInput { value: ResolutionEnum!, modifier } ---
-                if key == "resolution" || key == "average_resolution" {
-                    if let s = subDict["value"] as? String { subDict["value"] = s.uppercased() }
-                    for k in subDict.keys where !stdKeys.contains(k) { subDict.removeValue(forKey: k) }
-                    newDict[key] = subDict
-                    continue
-                }
-                
-                // --- Gender: GenderCriterionInput { value: GenderEnum, value_list: [GenderEnum!], modifier } ---
-                if key == "gender" {
-                    // value can arrive as a string ("MALE") or an array (["Male"])
-                    if let s = subDict["value"] as? String {
-                        subDict["value"] = s.uppercased()
-                    } else if let arr = subDict["value"] as? [Any] {
-                        // Array of gender values → move to value_list, remove value
-                        let uppercased = arr.compactMap { item -> String? in
-                            if let s = item as? String { return s.uppercased() }
-                            if let obj = item as? [String: Any], let id = obj["id"] as? String { return id.uppercased() }
-                            return nil
-                        }
-                        subDict["value_list"] = uppercased
-                        subDict.removeValue(forKey: "value")
-                    }
-                    if let vl = subDict["value_list"] as? [Any] {
-                        subDict["value_list"] = vl.compactMap { ($0 as? String)?.uppercased() }
-                    }
-                    let genderKeys: Set<String> = ["value", "value_list", "modifier"]
-                    for k in subDict.keys where !genderKeys.contains(k) { subDict.removeValue(forKey: k) }
-                    newDict[key] = subDict
-                    continue
-                }
-                
-                // --- Circumcised: CircumcisionCriterionInput { value: [CircumisedEnum!], modifier } ---
-                if key == "circumcised" {
-                    if let arr = subDict["value"] as? [Any] {
-                        subDict["value"] = arr.compactMap { item -> String? in
-                            if let s = item as? String { return s.uppercased() }
-                            if let obj = item as? [String: Any], let id = obj["id"] as? String { return id.uppercased() }
-                            return nil
-                        }
-                    } else if let s = subDict["value"] as? String {
-                        subDict["value"] = [s.uppercased()]
-                    }
-                    for k in subDict.keys where !stdKeys.contains(k) { subDict.removeValue(forKey: k) }
-                    newDict[key] = subDict
-                    continue
-                }
-                
-                // --- StashID criterion types ---
-                if key == "stash_id_endpoint" {
-                    let valid: Set<String> = ["endpoint", "stash_id", "modifier"]
-                    for k in subDict.keys where !valid.contains(k) { subDict.removeValue(forKey: k) }
-                    newDict[key] = subDict
-                    continue
-                }
-                if key == "stash_ids_endpoint" {
-                    let valid: Set<String> = ["endpoint", "stash_ids", "modifier"]
-                    for k in subDict.keys where !valid.contains(k) { subDict.removeValue(forKey: k) }
-                    newDict[key] = subDict
-                    continue
-                }
-                
-                // --- PhashDistance ---
-                if key == "phash_distance" {
-                    let valid: Set<String> = ["value", "modifier", "distance"]
-                    for k in subDict.keys where !valid.contains(k) { subDict.removeValue(forKey: k) }
-                    newDict[key] = subDict
-                    continue
-                }
-                
-                // --- Default: StringCriterionInput { value, modifier } and other types ---
-                for k in subDict.keys where !stdKeys.contains(k) { subDict.removeValue(forKey: k) }
-                newDict[key] = subDict
-                
-            } else if key == "orientation", let valArray = value as? [String] {
-                // orientation as flat string array
-                newDict[key] = ["value": valArray.map { $0.uppercased() }]
-            }
-        }
-        
-        print("🔍 sanitizeFilter OUTPUT: \(newDict)")
-        return newDict
+        return FilterMapper.sanitize(dict, isMarker: isMarker)
     }
+
 
     func fetchPerformerGalleries(performerId: String, sortBy: GallerySortOption = .dateDesc, isInitialLoad: Bool = true) {
         if isInitialLoad {
@@ -2182,7 +1871,7 @@ class StashDBViewModel: ObservableObject {
         let filterDict: [String: Any] = [
             "page": page,
             "per_page": scenesPerPage,
-            "sort": sortBy.sortField,
+            "sort": sortBy.sortField == "random" ? "random_\(randomSeed)" : sortBy.sortField,
             "direction": sortBy.direction
         ]
         
@@ -2294,7 +1983,7 @@ class StashDBViewModel: ObservableObject {
         let filterDict: [String: Any] = [
             "page": page,
             "per_page": scenesPerPage,
-            "sort": sortBy.sortField,
+            "sort": sortBy.sortField == "random" ? "random_\(randomSeed)" : sortBy.sortField,
             "direction": sortBy.direction
         ]
         
@@ -2403,7 +2092,7 @@ class StashDBViewModel: ObservableObject {
         var filterDict: [String: Any] = [
             "page": page,
             "per_page": performersPerPage,
-            "sort": sortBy.sortField,
+            "sort": sortBy.sortField == "random" ? "random_\(randomSeed)" : sortBy.sortField,
             "direction": sortBy.direction
         ]
         if !searchQuery.isEmpty {
@@ -2553,7 +2242,7 @@ class StashDBViewModel: ObservableObject {
         var filterParams: [String: Any] = [
             "page": page,
             "per_page": studiosPerPage,
-            "sort": sortBy.sortField,
+            "sort": sortBy.sortField == "random" ? "random_\(randomSeed)" : sortBy.sortField,
             "direction": sortBy.direction
         ]
         
@@ -2680,7 +2369,7 @@ class StashDBViewModel: ObservableObject {
             "filter": [
                 "page": page,
                 "per_page": tagsPerPage,
-                "sort": sortBy.sortField,
+                "sort": sortBy.sortField == "random" ? "random_\(randomSeed)" : sortBy.sortField,
                 "direction": sortBy.direction
             ],
             "tag_filter": tagFilter
@@ -2772,7 +2461,7 @@ class StashDBViewModel: ObservableObject {
             "filter": [
                 "page": page,
                 "per_page": groupsPerPage,
-                "sort": sortBy.sortField,
+                "sort": sortBy.sortField == "random" ? "random_\(randomSeed)" : sortBy.sortField,
                 "direction": sortBy.direction
             ],
             "group_filter": groupFilter
@@ -2850,7 +2539,7 @@ class StashDBViewModel: ObservableObject {
             "filter": [
                 "page": page,
                 "per_page": groupDetailPerPage,
-                "sort": sortBy.sortField,
+                "sort": sortBy.sortField == "random" ? "random_\(randomSeed)" : sortBy.sortField,
                 "direction": sortBy.direction
             ],
             "scene_filter": sceneFilter
@@ -2901,7 +2590,7 @@ class StashDBViewModel: ObservableObject {
             "filter": [
                 "page": page,
                 "per_page": 20,
-                "sort": sortBy.sortField,
+                "sort": sortBy.sortField == "random" ? "random_\(randomSeed)" : sortBy.sortField,
                 "direction": sortBy.direction
             ],
             "gallery_filter": [
@@ -2984,7 +2673,7 @@ class StashDBViewModel: ObservableObject {
         let filterDict: [String: Any] = [
             "page": page,
             "per_page": scenesPerPage,
-            "sort": sortBy.sortField,
+            "sort": sortBy.sortField == "random" ? "random_\(randomSeed)" : sortBy.sortField,
             "direction": sortBy.direction
         ]
         
@@ -3084,7 +2773,7 @@ class StashDBViewModel: ObservableObject {
         var filterParams: [String: Any] = [
             "page": page,
             "per_page": 20,
-            "sort": sortBy.sortField,
+            "sort": sortBy.sortField == "random" ? "random_\(randomSeed)" : sortBy.sortField,
             "direction": sortBy.direction
         ]
         
@@ -3166,7 +2855,7 @@ class StashDBViewModel: ObservableObject {
             "filter": [
                 "page": page,
                 "per_page": 40,
-                "sort": sortBy.sortField,
+                "sort": sortBy.sortField == "random" ? "random_\(randomSeed)" : sortBy.sortField,
                 "direction": sortBy.direction
             ],
             "image_filter": [
@@ -3231,7 +2920,7 @@ class StashDBViewModel: ObservableObject {
         let filterDict: [String: Any] = [
             "page": page,
             "per_page": 40,
-            "sort": sortBy.sortField,
+            "sort": sortBy.sortField == "random" ? "random_\(randomSeed)" : sortBy.sortField,
             "direction": sortBy.direction
         ]
         

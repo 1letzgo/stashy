@@ -57,10 +57,17 @@ struct HomeView: View {
                 } else {
                     // Refresh invisibly without clearing caches on returning to the tab
                     viewModel.fetchStatistics()
-                    let firstSceneRowId = tabManager.homeRows.first(where: { $0.isEnabled && $0.type != .statistics })?.id
                     for row in tabManager.homeRows where row.isEnabled && row.type != .statistics {
-                        let limit = row.id == firstSceneRowId ? 20 : 5
-                        viewModel.fetchScenesForHomeRow(config: row, limit: limit, forceRefresh: true) { _ in }
+                        let limit = 10
+                        if row.type == .newPerformers || row.type == .performersHighestSceneCount {
+                            viewModel.fetchPerformersForHomeRow(config: row, limit: limit, forceRefresh: true) { _ in }
+                        } else if row.type == .newStudios || row.type == .studiosHighestSceneCount {
+                            viewModel.fetchStudiosForHomeRow(config: row, limit: limit, forceRefresh: true) { _ in }
+                        } else if row.type == .newGalleries || row.type == .recentlyUpdatedGalleries {
+                            viewModel.fetchGalleriesForHomeRow(config: row, limit: limit, forceRefresh: true) { _ in }
+                        } else {
+                            viewModel.fetchScenesForHomeRow(config: row, limit: limit, forceRefresh: true) { _ in }
+                        }
                     }
                 }
             }

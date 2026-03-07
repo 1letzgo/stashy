@@ -7,6 +7,7 @@ struct HomeSceneCardView: View {
     let scene: Scene
     var isLarge: Bool = false
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject var tabManager = TabManager.shared
     
     // Preview Video State
     @State private var previewPlayer: AVPlayer?
@@ -14,7 +15,16 @@ struct HomeSceneCardView: View {
     @State private var isPressing = false
 
     
-    private var cardWidth: CGFloat { isLarge ? 280 : 200 }
+    private var cardWidth: CGFloat {
+        if isLarge {
+            if tabManager.dashboardHeroSize == .big {
+                return UIScreen.main.bounds.width - 24
+            } else {
+                return 280
+            }
+        }
+        return 200
+    }
     
     var body: some View {
         ZStack(alignment: .bottomLeading) {

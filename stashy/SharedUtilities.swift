@@ -876,3 +876,203 @@ struct CenterPlayButton: View {
         }
     }
 }
+
+// MARK: - Filter Mapper
+
+/// Utility to map and sanitize Stash filters from UI/Saved format to GraphQL-ready Searchable format.
+public struct FilterMapper {
+    
+    /// Main entry point to sanitize a filter dictionary.
+    /// - Parameters:
+    ///   - dict: The raw filter dictionary (either from saved_filter or UI).
+    ///   - isMarker: Whether this is a marker filter (requires nesting some scene criteria).
+    /// - Returns: A sanitized dictionary ready for GraphQL.
+    public static func sanitize(_ dict: [String: Any], isMarker: Bool = false) -> [String: Any] {
+        var newDict = dict
+        
+        // 1. Handle the "c" (criteria) array format used by Stash UI
+        if let criteria = newDict["c"] as? [[String: Any]] {
+            var rules: [[String: Any]] = []
+            
+            for item in criteria {
+                if var key = item["id"] as? String {
+                    var outputItem = item
+                    
+                    // Remove UI-only metadata
+                    for uiKey in ["id", "type", "inputType", "criterionOption"] {
+                        outputItem.removeValue(forKey: uiKey)
+                    }
+                    
+                    // Map "rating" to "rating100" for GraphQL compatibility
+                    if key == "rating" { key = "rating100" }
+                    
+                    // Recursively sanitize nested logic or subfilters
+                    outputItem = sanitize(outputItem, isMarker: false)
+                    
+                    // Add to rules list
+                    if isMarker && isSceneSpecificKey(key) {
+                        rules.append(["scene_filter": [key: outputItem]])
+                    } else {
+                        rules.append([key: outputItem])
+                    }
+                }
+            }
+            
+            // Combine rules using AND logic if we have multiple, or set directly if single
+            if rules.count > 1 {
+                newDict["AND"] = rules
+            } else if let firstRule = rules.first {
+                for (k, v) in firstRule {
+                    newDict[k] = v
+                }
+            }
+            
+            newDict.removeValue(forKey: "c")
+        }
+        
+        // 2. Clean up top-level UI-only keys
+        let invalidTopKeys = ["sort", "direction", "mode", "displayMode", "zoomIndex", "sortDirection", "type", "inputType", "criterionOption"]
+        for key in invalidTopKeys {
+            newDict.removeValue(forKey: key)
+        }
+        
+        // 3. Process all remaining keys recursively
+        for (key, value) in newDict {
+            // Handle Logic Operators (AND, OR, NOT) which can be Arrays or Dicts
+            if ["AND", "OR", "NOT"].contains(key) {
+                if let filterArray = value as? [[String: Any]] {
+                    newDict[key] = filterArray.map { sanitize($0, isMarker: false) }
+                } else if let filterDict = value as? [String: Any] {
+                    newDict[key] = sanitize(filterDict, isMarker: false)
+                }
+                continue
+            }
+            
+            // Handle nested sub-filters (e.g., performers_filter, scene_filter)
+            if key.hasSuffix("_filter") || key == "scene_filter" {
+                if let subFilter = value as? [String: Any] {
+                    newDict[key] = sanitize(subFilter, isMarker: false)
+                }
+                continue
+            }
+            
+            // Handle Criterion Input objects (which often have "value", "modifier", etc.)
+            if let subDict = value as? [String: Any] {
+                newDict[key] = processCriterion(key: key, dict: subDict)
+            }
+        }
+        
+        return newDict
+    }
+    
+    // MARK: - Private Helpers
+    
+    private static func isSceneSpecificKey(_ key: String) -> Bool {
+        let keys: Set<String> = ["orientation", "duration", "rating100", "organized", "performers", "tags", "studios", "movies"]
+        return keys.contains(key)
+    }
+    
+    private static func processCriterion(key: String, dict: [String: Any]) -> Any {
+        var subDict = dict
+        
+        // Strip UI-only metadata inside criteria
+        for uiKey in ["type", "inputType", "criterionOption"] {
+            subDict.removeValue(forKey: uiKey)
+        }
+        
+        // Unwrap nested value structures (Stash UI quirk: {"value": {"value": X}} or {"value": {"id": X}})
+        if let valueDict = subDict["value"] as? [String: Any] {
+            if let inner = valueDict["value"] { subDict["value"] = inner }
+            else if let inner = valueDict["id"] { subDict["value"] = inner }
+            else if let items = valueDict["items"] as? [Any] { subDict["value"] = items }
+        }
+        if let vd2 = subDict["value2"] as? [String: Any], let iv2 = vd2["value"] {
+            subDict["value2"] = iv2
+        }
+        
+        // Orientation mapping (must be Uppercased array, no modifier)
+        if key == "orientation" {
+            if let arr = subDict["value"] as? [Any] {
+                subDict["value"] = arr.compactMap { item -> String? in
+                    if let s = item as? String { return s.uppercased() }
+                    if let obj = item as? [String: Any], let id = obj["id"] as? String { return id.uppercased() }
+                    return nil
+                }
+            } else if let s = subDict["value"] as? String {
+                subDict["value"] = [s.uppercased()]
+            }
+            subDict.removeValue(forKey: "modifier")
+        }
+        
+        // Resolution mapping
+        if key == "resolution" || key == "average_resolution" {
+            if let s = subDict["value"] as? String { subDict["value"] = s.uppercased() }
+        }
+        
+        // Integer field casting
+        let intFields: Set<String> = ["rating", "rating100", "play_count", "resume_time", "scene_count", "duration", "o_counter", "id"]
+        if intFields.contains(key) || key.hasSuffix("_count") {
+            if let v = subDict["value"] { subDict["value"] = castToInt(v) }
+            if let v = subDict["value2"] { subDict["value2"] = castToInt(v) }
+        }
+        
+        // Multi-select/ID mapping
+        let multiSelectFields: Set<String> = ["performers", "studios", "tags", "galleries", "scenes", "groups", "movies"]
+        if multiSelectFields.contains(key) {
+            if let valArray = subDict["value"] as? [Any] {
+                subDict["value"] = mapToIds(valArray)
+            }
+            if let exArr = subDict["excludes"] as? [Any] {
+                subDict["excludes"] = mapToIds(exArr)
+            }
+        }
+        
+        // Single enum field mapping (flatten array to string, uppercase)
+        let singleEnumFields: Set<String> = ["gender", "ethnicity", "fake_tits", "hair_color", "eye_color", "career_length"]
+        if singleEnumFields.contains(key) {
+            if let valArray = subDict["value"] as? [Any], let first = valArray.first as? String {
+                subDict["value"] = first.uppercased()
+            } else if let s = subDict["value"] as? String {
+                subDict["value"] = s.uppercased()
+            }
+        }
+        
+        // Boolean field flattening (Stash API expects simple Bool for these, not a criterion object)
+        let booleanFields: Set<String> = ["interactive", "organized", "favorite", "performer_favorite", "studio_favorite", "gallery_favorite", "filter_favorites"]
+        if booleanFields.contains(key) {
+            if let v = subDict["value"] {
+                return castToBool(v)
+            }
+        }
+        
+        return subDict
+    }
+    
+    private static func castToBool(_ val: Any) -> Bool {
+        if let b = val as? Bool { return b }
+        if let s = val as? String {
+            return s.lowercased() == "true" || s == "1" || s.lowercased() == "yes"
+        }
+        if let i = val as? Int { return i != 0 }
+        return false
+    }
+    
+    private static func castToInt(_ val: Any) -> Any {
+        if let i = val as? Int { return i }
+        if let d = val as? Double { return Int(d) }
+        if let s = val as? String, let i = Int(s) { return i }
+        return val
+    }
+    
+    private static func mapToIds(_ array: [Any]) -> [String] {
+        return array.compactMap { item -> String? in
+            if let s = item as? String { return s }
+            if let i = item as? Int { return String(i) }
+            if let obj = item as? [String: Any] {
+                if let id = obj["id"] as? String { return id }
+                if let id = obj["id"] as? Int { return String(id) }
+            }
+            return nil
+        }
+    }
+}

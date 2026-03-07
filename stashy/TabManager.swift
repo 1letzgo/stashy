@@ -176,6 +176,18 @@ enum HomeRowType: String, Codable {
     }
 }
 
+enum DashboardHeroSize: String, Codable, CaseIterable {
+    case big
+    case small
+    
+    var title: String {
+        switch self {
+        case .big: return "Big Hero"
+        case .small: return "Small Hero"
+        }
+    }
+}
+
 // MARK: - Reels Mode Configuration
 enum ReelsModeType: String, Codable, CaseIterable {
     case scenes
@@ -230,6 +242,11 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(isPiPEnabled, forKey: isPiPEnabledKey)
         }
     }
+    @Published var dashboardHeroSize: DashboardHeroSize = .big {
+        didSet {
+            UserDefaults.standard.set(dashboardHeroSize.rawValue, forKey: dashboardHeroSizeKey)
+        }
+    }
 
     // Session-only sort options (not persisted)
     private var sessionSortOptions: [AppTab: String] = [:]
@@ -242,6 +259,7 @@ class TabManager: ObservableObject {
     private let reelsFillHeightKey = "ReelsFillHeight"
     private let reelsContinuousPlayKey = "ReelsContinuousPlay"
     private let isPiPEnabledKey = "isPiPEnabled"
+    private let dashboardHeroSizeKey = "DashboardHeroSize"
     
     init() {
         // Initial load based on currently active server
@@ -264,6 +282,12 @@ class TabManager: ObservableObject {
         self.reelsFillHeight = UserDefaults.standard.object(forKey: reelsFillHeightKey) as? Bool ?? true
         self.reelsContinuousPlay = UserDefaults.standard.bool(forKey: reelsContinuousPlayKey)
         self.isPiPEnabled = UserDefaults.standard.object(forKey: isPiPEnabledKey) as? Bool ?? true
+        if let heroSizeRaw = UserDefaults.standard.string(forKey: dashboardHeroSizeKey),
+           let heroSize = DashboardHeroSize(rawValue: heroSizeRaw) {
+            self.dashboardHeroSize = heroSize
+        } else {
+            self.dashboardHeroSize = .big
+        }
     }
     
     private var currentServerSuffix: String {
