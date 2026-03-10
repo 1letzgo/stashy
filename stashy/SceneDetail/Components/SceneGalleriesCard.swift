@@ -83,7 +83,7 @@ struct SceneGalleriesCard: View {
                     .padding(.bottom, 12)
             }
         }
-        .background(Color(UIColor.systemBackground))
+        .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
     }

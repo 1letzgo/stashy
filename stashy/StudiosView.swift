@@ -528,7 +528,7 @@ struct StudioRowView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color(UIColor.systemBackground))
+        .background(Color.secondaryAppBackground)
         .contentShape(Rectangle())
     }
 }
@@ -585,7 +585,7 @@ struct StudioCardView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
         }
-        .background(Color(UIColor.systemBackground))
+        .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
     }

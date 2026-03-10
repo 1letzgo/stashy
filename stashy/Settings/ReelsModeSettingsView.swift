@@ -23,6 +23,7 @@ struct ReelsModeSettingsView: View {
             } footer: {
                 Text("Immersive Scaling stretches content to fill the full screen when orientation matches the video. Continuous Play automatically advances to the next video instead of looping.")
             }
+            .listRowBackground(Color.secondaryAppBackground)
             
             Section {
                 ForEach(tabManager.reelsModes) { modeConfig in
@@ -71,7 +72,7 @@ struct ReelsModeSettingsView: View {
                     .listRowSeparator(.hidden)
                     .listRowBackground(
                         RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
-                            .fill(Color(UIColor.secondarySystemGroupedBackground))
+                            .fill(Color.secondaryAppBackground)
                             .padding(.vertical, 4)
                     )
                 }
@@ -84,6 +85,7 @@ struct ReelsModeSettingsView: View {
         .environment(\.editMode, .constant(.active))
         .deleteDisabled(true)
         .navigationTitle("StashTok Modes")
+        .applyAppBackground()
         .onAppear {
             viewModel.fetchSavedFilters()
         }

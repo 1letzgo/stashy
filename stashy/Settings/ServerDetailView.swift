@@ -41,6 +41,7 @@ struct ServerDetailView: View {
                     }
                 }
             }
+            .listRowBackground(Color.secondaryAppBackground)
 
             Section("Actions") {
                 if !isActive {
@@ -88,6 +89,7 @@ struct ServerDetailView: View {
                         .foregroundColor(.primary)
                 }
             }
+            .listRowBackground(Color.secondaryAppBackground)
 
             Section {
                 Button(role: .destructive, action: {
@@ -98,8 +100,10 @@ struct ServerDetailView: View {
                         .foregroundColor(appearanceManager.tintColor)
                 }
             }
+            .listRowBackground(Color.secondaryAppBackground)
         }
         .navigationTitle(server.name)
+        .applyAppBackground()
         .alert("Library Scan", isPresented: $showScanAlert) {
             Button("OK", role: .cancel) { }
         } message: {

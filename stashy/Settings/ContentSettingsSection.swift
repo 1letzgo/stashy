@@ -22,6 +22,7 @@ struct ContentSettingsSection: View {
                 Label("Configure StashTok", systemImage: "slider.horizontal.3")
             }
         }
+        .listRowBackground(Color.secondaryAppBackground)
     }
 }
 #endif

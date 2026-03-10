@@ -12,6 +12,7 @@ enum AppTheme: String, CaseIterable, Identifiable {
     case system = "System"
     case light = "Light"
     case dark = "Dark"
+    case darkBlue = "Dark Blue"
     
     var id: String { self.rawValue }
     
@@ -19,7 +20,7 @@ enum AppTheme: String, CaseIterable, Identifiable {
         switch self {
         case .system: return nil
         case .light: return .light
-        case .dark: return .dark
+        case .dark, .darkBlue: return .dark
         }
     }
 }
@@ -44,6 +45,13 @@ class AppearanceManager: ObservableObject {
         didSet {
             UserDefaults.standard.set(preferredTheme.rawValue, forKey: kPreferredTheme)
         }
+    }
+
+    var currentTheme: AppTheme {
+        if preferredTheme == .system {
+            return .dark // Default to dark for system if needed, or implement full resolution
+        }
+        return preferredTheme
     }
 
     var oCounterIconFilled: String {

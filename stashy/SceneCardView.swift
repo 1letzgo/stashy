@@ -168,18 +168,26 @@ struct SceneCardView: View {
                     }
 
                 }
-                
-                // Resume Progress
-                if let resumeTime = scene.resumeTime, resumeTime > 0, let duration = scene.sceneDuration {
-                    ProgressView(value: resumeTime, total: duration)
-                        .progressViewStyle(LinearProgressViewStyle(tint: appearanceManager.tintColor))
-                        .frame(height: 3)
-                        .padding(.top, 2)
-                }
             }
             .padding(12)
         }
-        .background(Color(UIColor.secondarySystemBackground))
+        .overlay(alignment: .bottom) {
+            if let resumeTime = scene.resumeTime, resumeTime > 0, let duration = scene.sceneDuration {
+                GeometryReader { geo in
+                    ZStack(alignment: .leading) {
+                        Rectangle()
+                            .fill(Color.white.opacity(0.2))
+                            .frame(height: 5)
+                        
+                        Rectangle()
+                            .fill(appearanceManager.tintColor)
+                            .frame(width: geo.size.width * CGFloat(min(resumeTime, duration) / duration), height: 5)
+                    }
+                }
+                .frame(height: 5)
+            }
+        }
+        .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
         .onDisappear {

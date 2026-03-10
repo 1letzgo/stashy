@@ -24,15 +24,18 @@ struct DefaultSortView: View {
                     sortPicker(for: tab.id)
                 }
             }
+            .listRowBackground(Color.secondaryAppBackground)
 
             Section(header: Text("Detail Views Sort Order")) {
                 ForEach(tabManager.detailViews) { config in
                     detailSortPicker(for: config)
                 }
             }
+            .listRowBackground(Color.secondaryAppBackground)
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Default Sorting")
+        .applyAppBackground()
     }
 
     @ViewBuilder

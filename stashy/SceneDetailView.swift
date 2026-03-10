@@ -175,8 +175,8 @@ struct SceneDetailView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(appearanceManager.tintColor.opacity(0.1))
-                            .foregroundColor(appearanceManager.tintColor)
+                            .background(appearanceManager.tintColor.opacity(0.15))
+                            .foregroundColor(Color.pillAccent)
                             .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                         }
                     }
@@ -216,8 +216,8 @@ struct SceneDetailView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(appearanceManager.tintColor.opacity(0.1))
-                        .foregroundColor(appearanceManager.tintColor)
+                        .background(appearanceManager.tintColor.opacity(0.15))
+                        .foregroundColor(Color.pillAccent)
                         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                     }
                     .padding(.top, 10)
@@ -555,7 +555,7 @@ struct SceneDetailView: View {
         HStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.caption)
-                .foregroundColor(color ?? appearanceManager.tintColor)
+                .foregroundColor(color ?? Color.pillAccent)
             Text(text)
                 .font(.caption)
                 .fontWeight(.bold)
@@ -565,12 +565,12 @@ struct SceneDetailView: View {
         .padding(.vertical, 4)
         .background(
             ZStack {
-                Color(UIColor.systemBackground)
-                (color ?? appearanceManager.tintColor).opacity(0.1)
+                Color.appBackground
+                (color ?? appearanceManager.tintColor).opacity(0.15)
             }
         )
         .clipShape(Capsule())
-        .overlay(Capsule().stroke(color ?? appearanceManager.tintColor, lineWidth: 0.5))
+        .overlay(Capsule().stroke((color ?? appearanceManager.tintColor).opacity(0.4), lineWidth: 0.5))
     }
     
     /// Updates the player if a better stream becomes available (e.g. replacing an incompatible MKV fallback with a transcribed MP4)
@@ -760,6 +760,7 @@ struct AddMarkerSheet: View {
             }
             .navigationTitle("Add Marker")
             .navigationBarTitleDisplayMode(.inline)
+            .applyAppBackground()
             .toolbar {
                 ToolbarItem(placement: .navigationBarLeading) {
                     Button("Cancel") {
@@ -1000,7 +1001,7 @@ struct AudioVibeCard: View {
             }
         }
         .padding(12)
-        .background(Color(UIColor.systemBackground))
+        .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
     }

@@ -50,6 +50,7 @@ struct ServerStatisticsView: View {
                             .foregroundColor(.secondary)
                     }
                 }
+                .listRowBackground(Color.secondaryAppBackground)
             } else if viewModel.isLoading {
                 Section {
                     HStack {
@@ -74,6 +75,7 @@ struct ServerStatisticsView: View {
             }
         }
         .navigationTitle("Statistics")
+        .applyAppBackground()
         .onAppear {
             viewModel.fetchStatistics()
         }

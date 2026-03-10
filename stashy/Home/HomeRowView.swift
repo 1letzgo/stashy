@@ -2,13 +2,19 @@
 #if !os(tvOS)
 import SwiftUI
 
+extension Array {
+    subscript(safe index: Index) -> Element? {
+        indices.contains(index) ? self[index] : nil
+    }
+}
+
 struct HomeRowView: View {
     let config: HomeRowConfig
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var tabManager = TabManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
     var isLarge: Bool = false
-    
+    var hideHeader: Bool = false
     @State private var scrollID: String?
     
     // Use ViewModel cache instead of local @State
@@ -56,107 +62,79 @@ struct HomeRowView: View {
             return scenes.isEmpty
         }
     }
-    
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            NavigationLink(destination: destinationView) {
-                HStack(spacing: 4) {
-                    Text(config.title)
-                        .font(.headline)
-                        .foregroundColor(.primary)
-                    
-                    Image(systemName: "chevron.right")
-                        .font(.system(size: 14, weight: .bold))
-                        .foregroundColor(.secondary.opacity(0.5))
-                    
-                    Spacer()
+        let screenWidth = UIScreen.main.bounds.width
+        let isBigHero = isLarge && tabManager.dashboardHeroSize == .big
+        let rowSpacing: CGFloat = isBigHero ? 0 : 12
+        let itemPadding: CGFloat = isBigHero ? 10 : 0
+        let horizontalPadding: CGFloat = isBigHero ? 0 : 12
+        
+        let heroTopPadding: CGFloat = 115
+        let heroBottomPadding: CGFloat = 8 // Symmetrical bottom gap
+        let dotsAreaHeight: CGFloat = 0 
+        let cardHeight = isBigHero ? (screenWidth - 20) * 9 / 16 : 200 * 9 / 16
+
+        // totalHeroHeight = (statusBar + navBar + margin) + card + 22 (dots+gap) + 8 (bottom gap)
+        let totalHeroHeight: CGFloat = heroTopPadding + cardHeight + dotsAreaHeight + heroBottomPadding
+        
+        ZStack(alignment: .top) {
+            // Adaptive Background for Hero Row
+            if isBigHero && hideHeader {
+                let focusedScene = scenes.first { $0.id == scrollID } ?? scenes.first
+                if let url = focusedScene?.thumbnailURL {
+                    Color.clear
+                        .frame(width: screenWidth, height: totalHeroHeight)
+                        .overlay(
+                            CustomAsyncImage(url: url) { loader in
+                                if let image = loader.image {
+                                    image
+                                        .resizable()
+                                        .scaledToFill()
+                                }
+                            }
+                            .scaleEffect(1.2)
+                            .blur(radius: 50)
+                        )
+                        .clipped() // Strict container-level clipping
+                        .overlay(Color.black.opacity(0.45))
+                        .ignoresSafeArea(.container, edges: .top)
+                        .animation(.easeInOut(duration: 0.5), value: scrollID)
                 }
-                .padding(.horizontal, 12)
-                .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
             
-            if isLoading {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 12) {
-                        ForEach(0..<5) { _ in
-                            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
-                                .fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-                                .frame(width: getItemWidth(), height: getItemHeight())
-                                .overlay(ProgressView())
-                        }
+            VStack(alignment: .leading, spacing: isBigHero && hideHeader ? 0 : 12) {
+                if isBigHero && hideHeader {
+                    // 115pt area for the hero header
+                    VStack(alignment: .leading, spacing: 0) {
+                        Spacer().frame(height: 65) // Space for status bar / notch
+                        heroHeader
+                        Spacer()
                     }
-                    .padding(.horizontal, 12)
+                    .frame(height: heroTopPadding)
+                    .zIndex(20)
                 }
-            } else if isContentEmpty {
-                Text("No content found")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, 12)
-            } else {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: (isLarge && tabManager.dashboardHeroSize == .big) ? 0 : 12) {
-                        if config.type == .newPerformers || config.type == .performersHighestSceneCount {
-                            ForEach(performers) { performer in
-                                NavigationLink(destination: PerformerDetailView(performer: performer)) {
-                                    HomePerformerCardView(performer: performer, isLarge: isLarge)
-                                        .padding(.horizontal, (isLarge && tabManager.dashboardHeroSize == .big) ? 12 : 0)
-                                }
-                                .buttonStyle(.plain)
-                                .id(performer.id)
-                            }
-                        } else if config.type == .newStudios || config.type == .studiosHighestSceneCount {
-                            ForEach(studios) { studio in
-                                NavigationLink(destination: StudioDetailView(studio: studio)) {
-                                    HomeStudioCardView(studio: studio, isLarge: isLarge)
-                                        .padding(.horizontal, (isLarge && tabManager.dashboardHeroSize == .big) ? 12 : 0)
-                                }
-                                .buttonStyle(.plain)
-                                .id(studio.id)
-                            }
-                        } else if config.type == .newGalleries || config.type == .recentlyUpdatedGalleries {
-                            ForEach(galleries) { gallery in
-                                NavigationLink(destination: ImagesView(gallery: gallery)) {
-                                    HomeGalleryCardView(gallery: gallery, isLarge: isLarge)
-                                        .padding(.horizontal, (isLarge && tabManager.dashboardHeroSize == .big) ? 12 : 0)
-                                }
-                                .buttonStyle(.plain)
-                                .id(gallery.id)
-                            }
-                        } else {
-                            ForEach(scenes) { scene in
-                                NavigationLink(destination: SceneDetailView(scene: scene)) {
-                                    HomeSceneCardView(scene: scene, isLarge: isLarge)
-                                        .padding(.horizontal, (isLarge && tabManager.dashboardHeroSize == .big) ? 12 : 0)
-                                }
-                                .buttonStyle(.plain)
-                                .id(scene.id)
-                            }
-                        }
-                    }
-                    .padding(.horizontal, (isLarge && tabManager.dashboardHeroSize == .big) ? 0 : 12)
-                    .scrollTargetLayout()
+                
+                if !hideHeader {
+                    headerRow
                 }
-                .scrollPosition(id: $scrollID)
-                .scrollTargetBehavior((isLarge && tabManager.dashboardHeroSize == .big) ? .paging : .init())
-                .overlay(alignment: .bottom) {
-                    if isLarge && tabManager.dashboardHeroSize == .big {
-                        PageIndicator(itemCount: getItemCount(), selectedID: scrollID, items: getItems())
-                            .padding(.bottom, 8)
-                    }
+                
+                if isLoading {
+                    loadingPlaceholder(isBigHero: isBigHero)
+                } else if isContentEmpty {
+                    emptyState
+                } else {
+                    mainContent(isBigHero: isBigHero, spacing: rowSpacing, padding: itemPadding, hPadding: horizontalPadding)
+                }
+                
+                if isBigHero && hideHeader {
+                    Spacer().frame(height: heroBottomPadding)
                 }
             }
+            .frame(height: isBigHero && hideHeader ? totalHeroHeight : nil)
+            .frame(maxWidth: .infinity)
         }
         .onAppear {
             checkAndLoadScenes()
-        }
-        .onChange(of: viewModel.savedFilters) { _, _ in
-            checkAndLoadScenes()
-        }
-        .onChange(of: viewModel.isLoadingSavedFilters) { oldValue, newValue in
-            if oldValue == true && newValue == false {
-                checkAndLoadScenes()
-            }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
             if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.dashboard.rawValue {
@@ -175,6 +153,133 @@ struct HomeRowView: View {
             viewModel.homeRowStudios[config.type] = nil
             viewModel.homeRowGalleries[config.type] = nil
             checkAndLoadScenes()
+        }
+        .onChange(of: viewModel.savedFilters) { _, _ in
+            checkAndLoadScenes()
+        }
+        .onChange(of: viewModel.isLoadingSavedFilters) { oldValue, newValue in
+            if oldValue == true && newValue == false {
+                checkAndLoadScenes()
+            }
+        }
+    }
+    
+    @ViewBuilder
+    private var headerRow: some View {
+        NavigationLink(destination: destinationView) {
+            HStack(spacing: 4) {
+                Text(config.title)
+                    .font(.headline)
+                    .foregroundColor(.primary)
+                
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundColor(.secondary.opacity(0.5))
+                
+                Spacer()
+            }
+            .padding(.horizontal, 12)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var heroHeader: some View {
+        Text(config.title)
+            .font(.system(size: 28, weight: .black))
+            .foregroundColor(.white)
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.horizontal, 20)
+            .shadow(color: .black.opacity(0.5), radius: 10, x: 0, y: 2)
+    }
+    
+    @ViewBuilder
+    private func loadingPlaceholder(isBigHero: Bool) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 12) {
+                ForEach(0..<5) { _ in
+                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
+                        .fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                        .frame(width: getItemWidth(), height: getItemHeight())
+                        .overlay(ProgressView())
+                }
+            }
+            .padding(.horizontal, 12)
+        }
+    }
+    
+    @ViewBuilder
+    private var emptyState: some View {
+        Text("No content found")
+            .font(.caption)
+            .foregroundColor(.secondary)
+            .padding(.horizontal, 12)
+    }
+    
+    @ViewBuilder
+    private func mainContent(isBigHero: Bool, spacing: CGFloat, padding: CGFloat, hPadding: CGFloat) -> some View {
+        ZStack(alignment: .bottomTrailing) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: spacing) {
+                    if config.type == .newPerformers || config.type == .performersHighestSceneCount {
+                        ForEach(performers) { performer in
+                            NavigationLink(destination: PerformerDetailView(performer: performer)) {
+                                HomePerformerCardView(performer: performer, isLarge: isLarge)
+                                    .padding(.horizontal, padding)
+                            }
+                            .buttonStyle(.plain)
+                            .frame(width: getItemWidth())
+                            .id(performer.id)
+                        }
+                    } else if config.type == .newStudios || config.type == .studiosHighestSceneCount {
+                        ForEach(studios) { studio in
+                            NavigationLink(destination: StudioDetailView(studio: studio)) {
+                                HomeStudioCardView(studio: studio, isLarge: isLarge)
+                                    .padding(.horizontal, padding)
+                            }
+                            .buttonStyle(.plain)
+                            .frame(width: getItemWidth())
+                            .id(studio.id)
+                        }
+                    } else if config.type == .newGalleries || config.type == .recentlyUpdatedGalleries {
+                        ForEach(galleries) { gallery in
+                            NavigationLink(destination: ImagesView(gallery: gallery)) {
+                                HomeGalleryCardView(gallery: gallery, isLarge: isLarge)
+                                    .padding(.horizontal, padding)
+                            }
+                            .buttonStyle(.plain)
+                            .frame(width: getItemWidth())
+                            .id(gallery.id)
+                        }
+                    } else {
+                        ForEach(scenes) { scene in
+                            NavigationLink(destination: SceneDetailView(scene: scene)) {
+                                HomeSceneCardView(scene: scene, isLarge: isLarge)
+                                    .padding(.horizontal, padding)
+                            }
+                            .buttonStyle(.plain)
+                            .frame(width: getItemWidth())
+                            .id(scene.id)
+                        }
+                    }
+                }
+                .padding(.horizontal, hPadding)
+                .scrollTargetLayout()
+            }
+            .scrollPosition(id: $scrollID)
+            .if(isBigHero) { view in
+                view.scrollTargetBehavior(.paging)
+            }
+            .if(!isBigHero) { view in
+                view.scrollTargetBehavior(.viewAligned)
+            }
+            
+            if isBigHero {
+                PageIndicator(itemCount: getItemCount(), selectedID: scrollID, items: getItems())
+                    .padding(.trailing, 25)
+                    .padding(.bottom, 15)
+            }
         }
     }
     
@@ -224,7 +329,7 @@ struct HomeRowView: View {
     private func getItemWidth() -> CGFloat {
         if isLarge {
             if tabManager.dashboardHeroSize == .big {
-                return UIScreen.main.bounds.width - 24 // 12pt padding on each side
+                return UIScreen.main.bounds.width // This is for the paging frame
             } else {
                 return 280 // Standard "Small Hero" width
             }
@@ -247,6 +352,9 @@ struct HomeRowView: View {
     
     private func getItemHeight() -> CGFloat {
         if isLarge {
+            if tabManager.dashboardHeroSize == .big {
+                return (UIScreen.main.bounds.width - 20) * 9 / 16
+            }
             let width = getItemWidth()
             return width * 9 / 16
         }
@@ -295,20 +403,14 @@ struct PageIndicator: View {
         HStack(spacing: 6) {
             ForEach(0..<itemCount, id: \.self) { index in
                 Circle()
-                    .fill((selectedID ?? items.first) == (items[safe: index] ?? "") ? Color.white : Color.white.opacity(0.4))
-                    .frame(width: 6, height: 6)
+                    .fill((selectedID ?? items.first) == (items[safe: index] ?? "") ? Color.white : Color.white.opacity(0.35))
+                    .frame(width: 5, height: 5)
             }
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(Color.black.opacity(0.3))
+        .padding(.horizontal, 10)
+        .padding(.vertical, 5)
+        .background(Color.white.opacity(0.12))
         .clipShape(Capsule())
-    }
-}
-
-extension Array {
-    subscript(safe index: Index) -> Element? {
-        indices.contains(index) ? self[index] : nil
     }
 }
 
@@ -394,7 +496,7 @@ struct HomePerformerCardView: View {
                     .padding(.horizontal, 5)
                     .padding(.vertical, 3)
                     .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .clipShape(Capsule())
                 }
                 
                 Spacer()
@@ -411,7 +513,9 @@ struct HomePerformerCardView: View {
             .padding(6)
         }
         .frame(width: cardWidth, height: cardHeight)
+        .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .contentShape(Rectangle())
     }
 }
 
@@ -474,6 +578,10 @@ struct HomeStudioCardView: View {
                             Text("\(galleryCount)")
                                 .font(.system(size: isLarge ? 11 : 9, weight: .medium))
                         }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(Color.black.opacity(0.1))
+                        .clipShape(Capsule())
                     }
                 }
                 .foregroundColor(.secondary)
@@ -484,8 +592,9 @@ struct HomeStudioCardView: View {
             .frame(height: isLarge ? 36 : 32)
         }
         .frame(width: cardWidth, height: cardHeight)
-        .background(Color(UIColor.systemBackground))
+        .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .contentShape(Rectangle())
         .cardShadow()
     }
 }

@@ -21,6 +21,7 @@ struct AppearanceSettingsView: View {
                 }
                 .pickerStyle(.segmented)
             }
+            .listRowBackground(Color.secondaryAppBackground)
             
             Section(header: Text("App Accent Color"), footer: Text("This color will be applied to the tab bar, navigation bar buttons, and other interactive elements throughout the app.")) {
                 // Color Picker
@@ -50,6 +51,7 @@ struct AppearanceSettingsView: View {
                 }
                 .padding(.vertical, 8)
             }
+            .listRowBackground(Color.secondaryAppBackground)
             Section(header: Text("Counter Icon"), footer: Text("Choose which icon to display for the Counter throughout the app.")) {
                 LazyVGrid(columns: [GridItem(.adaptive(minimum: 56))], spacing: 12) {
                     ForEach(appearanceManager.oCounterIconPresets) { option in
@@ -88,9 +90,11 @@ struct AppearanceSettingsView: View {
                 }
                 .padding(.vertical, 8)
             }
+            .listRowBackground(Color.secondaryAppBackground)
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Appearance")
+        .applyAppBackground()
     }
 }
 #endif

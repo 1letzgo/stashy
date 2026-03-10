@@ -18,7 +18,7 @@ struct HomeSceneCardView: View {
     private var cardWidth: CGFloat {
         if isLarge {
             if tabManager.dashboardHeroSize == .big {
-                return UIScreen.main.bounds.width - 24
+                return UIScreen.main.bounds.width - 20
             } else {
                 return 280
             }
@@ -27,43 +27,46 @@ struct HomeSceneCardView: View {
     }
     
     var body: some View {
+        let isBigHero = isLarge && tabManager.dashboardHeroSize == .big
+        
         ZStack(alignment: .bottomLeading) {
             // Image
-            GeometryReader { geometry in
-                ZStack {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                    
-                    if let thumbnailURL = scene.thumbnailURL {
-                        CustomAsyncImage(url: thumbnailURL) { loader in
-                            if loader.isLoading {
-                                ProgressView()
-                            } else if let image = loader.image {
-                                image
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: geometry.size.width, height: geometry.size.height)
-                                    .clipped()
-                            } else {
-                                Image(systemName: "film")
-                                    .foregroundColor(.secondary)
-                            }
+            ZStack {
+                Rectangle()
+                    .fill(Color.gray.opacity(0.1)) // Subtle, non-transparent background
+                
+                if let thumbnailURL = scene.thumbnailURL {
+                    CustomAsyncImage(url: thumbnailURL) { loader in
+                        if loader.isLoading {
+                            ProgressView()
+                        } else if let image = loader.image {
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: cardWidth, height: cardWidth * 9 / 16)
+                                .clipped()
+                        } else {
+                            Image(systemName: "film")
+                                .foregroundColor(.secondary)
                         }
-                    } else {
-                        Image(systemName: "film")
-                            .foregroundColor(.secondary)
                     }
-                    
-                    // Video Preview Overlay
-                    if isPreviewing, let previewPlayer = previewPlayer {
-                        AspectFillVideoPlayer(player: previewPlayer)
-                            .frame(width: geometry.size.width, height: geometry.size.height)
-                            .clipped()
-                            .allowsHitTesting(false)
-                            .transition(.opacity)
-                    }
+                } else {
+                    Image(systemName: "film")
+                        .foregroundColor(.secondary)
+                }
+                
+                // Video Preview Overlay
+                if isPreviewing, let previewPlayer = previewPlayer {
+                    AspectFillVideoPlayer(player: previewPlayer)
+                        .frame(width: cardWidth, height: cardWidth * 9 / 16)
+                        .clipped()
+                        .allowsHitTesting(false)
+                        .transition(.opacity)
                 }
             }
+            .frame(width: cardWidth, height: cardWidth * 9 / 16)
+            .clipped() // Hard clip for the container
+            .contentShape(Rectangle())
             .onLongPressGesture(minimumDuration: 0.15, pressing: { pressing in
                 isPressing = pressing
                 if pressing {
@@ -72,6 +75,7 @@ struct HomeSceneCardView: View {
                     stopPreview()
                 }
             }, perform: {})
+            .contentShape(Rectangle()) // Ensure tap area matches card bounds
             
             // Gradient Overlay for Text Readability
             LinearGradient(
@@ -89,12 +93,12 @@ struct HomeSceneCardView: View {
                     // Studio Badge (Top Left)
                     if let studio = scene.studio {
                         Text(studio.name.uppercased())
-                            .font(.system(size: 8, weight: .bold))
+                            .font(.system(size: isBigHero ? 11 : 8, weight: .bold))
                             .foregroundColor(.white)
-                            .padding(.horizontal, 6)
-                            .padding(.vertical, 3)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
                             .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .clipShape(Capsule())
                     }
                     
                     Spacer()
@@ -102,12 +106,12 @@ struct HomeSceneCardView: View {
                     // Duration Badge (Top Right, moved from bottom)
                     if let duration = scene.files?.first?.duration {
                         Text(formatDuration(duration))
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.system(size: isBigHero ? 12 : 10, weight: .bold))
                             .foregroundColor(.white)
-                            .padding(.horizontal, 4)
-                            .padding(.vertical, 2)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
                             .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                            .clipShape(RoundedRectangle(cornerRadius: 4))
+                            .clipShape(Capsule())
                     }
                     
                     // Download Indicator
@@ -127,31 +131,36 @@ struct HomeSceneCardView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     // Title (Bottom Left)
                     Text(scene.title ?? "Untitled Scene")
-                    .font(isLarge ? .subheadline : .caption)
+                    .font(isBigHero ? .headline : (isLarge ? .subheadline : .caption))
                     .fontWeight(.bold)
                     .foregroundColor(.white)
                     .lineLimit(2)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, alignment: .bottomLeading)
                     .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
-                    
-                    // Resume Progress
-                    if let resumeTime = scene.resumeTime, resumeTime > 0, let duration = scene.sceneDuration {
-                        ProgressView(value: min(resumeTime, duration), total: duration)
-                            .progressViewStyle(LinearProgressViewStyle(tint: appearanceManager.tintColor))
-                            .frame(height: 3)
-                    }
                 }
             }
-            .padding(8)
+            .padding(isBigHero ? 16 : 8)
+            .padding(.bottom, isBigHero ? 8 : 4) // Space for progress bar
+        }
+        .overlay(alignment: .bottom) {
+            // Resume Progress at absolute bottom
+            if let resumeTime = scene.resumeTime, resumeTime > 0, let duration = scene.sceneDuration {
+                ZStack(alignment: .leading) {
+                    Rectangle()
+                        .fill(Color.white.opacity(0.2))
+                        .frame(height: 5)
+                    
+                    Rectangle()
+                        .fill(appearanceManager.tintColor)
+                        .frame(width: cardWidth * CGFloat(min(resumeTime, duration) / duration), height: 5)
+                }
+            }
         }
         .frame(width: cardWidth, height: cardWidth * 9 / 16)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)) // Updated to 12
-        .overlay(
-            // Optional: Add border if needed, but usually shadow is enough
-            // RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card).stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
-            EmptyView()
-        )
+        .background(Color.secondaryAppBackground)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .shadow(color: .black.opacity(isBigHero ? 0.35 : 0), radius: 12, x: 0, y: 8)
         .onDisappear {
             stopPreview()
         }

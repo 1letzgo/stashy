@@ -58,6 +58,7 @@ struct ServerSetupWizardView: View {
             }
             .navigationTitle("Server Setup")
             .navigationBarTitleDisplayMode(.inline)
+            .applyAppBackground()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") {
@@ -109,7 +110,7 @@ struct ServerSetupWizardView: View {
                         
                         TextField("My Stash", text: $serverName)
                             .padding()
-                            .background(Color(.secondarySystemGroupedBackground))
+                            .background(Color.secondaryAppBackground)
                             .cornerRadius(DesignTokens.CornerRadius.card)
                     }
                     
@@ -126,7 +127,7 @@ struct ServerSetupWizardView: View {
                         }
                         .pickerStyle(.segmented)
                         .padding()
-                        .background(Color(.secondarySystemGroupedBackground))
+                        .background(Color.secondaryAppBackground)
                         .cornerRadius(DesignTokens.CornerRadius.card)
                     }
                     
@@ -141,7 +142,7 @@ struct ServerSetupWizardView: View {
                             .autocapitalization(.none)
                             .autocorrectionDisabled()
                             .padding()
-                            .background(Color(.secondarySystemGroupedBackground))
+                            .background(Color.secondaryAppBackground)
                             .cornerRadius(DesignTokens.CornerRadius.card)
                             .onChange(of: serverAddress) { oldValue, newValue in
                                 if newValue.lowercased().hasPrefix("https://") {
@@ -178,7 +179,7 @@ struct ServerSetupWizardView: View {
                             .autocapitalization(.none)
                             .autocorrectionDisabled()
                             .padding()
-                            .background(Color(.secondarySystemGroupedBackground))
+                            .background(Color.secondaryAppBackground)
                             .cornerRadius(DesignTokens.CornerRadius.card)
                     }
                 }
@@ -280,7 +281,7 @@ struct ServerSetupWizardView: View {
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 16)
-                    .background(Color(.secondarySystemGroupedBackground))
+                    .background(Color.secondaryAppBackground)
                     .foregroundColor(.primary)
                     .cornerRadius(DesignTokens.CornerRadius.button)
                 }

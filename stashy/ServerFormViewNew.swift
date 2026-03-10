@@ -110,6 +110,7 @@ struct ServerFormViewNew: View {
             } header: {
                 Text("Server Details")
             }
+            .listRowBackground(Color.secondaryAppBackground)
             
             // Authentication Section
             Section {
@@ -125,6 +126,7 @@ struct ServerFormViewNew: View {
             } footer: {
                 Text("Enter the API key if authentication is enabled on your Stash server.")
             }
+            .listRowBackground(Color.secondaryAppBackground)
             
             // Connection Test Section
             Section {
@@ -176,6 +178,7 @@ struct ServerFormViewNew: View {
                     Text("URL: \(currentBaseURL)")
                 }
             }
+            .listRowBackground(Color.secondaryAppBackground)
             
             // Delete Button (only if editing)
             if configToEdit != nil {
@@ -189,10 +192,12 @@ struct ServerFormViewNew: View {
                         }
                     }
                 }
+                .listRowBackground(Color.secondaryAppBackground)
             }
         }
         .navigationTitle(configToEdit == nil ? "Add Server" : "Edit Server")
         .navigationBarTitleDisplayMode(.inline)
+        .applyAppBackground()
         .toolbar {
             ToolbarItem(placement: .cancellationAction) {
                 Button("Cancel") {

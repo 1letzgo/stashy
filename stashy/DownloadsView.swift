@@ -79,7 +79,7 @@ struct DownloadsView: View {
                                         }
                                     }
                                     .padding()
-                                    .background(Color(UIColor.systemBackground))
+                                    .background(Color.secondaryAppBackground)
                                     .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                                     .subtleShadow()
                                     .padding(.horizontal)
@@ -157,7 +157,7 @@ struct DownloadedSceneCard: View {
                         .padding(.horizontal, 4)
                         .padding(.vertical, 2)
                         .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
+                        .clipShape(Capsule())
                         .padding(4)
                         .frame(maxWidth: 130, maxHeight: 100, alignment: .bottomTrailing)
                 }
@@ -221,7 +221,7 @@ struct DownloadedSceneCard: View {
             Spacer()
         }
         .frame(height: 100)
-        .background(Color(UIColor.systemBackground))
+        .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .subtleShadow()
     }
@@ -353,7 +353,7 @@ struct DownloadDetailView: View {
                 }
                 .padding(12)
                 .padding(.bottom, (downloaded.details?.isEmpty ?? true) ? 0 : 20)
-                .background(Color(UIColor.systemBackground))
+                .background(Color.secondaryAppBackground)
                 .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                 .cardShadow()
                 .overlay(
@@ -429,7 +429,7 @@ struct DownloadDetailView: View {
                     }
                     .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(UIColor.systemBackground))
+                    .background(Color.secondaryAppBackground)
                     .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                     .cardShadow()
                 }

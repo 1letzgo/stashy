@@ -53,12 +53,14 @@ struct SettingsView: View {
                     Label("Security", systemImage: "lock.shield")
                 }
             }
+            .listRowBackground(Color.secondaryAppBackground)
             
             Section(header: Text("Appearance")) {
                 NavigationLink(destination: AppearanceSettingsView()) {
                     Label("Appearance", systemImage: "paintbrush")
                 }
             }
+            .listRowBackground(Color.secondaryAppBackground)
 
             // MARK: - Content & Tabs
             if configManager.activeConfig != nil {
@@ -76,12 +78,14 @@ struct SettingsView: View {
                         Label("Filters", systemImage: "line.3.horizontal.decrease.circle")
                     }
                 }
+                .listRowBackground(Color.secondaryAppBackground)
             }
 
             // MARK: - About
             tipSection
             aboutSection
         }
+        .applyAppBackground()
         .navigationTitle("Settings")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $showingAddServerSheet) {
@@ -212,6 +216,7 @@ struct SettingsView: View {
                 }
             }
         }
+        .listRowBackground(Color.secondaryAppBackground)
     }
 
     private func tipRow(icon: String, title: String, price: String) -> some View {
@@ -248,6 +253,7 @@ struct SettingsView: View {
                         .foregroundColor(appearanceManager.tintColor)
                 }
             }
+            .listRowBackground(Color.secondaryAppBackground)
             
             Text("🚧 crafted by letzgo")
                 .font(.caption)

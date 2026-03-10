@@ -20,11 +20,10 @@ struct DashboardSettingsView: View {
                     set: { tabManager.dashboardHeroSize = $0 ? .big : .small }
                 ))
                 .tint(appearanceManager.tintColor)
-            } header: {
-                Text("Hero Layout")
             } footer: {
                 Text("Enable Big Hero to show one item at a time with full-width paging. If disabled, a standard carousel will be shown.")
             }
+            .listRowBackground(Color.secondaryAppBackground)
             
             Section {
                 ForEach(tabManager.homeRows) { row in
@@ -39,11 +38,10 @@ struct DashboardSettingsView: View {
                 .onMove { indices, newOffset in
                     tabManager.moveHomeRow(from: indices, to: newOffset)
                 }
-            } header: {
-                Text("Dashboard Rows")
             } footer: {
                 Text("Enable and reorder the rows shown on the Dashboard.")
             }
+            .listRowBackground(Color.secondaryAppBackground)
 
             Section {
                 // Anchored Dashboard item
@@ -79,15 +77,15 @@ struct DashboardSettingsView: View {
                     }
                     tabManager.moveSubTab(from: adjustedIndices, to: newOffset + 1, within: .catalogue)
                 }
-            } header: {
-                Text("Statistic Card & Menu")
             } footer: {
                 Text("Reorder cards. Dashboard is anchored at the top.")
             }
+            .listRowBackground(Color.secondaryAppBackground)
         }
         .listStyle(.insetGrouped)
         .environment(\.editMode, .constant(.active))
         .navigationTitle("Dashboard Settings")
+        .applyAppBackground()
     }
 }
 #endif

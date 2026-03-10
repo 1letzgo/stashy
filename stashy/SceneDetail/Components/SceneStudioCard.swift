@@ -24,7 +24,7 @@ struct SceneStudioCard: View {
             .padding(.bottom, 12)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-        .background(Color(UIColor.systemBackground))
+        .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
     }
@@ -49,13 +49,13 @@ struct SceneStudioCard: View {
                 .padding(.vertical, 4)
                 .background(
                     ZStack {
-                        Color(UIColor.systemBackground)
+                        Color.secondaryAppBackground
                         appearanceManager.tintColor.opacity(0.1)
                     }
                 )
-                .foregroundColor(appearanceManager.tintColor)
+                .foregroundColor(Color.pillAccent)
                 .clipShape(Capsule())
-                .overlay(Capsule().stroke(appearanceManager.tintColor, lineWidth: 0.5))
+                .overlay(Capsule().stroke(appearanceManager.tintColor.opacity(0.4), lineWidth: 0.5))
                 .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
                 .offset(y: 8)
         }

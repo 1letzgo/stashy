@@ -178,6 +178,16 @@ enum StashJSONValue: Codable {
 import SwiftUI
 
 extension View {
+    /// Applies a transformation to the view if a condition is met.
+    @ViewBuilder
+    func `if`<Content: View>(_ condition: Bool, transform: (Self) -> Content) -> some View {
+        if condition {
+            transform(self)
+        } else {
+            self
+        }
+    }
+
     /// Applies the .searchable modifier conditionally.
     /// Search field is only visible when isSearchVisible is true.
     #if !os(tvOS)
@@ -193,7 +203,9 @@ extension View {
     
     /// Applies the standard app background color.
     func applyAppBackground() -> some View {
-        self.background(Color.appBackground)
+        self
+            .scrollContentBackground(.hidden)
+            .background(Color.appBackground)
     }
     
     /// Adds a shimmering effect to the view (usually for loading states)
@@ -898,22 +910,29 @@ public struct FilterMapper {
                 if var key = item["id"] as? String {
                     var outputItem = item
                     
-                    // Remove UI-only metadata
-                    for uiKey in ["id", "type", "inputType", "criterionOption"] {
-                        outputItem.removeValue(forKey: uiKey)
-                    }
-                    
                     // Map "rating" to "rating100" for GraphQL compatibility
                     if key == "rating" { key = "rating100" }
                     
-                    // Recursively sanitize nested logic or subfilters
-                    outputItem = sanitize(outputItem, isMarker: false)
+                    // If this is a nested logic node (has its own "c" array), sanitize recursively.
+                    // Otherwise, it's a leaf criterion - process it directly using its ID as the field key.
+                    let processedItem: Any
+                    if outputItem["c"] != nil || outputItem["AND"] != nil || outputItem["OR"] != nil || outputItem["NOT"] != nil {
+                        processedItem = sanitize(outputItem, isMarker: false)
+                    } else {
+                        processedItem = processCriterion(key: key, dict: outputItem)
+                    }
                     
                     // Add to rules list
                     if isMarker && isSceneSpecificKey(key) {
-                        rules.append(["scene_filter": [key: outputItem]])
+                        rules.append(["scene_filter": [key: processedItem]])
                     } else {
-                        rules.append([key: outputItem])
+                        if let dict = processedItem as? [String: Any] {
+                            rules.append([key: dict])
+                        } else if let b = processedItem as? Bool {
+                            rules.append([key: b])
+                        } else {
+                            rules.append([key: processedItem])
+                        }
                     }
                 }
             }
@@ -931,7 +950,7 @@ public struct FilterMapper {
         }
         
         // 2. Clean up top-level UI-only keys
-        let invalidTopKeys = ["sort", "direction", "mode", "displayMode", "zoomIndex", "sortDirection", "type", "inputType", "criterionOption"]
+        let invalidTopKeys = ["id", "sort", "direction", "mode", "displayMode", "zoomIndex", "sortDirection", "type", "inputType", "criterionOption"]
         for key in invalidTopKeys {
             newDict.removeValue(forKey: key)
         }
@@ -976,7 +995,7 @@ public struct FilterMapper {
         var subDict = dict
         
         // Strip UI-only metadata inside criteria
-        for uiKey in ["type", "inputType", "criterionOption"] {
+        for uiKey in ["id", "type", "inputType", "criterionOption"] {
             subDict.removeValue(forKey: uiKey)
         }
         
@@ -988,6 +1007,11 @@ public struct FilterMapper {
         }
         if let vd2 = subDict["value2"] as? [String: Any], let iv2 = vd2["value"] {
             subDict["value2"] = iv2
+        }
+        if let excludesDict = subDict["excludes"] as? [String: Any] {
+            if let inner = excludesDict["value"] { subDict["excludes"] = inner }
+            else if let inner = excludesDict["id"] { subDict["excludes"] = inner }
+            else if let items = excludesDict["items"] as? [Any] { subDict["excludes"] = items }
         }
         
         // Orientation mapping (must be Uppercased array, no modifier)

@@ -405,7 +405,7 @@ struct TagCardView: View {
         } // Closing HStack
         .frame(maxWidth: .infinity, alignment: .leading)
         .frame(height: 48) // Optimized height for two lines of subheadline
-        .background(Color(UIColor.secondarySystemBackground))
+        .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .overlay(
             RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
@@ -576,7 +576,7 @@ struct TagDetailView: View {
                             }
                             .padding(12)
                         }
-                        .background(Color(UIColor.secondarySystemBackground))
+                        .background(Color.secondaryAppBackground)
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                         .overlay(
                             RoundedRectangle(cornerRadius: 12)

@@ -184,7 +184,7 @@ struct StudioDetailView: View {
                          }
                      } label: {
                          Image(systemName: isFavorite ? "heart.fill" : "heart")
-                             .foregroundColor(isFavorite ? .red : appearanceManager.tintColor)
+                             .foregroundColor(isFavorite ? .red : Color.pillAccent)
                      }
 
                     if selectedDetailTab == .scenes {
@@ -281,7 +281,7 @@ struct StudioDetailView: View {
             .frame(width: 140)
             , alignment: .leading
         )
-        .background(Color(UIColor.secondarySystemBackground))
+        .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .overlay(
             RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
@@ -304,9 +304,9 @@ struct StudioDetailView: View {
                     }) {
                         Image(systemName: isHeaderExpanded ? "chevron.up" : "chevron.down")
                             .font(.system(size: 10, weight: .bold))
-                            .foregroundColor(appearanceManager.tintColor)
+                            .foregroundColor(Color.pillAccent)
                             .padding(6)
-                            .background(appearanceManager.tintColor.opacity(0.1))
+                            .background(appearanceManager.tintColor.opacity(0.15))
                             .clipShape(Circle())
                     }
                     .padding(8)
@@ -355,7 +355,7 @@ struct StudioDetailView: View {
         HStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.caption)
-                .foregroundColor(appearanceManager.tintColor)
+                .foregroundColor(Color.pillAccent)
             Text(text)
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -516,7 +516,7 @@ struct StudioDetailView: View {
             }
         } label: {
             Image(systemName: "arrow.up.arrow.down")
-                .foregroundColor(appearanceManager.tintColor)
+                .foregroundColor(Color.pillAccent)
         }
     }
     

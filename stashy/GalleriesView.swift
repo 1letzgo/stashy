@@ -427,6 +427,20 @@ struct GalleryCardView: View {
                                 }
                                 
                                 Spacer()
+                                
+                                if let count = gallery.imageCount, count > 0 {
+                                    HStack(spacing: 2) {
+                                        Image(systemName: "photo.stack")
+                                            .font(.system(size: 8, weight: .bold))
+                                        Text("\(count)")
+                                            .font(.system(size: 9, weight: .bold))
+                                    }
+                                    .foregroundColor(.white)
+                                    .padding(.horizontal, 5)
+                                    .padding(.vertical, 3)
+                                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
+                                    .clipShape(Capsule())
+                                }
                             }
                             .padding(6)
                             
@@ -447,7 +461,7 @@ struct GalleryCardView: View {
                     }
                 }
             )
-            .background(Color(UIColor.secondarySystemBackground))
+            .background(Color.secondaryAppBackground)
             .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
             .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)) // Ensure hit testing works on entire card
             .cardShadow()

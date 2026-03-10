@@ -219,7 +219,7 @@ struct ReelsView: View {
         var playCount: Int? {
             switch self {
             case .scene(let s): return s.playCount
-            case .marker(let m): return m.scene?.playCount
+            case .marker(let m): return m.playCount
             case .clip: return nil  // Images don't track play count
             }
         }
@@ -477,11 +477,8 @@ struct ReelsView: View {
     }
 
     private func handlePlayCountChange(item: ReelItemData, newCount: Int) {
-        var targetSceneId: String?
-        if case .scene(let scene) = item { targetSceneId = scene.id }
-        else if case .marker(let marker) = item { targetSceneId = marker.scene?.id }
-        
-        if let sceneId = targetSceneId {
+        if case .scene(let scene) = item {
+            let sceneId = scene.id
             // 1. Scene List Update
             if let index = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
                 let originalCount = viewModel.scenes[index].playCount ?? 0
@@ -501,7 +498,7 @@ struct ReelsView: View {
                 }
             }
             
-            // 2. Scene Markers Update
+            // 2. Scene Markers Update (associated scene count)
             let markerIndices = viewModel.sceneMarkers.enumerated().compactMap { index, marker in
                 marker.scene?.id == sceneId ? index : nil
             }
@@ -531,6 +528,31 @@ struct ReelsView: View {
             // 3. Fallback (if not in any list)
             if !viewModel.scenes.contains(where: { $0.id == sceneId }) && markerIndices.isEmpty {
                 viewModel.addScenePlay(sceneId: sceneId) { _ in }
+            }
+        } else if case .marker(let marker) = item {
+            // MARKER Play Count Update (The fix)
+            let markerId = marker.id
+            
+            // 1. Optimistic Update for Scene Markers List
+            if let index = viewModel.sceneMarkers.firstIndex(where: { $0.id == markerId }) {
+                let originalCount = viewModel.sceneMarkers[index].playCount ?? 0
+                viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withPlayCount(newCount)
+                
+                viewModel.addSceneMarkerPlay(markerId: markerId) { returnedCount in
+                    if let count = returnedCount {
+                        DispatchQueue.main.async {
+                            viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withPlayCount(count)
+                        }
+                    } else {
+                        DispatchQueue.main.async {
+                            viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withPlayCount(originalCount)
+                            ToastManager.shared.show("Marker view count update failed", icon: "exclamationmark.triangle", style: .error)
+                        }
+                    }
+                }
+            } else {
+                // 2. Fallback (if not in current list)
+                viewModel.addSceneMarkerPlay(markerId: markerId) { _ in }
             }
         }
     }

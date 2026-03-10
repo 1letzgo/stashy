@@ -284,7 +284,7 @@ struct ImagesView: View {
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 12)
-        .background(Color(UIColor.secondarySystemBackground).opacity(0.95))
+        .background(Color.secondaryAppBackground.opacity(0.95))
         .clipShape(Capsule())
         .overlay(Capsule().stroke(Color.primary.opacity(0.1), lineWidth: 0.5))
         .floatingShadow()

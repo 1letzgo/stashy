@@ -542,7 +542,7 @@ struct GroupCardView: View {
             }
             .padding(12)
         }
-        .background(Color(UIColor.secondarySystemBackground))
+        .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
     }

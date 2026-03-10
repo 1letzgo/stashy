@@ -34,7 +34,7 @@ struct SceneVideoPlayerCard: View {
             videoPlayerArea
             infoSection
         }
-        .background(Color(UIColor.systemBackground))
+        .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
         .overlay(expandToggleOverlay, alignment: .bottomTrailing)
@@ -117,14 +117,14 @@ struct SceneVideoPlayerCard: View {
                 if let resumeTime = activeScene.resumeTime, resumeTime > 0, let duration = activeScene.sceneDuration, duration > 0 {
                     ProgressView(value: resumeTime, total: duration)
                         .progressViewStyle(LinearProgressViewStyle(tint: appearanceManager.tintColor))
-                        .frame(height: 4)
+                        .frame(height: 6)
                         .frame(maxHeight: .infinity, alignment: .bottom)
                 }
             }
         }
         .frame(maxWidth: .infinity)
         .aspectRatio(16/9, contentMode: .fit)
-        .background(Color(UIColor.secondarySystemBackground))
+        .background(Color.secondaryAppBackground)
         .clipShape(
             UnevenRoundedRectangle(
                 topLeadingRadius: 12,
@@ -227,14 +227,14 @@ struct SceneVideoPlayerCard: View {
             if let details = activeScene.details, !details.isEmpty {
                 Text(details)
                     .font(.body)
-                    .foregroundColor(.secondary)
-                    .lineLimit(isHeaderExpanded ? nil : 2)
+                    .foregroundColor(.primary.opacity(0.8))
+                    .lineLimit(isHeaderExpanded ? nil : 3)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(12)
         .padding(.bottom, (activeScene.details?.isEmpty ?? true) ? 0 : 20)
-        .background(Color(UIColor.systemBackground))
+        .background(Color.secondaryAppBackground)
     }
 
     @ViewBuilder
@@ -257,58 +257,60 @@ struct SceneVideoPlayerCard: View {
 
     @ViewBuilder
     private var metadataSwipeBar: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                // O-Counter
-                Button(action: {
-                    HapticManager.light()
-                    viewModel.incrementOCounter(sceneId: activeScene.id) { newCount in
-                        if let count = newCount {
-                            DispatchQueue.main.async { activeScene = activeScene.withOCounter(count) }
-                        }
-                    }
-                }) {
-                    infoPill(icon: AppearanceManager.shared.oCounterIconFilled, text: "\(activeScene.oCounter ?? 0)", color: .red)
-                }
-                .buttonStyle(.plain)
-                
-                // Add Marker Button
-                Button(action: {
-                    capturedMarkerTime = player?.currentTime().seconds ?? 0
-                    showingAddMarkerSheet = true
-                }) {
-                    infoPill(icon: "plus.square.fill.on.square.fill", text: "Marker", color: .green)
-                }
-                .buttonStyle(.plain)
-                
-                // Audio Sync - TEMPORARILY ALWAYS SHOW FOR DEBUGGING
-                audioSyncButton
-                
+        VStack(alignment: .leading, spacing: 10) {
+            // Row 1: Fixed (Not scrollable) - o_counter, Rate, play counter, duration, date
+            HStack(spacing: 5) {
+                oCounterButton
                 ratingMenu
-                playbackSpeedMenu
-                qualityMenu
-
-                if DownloadManager.shared.isDownloaded(id: activeScene.id) {
-                    infoPill(icon: "checkmark.circle.fill", text: "Downloaded", color: .green)
-                }
                 
-
-                if activeScene.organized == true {
-                    infoPill(icon: "checkmark.seal.fill", text: "Organized", color: .green)
-                }
-                if let date = activeScene.date {
-                    infoPill(icon: "calendar", text: date)
+                if let playCount = activeScene.playCount, playCount > 0 {
+                    infoPill(icon: "play.circle", text: "\(playCount) plays")
                 }
                 if let duration = activeScene.sceneDuration {
                     infoPill(icon: "clock", text: formatTime(duration))
                 }
-                if let playCount = activeScene.playCount, playCount > 0 {
-                    infoPill(icon: "play.circle", text: "\(playCount) plays")
+                if let date = activeScene.date {
+                    infoPill(icon: "calendar", text: date)
                 }
             }
-            .padding(.horizontal, 12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            
+            // Row 2: Fixed & Centered - marker, video quality, Audio sync
+            HStack(spacing: 8) {
+                Spacer()
+                addMarkerButton
+                qualityMenu
+                audioSyncButton
+                Spacer()
+            }
+            .frame(maxWidth: .infinity)
         }
-        .padding(.horizontal, -12)
+    }
+
+    @ViewBuilder
+    private var oCounterButton: some View {
+        Button(action: {
+            HapticManager.light()
+            viewModel.incrementOCounter(sceneId: activeScene.id) { newCount in
+                if let count = newCount {
+                    DispatchQueue.main.async { activeScene = activeScene.withOCounter(count) }
+                }
+            }
+        }) {
+            infoPill(icon: AppearanceManager.shared.oCounterIconFilled, text: "\(activeScene.oCounter ?? 0)", color: .red)
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var addMarkerButton: some View {
+        Button(action: {
+            capturedMarkerTime = player?.currentTime().seconds ?? 0
+            showingAddMarkerSheet = true
+        }) {
+            infoPill(icon: "plus.square.fill.on.square.fill", text: "Marker", color: .green)
+        }
+        .buttonStyle(.plain)
     }
 
     @ViewBuilder
@@ -343,34 +345,11 @@ struct SceneVideoPlayerCard: View {
             infoPill(
                 icon: activeScene.rating100 == nil ? "star" : "star.fill",
                 text: activeScene.rating100 == nil ? "Rate" : String(format: "%.1f", stars),
-                color: activeScene.rating100 == nil ? .secondary : .orange
+                color: activeScene.rating100 == nil ? Color.pillAccent : .orange
             )
         }
     }
 
-    @ViewBuilder
-    private var playbackSpeedMenu: some View {
-        Menu {
-            Section("Playback Speed") {
-                ForEach([0.5, 0.75, 1.0, 1.25, 1.5, 2.0], id: \.self) { speed in
-                    Button(action: {
-                        playbackSpeed = speed
-                        if player?.timeControlStatus == .playing {
-                            player?.rate = Float(speed)
-                        }
-                    }) {
-                        HStack {
-                            Text(String(format: "%.2fx", speed))
-                            if playbackSpeed == speed { Image(systemName: "checkmark") }
-                        }
-                    }
-                }
-            }
-        } label: {
-            infoPill(icon: "speedometer", text: String(format: "%.2fx", playbackSpeed), color: .purple)
-        }
-        .buttonStyle(.plain)
-    }
 
     @ViewBuilder
     private var qualityMenu: some View {
@@ -472,7 +451,7 @@ struct SceneVideoPlayerCard: View {
                     .padding(.vertical, 1)
                     .background(Color.black.opacity(DesignTokens.Opacity.badge))
                     .foregroundColor(.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 3))
+                    .clipShape(Capsule())
                     .padding(2)
             }
             .clipShape(RoundedRectangle(cornerRadius: 4))
@@ -499,7 +478,7 @@ struct SceneVideoPlayerCard: View {
     }
     
     @ViewBuilder
-    private func infoPill(icon: String, text: String, color: Color = .secondary) -> some View {
+    private func infoPill(icon: String, text: String, color: Color = Color.pillAccent) -> some View {
         HStack(spacing: 4) {
             Image(systemName: icon)
                 .font(.system(size: 10, weight: .bold))
@@ -552,7 +531,7 @@ struct SceneVideoPlayerCard: View {
             let isAudioActive = handyManager.isAudioMode
             infoPill(icon: isAudioActive ? "waveform.and.mic" : "waveform", 
                      text: isAudioActive ? "Sync ON" : "Audio Sync", 
-                     color: isAudioActive ? .purple : .secondary)
+                     color: isAudioActive ? .purple : Color.pillAccent)
         }
     }
 }

@@ -22,22 +22,51 @@ struct HomeView: View {
             } else if viewModel.statistics == nil && viewModel.errorMessage != nil {
                 ConnectionErrorView { viewModel.fetchStatistics() }
             } else {
+                let firstSceneRowId = tabManager.homeRows.first(where: { $0.isEnabled && $0.type != .statistics })?.id
+                let isBigHeroEnabled = tabManager.dashboardHeroSize == .big
+                
                 ScrollView {
                     VStack(spacing: 24) {
-                        let firstSceneRowId = tabManager.homeRows.first(where: { $0.isEnabled && $0.type != .statistics })?.id
+                        // 1. If Big Hero is enabled, render it FIRST at the absolute top
+                        if isBigHeroEnabled, let firstId = firstSceneRowId, 
+                           let heroRow = tabManager.homeRows.first(where: { $0.id == firstId }) {
+                            HomeRowView(
+                                config: heroRow, 
+                                viewModel: viewModel, 
+                                isLarge: true,
+                                hideHeader: true
+                            )
+                        }
                         
+                        // 2. Render all other rows in their relative order
                         ForEach(tabManager.homeRows) { row in
                             if row.isEnabled {
-                                if row.type == .statistics {
+                                // Skip the hero row if it was already rendered at the top
+                                if isBigHeroEnabled && row.id == firstSceneRowId {
+                                    EmptyView()
+                                } else if row.type == .statistics {
                                     HomeStatisticsRowView(viewModel: viewModel)
                                 } else {
-                                    HomeRowView(config: row, viewModel: viewModel, isLarge: row.id == firstSceneRowId)
+                                    HomeRowView(
+                                        config: row, 
+                                        viewModel: viewModel, 
+                                        isLarge: row.id == firstSceneRowId,
+                                        hideHeader: false
+                                    )
                                 }
                             }
                         }
                     }
-                    .padding(.vertical, 16)
+                    .padding(.top, isBigHeroEnabled ? 0 : 16)
                     .padding(.bottom, 80) // Floating bar space
+                }
+                .ignoresSafeArea(.container, edges: isBigHeroEnabled ? .top : [])
+                .navigationTitle(isBigHeroEnabled ? "" : "Dashboard")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .navigationBarTrailing) {
+                        EmptyView()
+                    }
                 }
                 .refreshable {
                     viewModel.homeRowScenes.removeAll()

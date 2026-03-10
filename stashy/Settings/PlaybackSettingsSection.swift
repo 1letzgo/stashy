@@ -53,6 +53,7 @@ struct PlaybackSettingsSection: View {
                 .tint(appearanceManager.tintColor)
             #endif
         }
+        .listRowBackground(Color.secondaryAppBackground)
 
         #if !os(tvOS)
         Section(header: Text("Interactive Devices")) {
@@ -66,6 +67,7 @@ struct PlaybackSettingsSection: View {
                 Label("Love Spouse", systemImage: "antenna.radiowaves.left.and.right")
             }
         }
+        .listRowBackground(Color.secondaryAppBackground)
         #endif
     }
 }
@@ -126,6 +128,7 @@ struct IntifaceSettingsView: View {
         }
         .navigationTitle("Intiface")
         .navigationBarTitleDisplayMode(.inline)
+        .applyAppBackground()
     }
 }
 #endif
@@ -169,6 +172,7 @@ struct HandySettingsView: View {
         }
         .navigationTitle("The Handy")
         .navigationBarTitleDisplayMode(.inline)
+        .applyAppBackground()
     }
 }
 #endif
@@ -199,6 +203,7 @@ struct LoveSpouseSettingsView: View {
         }
         .navigationTitle("Love Spouse")
         .navigationBarTitleDisplayMode(.inline)
+        .applyAppBackground()
     }
 }
 #endif

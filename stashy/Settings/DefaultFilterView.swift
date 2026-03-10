@@ -28,10 +28,12 @@ struct DefaultFilterView: View {
             } footer: {
                 Text("Pick a saved filter that will be applied automatically when you open the respective tab.")
             }
+            .listRowBackground(Color.secondaryAppBackground)
 
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Default Filters")
+        .applyAppBackground()
         .toolbar {
             if viewModel.isLoadingSavedFilters {
                 ToolbarItem(placement: .navigationBarTrailing) {

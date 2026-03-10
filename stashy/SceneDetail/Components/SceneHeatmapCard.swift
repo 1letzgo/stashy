@@ -45,7 +45,7 @@ struct SceneHeatmapCard: View {
                                 }
                                 .font(.caption)
                                 .fontWeight(.bold)
-                                .foregroundColor(handyManager.isSyncing ? .white : appearanceManager.tintColor)
+                                .foregroundColor(handyManager.isSyncing ? .white : Color.pillAccent)
                                 .padding(.horizontal, 8)
                                 .frame(minWidth: 92, minHeight: 28)
                                 .background(handyManager.isSyncing ? Color.green : appearanceManager.tintColor.opacity(0.1))
@@ -69,7 +69,7 @@ struct SceneHeatmapCard: View {
                                 }
                                 .font(.caption)
                                 .fontWeight(.bold)
-                                .foregroundColor(buttplugManager.isSyncing ? .white : appearanceManager.tintColor)
+                                .foregroundColor(buttplugManager.isSyncing ? .white : Color.pillAccent)
                                 .padding(.horizontal, 8)
                                 .frame(minWidth: 92, minHeight: 28)
                                 .background(buttplugManager.isSyncing ? Color.green : appearanceManager.tintColor.opacity(0.1))
@@ -94,7 +94,7 @@ struct SceneHeatmapCard: View {
                                 }
                                 .font(.caption)
                                 .fontWeight(.bold)
-                                .foregroundColor(isSyncing ? .white : appearanceManager.tintColor)
+                                .foregroundColor(isSyncing ? .white : Color.pillAccent)
                                 .padding(.horizontal, 8)
                                 .frame(minWidth: 92, minHeight: 28)
                                 .background(isSyncing ? Color.green : appearanceManager.tintColor.opacity(0.1))
@@ -104,7 +104,7 @@ struct SceneHeatmapCard: View {
                     }
                 } else {
                     Image(systemName: "waveform.path")
-                        .foregroundStyle(appearanceManager.tintColor)
+                        .foregroundStyle(Color.pillAccent)
                         .font(.subheadline)
                 }
             }
@@ -156,7 +156,7 @@ struct SceneHeatmapCard: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 8)
         }
-        .background(Color(UIColor.systemBackground))
+        .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
     }
@@ -209,7 +209,7 @@ struct SceneHeatmapCard: View {
                     
                     Text(formatTime(time))
                         .font(.system(size: 9, weight: .medium, design: .monospaced))
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(.primary.opacity(0.8))
                         // Align text so it doesn't go off screen
                         .fixedSize()
                         .offset(x: pos == 1.0 ? -25 : (pos == 0 ? 0 : -10))

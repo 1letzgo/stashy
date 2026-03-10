@@ -16,12 +16,74 @@ import CoreBluetooth
 
 extension Color {
     static let appAccent = Color(red: 0x64/255.0, green: 0x4C/255.0, blue: 0x3D/255.0)
-    #if os(tvOS)
-    static let appBackground = Color(UIColor.separator).opacity(0.1)
-    #else
-    static let appBackground = Color(UIColor.systemGray6)
-    #endif
-    static let studioHeaderGray = Color(red: 44/255.0, green: 44/255.0, blue: 46/255.0)
+    
+    static var appBackground: Color {
+        #if os(tvOS)
+        return Color(UIColor.separator).opacity(0.1)
+        #else
+        switch AppearanceManager.shared.currentTheme {
+        case .darkBlue:
+            return Color(hex: "#1E293B")
+        default:
+            return Color(UIColor.systemGray6)
+        }
+        #endif
+    }
+    
+    static var secondaryAppBackground: Color {
+        #if os(tvOS)
+        return Color(UIColor.separator).opacity(0.15)
+        #else
+        switch AppearanceManager.shared.currentTheme {
+        case .darkBlue:
+            return Color(hex: "#334155")
+        default:
+            return Color(UIColor.secondarySystemBackground)
+        }
+        #endif
+    }
+    
+    static var pillAccent: Color {
+        #if os(tvOS)
+        return .primary
+        #else
+        switch AppearanceManager.shared.currentTheme {
+        case .darkBlue:
+            return .white.opacity(0.9)
+        default:
+            return AppearanceManager.shared.tintColor
+        }
+        #endif
+    }
+    
+    static var studioHeaderGray: Color {
+        AppearanceManager.shared.currentTheme == .darkBlue ? Color(hex: "#1E293B") : Color(red: 44/255.0, green: 44/255.0, blue: 46/255.0)
+    }
+
+    init(hex: String) {
+        let hex = hex.trimmingCharacters(in: CharacterSet.alphanumerics.inverted)
+        var int: UInt64 = 0
+        Scanner(string: hex).scanHexInt64(&int)
+        let a, r, g, b: UInt64
+        switch hex.count {
+        case 3: // RGB (12-bit)
+            (a, r, g, b) = (255, (int >> 8) * 17, (int >> 4 & 0xF) * 17, (int & 0xF) * 17)
+        case 6: // RGB (24-bit)
+            (a, r, g, b) = (255, int >> 16, int >> 8 & 0xFF, int & 0xFF)
+        case 8: // ARGB (32-bit)
+            (a, r, g, b) = (int >> 24, int >> 16 & 0xFF, int >> 8 & 0xFF, int & 0xFF)
+        default:
+            (a, r, g, b) = (1, 1, 1, 0)
+        }
+
+        self.init(
+            .sRGB,
+            red: Double(r) / 255,
+            green: Double(g) / 255,
+            blue:  Double(b) / 255,
+            opacity: Double(a) / 255
+        )
+    }
 }
 
 // MARK: - Network Errors
@@ -3162,6 +3224,38 @@ class StashDBViewModel: ObservableObject {
         }
     }
     
+    func addSceneMarkerPlay(markerId: String, completion: ((Int?) -> Void)? = nil) {
+        let mutation = """
+        mutation SceneMarkerIncrementPlay($id: ID!) {
+          sceneMarkerUpdate(input: { id: $id }) {
+            id
+            play_count
+          }
+        }
+        """
+        
+        let variables: [String: Any] = ["id": markerId]
+        
+        print("🎬 MARKER PLAY: Sending increment via sceneMarkerUpdate for marker \(markerId)")
+        Task {
+            do {
+                let result = try await GraphQLClient.shared.performMutation(mutation: mutation, variables: variables)
+                if let data = result["data"]?.value as? [String: Any],
+                   let payload = data["sceneMarkerUpdate"] as? [String: Any] {
+                    if let newCount = payload["play_count"] as? Int {
+                        print("✅ MARKER PLAY: Success for marker \(markerId). New count: \(newCount)")
+                        await MainActor.run { completion?(newCount) }
+                        return
+                    }
+                }
+                await MainActor.run { completion?(nil) }
+            } catch {
+                print("❌ MARKER PLAY: Error for marker \(markerId): \(error)")
+                await MainActor.run { completion?(nil) }
+            }
+        }
+    }
+    
     func incrementOCounter(sceneId: String, completion: ((Int?) -> Void)? = nil) {
         let mutation = """
         {
@@ -4627,16 +4721,22 @@ struct SceneMarker: Codable, Identifiable, Equatable {
     let screenshot: String?
     let preview: String?
     let stream: String?
+    let playCount: Int?
     let scene: MarkerScene?
 
     enum CodingKeys: String, CodingKey {
         case id, title, seconds, tags, screenshot, preview, stream, scene
         case endSeconds = "end_seconds"
         case primaryTag = "primary_tag"
+        case playCount = "play_count"
     }
 
     func withScene(_ newScene: MarkerScene?) -> SceneMarker {
-        SceneMarker(id: id, title: title, seconds: seconds, endSeconds: endSeconds, primaryTag: primaryTag, tags: tags, screenshot: screenshot, preview: preview, stream: stream, scene: newScene)
+        SceneMarker(id: id, title: title, seconds: seconds, endSeconds: endSeconds, primaryTag: primaryTag, tags: tags, screenshot: screenshot, preview: preview, stream: stream, playCount: playCount, scene: newScene)
+    }
+
+    func withPlayCount(_ newCount: Int?) -> SceneMarker {
+        SceneMarker(id: id, title: title, seconds: seconds, endSeconds: endSeconds, primaryTag: primaryTag, tags: tags, screenshot: screenshot, preview: preview, stream: stream, playCount: newCount, scene: scene)
     }
     
     // Computed property for thumbnail URL

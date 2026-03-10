@@ -20,37 +20,37 @@ struct ServerListSection: View {
 
     var body: some View {
         Section("Servers") {
-            List {
-                ForEach(configManager.savedServers) { server in
-                    ServerListRow(
-                        server: server,
-                        viewModel: viewModel,
-                        isActive: configManager.activeConfig?.id == server.id,
-                        isConnected: configManager.activeConfig?.id == server.id && viewModel.isServerConnected,
-                        isScanning: isScanningLibrary,
-                        onConnect: {
-                            configManager.saveConfig(server)
-                            viewModel.resetData()
-                            viewModel.testConnection()
-                            viewModel.fetchStatistics()
-                            coordinator.resetAllStacks()
-                        },
-                        onEdit: {
-                            editingServer = server
-                        },
-                        onScan: onScan
-                    )
-                }
-                .onDelete { indexSet in
-                    configManager.deleteServer(at: indexSet)
-                }
+            ForEach(configManager.savedServers) { server in
+                ServerListRow(
+                    server: server,
+                    viewModel: viewModel,
+                    isActive: configManager.activeConfig?.id == server.id,
+                    isConnected: configManager.activeConfig?.id == server.id && viewModel.isServerConnected,
+                    isScanning: isScanningLibrary,
+                    onConnect: {
+                        configManager.saveConfig(server)
+                        viewModel.resetData()
+                        viewModel.testConnection()
+                        viewModel.fetchStatistics()
+                        coordinator.resetAllStacks()
+                    },
+                    onEdit: {
+                        editingServer = server
+                    },
+                    onScan: onScan
+                )
             }
+            .onDelete { indexSet in
+                configManager.deleteServer(at: indexSet)
+            }
+            .listRowBackground(Color.secondaryAppBackground)
 
             Button(action: {
                 showingAddServerSheet = true
             }) {
                 Label("Add New Server", systemImage: "plus")
             }
+            .listRowBackground(Color.secondaryAppBackground)
         }
     }
 }

@@ -23,14 +23,17 @@ struct SceneTagsCard: View {
                     if let tags = tags {
                         WrappedHStack(items: tags) { tag in
                             NavigationLink(destination: TagDetailView(selectedTag: tag)) {
-                                 Text(tag.name)
-                                    .font(.caption)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
-                                    .background(appearanceManager.tintColor.opacity(0.1))
-                                    .foregroundColor(appearanceManager.tintColor)
-                                    .clipShape(Capsule())
-                                    .overlay(Capsule().stroke(appearanceManager.tintColor, lineWidth: 0.5))
+                                 HStack(spacing: 4) {
+                                     Image(systemName: "tag.fill")
+                                         .font(.system(size: 10, weight: .bold))
+                                     Text(tag.name)
+                                         .font(.system(size: 10, weight: .bold))
+                                 }
+                                 .padding(.horizontal, 10)
+                                 .padding(.vertical, 6)
+                                 .background(Color.pillAccent.opacity(0.1))
+                                 .foregroundColor(Color.pillAccent)
+                                 .clipShape(Capsule())
                             }
                             .buttonStyle(.plain)
                         }
@@ -68,7 +71,7 @@ struct SceneTagsCard: View {
             .padding(.horizontal, 12)
             .padding(.bottom, 12)
         }
-        .background(Color(UIColor.systemBackground))
+        .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
     }
