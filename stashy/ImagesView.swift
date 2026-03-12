@@ -51,7 +51,7 @@ struct ImagesView: View {
         
         // Fetch new data immediately
         if let gallery = gallery {
-             viewModel.fetchGalleryImages(galleryId: gallery.id)
+             viewModel.fetchGalleryImages(galleryId: gallery.id, sortBy: newOption)
         } else {
              viewModel.fetchImages(sortBy: newOption, filter: selectedFilter)
         }
@@ -65,7 +65,7 @@ struct ImagesView: View {
         }
         .refreshable {
             if let gallery = gallery {
-                viewModel.fetchGalleryImages(galleryId: gallery.id)
+                viewModel.fetchGalleryImages(galleryId: gallery.id, sortBy: selectedSortOption)
             } else {
                 viewModel.fetchImages(sortBy: selectedSortOption, filter: selectedFilter)
             }
@@ -99,7 +99,7 @@ struct ImagesView: View {
 
             if let gallery = gallery {
                 if viewModel.galleryImages.isEmpty {
-                    viewModel.fetchGalleryImages(galleryId: gallery.id)
+                    viewModel.fetchGalleryImages(galleryId: gallery.id, sortBy: selectedSortOption)
                 }
             } else {
                 // If no default filter is set, fetch immediately ONLY if we don't have images yet
