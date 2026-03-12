@@ -47,6 +47,7 @@ class AppearanceManager: ObservableObject {
         }
     }
 
+
     var currentTheme: AppTheme {
         if preferredTheme == .system {
             return .dark // Default to dark for system if needed, or implement full resolution
@@ -64,6 +65,7 @@ class AppearanceManager: ObservableObject {
     private let kTintColorAlpha = "kTintColorAlpha"
     private let kOCounterIcon = "kOCounterIcon"
     private let kPreferredTheme = "kPreferredTheme"
+
 
     private init() {
         // Load from UserDefaults or use default
@@ -115,6 +117,25 @@ class AppearanceManager: ObservableObject {
     var uiColor: UIColor {
         return UIColor(tintColor)
     }
+
+    func isSameColor(_ color1: Color, _ color2: Color) -> Bool {
+        let uiColor1 = UIColor(color1)
+        let uiColor2 = UIColor(color2)
+        
+        var r1: CGFloat = 0, g1: CGFloat = 0, b1: CGFloat = 0, a1: CGFloat = 0
+        var r2: CGFloat = 0, g2: CGFloat = 0, b2: CGFloat = 0, a2: CGFloat = 0
+        
+        guard uiColor1.getRed(&r1, green: &g1, blue: &b1, alpha: &a1),
+              uiColor2.getRed(&r2, green: &g2, blue: &b2, alpha: &a2) else {
+            return false
+        }
+        
+        let threshold: CGFloat = 0.01
+        return abs(r1 - r2) < threshold &&
+               abs(g1 - g2) < threshold &&
+               abs(b1 - b2) < threshold &&
+               abs(a1 - a2) < threshold
+    }
     
     // Counter Icon Presets
     let oCounterIconPresets: [IconOption] = [
@@ -163,3 +184,4 @@ struct ColorOption: Identifiable, Hashable {
         return nameKey // We are currently using strings directly, no localizations detected yet.
     }
 }
+

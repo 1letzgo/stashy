@@ -5,7 +5,7 @@
 //  Improved server form with live connection testing
 //
 
-#if !os(tvOS)
+#if !os(tvOS) && !os(watchOS)
 import SwiftUI
 
 // MARK: - Improved Server Form View
@@ -24,6 +24,13 @@ struct ServerFormViewNew: View {
     @State private var testResult: ConnectionTestResult = .none
     @State private var testMessage: String = ""
     
+    // Login State
+    @State private var username: String = ""
+    @State private var password: String = ""
+    @State private var isLoginFlowVisible: Bool = false
+    @State private var isFetchingKey: Bool = false
+    @State private var loginErrorMessage: String? = nil
+    
     let configToEdit: ServerConfig?
     let onSave: (ServerConfig) -> Void
     let onDelete: (() -> Void)?
@@ -35,6 +42,8 @@ struct ServerFormViewNew: View {
         case success
         case failure
     }
+    
+    @State private var authMethod: AuthMethod = .none
     
     init(configToEdit: ServerConfig?, onSave: @escaping (ServerConfig) -> Void, onDelete: (() -> Void)? = nil) {
         self.configToEdit = configToEdit
@@ -114,17 +123,68 @@ struct ServerFormViewNew: View {
             
             // Authentication Section
             Section {
-                HStack {
-                    Image(systemName: "key.fill")
-                        .foregroundColor(.secondary)
-                    SecureField("API Key (optional)", text: $apiKey)
+                Picker("Auth Method", selection: $authMethod) {
+                    ForEach(AuthMethod.allCases, id: \.self) { method in
+                        Text(method.rawValue).tag(method)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .padding(.vertical, 4)
+                
+                if authMethod == .login {
+                    TextField("Username", text: $username)
+                        .textContentType(.username)
                         .autocapitalization(.none)
-                        .autocorrectionDisabled()
+                        .disableAutocorrection(true)
+                    
+                    SecureField("Password", text: $password)
+                        .textContentType(.password)
+                    
+                    Button(action: fetchKeyViaLogin) {
+                        HStack {
+                            if isFetchingKey {
+                                ProgressView()
+                                    .scaleEffect(0.8)
+                                    .padding(.trailing, 4)
+                            }
+                            Text("Fetch API Key")
+                                .fontWeight(.bold)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(username.isEmpty || password.isEmpty || isFetchingKey ? Color.gray.opacity(0.3) : appearanceManager.tintColor)
+                        .foregroundColor(.white)
+                        .cornerRadius(DesignTokens.CornerRadius.button)
+                    }
+                    .disabled(username.isEmpty || password.isEmpty || isFetchingKey)
+                    .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
+                    
+                    if let error = loginErrorMessage {
+                        Text(error)
+                            .font(.caption)
+                            .foregroundColor(.red)
+                    }
+                } else if authMethod == .apiKey {
+                    HStack {
+                        Image(systemName: "key.fill")
+                            .foregroundColor(.secondary)
+                        SecureField("API Key", text: $apiKey)
+                            .autocapitalization(.none)
+                            .autocorrectionDisabled()
+                    }
+                    .padding(.vertical, 4)
                 }
             } header: {
                 Text("Authentication")
             } footer: {
-                Text("Enter the API key if authentication is enabled on your Stash server.")
+                switch authMethod {
+                case .none:
+                    Text("No authentication will be used.")
+                case .login:
+                    Text("Login with your Stash credentials to retrieve the API key.")
+                case .apiKey:
+                    Text("Enter your Stash API key directly.")
+                }
             }
             .listRowBackground(Color.secondaryAppBackground)
             
@@ -237,8 +297,12 @@ struct ServerFormViewNew: View {
                 // Load API key from Keychain first, fallback to config
                 if let savedKey = KeychainManager.shared.loadAPIKey(forServerID: config.id) {
                     apiKey = savedKey
+                    authMethod = .apiKey
+                } else if let configKey = config.apiKey, !configKey.isEmpty {
+                    apiKey = configKey
+                    authMethod = .apiKey
                 } else {
-                    apiKey = config.apiKey ?? ""
+                    authMethod = .none
                 }
             }
         }
@@ -294,9 +358,11 @@ struct ServerFormViewNew: View {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.timeoutInterval = 15 // Consistent with GraphQLClient
         
-        if !apiKey.isEmpty {
-            request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
-        }
+                if authMethod == .apiKey || authMethod == .login {
+                    if !apiKey.isEmpty {
+                        request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
+                    }
+                }
         
         let query = """
         {"query": "{ version { version } }"}
@@ -327,7 +393,7 @@ struct ServerFormViewNew: View {
                 
                 if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                     testResult = .failure
-                    testMessage = "Authentication required - check API Key"
+                    testMessage = "Authentication failed"
                     return
                 }
                 
@@ -357,9 +423,14 @@ struct ServerFormViewNew: View {
         let serverID = configToEdit?.id ?? UUID()
         
         // Save API key to Keychain
-        if !apiKey.isEmpty {
-            _ = KeychainManager.shared.saveAPIKey(apiKey, forServerID: serverID)
+        if authMethod == .apiKey || authMethod == .login {
+            if !apiKey.isEmpty {
+                _ = KeychainManager.shared.saveAPIKey(apiKey, forServerID: serverID)
+            } else {
+                KeychainManager.shared.deleteAPIKey(forServerID: serverID)
+            }
         } else {
+            // None selected, clear everything
             KeychainManager.shared.deleteAPIKey(forServerID: serverID)
         }
         
@@ -374,6 +445,38 @@ struct ServerFormViewNew: View {
             subpath: parsed.subpath
         )
         onSave(newConfig)
+    }
+    
+    private func fetchKeyViaLogin() {
+        guard isConfigValid else { return }
+        
+        isFetchingKey = true
+        loginErrorMessage = nil
+        
+        Task {
+            do {
+                let fetchedKey = try await LoginAuthHelper.shared.fetchAPIKey(
+                    baseURL: currentBaseURL,
+                    username: username,
+                    password: password
+                )
+                
+                await MainActor.run {
+                    self.apiKey = fetchedKey
+                    self.isFetchingKey = false
+                    self.authMethod = .apiKey
+                    self.username = ""
+                    self.password = ""
+                    // Automatically test connection with the new key
+                    self.testConnection()
+                }
+            } catch {
+                await MainActor.run {
+                    self.loginErrorMessage = error.localizedDescription
+                    self.isFetchingKey = false
+                }
+            }
+        }
     }
 }
 

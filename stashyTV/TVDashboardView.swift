@@ -30,8 +30,7 @@ struct TVDashboardView: View {
                 contentRows
             }
         }
-        .background(Color.black)
-        .navigationBarHidden(true)
+        .background(Color.appBackground)
         .onAppear {
             loadData()
         }

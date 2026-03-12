@@ -34,6 +34,7 @@ struct DefaultFilterView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Default Filters")
         .applyAppBackground()
+        .scrollContentBackground(.hidden)
         .toolbar {
             if viewModel.isLoadingSavedFilters {
                 ToolbarItem(placement: .navigationBarTrailing) {

@@ -188,6 +188,13 @@ struct TVServerFormView: View {
     @State private var port: String = ""
     @State private var selectedProtocol: ServerProtocol = .https
     @State private var apiKey: String = ""
+    
+    // Auth State
+    @State private var authMethod: AuthMethod = .none
+    @State private var username = ""
+    @State private var password = ""
+    @State private var isFetchingKey = false
+    @State private var loginErrorMessage: String? = nil
 
     @FocusState private var focusedField: Field?
 
@@ -202,63 +209,112 @@ struct TVServerFormView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 40) {
-                Text(server == nil ? "Add Server" : "Edit Server")
-                    .font(.largeTitle)
-                    .fontWeight(.bold)
-                    .padding(.top, 40)
+            ScrollView {
+                VStack(spacing: 40) {
+                    Text(server == nil ? "Add Server" : "Edit Server")
+                        .font(.largeTitle)
+                        .fontWeight(.bold)
+                        .padding(.top, 40)
 
-                VStack(spacing: 24) {
-                    TextField("Server Name", text: $name)
-                        .focused($focusedField, equals: .name)
+                    VStack(spacing: 24) {
+                        TextField("Server Name", text: $name)
+                            .focused($focusedField, equals: .name)
 
-                    TextField("Server Address", text: $address)
-                        .focused($focusedField, equals: .address)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .onChange(of: address) { _, newValue in
-                            let detection = ServerConfig.detectProtocol(from: newValue)
-                            if let detectedProtocol = detection.protocol {
-                                selectedProtocol = detectedProtocol
-                                address = detection.address
+                        TextField("Server Address", text: $address)
+                            .focused($focusedField, equals: .address)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                            .onChange(of: address) { _, newValue in
+                                let detection = ServerConfig.detectProtocol(from: newValue)
+                                if let detectedProtocol = detection.protocol {
+                                    selectedProtocol = detectedProtocol
+                                    address = detection.address
+                                }
                             }
-                        }
 
-                    HStack(spacing: 24) {
-                        TextField("Port (optional)", text: $port)
-                            .focused($focusedField, equals: .port)
+                        HStack(spacing: 24) {
+                            TextField("Port (optional)", text: $port)
+                                .focused($focusedField, equals: .port)
+                                .frame(maxWidth: 300)
+
+                            Picker("Protocol", selection: $selectedProtocol) {
+                                ForEach(ServerProtocol.allCases, id: \.self) { proto in
+                                    Text(proto.displayName).tag(proto)
+                                }
+                            }
+                            .pickerStyle(.segmented)
                             .frame(maxWidth: 300)
+                        }
 
-                        Picker("Protocol", selection: $selectedProtocol) {
-                            ForEach(ServerProtocol.allCases, id: \.self) { proto in
-                                Text(proto.displayName).tag(proto)
+                        // Authentication Section
+                        VStack(alignment: .leading, spacing: 24) {
+                            Text("Authentication")
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                            
+                            Picker("Auth Method", selection: $authMethod) {
+                                ForEach(AuthMethod.allCases, id: \.self) { method in
+                                    Text(method.rawValue).tag(method)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            
+                            if authMethod == .login {
+                                VStack(spacing: 24) {
+                                    TextField("Username", text: $username)
+                                        .textContentType(.username)
+                                        .textInputAutocapitalization(.never)
+                                    
+                                    SecureField("Password", text: $password)
+                                        .textContentType(.password)
+                                    
+                                    Button {
+                                        fetchKeyViaLogin()
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            if isFetchingKey {
+                                                ProgressView()
+                                            }
+                                            Text(isFetchingKey ? "Logging in..." : "Fetch API Key")
+                                        }
+                                        .frame(minWidth: 300)
+                                    }
+                                    .disabled(username.isEmpty || password.isEmpty || isFetchingKey)
+                                    
+                                    if let error = loginErrorMessage {
+                                        Text(error)
+                                            .foregroundColor(.red)
+                                            .font(.callout)
+                                    }
+                                }
+                            } else if authMethod == .apiKey {
+                                TextField("API Key", text: $apiKey)
+                                    .focused($focusedField, equals: .apiKey)
+                                    .autocorrectionDisabled()
+                                    .textInputAutocapitalization(.never)
                             }
                         }
-                        .pickerStyle(.segmented)
-                        .frame(maxWidth: 300)
+                        .padding()
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(20)
                     }
+                    .frame(maxWidth: 800)
 
-                    TextField("API Key (optional)", text: $apiKey)
-                        .focused($focusedField, equals: .apiKey)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
+                    HStack(spacing: 40) {
+                        Button("Cancel") {
+                            dismiss()
+                        }
+
+                        Button("Save") {
+                            save()
+                        }
+                        .disabled(address.isEmpty)
+                    }
+                    .padding(.bottom, 60)
                 }
-                .frame(maxWidth: 700)
-
-                HStack(spacing: 40) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-
-                    Button("Save") {
-                        save()
-                    }
-                    .disabled(address.isEmpty)
-                }
-
-                Spacer()
+                .padding(.horizontal, 60)
             }
-            .padding(60)
+        }
             .onAppear {
                 if let server = server {
                     name = server.name
@@ -266,10 +322,16 @@ struct TVServerFormView: View {
                     port = server.port ?? ""
                     selectedProtocol = server.serverProtocol
                     apiKey = server.secureApiKey ?? ""
+                    
+                    // Determine initial auth method
+                    if let key = server.secureApiKey, !key.isEmpty {
+                        authMethod = .apiKey
+                    } else {
+                        authMethod = .none
+                    }
                 }
             }
         }
-    }
 
     private func save() {
         let parsed = ServerConfig.parseHostAndPort(address)
@@ -282,10 +344,49 @@ struct TVServerFormView: View {
             serverAddress: finalAddress,
             port: finalPort,
             serverProtocol: selectedProtocol,
-            apiKey: apiKey.isEmpty ? nil : apiKey
+            apiKey: authMethod == .none ? nil : (apiKey.isEmpty ? nil : apiKey)
         )
 
         onSave(config)
+    }
+    
+    private func fetchKeyViaLogin() {
+        let parsed = ServerConfig.parseHostAndPort(address)
+        let finalAddress = parsed.host
+        let finalPort = !port.isEmpty ? port : parsed.port
+        
+        let config = ServerConfig(
+            name: name,
+            serverAddress: finalAddress,
+            port: finalPort,
+            serverProtocol: selectedProtocol
+        )
+        
+        isFetchingKey = true
+        loginErrorMessage = nil
+        
+        Task {
+            do {
+                let fetchedKey = try await LoginAuthHelper.shared.fetchAPIKey(
+                    baseURL: config.baseURL,
+                    username: username,
+                    password: password
+                )
+                
+                await MainActor.run {
+                    self.apiKey = fetchedKey
+                    self.isFetchingKey = false
+                    self.authMethod = .apiKey
+                    self.username = ""
+                    self.password = ""
+                }
+            } catch {
+                await MainActor.run {
+                    self.loginErrorMessage = error.localizedDescription
+                    self.isFetchingKey = false
+                }
+            }
+        }
     }
 }
 

@@ -96,9 +96,7 @@ struct TVGenericGridView<Item: TVGridItem, Card: View, Header: View>: View {
                 }
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black)
-        .navigationTitle("")
+        .background(Color.appBackground)
         .onAppear {
             onAppear()
         }

@@ -19,13 +19,13 @@ extension Color {
     
     static var appBackground: Color {
         #if os(tvOS)
-        return Color(UIColor.separator).opacity(0.1)
+        return Color(hex: "#161E2B")
         #else
         switch AppearanceManager.shared.currentTheme {
         case .darkBlue:
             return Color(hex: "#1E293B")
         default:
-            return Color(UIColor.systemGray6)
+            return Color(UIColor.systemGroupedBackground)
         }
         #endif
     }
@@ -38,7 +38,7 @@ extension Color {
         case .darkBlue:
             return Color(hex: "#334155")
         default:
-            return Color(UIColor.secondarySystemBackground)
+            return Color(UIColor.secondarySystemGroupedBackground)
         }
         #endif
     }
@@ -454,6 +454,8 @@ class StashDBViewModel: ObservableObject {
         case updatedAtAsc
         case createdAtDesc
         case createdAtAsc
+        case oCountDesc
+        case oCountAsc
 
         var displayName: String {
             switch self {
@@ -467,14 +469,16 @@ class StashDBViewModel: ObservableObject {
             case .updatedAtAsc: return "Updated (Oldest First)"
             case .createdAtDesc: return "Created (Newest First)"
             case .createdAtAsc: return "Created (Oldest First)"
+            case .oCountDesc: return "O-Count (High-Low)"
+            case .oCountAsc: return "O-Count (Low-High)"
             case .random: return "Random"
             }
         }
 
         var direction: String {
             switch self {
-            case .nameAsc, .sceneCountAsc, .birthdateAsc, .updatedAtAsc, .createdAtAsc: return "ASC"
-            case .nameDesc, .sceneCountDesc, .birthdateDesc, .updatedAtDesc, .createdAtDesc, .random: return "DESC"
+            case .nameAsc, .sceneCountAsc, .birthdateAsc, .updatedAtAsc, .createdAtAsc, .oCountAsc: return "ASC"
+            case .nameDesc, .sceneCountDesc, .birthdateDesc, .updatedAtDesc, .createdAtDesc, .oCountDesc, .random: return "DESC"
             }
         }
 
@@ -485,6 +489,7 @@ class StashDBViewModel: ObservableObject {
             case .birthdateAsc, .birthdateDesc: return "birthdate"
             case .updatedAtAsc, .updatedAtDesc: return "updated_at"
             case .createdAtAsc, .createdAtDesc: return "created_at"
+            case .oCountAsc, .oCountDesc: return "o_counter"
             case .random: return "random"
             }
         }
@@ -1432,7 +1437,7 @@ class StashDBViewModel: ObservableObject {
             setSort(.ratingDesc)
         case .random:
             setSort(.random)
-        case .statistics, .newPerformers, .performersHighestSceneCount, .newStudios, .studiosHighestSceneCount, .newGalleries, .recentlyUpdatedGalleries:
+        case .statistics, .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .newStudios, .studiosHighestSceneCount, .newGalleries, .recentlyUpdatedGalleries:
             homeRowLoadingState[rowType] = false
             completion([])
             return
@@ -1513,6 +1518,8 @@ class StashDBViewModel: ObservableObject {
             setSort(.createdAtDesc)
         case .performersHighestSceneCount:
             setSort(.sceneCountDesc)
+        case .performersHighestOCount:
+            setSort(.oCountDesc)
         default:
             homeRowLoadingState[rowType] = false
             completion([])
@@ -4856,11 +4863,13 @@ struct ScenePerformer: Codable, Identifiable, Equatable {
     let name: String
     let sceneCount: Int?
     let galleryCount: Int?
+    let oCounter: Int?
     
     enum CodingKeys: String, CodingKey {
         case id, name
         case sceneCount = "scene_count"
         case galleryCount = "gallery_count"
+        case oCounter = "o_counter"
     }
 
     var thumbnailURL: URL? {
@@ -4928,9 +4937,11 @@ struct Performer: Codable, Identifiable, Equatable {
     let rating100: Int?
     let createdAt: String?
     let updatedAt: String?
+    let oCounter: Int?
     
     enum CodingKeys: String, CodingKey {
         case id, name, disambiguation, birthdate, country, gender, ethnicity, weight, measurements, tattoos, piercings, favorite, rating100
+        case oCounter = "o_counter"
         case imagePath = "image_path"
         case sceneCount = "scene_count"
         case galleryCount = "gallery_count"

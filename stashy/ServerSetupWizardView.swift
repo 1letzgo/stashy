@@ -5,7 +5,7 @@
 //  Step-by-step wizard for first-time server setup
 //
 
-#if !os(tvOS)
+#if !os(tvOS) && !os(watchOS)
 import SwiftUI
 
 struct ServerSetupWizardView: View {
@@ -21,6 +21,13 @@ struct ServerSetupWizardView: View {
     @State private var serverProtocol: ServerProtocol = .https
     @State private var apiKey = ""
     @State private var serverName = "My Stash"
+    
+    // Auth State
+    @State private var authMethod: AuthMethod = .none
+    @State private var username = ""
+    @State private var password = ""
+    @State private var isFetchingKey = false
+    @State private var loginErrorMessage: String? = nil
     
     // Connection Test State
     @State private var isTestingConnection = false
@@ -164,24 +171,79 @@ struct ServerSetupWizardView: View {
                             .foregroundColor(.secondary.opacity(0.8))
                     }
                     
-                    // API Key
-                    VStack(alignment: .leading, spacing: 8) {
-                        HStack {
-                            Text("API Key")
+                    // Authentication Section Card
+                    VStack(alignment: .leading, spacing: 16) {
+                        VStack(alignment: .leading, spacing: 8) {
+                            Text("Authentication")
                                 .font(.caption)
                                 .foregroundColor(.secondary)
-                            Text("(Optional)")
-                                .font(.caption2)
-                                .foregroundColor(.secondary.opacity(0.7))
+                            
+                            Picker("Auth Method", selection: $authMethod) {
+                                ForEach(AuthMethod.allCases, id: \.self) { method in
+                                    Text(method.rawValue).tag(method)
+                                }
+                            }
+                            .pickerStyle(.segmented)
                         }
                         
-                        SecureField("If server is protected", text: $apiKey)
-                            .autocapitalization(.none)
-                            .autocorrectionDisabled()
-                            .padding()
-                            .background(Color.secondaryAppBackground)
-                            .cornerRadius(DesignTokens.CornerRadius.card)
+                        if authMethod == .login {
+                            VStack(spacing: 12) {
+                                TextField("Username", text: $username)
+                                    .textContentType(.username)
+                                    .autocapitalization(.none)
+                                    .disableAutocorrection(true)
+                                    .padding()
+                                    .background(Color.appBackground.opacity(0.3))
+                                    .cornerRadius(DesignTokens.CornerRadius.button)
+                                
+                                SecureField("Password", text: $password)
+                                    .textContentType(.password)
+                                    .padding()
+                                    .background(Color.appBackground.opacity(0.3))
+                                    .cornerRadius(DesignTokens.CornerRadius.button)
+                                
+                                Button(action: fetchKeyViaLogin) {
+                                    HStack {
+                                        if isFetchingKey {
+                                            ProgressView()
+                                                .scaleEffect(0.8)
+                                                .padding(.trailing, 4)
+                                        }
+                                        Text("Fetch API Key")
+                                            .fontWeight(.bold)
+                                    }
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 12)
+                                    .background(username.isEmpty || password.isEmpty || isFetchingKey ? Color.gray.opacity(0.3) : appearanceManager.tintColor)
+                                    .foregroundColor(.white)
+                                    .cornerRadius(DesignTokens.CornerRadius.button)
+                                }
+                                .disabled(username.isEmpty || password.isEmpty || isFetchingKey)
+                                
+                                if let error = loginErrorMessage {
+                                    Text(error)
+                                        .font(.caption)
+                                        .foregroundColor(.red)
+                                }
+                            }
+                        } else if authMethod == .apiKey {
+                            VStack(alignment: .leading, spacing: 8) {
+                                Text("API Key")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                                
+                                SecureField("Enter API Key", text: $apiKey)
+                                    .autocapitalization(.none)
+                                    .autocorrectionDisabled()
+                                    .padding()
+                                    .background(Color.appBackground.opacity(0.3))
+                                    .cornerRadius(DesignTokens.CornerRadius.button)
+                            }
+                        }
                     }
+                    .padding()
+                    .background(Color.secondaryAppBackground)
+                    .cornerRadius(DesignTokens.CornerRadius.card)
                 }
                 .padding(.horizontal, 24)
                 
@@ -355,6 +417,10 @@ struct ServerSetupWizardView: View {
         let testQuery = ["query": "{ systemStatus { status } }"]
         request.httpBody = try? JSONSerialization.data(withJSONObject: testQuery)
         
+        if (authMethod == .apiKey || authMethod == .login) && !apiKey.isEmpty {
+            request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
+        }
+        
         URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
                 if let error = error {
@@ -395,6 +461,37 @@ struct ServerSetupWizardView: View {
         let config = buildConfig()
         onComplete(config)
         dismiss()
+    }
+    
+    private func fetchKeyViaLogin() {
+        let config = buildConfig()
+        isFetchingKey = true
+        loginErrorMessage = nil
+        
+        Task {
+            do {
+                let fetchedKey = try await LoginAuthHelper.shared.fetchAPIKey(
+                    baseURL: config.baseURL,
+                    username: username,
+                    password: password
+                )
+                
+                await MainActor.run {
+                    self.apiKey = fetchedKey
+                    self.isFetchingKey = false
+                    self.authMethod = .apiKey
+                    self.username = ""
+                    self.password = ""
+                    // Move to the next step immediately after successful login
+                    withAnimation { currentStep = 2 }
+                }
+            } catch {
+                await MainActor.run {
+                    self.loginErrorMessage = error.localizedDescription
+                    self.isFetchingKey = false
+                }
+            }
+        }
     }
 }
 

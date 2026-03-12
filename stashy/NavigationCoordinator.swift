@@ -5,7 +5,7 @@
 //  Created by Daniel Goletz on 29.09.25.
 //
 
-#if !os(tvOS)
+#if !os(tvOS) && !os(watchOS)
 import SwiftUI
 import Combine
 import AVKit

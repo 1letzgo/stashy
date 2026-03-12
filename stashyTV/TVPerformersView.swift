@@ -32,8 +32,7 @@ struct TVPerformersView: View {
                 contentGrid
             }
         }
-        .navigationTitle("")
-        .background(Color.black)
+        .background(Color.appBackground)
         .onChange(of: viewModel.performers.first?.id) { oldID, newID in
             if oldID != newID {
                 focusedPerformerID = newID

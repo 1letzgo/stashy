@@ -106,7 +106,7 @@ struct StudioDetailView: View {
             }
             .padding(16)
         }
-        .background(Color.appBackground)
+        .applyAppBackground()
         .onAppear {
             // If we know from the passed studio object that there are no scenes but there are galleries,
             // switch immediately so the user sees content.

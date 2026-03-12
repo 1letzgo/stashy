@@ -38,7 +38,7 @@ struct HomeRowView: View {
         // Loading if: no cached data AND currently fetching
         let isEmpty: Bool
         switch config.type {
-        case .newPerformers, .performersHighestSceneCount:
+        case .newPerformers, .performersHighestSceneCount, .performersHighestOCount:
             isEmpty = performers.isEmpty
         case .newStudios, .studiosHighestSceneCount:
             isEmpty = studios.isEmpty
@@ -52,7 +52,7 @@ struct HomeRowView: View {
     
     private var isContentEmpty: Bool {
         switch config.type {
-        case .newPerformers, .performersHighestSceneCount:
+        case .newPerformers, .performersHighestSceneCount, .performersHighestOCount:
             return performers.isEmpty
         case .newStudios, .studiosHighestSceneCount:
             return studios.isEmpty
@@ -225,7 +225,17 @@ struct HomeRowView: View {
                     if config.type == .newPerformers || config.type == .performersHighestSceneCount {
                         ForEach(performers) { performer in
                             NavigationLink(destination: PerformerDetailView(performer: performer)) {
-                                HomePerformerCardView(performer: performer, isLarge: isLarge)
+                                HomePerformerCardView(performer: performer, badgeType: .sceneCount, isLarge: isLarge)
+                                    .padding(.horizontal, padding)
+                            }
+                            .buttonStyle(.plain)
+                            .frame(width: getItemWidth())
+                            .id(performer.id)
+                        }
+                    } else if config.type == .performersHighestOCount {
+                        ForEach(performers.sorted(by: { ($0.oCounter ?? 0) > ($1.oCounter ?? 0) }).prefix(10)) { performer in
+                            NavigationLink(destination: PerformerDetailView(performer: performer)) {
+                                HomePerformerCardView(performer: performer, badgeType: .oCount, isLarge: isLarge)
                                     .padding(.horizontal, padding)
                             }
                             .buttonStyle(.plain)
@@ -296,7 +306,7 @@ struct HomeRowView: View {
     private func loadScenes() {
         let limit = 10
         
-        if config.type == .newPerformers || config.type == .performersHighestSceneCount {
+        if config.type == .newPerformers || config.type == .performersHighestSceneCount || config.type == .performersHighestOCount {
             viewModel.fetchPerformersForHomeRow(config: config, limit: limit) { _ in }
         } else if config.type == .newStudios || config.type == .studiosHighestSceneCount {
             viewModel.fetchStudiosForHomeRow(config: config, limit: limit) { _ in }
@@ -313,6 +323,8 @@ struct HomeRowView: View {
             PerformersView(initialSort: .createdAtDesc)
         } else if config.type == .performersHighestSceneCount {
             PerformersView(initialSort: .sceneCountDesc)
+        } else if config.type == .performersHighestOCount {
+            PerformersView(initialSort: .oCountDesc)
         } else if config.type == .newStudios {
             StudiosView(initialSort: .createdAtDesc)
         } else if config.type == .studiosHighestSceneCount {
@@ -338,7 +350,7 @@ struct HomeRowView: View {
         // Standard width for non-hero rows
         let baseWidth: CGFloat = 200
         
-        if config.type == .newPerformers || config.type == .performersHighestSceneCount {
+        if config.type == .newPerformers || config.type == .performersHighestSceneCount || config.type == .performersHighestOCount {
             // Performers are portrait (2:3), but matched to the height of 16:9 scenes
             let matchedHeight = baseWidth * 9 / 16
             return matchedHeight * 2 / 3
@@ -370,6 +382,7 @@ struct HomeRowView: View {
         case .topCounter3Min: return .oCounterDesc
         case .topRating3Min: return .ratingDesc
         case .random: return .random
+        case .performersHighestOCount: return .oCounterDesc
         case .statistics, .newPerformers, .performersHighestSceneCount, .newStudios, .studiosHighestSceneCount, .newGalleries, .recentlyUpdatedGalleries:
             return nil
         }
@@ -377,7 +390,7 @@ struct HomeRowView: View {
     
     private func getItemCount() -> Int {
         switch config.type {
-        case .newPerformers, .performersHighestSceneCount: return performers.count
+        case .newPerformers, .performersHighestSceneCount, .performersHighestOCount: return performers.count
         case .newStudios, .studiosHighestSceneCount: return studios.count
         case .newGalleries, .recentlyUpdatedGalleries: return galleries.count
         default: return scenes.count
@@ -386,7 +399,7 @@ struct HomeRowView: View {
     
     private func getItems() -> [String] {
         switch config.type {
-        case .newPerformers, .performersHighestSceneCount: return performers.map { $0.id }
+        case .newPerformers, .performersHighestSceneCount, .performersHighestOCount: return performers.map { $0.id }
         case .newStudios, .studiosHighestSceneCount: return studios.map { $0.id }
         case .newGalleries, .recentlyUpdatedGalleries: return galleries.map { $0.id }
         default: return scenes.map { $0.id }
@@ -416,6 +429,7 @@ struct PageIndicator: View {
 
 struct HomePerformerCardView: View {
     let performer: Performer
+    var badgeType: PerformerBadgeType = .sceneCount
     var isLarge: Bool = false
     @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var appearanceManager = AppearanceManager.shared
@@ -485,11 +499,11 @@ struct HomePerformerCardView: View {
                 HStack(alignment: .top) {
                     Spacer()
                     
-                    // Scene Count Badge (Top Right)
+                    // Single Badge (Top Right)
                     HStack(spacing: 2) {
-                        Image(systemName: "film")
+                        Image(systemName: badgeType == .oCount ? appearanceManager.oCounterIcon : "film")
                             .font(.system(size: 8, weight: .bold))
-                        Text("\(performer.sceneCount)")
+                        Text("\(badgeType == .oCount ? (performer.oCounter ?? 0) : performer.sceneCount)")
                             .font(.system(size: 9, weight: .bold))
                     }
                     .foregroundColor(.white)

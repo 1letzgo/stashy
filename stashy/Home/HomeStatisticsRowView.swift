@@ -5,6 +5,7 @@ import SwiftUI
 struct HomeStatisticsRowView: View {
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var tabManager = TabManager.shared
+    @ObservedObject var appearanceManager = AppearanceManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
     
     var body: some View {
@@ -23,8 +24,11 @@ struct HomeStatisticsRowView: View {
                     }
                     .sorted { $0.sortOrder < $1.sortOrder }
 
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 10) {
+                if tabManager.useCompactStatistics {
+                    compactStatisticsCard(sortedTabs: sortedTabs, stats: stats)
+                } else {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 10) {
                         ForEach(sortedTabs) { tab in
                             Group {
                                 switch tab.id {
@@ -57,7 +61,8 @@ struct HomeStatisticsRowView: View {
                     }
                     .padding(.horizontal, 12)
                 }
-            } else if viewModel.isLoading {
+            }
+        } else if viewModel.isLoading {
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 10) {
                         ForEach(0..<6) { _ in
@@ -110,6 +115,65 @@ struct HomeStatisticsRowView: View {
         formatter.maximumUnitCount = 2
         
         return formatter.string(from: TimeInterval(value)) ?? "\(hours)h"
+    }
+
+    // MARK: - Compact View Helpers
+
+    @ViewBuilder
+    private func compactStatisticsCard(sortedTabs: [TabConfig], stats: Statistics) -> some View {
+        VStack(spacing: 8) {
+            LazyVGrid(columns: [GridItem(.flexible(), spacing: 24, alignment: .leading), GridItem(.flexible(), alignment: .leading)], spacing: 16) {
+                ForEach(sortedTabs) { tab in
+                    Group {
+                        switch tab.id {
+                        case .scenes: compactStatRow(title: "Scenes", value: formatCount(stats.sceneCount), icon: "film", color: .blue)
+                                .onTapGesture { coordinator.navigateToScenes() }
+                        case .galleries: compactStatRow(title: "Galleries", value: formatCount(stats.galleryCount), icon: "photo.stack", color: .green)
+                                .onTapGesture { coordinator.navigateToGalleries() }
+                        case .images: compactStatRow(title: "Images", value: formatCount(stats.imageCount), icon: "photo", color: .teal)
+                                .onTapGesture { coordinator.navigateToImages() }
+                        case .performers: compactStatRow(title: "Performers", value: formatCount(stats.performerCount), icon: "person.2", color: .purple)
+                                .onTapGesture { coordinator.navigateToPerformers() }
+                        case .studios: compactStatRow(title: "Studios", value: formatCount(stats.studioCount), icon: "building.2", color: .orange)
+                                .onTapGesture { coordinator.navigateToStudios() }
+                        case .tags: compactStatRow(title: "Tags", value: formatCount(stats.tagCount), icon: "tag", color: .pink)
+                                .onTapGesture { coordinator.navigateToTags() }
+                        case .groups: compactStatRow(title: "Groups", value: formatCount(stats.movieCount), icon: "rectangle.stack.fill", color: Color(red: 0.1, green: 0.7, blue: 0.9))
+                                .onTapGesture { coordinator.navigateToGroups() }
+                        default: EmptyView()
+                        }
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(Color.secondaryAppBackground)
+        .cornerRadius(DesignTokens.CornerRadius.card)
+        .cardShadow()
+        .padding(.horizontal, 12)
+    }
+
+    private func compactStatRow(title: String, value: String, icon: String, color: Color) -> some View {
+        HStack(spacing: 8) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(appearanceManager.tintColor)
+                .frame(width: 20)
+            
+            Text(title)
+                .font(.subheadline)
+                .foregroundColor(.primary)
+                .lineLimit(1)
+            
+            Spacer()
+            
+            Text(value)
+                .font(.subheadline)
+                .fontWeight(.bold)
+                .foregroundColor(.secondary)
+                .lineLimit(1)
+        }
+        .contentShape(Rectangle()) // makes the whole row tappable
     }
 }
 

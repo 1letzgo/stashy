@@ -20,6 +20,8 @@
 		1998A3883F7C4601AC6BFE39 /* UniversalSearchView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B7652F1B72E5003ED852 /* UniversalSearchView.swift */; };
 		2589B7DB551E457BA8800634 /* PerformerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045D2E8A8C2000323FF2 /* PerformerDetailView.swift */; };
 		2F2314B3093A480F864AFEEC /* HomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB192F16743C007C2090 /* HomeView.swift */; };
+		372E2D6A2F6339EE00603361 /* LoginAuthHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2D692F6339EE00603361 /* LoginAuthHelper.swift */; };
+		372E2D6B2F633DB400603361 /* LoginAuthHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2D692F6339EE00603361 /* LoginAuthHelper.swift */; };
 		37BE5B4E2F51718500107960 /* AudioAnalysisManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37BE5B4C2F51718500107960 /* AudioAnalysisManager.swift */; };
 		37D3E2E52F39384000AB8FAD /* ServerConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB779EFE84155DC02AAC07 /* ServerConfig.swift */; };
 		37D3E3262F39444C00AB8FAD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0000022E8A9C0000000001 /* Assets.xcassets */; };
@@ -128,6 +130,7 @@
 		08FB779EFE84155DC02AAC07 /* ServerConfig.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ServerConfig.swift; sourceTree = "<group>"; };
 		08FB77A0FE84155DC02AAC07 /* stashy/Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = stashy/Info.plist; sourceTree = "<group>"; };
 		08FB77A2FE84155DC02AAC07 /* StashDBViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StashDBViewModel.swift; sourceTree = "<group>"; };
+		372E2D692F6339EE00603361 /* LoginAuthHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginAuthHelper.swift; sourceTree = "<group>"; };
 		37BE5B4C2F51718500107960 /* AudioAnalysisManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AudioAnalysisManager.swift; sourceTree = "<group>"; };
 		37D3E24E2F3932C400AB8FAD /* stashyTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = stashyTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		37D3E4912F3A305D00AB8FAD /* SceneHeatmapCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneHeatmapCard.swift; sourceTree = "<group>"; };
@@ -247,6 +250,7 @@
 				DFSEC0072F2A000100000007 /* Components */,
 				DFGQ000042F28A0000000004 /* GraphQLQueries.swift */,
 				DF22BB192F16743C007C2090 /* HomeView.swift */,
+				372E2D692F6339EE00603361 /* LoginAuthHelper.swift */,
 				DF22BB262F167CDC007C2090 /* ImageCacheManager.swift */,
 				37BE5B4D2F51718500107960 /* Managers */,
 				DFSM000022F2NEWFILE002 /* KeychainManager.swift */,
@@ -393,8 +397,6 @@
 				37D3E24F2F3932C400AB8FAD /* stashyTV */,
 			);
 			name = stashyTV;
-			packageProductDependencies = (
-			);
 			productName = stashyTV;
 			productReference = 37D3E24E2F3932C400AB8FAD /* stashyTV.app */;
 			productType = "com.apple.product-type.application";
@@ -506,6 +508,7 @@
 				DF675E712F2A6386004CA019 /* SceneRepository.swift in Sources */,
 				DF675E722F2A6386004CA019 /* PerformerRepository.swift in Sources */,
 				DFE504602E8A8C2000323FF0 /* PerformerDetailView.swift in Sources */,
+				372E2D6A2F6339EE00603361 /* LoginAuthHelper.swift in Sources */,
 				DFE504602E8A8C2000323FF3 /* StudioDetailView.swift in Sources */,
 				DFE504642E8A8C5000323FF0 /* SceneDelegate.swift in Sources */,
 				08FB7793FE84155DC02AAC07 /* App.swift in Sources */,
@@ -582,6 +585,7 @@
 				51487CAA64DF4CC3B986B68C /* SceneStudioCard.swift in Sources */,
 				A448F31312224C5CA0763758 /* SceneTagsCard.swift in Sources */,
 				37D3E4932F3A305D00AB8FAD /* SceneHeatmapCard.swift in Sources */,
+				372E2D6B2F633DB400603361 /* LoginAuthHelper.swift in Sources */,
 				DED26B5AB7A04A979AF74BAE /* SceneVideoPlayerCard.swift in Sources */,
 				5B3249B4152046408B964DDC /* StarRatingView.swift in Sources */,
 				11A2D778BDD54ABE859A5F1D /* ServerSetupWizardView.swift in Sources */,
@@ -728,9 +732,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = stashy;
@@ -756,9 +762,11 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = stashy;
@@ -786,6 +794,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
@@ -826,6 +835,7 @@
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";

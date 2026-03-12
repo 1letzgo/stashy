@@ -32,8 +32,7 @@ struct TVTagsView: View {
                 contentGrid
             }
         }
-        .navigationTitle("")
-        .background(Color.black)
+        .background(Color.appBackground)
         .onChange(of: viewModel.tags.first?.id) { oldID, newID in
             if oldID != newID {
                 focusedTagID = newID

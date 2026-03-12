@@ -82,6 +82,9 @@ struct SettingsView: View {
             }
 
             // MARK: - About
+            #if !os(tvOS)
+            interactiveDevicesSection
+            #endif
             tipSection
             aboutSection
         }
@@ -263,6 +266,24 @@ struct SettingsView: View {
         }
     }
 
+    // MARK: - Interactive Devices
+    #if !os(tvOS)
+    private var interactiveDevicesSection: some View {
+        Section(header: Text("Interactive Devices")) {
+            NavigationLink(destination: HandySettingsView()) {
+                Label("The Handy", systemImage: "hand.tap")
+            }
+            NavigationLink(destination: IntifaceSettingsView()) {
+                Label("Intiface", systemImage: "cable.connector")
+            }
+            NavigationLink(destination: LoveSpouseSettingsView()) {
+                Label("Love Spouse", systemImage: "antenna.radiowaves.left.and.right")
+            }
+        }
+        .listRowBackground(Color.secondaryAppBackground)
+    }
+    #endif
+
     // MARK: - Actions
 
     private func startLibraryScan() {
@@ -335,6 +356,149 @@ class StoreManager: ObservableObject {
         case .verified(let safe):
             return safe
         }
+    }
+}
+
+
+struct IntifaceSettingsView: View {
+    @ObservedObject var buttplugManager = ButtplugManager.shared
+    @ObservedObject var appearanceManager = AppearanceManager.shared
+    
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Enable Intiface", isOn: $buttplugManager.isEnabled)
+                    .tint(appearanceManager.tintColor)
+            }
+            .listRowBackground(Color.secondaryAppBackground)
+            
+            Section(header: Text("Intiface Server")) {
+                TextField("Server Address", text: $buttplugManager.serverAddress)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+                    .disabled(!buttplugManager.isEnabled)
+                
+                HStack {
+                    Text("Status")
+                    Spacer()
+                    Text(buttplugManager.statusMessage)
+                        .foregroundColor(buttplugManager.isConnected ? .green : .secondary)
+                }
+                
+                if buttplugManager.isConnected {
+                    Button("Disconnect", role: .destructive) {
+                        buttplugManager.disconnect()
+                    }
+                } else {
+                    Button("Connect") {
+                        buttplugManager.connect()
+                    }
+                    .disabled(!buttplugManager.isEnabled)
+                }
+            }
+            .listRowBackground(Color.secondaryAppBackground)
+            
+            if !buttplugManager.devices.isEmpty {
+                Section(header: Text("Discovered Devices")) {
+                    ForEach(buttplugManager.devices) { device in
+                        HStack {
+                            Image(systemName: "cable.connector")
+                            Text(device.name)
+                            Spacer()
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                        }
+                    }
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+            }
+            
+            Section(footer: Text("Stashy connects to Intiface Desktop or Intiface Central via WebSockets. Ensure 'Enable Remote Network Access' is turned on in Intiface settings.")) {
+            }
+            .listRowBackground(Color.secondaryAppBackground)
+        }
+        .navigationTitle("Intiface")
+        .navigationBarTitleDisplayMode(.inline)
+        .applyAppBackground()
+        .scrollContentBackground(.hidden)
+    }
+}
+
+struct HandySettingsView: View {
+    @ObservedObject var handyManager = HandyManager.shared
+    @ObservedObject var appearanceManager = AppearanceManager.shared
+
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Enable The Handy", isOn: $handyManager.isEnabled)
+                    .tint(appearanceManager.tintColor)
+            }
+            .listRowBackground(Color.secondaryAppBackground)
+            
+            Section(header: Text("Handy Connection"), footer: Text("Stashy now automatically uploads local funscripts to Handy Cloud. The Public URL is only needed for advanced setups.")) {
+                TextField("Connection Key", text: HandyManager.shared.$connectionKey)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+                    .disabled(!handyManager.isEnabled)
+                
+                TextField("Public URL Override (Optional)", text: HandyManager.shared.$publicUrl)
+                    .autocapitalization(.none)
+                    .disableAutocorrection(true)
+                    .keyboardType(.URL)
+                    .disabled(!handyManager.isEnabled)
+                
+                HStack {
+                    Text("Status")
+                    Spacer()
+                    Text(handyManager.statusMessage)
+                        .foregroundColor(handyManager.isConnected ? .green : .secondary)
+                }
+                
+                Button("Check Connection") {
+                    handyManager.checkConnection()
+                }
+                .disabled(!handyManager.isEnabled)
+            }
+            .listRowBackground(Color.secondaryAppBackground)
+        }
+        .navigationTitle("The Handy")
+        .navigationBarTitleDisplayMode(.inline)
+        .applyAppBackground()
+        .scrollContentBackground(.hidden)
+    }
+}
+
+struct LoveSpouseSettingsView: View {
+    @ObservedObject var loveSpouseManager = LoveSpouseManager.shared
+    @ObservedObject var appearanceManager = AppearanceManager.shared
+    
+    var body: some View {
+        Form {
+            Section {
+                Toggle("Enable Love Spouse", isOn: $loveSpouseManager.isEnabled)
+                    .tint(appearanceManager.tintColor)
+            }
+            .listRowBackground(Color.secondaryAppBackground)
+            
+            Section(header: Text("Connection Status")) {
+                HStack {
+                    Text("Bluetooth")
+                    Spacer()
+                    Text(loveSpouseManager.statusMessage)
+                        .foregroundColor(loveSpouseManager.isConnected ? .green : .secondary)
+                }
+            }
+            .listRowBackground(Color.secondaryAppBackground)
+            
+            Section(footer: Text("Love Spouse 2.4g toys use BLE advertising. Ensure Bluetooth is enabled and the toy is in pairing/scan mode. Both toys in range will react simultaneously.")) {
+            }
+            .listRowBackground(Color.secondaryAppBackground)
+        }
+        .navigationTitle("Love Spouse")
+        .navigationBarTitleDisplayMode(.inline)
+        .applyAppBackground()
+        .scrollContentBackground(.hidden)
     }
 }
 

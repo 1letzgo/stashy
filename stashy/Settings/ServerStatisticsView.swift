@@ -76,6 +76,7 @@ struct ServerStatisticsView: View {
         }
         .navigationTitle("Statistics")
         .applyAppBackground()
+        .scrollContentBackground(.hidden)
         .onAppear {
             viewModel.fetchStatistics()
         }

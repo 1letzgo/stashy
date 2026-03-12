@@ -84,7 +84,7 @@ struct ReelsModeSettingsView: View {
         .listStyle(.insetGrouped)
         .environment(\.editMode, .constant(.active))
         .deleteDisabled(true)
-        .navigationTitle("StashTok Modes")
+        .navigationTitle("StashTok")
         .applyAppBackground()
         .onAppear {
             viewModel.fetchSavedFilters()

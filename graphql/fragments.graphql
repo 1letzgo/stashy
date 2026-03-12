@@ -1,5 +1,5 @@
 fragment SceneFields on Scene {
-  id title details date organized resume_time play_count rating100 created_at updated_at
+  id title details date organized resume_time play_count o_counter rating100 created_at updated_at
   studio { ...StudioFields }
   performers { ...PerformerFields }
   files { id path width height duration video_codec audio_codec bit_rate frame_rate }
@@ -9,7 +9,7 @@ fragment SceneFields on Scene {
 }
 
 fragment PerformerFields on Performer {
-  id name disambiguation birthdate country image_path scene_count gallery_count gender ethnicity height_cm weight measurements fake_tits career_length tattoos piercings alias_list favorite rating100 created_at updated_at
+  id name disambiguation birthdate country image_path scene_count gallery_count gender ethnicity height_cm weight measurements fake_tits career_length tattoos piercings alias_list favorite rating100 o_counter created_at updated_at
 }
 
 fragment StudioFields on Studio {

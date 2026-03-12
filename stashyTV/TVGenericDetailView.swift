@@ -135,8 +135,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                 .padding(.bottom, 80)
             }
         }
-        .navigationTitle("")
-        .background(Color.black)
+        .background(Color.appBackground)
     }
 
     @ViewBuilder

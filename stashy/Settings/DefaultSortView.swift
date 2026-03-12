@@ -36,6 +36,7 @@ struct DefaultSortView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Default Sorting")
         .applyAppBackground()
+        .scrollContentBackground(.hidden)
     }
 
     @ViewBuilder

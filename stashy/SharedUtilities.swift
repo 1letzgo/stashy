@@ -13,6 +13,13 @@ import WebKit
 #endif
 import StoreKit
 
+// MARK: - Shared Enums
+
+enum PerformerBadgeType {
+    case sceneCount
+    case oCount
+}
+
 // MARK: - Global Helper Functions
 
 /// Adds the API key as a query parameter to the URL for authentication
@@ -202,10 +209,15 @@ extension View {
     #endif
     
     /// Applies the standard app background color.
+    @ViewBuilder
     func applyAppBackground() -> some View {
+        #if os(tvOS)
+        self.background(Color.appBackground)
+        #else
         self
             .scrollContentBackground(.hidden)
             .background(Color.appBackground)
+        #endif
     }
     
     /// Adds a shimmering effect to the view (usually for loading states)
@@ -908,7 +920,7 @@ public struct FilterMapper {
             
             for item in criteria {
                 if var key = item["id"] as? String {
-                    var outputItem = item
+                    let outputItem = item
                     
                     // Map "rating" to "rating100" for GraphQL compatibility
                     if key == "rating" { key = "rating100" }

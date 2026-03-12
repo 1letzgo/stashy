@@ -22,7 +22,7 @@ struct TVSceneDetailView: View {
 
     var body: some View {
         ZStack(alignment: .top) {
-            Color.black.ignoresSafeArea()
+            Color.appBackground.ignoresSafeArea()
             
             // Full Screen Hero Background
             if let scene = sceneDetail {
@@ -132,37 +132,42 @@ struct TVSceneDetailView: View {
 
     @ViewBuilder
     private func heroBackground(scene: Scene) -> some View {
-        ZStack(alignment: .topTrailing) {
-            if let thumbnailURL = scene.thumbnailURL {
-                CustomAsyncImage(url: thumbnailURL) { loader in
-                    if let image = loader.image {
-                        image
-                            .resizable()
-                            .scaledToFill()
-                    } else {
-                        Color.black
+        GeometryReader { geo in
+            ZStack(alignment: .topTrailing) {
+                if let thumbnailURL = scene.thumbnailURL {
+                    CustomAsyncImage(url: thumbnailURL) { loader in
+                        if let image = loader.image {
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: geo.size.width, height: geo.size.height)
+                                .clipped()
+                        } else {
+                            Color.appBackground
+                        }
                     }
+                } else {
+                     Color.appBackground
                 }
-            } else {
-                 Color.black
+
+                // Subtle overall darkening
+                Color.black.opacity(0.1)
+
+                // Complex Gradient Overlay to fade into the black background and side
+                LinearGradient(
+                    colors: [Color.appBackground.opacity(0.9), Color.appBackground.opacity(0.5), .clear, .clear],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+                
+                // Bottom linear gradient to ground the content
+                LinearGradient(
+                    colors: [Color.appBackground.opacity(0.9), Color.appBackground.opacity(0.4), .clear],
+                    startPoint: .bottom,
+                    endPoint: .center
+                )
             }
-
-            // Subtle overall darkening
-            Color.black.opacity(0.2)
-
-            // Complex Gradient Overlay to fade into the black background and side
-            LinearGradient(
-                colors: [.black, .black.opacity(0.8), .black.opacity(0.2), .clear],
-                startPoint: .leading,
-                endPoint: .trailing
-            )
-            
-            // Large radial-like or bottom linear gradient to ground the content
-            LinearGradient(
-                colors: [.black, .black.opacity(0.7), .clear],
-                startPoint: .bottom,
-                endPoint: .center
-            )
+            .frame(width: geo.size.width, height: geo.size.height)
         }
         .ignoresSafeArea()
     }
@@ -173,15 +178,17 @@ struct TVSceneDetailView: View {
         let isWaiting = isLoadingDetail || isLoadingStreams
         let hasProgress = (scene.resumeTime ?? 0) > 0
         
-        VStack(alignment: .leading, spacing: 24) {
+        VStack(alignment: .leading, spacing: 16) {
             
+            // 1. Studio/Category (Optional top line)
             if let studio = scene.studio {
                 Text(studio.name.uppercased())
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
-                    .foregroundColor(AppearanceManager.shared.tintColor)
+                    .font(.system(size: 24, weight: .bold, design: .rounded))
+                    .foregroundColor(.white.opacity(0.8))
                     .tracking(2)
             }
 
+            // 2. Main Title
             Text(scene.title ?? "Untitled Scene")
                 .font(.system(size: 80, weight: .bold))
                 .foregroundColor(.white)
@@ -189,122 +196,113 @@ struct TVSceneDetailView: View {
                 .shadow(color: .black.opacity(0.6), radius: 10, x: 0, y: 5)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
-            // Synopsis / Details (Moved here for immediate visibility)
+            // 3. Synopsis / Details (Optional, below title)
             if let details = scene.details, !details.isEmpty {
                 Text(details)
                     .font(.title3)
                     .foregroundColor(.white.opacity(0.6))
-                    .lineLimit(4)
-                    .frame(maxWidth: 800, alignment: .leading)
-                    .padding(.bottom, 8)
+                    .lineLimit(3)
+                    .frame(maxWidth: 1000, alignment: .leading)
             }
 
-            // Inline Metadata
+            // 4. Metadata Line (Duration, Res) + Progress Bar
             HStack(spacing: 24) {
-                if let rating = scene.rating100, rating > 0 {
+                if let duration = scene.sceneDuration, duration > 0 {
                     HStack(spacing: 6) {
-                        Image(systemName: "star.fill").foregroundColor(.yellow)
-                        Text(String(format: "%.1f", Double(rating) / 20.0))
-                            .fontWeight(.bold)
+                        Image(systemName: "clock")
+                        Text(formattedDuration(duration))
                     }
                     .font(.headline)
                 }
 
-                if let date = scene.date {
-                    Text(date.prefix(4))
-                        .font(.headline)
-                        .fontWeight(.medium)
-                }
-
-                if let duration = scene.sceneDuration, duration > 0 {
-                    Text(formattedDuration(duration))
-                        .font(.headline)
-                        .fontWeight(.medium)
-                }
-
                 if let resolution = resolutionString(for: scene) {
-                    Text(resolution)
-                        .font(.subheadline)
-                        .fontWeight(.bold)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 4)
-                        .background(Color.white.opacity(0.15))
-                        .clipShape(RoundedRectangle(cornerRadius: 6))
+                    HStack(spacing: 6) {
+                        Image(systemName: "tv")
+                        Text(resolution)
+                    }
+                    .font(.headline)
                 }
-            }
-            .foregroundColor(.white.opacity(0.9))
 
-            // Playback Actions
-            VStack(alignment: .leading, spacing: 20) {
-                HStack(spacing: 24) {
-                    // Resume/Play Button
-                    Button {
-                        startPlayback(for: scene)
-                    } label: {
-                        HStack(spacing: 12) {
-                            if isWaiting && !hasStream {
-                                ProgressView().progressViewStyle(CircularProgressViewStyle(tint: .black))
-                                Text("Loading")
-                            } else if hasStream {
-                                Image(systemName: hasProgress ? "play.fill" : "play.fill")
-                                Text(hasProgress ? "Resume" : "Play")
-                            } else {
-                                Image(systemName: "xmark.circle")
-                                Text("No Stream")
-                            }
-                        }
-                        .font(.title3)
-                        .fontWeight(.bold)
-                        .foregroundColor(hasStream ? .black : .white)
-                        .padding(.horizontal, 40)
-                        .padding(.vertical, 16)
-                        .frame(minWidth: 240)
-                        .background(hasStream ? Color.white : Color.white.opacity(0.2))
-                        .clipShape(RoundedRectangle(cornerRadius: 12))
+                // Rating Pill
+                if let rating100 = scene.rating100, rating100 > 0 {
+                    HStack(spacing: 8) {
+                        Image(systemName: "star.fill")
+                            .foregroundColor(.yellow)
+                        Text(String(format: "%.1f", Double(rating100) / 20.0))
                     }
-                    .buttonStyle(.card)
-                    .disabled(!hasStream || (isWaiting && !hasStream))
+                    .font(.headline)
+                }
 
-                    // Restart Button (Only if progress exists)
-                    if hasProgress {
-                        Button {
-                            startPlayback(for: scene, at: 0)
-                        } label: {
-                            HStack(spacing: 12) {
-                                Image(systemName: "arrow.counterclockwise")
-                                Text("Restart")
-                            }
-                            .font(.title3)
-                            .fontWeight(.bold)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 40)
-                            .padding(.vertical, 16)
-                            .background(Color.white.opacity(0.15))
-                            .clipShape(RoundedRectangle(cornerRadius: 12))
-                        }
-                        .buttonStyle(.card)
+                // O-Count Pill
+                if let oCounter = scene.oCounter, oCounter > 0 {
+                    HStack(spacing: 6) {
+                        Image(systemName: "heart.circle")
+                        Text("\(oCounter)")
                     }
+                    .font(.headline)
                 }
                 
-                // Progress Bar
+                // Progress Bar inline with metadata
                 if let resumeTime = scene.resumeTime, resumeTime > 0, let duration = scene.sceneDuration, duration > 0 {
-                    HStack(spacing: 15) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "play.fill")
+                            .font(.caption)
+                        
+                        Text("\(Int(resumeTime / duration * 100))%")
+                            .font(.headline)
+                        
                         GeometryReader { geo in
                             ZStack(alignment: .leading) {
-                                Rectangle().fill(Color.white.opacity(0.15))
+                                Rectangle().fill(Color.white.opacity(0.3))
                                 Rectangle().fill(AppearanceManager.shared.tintColor)
                                     .frame(width: geo.size.width * CGFloat(resumeTime / duration))
                             }
                         }
-                        .frame(width: 400, height: 8)
-                        .clipShape(RoundedRectangle(cornerRadius: 4))
-                        
-                        Text("\(Int(resumeTime / duration * 100))% complete")
-                            .font(.headline)
-                            .foregroundColor(.white.opacity(0.5))
+                        .frame(width: 200, height: 4)
+                        .clipShape(Capsule())
                     }
-                    .frame(height: 20)
                 }
+            }
+            .foregroundColor(.white.opacity(0.9))
+            .padding(.top, 8)
+
+            // 5. Action Buttons & Info Pills Row
+            HStack(spacing: 20) {
+                // Play Action
+                Button {
+                    startPlayback(for: scene)
+                } label: {
+                    HStack(spacing: 12) {
+                        if isWaiting && !hasStream {
+                            ProgressView()
+                            Text("Loading")
+                        } else if hasStream {
+                            Image(systemName: "play.fill")
+                            Text(hasProgress ? "Resume" : "Play")
+                        } else {
+                            Image(systemName: "xmark.circle")
+                            Text("No Stream")
+                        }
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                }
+                .disabled(!hasStream || (isWaiting && !hasStream))
+
+                // Restart Action
+                if hasProgress {
+                    Button {
+                        startPlayback(for: scene, at: 0)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "arrow.counterclockwise")
+                            Text("Restart")
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                    }
+                }
+                
             }
             .padding(.top, 16)
         }
@@ -473,7 +471,6 @@ struct TVSceneDetailView: View {
                                         .clipShape(RoundedRectangle(cornerRadius: 5))
                                         .padding(8)
                                 }
-                                .clipShape(RoundedRectangle(cornerRadius: 10))
                             }
                             .buttonStyle(.card)
                             
@@ -507,7 +504,6 @@ struct TVSceneDetailView: View {
                                 performerThumbnail(performer: performer)
                                     .frame(width: 180, height: 270)
                                     .clipped()
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
 
                                 Text(performer.name)
                                     .font(.headline)
@@ -551,8 +547,6 @@ struct TVSceneDetailView: View {
                         }
                     }
                     .frame(width: 320, height: 180)
-                    .background(Color.white.opacity(0.85))
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
 
                     Text(studio.name)
                         .font(.headline)

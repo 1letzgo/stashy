@@ -638,7 +638,8 @@ extension ScenePerformer {
             favorite: nil,
             rating100: nil,
             createdAt: nil,
-            updatedAt: nil
+            updatedAt: nil,
+            oCounter: nil
         )
     }
 }
@@ -707,6 +708,7 @@ struct AddMarkerSheet: View {
                             .keyboardType(.numbersAndPunctuation)
                     }
                 }
+                .listRowBackground(Color.secondaryAppBackground)
                 
                 Section(header: Text("Primary Tag")) {
                     TextField("Search Tags...", text: $searchText)
@@ -757,6 +759,7 @@ struct AddMarkerSheet: View {
                         }
                     }
                 }
+                .listRowBackground(Color.secondaryAppBackground)
             }
             .navigationTitle("Add Marker")
             .navigationBarTitleDisplayMode(.inline)

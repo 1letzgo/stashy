@@ -32,6 +32,14 @@ struct TVServerSetupView: View {
     @State private var port: String = ""
     @State private var selectedProtocol: ServerProtocol = .https
     @State private var apiKey: String = ""
+    
+    // Auth State
+    @State private var authMethod: AuthMethod = .none
+    @State private var username = ""
+    @State private var password = ""
+    @State private var isFetchingKey = false
+    @State private var loginErrorMessage: String? = nil
+    
     @State private var errorMessage: String?
     @State private var isTesting: Bool = false
 
@@ -43,92 +51,140 @@ struct TVServerSetupView: View {
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 48) {
-                // Header
-                VStack(spacing: 16) {
-                    Image(systemName: "server.rack")
-                        .font(.system(size: 80))
-                        .foregroundStyle(.secondary)
+            ScrollView {
+                VStack(spacing: 48) {
+                    // Header
+                    VStack(spacing: 16) {
+                        Image(systemName: "server.rack")
+                            .font(.system(size: 80))
+                            .foregroundStyle(.secondary)
 
-                    Text("Connect to Stash")
-                        .font(.largeTitle)
-                        .fontWeight(.bold)
+                        Text("Connect to Stash")
+                            .font(.largeTitle)
+                            .fontWeight(.bold)
 
-                    Text("Enter your Stash server details to get started.")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                }
-                .padding(.top, 40)
-
-                // Form
-                VStack(spacing: 24) {
-                    TextField("Server Name", text: $serverName)
-                        .focused($focusedField, equals: .name)
-                        .textContentType(.name)
-
-                    TextField("Server Address (e.g. 192.168.1.100 or stash.example.com)", text: $serverAddress)
-                        .focused($focusedField, equals: .address)
-                        .textContentType(.URL)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-                        .onChange(of: serverAddress) { _, newValue in
-                            let detection = ServerConfig.detectProtocol(from: newValue)
-                            if let detectedProtocol = detection.protocol {
-                                selectedProtocol = detectedProtocol
-                                serverAddress = detection.address
-                            }
-                        }
-
-                    HStack(spacing: 24) {
-                        TextField("Port (optional)", text: $port)
-                            .focused($focusedField, equals: .port)
-                            .frame(maxWidth: 300)
-                        #if swift(>=5.9)
-                            .keyboardType(.numberPad)
-                        #endif
-
-                        Picker("Protocol", selection: $selectedProtocol) {
-                            ForEach(ServerProtocol.allCases, id: \.self) { proto in
-                                Text(proto.displayName).tag(proto)
-                            }
-                        }
-                        .pickerStyle(.segmented)
-                        .frame(maxWidth: 300)
-                    }
-
-                    TextField("API Key (optional)", text: $apiKey)
-                        .focused($focusedField, equals: .apiKey)
-                        .autocorrectionDisabled()
-                        .textInputAutocapitalization(.never)
-
-                    if let errorMessage = errorMessage {
-                        Text(errorMessage)
-                            .foregroundColor(.red)
-                            .font(.callout)
-                    }
-                }
-                .frame(maxWidth: 800)
-
-                // Connect Button
-                Button {
-                    saveAndConnect()
-                } label: {
-                    HStack(spacing: 12) {
-                        if isTesting {
-                            ProgressView()
-                        }
-                        Text(isTesting ? "Connecting..." : "Connect")
+                        Text("Enter your Stash server details to get started.")
                             .font(.title3)
-                            .fontWeight(.semibold)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
                     }
-                    .frame(minWidth: 300)
-                }
-                .disabled(serverAddress.isEmpty || isTesting)
+                    .padding(.top, 40)
 
-                Spacer()
+                    // Form
+                    VStack(spacing: 24) {
+                        TextField("Server Name", text: $serverName)
+                            .focused($focusedField, equals: .name)
+                            .textContentType(.name)
+
+                        TextField("Server Address (e.g. 192.168.1.100 or stash.example.com)", text: $serverAddress)
+                            .focused($focusedField, equals: .address)
+                            .textContentType(.URL)
+                            .autocorrectionDisabled()
+                            .textInputAutocapitalization(.never)
+                            .onChange(of: serverAddress) { _, newValue in
+                                let detection = ServerConfig.detectProtocol(from: newValue)
+                                if let detectedProtocol = detection.protocol {
+                                    selectedProtocol = detectedProtocol
+                                    serverAddress = detection.address
+                                }
+                            }
+
+                        HStack(spacing: 24) {
+                            TextField("Port (optional)", text: $port)
+                                .focused($focusedField, equals: .port)
+                                .frame(maxWidth: 300)
+                            #if swift(>=5.9)
+                                .keyboardType(.numberPad)
+                            #endif
+
+                            Picker("Protocol", selection: $selectedProtocol) {
+                                ForEach(ServerProtocol.allCases, id: \.self) { proto in
+                                    Text(proto.displayName).tag(proto)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            .frame(maxWidth: 300)
+                        }
+
+                        // Authentication Section
+                        VStack(alignment: .leading, spacing: 24) {
+                            Text("Authentication")
+                                .font(.headline)
+                                .foregroundColor(.secondary)
+                            
+                            Picker("Auth Method", selection: $authMethod) {
+                                ForEach(AuthMethod.allCases, id: \.self) { method in
+                                    Text(method.rawValue).tag(method)
+                                }
+                            }
+                            .pickerStyle(.segmented)
+                            
+                            if authMethod == .login {
+                                VStack(spacing: 24) {
+                                    TextField("Username", text: $username)
+                                        .textContentType(.username)
+                                        .textInputAutocapitalization(.never)
+                                    
+                                    SecureField("Password", text: $password)
+                                        .textContentType(.password)
+                                    
+                                    Button {
+                                        fetchKeyViaLogin()
+                                    } label: {
+                                        HStack(spacing: 12) {
+                                            if isFetchingKey {
+                                                ProgressView()
+                                            }
+                                            Text(isFetchingKey ? "Logging in..." : "Fetch API Key")
+                                        }
+                                        .frame(minWidth: 300)
+                                    }
+                                    .disabled(username.isEmpty || password.isEmpty || isFetchingKey)
+                                    
+                                    if let error = loginErrorMessage {
+                                        Text(error)
+                                            .foregroundColor(.red)
+                                            .font(.callout)
+                                    }
+                                }
+                            } else if authMethod == .apiKey {
+                                TextField("API Key", text: $apiKey)
+                                    .focused($focusedField, equals: .apiKey)
+                                    .autocorrectionDisabled()
+                                    .textInputAutocapitalization(.never)
+                            }
+                        }
+                        .padding()
+                        .background(Color.white.opacity(0.05))
+                        .cornerRadius(20)
+
+                        if let errorMessage = errorMessage {
+                            Text(errorMessage)
+                                .foregroundColor(.red)
+                                .font(.callout)
+                        }
+                    }
+                    .frame(maxWidth: 800)
+
+                    // Connect Button
+                    Button {
+                        saveAndConnect()
+                    } label: {
+                        HStack(spacing: 12) {
+                            if isTesting {
+                                ProgressView()
+                            }
+                            Text(isTesting ? "Connecting..." : "Connect")
+                                .font(.title3)
+                                .fontWeight(.semibold)
+                        }
+                        .frame(minWidth: 300)
+                    }
+                    .disabled(serverAddress.isEmpty || isTesting)
+                    .padding(.bottom, 60)
+                }
+                .padding(.horizontal, 60)
             }
-            .padding(60)
         }
     }
 
@@ -155,6 +211,46 @@ struct TVServerSetupView: View {
         // Give a brief moment for the config to propagate
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
             isTesting = false
+        }
+    }
+    
+    private func fetchKeyViaLogin() {
+        let parsed = ServerConfig.parseHostAndPort(serverAddress)
+        let finalAddress = parsed.host
+        let finalPort = !port.isEmpty ? port : parsed.port
+        
+        let config = ServerConfig(
+            name: serverName,
+            serverAddress: finalAddress,
+            port: finalPort,
+            serverProtocol: selectedProtocol
+        )
+        
+        isFetchingKey = true
+        loginErrorMessage = nil
+        
+        Task {
+            do {
+                let fetchedKey = try await LoginAuthHelper.shared.fetchAPIKey(
+                    baseURL: config.baseURL,
+                    username: username,
+                    password: password
+                )
+                
+                await MainActor.run {
+                    self.apiKey = fetchedKey
+                    self.isFetchingKey = false
+                    self.authMethod = .apiKey
+                    self.username = ""
+                    self.password = ""
+                    // Focus API key field after fetch?
+                }
+            } catch {
+                await MainActor.run {
+                    self.loginErrorMessage = error.localizedDescription
+                    self.isFetchingKey = false
+                }
+            }
         }
     }
 }

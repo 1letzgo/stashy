@@ -82,6 +82,7 @@ struct PerformersView: View {
         }
         .navigationTitle("Performers")
         .navigationBarTitleDisplayMode(.inline)
+        .applyAppBackground()
 
         .onChange(of: searchText) { oldValue, newValue in
             // Debounce: Nur suchen wenn Nutzer aufhört zu tippen (0.5s Delay)
@@ -152,24 +153,24 @@ struct PerformersView: View {
                             }
                         }
                         
-                        // Scene Count
+                        // Counter
                         Menu {
-                            Button(action: { changeSortOption(to: .sceneCountDesc) }) {
+                            Button(action: { changeSortOption(to: .oCountDesc) }) {
                                 HStack {
                                     Text("High → Low")
-                                    if selectedSortOption == .sceneCountDesc { Image(systemName: "checkmark") }
+                                    if selectedSortOption == .oCountDesc { Image(systemName: "checkmark") }
                                 }
                             }
-                            Button(action: { changeSortOption(to: .sceneCountAsc) }) {
+                            Button(action: { changeSortOption(to: .oCountAsc) }) {
                                 HStack {
                                     Text("Low → High")
-                                    if selectedSortOption == .sceneCountAsc { Image(systemName: "checkmark") }
+                                    if selectedSortOption == .oCountAsc { Image(systemName: "checkmark") }
                                 }
                             }
                         } label: {
                             HStack {
-                                Text("Scene Count")
-                                if selectedSortOption == .sceneCountAsc || selectedSortOption == .sceneCountDesc {
+                                Text("Counter")
+                                if selectedSortOption == .oCountAsc || selectedSortOption == .oCountDesc {
                                     Image(systemName: "checkmark")
                                 }
                             }
@@ -379,7 +380,7 @@ struct PerformersView: View {
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(viewModel.performers) { performer in
                         NavigationLink(destination: PerformerDetailView(performer: performer)) {
-                            PerformerCardView(performer: performer)
+                            PerformerCardView(performer: performer, badgeType: (selectedSortOption == .oCountDesc || selectedSortOption == .oCountAsc) ? .oCount : .sceneCount)
                         }
                         .buttonStyle(PlainButtonStyle())
                         .id(performer.id)
@@ -435,6 +436,8 @@ struct PerformersView: View {
 
 struct PerformerCardView: View {
     let performer: Performer
+    var badgeType: PerformerBadgeType = .sceneCount
+    @ObservedObject var appearanceManager = AppearanceManager.shared
 
     var body: some View {
 
@@ -478,32 +481,16 @@ struct PerformerCardView: View {
             )
             .frame(height: 120)
             
-            // Top Badges
+            // Top Badge (Single value Top Right)
             VStack {
                 HStack {
-                    // Gallery Badge (Top Left)
-                    if let galleryCount = performer.galleryCount, galleryCount > 0 {
-                        HStack(spacing: 3) {
-                            Image(systemName: "photo.stack")
-                                .font(.system(size: 10, weight: .bold))
-                            Text("\(galleryCount)")
-                                .font(.system(size: 11, weight: .bold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                        .clipShape(Capsule())
-                        .shadow(color: .black.opacity(0.2), radius: 2)
-                    }
-                    
                     Spacer()
                     
-                    // Scenes Badge (Top Right)
+                    // Single Badge (Top Right)
                     HStack(spacing: 3) {
-                        Image(systemName: "film")
+                        Image(systemName: badgeType == .oCount ? appearanceManager.oCounterIcon : "film")
                             .font(.system(size: 10, weight: .bold))
-                        Text("\(performer.sceneCount)")
+                        Text("\(badgeType == .oCount ? (performer.oCounter ?? 0) : performer.sceneCount)")
                             .font(.system(size: 11, weight: .bold))
                     }
                     .foregroundColor(.white)

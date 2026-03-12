@@ -88,7 +88,7 @@ struct HomeView: View {
                     viewModel.fetchStatistics()
                     for row in tabManager.homeRows where row.isEnabled && row.type != .statistics {
                         let limit = 10
-                        if row.type == .newPerformers || row.type == .performersHighestSceneCount {
+                        if row.type == .newPerformers || row.type == .performersHighestSceneCount || row.type == .performersHighestOCount {
                             viewModel.fetchPerformersForHomeRow(config: row, limit: limit, forceRefresh: true) { _ in }
                         } else if row.type == .newStudios || row.type == .studiosHighestSceneCount {
                             viewModel.fetchStudiosForHomeRow(config: row, limit: limit, forceRefresh: true) { _ in }

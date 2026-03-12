@@ -64,6 +64,7 @@ struct StudiosView: View {
         }
         .navigationTitle(hideTitle ? "" : "Studios")
         .navigationBarTitleDisplayMode(.inline)
+        .applyAppBackground()
         .conditionalSearchable(isVisible: isSearchVisible, text: $searchText, prompt: "Search studios...")
         .toolbar {
             toolbarContent

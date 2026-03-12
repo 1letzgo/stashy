@@ -15,6 +15,17 @@ struct DashboardSettingsView: View {
     var body: some View {
         List {
             Section {
+                Toggle("Compact Statistics", isOn: Binding(
+                    get: { tabManager.useCompactStatistics },
+                    set: { tabManager.useCompactStatistics = $0 }
+                ))
+                .tint(appearanceManager.tintColor)
+            } footer: {
+                Text("Show statistics as a single compact card with a 2-column layout instead of a horizontal scrolling row.")
+            }
+            .listRowBackground(Color.secondaryAppBackground)
+
+            Section {
                 Toggle("Big Hero Layout", isOn: Binding(
                     get: { tabManager.dashboardHeroSize == .big },
                     set: { tabManager.dashboardHeroSize = $0 ? .big : .small }
@@ -42,49 +53,10 @@ struct DashboardSettingsView: View {
                 Text("Enable and reorder the rows shown on the Dashboard.")
             }
             .listRowBackground(Color.secondaryAppBackground)
-
-            Section {
-                // Anchored Dashboard item
-                if let dashTab = tabManager.tabs.first(where: { $0.id == .dashboard }) {
-                    HStack {
-                        Text(dashTab.id.title)
-                            .foregroundColor(.primary)
-                        Spacer()
-                        Text("Always Visible")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
-                }
-
-                ForEach(tabManager.tabs.filter { 
-                    $0.id == .scenes || $0.id == .galleries || $0.id == .performers || 
-                    $0.id == .studios || $0.id == .tags || $0.id == .images || 
-                    $0.id == .groups
-                }.sorted { $0.sortOrder < $1.sortOrder }) { tab in
-                    Toggle(isOn: Binding(
-                        get: { tab.isVisible },
-                        set: { _ in tabManager.toggle(tab.id) }
-                    )) {
-                        Text(tab.id.title)
-                    }
-                    .tint(appearanceManager.tintColor)
-                }
-                .onMove { indices, newOffset in
-                    // Adjust indices because .dashboard is at index 0 but excluded from ForEach
-                    var adjustedIndices = IndexSet()
-                    for index in indices {
-                        adjustedIndices.insert(index + 1)
-                    }
-                    tabManager.moveSubTab(from: adjustedIndices, to: newOffset + 1, within: .catalogue)
-                }
-            } footer: {
-                Text("Reorder cards. Dashboard is anchored at the top.")
-            }
-            .listRowBackground(Color.secondaryAppBackground)
         }
         .listStyle(.insetGrouped)
         .environment(\.editMode, .constant(.active))
-        .navigationTitle("Dashboard Settings")
+        .navigationTitle("Dashboard")
         .applyAppBackground()
     }
 }

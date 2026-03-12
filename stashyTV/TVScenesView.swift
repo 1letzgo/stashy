@@ -53,8 +53,7 @@ struct TVScenesView: View {
                 contentGrid
             }
         }
-        .navigationTitle("")
-        .background(Color.black)
+        .background(Color.appBackground)
         .onChange(of: viewModel.scenes.first?.id) { oldID, newID in
             if oldID != newID {
                 focusedSceneID = newID

@@ -104,6 +104,7 @@ struct ServerDetailView: View {
         }
         .navigationTitle(server.name)
         .applyAppBackground()
+        .scrollContentBackground(.hidden)
         .alert("Library Scan", isPresented: $showScanAlert) {
             Button("OK", role: .cancel) { }
         } message: {

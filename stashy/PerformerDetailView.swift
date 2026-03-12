@@ -116,7 +116,7 @@ struct PerformerDetailView: View {
             }
             .padding(16)
         }
-        .background(Color.appBackground)
+        .applyAppBackground()
         .onAppear {
             loadData()
             isFavorite = performer.favorite ?? false
@@ -423,7 +423,7 @@ struct PerformerDetailView: View {
                     HStack(spacing: 4) {
                         // StashTok Button
                         Button(action: {
-                            let sp = ScenePerformer(id: displayPerformer.id, name: displayPerformer.name, sceneCount: displayPerformer.sceneCount, galleryCount: displayPerformer.galleryCount)
+                            let sp = ScenePerformer(id: displayPerformer.id, name: displayPerformer.name, sceneCount: displayPerformer.sceneCount, galleryCount: displayPerformer.galleryCount, oCounter: displayPerformer.oCounter)
                             coordinator.navigateToReels(performer: sp)
                         }) {
                             HStack(spacing: 4) {
@@ -599,7 +599,8 @@ struct PerformerDetailView: View {
         favorite: false,
         rating100: nil,
         createdAt: nil,
-        updatedAt: nil
+        updatedAt: nil,
+        oCounter: 0
     )
     PerformerDetailView(performer: samplePerformer)
 }

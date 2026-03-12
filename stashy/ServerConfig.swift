@@ -25,6 +25,12 @@ enum ServerProtocol: String, Codable, CaseIterable {
     }
 }
 
+enum AuthMethod: String, Codable, CaseIterable {
+    case none = "None"
+    case login = "Login"
+    case apiKey = "API Key"
+}
+
 enum StreamingQuality: String, Codable, CaseIterable {
     case original = "Original"
     case uhd = "4K (2160p)"

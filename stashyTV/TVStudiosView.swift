@@ -30,8 +30,7 @@ struct TVStudiosView: View {
                 contentGrid
             }
         }
-        .navigationTitle("")
-        .background(Color.black)
+        .background(Color.appBackground)
         .onChange(of: viewModel.studios.first?.id) { oldID, newID in
             if oldID != newID {
                 focusedStudioID = newID

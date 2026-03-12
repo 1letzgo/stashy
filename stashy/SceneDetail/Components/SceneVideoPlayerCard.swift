@@ -215,11 +215,29 @@ struct SceneVideoPlayerCard: View {
     @ViewBuilder
     private var infoSection: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(activeScene.title ?? "Unbekannter Titel")
-                .font(.title2)
-                .fontWeight(.bold)
-                .foregroundColor(.primary)
-                .lineLimit(2)
+            VStack(alignment: .leading, spacing: 4) {
+                Text(activeScene.title ?? "Unbekannter Titel")
+                    .font(.title2)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+
+                if activeScene.sceneDuration != nil || activeScene.date != nil {
+                    HStack {
+                        if let duration = activeScene.sceneDuration {
+                            Text("Duration: \(formatTime(duration))")
+                        }
+                        
+                        Spacer()
+                        
+                        if let date = activeScene.date {
+                            Text("Released: \(date)")
+                        }
+                    }
+                    .font(.subheadline)
+                    .foregroundColor(.secondary)
+                }
+            }
 
             markerScrollView
             metadataSwipeBar
@@ -230,6 +248,7 @@ struct SceneVideoPlayerCard: View {
                     .foregroundColor(.primary.opacity(0.8))
                     .lineLimit(isHeaderExpanded ? nil : 3)
                     .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.top, 4)
             }
         }
         .padding(12)
@@ -258,30 +277,22 @@ struct SceneVideoPlayerCard: View {
     @ViewBuilder
     private var metadataSwipeBar: some View {
         VStack(alignment: .leading, spacing: 10) {
-            // Row 1: Fixed (Not scrollable) - o_counter, Rate, play counter, duration, date
-            HStack(spacing: 5) {
+            HStack(spacing: 0) {
                 oCounterButton
+                Spacer(minLength: 4)
                 ratingMenu
                 
                 if let playCount = activeScene.playCount, playCount > 0 {
-                    infoPill(icon: "play.circle", text: "\(playCount) plays")
+                    Spacer(minLength: 4)
+                    infoPill(icon: "play.circle", text: "\(playCount)")
                 }
-                if let duration = activeScene.sceneDuration {
-                    infoPill(icon: "clock", text: formatTime(duration))
-                }
-                if let date = activeScene.date {
-                    infoPill(icon: "calendar", text: date)
-                }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            
-            // Row 2: Fixed & Centered - marker, video quality, Audio sync
-            HStack(spacing: 8) {
-                Spacer()
+                
+                Spacer(minLength: 4)
                 addMarkerButton
+                Spacer(minLength: 4)
                 qualityMenu
+                Spacer(minLength: 4)
                 audioSyncButton
-                Spacer()
             }
             .frame(maxWidth: .infinity)
         }
@@ -484,9 +495,11 @@ struct SceneVideoPlayerCard: View {
                 .font(.system(size: 10, weight: .bold))
             Text(text)
                 .font(.system(size: 10, weight: .bold))
+                .lineLimit(1)
+                .minimumScaleFactor(0.8)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 8)
+        .frame(height: 24)
         .background(color.opacity(0.1))
         .foregroundColor(color)
         .clipShape(Capsule())
@@ -530,7 +543,7 @@ struct SceneVideoPlayerCard: View {
         } label: {
             let isAudioActive = handyManager.isAudioMode
             infoPill(icon: isAudioActive ? "waveform.and.mic" : "waveform", 
-                     text: isAudioActive ? "Sync ON" : "Audio Sync", 
+                     text: isAudioActive ? "Sync ON" : "Sync", 
                      color: isAudioActive ? .purple : Color.pillAccent)
         }
     }
