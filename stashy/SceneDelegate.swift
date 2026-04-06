@@ -8,11 +8,11 @@
 #if !os(tvOS) && !os(watchOS)
 import UIKit
 import SwiftUI
-import SwiftUI
 
 class SceneDelegate: UIResponder, UIWindowSceneDelegate {
 
     var window: UIWindow?
+    private var blurView: UIVisualEffectView?
     var navigationCoordinator = NavigationCoordinator()
 
     func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
@@ -43,11 +43,18 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     func sceneDidBecomeActive(_ scene: UIScene) {
         // Called when the scene has moved from an inactive state to an active state.
         // Use this method to restart any tasks that were paused (or not yet started) when the scene was inactive.
+        // Remove the UIKit blur when becoming active.
+        // If locked, the SwiftUI PasscodeEntryView handles content protection from here.
+        hideBlurOverlay()
     }
 
     func sceneWillResignActive(_ scene: UIScene) {
         // Called when the scene will move from an active state to an inactive state.
         // This may occur due to temporary interruptions (ex. an incoming phone call).
+        // If autoLockOnBackground is enabled, blur background to protect content 
+        if SecurityManager.shared.autoLockOnBackground && SecurityManager.shared.isPasscodeSet && !SecurityManager.shared.isPiPActive {
+            showBlurOverlay()
+        }
     }
 
     func sceneWillEnterForeground(_ scene: UIScene) {
@@ -60,6 +67,31 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             SecurityManager.shared.lock()
         }
     }
+
+    private func showBlurOverlay() {
+        guard blurView == nil, let window = window else { return }
+
+        let style: UIBlurEffect.Style
+        switch AppearanceManager.shared.preferredTheme {
+        case .light:
+            style = .light
+        case .dark, .darkBlue:
+            style = .dark
+        case .system:
+            style = .regular
+        }
+
+        let blur = UIVisualEffectView(effect: UIBlurEffect(style: style))
+        blur.frame = window.bounds
+        blur.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        window.addSubview(blur)
+        self.blurView = blur
+    }
+
+    private func hideBlurOverlay() {
+        guard blurView != nil else { return }
+        blurView?.removeFromSuperview()
+        blurView = nil
+    }
 }
 #endif
-
