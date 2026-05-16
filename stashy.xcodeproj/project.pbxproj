@@ -8,6 +8,8 @@
 
 /* Begin PBXBuildFile section */
 		02B19A59AAFE4A16B45A861F /* DownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB172F16743C007C2090 /* DownloadsView.swift */; };
+		DFSP00022F50SPRITE002 /* SpritePreviewManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSP00012F50SPRITE001 /* SpritePreviewManager.swift */; };
+		DFSP00032F50SPRITE003 /* SpritePreviewManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSP00012F50SPRITE001 /* SpritePreviewManager.swift */; };
 		08FB7793FE84155DC02AAC07 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7794FE84155DC02AAC07 /* App.swift */; };
 		08FB7797FE84155DC02AAC07 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7798FE84155DC02AAC07 /* MainTabView.swift */; };
 		08FB779DFE84155DC02AAC07 /* ServerConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB779EFE84155DC02AAC07 /* ServerConfig.swift */; };
@@ -159,6 +161,7 @@
 
 /* Begin PBXFileReference section */
 		08FB7794FE84155DC02AAC07 /* App.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
+		DFSP00012F50SPRITE001 /* SpritePreviewManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpritePreviewManager.swift; sourceTree = "<group>"; };
 		08FB7798FE84155DC02AAC07 /* MainTabView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		08FB779EFE84155DC02AAC07 /* ServerConfig.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ServerConfig.swift; sourceTree = "<group>"; };
 		08FB77A0FE84155DC02AAC07 /* stashy/Info.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = stashy/Info.plist; sourceTree = "<group>"; };
@@ -302,6 +305,7 @@
 				372E2D692F6339EE00603361 /* LoginAuthHelper.swift */,
 				DF22BB262F167CDC007C2090 /* ImageCacheManager.swift */,
 				37BE5B4D2F51718500107960 /* Managers */,
+				DFSP00042F50SPRITE004 /* Utilities */,
 				DFSM000022F2NEWFILE002 /* KeychainManager.swift */,
 				08FB7798FE84155DC02AAC07 /* MainTabView.swift */,
 				DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */,
@@ -342,6 +346,14 @@
 				DFSEC0022F2A000100000002 /* SecurityManager.swift */,
 			);
 			path = Managers;
+			sourceTree = "<group>";
+		};
+		DFSP00042F50SPRITE004 /* Utilities */ = {
+			isa = PBXGroup;
+			children = (
+				DFSP00012F50SPRITE001 /* SpritePreviewManager.swift */,
+			);
+			path = Utilities;
 			sourceTree = "<group>";
 		};
 		DF675E612F2A46A1004CA019 /* Home */ = {
@@ -646,6 +658,7 @@
 				DFSEC0012F2A000100000001 /* SecurityManager.swift in Sources */,
 				DFSEC0032F2A000100000003 /* PasscodeEntryView.swift in Sources */,
 				DFSEC0052F2A000100000005 /* SecuritySettingsView.swift in Sources */,
+				DFSP00022F50SPRITE002 /* SpritePreviewManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -704,6 +717,7 @@
 				C047CE6380F048858A91E6C9 /* GraphQLClient.swift in Sources */,
 				C047CE6380F048858A91E6CA /* TrustAllSessionDelegate.swift in Sources */,
 				E909C6E8F4744C4D939F78BD /* GraphQLQueries.swift in Sources */,
+				DFSP00032F50SPRITE003 /* SpritePreviewManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

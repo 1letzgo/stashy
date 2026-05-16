@@ -402,16 +402,22 @@ struct AnimatedWebView: UIViewRepresentable {
 
 
 /// A wrapper around UIScrollView that provides pinch-to-zoom and panning for any SwiftUI view.
+class HorizontalSeekPanGesture: UIPanGestureRecognizer {
+    weak var scrollView: UIScrollView?
+}
+
 struct ZoomableScrollView<Content: View>: UIViewRepresentable {
     private var content: Content
     private var onTap: ((CGPoint) -> Void)?
     private var onLongPress: ((Bool) -> Void)?
+    private var onHorizontalPan: ((CGFloat, UIGestureRecognizer.State) -> Void)?
     @Binding var isZoomed: Bool
-    
-    init(isZoomed: Binding<Bool> = .constant(false), onTap: ((CGPoint) -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil, @ViewBuilder content: () -> Content) {
+
+    init(isZoomed: Binding<Bool> = .constant(false), onTap: ((CGPoint) -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil, onHorizontalPan: ((CGFloat, UIGestureRecognizer.State) -> Void)? = nil, @ViewBuilder content: () -> Content) {
         self._isZoomed = isZoomed
         self.onTap = onTap
         self.onLongPress = onLongPress
+        self.onHorizontalPan = onHorizontalPan
         self.content = content()
     }
     
@@ -455,32 +461,42 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         let longPress = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleLongPress(_:)))
         longPress.minimumPressDuration = 0.3
         scrollView.addGestureRecognizer(longPress)
-        
+
+        #if !os(tvOS)
+        let seekPan = HorizontalSeekPanGesture(target: context.coordinator, action: #selector(Coordinator.handleSeekPan(_:)))
+        seekPan.scrollView = scrollView
+        seekPan.delegate = context.coordinator
+        scrollView.addGestureRecognizer(seekPan)
+        #endif
+
         return scrollView
     }
-    
+
     func updateUIView(_ uiView: UIScrollView, context: Context) {
         context.coordinator.hostingController.rootView = content
         context.coordinator.onTap = onTap
         context.coordinator.onLongPress = onLongPress
+        context.coordinator.onHorizontalPan = onHorizontalPan
         context.coordinator.isZoomed = $isZoomed
     }
-    
+
     func makeCoordinator() -> Coordinator {
-        Coordinator(hostingController: UIHostingController(rootView: content), isZoomed: $isZoomed, onTap: onTap, onLongPress: onLongPress)
+        Coordinator(hostingController: UIHostingController(rootView: content), isZoomed: $isZoomed, onTap: onTap, onLongPress: onLongPress, onHorizontalPan: onHorizontalPan)
     }
     
-    class Coordinator: NSObject, UIScrollViewDelegate {
+    class Coordinator: NSObject, UIScrollViewDelegate, UIGestureRecognizerDelegate {
         var hostingController: UIHostingController<Content>
         var isZoomed: Binding<Bool>
         var onTap: ((CGPoint) -> Void)?
         var onLongPress: ((Bool) -> Void)?
-        
-        init(hostingController: UIHostingController<Content>, isZoomed: Binding<Bool>, onTap: ((CGPoint) -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil) {
+        var onHorizontalPan: ((CGFloat, UIGestureRecognizer.State) -> Void)?
+
+        init(hostingController: UIHostingController<Content>, isZoomed: Binding<Bool>, onTap: ((CGPoint) -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil, onHorizontalPan: ((CGFloat, UIGestureRecognizer.State) -> Void)? = nil) {
             self.hostingController = hostingController
             self.isZoomed = isZoomed
             self.onTap = onTap
             self.onLongPress = onLongPress
+            self.onHorizontalPan = onHorizontalPan
         }
         
         func viewForZooming(in scrollView: UIScrollView) -> UIView? {
@@ -517,6 +533,23 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
             }
         }
         
+        @objc func handleSeekPan(_ gesture: UIPanGestureRecognizer) {
+            let translation = gesture.translation(in: gesture.view)
+            onHorizontalPan?(translation.x, gesture.state)
+        }
+
+        func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+            guard let seekPan = gestureRecognizer as? HorizontalSeekPanGesture else { return true }
+            guard let scrollView = seekPan.scrollView, scrollView.zoomScale <= 1.01 else { return false }
+            let vel = seekPan.velocity(in: seekPan.view)
+            return abs(vel.x) > abs(vel.y) * 1.5
+        }
+
+        func gestureRecognizer(_ gestureRecognizer: UIGestureRecognizer, shouldRecognizeSimultaneouslyWith otherGestureRecognizer: UIGestureRecognizer) -> Bool {
+            if gestureRecognizer is HorizontalSeekPanGesture { return true }
+            return false
+        }
+
         @objc func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
             guard let scrollView = gesture.view as? UIScrollView else { return }
             

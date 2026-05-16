@@ -1118,6 +1118,27 @@ struct ReelsView: View {
             }
         }
 
+        var videoAspectRatio: CGFloat? {
+            let file: SceneFile?
+            switch self {
+            case .scene(let s): file = s.files?.first
+            case .marker(let m): file = m.scene?.files?.first
+            case .preview(let s): file = s.files?.first
+            case .clip: file = nil
+            }
+            guard let w = file?.width, let h = file?.height, w > 0, h > 0 else { return nil }
+            return CGFloat(w) / CGFloat(h)
+        }
+
+        var spritePaths: (vtt: String?, sprite: String?) {
+            switch self {
+            case .scene(let s): return (s.paths?.vtt, s.paths?.sprite)
+            case .marker(let m): return (m.scene?.paths?.vtt, m.scene?.paths?.sprite)
+            case .preview(let s): return (s.paths?.vtt, s.paths?.sprite)
+            case .clip: return (nil, nil)
+            }
+        }
+
     }
 
     private var currentReelItems: [ReelItemData] {
@@ -3354,6 +3375,9 @@ struct ReelItemView: View {
     @State private var isFastForwarding = false
     var onInteraction: () -> Void
     @StateObject private var videoSurfaceReadiness = ReelItemVideoSurfaceReadiness()
+    @StateObject private var spritePreview = SpritePreviewManager()
+    @State private var isSwipeSeeking = false
+    @State private var seekTimeOffset: Double = 0
 
     private var shouldFill: Bool {
         // Only fill if the setting is enabled
@@ -3379,6 +3403,8 @@ struct ReelItemView: View {
     private var mainContent: some View {
         ZStack(alignment: .bottom) {
             mediaLayer
+            seekPreviewOverlay
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
             fastForwardOverlay
             playButtonOverlay
             bottomBarOverlay
@@ -3572,7 +3598,7 @@ extension ReelItemView {
 
     @ViewBuilder
     private var mediaLayer: some View {
-        ZoomableScrollView(isZoomed: $isZoomed, onTap: handleMediaTap, onLongPress: handleLongPress) {
+        ZoomableScrollView(isZoomed: $isZoomed, onTap: handleMediaTap, onLongPress: handleLongPress, onHorizontalPan: handleSeekPan) {
             ZStack {
                 Group {
                     if item.isAnimated {
@@ -3664,6 +3690,103 @@ extension ReelItemView {
             }
         }
         onInteraction()
+    }
+
+    private func handleSeekPan(translation: CGFloat, state: UIGestureRecognizer.State) {
+        guard !item.isAnimated else { return }
+        let screenWidth = UIScreen.main.bounds.width
+        let deadzone: CGFloat = 20
+
+        switch state {
+        case .began, .changed:
+            let absTrans = abs(translation)
+            if absTrans < deadzone {
+                seekTimeOffset = 0
+                if isSwipeSeeking {
+                    withAnimation(.easeOut(duration: 0.15)) { isSwipeSeeking = false }
+                }
+            } else {
+                let progress = min((absTrans - deadzone) / (screenWidth - deadzone), 1.0)
+                let seconds = 10.0 + Double(progress) * 1190.0
+                seekTimeOffset = translation > 0 ? seconds : -seconds
+                seekTimeOffset = max(-scrubberState.time, min(seekTimeOffset, scrubberState.duration - scrubberState.time))
+                if !isSwipeSeeking {
+                    withAnimation(.easeOut(duration: 0.15)) { isSwipeSeeking = true }
+                }
+            }
+
+        case .ended:
+            if isSwipeSeeking && abs(seekTimeOffset) >= 10 {
+                let targetTime = max(0, min(scrubberState.time + seekTimeOffset, scrubberState.duration))
+                seek(to: targetTime)
+                onInteraction()
+            }
+            withAnimation(.easeOut(duration: 0.15)) { isSwipeSeeking = false }
+            seekTimeOffset = 0
+
+        case .cancelled, .failed:
+            withAnimation(.easeOut(duration: 0.15)) { isSwipeSeeking = false }
+            seekTimeOffset = 0
+
+        default:
+            break
+        }
+    }
+
+    private func formatSeekOffset(_ seconds: Double) -> String {
+        let sign = seconds >= 0 ? "+" : "-"
+        let abs = abs(seconds)
+        let m = Int(abs) / 60
+        let s = Int(abs) % 60
+        return "\(sign)\(m):\(String(format: "%02d", s))"
+    }
+
+    private func formatTimestamp(_ seconds: Double) -> String {
+        let clamped = max(0, seconds)
+        let m = Int(clamped) / 60
+        let s = Int(clamped) % 60
+        return "\(m):\(String(format: "%02d", s))"
+    }
+
+    private var seekPreviewSize: CGSize {
+        let isLandscape = UIScreen.main.bounds.width > UIScreen.main.bounds.height
+        let maxDim: CGFloat = isLandscape ? 120 : 140
+        let ratio = item.videoAspectRatio ?? 16.0 / 9.0
+        if ratio >= 1 {
+            return CGSize(width: maxDim, height: maxDim / ratio)
+        } else {
+            return CGSize(width: maxDim * ratio, height: maxDim)
+        }
+    }
+
+    @ViewBuilder
+    private var seekPreviewOverlay: some View {
+        if isSwipeSeeking {
+            let targetTime = max(0, min(scrubberState.time + seekTimeOffset, scrubberState.duration))
+            let isLandscape = UIScreen.main.bounds.width > UIScreen.main.bounds.height
+            let previewSize = seekPreviewSize
+            VStack(alignment: .leading, spacing: 4) {
+                if let frame = spritePreview.frameImage(at: targetTime) {
+                    Image(uiImage: frame)
+                        .resizable()
+                        .aspectRatio(contentMode: .fill)
+                        .frame(width: previewSize.width, height: previewSize.height)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                Text(formatSeekOffset(seekTimeOffset))
+                    .font(.system(size: isLandscape ? 17 : 20, weight: .bold, design: .monospaced))
+                    .foregroundColor(.white)
+                Text("→ \(formatTimestamp(targetTime))")
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.7))
+            }
+            .padding(10)
+            .background(.ultraThinMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.top, isLandscape ? 16 : 80)
+            .padding(.leading, isLandscape ? 60 : 16)
+            .transition(.opacity)
+        }
     }
 
     @ViewBuilder
@@ -3811,6 +3934,9 @@ extension ReelItemView {
     func setupPlayer() {
         // Animations don't need AVPlayer
         guard !item.isAnimated else { return }
+
+        let paths = item.spritePaths
+        spritePreview.load(vttURLString: paths.vtt, spriteURLString: paths.sprite)
 
         // `onAppear` + scroll settle can both call `setupPlayer` in the same transition; avoid a second
         // `initPlayer`/generation bump (visible flash + duplicate stream work).
