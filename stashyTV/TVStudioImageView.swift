@@ -129,10 +129,35 @@ private struct TVPocketSVGView: UIViewRepresentable {
     func updateUIView(_ uiView: SVGImageView, context: Context) {
         uiView.contentMode = (contentMode == .fill) ? .scaleAspectFill : .scaleAspectFit
         uiView.layer.contentsGravity = (contentMode == .fill) ? .resizeAspectFill : .resizeAspect
-        uiView.paths = SVGBezierPath.paths(fromSVGString: svgString)
-        // Force a layout pass so the layer scales to the SwiftUI-provided bounds.
+        uiView.paths = SVGBezierPath.paths(fromSVGString: Self.sanitizeSVGColors(svgString))
         uiView.setNeedsLayout()
         uiView.layoutIfNeeded()
         uiView.setNeedsDisplay()
+    }
+
+    // PocketSVG's hexTriplet parser only handles named SVG colors, #hex, and rgb().
+    // It crashes on rgba(), currentColor, transparent, inherit, url(), hsl(), etc.
+    static func sanitizeSVGColors(_ svg: String) -> String {
+        var result = svg
+        result = result.replacingOccurrences(
+            of: #"rgba\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)\s*,\s*[\d.]+\s*\)"#,
+            with: "rgb($1,$2,$3)",
+            options: .regularExpression
+        )
+        result = result.replacingOccurrences(
+            of: #"hsla?\([^)]*\)"#,
+            with: "#000000",
+            options: .regularExpression
+        )
+        result = result.replacingOccurrences(
+            of: #"url\([^)]*\)"#,
+            with: "none",
+            options: .regularExpression
+        )
+        let keywords = ["transparent", "currentColor", "currentcolor", "inherit"]
+        for keyword in keywords {
+            result = result.replacingOccurrences(of: keyword, with: keyword == "transparent" ? "none" : "#000000")
+        }
+        return result
     }
 }
