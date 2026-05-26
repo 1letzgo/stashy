@@ -268,68 +268,7 @@ struct TVSceneDetailView: View {
                     .frame(maxWidth: 1000, alignment: .leading)
             }
 
-            // 4. Metadata Line (Duration, Res) + Progress Bar
-            HStack(spacing: 24) {
-                if let duration = scene.sceneDuration, duration > 0 {
-                    HStack(spacing: 6) {
-                        Image(systemName: "clock")
-                        Text(formattedDuration(duration))
-                    }
-                    .font(.headline)
-                }
-
-                if let resolution = resolutionString(for: scene) {
-                    HStack(spacing: 6) {
-                        Image(systemName: "tv")
-                        Text(resolution)
-                    }
-                    .font(.headline)
-                }
-
-                // Rating Pill
-                if let rating100 = scene.rating100, rating100 > 0 {
-                    HStack(spacing: 8) {
-                        Image(systemName: "star.fill")
-                            .foregroundColor(.yellow)
-                        Text(String(format: "%.1f", Double(rating100) / 20.0))
-                    }
-                    .font(.headline)
-                }
-
-                // O-Count Pill
-                if let oCounter = scene.oCounter, oCounter > 0 {
-                    HStack(spacing: 6) {
-                        Image(systemName: "heart.circle")
-                        Text("\(oCounter)")
-                    }
-                    .font(.headline)
-                }
-                
-                // Progress Bar inline with metadata
-                if let resumeTime = scene.resumeTime, resumeTime > 0, let duration = scene.sceneDuration, duration > 0 {
-                    HStack(spacing: 12) {
-                        Image(systemName: "play.fill")
-                            .font(.caption)
-                        
-                        Text("\(Int(resumeTime / duration * 100))%")
-                            .font(.headline)
-                        
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Rectangle().fill(Color.white.opacity(0.3))
-                                Rectangle().fill(AppearanceManager.shared.tintColor)
-                                    .frame(width: geo.size.width * CGFloat(resumeTime / duration))
-                            }
-                        }
-                        .frame(width: 200, height: 4)
-                        .clipShape(Capsule())
-                    }
-                }
-            }
-            .foregroundColor(.white.opacity(0.9))
-            .padding(.top, 8)
-
-            // 5. Action Buttons & Info Pills Row
+            // 4. Action Buttons & Info Pills Row
             HStack(spacing: 20) {
                 // Play Action
                 Button {
@@ -366,7 +305,59 @@ struct TVSceneDetailView: View {
                         .padding(.vertical, 8)
                     }
                 }
+            }
+            
+            .foregroundColor(.white.opacity(0.9))
+            .padding(.top, 8)
+            
+            // 5. Metadata Line (Duration, Res) + Progress Bar
+            HStack(spacing: 24) {
+                TVStarRatingPill(rating100: scene.rating100) { newRating in
+                    commitRating(scene: scene, newRating: newRating)
+                }
+
+                TVOCountPill(
+                    oCounter: scene.oCounter,
+                    iconName: AppearanceManager.shared.oCounterIconFilled,
+                    onIncrement: { incrementOCount(scene: scene) }
+                )
                 
+                if let duration = scene.sceneDuration, duration > 0 {
+                    HStack(spacing: 6) {
+                        Image(systemName: "clock")
+                        Text(formattedDuration(duration))
+                    }
+                    .font(.headline)
+                }
+
+                if let resolution = resolutionString(for: scene) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "tv")
+                        Text(resolution)
+                    }
+                    .font(.headline)
+                }
+
+                // Progress Bar inline with metadata
+                if let resumeTime = scene.resumeTime, resumeTime > 0, let duration = scene.sceneDuration, duration > 0 {
+                    HStack(spacing: 12) {
+                        Image(systemName: "play.fill")
+                            .font(.caption)
+                        
+                        Text("\(Int(resumeTime / duration * 100))%")
+                            .font(.headline)
+                        
+                        GeometryReader { geo in
+                            ZStack(alignment: .leading) {
+                                Rectangle().fill(Color.white.opacity(0.3))
+                                Rectangle().fill(AppearanceManager.shared.tintColor)
+                                    .frame(width: geo.size.width * CGFloat(resumeTime / duration))
+                            }
+                        }
+                        .frame(width: 200, height: 4)
+                        .clipShape(Capsule())
+                    }
+                }
             }
             .padding(.top, 16)
         }
@@ -393,22 +384,20 @@ struct TVSceneDetailView: View {
                 }
 
                 // Rating
-                if let rating100 = scene.rating100, rating100 > 0 {
-                    HStack(spacing: 6) {
-                        ForEach(0..<5, id: \.self) { index in
-                            let starValue = Double(index + 1) * 20.0
-                            let rating = Double(rating100)
-                            Image(systemName: rating >= starValue ? "star.fill" :
-                                  (rating >= starValue - 10 ? "star.leadinghalf.filled" : "star"))
-                                .font(.title3)
-                                .foregroundColor(.yellow)
-                        }
+                HStack(spacing: 6) {
+                    ForEach(0..<5, id: \.self) { index in
+                        let starValue = Double(index + 1) * 20.0
+                        let rating = Double(scene.rating100 ?? 0)
+                        Image(systemName: rating >= starValue ? "star.fill" :
+                              (rating >= starValue - 10 ? "star.leadinghalf.filled" : "star"))
+                            .font(.title3)
+                            .foregroundColor(rating >= starValue ? .yellow : .gray.opacity(0.4))
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Color.white.opacity(0.06))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
                 }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(Color.white.opacity(0.06))
+                .clipShape(RoundedRectangle(cornerRadius: 10))
 
                 // Play Count
                 if let playCount = scene.playCount, playCount > 0 {
@@ -416,9 +405,7 @@ struct TVSceneDetailView: View {
                 }
 
                 // O-Counter
-                if let oCounter = scene.oCounter, oCounter > 0 {
-                    metadataPill(icon: "heart.circle", text: "\(oCounter)")
-                }
+                metadataPill(icon: "heart.circle", text: "\(scene.oCounter ?? 0)")
 
                 // Resolution
                 if let file = scene.files?.first, let w = file.width, let h = file.height {
@@ -441,6 +428,34 @@ struct TVSceneDetailView: View {
         .padding(.vertical, 10)
         .background(Color.white.opacity(0.06))
         .clipShape(RoundedRectangle(cornerRadius: 10))
+    }
+
+    // MARK: - Rating & O-Count
+
+    private func commitRating(scene: Scene, newRating: Int?) {
+        sceneDetail = scene.withRating(newRating)
+        viewModel.updateSceneRating(sceneId: scene.id, rating100: newRating) { success in
+            if !success {
+                DispatchQueue.main.async {
+                    sceneDetail = scene
+                }
+            }
+        }
+    }
+
+    private func incrementOCount(scene: Scene) {
+        let current = scene.oCounter ?? 0
+        sceneDetail = scene.withOCounter(current + 1)
+
+        viewModel.incrementOCounter(sceneId: scene.id) { newCount in
+            if let count = newCount {
+                DispatchQueue.main.async {
+                    if let s = sceneDetail {
+                        sceneDetail = s.withOCounter(count)
+                    }
+                }
+            }
+        }
     }
 
     // MARK: - Playback
