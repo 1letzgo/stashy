@@ -6,12 +6,19 @@
 //
 
 import SwiftUI
+import AVKit
 
 struct TVSceneCardView: View {
     let scene: Scene
     var width: CGFloat = 410
     var height: CGFloat = 230
     @Environment(\.isFocused) var isFocused
+
+    // Hover-to-preview state
+    @State private var previewPlayer: AVPlayer?
+    @State private var showPreview = false
+    @State private var hoverTask: Task<Void, Never>?
+    @State private var loopObserver: NSObjectProtocol?
 
     var body: some View {
         // Thumbnail with overlays
@@ -21,6 +28,15 @@ struct TVSceneCardView: View {
                 .frame(width: width, height: height)
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 10))
+
+            // Video preview overlay (shown after hovering ~1s)
+            if showPreview, let previewPlayer {
+                TVPreviewPlayerView(player: previewPlayer)
+                    .frame(width: width, height: height)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
 
             // Gradient
             LinearGradient(
@@ -109,6 +125,76 @@ struct TVSceneCardView: View {
             }
         }
         .frame(width: width, height: height)
+        .onChange(of: isFocused) { focused in
+            if focused {
+                startHoverPreview()
+            } else {
+                teardownPreview()
+            }
+        }
+        .onDisappear {
+            teardownPreview()
+        }
+    }
+
+    // MARK: - Hover preview
+
+    private func startHoverPreview() {
+        hoverTask?.cancel()
+        guard let previewURL = scene.previewURL else { return }
+        hoverTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 1_000_000_000)
+            guard !Task.isCancelled else { return }
+
+            let player = createMutedPreviewPlayer(for: previewURL)
+            player.actionAtItemEnd = .none
+            loopObserver = NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemDidPlayToEndTime,
+                object: player.currentItem,
+                queue: .main
+            ) { _ in
+                player.seek(to: .zero)
+                player.play()
+            }
+            previewPlayer = player
+            player.play()
+            withAnimation(.easeIn(duration: 0.25)) {
+                showPreview = true
+            }
+        }
+    }
+
+    private func teardownPreview() {
+        hoverTask?.cancel()
+        hoverTask = nil
+
+        // Stop playback and detach the loop observer immediately so audio,
+        // network, and the seek-to-start loop halt the moment focus leaves.
+        if let loopObserver {
+            NotificationCenter.default.removeObserver(loopObserver)
+            self.loopObserver = nil
+        }
+        let departingPlayer = previewPlayer
+        departingPlayer?.pause()
+
+        guard showPreview else {
+            // Nothing on screen yet (e.g. torn down before the 1s timer fired).
+            previewPlayer = nil
+            return
+        }
+
+        // Keep the player attached through the fade so .transition(.opacity)
+        // can cross-fade back to the thumbnail, then release it once done.
+        withAnimation(.easeOut(duration: 0.2)) {
+            showPreview = false
+        }
+        Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            // Skip if a new preview took over during the fade-out.
+            if previewPlayer === departingPlayer {
+                previewPlayer = nil
+            }
+        }
     }
 
     // MARK: - Thumbnail
@@ -164,8 +250,45 @@ struct TVSceneCardView: View {
 
 struct TVSceneCardTitleView: View {
     let scene: Scene
-    
+
     var body: some View {
         EmptyView()
+    }
+}
+
+// Lightweight AVPlayerLayer-backed view for muted hover previews on tvOS.
+struct TVPreviewPlayerView: UIViewRepresentable {
+    let player: AVPlayer
+
+    func makeUIView(context: Context) -> PlayerLayerView {
+        PlayerLayerView(player: player)
+    }
+
+    func updateUIView(_ uiView: PlayerLayerView, context: Context) {
+        if uiView.player !== player {
+            uiView.player = player
+        }
+    }
+
+    final class PlayerLayerView: UIView {
+        override class var layerClass: AnyClass { AVPlayerLayer.self }
+
+        private var playerLayer: AVPlayerLayer { layer as! AVPlayerLayer }
+
+        var player: AVPlayer? {
+            get { playerLayer.player }
+            set { playerLayer.player = newValue }
+        }
+
+        init(player: AVPlayer) {
+            super.init(frame: .zero)
+            self.player = player
+            playerLayer.videoGravity = .resizeAspectFill
+            isUserInteractionEnabled = false
+        }
+
+        required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+        override var canBecomeFocused: Bool { false }
     }
 }
