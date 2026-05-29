@@ -3733,14 +3733,6 @@ extension ReelItemView {
         }
     }
 
-    private func formatSeekOffset(_ seconds: Double) -> String {
-        let sign = seconds >= 0 ? "+" : "-"
-        let abs = abs(seconds)
-        let m = Int(abs) / 60
-        let s = Int(abs) % 60
-        return "\(sign)\(m):\(String(format: "%02d", s))"
-    }
-
     private func formatTimestamp(_ seconds: Double) -> String {
         let clamped = max(0, seconds)
         let m = Int(clamped) / 60
@@ -3748,9 +3740,15 @@ extension ReelItemView {
         return "\(m):\(String(format: "%02d", s))"
     }
 
+    private var seekPreviewScale: CGFloat {
+        let shortEdge = min(UIScreen.main.bounds.width, UIScreen.main.bounds.height)
+        return max(1.0, shortEdge / 390)
+    }
+
     private var seekPreviewSize: CGSize {
         let isLandscape = UIScreen.main.bounds.width > UIScreen.main.bounds.height
-        let maxDim: CGFloat = isLandscape ? 120 : 140
+        let scale = seekPreviewScale
+        let maxDim: CGFloat = (isLandscape ? 120 : 140) * scale
         let ratio = item.videoAspectRatio ?? 16.0 / 9.0
         if ratio >= 1 {
             return CGSize(width: maxDim, height: maxDim / ratio)
@@ -3764,26 +3762,25 @@ extension ReelItemView {
         if isSwipeSeeking {
             let targetTime = max(0, min(scrubberState.time + seekTimeOffset, scrubberState.duration))
             let isLandscape = UIScreen.main.bounds.width > UIScreen.main.bounds.height
+            let scale = seekPreviewScale
+            let textScale = sqrt(scale)
             let previewSize = seekPreviewSize
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: 4 * textScale) {
                 if let frame = spritePreview.frameImage(at: targetTime) {
                     Image(uiImage: frame)
                         .resizable()
                         .aspectRatio(contentMode: .fill)
                         .frame(width: previewSize.width, height: previewSize.height)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                        .clipShape(RoundedRectangle(cornerRadius: 8 * scale))
                 }
-                Text(formatSeekOffset(seekTimeOffset))
-                    .font(.system(size: isLandscape ? 17 : 20, weight: .bold, design: .monospaced))
+                Text(formatTimestamp(targetTime))
+                    .font(.system(size: (isLandscape ? 17 : 20) * textScale, weight: .bold, design: .monospaced))
                     .foregroundColor(.white)
-                Text("→ \(formatTimestamp(targetTime))")
-                    .font(.system(size: 12, weight: .medium, design: .monospaced))
-                    .foregroundColor(.white.opacity(0.7))
             }
-            .padding(10)
+            .padding(10 * textScale)
             .background(.ultraThinMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .padding(.top, isLandscape ? 16 : 80)
+            .clipShape(RoundedRectangle(cornerRadius: 12 * textScale))
+            .padding(.top, (isUIVisible ? (isLandscape ? 60 : 120) : (isLandscape ? 16 : 80)) * scale)
             .padding(.leading, isLandscape ? 60 : 16)
             .transition(.opacity)
         }
