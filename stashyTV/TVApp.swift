@@ -8,6 +8,7 @@
 import SwiftUI
 import CryptoKit
 import Combine
+import KSPlayer
 
 @main
 struct TVApp: App {
@@ -15,6 +16,11 @@ struct TVApp: App {
     @StateObject private var securityManager = TVSecurityManager.shared
     @Environment(\.scenePhase) private var scenePhase
     @State private var lastScenePhase: ScenePhase = .active
+
+    init() {
+        KSOptions.firstPlayerType = KSMEPlayer.self
+        KSOptions.secondPlayerType = KSAVPlayer.self
+    }
 
     var body: some SwiftUI.Scene {
         WindowGroup {

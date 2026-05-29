@@ -137,6 +137,7 @@
 		F0A11E1B0B0B0B0B0B0B0B01 /* PocketSVG in Frameworks */ = {isa = PBXBuildFile; productRef = 1A2B3C4D5E6F708192A3B4C5 /* PocketSVG */; };
 		F0A11E1B0B0B0B0B0B0B0B02 /* PocketSVG in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 1A2B3C4D5E6F708192A3B4C5 /* PocketSVG */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		B1A2C3D4E5F60718293A4B5C5 /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = B1A2C3D4E5F60718293A4B5C4 /* KSPlayer */; };
+		B1A2C3D4E5F60718293A4B5C7 /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = B1A2C3D4E5F60718293A4B5C6 /* KSPlayer */; };
 		F21C93AC1160498EB0A17AF4 /* GalleryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E672F2A6386004CA019 /* GalleryRepository.swift */; };
 		F4BF2858338E42E6AA292FCC /* PerformersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB392F1832E8007C2090 /* PerformersView.swift */; };
 		F6BC02EF04794FCAA2460E89 /* PerformerRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E682F2A6386004CA019 /* PerformerRepository.swift */; };
@@ -261,6 +262,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				B1A2C3D4E5F60718293A4B5C7 /* KSPlayer in Frameworks */,
 				F0A11E1B0B0B0B0B0B0B0B01 /* PocketSVG in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -462,6 +464,7 @@
 				F0A11E1B0B0B0B0B0B0B0B03 /* Embed Frameworks */,
 				37D3E24B2F3932C400AB8FAD /* Frameworks */,
 				37D3E24C2F3932C400AB8FAD /* Resources */,
+				B1A2C3D4E5F60718293A4B5C8 /* Patch Embedded Framework Bundle IDs */,
 			);
 			buildRules = (
 			);
@@ -472,6 +475,7 @@
 			);
 			name = stashyTV;
 			packageProductDependencies = (
+				B1A2C3D4E5F60718293A4B5C6 /* KSPlayer */,
 				1A2B3C4D5E6F708192A3B4C5 /* PocketSVG */,
 			);
 			productName = stashyTV;
@@ -557,6 +561,25 @@
 			shellScript = "$PROJECT_DIR/stashy/scripts/bump_version.sh \n";
 		};
 		E7F1C9B62F10EA1E004BBEB5 /* Patch Embedded Framework Bundle IDs */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Patch Embedded Framework Bundle IDs";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"$PROJECT_DIR\"/stashy/scripts/patch_embedded_framework_bundle_ids.sh\n";
+		};
+		B1A2C3D4E5F60718293A4B5C8 /* Patch Embedded Framework Bundle IDs */ = {
 			isa = PBXShellScriptBuildPhase;
 			alwaysOutOfDate = 1;
 			buildActionMask = 2147483647;
@@ -920,7 +943,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "stashyTV-Info.plist";
@@ -962,7 +985,7 @@
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
-				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GENERATE_INFOPLIST_FILE = NO;
 				INFOPLIST_FILE = "stashyTV-Info.plist";
@@ -1046,6 +1069,11 @@
 			productName = PocketSVG;
 		};
 		B1A2C3D4E5F60718293A4B5C4 /* KSPlayer */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = B1A2C3D4E5F60718293A4B5C2 /* XCRemoteSwiftPackageReference "KSPlayer" */;
+			productName = KSPlayer;
+		};
+		B1A2C3D4E5F60718293A4B5C6 /* KSPlayer */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = B1A2C3D4E5F60718293A4B5C2 /* XCRemoteSwiftPackageReference "KSPlayer" */;
 			productName = KSPlayer;

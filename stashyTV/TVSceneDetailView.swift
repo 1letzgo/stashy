@@ -8,6 +8,7 @@
 import SwiftUI
 import AVKit
 import Combine
+import KSPlayer
 
 struct TVSceneDetailView: View {
     let sceneId: String
@@ -20,6 +21,8 @@ struct TVSceneDetailView: View {
     @State private var isLoadingDetail = true
     @State private var isLoadingStreams = true
     @State private var hasAddedPlay = false
+    @Namespace private var focusNS
+    @Environment(\.resetFocus) private var resetFocus
 
     /// Same idea as iOS `ScenesView`: list/detail only treat transport/config as “connection” errors.
     private var hasValidActiveServer: Bool {
@@ -107,20 +110,30 @@ struct TVSceneDetailView: View {
         }
         .onPlayPauseCommand {
             if sceneDetail != nil {
-                if playerViewModel.player?.rate == 0 {
-                    playerViewModel.player?.play()
-                } else {
-                    playerViewModel.player?.pause()
+                if let playerLayer = playerViewModel.ksCoordinator.playerLayer {
+                    if playerLayer.player.isPlaying {
+                        playerLayer.pause()
+                    } else {
+                        playerLayer.play()
+                    }
                 }
             }
         }
+        .focusScope(focusNS)
         .fullScreenCover(isPresented: $playerViewModel.isShowingPlayer, onDismiss: {
             playerViewModel.clear()
-            loadData()
-        }) {
-            if let player = playerViewModel.player {
-                TVVideoPlayerView(player: player, isPresented: $playerViewModel.isShowingPlayer)
+            loadData(silent: true)
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                resetFocus(in: focusNS)
             }
+        }) {
+            TVVideoPlayerView(
+                playerViewModel: playerViewModel,
+                isPresented: $playerViewModel.isShowingPlayer,
+                sceneTitle: sceneDetail?.title,
+                vttURLString: sceneDetail?.paths?.vtt,
+                spriteURLString: sceneDetail?.paths?.sprite
+            )
         }
     }
 
@@ -151,24 +164,30 @@ struct TVSceneDetailView: View {
         loadData()
     }
 
-    private func loadData() {
+    private func loadData(silent: Bool = false) {
         guard hasValidActiveServer else {
-            isLoadingDetail = false
-            isLoadingStreams = false
+            if !silent {
+                isLoadingDetail = false
+                isLoadingStreams = false
+            }
             return
         }
 
-        isLoadingDetail = true
-        isLoadingStreams = true
+        if !silent {
+            isLoadingDetail = true
+            isLoadingStreams = true
+        }
 
         viewModel.fetchSceneDetails(sceneId: sceneId) { scene in
             self.sceneDetail = scene
-            self.isLoadingDetail = false
+            if !silent { self.isLoadingDetail = false }
         }
 
-        viewModel.fetchSceneStreams(sceneId: sceneId) { streams in
-            self.sceneStreams = streams
-            self.isLoadingStreams = false
+        if !silent {
+            viewModel.fetchSceneStreams(sceneId: sceneId) { streams in
+                self.sceneStreams = streams
+                self.isLoadingStreams = false
+            }
         }
     }
 
@@ -332,6 +351,7 @@ struct TVSceneDetailView: View {
                     .padding(.vertical, 8)
                 }
                 .disabled(!hasStream || (isWaiting && !hasStream))
+                .prefersDefaultFocus(in: focusNS)
 
                 // Restart Action
                 if hasProgress {
@@ -444,42 +464,15 @@ struct TVSceneDetailView: View {
         }
         
         let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original
-        let compatible = ["mp4", "m4v", "mov"]
-        let fileFormat = scene.files?.first?.format?.lowercased() ?? ""
-        let isNativelyCompatible = compatible.contains(fileFormat)
-        
-        // Use bestStream() which respects quality settings and format compatibility.
-        // For compatible formats (MP4) at Original quality, bestStream returns nil
-        // → use direct stream path (much faster seeking than HLS transcoding).
+
+        // KSPlayer handles all container formats (MKV, AVI, etc.) natively via FFmpeg,
+        // so no format-gating is needed. Just respect the user's quality preference.
         let sceneWithStreams = scene.withStreams(sceneStreams)
         if let streamURL = sceneWithStreams.bestStream(for: quality) {
-            print("📺 TV: Using quality-selected stream (\(quality.displayName)) for format: \(fileFormat)")
             playerViewModel.setupPlayer(url: streamURL, sceneId: scene.id, viewModel: viewModel, startAt: startTime)
             return
         }
-        
-        // Non-compatible format (MKV, AVI, WMV, etc.): force HLS even if bestStream
-        // returned nil (e.g. because sceneStreams were not loaded).
-        // Apple TV cannot play these formats via direct stream.
-        if !isNativelyCompatible {
-            // Try any available HLS stream first
-            if let hlsStream = sceneStreams.first(where: { $0.mime_type == "application/vnd.apple.mpegurl" }),
-               let url = URL(string: hlsStream.url) {
-                print("📺 TV: Non-MP4 (\(fileFormat)) — forcing HLS stream")
-                playerViewModel.setupPlayer(url: url, sceneId: scene.id, viewModel: viewModel, startAt: startTime)
-                return
-            }
-            // Try MP4 transcode stream as fallback
-            if let mp4Stream = sceneStreams.first(where: { $0.mime_type == "video/mp4" }),
-               let url = URL(string: mp4Stream.url) {
-                print("📺 TV: Non-MP4 (\(fileFormat)) — using MP4 transcode stream")
-                playerViewModel.setupPlayer(url: url, sceneId: scene.id, viewModel: viewModel, startAt: startTime)
-                return
-            }
-        }
-        
-        // Direct stream fallback — only safe for natively compatible formats (MP4/MOV/M4V)
-        // or when format is unknown (Stash transcodes on the fly via /stream endpoint)
+
         if let directPath = scene.paths?.stream {
             let fullURL: String
             if directPath.starts(with: "http://") || directPath.starts(with: "https://") {
@@ -490,7 +483,6 @@ struct TVSceneDetailView: View {
                 return
             }
             if let url = URL(string: fullURL) {
-                print("📺 TV: Using direct stream for \(isNativelyCompatible ? "compatible" : "unknown") format (\(fileFormat))")
                 playerViewModel.setupPlayer(url: url, sceneId: scene.id, viewModel: viewModel, startAt: startTime)
             }
         }
@@ -733,148 +725,494 @@ struct TVSceneDetailView: View {
 // MARK: - Player View Model
 
 class TVPlayerViewModel: ObservableObject {
-    @Published var player: AVPlayer?
+    @Published var playbackURL: URL?
+    @Published var startSeconds: Double = 0
     @Published var isShowingPlayer = false
     @Published var error: Error?
 
-    private var statusObserver: NSKeyValueObservation?
+    let ksCoordinator = KSVideoPlayer.Coordinator()
     private var progressTimer: AnyCancellable?
-    /// Nach System-Spulen bleibt der Player oft bei rate 0; Apple-TV+-ähnlich wieder anspielen.
-    private var timeJumpedObserver: NSObjectProtocol?
     private var sceneId: String?
     private var viewModel: StashDBViewModel?
-    /// Avoid duplicate seek/play when `status` KVO fires more than once at `.readyToPlay`.
-    private var didApplyInitialPlayback = false
 
     func setupPlayer(url: URL, sceneId: String, viewModel: StashDBViewModel, startAt timestamp: Double = 0) {
-        print("🚀 TV PLAYER VM: Setting up player for URL: \(url.absoluteString) at \(timestamp)s")
+        let authenticatedURL = signedURL(url) ?? url
         self.sceneId = sceneId
         self.viewModel = viewModel
-        self.didApplyInitialPlayback = false
-
-        let newPlayer = createPlayer(for: url)
-        self.player = newPlayer
+        self.startSeconds = max(0, timestamp)
+        self.playbackURL = authenticatedURL
         self.isShowingPlayer = true
-
-        let startSeconds = max(0, timestamp)
-
-        statusObserver = newPlayer.currentItem?.observe(\.status, options: [.new, .initial]) { [weak self, weak newPlayer] item, _ in
-            guard let self, let newPlayer else { return }
-            DispatchQueue.main.async {
-                guard self.player === newPlayer else { return }
-                if item.status == .failed {
-                    self.error = item.error
-                    print("❌ TV PLAYER VM: Playback FAILED: \(item.error?.localizedDescription ?? "Unknown error")")
-                    if let error = item.error as NSError? {
-                        print("❌ TV PLAYER VM: Error domain: \(error.domain), code: \(error.code)")
-                        print("❌ TV PLAYER VM: Error user info: \(error.userInfo)")
-                    }
-                } else if item.status == .readyToPlay {
-                    print("✅ TV PLAYER VM: Player item READY to play")
-                    self.applyInitialPlaybackIfNeeded(player: newPlayer, startSeconds: startSeconds)
-                }
-            }
-        }
 
         progressTimer = Timer.publish(every: 10, on: .main, in: .common)
             .autoconnect()
             .sink { [weak self] _ in
                 self?.saveProgress()
             }
-
-        registerAutoResumeAfterScrub(on: newPlayer)
-    }
-
-    private func registerAutoResumeAfterScrub(on player: AVPlayer) {
-        removeTimeJumpedObserver()
-        guard let item = player.currentItem else { return }
-        timeJumpedObserver = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemTimeJumped,
-            object: item,
-            queue: .main
-        ) { [weak player] _ in
-            guard let player, player.rate == 0 else { return }
-            player.play()
-        }
-    }
-
-    private func removeTimeJumpedObserver() {
-        if let token = timeJumpedObserver {
-            NotificationCenter.default.removeObserver(token)
-            timeJumpedObserver = nil
-        }
-    }
-
-    /// Seeking before `readyToPlay` (especially HLS/transcodes) causes UI hangs and endless buffering after scrubs.
-    private func applyInitialPlaybackIfNeeded(player: AVPlayer, startSeconds: Double) {
-        guard !didApplyInitialPlayback else { return }
-        didApplyInitialPlayback = true
-
-        let item = player.currentItem
-        let durationSec = item?.duration.seconds ?? 0
-        var start = startSeconds
-        if durationSec.isFinite, durationSec > 0 {
-            start = min(start, max(0, durationSec - 0.5))
-        }
-
-        if start > 0.25 {
-            let target = CMTime(seconds: start, preferredTimescale: 600)
-            let tol = CMTime(seconds: 2, preferredTimescale: 600)
-            player.seek(to: target, toleranceBefore: tol, toleranceAfter: tol) { [weak self, weak player] _ in
-                DispatchQueue.main.async {
-                    guard let self, let player, self.player === player else { return }
-                    player.play()
-                }
-            }
-        } else {
-            player.play()
-        }
     }
 
     func saveProgress() {
-        guard let player = player,
-              let sceneId = sceneId,
-              let viewModel = viewModel else { return }
-        
-        let currentTime = player.currentTime().seconds
+        guard let sceneId, let viewModel else { return }
+        let currentTime = ksCoordinator.playerLayer?.player.currentPlaybackTime ?? 0
         if currentTime > 0 {
-            print("💾 TV PLAYER VM: Saving progress: \(currentTime)s for \(sceneId)")
             viewModel.updateSceneResumeTime(sceneId: sceneId, resumeTime: currentTime)
         }
     }
 
     func clear() {
         saveProgress()
-        removeTimeJumpedObserver()
         progressTimer = nil
-        statusObserver = nil
-        didApplyInitialPlayback = true
-        let p = player
-        player = nil
+        ksCoordinator.resetPlayer()
+        playbackURL = nil
         sceneId = nil
         viewModel = nil
-        p?.pause()
-        p?.replaceCurrentItem(with: nil)
     }
 }
 
 // MARK: - Embedded Video Player for tvOS Full Screen Cover
 
 struct TVVideoPlayerView: View {
-    let player: AVPlayer
+    @ObservedObject var playerViewModel: TVPlayerViewModel
+    @ObservedObject private var timeModel: ControllerTimeModel
     @Binding var isPresented: Bool
+    var sceneTitle: String?
+    var vttURLString: String?
+    var spriteURLString: String?
+
+    init(playerViewModel: TVPlayerViewModel, isPresented: Binding<Bool>, sceneTitle: String? = nil, vttURLString: String? = nil, spriteURLString: String? = nil) {
+        self.playerViewModel = playerViewModel
+        self._timeModel = ObservedObject(wrappedValue: playerViewModel.ksCoordinator.timemodel)
+        self._isPresented = isPresented
+        self.sceneTitle = sceneTitle
+        self.vttURLString = vttURLString
+        self.spriteURLString = spriteURLString
+    }
+
+    @State private var showControls = true
+    @State private var hideTask: Task<Void, Never>?
+    @State private var isScrubbing = false
+    @State private var seekTargetTime: Double = 0
+    @State private var panAnchorTime: Double = 0
+    @StateObject private var spritePreview = SpritePreviewManager()
+
+    private var coordinator: KSVideoPlayer.Coordinator { playerViewModel.ksCoordinator }
+    private var isPlaying: Bool {
+        let s = coordinator.state
+        return s == .buffering || s == .bufferFinished
+    }
+    private var currentPlaybackTime: Double {
+        coordinator.playerLayer?.player.currentPlaybackTime ?? Double(timeModel.currentTime)
+    }
 
     var body: some View {
-        VideoPlayer(player: player) {
-            // Empty overlay - VideoPlayer provides native tvOS controls
+        if let url = playerViewModel.playbackURL {
+            ZStack {
+                KSVideoPlayer(coordinator: coordinator, url: url, options: tvKSOptions())
+                    .onStateChanged { playerLayer, state in
+                        if state == .readyToPlay, playerViewModel.startSeconds > 0.25 {
+                            let seekTo = playerViewModel.startSeconds
+                            playerViewModel.startSeconds = 0
+                            playerLayer.seek(time: seekTo, autoPlay: true) { _ in }
+                        }
+                        if state == .bufferFinished {
+                            scheduleHide()
+                        }
+                    }
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+
+                TVRemoteInputView(
+                    onSelect: { handleSelectOrPlayPause() },
+                    onPlayPause: { handleSelectOrPlayPause() },
+                    onLeft: { handleHorizontal(scrubDelta: -20, skipInterval: -20) },
+                    onRight: { handleHorizontal(scrubDelta: 20, skipInterval: 20) },
+                    onUp: {
+                        if isPlaying {
+                            coordinator.skip(interval: 180)
+                            flashControls()
+                        }
+                    },
+                    onDown: {
+                        if isPlaying {
+                            coordinator.skip(interval: -180)
+                            flashControls()
+                        }
+                    },
+                    onMenu: {
+                        if isScrubbing {
+                            cancelScrub()
+                        } else if showControls {
+                            showControls = false
+                        } else {
+                            isPresented = false
+                        }
+                    },
+                    onPan: { translation, state in
+                        handleScrubPan(translation: translation, state: state)
+                    }
+                )
+
+                if showControls {
+                    transportOverlay
+                        .transition(.opacity)
+                        .allowsHitTesting(false)
+                }
+            }
+            .animation(.easeInOut(duration: 0.25), value: showControls)
+            .animation(.easeInOut(duration: 0.2), value: isScrubbing)
+            .onAppear {
+                spritePreview.load(vttURLString: vttURLString, spriteURLString: spriteURLString)
+            }
+            .onDisappear {
+                hideTask?.cancel()
+            }
         }
-        .ignoresSafeArea()
-        .onExitCommand {
-            // Menu button should close the player, not exit the app.
-            isPresented = false
+    }
+
+    // MARK: - Transport Overlay
+
+    @ViewBuilder
+    private var transportOverlay: some View {
+        let currentActual = Double(timeModel.currentTime)
+        let total = Double(max(timeModel.totalTime, 1))
+        let displayTime = isScrubbing ? seekTargetTime : currentActual
+        let fraction = min(max(displayTime / total, 0), 1)
+
+        ZStack(alignment: .bottom) {
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.7)],
+                startPoint: .init(x: 0.5, y: 0.5),
+                endPoint: .bottom
+            )
+            .ignoresSafeArea()
+
+            VStack(alignment: .leading, spacing: 12) {
+                if let title = sceneTitle, !title.isEmpty {
+                    Text(title)
+                        .font(.title3)
+                        .fontWeight(.bold)
+                        .foregroundStyle(.white)
+                }
+
+                GeometryReader { geo in
+                    let barHeight: CGFloat = 8
+                    let playedWidth = geo.size.width * fraction
+
+                    ZStack(alignment: .leading) {
+                        Capsule()
+                            .fill(.white.opacity(0.15))
+                            .overlay { Capsule().fill(.ultraThinMaterial) }
+                            .environment(\.colorScheme, .dark)
+                            .frame(height: barHeight)
+
+                        if isScrubbing {
+                            let currentFraction = min(max(currentActual / total, 0), 1)
+                            Capsule()
+                                .fill(Color.white.opacity(0.4))
+                                .frame(width: max(geo.size.width * currentFraction, barHeight), height: barHeight)
+                        }
+
+                        Capsule()
+                            .fill(Color.white)
+                            .shadow(color: .white.opacity(0.5), radius: 4, x: 0, y: 0)
+                            .frame(width: max(playedWidth, barHeight), height: barHeight)
+                            .animation(.easeOut(duration: 0.3), value: playedWidth)
+                    }
+                    .overlay(alignment: .bottom) {
+                        if isScrubbing {
+                            spriteSeekPreview(seekTime: seekTargetTime, barWidth: geo.size.width, fraction: fraction)
+                                .offset(y: -20)
+                        }
+                    }
+                }
+                .frame(height: 8)
+
+                HStack(spacing: 8) {
+                    Text(formatTime(displayTime))
+                        .monospacedDigit()
+                    Image(systemName: isPlaying ? "play.circle.fill" : "pause.circle.fill")
+                        .font(.callout)
+
+                    Spacer()
+
+                    Text("-\(formatTime(max(0, total - displayTime)))")
+                        .monospacedDigit()
+                }
+                .font(.callout)
+                .foregroundStyle(.white)
+            }
+            .padding(.horizontal, 80)
+            .padding(.bottom, 60)
         }
-        .onDisappear {
-            // Final progress save handled by VM clear
+    }
+
+    // MARK: - Sprite Seek Preview
+
+    @ViewBuilder
+    private func spriteSeekPreview(seekTime: Double, barWidth: CGFloat, fraction: Double) -> some View {
+        let thumbWidth: CGFloat = 280
+        let thumbHeight: CGFloat = 158
+        let halfThumb = thumbWidth / 2
+        let centerX = barWidth * fraction
+        let clampedX = min(max(centerX, halfThumb), barWidth - halfThumb)
+
+        VStack(spacing: 6) {
+            if let frame = spritePreview.frameImage(at: seekTime) {
+                Image(uiImage: frame)
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+                    .frame(width: thumbWidth, height: thumbHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .strokeBorder(Color.white.opacity(0.3), lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.6), radius: 8, x: 0, y: 4)
+            } else {
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(.ultraThinMaterial)
+                    .environment(\.colorScheme, .dark)
+                    .frame(width: thumbWidth, height: thumbHeight)
+                    .overlay(
+                        Text(formatTime(seekTime))
+                            .font(.title2)
+                            .fontWeight(.bold)
+                            .foregroundColor(.white)
+                    )
+            }
         }
+        .fixedSize()
+        .position(x: clampedX, y: -(thumbHeight / 2))
+    }
+
+    // MARK: - Scrubbing
+
+    private func handleSelectOrPlayPause() {
+        if isScrubbing {
+            commitScrub()
+        } else {
+            togglePlayPause()
+            flashControls()
+        }
+    }
+
+    private func handleHorizontal(scrubDelta: Double, skipInterval: Int) {
+        if !isPlaying {
+            enterOrContinueScrub(delta: scrubDelta)
+        } else {
+            coordinator.skip(interval: skipInterval)
+            flashControls()
+        }
+    }
+
+    private func enterOrContinueScrub(delta: Double) {
+        let total = Double(timeModel.totalTime)
+        guard total > 0 else { return }
+
+        let base = isScrubbing ? seekTargetTime : currentPlaybackTime
+        seekTargetTime = max(0, min(base + delta, total))
+        if !isScrubbing { isScrubbing = true }
+        showControls = true
+        hideTask?.cancel()
+    }
+
+    private func commitScrub() {
+        guard isScrubbing, let layer = coordinator.playerLayer else { return }
+        isScrubbing = false
+        layer.seek(time: seekTargetTime, autoPlay: true) { _ in }
+        flashControls()
+    }
+
+    private func cancelScrub() {
+        isScrubbing = false
+        flashControls()
+    }
+
+    private func handleScrubPan(translation: CGFloat, state: UIGestureRecognizer.State) {
+        guard !isPlaying else { return }
+        let total = Double(timeModel.totalTime)
+        guard total > 0 else { return }
+
+        switch state {
+        case .began:
+            panAnchorTime = isScrubbing ? seekTargetTime : currentPlaybackTime
+            if !isScrubbing { isScrubbing = true }
+            showControls = true
+            hideTask?.cancel()
+        case .changed:
+            let offset = Double(translation / 1600) * total
+            seekTargetTime = max(0, min(panAnchorTime + offset, total))
+        default:
+            break
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func togglePlayPause() {
+        if let layer = coordinator.playerLayer {
+            if isPlaying {
+                layer.pause()
+            } else {
+                layer.play()
+            }
+        }
+    }
+
+    private func flashControls() {
+        showControls = true
+        scheduleHide()
+    }
+
+    private func scheduleHide() {
+        hideTask?.cancel()
+        hideTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(4))
+            guard !Task.isCancelled else { return }
+            if isPlaying && !isScrubbing {
+                showControls = false
+            }
+        }
+    }
+
+    private func formatTime(_ seconds: Double) -> String {
+        let s = Int(max(0, seconds))
+        let h = s / 3600
+        let m = (s % 3600) / 60
+        let sec = s % 60
+        if h > 0 {
+            return String(format: "%d:%02d:%02d", h, m, sec)
+        }
+        return String(format: "%d:%02d", m, sec)
+    }
+
+    private func tvKSOptions() -> KSOptions {
+        let o = KSOptions()
+        o.preferredForwardBufferDuration = 2
+        if let key = ServerConfigManager.shared.activeConfig?.secureApiKey, !key.isEmpty {
+            o.appendHeader(["ApiKey": key])
+        }
+        return o
+    }
+}
+
+// MARK: - Focus-owning UIKit view for Siri Remote input
+
+struct TVRemoteInputView: UIViewRepresentable {
+    var onSelect: () -> Void
+    var onPlayPause: () -> Void
+    var onLeft: () -> Void
+    var onRight: () -> Void
+    var onUp: () -> Void
+    var onDown: () -> Void
+    var onMenu: () -> Void
+    var onPan: ((CGFloat, UIGestureRecognizer.State) -> Void)?
+
+    func makeUIView(context: Context) -> TVRemoteInputUIView {
+        let view = TVRemoteInputUIView()
+        view.onSelect = onSelect
+        view.onPlayPause = onPlayPause
+        view.onLeft = onLeft
+        view.onRight = onRight
+        view.onUp = onUp
+        view.onDown = onDown
+        view.onMenu = onMenu
+        view.onPan = onPan
+        return view
+    }
+
+    func updateUIView(_ uiView: TVRemoteInputUIView, context: Context) {
+        uiView.onSelect = onSelect
+        uiView.onPlayPause = onPlayPause
+        uiView.onLeft = onLeft
+        uiView.onRight = onRight
+        uiView.onUp = onUp
+        uiView.onDown = onDown
+        uiView.onMenu = onMenu
+        uiView.onPan = onPan
+    }
+}
+
+final class TVRemoteInputUIView: UIView {
+    var onSelect: (() -> Void)?
+    var onPlayPause: (() -> Void)?
+    var onLeft: (() -> Void)?
+    var onRight: (() -> Void)?
+    var onUp: (() -> Void)?
+    var onDown: (() -> Void)?
+    var onMenu: (() -> Void)?
+    var onPan: ((CGFloat, UIGestureRecognizer.State) -> Void)?
+
+    private var repeatTimer: Timer?
+    private var panRecognizer: UIPanGestureRecognizer?
+
+    override var canBecomeFocused: Bool { true }
+
+    override func didMoveToWindow() {
+        super.didMoveToWindow()
+        if window != nil {
+            setNeedsFocusUpdate()
+            updateFocusIfNeeded()
+            if panRecognizer == nil {
+                let pan = UIPanGestureRecognizer(target: self, action: #selector(handlePan(_:)))
+                addGestureRecognizer(pan)
+                panRecognizer = pan
+            }
+        }
+    }
+
+    @objc private func handlePan(_ recognizer: UIPanGestureRecognizer) {
+        let translation = recognizer.translation(in: self).x
+        onPan?(translation, recognizer.state)
+    }
+
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        guard let press = presses.first else {
+            super.pressesBegan(presses, with: event)
+            return
+        }
+        switch press.type {
+        case .select:
+            onSelect?()
+        case .playPause:
+            onPlayPause?()
+        case .leftArrow:
+            onLeft?()
+            startRepeat { [weak self] in self?.onLeft?() }
+        case .rightArrow:
+            onRight?()
+            startRepeat { [weak self] in self?.onRight?() }
+        case .upArrow:
+            onUp?()
+            startRepeat { [weak self] in self?.onUp?() }
+        case .downArrow:
+            onDown?()
+            startRepeat { [weak self] in self?.onDown?() }
+        case .menu:
+            onMenu?()
+        default:
+            super.pressesBegan(presses, with: event)
+        }
+    }
+
+    override func pressesEnded(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        stopRepeat()
+        super.pressesEnded(presses, with: event)
+    }
+
+    override func pressesCancelled(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        stopRepeat()
+        super.pressesCancelled(presses, with: event)
+    }
+
+    private func startRepeat(_ action: @escaping () -> Void) {
+        stopRepeat()
+        repeatTimer = Timer.scheduledTimer(withTimeInterval: 0.3, repeats: true) { _ in
+            action()
+        }
+    }
+
+    private func stopRepeat() {
+        repeatTimer?.invalidate()
+        repeatTimer = nil
     }
 }

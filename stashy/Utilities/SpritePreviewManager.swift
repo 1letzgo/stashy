@@ -1,3 +1,4 @@
+import Combine
 import UIKit
 
 struct VTTEntry {
@@ -16,12 +17,16 @@ class SpritePreviewManager: ObservableObject {
 
     private var vttEntries: [VTTEntry] = []
     private var loadTask: Task<Void, Never>?
+    private var cachedEntry: VTTEntry?
+    private var cachedFrame: UIImage?
 
     func load(vttURLString: String?, spriteURLString: String?) {
         loadTask?.cancel()
         vttEntries = []
         spriteImage = nil
         isLoaded = false
+        cachedEntry = nil
+        cachedFrame = nil
 
         guard let vttStr = vttURLString, let spriteStr = spriteURLString,
               let vttURL = URL(string: vttStr), let spriteURL = URL(string: spriteStr) else { return }
@@ -49,6 +54,12 @@ class SpritePreviewManager: ObservableObject {
         guard let sprite = spriteImage, let cgImage = sprite.cgImage else { return nil }
         guard let entry = findEntry(for: time) else { return nil }
 
+        if let cached = cachedEntry, cached.x == entry.x, cached.y == entry.y,
+           cached.width == entry.width, cached.height == entry.height,
+           let frame = cachedFrame {
+            return frame
+        }
+
         let scale = sprite.scale
         let cropRect = CGRect(
             x: CGFloat(entry.x) * scale,
@@ -57,7 +68,10 @@ class SpritePreviewManager: ObservableObject {
             height: CGFloat(entry.height) * scale
         )
         guard let cropped = cgImage.cropping(to: cropRect) else { return nil }
-        return UIImage(cgImage: cropped, scale: scale, orientation: .up)
+        let frame = UIImage(cgImage: cropped, scale: scale, orientation: .up)
+        cachedEntry = entry
+        cachedFrame = frame
+        return frame
     }
 
     private func findEntry(for time: Double) -> VTTEntry? {
