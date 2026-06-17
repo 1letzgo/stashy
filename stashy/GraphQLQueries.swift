@@ -150,7 +150,10 @@ class GraphQLQueries {
         
         // Append only required fragments based on query name
         switch queryName {
-        case "findScenes", "findScene":
+        case "findScenes":
+            // List: schlankes Fragment (ohne Marker/Tags/Galleries/Groups und ohne riesige PerformerFields-Streuung).
+            fragments = loadQuery(named: "fragment_SceneListFields")
+        case "findScene":
             fragments = sceneRelatedFragments
             
         case "findPerformers":

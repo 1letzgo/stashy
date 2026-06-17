@@ -15,7 +15,7 @@ private extension Notification.Name {
     static let reelsPauseAllPlayers = Notification.Name("ReelsPauseAllPlayers")
 }
 
-private enum ReelsPlayerRegistry {
+enum ReelsPlayerRegistry {
     private static let players = NSHashTable<AVPlayer>.weakObjects()
     private static let lock = NSLock()
 
@@ -41,7 +41,8 @@ private enum ReelsPlayerRegistry {
 
 /// Reels „Session“ state: **RAM only** — survives tab switches / navigation within one app launch, **not** an app restart.
 /// One-time cleanup removes legacy `UserDefaults` keys from older builds so nothing persists across relaunch.
-private enum ReelsSessionRAM {
+///
+enum ReelsSessionRAM {
     private static let lock = NSLock()
     private static var strings: [String: String] = [:]
     private static var ints: [String: Int] = [:]
@@ -92,13 +93,14 @@ private enum ReelsSessionRAM {
         if value > 0 { ints[key] = value }
         else { ints.removeValue(forKey: key) }
     }
+
 }
 
-struct ReelsView: View {
+struct ReelsViewBody: View {
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @ObservedObject private var tabManager = TabManager.shared
     @ObservedObject private var configManager = ServerConfigManager.shared
-    @StateObject private var viewModel = StashDBViewModel()
+    @ObservedObject var viewModel: StashDBViewModel
     @EnvironmentObject var coordinator: NavigationCoordinator
     @State private var selectedSortOption: StashDBViewModel.SceneSortOption = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .scenes) ?? "") ?? .random
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
@@ -114,6 +116,13 @@ struct ReelsView: View {
     @StateObject private var reelsClipImageFilters = DetailLinkedImagesFilterModel(
         scope: .reelsClips,
         initialSort: StashDBViewModel.ImageSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .clips) ?? "") ?? .random
+    )
+    /// Pics nutzt dasselbe Filter-Model wie StashLine, wird aber **am Parent gehalten** —
+    /// damit überlebt der gewählte Filter / Sort den Wechsel zwischen Reels-Modi
+    /// (analog zu `reelsClipImageFilters`). Wird per `externalListFilters:` an `StashLineView` gereicht.
+    @StateObject private var reelsPicsImageFilters = DetailLinkedImagesFilterModel(
+        scope: .reelsStashLine,
+        initialSort: StashDBViewModel.ImageSortOption(rawValue: TabManager.shared.getSortOption(for: .stashline) ?? "") ?? .dateDesc
     )
     @State private var selectedPreviewFilter: StashDBViewModel.SavedFilter?
     @State private var showReelsSceneFilterSheet = false
@@ -151,6 +160,9 @@ struct ReelsView: View {
     @State private var scrubberState = ScrubberState()
     @State private var isInitialized = false
     @State private var playTrigger = 0  // Incremented when first item should autoplay
+    /// Nach erstem Besuch von Reels-Pics bleibt `StashLineView` im View-Baum (wie nach Tab zu Settings),
+    /// damit Scroll-Position nicht durch `if reelsMode == .pics` zerstört wird.
+    @State private var reelsStashLineHostRetained = false
     @State private var pendingRestoreId: String? = nil
     @State private var shouldScrollToTopAfterCriterionChange: Bool = false
 
@@ -181,7 +193,7 @@ struct ReelsView: View {
             case .markers: return selectedMarkerSortOption.rawValue
             case .clips: return reelsClipImageFilters.selectedSortOption.rawValue
             case .previews: return selectedSortOption.rawValue
-            case .pics: return nil
+            case .pics: return reelsPicsImageFilters.selectedSortOption.rawValue
             }
         }()
         if let raw = sortRaw {
@@ -200,7 +212,7 @@ struct ReelsView: View {
             case .previews:
                 return selectedPreviewFilter?.id
             case .pics:
-                return nil
+                return reelsPicsImageFilters.selectedFilter?.id
             }
         }()
         if let id = filterId, !id.isEmpty {
@@ -346,14 +358,14 @@ struct ReelsView: View {
                 reelsPreviewLiveSheetPresetSelection = ""
             }
         case .clips:
-            if let f = reelsClipImageFilters.selectedFilter {
-                reelsClipImageFilters.catalogPresetRowSelection = ListLivePresetTag.serverRow(f.id)
-            } else {
-                reelsClipImageFilters.catalogPresetRowSelection = ""
-            }
+            reelsSyncClipCatalogPresetPickerSelection()
         case .pics:
             break
         }
+    }
+
+    private func reelsSyncClipCatalogPresetPickerSelection() {
+        reelsClipImageFilters.applyResolvedCatalogPresetPickerRowIfNeeded(viewModel: viewModel)
     }
 
     /// Keeps filter-sort sheet preset rows and live chips aligned with `@State` selections (e.g. after defaults or session restore).
@@ -422,6 +434,20 @@ struct ReelsView: View {
         viewModel.savedFilters.values
             .filter { $0.mode == .scenes }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// Reels filter sheet: Szenen- und Vorschau-Modus nutzen Szenenfilter; Marker-Modus `SCENE_MARKERS`.
+    private var reelsSceneStyleSheetServerFilters: [StashDBViewModel.SavedFilter] {
+        switch reelsMode {
+        case .markers:
+            return viewModel.savedFilters.values
+                .filter { $0.mode == .sceneMarkers }
+                .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        case .scenes, .previews:
+            return sortedServerSceneFiltersForReels
+        default:
+            return sortedServerSceneFiltersForReels
+        }
     }
 
     private func refetchReelsClipsFromModel(_ vm: StashDBViewModel) {
@@ -576,14 +602,15 @@ struct ReelsView: View {
             }
         } else {
             reelsSetPrimarySceneishSavedFilter(f)
+            let sanitizeAsMarker = (f.mode == .sceneMarkers)
             if SceneLiveChipFilterSupport.savedFilterSupportsLiveChipEditor(f), let raw = f.filterDict {
                 reelsMapLiveFragmentToActiveChips(raw)
             } else {
                 reelsClearActiveLiveChipsOnly()
                 let flat: [String: Any]? = {
-                    if let raw = f.filterDict { return FilterMapper.sanitize(raw, isMarker: false) }
+                    if let raw = f.filterDict { return FilterMapper.sanitize(raw, isMarker: sanitizeAsMarker) }
                     if let obj = f.object_filter, let objDict = obj.value as? [String: Any] {
-                        return FilterMapper.sanitize(objDict, isMarker: false)
+                        return FilterMapper.sanitize(objDict, isMarker: sanitizeAsMarker)
                     }
                     return nil
                 }()
@@ -894,14 +921,6 @@ struct ReelsView: View {
             }
         }
 
-        /// Thumbnail under the player only fades out when the stream is ready in **scenes** and **previews**; markers/clips keep the static layer until swapped.
-        var hidesReelThumbnailWhenVideoReady: Bool {
-            switch self {
-            case .scene, .preview: return true
-            case .marker, .clip: return false
-            }
-        }
-        
         var title: String? {
             func nonEmpty(_ s: String?) -> String? {
                 guard let t = s?.trimmingCharacters(in: .whitespacesAndNewlines), !t.isEmpty else { return nil }
@@ -962,15 +981,6 @@ struct ReelsView: View {
             }
         }
         
-        var thumbnailURL: URL? {
-            switch self {
-            case .scene(let s): return s.thumbnailURL
-            case .marker(let m): return m.thumbnailURL
-            case .clip(let c): return c.thumbnailURL
-            case .preview(let s): return s.thumbnailURL
-            }
-        }
-        
         var videoURL: URL? {
             let quality = ServerConfigManager.shared.activeConfig?.reelsQuality ?? .sd
             switch self {
@@ -1014,14 +1024,6 @@ struct ReelsView: View {
             case .marker: return 0
             case .clip: return 0
             case .preview: return 0
-            }
-        }
-
-        var endTime: Double? {
-            switch self {
-            case .marker: return nil
-            case .preview: return nil
-            default: return nil
             }
         }
 
@@ -1347,7 +1349,7 @@ struct ReelsView: View {
         // Merge performer and tags into filter if needed
         // IMPORTANT: Use resolved filters (not stale @State) so merges match the fetch below.
         let mergedSceneFilter = viewModel.mergeFilterWithCriteria(filter: resolvedSceneFilterEarly, performer: performer, tags: tags, mode: .scenes)
-        let mergedMarkerFilter = viewModel.mergeFilterWithCriteria(filter: resolvedMarkerFilterEarly, performer: performer, tags: tags, mode: .scenes)
+        let mergedMarkerFilter = viewModel.mergeFilterWithCriteria(filter: resolvedMarkerFilterEarly, performer: performer, tags: tags, mode: .sceneMarkers)
         let mergedClipFilter = viewModel.mergeFilterWithCriteria(filter: resolvedClipFilter, performer: performer, tags: tags, mode: .images)
         let mergedPreviewFilter = viewModel.mergeFilterWithCriteria(filter: resolvedPreviewFilter, performer: performer, tags: tags, mode: .scenes)
         let sceneLiveForScenes = reelsSceneLiveChips.effectiveLiveFilter(for: resolvedSceneFilterEarly)
@@ -1740,7 +1742,14 @@ struct ReelsView: View {
     @ViewBuilder
     private var premiumContent: some View {
         premiumContentBase
-            .onAppear { handleOnAppear() }
+            .onAppear {
+                handleOnAppear()
+            }
+            .onChange(of: coordinator.selectedTab) { _, newTab in
+                if newTab != .reels {
+                    reelsStopPlaybackAndAccessories()
+                }
+            }
             .sceneLiveUpdates(using: viewModel)
             .onChange(of: isMenuOpen) { _, newValue in
                 guard newValue else { return }
@@ -1749,33 +1758,23 @@ struct ReelsView: View {
                 }
             }
             .onDisappear {
-                UIApplication.shared.isIdleTimerDisabled = false
-                
-                // Stop all audio & interactive sync
-                HandyManager.shared.stop()
-                ButtplugManager.shared.stopAllDevices()
-                LoveSpouseManager.shared.stop()
-                
-                // Deactivate audio session to release focus immediately
-                do {
-                    try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-                    print("🎬 Reels: Audio session deactivated")
-                } catch {
-                    print("🎬 Reels: Audio deactivation error: \(error)")
-                }
+                reelsStopPlaybackAndAccessories()
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
                 handleDefaultFilterChanged(notification)
             }
             .onChange(of: viewModel.savedFilters) { _, newValue in
                 handleSavedFiltersChanged(newValue)
+                if reelsMode == .clips {
+                    reelsSyncClipCatalogPresetPickerSelection()
+                }
             }
     }
 
     @ViewBuilder
     private var reelsSceneStyleFilterSheet: some View {
         SceneLiveFilterSheet(
-            serverSceneFilters: sortedServerSceneFiltersForReels,
+            serverSceneFilters: reelsSceneStyleSheetServerFilters,
             localPresets: reelsSceneLivePresets,
             selectedPresetId: reelsActiveSceneStyleSheetPresetSelection,
             liveChipRowsVisible: SceneLiveChipFilterSupport.savedFilterSupportsLiveChipEditor(reelsLiveChipTargetFilter),
@@ -1872,7 +1871,10 @@ struct ReelsView: View {
     @ViewBuilder
     private var premiumContentBase: some View {
         premiumContentLayout
-            .toolbar(reelsMode == .pics || isUIVisible ? .visible : .hidden, for: .tabBar)
+            // `.automatic` (statt `.visible`), damit gepushte Children wie `FullScreenImageView`
+            // ihre eigene `.toolbar(.hidden, for: .tabBar)`-Einstellung durchsetzen können.
+            // Ein explizites `.visible` am NavigationStack-Root überschreibt sonst Pushed-Views.
+            .toolbar(reelsMode == .pics || isUIVisible ? .automatic : .hidden, for: .tabBar)
             .sheet(isPresented: $showStashSyncSheet) {
                 #if !os(tvOS)
                 StashSyncSheet()
@@ -1888,7 +1890,9 @@ struct ReelsView: View {
                     serverFilters: reelsClipImageFilters.sortedServerImageFilters(viewModel: viewModel),
                     localPresets: reelsClipImageFilters.localCatalogPresets,
                     selectedPresetRowId: $reelsClipImageFilters.catalogPresetRowSelection,
+                    filterMenuTitleFallback: reelsClipImageFilters.selectedFilter?.name,
                     liveChipRowsVisible: reelsClipImageFilters.imageLiveChipRowsVisible,
+                    showMediaTypeFilter: reelsClipImageFilters.showImageMediaTypeFilter,
                     sortOption: reelsClipImageFilters.selectedSortOption,
                     onSortChange: { new in
                         reelsClipImageFilters.changeSortOption(to: new, viewModel: viewModel)
@@ -1900,6 +1904,7 @@ struct ReelsView: View {
                     liveOCounterTag: $reelsClipImageFilters.liveFilterOCounterTag,
                     liveStudioIds: $reelsClipImageFilters.liveFilterStudioIds,
                     liveTagIds: $reelsClipImageFilters.liveFilterTagIds,
+                    liveMediaKind: $reelsClipImageFilters.liveFilterMediaKind,
                     studioPickerOptions: reelsClipImageFilters.studioPickerOptions,
                     studioPickerLoading: reelsClipImageFilters.studioPickerLoading,
                     onStudioPickerSectionAppear: { reelsClipImageFilters.loadStudioPickerOptions(viewModel: viewModel) },
@@ -1941,7 +1946,7 @@ struct ReelsView: View {
                     ListLivePresetTag.migrateLegacySelection(&sel)
                     reelsClipImageFilters.catalogPresetRowSelection = sel
                     reelsClipImageFilters.refreshLocalPresets()
-                    reelsSyncFilterSheetPresetRow(for: .clips)
+                    reelsSyncClipCatalogPresetPickerSelection()
                     Task { @MainActor in
                         reelsClipFilterSheetHydrating = false
                     }
@@ -2001,6 +2006,9 @@ struct ReelsView: View {
             .onChange(of: reelsMode) { oldValue, newValue in handleModeChange(from: oldValue, to: newValue) }
             .onChange(of: currentVisibleSceneId) { _, _ in
                 isMenuOpen = false
+                if reelsMode == .clips {
+                    reelsSyncClipCatalogPresetPickerSelection()
+                }
                 // Avoid turning playback on mid-gesture: `scrollPosition` can update before paging settles,
                 // which would briefly attach/play the next row's player (flash). Resume is handled in `onScrollPhaseChange(.idle)`.
                 if !isUserScrollingReels {
@@ -2030,6 +2038,12 @@ struct ReelsView: View {
             .onChange(of: viewModel.sceneMarkers.count) { _, _ in continuePagedRestoreIfNeeded() }
             .onChange(of: viewModel.clips.count) { _, _ in continuePagedRestoreIfNeeded() }
             .onChange(of: viewModel.previews.count) { _, _ in continuePagedRestoreIfNeeded() }
+            .modifier(ReelsPicsFiltersPersistObserver(
+                filterId: reelsPicsImageFilters.selectedFilter?.id,
+                sortOption: reelsPicsImageFilters.selectedSortOption,
+                isPicsMode: reelsMode == .pics,
+                save: { saveSessionState(for: .pics) }
+            ))
     }
 
     @ViewBuilder
@@ -2044,17 +2058,24 @@ struct ReelsView: View {
                 }
             }
 
+            let stashLineHostInTree = isInitialized && (reelsMode == .pics || reelsStashLineHostRetained)
+
+            if stashLineHostInTree {
+                StashLineView(
+                    performerFilter: selectedPerformer?.toGalleryPerformer(),
+                    isEmbedded: true,
+                    onPerformerTap: { performer in
+                        applyPerformerFilter(performer.toScenePerformer())
+                    },
+                    externalListFilters: reelsPicsImageFilters
+                )
+                .applyAppBackground()
+                .opacity(reelsMode == .pics ? 1 : 0)
+                .allowsHitTesting(reelsMode == .pics)
+            }
+
             if reelsMode == .pics {
-                if isInitialized {
-                    StashLineView(
-                        performerFilter: selectedPerformer?.toGalleryPerformer(),
-                        isEmbedded: true,
-                        onPerformerTap: { performer in
-                            applyPerformerFilter(performer.toScenePerformer())
-                        }
-                    )
-                    .applyAppBackground()
-                } else {
+                if !stashLineHostInTree {
                     StandardLoadingView(message: "Loading StashLine...")
                 }
             } else {
@@ -2068,6 +2089,9 @@ struct ReelsView: View {
                     reelsListView()
                 }
             }
+        }
+        .onChange(of: reelsMode) { _, newMode in
+            if newMode == .pics { reelsStashLineHostRetained = true }
         }
         .ignoresSafeArea(reelsPremiumContentSafeAreaRegions)
         .allowsHitTesting(!isMenuOpen)
@@ -2097,7 +2121,7 @@ struct ReelsView: View {
                 let newFilter = defaultId != nil ? viewModel.savedFilters[defaultId!] : nil
                 applySettings(sortBy: selectedSortOption, sceneFilter: newFilter, performer: selectedPerformer, tags: selectedTags)
             case .markers:
-                let defaultId = TabManager.shared.getDefaultFilterId(for: .reels)
+                let defaultId = TabManager.shared.getDefaultMarkerFilterId(for: .reels)
                 let newFilter = defaultId != nil ? viewModel.savedFilters[defaultId!] : nil
                 applySettings(markerSortBy: selectedMarkerSortOption, markerFilter: newFilter, performer: selectedPerformer, tags: selectedTags)
             case .clips:
@@ -2157,7 +2181,7 @@ struct ReelsView: View {
             let defaultId: String? = {
                 switch reelsMode {
                 case .scenes: return TabManager.shared.getDefaultFilterId(for: .reels)
-                case .markers: return TabManager.shared.getDefaultFilterId(for: .reels)
+                case .markers: return TabManager.shared.getDefaultMarkerFilterId(for: .reels)
                 case .clips: return TabManager.shared.getDefaultClipFilterId(for: .reels)
                 case .previews: return TabManager.shared.getDefaultPreviewFilterId(for: .reels)
                 case .pics: return nil
@@ -2168,7 +2192,6 @@ struct ReelsView: View {
             // already browsing with "no saved filter", a later `fetchSavedFilters` (e.g. opening the sheet)
             // must not inject the default filter and reset the feed.
             if isCurrentlyEmpty {
-                print("✅ ReelsView: Saved filters arrived, triggering initial load...")
                 if let defId = defaultId, let filter = newValue[defId] {
                     switch reelsMode {
                     case .scenes:
@@ -2212,6 +2235,23 @@ struct ReelsView: View {
         }
     }
 
+    /// Pausiert alle registrierten Reels-`AVPlayer`, beendet Zubehör-Sync und gibt die Audio-Session frei.
+    /// Wichtig beim **Haupttab-Wechsel weg von Feeds**: SwiftUI-`TabView` ruft hier oft kein `onDisappear` auf.
+    private func reelsStopPlaybackAndAccessories() {
+        currentItemIsPlaying = false
+        ReelsPlayerRegistry.pauseAll()
+        NotificationCenter.default.post(name: .reelsPauseAllPlayers, object: nil)
+        UIApplication.shared.isIdleTimerDisabled = false
+        HandyManager.shared.stop()
+        ButtplugManager.shared.stopAllDevices()
+        LoveSpouseManager.shared.stop()
+        do {
+            try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        } catch {
+            print("🎬 Reels: Audio deactivation error: \(error)")
+        }
+    }
+
     private func handleOnAppear() {
         UIApplication.shared.isIdleTimerDisabled = true
         reelsClipImageFilters.externalRefetchClips = { vm in
@@ -2233,7 +2273,6 @@ struct ReelsView: View {
 
         // 0. Guard against rotation-triggered onAppear
         if isRotating {
-            print("🔄 ReelsView: Skipping recursive onAppear during rotation")
             isRotating = false
             return
         }
@@ -2283,7 +2322,12 @@ struct ReelsView: View {
                 selectedPreviewFilter = viewModel.savedFilters[fid]
             }
         case .pics:
-            break
+            if let raw = sessionSortRaw(for: .pics), let opt = StashDBViewModel.ImageSortOption(rawValue: raw) {
+                reelsPicsImageFilters.selectedSortOption = opt
+            }
+            if let fid = sessionFilterId(for: .pics) {
+                reelsPicsImageFilters.selectedFilter = viewModel.savedFilters[fid]
+            }
         }
 
         // IMPORTANT: Restore the session sort/filter BEFORE restoring scroll position.
@@ -2360,7 +2404,7 @@ struct ReelsView: View {
                 let savedSortStr = TabManager.shared.getReelsDefaultSort(for: .markers)
                 let savedSort = StashDBViewModel.SceneMarkerSortOption(rawValue: savedSortStr ?? "") ?? .random
                 var baseFilter = selectedMarkerFilter
-                if baseFilter == nil, let defId = TabManager.shared.getDefaultFilterId(for: .reels) {
+                if baseFilter == nil, let defId = TabManager.shared.getDefaultMarkerFilterId(for: .reels) {
                     baseFilter = viewModel.savedFilters[defId]
                 }
                 applySettings(markerSortBy: savedSort, markerFilter: baseFilter, performer: initialPerformer, tags: initialTags, mode: .markers)
@@ -2402,7 +2446,7 @@ struct ReelsView: View {
                 let defaultId: String? = {
                     switch reelsMode {
                     case .scenes: return TabManager.shared.getDefaultFilterId(for: .reels)
-                    case .markers: return TabManager.shared.getDefaultFilterId(for: .reels)
+                    case .markers: return TabManager.shared.getDefaultMarkerFilterId(for: .reels)
                     case .clips: return TabManager.shared.getDefaultClipFilterId(for: .reels)
                     case .previews: return TabManager.shared.getDefaultPreviewFilterId(for: .reels)
                     case .pics: return nil
@@ -2412,8 +2456,7 @@ struct ReelsView: View {
                 let hasFiltersArrived = !viewModel.savedFilters.isEmpty
                 
                 if defaultId != nil, !hasFiltersArrived {
-                    // We need to wait for onChange(of: viewModel.savedFilters) to trigger applySettings
-                    print("🕓 ReelsView: Waiting for filters before initial load...")
+                    // Wait for onChange(of: viewModel.savedFilters) to trigger applySettings.
                 } else {
                     // Filters are ready OR no default filter is configured
                     var initialSceneFilter = selectedFilter
@@ -2512,7 +2555,7 @@ struct ReelsView: View {
         case .markers:
             let sortRaw = sessionSortRaw(for: .markers) ?? TabManager.shared.getReelsDefaultSort(for: .markers) ?? ""
             selectedMarkerSortOption = StashDBViewModel.SceneMarkerSortOption(rawValue: sortRaw) ?? selectedMarkerSortOption
-            let fid = sessionFilterId(for: .markers) ?? TabManager.shared.getDefaultFilterId(for: .reels)
+            let fid = sessionFilterId(for: .markers) ?? TabManager.shared.getDefaultMarkerFilterId(for: .reels)
             let f = fid != nil ? viewModel.savedFilters[fid!] : nil
             selectedMarkerFilter = f
         case .clips:
@@ -2526,7 +2569,10 @@ struct ReelsView: View {
             let fid = sessionFilterId(for: .previews) ?? TabManager.shared.getDefaultPreviewFilterId(for: .reels)
             selectedPreviewFilter = (fid != nil ? viewModel.savedFilters[fid!] : nil)
         case .pics:
-            break
+            let sortRaw = sessionSortRaw(for: .pics) ?? TabManager.shared.getSortOption(for: .stashline) ?? ""
+            reelsPicsImageFilters.selectedSortOption = StashDBViewModel.ImageSortOption(rawValue: sortRaw) ?? reelsPicsImageFilters.selectedSortOption
+            let fid = sessionFilterId(for: .pics) ?? TabManager.shared.getDefaultFilterId(for: .stashline)
+            reelsPicsImageFilters.selectedFilter = (fid != nil ? viewModel.savedFilters[fid!] : nil)
         }
 
         reelsSyncFilterSheetPresetAndLiveChips(for: newValue, savedFilters: viewModel.savedFilters)
@@ -2625,7 +2671,9 @@ struct ReelsView: View {
         .background(Color.black)
         .id(item.id)
         .onAppear {
-            if index == itemCount - 2 {
+            // Früher nachladen als nur beim vorletzten Eintrag — weniger Warten am Listenende.
+            let prefetchDistance = 5
+            if itemCount >= prefetchDistance, index >= itemCount - prefetchDistance {
                 switch reelsMode {
                 case .scenes: viewModel.loadMoreScenes()
                 case .markers: viewModel.loadMoreMarkers()
@@ -3218,6 +3266,7 @@ struct ReelsView: View {
                     showReelsSceneFilterSheet = true
                 case .clips:
                     reelsClipImageFilters.refreshLocalPresets()
+                    reelsSyncClipCatalogPresetPickerSelection()
                     reelsClipImageFilters.showFilterSortSheet = true
                 case .pics:
                     break
@@ -3255,61 +3304,76 @@ struct ReelsView: View {
 
 // MARK: - Reel thumbnail-first video (hide AV layer until first frame is ready)
 
+/// Steuert die Thumbnail→Video-Überblendung: wird `true`, wenn der `AVPlayerLayer` das **erste Frame**
+/// tatsächlich gerendert hat (`isReadyForDisplay`). Vorher: `AVPlayerItem.status == .readyToPlay` —
+/// das bedeutet nur „Buffer reicht zum Starten“ und kann zu kurzem Schwarz vor dem ersten Frame führen.
+///
+/// Failure-Pfad (`item.status == .failed`) bleibt erhalten und blendet den Player wieder aus.
 private final class ReelItemVideoSurfaceReadiness: ObservableObject {
     @Published private(set) var showsDecodedVideo: Bool = false
+    private var layerReadyObservation: NSKeyValueObservation?
     private var itemStatusObservation: NSKeyValueObservation?
     private var currentItemObservation: NSKeyValueObservation?
+    private weak var boundLayer: AVPlayerLayer?
 
+    /// Auf Player-Wechsel reagieren (Item-Wechsel ⇒ Reset der Anzeige + neue Failure-Beobachtung).
     func observe(player: AVPlayer?) {
-        itemStatusObservation?.invalidate()
-        itemStatusObservation = nil
         currentItemObservation?.invalidate()
         currentItemObservation = nil
+        itemStatusObservation?.invalidate()
+        itemStatusObservation = nil
         showsDecodedVideo = false
 
         guard let player else { return }
 
         currentItemObservation = player.observe(\.currentItem, options: [.initial, .new]) { [weak self] player, _ in
             DispatchQueue.main.async {
-                self?.rebindItemStatus(player.currentItem)
+                self?.showsDecodedVideo = false
+                self?.bindItemFailure(player.currentItem)
             }
         }
     }
 
-    private func rebindItemStatus(_ item: AVPlayerItem?) {
-        itemStatusObservation?.invalidate()
-        itemStatusObservation = nil
-        showsDecodedVideo = false
+    /// Vom `FullScreenVideoPlayer` per `onLayerReady` aufgerufen — wir hängen uns dauerhaft an
+    /// `AVPlayerLayer.isReadyForDisplay`. Sobald `true`, ist das erste Frame sichtbar → Thumbnail ausblenden.
+    func bind(layer: AVPlayerLayer) {
+        if boundLayer === layer, layerReadyObservation != nil { return }
+        layerReadyObservation?.invalidate()
+        layerReadyObservation = nil
+        boundLayer = layer
 
-        guard let item else { return }
-
-        if item.status == .readyToPlay {
+        if layer.isReadyForDisplay {
             showsDecodedVideo = true
         }
-
-        itemStatusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] avItem, _ in
-            guard let self else { return }
+        layerReadyObservation = layer.observe(\.isReadyForDisplay, options: [.initial, .new]) { [weak self] avLayer, _ in
             DispatchQueue.main.async {
-                switch avItem.status {
-                case .readyToPlay:
-                    self.showsDecodedVideo = true
-                case .failed:
-                    self.showsDecodedVideo = false
-                default:
-                    break
+                if avLayer.isReadyForDisplay {
+                    self?.showsDecodedVideo = true
                 }
             }
         }
     }
 
+    private func bindItemFailure(_ item: AVPlayerItem?) {
+        itemStatusObservation?.invalidate()
+        itemStatusObservation = nil
+        guard let item else { return }
+        itemStatusObservation = item.observe(\.status, options: [.initial, .new]) { [weak self] avItem, _ in
+            if avItem.status == .failed {
+                DispatchQueue.main.async { self?.showsDecodedVideo = false }
+            }
+        }
+    }
+
     deinit {
+        layerReadyObservation?.invalidate()
         itemStatusObservation?.invalidate()
         currentItemObservation?.invalidate()
     }
 }
 
 struct ReelItemView: View {
-    let item: ReelsView.ReelItemData
+    let item: ReelsViewBody.ReelItemData
     @Binding var currentVisibleSceneId: String?
     
     var isActive: Bool {
@@ -3592,12 +3656,20 @@ extension ReelItemView {
                             }
                         }
                     } else {
+                        // Bewusst kein Thumbnail mehr vor dem Video — schwarzer Hintergrund bleibt sichtbar,
+                        // bis der Player das **erste echte Frame** dekodiert hat (`AVPlayerLayer.isReadyForDisplay`).
+                        // Spart pro Karte einen `CustomAsyncImage`-Request + Render-Pass und vermeidet das Aufblitzen
+                        // eines Standbilds vor dem Video.
                         ZStack {
-                            reelThumbnailBackdrop
-                                .opacity(item.hidesReelThumbnailWhenVideoReady ? (videoSurfaceReadiness.showsDecodedVideo ? 0 : 1) : 1)
-                                .animation(.easeInOut(duration: 0.18), value: videoSurfaceReadiness.showsDecodedVideo)
+                            Color.black
                             if let player = player {
-                                FullScreenVideoPlayer(player: player, videoGravity: shouldFill ? .resizeAspectFill : .resizeAspect)
+                                FullScreenVideoPlayer(
+                                    player: player,
+                                    videoGravity: shouldFill ? .resizeAspectFill : .resizeAspect,
+                                    onLayerReady: { layer in
+                                        videoSurfaceReadiness.bind(layer: layer)
+                                    }
+                                )
                                     .opacity(videoSurfaceReadiness.showsDecodedVideo ? 1 : 0)
                                     .animation(.easeInOut(duration: 0.18), value: videoSurfaceReadiness.showsDecodedVideo)
                                     .allowsHitTesting(videoSurfaceReadiness.showsDecodedVideo)
@@ -3612,25 +3684,6 @@ extension ReelItemView {
         .ignoresSafeArea()
         .focusable(false)
         .focusEffectDisabled()
-    }
-
-    /// Still image behind the player until `.readyToPlay` (in scenes/previews, hidden once video is ready; markers/clips stay as underlay).
-    @ViewBuilder
-    private var reelThumbnailBackdrop: some View {
-        if let url = item.thumbnailURL {
-            CustomAsyncImage(url: url) { loader in
-                if let image = loader.image {
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: shouldFill ? .fill : .fit)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                } else {
-                    ProgressView().tint(.white)
-                }
-            }
-        } else {
-            Color.black
-        }
     }
 
     private func handleMediaTap(at location: CGPoint) {
@@ -3749,7 +3802,7 @@ extension ReelItemView {
     
 
     @ViewBuilder
-    private func performerLabel(for item: ReelsView.ReelItemData) -> some View {
+    private func performerLabel(for item: ReelsViewBody.ReelItemData) -> some View {
 
         if let performer = item.performers.first {
             Button(action: { onPerformerTap(performer) }) {
@@ -3763,7 +3816,7 @@ extension ReelItemView {
     }
 
     @ViewBuilder
-    private func titleLabel(for item: ReelsView.ReelItemData) -> some View {
+    private func titleLabel(for item: ReelsViewBody.ReelItemData) -> some View {
         if let title = item.title, !title.isEmpty {
             Group {
                 if let scene = item.underlyingScene {
@@ -3779,7 +3832,7 @@ extension ReelItemView {
     }
 
     @ViewBuilder
-    private func titleText(_ title: String, item: ReelsView.ReelItemData) -> some View {
+    private func titleText(_ title: String, item: ReelsViewBody.ReelItemData) -> some View {
         HStack(spacing: 8) {
             Text(title)
                 .font(.system(size: 15, weight: .medium))
@@ -3847,7 +3900,6 @@ extension ReelItemView {
         // Optimization: If we are already using a local file, don't bother fetching streams
         // Local files are already the "best" possible quality/performance.
         if let currentURL = item.videoURL, !currentURL.absoluteString.hasPrefix("http") {
-            print("📂 Reels: Scene \(sid) is local, skipping best stream fetch.")
             return
         }
         
@@ -4007,7 +4059,6 @@ extension ReelItemView {
             p.replaceCurrentItem(with: nil)
         }
         player = nil
-        print("🎬 Reels: Player cleaned up for item \(item.id)")
     }
 
     /// Re-creates the periodic time observer so it captures the current `self`
@@ -4062,6 +4113,8 @@ struct StashSyncManagerModifier: ViewModifier {
             .onAppear {
                 initialSync()
             }
+            // Ein einziger `onChange(of: isActive)` — vorher waren das zwei separate Blöcke
+            // (initialSync + Play/Pause-Resume), die quasi dasselbe taten und schwer zu lesen waren.
             .onChange(of: isActive) { _, active in
                 if active { initialSync() }
             }
@@ -4070,12 +4123,12 @@ struct StashSyncManagerModifier: ViewModifier {
             }
             .onChange(of: player?.currentItem) { _, newItem in
                 if StashSyncManager.shared.isActive {
-                                        ensureVideoAnalysis(for: newItem)
+                    ensureVideoAnalysis(for: newItem)
                 }
             }
             .onChange(of: HandyManager.shared.isStashSyncMode) { _, isStash in
-                if isStash && isActive { 
-                                        ensureVideoAnalysis(for: player?.currentItem)
+                if isStash && isActive {
+                    ensureVideoAnalysis(for: player?.currentItem)
                     StashSyncManager.shared.isActive = true
                     if isPlaying { HandyManager.shared.play(at: player?.currentTime().seconds ?? 0) }
                 } else if !isStash {
@@ -4083,8 +4136,8 @@ struct StashSyncManagerModifier: ViewModifier {
                 }
             }
             .onChange(of: ButtplugManager.shared.isStashSyncMode) { _, isStash in
-                if isStash && isActive { 
-                                        ensureVideoAnalysis(for: player?.currentItem)
+                if isStash && isActive {
+                    ensureVideoAnalysis(for: player?.currentItem)
                     StashSyncManager.shared.isActive = true
                     if isPlaying { ButtplugManager.shared.play(at: player?.currentTime().seconds ?? 0) }
                 } else if !isStash {
@@ -4092,8 +4145,8 @@ struct StashSyncManagerModifier: ViewModifier {
                 }
             }
             .onChange(of: LoveSpouseManager.shared.isStashSyncMode) { _, isStash in
-                if isStash && isActive { 
-                                        ensureVideoAnalysis(for: player?.currentItem)
+                if isStash && isActive {
+                    ensureVideoAnalysis(for: player?.currentItem)
                     StashSyncManager.shared.isActive = true
                     if isPlaying { LoveSpouseManager.shared.play(at: player?.currentTime().seconds ?? 0) }
                 } else if !isStash {
@@ -4101,51 +4154,34 @@ struct StashSyncManagerModifier: ViewModifier {
                 }
             }
             .onChange(of: isPlaying) { _, playing in
-                if StashSyncManager.shared.isActive && isActive {
-                    let currentTime = player?.currentTime().seconds ?? 0
-                    if playing {
-                        if HandyManager.shared.isStashSyncMode { HandyManager.shared.play(at: currentTime) }
-                        if ButtplugManager.shared.isStashSyncMode { ButtplugManager.shared.play(at: currentTime) }
-                        if LoveSpouseManager.shared.isStashSyncMode { LoveSpouseManager.shared.play(at: currentTime) }
-                    } else {
-                        if HandyManager.shared.isStashSyncMode { HandyManager.shared.pause() }
-                        if ButtplugManager.shared.isStashSyncMode { ButtplugManager.shared.pause() }
-                        if LoveSpouseManager.shared.isStashSyncMode { LoveSpouseManager.shared.pause() }
-                    }
-                }
-            }
-            .onChange(of: isActive) { _, active in
-                if active && StashSyncManager.shared.isActive {
-                    let currentTime = player?.currentTime().seconds ?? 0
-                    if isPlaying {
-                        if HandyManager.shared.isStashSyncMode { HandyManager.shared.play(at: currentTime) }
-                        if ButtplugManager.shared.isStashSyncMode { ButtplugManager.shared.play(at: currentTime) }
-                        if LoveSpouseManager.shared.isStashSyncMode { LoveSpouseManager.shared.play(at: currentTime) }
-                    } else {
-                        if HandyManager.shared.isStashSyncMode { HandyManager.shared.pause() }
-                        if ButtplugManager.shared.isStashSyncMode { ButtplugManager.shared.pause() }
-                        if LoveSpouseManager.shared.isStashSyncMode { LoveSpouseManager.shared.pause() }
-                    }
-                }
+                applyStashSyncPlaybackState(isActiveOverride: nil, isPlayingOverride: playing)
             }
     }
-    
 
-    private func initialSync() {
-        guard isActive && StashSyncManager.shared.isActive else {
-            print("🎬 ReelsView: initialSync check failed - isActive: \(isActive), StashSync: \(StashSyncManager.shared.isActive)")
-            return
-        }
-        print("🎬 ReelsView: Performing initial sync for manager states...")
-                ensureVideoAnalysis(for: player?.currentItem)
-        
-        if isPlaying {
-            let currentTime = player?.currentTime().seconds ?? 0
-            print("🎬 ReelsView: Resuming StashSync signals at \(currentTime)s")
+    /// Sync-Signale (Handy / Buttplug / LoveSpouse) ans aktuelle Play/Pause-Verhalten ankoppeln.
+    /// Wird zentral genutzt von `initialSync` und vom `isPlaying`-onChange, damit Logik nur an einer Stelle lebt.
+    private func applyStashSyncPlaybackState(isActiveOverride: Bool?, isPlayingOverride: Bool?) {
+        let effActive = isActiveOverride ?? isActive
+        let effPlaying = isPlayingOverride ?? isPlaying
+        guard StashSyncManager.shared.isActive && effActive else { return }
+        let currentTime = player?.currentTime().seconds ?? 0
+        if effPlaying {
             if HandyManager.shared.isStashSyncMode { HandyManager.shared.play(at: currentTime) }
             if ButtplugManager.shared.isStashSyncMode { ButtplugManager.shared.play(at: currentTime) }
             if LoveSpouseManager.shared.isStashSyncMode { LoveSpouseManager.shared.play(at: currentTime) }
+        } else {
+            if HandyManager.shared.isStashSyncMode { HandyManager.shared.pause() }
+            if ButtplugManager.shared.isStashSyncMode { ButtplugManager.shared.pause() }
+            if LoveSpouseManager.shared.isStashSyncMode { LoveSpouseManager.shared.pause() }
         }
+    }
+
+    private func initialSync() {
+        guard isActive && StashSyncManager.shared.isActive else { return }
+        ensureVideoAnalysis(for: player?.currentItem)
+        // Sync-Signale auf den aktuellen Play/Pause-Stand bringen — ersetzt den
+        // früheren zweiten `onChange(of: isActive)`-Block.
+        applyStashSyncPlaybackState(isActiveOverride: nil, isPlayingOverride: nil)
     }
     // MARK: - Helper Methods
     
@@ -4155,7 +4191,6 @@ struct StashSyncManagerModifier: ViewModifier {
     private func ensureVideoAnalysis(for item: AVPlayerItem?) {
         guard let item = item else { return }
         if HandyManager.shared.isStashSyncMode || ButtplugManager.shared.isStashSyncMode || LoveSpouseManager.shared.isStashSyncMode {
-            print("🎬 ReelsView: Ensuring Video Analysis is setup for current item")
             StashVideoSyncManager.shared.setup(for: item)
             StashVideoSyncManager.shared.isActive = true
         }
@@ -4175,7 +4210,40 @@ struct StashSyncManagerModifier: ViewModifier {
             StashVideoSyncManager.shared.stop()
         }
     }
-    
+}
+
+/// Feeds-Tab: optionales externes ViewModel (z. B. von ``MainTabView``), damit Listen beim Tab-Wechsel warm bleiben; Session-Position weiter in ``ReelsSessionRAM``.
+struct ReelsView: View {
+    @StateObject private var ownedViewModel = StashDBViewModel()
+    private let externalViewModel: StashDBViewModel?
+
+    init(viewModel: StashDBViewModel? = nil) {
+        self.externalViewModel = viewModel
+    }
+
+    var body: some View {
+        ReelsViewBody(viewModel: externalViewModel ?? ownedViewModel)
+    }
+}
+
+// MARK: - Pics-Filter-Persist Observer
+/// Persistiert Pics-Filter/Sort in `ReelsSessionRAM`, sobald sie sich ändern und der aktive Reels-Modus `.pics` ist.
+/// Ausgelagert als ViewModifier, damit `ReelsViewBody.premiumContentBase` für den Swift-Type-Checker handhabbar bleibt.
+private struct ReelsPicsFiltersPersistObserver: ViewModifier {
+    let filterId: String?
+    let sortOption: StashDBViewModel.ImageSortOption
+    let isPicsMode: Bool
+    let save: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .onChange(of: filterId) { _, _ in
+                if isPicsMode { save() }
+            }
+            .onChange(of: sortOption) { _, _ in
+                if isPicsMode { save() }
+            }
+    }
 }
 
 // MARK: - Scrubber Isolation

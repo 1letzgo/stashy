@@ -90,17 +90,20 @@ struct TVSceneCardView: View {
 
             // Resume progress bar
             if let resumeTime = scene.resumeTime, resumeTime > 0,
-               let duration = scene.sceneDuration ?? scene.duration, duration > 0 {
+               let duration = scene.sceneDuration ?? scene.duration, duration > 0,
+               duration.isFinite, resumeTime.isFinite {
+                let progress = max(0.0, min(1.0, resumeTime / duration))
                 VStack {
                     Spacer()
                     GeometryReader { geo in
+                        let safeWidth: CGFloat = (geo.size.width.isFinite && geo.size.width > 0) ? geo.size.width : 0
                         ZStack(alignment: .leading) {
                             Rectangle()
                                 .fill(Color.white.opacity(0.3))
                                 .frame(height: 4)
                             Rectangle()
                                 .fill(AppearanceManager.shared.tintColor)
-                                .frame(width: geo.size.width * CGFloat(resumeTime / duration), height: 4)
+                                .frame(width: safeWidth * CGFloat(progress), height: 4)
                         }
                     }
                     .frame(height: 4)

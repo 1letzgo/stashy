@@ -10,8 +10,8 @@ import SwiftUI
 import AVKit
 import AVFoundation
 
-struct GalleriesView: View {
-    @StateObject private var viewModel = StashDBViewModel()
+private struct GalleriesViewContent: View {
+    @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var configManager = ServerConfigManager.shared
     @ObservedObject private var appearance = AppearanceManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -39,13 +39,15 @@ struct GalleriesView: View {
     @State private var studioPickerLoading = false
 
     private var isLiveFilterActive: Bool {
-        liveFilterFavorite != nil || liveFilterMinRating > 0 || liveFilterFiles != nil || liveFilterStudioId != nil
+        liveFilterFavorite != nil || liveFilterMinRating != 0 || liveFilterFiles != nil || liveFilterStudioId != nil
     }
 
     private var activeLiveFilterDict: [String: Any] {
         var dict: [String: Any] = [:]
         if let fav = liveFilterFavorite { dict["favorite"] = fav }
-        if liveFilterMinRating > 0 {
+        if liveFilterMinRating == -1 {
+            dict["rating100"] = ["modifier": "IS_NULL"]
+        } else if liveFilterMinRating > 0 {
             dict["rating100"] = ["value": (liveFilterMinRating * 20), "modifier": "EQUALS"]
         }
         if liveFilterFiles == "has" { dict["file_count"] = ["value": 0, "modifier": "GREATER_THAN"] }
@@ -57,7 +59,7 @@ struct GalleriesView: View {
     }
 
     private var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive
+        selectedFilter != nil || isLiveFilterActive || !catalogPresetRowSelection.isEmpty
     }
 
     private var sortedServerGalleryFilters: [StashDBViewModel.SavedFilter] {
@@ -95,15 +97,20 @@ struct GalleriesView: View {
         if let fav = frag["favorite"] as? Bool {
             liveFilterFavorite = fav
         }
-        if let r = frag["rating100"] as? [String: Any], let raw = r["value"] {
-            let v: Int? = {
-                if let i = raw as? Int { return i }
-                if let d = raw as? Double { return Int(d) }
-                if let n = raw as? NSNumber { return n.intValue }
-                return nil
-            }()
-            if let v {
-                liveFilterMinRating = max(0, min(5, v / 20))
+        if let r = frag["rating100"] as? [String: Any] {
+            let mod = (r["modifier"] as? String) ?? ""
+            if mod == "IS_NULL" {
+                liveFilterMinRating = -1
+            } else if let raw = r["value"] {
+                let v: Int? = {
+                    if let i = raw as? Int { return i }
+                    if let d = raw as? Double { return Int(d) }
+                    if let n = raw as? NSNumber { return n.intValue }
+                    return nil
+                }()
+                if let v {
+                    liveFilterMinRating = max(0, min(5, v / 20))
+                }
             }
         }
         if let fc = frag["file_count"] as? [String: Any], let mod = fc["modifier"] as? String {
@@ -336,7 +343,8 @@ struct GalleriesView: View {
         }
     }
     
-    init(initialSort: StashDBViewModel.GallerySortOption? = nil, hideTitle: Bool = false) {
+    init(viewModel: StashDBViewModel, initialSort: StashDBViewModel.GallerySortOption? = nil, hideTitle: Bool = false) {
+        self.viewModel = viewModel
         self.hideTitle = hideTitle
         let savedSort = StashDBViewModel.GallerySortOption(rawValue: TabManager.shared.getSortOption(for: .galleries) ?? "")
         _selectedSortOption = State(initialValue: initialSort ?? savedSort ?? .dateDesc)
@@ -647,6 +655,27 @@ struct GalleriesView: View {
             refreshGalleryLocalPresets()
             applyCatalogPresetSelectionFromSheetIfNeeded()
         }
+    }
+}
+
+struct GalleriesView: View {
+    @StateObject private var ownedViewModel = StashDBViewModel()
+    let catalogBrowserViewModel: StashDBViewModel?
+    let initialSort: StashDBViewModel.GallerySortOption?
+    var hideTitle: Bool = false
+
+    init(initialSort: StashDBViewModel.GallerySortOption? = nil, hideTitle: Bool = false, catalogBrowserViewModel: StashDBViewModel? = nil) {
+        self.catalogBrowserViewModel = catalogBrowserViewModel
+        self.initialSort = initialSort
+        self.hideTitle = hideTitle
+    }
+
+    var body: some View {
+        GalleriesViewContent(
+            viewModel: catalogBrowserViewModel ?? ownedViewModel,
+            initialSort: initialSort,
+            hideTitle: hideTitle
+        )
     }
 }
 
@@ -1296,7 +1325,7 @@ struct FullScreenImageView: View {
         Task {
             let sessionConfig = URLSessionConfiguration.default
             sessionConfig.timeoutIntervalForRequest = 60
-            let session = URLSession(configuration: sessionConfig, delegate: TrustAllSessionDelegate.shared, delegateQueue: nil)
+            let session = URLSession(configuration: sessionConfig)
             var request = URLRequest(url: url)
             if let apiKey = ServerConfigManager.shared.activeConfig?.secureApiKey, !apiKey.isEmpty {
                 request.addValue(apiKey, forHTTPHeaderField: "ApiKey")

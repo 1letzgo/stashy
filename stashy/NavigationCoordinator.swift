@@ -27,8 +27,7 @@ class NavigationCoordinator: ObservableObject {
     // StashLine Navigation
     @Published var stashlinePath = NavigationPath()
     @Published var picsPerformerFilter: GalleryPerformer?
-    var picsGlobalScrollId: String? = nil
-    var picsPerformerScrollIds: [String: String] = [:]
+
     
     // IDs to force reset of navigation stacks
     @Published var homeTabID = UUID()
@@ -233,11 +232,17 @@ struct ConnectionErrorView: View {
 struct FullScreenVideoPlayer: UIViewRepresentable {
     let player: AVPlayer
     var videoGravity: AVLayerVideoGravity = .resizeAspectFill
-    
+    /// Optionaler Hook: erhält den frisch erzeugten `AVPlayerLayer` (für KVO auf `isReadyForDisplay`).
+    /// Wird bspw. von `ReelItemVideoSurfaceReadiness` verwendet, um die Thumbnail-Überblendung
+    /// erst beim **echten ersten Frame** zu starten — nicht schon bei `AVPlayerItem.status == .readyToPlay`.
+    var onLayerReady: ((AVPlayerLayer) -> Void)? = nil
+
     func makeUIView(context: Context) -> PlayerView {
-        return PlayerView(player: player, gravity: videoGravity)
+        let view = PlayerView(player: player, gravity: videoGravity)
+        onLayerReady?(view.playerLayer)
+        return view
     }
-    
+
     func updateUIView(_ uiView: PlayerView, context: Context) {
         if uiView.player != player {
             uiView.player = player

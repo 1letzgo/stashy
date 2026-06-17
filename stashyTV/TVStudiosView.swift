@@ -9,6 +9,7 @@ import SwiftUI
 
 struct TVStudiosView: View {
     @StateObject private var viewModel = StashDBViewModel()
+    @ObservedObject private var configManager = ServerConfigManager.shared
     @ObservedObject private var tabManager = TabManager.shared
     @State private var sortBy: StashDBViewModel.StudioSortOption
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
@@ -28,7 +29,11 @@ struct TVStudiosView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if viewModel.isLoadingStudios && viewModel.studios.isEmpty {
+            if !hasValidConfig {
+                TVConnectionErrorView(title: "Server not reachable", subtitle: "Add a server in Settings.") { reload() }
+            } else if viewModel.studios.isEmpty && (viewModel.errorMessage?.isEmpty == false) {
+                TVConnectionErrorView(title: "Server not reachable", subtitle: viewModel.errorMessage) { reload() }
+            } else if viewModel.isLoadingStudios && viewModel.studios.isEmpty {
                 loadingView
             } else if viewModel.studios.isEmpty {
                 emptyView
@@ -49,6 +54,7 @@ struct TVStudiosView: View {
             viewModel.fetchStudios(sortBy: sortBy, isInitialLoad: true, filter: newValue)
         }
         .onAppear {
+            guard hasValidConfig else { return }
             viewModel.fetchSavedFilters()
             if selectedFilter == nil, let filterId = tabManager.getDefaultFilterId(for: .studios) {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -65,6 +71,19 @@ struct TVStudiosView: View {
             selectedFilter = nil
             viewModel.fetchStudios(sortBy: sortBy, isInitialLoad: true, filter: nil)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .stashServerInitializationFinished)) { _ in
+            if hasValidConfig && viewModel.studios.isEmpty {
+                viewModel.fetchStudios(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
+            }
+        }
+    }
+
+    private var hasValidConfig: Bool { configManager.activeConfig?.hasValidConfig == true }
+
+    private func reload() {
+        guard hasValidConfig else { return }
+        viewModel.testConnection()
+        viewModel.fetchStudios(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
     }
 
 
@@ -157,6 +176,7 @@ struct TVStudiosView: View {
                 .padding(.bottom, 80)
             }
         }
+        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60) }
     }
 
     @ViewBuilder

@@ -25,8 +25,10 @@ struct TVSettingsView: View {
             // tvOS: must be focusable so ↑ from the first Saved Server row can leave the list
             // toward the tab bar; a plain HStack is skipped by the focus engine.
             Section {
-                Group {
-                    if let config = configManager.activeConfig {
+                if let config = configManager.activeConfig {
+                    NavigationLink {
+                        TVServerDetailView()
+                    } label: {
                         HStack(spacing: 20) {
                             Image(systemName: "server.rack")
                                 .font(.title2)
@@ -47,16 +49,16 @@ struct TVSettingsView: View {
                                 .foregroundColor(.green)
                                 .font(.title3)
                         }
-                    } else {
-                        HStack {
-                            Image(systemName: "exclamationmark.triangle")
-                                .foregroundColor(.yellow)
-                            Text("No server configured")
-                                .foregroundStyle(.secondary)
-                        }
                     }
+                } else {
+                    HStack {
+                        Image(systemName: "exclamationmark.triangle")
+                            .foregroundColor(.yellow)
+                        Text("No server configured")
+                            .foregroundStyle(.secondary)
+                    }
+                    .focusable()
                 }
-                .focusable()
             } header: {
                 Text("Active Server")
             }
@@ -195,6 +197,32 @@ struct TVSettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
+
+                    HStack {
+                        Text("Reels Quality")
+                        Spacer()
+                        Menu {
+                            ForEach(StreamingQuality.allCases, id: \.self) { quality in
+                                Button {
+                                    var updated = config
+                                    updated.reelsQuality = quality
+                                    configManager.saveConfig(updated)
+                                    configManager.addOrUpdateServer(updated)
+                                } label: {
+                                    HStack {
+                                        Text(quality.displayName)
+                                        if config.reelsQuality == quality {
+                                            Spacer()
+                                            Image(systemName: "checkmark")
+                                        }
+                                    }
+                                }
+                            }
+                        } label: {
+                            Text(config.reelsQuality.displayName)
+                                .foregroundColor(.secondary)
+                        }
+                    }
                 } else {
                     Text("Connect to a server to configure quality.")
                         .foregroundStyle(.secondary)
@@ -202,7 +230,7 @@ struct TVSettingsView: View {
             } header: {
                 Text("Playback")
             } footer: {
-                Text("\"Original\" streams MP4 files directly for the best seeking performance. Lower quality options use HLS transcoding.")
+                Text("\"Original\" streams MP4 files directly for best seeking performance. Lower qualities use HLS transcoding. Reels Quality is separately used for short autoplay previews if available.")
             }
 
             // MARK: - Default Sort

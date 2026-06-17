@@ -425,6 +425,10 @@ class StashDBViewModel: ObservableObject {
     func clearSearchResults() {
         scenes = []
         performers = []
+        studios = []
+        tags = []
+        groups = []
+        galleries = []
     }
     
     // Pagination properties for performers
@@ -1237,6 +1241,22 @@ class StashDBViewModel: ObservableObject {
         }
     }
 
+    /// Updates performer profile image path in dashboard rows and the main performers list (in-memory sync after mutation).
+    func patchPerformerImageInLists(performerId: String, newImagePath: String) {
+        for key in homeRowPerformers.keys {
+            guard var row = homeRowPerformers[key] else { continue }
+            if let idx = row.firstIndex(where: { $0.id == performerId }) {
+                row[idx].imagePath = newImagePath
+                homeRowPerformers[key] = row
+            }
+        }
+        if let idx = performers.firstIndex(where: { $0.id == performerId }) {
+            var p = performers[idx]
+            p.imagePath = newImagePath
+            performers[idx] = p
+        }
+    }
+
     /// Removes an image from all lists without reloading
     func removeImage(id: String) {
         allImages.removeAll { $0.id == id }
@@ -1381,6 +1401,49 @@ class StashDBViewModel: ObservableObject {
         return sanitizeFilter(merged)
     }
 
+    /// Merges a base marker saved filter with **scene-style** live chips by nesting live criteria under
+    /// `scene_filter` (``SceneMarkerFilterType``). Plain `mergedSceneObjectFilterForSave` flattens like `SceneFilterType`
+    /// and yields invalid marker filters—Stash then returns no markers.
+    func mergedMarkerObjectFilterForSave(base: SavedFilter?, live: [String: Any]) -> [String: Any] {
+        var marker: [String: Any] = [:]
+        if let base = base {
+            if let dict = base.filterDict {
+                marker = dict
+            } else if let obj = base.object_filter, let objDict = obj.value as? [String: Any] {
+                marker = objDict
+            }
+        }
+        marker = sanitizeFilter(marker, isMarker: true)
+        guard !live.isEmpty else { return marker }
+        var sceneNested = (marker["scene_filter"] as? [String: Any]) ?? [:]
+        let liveSan = sanitizeFilter(live, isMarker: false)
+        for (k, v) in liveSan {
+            sceneNested[k] = v
+        }
+        marker["scene_filter"] = sanitizeFilter(sceneNested, isMarker: false)
+        return sanitizeFilter(marker, isMarker: true)
+    }
+
+    /// Hoists scene-only keys mistakenly stored at the root of a marker filter (e.g. older stashy saves)
+    /// into `scene_filter` before `findSceneMarkers`.
+    private func normalizeSceneMarkerFilterForQuery(_ markerFilter: [String: Any]) -> [String: Any] {
+        let hoistFromRoot: Set<String> = [
+            "rating100", "organized", "interactive", "orientation", "performer_count",
+            "resolution", "performer_favorite", "o_counter", "studios", "groups", "movies"
+        ]
+        var out = markerFilter
+        var sceneNested = (out["scene_filter"] as? [String: Any]) ?? [:]
+        for key in hoistFromRoot {
+            if let v = out.removeValue(forKey: key) {
+                sceneNested[key] = v
+            }
+        }
+        if !sceneNested.isEmpty {
+            out["scene_filter"] = sanitizeFilter(sceneNested, isMarker: false)
+        }
+        return sanitizeFilter(out, isMarker: true)
+    }
+
     /// Creates or updates a **scene** saved filter on the Stash server (`saveFilter`).
     /// Stores stashy metadata in `ui_options` so the live-filter sheet can restore base filter, chips, and sort.
     func saveSceneSavedFilter(
@@ -1479,7 +1542,9 @@ class StashDBViewModel: ObservableObject {
             completion(.failure(NSError(domain: "stashy", code: -2, userInfo: [NSLocalizedDescriptionKey: "Name is empty"])))
             return
         }
-        let merged = mergedSceneObjectFilterForSave(base: baseFilter, live: liveFragment)
+        let merged = (mode == .sceneMarkers)
+            ? mergedMarkerObjectFilterForSave(base: baseFilter, live: liveFragment)
+            : mergedSceneObjectFilterForSave(base: baseFilter, live: liveFragment)
         var stashy: [String: Any] = [
             "liveFragment": liveFragment,
             "sortRaw": sortRaw
@@ -2187,7 +2252,8 @@ class StashDBViewModel: ObservableObject {
             markerFilter["scene_filter"] = sanitizeFilter(sceneNested, isMarker: false)
         }
         if !markerFilter.isEmpty {
-            variables["scene_marker_filter"] = sanitizeFilter(markerFilter, isMarker: true)
+            markerFilter = normalizeSceneMarkerFilterForQuery(markerFilter)
+            variables["scene_marker_filter"] = markerFilter
         }
 
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
@@ -2257,13 +2323,17 @@ class StashDBViewModel: ObservableObject {
         if let savedFilter = previewOnly ? currentPreviewFilter : currentSceneFilter {
             if let dict = savedFilter.filterDict {
                 let sanitized = sanitizeFilter(dict)
+                #if DEBUG
                 print("🔍 Scene Filter sanitized: \(sanitized)")
+                #endif
                 variables["scene_filter"] = sanitized
             } else if let obj = savedFilter.object_filter {
                 // Also sanitize object_filter content to handle boolean flags and nested structures
                 if let objDict = obj.value as? [String: Any] {
                     let sanitized = sanitizeFilter(objDict)
+                    #if DEBUG
                     print("🔍 Object Filter sanitized: \(sanitized)")
+                    #endif
                     variables["scene_filter"] = sanitized
                 } else {
                     variables["scene_filter"] = obj.value
@@ -2292,8 +2362,10 @@ class StashDBViewModel: ObservableObject {
             return
         }
         
+        #if DEBUG
         print("🔍 Debug loadScenesPage request body:")
         print(bodyString)
+        #endif
         
         // Pass bodyString as the query argument
         performGraphQLQuery(query: bodyString) { (response: AltScenesResponse?) in
@@ -4653,7 +4725,7 @@ class StashDBViewModel: ObservableObject {
 
         let query = GraphQLQueries.queryWithFragments("findImages")
 
-        let perPage = 200
+        let perPage = 100
         let filterDict: [String: Any] = [
             "page": page,
             "per_page": perPage,
@@ -4958,7 +5030,8 @@ class StashDBViewModel: ObservableObject {
         }
         
         let page = isInitialLoad ? 1 : currentClipsPage + 1
-        
+        let perPage = 40
+
         // Filter for video-like and animated extensions
         // Regex: .*\.(mp4|gif|mov|webm|m4v|mkv|webp)$ (case insensitive usually requires flags, but Stash regex is Go-flavor? or PCRE?)
         // Stash uses Go regex. (?i) is case insensitive.
@@ -5005,7 +5078,7 @@ class StashDBViewModel: ObservableObject {
         let variables: [String: Any] = [
             "filter": [
                 "page": page,
-                "per_page": 20,
+                "per_page": perPage,
                 "sort": currentClipSortOption.sortField == "random" ? randomSort(.images) : currentClipSortOption.sortField,
                 "direction": currentClipSortOption.direction
             ],
@@ -5035,7 +5108,7 @@ class StashDBViewModel: ObservableObject {
                         self.clips.append(contentsOf: newClips)
                     }
                     
-                    self.hasMoreClips = result.images.count == 20
+                    self.hasMoreClips = result.images.count == perPage
                     self.currentClipsPage = page
                     self.isLoadingClips = false
                 }
@@ -8516,6 +8589,15 @@ extension DownloadManager: URLSessionDownloadDelegate {
 struct VideoPlayerView: UIViewControllerRepresentable {
     let player: AVPlayer
     @Binding var isFullscreen: Bool
+    /// When `false`, the hosted `AVPlayerViewController` keeps `player == nil` so another
+    /// surface (e.g. a `fullScreenCover`) can attach the same `AVPlayer`.
+    var attachPlayer: Bool = true
+    var showsPlaybackControls: Bool = true
+    /// Reserved for future native-menu integration. iOS' `AVPlayerViewController`
+    /// has no public API for transport-bar custom menus (those are tvOS-only),
+    /// so the value is ignored on this platform — quality selection happens via
+    /// the SwiftUI overlay rendered above the inline player.
+    var transportMenu: UIMenu? = nil
     @ObservedObject var tabManager = TabManager.shared
 
     func makeCoordinator() -> Coordinator {
@@ -8523,26 +8605,36 @@ struct VideoPlayerView: UIViewControllerRepresentable {
     }
     func makeUIViewController(context: Context) -> AVPlayerViewController {
         let playerViewController = AVPlayerViewController()
-        playerViewController.player = player
+        playerViewController.player = attachPlayer ? player : nil
         playerViewController.delegate = context.coordinator
-        playerViewController.showsPlaybackControls = true
+        playerViewController.showsPlaybackControls = showsPlaybackControls
         playerViewController.videoGravity = .resizeAspect
         playerViewController.allowsPictureInPicturePlayback = TabManager.shared.isPiPEnabled
         playerViewController.canStartPictureInPictureAutomaticallyFromInline = TabManager.shared.isPiPEnabled
+        if #available(iOS 16.0, *) {
+            // Verhindert das Analyse-/„Text erkennen“-Steuerelement bei pausierten Frames (Visual Look Up).
+            playerViewController.allowsVideoFrameAnalysis = false
+        }
         return playerViewController
     }
 
     func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
-        if uiViewController.player != player {
-            uiViewController.player = player
+        uiViewController.showsPlaybackControls = showsPlaybackControls
+        if attachPlayer {
+            if uiViewController.player !== player { uiViewController.player = player }
+        } else {
+            uiViewController.player = nil
         }
-        
-        // Update PiP settings reactively
         if uiViewController.allowsPictureInPicturePlayback != tabManager.isPiPEnabled {
             uiViewController.allowsPictureInPicturePlayback = tabManager.isPiPEnabled
         }
         if uiViewController.canStartPictureInPictureAutomaticallyFromInline != tabManager.isPiPEnabled {
             uiViewController.canStartPictureInPictureAutomaticallyFromInline = tabManager.isPiPEnabled
+        }
+        if #available(iOS 16.0, *) {
+            if uiViewController.allowsVideoFrameAnalysis {
+                uiViewController.allowsVideoFrameAnalysis = false
+            }
         }
     }
 
@@ -8803,7 +8895,9 @@ extension StashDBViewModel {
 
         guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
               let bodyString = String(data: bodyData, encoding: .utf8) else {
-            completion([])
+            // Konsistent zur Erfolgsbahn: completion immer auf Main aufrufen
+            // (UI / `@Published`-Updates erwarten Main-Thread).
+            DispatchQueue.main.async { completion([]) }
             return
         }
 

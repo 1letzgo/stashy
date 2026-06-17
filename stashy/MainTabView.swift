@@ -8,12 +8,15 @@
 #if !os(tvOS)
 import SwiftUI
 import AVKit
+import AVFoundation
 
 struct MainTabView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var securityManager = SecurityManager.shared
+    /// Feeds (`ReelsView`): bleibt über Tab-Wechsel erhalten; Szenen-/Marker-Scroll-Position in `ReelsSessionRAM`.
+    @StateObject private var reelsFeedViewModel = StashDBViewModel()
     @State private var hasValidConfig = false
     @State private var showConfigWarning = false
     @State private var showOnboarding = false
@@ -73,7 +76,14 @@ struct MainTabView: View {
                 warningType = .authExpired
                 showConfigWarning = true
             }
-            
+            .onChange(of: coordinator.selectedTab) { oldTab, newTab in
+                // Fallback wenn `ReelsView` beim Tab-Wechsel keinen eigenen Teardown auslöst.
+                guard oldTab == .reels, newTab != .reels else { return }
+                ReelsPlayerRegistry.pauseAll()
+                NotificationCenter.default.post(name: Notification.Name("ReelsPauseAllPlayers"), object: nil)
+                try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            }
+
             if securityManager.isAppLocked {
                 PasscodeEntryView()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
@@ -181,7 +191,7 @@ extension MainTabView {
             
         case .reels:
             NavigationStack {
-                ReelsView()
+                ReelsView(viewModel: reelsFeedViewModel)
             }
             .id(coordinator.reelsTabID)
 

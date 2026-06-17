@@ -20,6 +20,7 @@ struct TVSceneDetailView: View {
     @State private var isLoadingDetail = true
     @State private var isLoadingStreams = true
     @State private var hasAddedPlay = false
+    @State private var selectedQuality: StreamingQuality? = nil
 
     /// Same idea as iOS `ScenesView`: list/detail only treat transport/config as “connection” errors.
     private var hasValidActiveServer: Bool {
@@ -65,21 +66,25 @@ struct TVSceneDetailView: View {
                         // Markers
                         if let markers = scene.sceneMarkers, !markers.isEmpty {
                             markersSection(markers: markers, scene: scene)
+                                .focusSection()
                         }
 
                         // Metadata Tags
                         if let tags = scene.tags, !tags.isEmpty {
                             tagsSection(tags: tags)
+                                .focusSection()
                         }
 
                         // Performers (Cast)
                         if !scene.performers.isEmpty {
                             performersSection(performers: scene.performers)
+                                .focusSection()
                         }
 
                         // Studio
                         if let studio = scene.studio {
                             studioSection(studio: studio)
+                                .focusSection()
                         }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
@@ -119,7 +124,10 @@ struct TVSceneDetailView: View {
             loadData()
         }) {
             if let player = playerViewModel.player {
-                TVVideoPlayerView(player: player, isPresented: $playerViewModel.isShowingPlayer)
+                TVVideoPlayerView(player: player, isPresented: $playerViewModel.isShowingPlayer) {
+                    // Failsafe — save progress falls fullScreenCover ohne `onDismiss` weggeht.
+                    playerViewModel.saveProgress()
+                }
             }
         }
     }
@@ -287,19 +295,23 @@ struct TVSceneDetailView: View {
                 }
                 
                 // Progress Bar inline with metadata
-                if let resumeTime = scene.resumeTime, resumeTime > 0, let duration = scene.sceneDuration, duration > 0 {
+                if let resumeTime = scene.resumeTime, resumeTime > 0,
+                   let duration = scene.sceneDuration, duration > 0,
+                   duration.isFinite, resumeTime.isFinite {
+                    let progress = max(0.0, min(1.0, resumeTime / duration))
                     HStack(spacing: 12) {
                         Image(systemName: "play.fill")
                             .font(.caption)
                         
-                        Text("\(Int(resumeTime / duration * 100))%")
+                        Text("\(Int(progress * 100))%")
                             .font(.headline)
                         
                         GeometryReader { geo in
+                            let safeWidth: CGFloat = (geo.size.width.isFinite && geo.size.width > 0) ? geo.size.width : 0
                             ZStack(alignment: .leading) {
                                 Rectangle().fill(Color.white.opacity(0.3))
                                 Rectangle().fill(AppearanceManager.shared.tintColor)
-                                    .frame(width: geo.size.width * CGFloat(resumeTime / duration))
+                                    .frame(width: safeWidth * CGFloat(progress))
                             }
                         }
                         .frame(width: 200, height: 4)
@@ -346,11 +358,82 @@ struct TVSceneDetailView: View {
                         .padding(.vertical, 8)
                     }
                 }
-                
+
+                // O-Counter
+                Button {
+                    viewModel.incrementOCounter(sceneId: scene.id)
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "heart.circle.fill")
+                        Text("\(scene.oCounter ?? 0)")
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                }
+
+                // Rating
+                Menu {
+                    ForEach((0...5).reversed(), id: \.self) { stars in
+                        Button {
+                            let value: Int? = (stars == 0) ? nil : (stars * 20)
+                            viewModel.updateSceneRating(sceneId: scene.id, rating100: value) { _ in }
+                        } label: {
+                            HStack {
+                                if stars == 0 { Text("No Rating") }
+                                else { Text(String(repeating: "★", count: stars)) }
+                                if currentRatingStars(scene) == stars { Spacer(); Image(systemName: "checkmark") }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "star.fill")
+                        Text(ratingLabel(for: scene))
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.card)
+
+                // Quality
+                Menu {
+                    ForEach(StreamingQuality.allCases, id: \.self) { q in
+                        Button {
+                            selectedQuality = q
+                        } label: {
+                            HStack {
+                                Text(q.displayName)
+                                if currentQuality == q { Spacer(); Image(systemName: "checkmark") }
+                            }
+                        }
+                    }
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "rectangle.stack")
+                        Text(currentQuality.displayName)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                }
+                .buttonStyle(.card)
             }
             .padding(.top, 16)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var currentQuality: StreamingQuality {
+        selectedQuality ?? ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original
+    }
+
+    private func currentRatingStars(_ scene: Scene) -> Int {
+        guard let r = scene.rating100, r > 0 else { return 0 }
+        return Int(round(Double(r) / 20.0))
+    }
+
+    private func ratingLabel(for scene: Scene) -> String {
+        let stars = currentRatingStars(scene)
+        return stars == 0 ? "Rate" : "\(stars)/5"
     }
 
     private func resolutionString(for scene: Scene) -> String? {
@@ -443,7 +526,7 @@ struct TVSceneDetailView: View {
             hasAddedPlay = true
         }
         
-        let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original
+        let quality = selectedQuality ?? ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original
         let compatible = ["mp4", "m4v", "mov"]
         let fileFormat = scene.files?.first?.format?.lowercased() ?? ""
         let isNativelyCompatible = compatible.contains(fileFormat)
@@ -741,10 +824,39 @@ class TVPlayerViewModel: ObservableObject {
     private var progressTimer: AnyCancellable?
     /// Nach System-Spulen bleibt der Player oft bei rate 0; Apple-TV+-ähnlich wieder anspielen.
     private var timeJumpedObserver: NSObjectProtocol?
+    /// Lifecycle-Observer für robuste Resume-Saves (Home-Knopf, Sleep, App-Switch).
+    private var willResignActiveObserver: NSObjectProtocol?
+    private var didEnterBackgroundObserver: NSObjectProtocol?
+    /// Coalesces repeated remote scrubs; we restore steady-state buffering only
+    /// after the user has stopped seeking for a short moment.
+    private var scrubSettleWorkItem: DispatchWorkItem?
     private var sceneId: String?
     private var viewModel: StashDBViewModel?
     /// Avoid duplicate seek/play when `status` KVO fires more than once at `.readyToPlay`.
     private var didApplyInitialPlayback = false
+
+    init() {
+        let center = NotificationCenter.default
+        willResignActiveObserver = center.addObserver(
+            forName: UIApplication.willResignActiveNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.saveProgress()
+        }
+        didEnterBackgroundObserver = center.addObserver(
+            forName: UIApplication.didEnterBackgroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.saveProgress()
+        }
+    }
+
+    deinit {
+        if let t = willResignActiveObserver { NotificationCenter.default.removeObserver(t) }
+        if let t = didEnterBackgroundObserver { NotificationCenter.default.removeObserver(t) }
+    }
 
     func setupPlayer(url: URL, sceneId: String, viewModel: StashDBViewModel, startAt timestamp: Double = 0) {
         print("🚀 TV PLAYER VM: Setting up player for URL: \(url.absoluteString) at \(timestamp)s")
@@ -792,9 +904,28 @@ class TVPlayerViewModel: ObservableObject {
             forName: .AVPlayerItemTimeJumped,
             object: item,
             queue: .main
-        ) { [weak player] _ in
-            guard let player, player.rate == 0 else { return }
-            player.play()
+        ) { [weak self, weak player] _ in
+            guard let self, let player else { return }
+            if let item = player.currentItem {
+                // During scrub bursts (remote seek), prefer a short buffer so
+                // seeks stay responsive instead of re-buffering deeply.
+                configureForVOD(item, isScrubbing: true)
+            }
+
+            // Restore normal playback buffering once seek activity settles.
+            self.scrubSettleWorkItem?.cancel()
+            let settleWork = DispatchWorkItem { [weak player] in
+                guard let item = player?.currentItem else { return }
+                configureForVOD(item, isScrubbing: false)
+            }
+            self.scrubSettleWorkItem = settleWork
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45, execute: settleWork)
+
+            // tvOS frequently leaves rate at 0 after scrub; auto-resume for a
+            // smoother "Apple TV+"-like experience.
+            if player.rate == 0 {
+                player.play()
+            }
         }
     }
 
@@ -845,6 +976,8 @@ class TVPlayerViewModel: ObservableObject {
 
     func clear() {
         saveProgress()
+        scrubSettleWorkItem?.cancel()
+        scrubSettleWorkItem = nil
         removeTimeJumpedObserver()
         progressTimer = nil
         statusObserver = nil
@@ -863,6 +996,7 @@ class TVPlayerViewModel: ObservableObject {
 struct TVVideoPlayerView: View {
     let player: AVPlayer
     @Binding var isPresented: Bool
+    var onDisappear: (() -> Void)? = nil
 
     var body: some View {
         VideoPlayer(player: player) {
@@ -874,7 +1008,7 @@ struct TVVideoPlayerView: View {
             isPresented = false
         }
         .onDisappear {
-            // Final progress save handled by VM clear
+            onDisappear?()
         }
     }
 }

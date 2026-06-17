@@ -36,8 +36,7 @@ class LoginAuthHelper {
         sessionConfig.httpCookieAcceptPolicy = .always
         sessionConfig.httpShouldSetCookies = true
         
-        // Same SSL handling as GraphQLClient (private nets + optional trust-all for active server).
-        let session = URLSession(configuration: sessionConfig, delegate: TrustAllSessionDelegate.shared, delegateQueue: nil)
+        let session = URLSession(configuration: sessionConfig)
         
         // 1. Perform Login
         guard var loginURL = URL(string: baseURL) else {

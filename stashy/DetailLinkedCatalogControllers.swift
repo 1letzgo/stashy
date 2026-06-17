@@ -56,7 +56,7 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
     }
 
     var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive
+        selectedFilter != nil || isLiveFilterActive || !catalogPresetRowSelection.isEmpty
     }
 
     func sortedServerPerformerFilters(viewModel: StashDBViewModel) -> [StashDBViewModel.SavedFilter] {
@@ -447,7 +447,7 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
     }
 
     var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive
+        selectedFilter != nil || isLiveFilterActive || !catalogPresetRowSelection.isEmpty
     }
 
     func sortedServerTagFilters(viewModel: StashDBViewModel) -> [StashDBViewModel.SavedFilter] {
@@ -752,11 +752,11 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
     }
 
     private var isLiveFilterActive: Bool {
-        liveFilterFavorite != nil || liveFilterMinRating > 0 || liveFilterScenes != nil
+        liveFilterFavorite != nil || liveFilterMinRating != 0 || liveFilterScenes != nil
     }
 
     var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive
+        selectedFilter != nil || isLiveFilterActive || !catalogPresetRowSelection.isEmpty
     }
 
     func sortedServerStudioFilters(viewModel: StashDBViewModel) -> [StashDBViewModel.SavedFilter] {
@@ -772,7 +772,9 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
     private var activeLiveFilterDict: [String: Any] {
         var dict: [String: Any] = [:]
         if let fav = liveFilterFavorite { dict["favorite"] = fav }
-        if liveFilterMinRating > 0 {
+        if liveFilterMinRating == -1 {
+            dict["rating100"] = ["modifier": "IS_NULL"]
+        } else if liveFilterMinRating > 0 {
             dict["rating100"] = ["value": (liveFilterMinRating * 20), "modifier": "EQUALS"]
         }
         if liveFilterScenes == "has" { dict["scene_count"] = ["value": 0, "modifier": "GREATER_THAN"] }
@@ -813,15 +815,20 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
         if let fav = frag["favorite"] as? Bool {
             liveFilterFavorite = fav
         }
-        if let r = frag["rating100"] as? [String: Any], let raw = r["value"] {
-            let v: Int? = {
-                if let i = raw as? Int { return i }
-                if let d = raw as? Double { return Int(d) }
-                if let n = raw as? NSNumber { return n.intValue }
-                return nil
-            }()
-            if let v {
-                liveFilterMinRating = max(0, min(5, v / 20))
+        if let r = frag["rating100"] as? [String: Any] {
+            let mod = (r["modifier"] as? String) ?? ""
+            if mod == "IS_NULL" {
+                liveFilterMinRating = -1
+            } else if let raw = r["value"] {
+                let v: Int? = {
+                    if let i = raw as? Int { return i }
+                    if let d = raw as? Double { return Int(d) }
+                    if let n = raw as? NSNumber { return n.intValue }
+                    return nil
+                }()
+                if let v {
+                    liveFilterMinRating = max(0, min(5, v / 20))
+                }
             }
         }
         if let sc = frag["scene_count"] as? [String: Any], let mod = sc["modifier"] as? String {
@@ -1086,11 +1093,11 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
     }
 
     private var isLiveFilterActive: Bool {
-        liveFilterFavorite != nil || liveFilterMinRating > 0 || liveFilterFiles != nil || liveFilterStudioId != nil
+        liveFilterFavorite != nil || liveFilterMinRating != 0 || liveFilterFiles != nil || liveFilterStudioId != nil
     }
 
     var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive
+        selectedFilter != nil || isLiveFilterActive || !catalogPresetRowSelection.isEmpty
     }
 
     func loadStudioPickerOptions(viewModel: StashDBViewModel) {
@@ -1116,7 +1123,9 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
     private var activeLiveFilterDict: [String: Any] {
         var dict: [String: Any] = [:]
         if let fav = liveFilterFavorite { dict["favorite"] = fav }
-        if liveFilterMinRating > 0 {
+        if liveFilterMinRating == -1 {
+            dict["rating100"] = ["modifier": "IS_NULL"]
+        } else if liveFilterMinRating > 0 {
             dict["rating100"] = ["value": (liveFilterMinRating * 20), "modifier": "EQUALS"]
         }
         if liveFilterFiles == "has" { dict["file_count"] = ["value": 0, "modifier": "GREATER_THAN"] }
@@ -1161,15 +1170,20 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
         if let fav = frag["favorite"] as? Bool {
             liveFilterFavorite = fav
         }
-        if let r = frag["rating100"] as? [String: Any], let raw = r["value"] {
-            let v: Int? = {
-                if let i = raw as? Int { return i }
-                if let d = raw as? Double { return Int(d) }
-                if let n = raw as? NSNumber { return n.intValue }
-                return nil
-            }()
-            if let v {
-                liveFilterMinRating = max(0, min(5, v / 20))
+        if let r = frag["rating100"] as? [String: Any] {
+            let mod = (r["modifier"] as? String) ?? ""
+            if mod == "IS_NULL" {
+                liveFilterMinRating = -1
+            } else if let raw = r["value"] {
+                let v: Int? = {
+                    if let i = raw as? Int { return i }
+                    if let d = raw as? Double { return Int(d) }
+                    if let n = raw as? NSNumber { return n.intValue }
+                    return nil
+                }()
+                if let v {
+                    liveFilterMinRating = max(0, min(5, v / 20))
+                }
             }
         }
         if let fc = frag["file_count"] as? [String: Any], let mod = fc["modifier"] as? String {
@@ -1448,6 +1462,7 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
     @Published var liveFilterTagIds: [String] = []
     @Published var tagPickerOptions: [Tag] = []
     @Published var tagPickerLoading = false
+    @Published var liveFilterMediaKind: ImageListMediaKind = .all
 
     init(scope: DetailLinkedImagesScope, initialSort: StashDBViewModel.ImageSortOption = .dateDesc) {
         self.scope = scope
@@ -1456,18 +1471,86 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
     }
 
     private var isLiveFilterActive: Bool {
-        liveFilterPerformerFavorite != nil || liveFilterMinRating > 0 || liveFilterOrganized != nil
+        let mediaKindActive: Bool = {
+            if case .reelsStashLine = scope { return false }
+            return liveFilterMediaKind != .all
+        }()
+        return liveFilterPerformerFavorite != nil || liveFilterMinRating != 0 || liveFilterOrganized != nil
             || liveFilterOCounterTag != nil || !liveFilterStudioIds.isEmpty || !liveFilterTagIds.isEmpty
+            || mediaKindActive
     }
 
     var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive
+        selectedFilter != nil || isLiveFilterActive || !catalogPresetRowSelection.isEmpty
+    }
+
+    /// Clips use a fixed video-style `path` regex in `fetchClips` and ignore live `path`.
+    /// StashLine (Reels „Pics“) lists images only — Bilder/Videos-Zeile ausblenden.
+    var showImageMediaTypeFilter: Bool {
+        switch scope {
+        case .reelsClips, .reelsStashLine: return false
+        default: return true
+        }
     }
 
     func sortedServerImageFilters(viewModel: StashDBViewModel) -> [StashDBViewModel.SavedFilter] {
         viewModel.savedFilters.values
             .filter { $0.mode == .images }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    /// Picker-Zeile (`server:` / `local:`) so wählen, dass sie **immer** zu Einträgen im Filter-Sheet passt.
+    /// Sonst zeigt SwiftUI bei `.menu` einen **leeren** Titel, obwohl `selectedFilter` noch gesetzt ist (z. B. Basis-Filter vs. Stashy-Wrapper, oder veraltete ID nach `savedFilters`-Reload).
+    func resolvedCatalogPresetPickerRowId(viewModel: StashDBViewModel) -> String {
+        let serverRows = sortedServerImageFilters(viewModel: viewModel)
+        let serverById = Dictionary(uniqueKeysWithValues: serverRows.map { ($0.id, $0) })
+
+        func localTagExists(_ tagged: String) -> Bool {
+            guard let ls = ListLivePresetTag.parseLocalUUIDString(tagged),
+                  let uuid = UUID(uuidString: ls) else { return false }
+            return localCatalogPresets.contains(where: { $0.id == uuid })
+        }
+
+        func serverTagExists(_ tagged: String) -> Bool {
+            guard let sid = ListLivePresetTag.parseServerId(tagged) else { return false }
+            return serverById[sid] != nil
+        }
+
+        let trimmed = catalogPresetRowSelection.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty, serverTagExists(trimmed) || localTagExists(trimmed) {
+            return trimmed
+        }
+
+        guard let base = selectedFilter else { return "" }
+
+        if serverById[base.id] != nil {
+            return ListLivePresetTag.serverRow(base.id)
+        }
+
+        let wrappers = serverRows
+            .filter { $0.stashyCatalogPresetMetadata?.baseSavedFilterId == base.id }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+
+        if let w = wrappers.first {
+            return ListLivePresetTag.serverRow(w.id)
+        }
+        return ""
+    }
+
+    /// Nach Server-Reload: gleiche Filter-ID, aktuelle Server-Struktur (verhindert hängende UI-Zustände).
+    func rehydrateSelectedFilter(from viewModel: StashDBViewModel) {
+        guard let f = selectedFilter else { return }
+        if let fresh = viewModel.savedFilters[f.id] {
+            selectedFilter = fresh
+        }
+    }
+
+    func applyResolvedCatalogPresetPickerRowIfNeeded(viewModel: StashDBViewModel) {
+        rehydrateSelectedFilter(from: viewModel)
+        let next = resolvedCatalogPresetPickerRowId(viewModel: viewModel)
+        if catalogPresetRowSelection != next {
+            catalogPresetRowSelection = next
+        }
     }
 
     var imageLiveChipRowsVisible: Bool {
@@ -1477,7 +1560,9 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
     private var activeLiveFilterDict: [String: Any] {
         var dict: [String: Any] = [:]
         if let fav = liveFilterPerformerFavorite { dict["performer_favorite"] = fav }
-        if liveFilterMinRating > 0 {
+        if liveFilterMinRating == -1 {
+            dict["rating100"] = ["modifier": "IS_NULL"]
+        } else if liveFilterMinRating > 0 {
             dict["rating100"] = ["value": (liveFilterMinRating * 20), "modifier": "EQUALS"]
         }
         if liveFilterOrganized == "true" { dict["organized"] = true }
@@ -1490,6 +1575,11 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
         }
         if !liveFilterTagIds.isEmpty {
             dict["tags"] = ["modifier": "INCLUDES", "value": liveFilterTagIds]
+        }
+        if let pathCrit = liveFilterMediaKind.pathCriterion {
+            if case .reelsStashLine = scope { /* images-only feed; ignore preset path */ } else {
+                dict["path"] = pathCrit
+            }
         }
         return dict
     }
@@ -1574,22 +1664,31 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
         liveFilterOCounterTag = nil
         liveFilterStudioIds = []
         liveFilterTagIds = []
+        liveFilterMediaKind = .all
     }
 
     func mapLiveFragmentToChips(_ frag: [String: Any]) {
         clearLiveChipsOnly()
+        if let media = ImageListMediaKind.fromPathFragment(frag["path"]) {
+            liveFilterMediaKind = media
+        }
         if let fav = frag["performer_favorite"] as? Bool {
             liveFilterPerformerFavorite = fav
         }
-        if let r = frag["rating100"] as? [String: Any], let raw = r["value"] {
-            let v: Int? = {
-                if let i = raw as? Int { return i }
-                if let d = raw as? Double { return Int(d) }
-                if let n = raw as? NSNumber { return n.intValue }
-                return nil
-            }()
-            if let v {
-                liveFilterMinRating = max(0, min(5, v / 20))
+        if let r = frag["rating100"] as? [String: Any] {
+            let mod = (r["modifier"] as? String) ?? ""
+            if mod == "IS_NULL" {
+                liveFilterMinRating = -1
+            } else if let raw = r["value"] {
+                let v: Int? = {
+                    if let i = raw as? Int { return i }
+                    if let d = raw as? Double { return Int(d) }
+                    if let n = raw as? NSNumber { return n.intValue }
+                    return nil
+                }()
+                if let v {
+                    liveFilterMinRating = max(0, min(5, v / 20))
+                }
             }
         }
         if let o = frag["organized"] as? Bool {

@@ -8,6 +8,7 @@
 import Foundation
 import AVKit
 import AVFoundation
+import Network
 
 /// Protocol for types that provide a user-facing display name (used by tvOS sort picker)
 protocol DisplayNameProvider {
@@ -119,8 +120,46 @@ extension View {
     }
 }
 
-/// Ensures `.playback` audio session for main scene/catalog playback (honors silent switch vs ambient previews).
-func prepareStashPlaybackAudioSession() {
+// MARK: - Playback Buffer Heuristics
+
+/// Buffer used during high-frequency scrubbing — keeps seeks responsive.
+let kScrubForwardBuffer: TimeInterval = 2
+/// Buffer used during steady-state playback — reduces stalls.
+let kPlayingForwardBuffer: TimeInterval = 6
+
+/// Builds an `AVURLAsset` for a Stash stream URL with apikey-query + ApiKey-header
+/// authentication applied consistently. Single source of truth for asset creation.
+func makeAuthenticatedAsset(for url: URL) -> AVURLAsset {
+    let authenticatedURL = signedURL(url) ?? url
+    var headers: [String: String] = [:]
+    if let config = ServerConfigManager.shared.loadConfig(),
+       let apiKey = config.secureApiKey, !apiKey.isEmpty {
+        headers["ApiKey"] = apiKey
+    }
+    return AVURLAsset(url: authenticatedURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+}
+
+/// Creates a VOD-tuned `AVPlayerItem` for Stash content with the playing-state buffer.
+func makeVODPlayerItem(for url: URL) -> AVPlayerItem {
+    let asset = makeAuthenticatedAsset(for: url)
+    let item = AVPlayerItem(asset: asset)
+    configureForVOD(item, isScrubbing: false)
+    // Seed a sensible peak bit rate based on the current network class.
+    if let cap = NetworkQualityMonitor.shared.recommendedPeakBitRate() {
+        item.preferredPeakBitRate = cap
+    }
+    return item
+}
+
+/// Applies VOD playback tuning. Call again with `isScrubbing: true` while the user
+/// is dragging the scrubber to keep seeks instantaneous.
+func configureForVOD(_ item: AVPlayerItem, isScrubbing: Bool) {
+    item.preferredForwardBufferDuration = isScrubbing ? kScrubForwardBuffer : kPlayingForwardBuffer
+    item.automaticallyPreservesTimeOffsetFromLive = false
+    item.canUseNetworkResourcesForLiveStreamingWhilePaused = true
+}
+
+func createPlayer(for url: URL) -> AVPlayer {
     let session = AVAudioSession.sharedInstance()
     if session.category != .playback {
         do {
@@ -130,31 +169,9 @@ func prepareStashPlaybackAudioSession() {
             print("🎬 VIDEO PLAYER: Error setting up AVAudioSession: \(error)")
         }
     }
-}
 
-func createPlayer(for url: URL) -> AVPlayer {
-    prepareStashPlaybackAudioSession()
-    
-    // Use signed URL with API key as query parameter for maximum compatibility
-    let authenticatedURL = signedURL(url) ?? url
-    print("🎬 VIDEO PLAYER: Creating player for URL: \(authenticatedURL.absoluteString)")
-    
-    var headers: [String: String] = [:]
-    if let config = ServerConfigManager.shared.loadConfig(),
-       let apiKey = config.secureApiKey, !apiKey.isEmpty {
-        headers["ApiKey"] = apiKey
-    }
-    
-    let asset = AVURLAsset(url: authenticatedURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
-    let playerItem = AVPlayerItem(asset: asset)
-    
-    // Performance Optimizations for scrubbing and playback.
-    // A small forward buffer (2s) keeps seeks snappy on HLS — a 10s buffer
-    // forces AVPlayer to download/transcode ~10s per jump before playback.
-    playerItem.preferredForwardBufferDuration = 2
-    // Stash scenes are VOD; preserving live offset breaks seeks/resume on HLS.
-    playerItem.automaticallyPreservesTimeOffsetFromLive = false
-    playerItem.canUseNetworkResourcesForLiveStreamingWhilePaused = true
+    let playerItem = makeVODPlayerItem(for: url)
+    print("🎬 VIDEO PLAYER: Creating player for URL: \((playerItem.asset as? AVURLAsset)?.url.absoluteString ?? url.absoluteString)")
 
     let player = AVPlayer(playerItem: playerItem)
     // Scrubbing responsiveness: `automaticallyWaitsToMinimizeStalling` makes
@@ -168,27 +185,67 @@ func createPlayer(for url: URL) -> AVPlayer {
 
 /// Creates a muted preview player that doesn't interrupt other audio
 func createMutedPreviewPlayer(for url: URL) -> AVPlayer {
-    // Use ambient category to mix with other audio and not interrupt
     do {
         try AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: .mixWithOthers)
     } catch {
         print("🎬 PREVIEW PLAYER: Error setting up AVAudioSession: \(error)")
     }
-    
-    // Use signed URL with API key
-    let authenticatedURL = signedURL(url) ?? url
-    
-    var headers: [String: String] = [:]
-    if let config = ServerConfigManager.shared.loadConfig(),
-       let apiKey = config.secureApiKey, !apiKey.isEmpty {
-        headers["ApiKey"] = apiKey
-    }
-    
-    let asset = AVURLAsset(url: authenticatedURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
+
+    let asset = makeAuthenticatedAsset(for: url)
     let playerItem = AVPlayerItem(asset: asset)
     let player = AVPlayer(playerItem: playerItem)
     player.isMuted = true
     return player
+}
+
+// MARK: - Network Quality Monitor
+
+/// Monitors current network reachability/cellular state and provides
+/// a recommended `preferredPeakBitRate` for HLS so we don't burn data
+/// on Mobilfunk or stall on a constrained link.
+final class NetworkQualityMonitor: @unchecked Sendable {
+    static let shared = NetworkQualityMonitor()
+
+    enum Connection { case unknown, wifi, cellular, wired, constrained }
+
+    private let monitor = NWPathMonitor()
+    private let queue = DispatchQueue(label: "stashy.network.monitor")
+    private(set) var connection: Connection = .unknown
+    private(set) var isExpensive: Bool = false
+    private(set) var isConstrained: Bool = false
+
+    private init() {
+        monitor.pathUpdateHandler = { [weak self] path in
+            guard let self = self else { return }
+            self.isExpensive = path.isExpensive
+            self.isConstrained = path.isConstrained
+            if path.isConstrained {
+                self.connection = .constrained
+            } else if path.usesInterfaceType(.wifi) {
+                self.connection = .wifi
+            } else if path.usesInterfaceType(.wiredEthernet) {
+                self.connection = .wired
+            } else if path.usesInterfaceType(.cellular) {
+                self.connection = .cellular
+            } else {
+                self.connection = .unknown
+            }
+        }
+        monitor.start(queue: queue)
+    }
+
+    /// Returns a peak bit rate cap (bits/sec) appropriate for the current link.
+    /// Returns `nil` to mean "no cap" (Wi-Fi / Wired).
+    func recommendedPeakBitRate() -> Double? {
+        switch connection {
+        case .cellular:
+            return 4_000_000   // ~ 1080p H.264 capped
+        case .constrained:
+            return 1_500_000   // ~ 480p
+        case .wifi, .wired, .unknown:
+            return nil
+        }
+    }
 }
 
 // MARK: - Generic JSON Handling
@@ -1023,6 +1080,12 @@ public struct FilterMapper {
         if intFields.contains(key) || key.hasSuffix("_count") {
             if let v = subDict["value"] { subDict["value"] = castToInt(v) }
             if let v = subDict["value2"] { subDict["value2"] = castToInt(v) }
+            // GraphQL `IntCriterionInput` requires `value: Int!` (see filters.graphql). Stash’s SQL builder
+            // ignores `value` for `IS_NULL` / `NOT_NULL` (pkg/sqlite/sql.go getNumericWhereClause).
+            let modStr = subDict["modifier"] as? String
+            if modStr == "IS_NULL" || modStr == "NOT_NULL", subDict["value"] == nil {
+                subDict["value"] = 0
+            }
         }
         
         // Multi-select/ID mapping

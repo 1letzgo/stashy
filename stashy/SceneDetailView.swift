@@ -11,7 +11,6 @@ import AVFoundation
 import AVKit
 import WebKit
 import Combine
-import KSPlayer
 
 struct SceneDetailView: View {
     let scene: Scene
@@ -40,6 +39,7 @@ struct SceneDetailView: View {
 
     @State private var isHeaderExpanded = false
     @State private var isTagsExpanded = false
+    @State private var isFullscreen = false
     @State private var isPlaybackStarted = false
     @State private var tagsTotalHeight: CGFloat = 0
     @State private var isMuted = !isHeadphonesConnected()
@@ -53,11 +53,6 @@ struct SceneDetailView: View {
     /// suppress redundant work (sync restarts, play-state side-effects) during
     /// high-frequency seeks.
     @State private var isScrubbing: Bool = false
-    
-    @StateObject private var sceneKSPlayerCoordinator = KSVideoPlayer.Coordinator()
-    @State private var lastPlaybackResumeChoice = false
-    @State private var didBootstrapKSPlayer = false
-    @State private var pendingSeekAfterKSReady: Double?
     
     // Preview Video State
     @State private var previewPlayer: AVPlayer?
@@ -120,16 +115,21 @@ struct SceneDetailView: View {
                     activeScene: $activeScene,
                     player: $player,
                     isPlaybackStarted: $isPlaybackStarted,
+                    isFullscreen: $isFullscreen,
                     isPreviewing: $isPreviewing,
+                    onSeek: { seconds in seekTo(seconds) },
+                    onStartPlayback: { resume in startPlayback(resume: resume) }
+                )
+
+                SceneDetailMetadataCard(
+                    activeScene: $activeScene,
+                    player: $player,
                     isHeaderExpanded: $isHeaderExpanded,
                     showingAddMarkerSheet: $showingAddMarkerSheet,
                     capturedMarkerTime: $capturedMarkerTime,
                     playbackSpeed: $playbackSpeed,
                     viewModel: viewModel,
-                    ksCoordinator: sceneKSPlayerCoordinator,
-                    scenePlaybackSignedURL: sceneDetailPlaybackSignedURL,
                     onSeek: { seconds in seekTo(seconds) },
-                    onStartPlayback: { resume in startPlayback(resume: resume) },
                     onTitleUpdated: { newTitle, newDetails in
                         activeScene = Scene(id: activeScene.id, title: newTitle, details: newDetails, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams)
                     }
@@ -293,11 +293,6 @@ struct SceneDetailView: View {
         }
     }
 
-    private var sceneDetailPlaybackSignedURL: URL? {
-        guard let u = activeScene.videoURL else { return nil }
-        return signedURL(u) ?? u
-    }
-
 
 
     var body: some View {
@@ -307,14 +302,6 @@ struct SceneDetailView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { sceneToolbarContent }
             .toolbar(.visible, for: .navigationBar)
-            .onChange(of: player) { oldPlayer, newPlayer in
-                if newPlayer == nil {
-                    didBootstrapKSPlayer = false
-                } else if isPlaybackStarted, !didBootstrapKSPlayer, oldPlayer == nil, let p = newPlayer {
-                    didBootstrapKSPlayer = true
-                    bootstrapKSPlayerAttached(p, applyResumeSeek: lastPlaybackResumeChoice)
-                }
-            }
             .modifier(SceneDetailAlertModifier(
                 showDeleteConfirmation: $showDeleteWithFilesConfirmation,
                 showingAddMarkerSheet: $showingAddMarkerSheet,
@@ -391,6 +378,7 @@ struct SceneDetailView: View {
 
     private func handleOnAppear() {
         print("🔍 Scene Detail: ID=\(activeScene.id), PlayCount=\(activeScene.playCount ?? -1)")
+        isFullscreen = false
         
         // Reset all SYNC states only on very first appear - WE WANT MANUAL ACTIVATION
         if !hasInitializedDevices {
@@ -443,26 +431,22 @@ struct SceneDetailView: View {
         if isDeleting {
             player?.pause()
             stopPreview()
-            sceneKSPlayerCoordinator.resetPlayer()
-            player = nil
             return
         }
 
-        player?.pause()
-        StashSyncManager.shared.stop()
-        if handyManager.isSyncing || handyManager.isStashSyncMode { handyManager.pause() }
-        if buttplugManager.isConnected { buttplugManager.stop() }
-        if loveSpouseManager.isConnected { loveSpouseManager.stop() }
+        if !isFullscreen {
+            player?.pause()
+            StashSyncManager.shared.stop()
+            if handyManager.isSyncing || handyManager.isStashSyncMode { handyManager.pause() }
+            if buttplugManager.isConnected { buttplugManager.stop() }
+            if loveSpouseManager.isConnected { loveSpouseManager.stop() }
+        }
         stopPreview()
         removeTimeObserver()
-
+        
         let currentTime = player?.currentTime().seconds
         let effectiveResumeTime = (currentTime != nil && currentTime! > 0) ? currentTime! : activeScene.resumeTime
-
-        sceneKSPlayerCoordinator.resetPlayer()
-        player = nil
-        didBootstrapKSPlayer = false
-
+        
         if let resumeTime = effectiveResumeTime, resumeTime > 0 {
             let sceneId = activeScene.id
             if currentTime != nil && currentTime! > 0 {
@@ -517,43 +501,38 @@ struct SceneDetailView: View {
     }
 
     private func startPlayback(resume: Bool) {
-        guard activeScene.videoURL != nil else { return }
+        guard let videoURL = activeScene.videoURL else { return }
 
-        prepareStashPlaybackAudioSession()
-        lastPlaybackResumeChoice = resume
+        if player == nil {
+            print("🎬 Player initializing with URL: \(videoURL.absoluteString)")
+            player = createPlayer(for: videoURL)
+            player?.isMuted = isMuted
+            addTimeObserverIfNeeded()
+
+            if resume, let resumeTime = activeScene.resumeTime, resumeTime > 0 {
+                let targetTime = CMTime(seconds: resumeTime, preferredTimescale: 600)
+                player?.seek(to: targetTime)
+            }
+        } else if resume, let resumeTime = activeScene.resumeTime, resumeTime > 0 {
+             let targetTime = CMTime(seconds: resumeTime, preferredTimescale: 600)
+             player?.seek(to: targetTime)
+        }
+        
         withAnimation {
             isPlaybackStarted = true
         }
-        if let player {
-            bootstrapKSPlayerAttached(player, applyResumeSeek: resume)
-        }
-    }
-
-    private func bootstrapKSPlayerAttached(_ player: AVPlayer, applyResumeSeek: Bool) {
-        player.isMuted = isMuted
-        addTimeObserverIfNeeded()
-
-        if let pending = pendingSeekAfterKSReady {
-            pendingSeekAfterKSReady = nil
-            let targetTime = CMTime(seconds: pending, preferredTimescale: 600)
-            player.seek(to: targetTime, toleranceBefore: .positiveInfinity, toleranceAfter: .positiveInfinity)
-        } else if applyResumeSeek, let resumeTime = activeScene.resumeTime, resumeTime > 0 {
-            let targetTime = CMTime(seconds: resumeTime, preferredTimescale: 600)
-            player.seek(to: targetTime)
-        }
-
-        player.rate = Float(playbackSpeed)
-        player.play()
+        player?.play()
         if handyManager.isSyncing {
-            handyManager.play(at: player.currentTime().seconds)
+            handyManager.play(at: player?.currentTime().seconds ?? 0)
         }
         if buttplugManager.isConnected {
-            buttplugManager.play(at: player.currentTime().seconds)
+            buttplugManager.play(at: player?.currentTime().seconds ?? 0)
         }
         if loveSpouseManager.isSyncing {
-            loveSpouseManager.play(at: player.currentTime().seconds)
+            loveSpouseManager.play(at: player?.currentTime().seconds ?? 0)
         }
-
+        player?.rate = Float(playbackSpeed)
+        
         if !hasAddedPlay {
             registerScenePlay()
         }
@@ -642,15 +621,17 @@ struct SceneDetailView: View {
             startPlayback(resume: false)
         }
 
+        // Switch to scrub-buffer once when scrubbing begins so AVPlayer
+        // can react to repeated seeks without re-buffering 6+ seconds.
+        if isScrubbing, let item = player?.currentItem {
+            configureForVOD(item, isScrubbing: true)
+        }
+
         let targetTime = CMTime(seconds: seconds, preferredTimescale: 600)
         // Keyframe-tolerant seeks are dramatically faster on HLS / transcoded
         // streams because AVPlayer can snap to the nearest I-frame instead of
         // forcing the server to re-encode up to the exact frame.
-        if let player {
-            player.seek(to: targetTime, toleranceBefore: .positiveInfinity, toleranceAfter: .positiveInfinity)
-        } else {
-            pendingSeekAfterKSReady = seconds
-        }
+        player?.seek(to: targetTime, toleranceBefore: .positiveInfinity, toleranceAfter: .positiveInfinity)
 
         // While actively scrubbing we don't kick device-syncs on every micro-seek
         // (that explodes network/Bluetooth traffic). Final commit happens on
@@ -671,14 +652,15 @@ struct SceneDetailView: View {
     /// Called from the heatmap scrubber when the user releases the drag.
     /// Does the final accurate seek + sync resume.
     private func commitScrub(to seconds: Double) {
-        isScrubbing = false
-        let targetTime = CMTime(seconds: seconds, preferredTimescale: 600)
-        if let player {
-            player.seek(to: targetTime, toleranceBefore: .positiveInfinity, toleranceAfter: .positiveInfinity)
-            player.play()
-        } else {
-            pendingSeekAfterKSReady = seconds
+        // Restore the steady-state forward buffer for stable playback.
+        if let item = player?.currentItem {
+            configureForVOD(item, isScrubbing: false)
         }
+        let targetTime = CMTime(seconds: seconds, preferredTimescale: 600)
+        // Final commit should be precise; only intermediate drag seeks are
+        // keyframe-tolerant for responsiveness.
+        player?.seek(to: targetTime, toleranceBefore: .zero, toleranceAfter: .zero)
+        player?.play()
         if handyManager.isSyncing { handyManager.play(at: seconds) }
         if buttplugManager.isConnected { buttplugManager.play(at: seconds) }
         if loveSpouseManager.isSyncing { loveSpouseManager.play(at: seconds) }
@@ -706,38 +688,32 @@ struct SceneDetailView: View {
         .overlay(Capsule().stroke((color ?? appearanceManager.tintColor).opacity(0.4), lineWidth: 0.5))
     }
     
-    /// Updates the player if a better stream becomes available (e.g. replacing an incompatible MKV fallback with a transcribed MP4)
+    /// Updates the player if a better stream becomes available (e.g. replacing an incompatible MKV fallback with a transcoded MP4).
+    /// Uses the central `makeVODPlayerItem` helper so buffering, headers and apikey-signing stay consistent with `qualityMenu` switches.
     private func updatePlayerStream() {
-        guard let currentURL = player?.currentItem?.asset as? AVURLAsset else { return }
+        guard let currentAsset = player?.currentItem?.asset as? AVURLAsset else { return }
         guard let newURL = activeScene.videoURL else { return }
-        
-        // Only switch if the URL path is different
-        if currentURL.url.absoluteString != newURL.absoluteString {
-            // Check if current URL is the likely incompatible fallback
-            let oldIsFallback = currentURL.url.pathExtension.lowercased() == "mkv"
-            let newIsStream = newURL.pathExtension.lowercased() == "mp4" || newURL.absoluteString.contains("/stream")
-            
-            if oldIsFallback || newIsStream {
-                print("♻️ Upgrading stream in SceneDetailView from \(currentURL.url.lastPathComponent) to \(newURL.lastPathComponent)...")
-                
-                let headers = ["ApiKey": ServerConfigManager.shared.activeConfig?.secureApiKey ?? ""]
-                let asset = AVURLAsset(url: newURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
-                let item = AVPlayerItem(asset: asset)
-                
-                let currentTime = player?.currentTime() ?? .zero
-                let wasPlaying = player?.rate ?? 0 > 0
-                
-                player?.replaceCurrentItem(with: item)
-                
-                if currentTime > .zero {
-                    player?.seek(to: currentTime)
-                }
-                
-                if wasPlaying || isPlaybackStarted {
-                    player?.play()
-                }
-            }
+
+        if currentAsset.url.absoluteString == newURL.absoluteString { return }
+
+        let oldIsFallback = currentAsset.url.pathExtension.lowercased() == "mkv"
+        let newIsStream = newURL.pathExtension.lowercased() == "mp4" || newURL.absoluteString.contains("/stream")
+        guard oldIsFallback || newIsStream else { return }
+
+        print("♻️ Upgrading stream from \(currentAsset.url.lastPathComponent) to \(newURL.lastPathComponent)…")
+
+        let currentTime = player?.currentTime() ?? .zero
+        let wasPlaying = (player?.rate ?? 0) > 0
+
+        let item = makeVODPlayerItem(for: newURL)
+        player?.replaceCurrentItem(with: item)
+        if currentTime > .zero {
+            player?.seek(to: currentTime, toleranceBefore: .positiveInfinity, toleranceAfter: .positiveInfinity)
         }
+        if wasPlaying || isPlaybackStarted {
+            player?.play()
+        }
+        StashVideoSyncManager.shared.setup(for: item)
     }
 }
 

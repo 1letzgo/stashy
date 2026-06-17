@@ -65,7 +65,6 @@
 		BEBA9D663C334D69A68E2935 /* SceneGroupsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA617C2A62174FFFB0912B44 /* SceneGroupsCard.swift */; };
 		BFFDBA13C2414AB6B3120A34 /* HomeStatisticsRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E5F2F2A46A1004CA019 /* HomeStatisticsRowView.swift */; };
 		C047CE6380F048858A91E6C9 /* GraphQLClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFGQ000022F28A0000000002 /* GraphQLClient.swift */; };
-		C047CE6380F048858A91E6CA /* TrustAllSessionDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFGQTRUST022F28A0000000001 /* TrustAllSessionDelegate.swift */; };
 		CA7A10D12F500001 /* ListCatalogFilterSortModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7A10D02F500000 /* ListCatalogFilterSortModels.swift */; };
 		CA7A10D42F500003 /* ListCatalogFilterSortSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7A10D32F500002 /* ListCatalogFilterSortSheets.swift */; };
 		CA7A10E12F500010 /* DetailLinkedCatalogControllers.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7A10E02F500011 /* DetailLinkedCatalogControllers.swift */; };
@@ -110,7 +109,6 @@
 		DFE504642E8A8C5000323FF0 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE504632E8A8C5000323FF0 /* SceneDelegate.swift */; };
 		DFF7EE412F0D3D2800344A8B /* TabManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF7EE402F0D3D2800344A8B /* TabManager.swift */; };
 		DFGQ000012F28A0000000001 /* GraphQLClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFGQ000022F28A0000000002 /* GraphQLClient.swift */; };
-		DFGQTRUST011F28A0000000001 /* TrustAllSessionDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFGQTRUST022F28A0000000001 /* TrustAllSessionDelegate.swift */; };
 		DFGQ000032F28A0000000003 /* GraphQLQueries.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFGQ000042F28A0000000004 /* GraphQLQueries.swift */; };
 		DFGQGRAPHQLBUILD001 /* graphql in Resources */ = {isa = PBXBuildFile; fileRef = DFGQGRAPHQLREF001 /* graphql */; };
 		DFSEC0012F2A000100000001 /* SecurityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSEC0022F2A000100000002 /* SecurityManager.swift */; };
@@ -216,7 +214,6 @@
 		DFE504632E8A8C5000323FF0 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		DFF7EE402F0D3D2800344A8B /* TabManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TabManager.swift; sourceTree = "<group>"; };
 		DFGQ000022F28A0000000002 /* GraphQLClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphQLClient.swift; sourceTree = "<group>"; };
-		DFGQTRUST022F28A0000000001 /* TrustAllSessionDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TrustAllSessionDelegate.swift; sourceTree = "<group>"; };
 		DFGQ000042F28A0000000004 /* GraphQLQueries.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GraphQLQueries.swift; sourceTree = "<group>"; };
 		DFGQGRAPHQLREF001 /* graphql */ = {isa = PBXFileReference; lastKnownFileType = folder; path = graphql; sourceTree = "<group>"; };
 		DFSEC0022F2A000100000002 /* SecurityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityManager.swift; sourceTree = "<group>"; };
@@ -292,7 +289,6 @@
 				DFUI000042F3AUDIT004 /* HapticManager.swift */,
 				DF675E6C2F2A6386004CA019 /* Repositories */,
 				DFGQ000022F28A0000000002 /* GraphQLClient.swift */,
-				DFGQTRUST022F28A0000000001 /* TrustAllSessionDelegate.swift */,
 				DF675E792F2A6392004CA019 /* SceneDetail */,
 				DFSEC0072F2A000100000007 /* Components */,
 				DFGQ000042F28A0000000004 /* GraphQLQueries.swift */,
@@ -635,7 +631,6 @@
 				A1ED4C0012345678901234AB /* EditModeSettingsView.swift in Sources */,
 				DF90B7642F1ACEA3003ED852 /* ServerSetupWizardView.swift in Sources */,
 				DFGQ000012F28A0000000001 /* GraphQLClient.swift in Sources */,
-				DFGQTRUST011F28A0000000001 /* TrustAllSessionDelegate.swift in Sources */,
 				DFGQ000032F28A0000000003 /* GraphQLQueries.swift in Sources */,
 				DFSM000012F2NEWFILE001 /* KeychainManager.swift in Sources */,
 				DFSM000052F2NEWFILE005 /* ServerFormViewNew.swift in Sources */,
@@ -702,7 +697,6 @@
 				7BB701173C934CC5AD19DC74 /* SceneDelegate.swift in Sources */,
 				790261AAF80B42C485B72074 /* TabManager.swift in Sources */,
 				C047CE6380F048858A91E6C9 /* GraphQLClient.swift in Sources */,
-				C047CE6380F048858A91E6CA /* TrustAllSessionDelegate.swift in Sources */,
 				E909C6E8F4744C4D939F78BD /* GraphQLQueries.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

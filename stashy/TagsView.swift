@@ -8,8 +8,8 @@
 #if !os(tvOS)
 import SwiftUI
 
-struct TagsView: View {
-    @StateObject private var viewModel = StashDBViewModel()
+private struct TagsViewContent: View {
+    @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -20,6 +20,11 @@ struct TagsView: View {
     @State private var searchText = ""
     @State private var isSearchVisible = false
     var hideTitle: Bool = false
+
+    init(viewModel: StashDBViewModel, hideTitle: Bool = false) {
+        self.viewModel = viewModel
+        self.hideTitle = hideTitle
+    }
 
     // Filter & sort sheet
     @State private var showFilterSortSheet = false
@@ -77,7 +82,7 @@ struct TagsView: View {
     }
 
     private var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive
+        selectedFilter != nil || isLiveFilterActive || !catalogPresetRowSelection.isEmpty
     }
 
     private var sortedServerTagFilters: [StashDBViewModel.SavedFilter] {
@@ -577,6 +582,21 @@ struct TagsView: View {
                 }
             }
         }
+    }
+}
+
+struct TagsView: View {
+    @StateObject private var ownedViewModel = StashDBViewModel()
+    let catalogBrowserViewModel: StashDBViewModel?
+    var hideTitle: Bool = false
+
+    init(hideTitle: Bool = false, catalogBrowserViewModel: StashDBViewModel? = nil) {
+        self.hideTitle = hideTitle
+        self.catalogBrowserViewModel = catalogBrowserViewModel
+    }
+
+    var body: some View {
+        TagsViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel, hideTitle: hideTitle)
     }
 }
 
@@ -1166,7 +1186,9 @@ struct TagDetailView: View {
             serverFilters: linkedImages.sortedServerImageFilters(viewModel: viewModel),
             localPresets: linkedImages.localCatalogPresets,
             selectedPresetRowId: $linkedImages.catalogPresetRowSelection,
+            filterMenuTitleFallback: linkedImages.selectedFilter?.name,
             liveChipRowsVisible: linkedImages.imageLiveChipRowsVisible,
+            showMediaTypeFilter: linkedImages.showImageMediaTypeFilter,
             sortOption: linkedImages.selectedSortOption,
             onSortChange: { linkedImages.changeSortOption(to: $0, viewModel: viewModel) },
             liveMinRating: $linkedImages.liveFilterMinRating,
@@ -1175,6 +1197,7 @@ struct TagDetailView: View {
             liveOCounterTag: $linkedImages.liveFilterOCounterTag,
             liveStudioIds: $linkedImages.liveFilterStudioIds,
             liveTagIds: $linkedImages.liveFilterTagIds,
+            liveMediaKind: $linkedImages.liveFilterMediaKind,
             studioPickerOptions: linkedImages.studioPickerOptions,
             studioPickerLoading: linkedImages.studioPickerLoading,
             onStudioPickerSectionAppear: { linkedImages.loadStudioPickerOptions(viewModel: viewModel) },
@@ -1214,6 +1237,7 @@ struct TagDetailView: View {
             linkedImages.catalogPresetRowSelection = sel
             linkedImages.refreshLocalPresets()
             linkedImages.applyCatalogPresetSelectionFromSheetIfNeeded(viewModel: viewModel)
+            linkedImages.applyResolvedCatalogPresetPickerRowIfNeeded(viewModel: viewModel)
         }
     }
     

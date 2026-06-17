@@ -19,6 +19,7 @@ class ImageCache {
     private let baseDiskCacheDirectory: URL
     private var _cachedServerCacheDirectory: URL?
     private var lastCleanupDate: Date?
+    private var performerImageObserver: NSObjectProtocol?
     
     private init() {
         // Memory Cache Config
@@ -33,6 +34,17 @@ class ImageCache {
         
         // Listen for server changes
         NotificationCenter.default.addObserver(self, selector: #selector(handleServerChange), name: NSNotification.Name("ServerConfigChanged"), object: nil)
+
+        performerImageObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("PerformerImageUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self,
+                  let performerId = notification.userInfo?["performerId"] as? String else { return }
+            let newPath = notification.userInfo?["newImagePath"] as? String
+            self.invalidatePerformerProfileImage(performerId: performerId, newImagePath: newPath)
+        }
     }
     
     @objc private func handleServerChange() {
@@ -202,6 +214,30 @@ class ImageCache {
         try? fileManager.removeItem(at: currentServerCacheDirectory)
     }
 
+    /// Drops memory and disk entries for this URL’s **stable** cache key (volatile query params stripped).
+    func removeObject(forKey key: NSURL) {
+        let stableKey = stableMemoryCacheKey(for: key)
+        memoryCache.removeObject(forKey: stableKey)
+        let fileURL = cacheFileURL(for: key)
+        if fileManager.fileExists(atPath: fileURL.path) {
+            try? fileManager.removeItem(at: fileURL)
+        }
+    }
+
+    /// After a performer profile image mutation, drop cached `/performer/{id}/image` and the new image URL
+    /// so views using default or busted URLs refetch instead of reusing stale pixels.
+    func invalidatePerformerProfileImage(performerId: String, newImagePath: String?) {
+        let config = ServerConfigManager.shared.activeConfig ?? ServerConfigManager.shared.loadConfig()
+        guard let config, config.hasValidConfig else { return }
+        let defaultURLString = "\(config.baseURL)/performer/\(performerId)/image"
+        if let u = URL(string: defaultURLString) {
+            removeObject(forKey: u as NSURL)
+        }
+        if let newImagePath, let u = URL(string: newImagePath) {
+            removeObject(forKey: u as NSURL)
+        }
+    }
+
     private func imageCost(_ image: UIImage) -> Int {
         if let cg = image.cgImage {
             return cg.bytesPerRow * cg.height
@@ -223,19 +259,35 @@ class ImageLoader: ObservableObject {
     private var url: URL?
     private var fetchTask: Task<Void, Never>?
     private let session: URLSession
+    private var performerImageRefreshObserver: NSObjectProtocol?
 
     deinit {
+        if let performerImageRefreshObserver {
+            NotificationCenter.default.removeObserver(performerImageRefreshObserver)
+        }
         fetchTask?.cancel()
     }
 
     init(url: URL?) {
         self.url = url
 
-        // Create custom session for SSL support
+        // Create session (standard TLS validation)
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15
         config.timeoutIntervalForResource = 30
-        self.session = URLSession(configuration: config, delegate: TrustAllSessionDelegate.shared, delegateQueue: nil)
+        self.session = URLSession(configuration: config)
+
+        performerImageRefreshObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("PerformerImageUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            guard let self,
+                  let performerId = note.userInfo?["performerId"] as? String,
+                  let u = self.url,
+                  Self.urlIndicatesPerformerProfileImage(u, performerId: performerId) else { return }
+            self.updateURL(u, force: true)
+        }
 
         // Synchronous memory cache check — avoids any loading flash for warm-cache hits
         if let url, let cachedUIImage = ImageCache.shared.memoryObject(forKey: url as NSURL) {
@@ -245,6 +297,13 @@ class ImageLoader: ObservableObject {
         } else {
             loadImage()
         }
+    }
+
+    /// True when this URL loads the Stash performer portrait for `performerId` (default path
+    /// or query-suffixed variants). Custom `image_path` URLs are handled via `thumbnailURL` changes
+    /// on the model; this catches the canonical `/performer/{id}/image` endpoint used by feeds.
+    private static func urlIndicatesPerformerProfileImage(_ u: URL, performerId: String) -> Bool {
+        u.path.contains("/performer/\(performerId)/")
     }
 
     func updateURL(_ newURL: URL?, force: Bool = false) {

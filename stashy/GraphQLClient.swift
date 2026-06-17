@@ -78,12 +78,8 @@ actor GraphQLClient {
             config.allowsConstrainedNetworkAccess = true
             config.allowsExpensiveNetworkAccess = true
             
-            // Create session with custom delegate for SSL handling
-            self.session = URLSession(
-                configuration: config,
-                delegate: TrustAllSessionDelegate.shared,
-                delegateQueue: nil
-            )
+            // Standard TLS validation (system trust store)
+            self.session = URLSession(configuration: config)
         }
     }
 
@@ -101,11 +97,7 @@ actor GraphQLClient {
         config.allowsConstrainedNetworkAccess = true
         config.allowsExpensiveNetworkAccess = true
         
-        self.session = URLSession(
-            configuration: config,
-            delegate: TrustAllSessionDelegate.shared,
-            delegateQueue: nil
-        )
+        self.session = URLSession(configuration: config)
         print("📱 GraphQL: Cancelled all pending requests and reset session")
     }
     

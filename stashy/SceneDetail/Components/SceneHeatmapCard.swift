@@ -165,6 +165,9 @@ struct SceneHeatmapCard: View {
                             draftProgress = fraction
                             if !isDragging {
                                 isDragging = true
+                                // New drag session: allow an immediate first seek even
+                                // when the previous drag ended moments ago.
+                                lastSeekSent = 0
                                 onScrubStateChange?(true)
                             }
                             // Throttle real seeks: playhead follows the finger
@@ -181,12 +184,13 @@ struct SceneHeatmapCard: View {
                             draftProgress = fraction
                             let finalSeconds = durationSeconds * Double(fraction)
                             isDragging = false
-                            onScrubStateChange?(false)
                             if let commit = onSeekCommit {
                                 commit(finalSeconds)
                             } else {
                                 onSeek(finalSeconds)
                             }
+                            // Keep host in "scrubbing" mode until final commit finished.
+                            onScrubStateChange?(false)
                         }
                 )
             }

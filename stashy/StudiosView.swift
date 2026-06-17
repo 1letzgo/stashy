@@ -9,8 +9,8 @@
 import SwiftUI
 import WebKit
 
-struct StudiosView: View {
-    @StateObject private var viewModel = StashDBViewModel()
+private struct StudiosViewContent: View {
+    @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var configManager = ServerConfigManager.shared
     @ObservedObject private var appearance = AppearanceManager.shared
     @State private var selectedSortOption: StashDBViewModel.StudioSortOption
@@ -39,7 +39,7 @@ struct StudiosView: View {
     @State private var liveFilterScenes: String? = nil // nil=any, "has"=has scenes, "none"=no scenes
 
     private var isLiveFilterActive: Bool {
-        liveFilterFavorite != nil || liveFilterMinRating > 0 || liveFilterScenes != nil
+        liveFilterFavorite != nil || liveFilterMinRating != 0 || liveFilterScenes != nil
     }
 
     private var activeLiveFilterDict: [String: Any] {
@@ -48,7 +48,9 @@ struct StudiosView: View {
             // For Studios, the filter key appears to be "favorite"
             dict["favorite"] = fav 
         }
-        if liveFilterMinRating > 0 {
+        if liveFilterMinRating == -1 {
+            dict["rating100"] = ["modifier": "IS_NULL"]
+        } else if liveFilterMinRating > 0 {
             // Exact star match (e.g. 1-star means exactly 20)
             dict["rating100"] = ["value": (liveFilterMinRating * 20), "modifier": "EQUALS"]
         }
@@ -63,7 +65,7 @@ struct StudiosView: View {
     }
 
     private var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive
+        selectedFilter != nil || isLiveFilterActive || !catalogPresetRowSelection.isEmpty
     }
 
     private var sortedServerStudioFilters: [StashDBViewModel.SavedFilter] {
@@ -91,15 +93,20 @@ struct StudiosView: View {
         if let fav = frag["favorite"] as? Bool {
             liveFilterFavorite = fav
         }
-        if let r = frag["rating100"] as? [String: Any], let raw = r["value"] {
-            let v: Int? = {
-                if let i = raw as? Int { return i }
-                if let d = raw as? Double { return Int(d) }
-                if let n = raw as? NSNumber { return n.intValue }
-                return nil
-            }()
-            if let v {
-                liveFilterMinRating = max(0, min(5, v / 20))
+        if let r = frag["rating100"] as? [String: Any] {
+            let mod = (r["modifier"] as? String) ?? ""
+            if mod == "IS_NULL" {
+                liveFilterMinRating = -1
+            } else if let raw = r["value"] {
+                let v: Int? = {
+                    if let i = raw as? Int { return i }
+                    if let d = raw as? Double { return Int(d) }
+                    if let n = raw as? NSNumber { return n.intValue }
+                    return nil
+                }()
+                if let v {
+                    liveFilterMinRating = max(0, min(5, v / 20))
+                }
             }
         }
         if let sc = frag["scene_count"] as? [String: Any],
@@ -303,7 +310,8 @@ struct StudiosView: View {
         showDeleteCatalogPresetAlert = false
     }
 
-    init(initialSort: StashDBViewModel.StudioSortOption? = nil, hideTitle: Bool = false) {
+    init(viewModel: StashDBViewModel, initialSort: StashDBViewModel.StudioSortOption? = nil, hideTitle: Bool = false) {
+        self.viewModel = viewModel
         let savedSort = StashDBViewModel.StudioSortOption(rawValue: TabManager.shared.getSortOption(for: .studios) ?? "")
         _selectedSortOption = State(initialValue: initialSort ?? savedSort ?? .nameAsc)
         self.hideTitle = hideTitle
@@ -932,6 +940,27 @@ struct SVGWebView: UIViewRepresentable {
             """
             webView.loadHTMLString(html, baseURL: nil)
         }
+    }
+}
+
+struct StudiosView: View {
+    @StateObject private var ownedViewModel = StashDBViewModel()
+    let catalogBrowserViewModel: StashDBViewModel?
+    let initialSort: StashDBViewModel.StudioSortOption?
+    var hideTitle: Bool = false
+
+    init(initialSort: StashDBViewModel.StudioSortOption? = nil, hideTitle: Bool = false, catalogBrowserViewModel: StashDBViewModel? = nil) {
+        self.catalogBrowserViewModel = catalogBrowserViewModel
+        self.initialSort = initialSort
+        self.hideTitle = hideTitle
+    }
+
+    var body: some View {
+        StudiosViewContent(
+            viewModel: catalogBrowserViewModel ?? ownedViewModel,
+            initialSort: initialSort,
+            hideTitle: hideTitle
+        )
     }
 }
 

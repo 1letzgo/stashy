@@ -8,6 +8,7 @@
 import SwiftUI
 import CryptoKit
 import Combine
+import AVFoundation
 
 @main
 struct TVApp: App {
@@ -15,6 +16,19 @@ struct TVApp: App {
     @StateObject private var securityManager = TVSecurityManager.shared
     @Environment(\.scenePhase) private var scenePhase
     @State private var lastScenePhase: ScenePhase = .active
+
+    init() {
+        // Konfiguriere Audio-Session einmal beim App-Start:
+        // - `.playback`: erlaubt Audio, auch wenn der Silent-Switch aktiv ist (irrelevant auf tvOS,
+        //   wichtig aber für Audio-Routing/Mixing-Verhalten)
+        // - dadurch wird Hintergrund-/System-Audio ordnungsgemäß unterbrochen statt zu konkurrieren.
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
+            try AVAudioSession.sharedInstance().setActive(true, options: [])
+        } catch {
+            print("⚠️ AVAudioSession setup failed: \(error)")
+        }
+    }
 
     var body: some SwiftUI.Scene {
         WindowGroup {

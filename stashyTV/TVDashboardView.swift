@@ -15,6 +15,8 @@ struct TVDashboardView: View {
     @State private var recentlyPlayedScenes: [Scene] = []
     @State private var recentlyReleasedScenes: [Scene] = []
     @State private var recentlyAddedScenes: [Scene] = []
+    @State private var topRatedScenes: [Scene] = []
+    @State private var randomScenes: [Scene] = []
 
     // Hero background for the top row (Continue Watching)
     @FocusState private var focusedHeroSceneID: String?
@@ -23,20 +25,27 @@ struct TVDashboardView: View {
     @State private var isLoadingPlayed: Bool = true
     @State private var isLoadingReleased: Bool = true
     @State private var isLoadingAdded: Bool = true
+    @State private var isLoadingTopRated: Bool = true
+    @State private var isLoadingRandom: Bool = true
 
     var body: some View {
         ZStack(alignment: .top) {
             dashboardHeroBackground
                 .ignoresSafeArea()
 
-            ScrollView([.vertical], showsIndicators: false) {
-                VStack(alignment: .leading, spacing: 0) {
-                    Spacer()
-                        .frame(height: 60)
+            if !hasValidConfig {
+                TVConnectionErrorView(title: "Server not reachable", subtitle: "Add a server in Settings.") { loadData() }
+            } else {
+                ScrollView([.vertical], showsIndicators: false) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Spacer()
+                            .frame(height: 60)
 
-                    // MARK: Content Rows
-                    contentRows
+                        // MARK: Content Rows
+                        contentRows
+                    }
                 }
+                .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60) }
             }
         }
         .background(Color.appBackground)
@@ -58,6 +67,22 @@ struct TVDashboardView: View {
     
     private var contentRows: some View {
         VStack(alignment: .leading, spacing: 50) {
+            HStack {
+                Spacer()
+                Button {
+                    refreshAll()
+                } label: {
+                    HStack(spacing: 8) {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Refresh")
+                    }
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 6)
+                }
+                .buttonStyle(.card)
+            }
+            .padding(.horizontal, 60)
+
             if isLoadingPlayed && isLoadingReleased && isLoadingAdded {
                 HStack {
                     Spacer()
@@ -92,15 +117,48 @@ struct TVDashboardView: View {
                         sortBy: .createdAtDesc
                     )
                 }
+
+                if !topRatedScenes.isEmpty {
+                    sceneRow(
+                        title: "Top Rated",
+                        scenes: topRatedScenes,
+                        sortBy: .ratingDesc
+                    )
+                }
+
+                if !randomScenes.isEmpty {
+                    sceneRow(
+                        title: "Random Picks",
+                        scenes: randomScenes,
+                        sortBy: .random
+                    )
+                }
             }
         }
         .padding(.bottom, 80)
     }
 
+    private func refreshAll() {
+        // Reset state and fetch from scratch.
+        recentlyPlayedScenes = []
+        recentlyReleasedScenes = []
+        recentlyAddedScenes = []
+        topRatedScenes = []
+        randomScenes = []
+        isLoadingPlayed = true
+        isLoadingReleased = true
+        isLoadingAdded = true
+        isLoadingTopRated = true
+        isLoadingRandom = true
+        loadData()
+    }
+
+    private var hasValidConfig: Bool { configManager.activeConfig?.hasValidConfig == true }
+
     // MARK: - Data Loading
 
     private func loadData() {
-        guard configManager.activeConfig != nil else { return }
+        guard hasValidConfig else { return }
         fetchHomeRows()
     }
 
@@ -145,6 +203,32 @@ struct TVDashboardView: View {
         viewModel.fetchScenesForHomeRow(config: addedConfig, limit: 15) { scenes in
             recentlyAddedScenes = scenes
             isLoadingAdded = false
+        }
+
+        isLoadingTopRated = true
+        let topRatedConfig = HomeRowConfig(
+            id: UUID(),
+            title: "Top Rated",
+            isEnabled: true,
+            sortOrder: 3,
+            type: .topRating3Min
+        )
+        viewModel.fetchScenesForHomeRow(config: topRatedConfig, limit: 15) { scenes in
+            topRatedScenes = scenes
+            isLoadingTopRated = false
+        }
+
+        isLoadingRandom = true
+        let randomConfig = HomeRowConfig(
+            id: UUID(),
+            title: "Random",
+            isEnabled: true,
+            sortOrder: 4,
+            type: .random
+        )
+        viewModel.fetchScenesForHomeRow(config: randomConfig, limit: 15) { scenes in
+            randomScenes = scenes
+            isLoadingRandom = false
         }
     }
 

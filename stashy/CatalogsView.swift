@@ -11,6 +11,8 @@ import SwiftUI
 struct CatalogsView: View {
     @ObservedObject var tabManager = TabManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
+    /// Ein ViewModel für alle Katalog-Listen-Tabs (Scenes, Images, …): Daten bleiben beim Unter-Tab-Wechsel warm, ein Verbindungstest.
+    @StateObject private var catalogBrowserViewModel = StashDBViewModel()
     
     enum CatalogsTab: String, CaseIterable {
         case dashboard = "Dashboard"
@@ -90,23 +92,23 @@ struct CatalogsView: View {
             if let tab = effectiveTab {
                 switch tab {
                 case .dashboard:
-                    HomeView()
+                    HomeView(catalogBrowserViewModel: catalogBrowserViewModel)
                 case .scenes:
-                    ScenesView()
+                    ScenesView.catalogTab(viewModel: catalogBrowserViewModel)
                 case .images:
-                    ImagesView()
+                    ImagesView(catalogBrowserViewModel: catalogBrowserViewModel)
                 case .galleries:
-                    GalleriesView()
+                    GalleriesView(catalogBrowserViewModel: catalogBrowserViewModel)
                 case .performers:
-                    PerformersView()
+                    PerformersView(catalogBrowserViewModel: catalogBrowserViewModel)
                 case .studios:
-                    StudiosView(hideTitle: false)
+                    StudiosView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
                 case .tags:
-                    TagsView(hideTitle: false)
+                    TagsView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
                 case .groups:
-                    GroupsView(hideTitle: false)
+                    GroupsView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
                 case .markers:
-                    MarkersView(hideTitle: false)
+                    MarkersView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
                 }
             } else {
                 VStack {
@@ -142,7 +144,22 @@ struct CatalogsView: View {
 
 #if !os(tvOS)
 struct GroupsView: View {
-    @StateObject private var viewModel = StashDBViewModel()
+    @StateObject private var ownedViewModel = StashDBViewModel()
+    let catalogBrowserViewModel: StashDBViewModel?
+    var hideTitle: Bool = false
+
+    init(hideTitle: Bool = false, catalogBrowserViewModel: StashDBViewModel? = nil) {
+        self.hideTitle = hideTitle
+        self.catalogBrowserViewModel = catalogBrowserViewModel
+    }
+
+    var body: some View {
+        GroupsViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel, hideTitle: hideTitle)
+    }
+}
+
+private struct GroupsViewContent: View {
+    @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -153,6 +170,11 @@ struct GroupsView: View {
     @State private var lastOpenedGroupId: String?
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     var hideTitle: Bool = false
+
+    init(viewModel: StashDBViewModel, hideTitle: Bool = false) {
+        self.viewModel = viewModel
+        self.hideTitle = hideTitle
+    }
     
     // Search function
     private func performSearch(isInitialLoad: Bool = true) {
@@ -1228,7 +1250,9 @@ struct GroupDetailView: View {
             serverFilters: linkedImages.sortedServerImageFilters(viewModel: viewModel),
             localPresets: linkedImages.localCatalogPresets,
             selectedPresetRowId: $linkedImages.catalogPresetRowSelection,
+            filterMenuTitleFallback: linkedImages.selectedFilter?.name,
             liveChipRowsVisible: linkedImages.imageLiveChipRowsVisible,
+            showMediaTypeFilter: linkedImages.showImageMediaTypeFilter,
             sortOption: linkedImages.selectedSortOption,
             onSortChange: { linkedImages.changeSortOption(to: $0, viewModel: viewModel) },
             liveMinRating: $linkedImages.liveFilterMinRating,
@@ -1237,6 +1261,7 @@ struct GroupDetailView: View {
             liveOCounterTag: $linkedImages.liveFilterOCounterTag,
             liveStudioIds: $linkedImages.liveFilterStudioIds,
             liveTagIds: $linkedImages.liveFilterTagIds,
+            liveMediaKind: $linkedImages.liveFilterMediaKind,
             studioPickerOptions: linkedImages.studioPickerOptions,
             studioPickerLoading: linkedImages.studioPickerLoading,
             onStudioPickerSectionAppear: { linkedImages.loadStudioPickerOptions(viewModel: viewModel) },
@@ -1276,6 +1301,7 @@ struct GroupDetailView: View {
             linkedImages.catalogPresetRowSelection = sel
             linkedImages.refreshLocalPresets()
             linkedImages.applyCatalogPresetSelectionFromSheetIfNeeded(viewModel: viewModel)
+            linkedImages.applyResolvedCatalogPresetPickerRowIfNeeded(viewModel: viewModel)
         }
     }
     

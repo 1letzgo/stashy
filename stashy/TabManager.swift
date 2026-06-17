@@ -811,8 +811,7 @@ class TabManager: ObservableObject {
             var hasChanges = false
             for item in ToolsItem.allCases {
                 if !result.contains(where: { $0.id == item }) {
-                    let enabled = item != .hotOrNot
-                    result.append(ToolsItemConfig(id: item, isEnabled: enabled, sortOrder: result.count))
+                    result.append(ToolsItemConfig(id: item, isEnabled: true, sortOrder: result.count))
                     hasChanges = true
                 }
             }
@@ -828,7 +827,7 @@ class TabManager: ObservableObject {
                 ToolsItemConfig(id: .downloads, isEnabled: true, sortOrder: 0),
                 ToolsItemConfig(id: .server, isEnabled: true, sortOrder: 1),
                 ToolsItemConfig(id: .statistics, isEnabled: true, sortOrder: 2),
-                ToolsItemConfig(id: .hotOrNot, isEnabled: false, sortOrder: 3)
+                ToolsItemConfig(id: .hotOrNot, isEnabled: true, sortOrder: 3)
             ]
             enforceFixedTools()
             saveTools()

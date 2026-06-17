@@ -727,7 +727,9 @@ struct StudioDetailView: View {
             serverFilters: linkedImages.sortedServerImageFilters(viewModel: viewModel),
             localPresets: linkedImages.localCatalogPresets,
             selectedPresetRowId: $linkedImages.catalogPresetRowSelection,
+            filterMenuTitleFallback: linkedImages.selectedFilter?.name,
             liveChipRowsVisible: linkedImages.imageLiveChipRowsVisible,
+            showMediaTypeFilter: linkedImages.showImageMediaTypeFilter,
             sortOption: linkedImages.selectedSortOption,
             onSortChange: { linkedImages.changeSortOption(to: $0, viewModel: viewModel) },
             liveMinRating: $linkedImages.liveFilterMinRating,
@@ -736,6 +738,7 @@ struct StudioDetailView: View {
             liveOCounterTag: $linkedImages.liveFilterOCounterTag,
             liveStudioIds: $linkedImages.liveFilterStudioIds,
             liveTagIds: $linkedImages.liveFilterTagIds,
+            liveMediaKind: $linkedImages.liveFilterMediaKind,
             studioPickerOptions: linkedImages.studioPickerOptions,
             studioPickerLoading: linkedImages.studioPickerLoading,
             onStudioPickerSectionAppear: { linkedImages.loadStudioPickerOptions(viewModel: viewModel) },
@@ -775,6 +778,7 @@ struct StudioDetailView: View {
             linkedImages.catalogPresetRowSelection = sel
             linkedImages.refreshLocalPresets()
             linkedImages.applyCatalogPresetSelectionFromSheetIfNeeded(viewModel: viewModel)
+            linkedImages.applyResolvedCatalogPresetPickerRowIfNeeded(viewModel: viewModel)
         }
     }
     

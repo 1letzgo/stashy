@@ -9,6 +9,7 @@ import SwiftUI
 
 struct TVTagsView: View {
     @StateObject private var viewModel = StashDBViewModel()
+    @ObservedObject private var configManager = ServerConfigManager.shared
     @ObservedObject private var tabManager = TabManager.shared
     @State private var sortBy: StashDBViewModel.TagSortOption
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
@@ -28,7 +29,11 @@ struct TVTagsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            if viewModel.isLoadingTags && viewModel.tags.isEmpty {
+            if !hasValidConfig {
+                TVConnectionErrorView(title: "Server not reachable", subtitle: "Add a server in Settings.") { reload() }
+            } else if viewModel.tags.isEmpty && (viewModel.errorMessage?.isEmpty == false) {
+                TVConnectionErrorView(title: "Server not reachable", subtitle: viewModel.errorMessage) { reload() }
+            } else if viewModel.isLoadingTags && viewModel.tags.isEmpty {
                 loadingView
             } else if viewModel.tags.isEmpty {
                 emptyView
@@ -49,6 +54,7 @@ struct TVTagsView: View {
             viewModel.fetchTags(sortBy: sortBy, isInitialLoad: true, filter: newValue)
         }
         .onAppear {
+            guard hasValidConfig else { return }
             viewModel.fetchSavedFilters()
             if selectedFilter == nil, let filterId = tabManager.getDefaultFilterId(for: .tags) {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -65,6 +71,19 @@ struct TVTagsView: View {
             selectedFilter = nil
             viewModel.fetchTags(sortBy: sortBy, isInitialLoad: true, filter: nil)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .stashServerInitializationFinished)) { _ in
+            if hasValidConfig && viewModel.tags.isEmpty {
+                viewModel.fetchTags(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
+            }
+        }
+    }
+
+    private var hasValidConfig: Bool { configManager.activeConfig?.hasValidConfig == true }
+
+    private func reload() {
+        guard hasValidConfig else { return }
+        viewModel.testConnection()
+        viewModel.fetchTags(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
     }
 
 
@@ -157,6 +176,7 @@ struct TVTagsView: View {
                 .padding(.bottom, 80)
             }
         }
+        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60) }
     }
 
     @ViewBuilder

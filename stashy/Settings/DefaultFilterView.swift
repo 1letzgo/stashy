@@ -36,7 +36,7 @@ struct DefaultFilterView: View {
                 filterPicker(for: .studios, title: "Studios", icon: "building.2")
                 filterPicker(for: .groups, title: "Groups", icon: "rectangle.stack.fill")
                 filterPicker(for: .tags, title: "Tags", icon: "tag")
-                filterPicker(for: .markers, title: "Markers", icon: "bookmark.fill", modeOverride: .scenes)
+                filterPicker(for: .markers, title: "Markers", icon: "bookmark.fill", modeOverride: .sceneMarkers)
             } header: {
                 Text("Default Filters")
             } footer: {
@@ -64,6 +64,44 @@ struct DefaultFilterView: View {
 
     @ViewBuilder
     private func filterPicker(for tab: AppTab, title: String, icon: String, modeOverride: StashDBViewModel.FilterMode? = nil) -> some View {
+        if tab == .markers {
+            let mode = modeOverride ?? StashDBViewModel.FilterMode.sceneMarkers
+            let filters = viewModel.savedFilters.values
+                .filter { $0.mode == mode }
+                .sorted { $0.name < $1.name }
+
+            let currentId = tabManager.getDefaultMarkerFilterId(for: .markers)
+
+            HStack {
+                Label(title, systemImage: icon)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.9)
+                    .layoutPriority(1)
+                Spacer()
+
+                if filters.isEmpty && !viewModel.isLoadingSavedFilters {
+                    Text("No filters found")
+                        .foregroundColor(.secondary)
+                        .font(.subheadline)
+                } else {
+                    let current = currentId ?? ""
+                    Menu {
+                        Button(action: { tabManager.setDefaultMarkerFilter(for: .markers, filterId: nil, filterName: nil) }) {
+                            HStack { Text("None"); if current.isEmpty { Image(systemName: "checkmark") } }
+                        }
+                        Divider()
+                        ForEach(filters) { filter in
+                            Button(action: { tabManager.setDefaultMarkerFilter(for: .markers, filterId: filter.id, filterName: filter.name) }) {
+                                HStack { Text(filter.name); if filter.id == current { Image(systemName: "checkmark") } }
+                            }
+                        }
+                    } label: {
+                        let currentName = filters.first(where: { $0.id == current })?.name ?? "None"
+                        pickerLabelText(currentName)
+                    }
+                }
+            }
+        } else {
         let mode: StashDBViewModel.FilterMode? = modeOverride ?? {
             switch tab {
             case .scenes, .reels, .dashboard: return .scenes
@@ -113,6 +151,7 @@ struct DefaultFilterView: View {
                     }
                 }
             }
+        }
         }
     }
 }

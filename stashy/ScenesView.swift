@@ -8,30 +8,10 @@
 #if !os(tvOS)
 import SwiftUI
 
-/// Preset picker row id: `""` | `server:<stashId>` | `local:<uuid>`
-enum SceneLivePresetTag {
-    static let serverPrefix = "server:"
-    static let localPrefix = "local:"
-
-    static func serverRow(_ id: String) -> String { serverPrefix + id }
-    static func localRow(_ uuid: UUID) -> String { localPrefix + uuid.uuidString }
-
-    static func parseServerId(_ tagged: String) -> String? {
-        guard tagged.hasPrefix(serverPrefix) else { return nil }
-        return String(tagged.dropFirst(serverPrefix.count))
-    }
-
-    static func parseLocalUUIDString(_ tagged: String) -> String? {
-        guard tagged.hasPrefix(localPrefix) else { return nil }
-        return String(tagged.dropFirst(localPrefix.count))
-    }
-
-    static func migrateLegacySelection(_ selection: inout String) {
-        let s = selection
-        guard !s.isEmpty, !s.contains(":"), UUID(uuidString: s) != nil else { return }
-        selection = localPrefix + s
-    }
-}
+/// Preset picker row id: `""` | `server:<stashId>` | `local:<uuid>`.
+/// Identisch zu `ListLivePresetTag` (Katalog-Filter); nur als Alias erhalten,
+/// um Duplikat-Logik zu vermeiden.
+typealias SceneLivePresetTag = ListLivePresetTag
 
 /// Maps to `SceneSortOption.sortField` for the live-filter sheet (dropdown + asc/desc).
 private enum SceneLiveSortFieldKind: String, CaseIterable, Identifiable {
@@ -118,7 +98,7 @@ private enum SceneLiveSortPickerValue: Hashable {
 // MARK: - Marker sort (Reels „Markers“ + `SceneLiveFilterSheet`)
 
 /// Maps to `SceneMarkerSortOption` for the live-filter sheet (dropdown + asc/desc), same layout as scene sort.
-private enum MarkerLiveSortFieldKind: String, CaseIterable, Identifiable {
+enum MarkerLiveSortFieldKind: String, CaseIterable, Identifiable {
     case created_at
     case updated_at
     case title
@@ -158,7 +138,7 @@ private enum MarkerLiveSortFieldKind: String, CaseIterable, Identifiable {
     }
 }
 
-private enum MarkerLiveSortPickerValue: Hashable {
+enum MarkerLiveSortPickerValue: Hashable {
     case known(MarkerLiveSortFieldKind)
 
     static func from(_ option: StashDBViewModel.SceneMarkerSortOption) -> MarkerLiveSortPickerValue {
@@ -356,8 +336,6 @@ private struct ScenesViewContent: View {
     @State private var searchText = ""
     @State private var isSearchVisible = false
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
-    @State private var scrollPosition: String? = nil
-    @State private var shouldRestoreScroll = false
     @State private var hasInjectedSort = false  // Flag to preserve coordinator sort
     @State private var internalLiveFilterSheetPresented = false
     @State private var liveFilterMinRating: Int = 0      // 0 = any, 1–5 stars
@@ -426,7 +404,8 @@ private struct ScenesViewContent: View {
 
     private var showsBlockingInitialLoad: Bool {
         switch scope {
-        case .catalog: return viewModel.isLoading && viewModel.scenes.isEmpty
+        case .catalog:
+            return viewModel.scenes.isEmpty && (viewModel.isLoading || viewModel.isLoadingScenes)
         case .performer: return viewModel.isLoadingPerformerScenes && viewModel.performerScenes.isEmpty
         case .studio: return viewModel.isLoadingStudioScenes && viewModel.studioScenes.isEmpty
         case .tag: return viewModel.isLoadingTagScenes && viewModel.tagScenes.isEmpty
@@ -487,7 +466,7 @@ private struct ScenesViewContent: View {
     }
 
     private var isLiveFilterActive: Bool {
-        liveFilterMinRating > 0 || liveFilterOrganized != nil
+        liveFilterMinRating != 0 || liveFilterOrganized != nil
         || liveFilterInteractive != nil || liveFilterOrientation != nil || liveFilterPerformerCount != nil
         || liveFilterResolution != nil || liveFilterPerformerFavorite != nil || liveFilterOCounterTag != nil
         || !liveFilterStudioIds.isEmpty || !liveFilterTagIds.isEmpty || !liveFilterGroupIds.isEmpty
@@ -515,7 +494,9 @@ private struct ScenesViewContent: View {
 
     private var activeLiveFilterDict: [String: Any] {
         var dict: [String: Any] = [:]
-        if liveFilterMinRating > 0 {
+        if liveFilterMinRating == -1 {
+            dict["rating100"] = ["modifier": "IS_NULL"]
+        } else if liveFilterMinRating > 0 {
             // Exact star match (e.g. 1-star means exactly 20)
             dict["rating100"] = ["value": (liveFilterMinRating * 20), "modifier": "EQUALS"]
         }
@@ -570,6 +551,11 @@ private struct ScenesViewContent: View {
         if !liveFilterGroupIds.isEmpty {
             dict["groups"] = ["modifier": "INCLUDES", "value": liveFilterGroupIds]
         }
+        if liveFilterMinRating == -1 {
+            dict["rating100"] = ["modifier": "IS_NULL"]
+        } else if liveFilterMinRating > 0, dict["rating100"] == nil {
+            dict["rating100"] = ["value": (liveFilterMinRating * 20), "modifier": "EQUALS"]
+        }
         return dict
     }
 
@@ -600,7 +586,7 @@ private struct ScenesViewContent: View {
         } else if SceneLiveChipFilterSupport.savedFilterSupportsLiveChipEditor(f) {
             if let raw = f.filterDict {
                 mapLiveFragmentToChips(raw)
-            } else {
+                } else {
                 clearLiveFilterChipsOnly()
             }
                 } else {
@@ -620,8 +606,15 @@ private struct ScenesViewContent: View {
 
     private func mapLiveFragmentToChips(_ frag: [String: Any]) {
         let frag = FilterMapper.sanitize(frag, isMarker: false)
-        if let rating = frag["rating100"] as? [String: Any], let raw = rating["value"], let v = intFromLiveJSON(raw) {
-            liveFilterMinRating = max(0, min(5, v / 20))
+        if let rating = frag["rating100"] as? [String: Any] {
+            let mod = (rating["modifier"] as? String) ?? ""
+            if mod == "IS_NULL" {
+                liveFilterMinRating = -1
+            } else if let raw = rating["value"], let v = intFromLiveJSON(raw) {
+                liveFilterMinRating = max(0, min(5, v / 20))
+            } else {
+                liveFilterMinRating = 0
+            }
         } else {
             liveFilterMinRating = 0
         }
@@ -980,9 +973,6 @@ private struct ScenesViewContent: View {
             viewModel.refreshRandomSeed()
         }
         selectedSortOption = newOption
-        scrollPosition = nil
-        shouldRestoreScroll = false
-        
         persistSceneSort(newOption)
 
         switch scope {
@@ -1461,10 +1451,9 @@ private struct ScenesViewContent: View {
     }
 
     private var scenesGrid: some View {
-        ScrollViewReader { proxy in
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 12) {
-                    ForEach(primaryScenes) { scene in
+                ForEach(primaryScenes) { scene in
                         NavigationLink(destination: SceneDetailView(scene: scene)) {
                             SceneCardView(scene: scene)
                                 .contentShape(Rectangle())
@@ -1474,29 +1463,17 @@ private struct ScenesViewContent: View {
                     }
 
                     // Loading indicator for pagination
-                    if isLoadingMorePrimary {
+                if isLoadingMorePrimary {
                         ProgressView()
                             .frame(maxWidth: .infinity)
                             .padding()
-                    } else if hasMorePrimary && !primaryScenes.isEmpty {
+                } else if hasMorePrimary && !primaryScenes.isEmpty {
                         // Invisible element to trigger loading more scenes
                         Color.clear
                             .frame(height: 1)
                             .onAppear {
-                                // Save scroll position before loading - use element around 3/4 of current list
-                                let currentCount = primaryScenes.count
-                                if currentCount > 4 {
-                                    let targetIndex = currentCount * 3 / 4
-                                    if targetIndex < currentCount {
-                                        scrollPosition = primaryScenes[targetIndex].id
-                                        shouldRestoreScroll = true
-                                    }
-                                } else if let lastScene = primaryScenes.last {
-                                    scrollPosition = lastScene.id
-                                    shouldRestoreScroll = true
-                                }
-                                loadMorePrimary()
-                            }
+                            loadMorePrimary()
+                        }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -1505,20 +1482,6 @@ private struct ScenesViewContent: View {
             }
             .background(Color.appBackground)
             .refreshable { performSearch() }
-            .onChange(of: isLoadingMorePrimary) { oldValue, isLoading in
-                if !isLoading && shouldRestoreScroll {
-                    // Loading completed, restore scroll position
-                    if let scrollPosition = scrollPosition {
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                            withAnimation(.easeOut(duration: 0.3)) {
-                                proxy.scrollTo(scrollPosition, anchor: .top)
-                            }
-                            shouldRestoreScroll = false
-                        }
-                    }
-                }
-            }
-        }
     }
 }
 
@@ -1564,12 +1527,20 @@ struct ScenesView: View {
     }
 
     private var effectiveViewModel: StashDBViewModel {
-        switch scope {
-        case .catalog:
-            return ownedViewModel
-        case .performer, .studio, .tag, .group:
-            return sharedViewModel ?? ownedViewModel
-        }
+        sharedViewModel ?? ownedViewModel
+    }
+
+    /// Katalog-Tab unter ``CatalogsView``: ein über Tab-Wechsel hinweg bleibendes ViewModel.
+    static func catalogTab(viewModel: StashDBViewModel) -> some View {
+        ScenesViewContent(
+            viewModel: viewModel,
+            sort: nil,
+            filter: nil,
+            hideTitle: false,
+            scope: .catalog,
+            externalLiveFilterSheetBinding: nil,
+            showsFloatingFilterButton: true
+        )
     }
 }
 
@@ -1683,6 +1654,8 @@ struct SceneLiveFilterSheet: View {
 
     var serverSceneFilters: [StashDBViewModel.SavedFilter]
     var localPresets: [SceneLiveFilterPreset]
+    /// When ``useMarkerSort`` is true, local on-device presets come from the markers store instead of ``localPresets``.
+    var markerLocalPresets: [MarkerLiveFilterPreset] = []
     @Binding var selectedPresetId: String
     /// `false` when the active saved filter uses criteria the chip rows cannot edit (tags, NOT, AND/OR, …).
     var liveChipRowsVisible: Bool
@@ -1743,7 +1716,15 @@ struct SceneLiveFilterSheet: View {
                                     }
                                 }
                             }
-                            if !localPresets.isEmpty {
+                            if useMarkerSort {
+                                if !markerLocalPresets.isEmpty {
+                                    Section {
+                                        ForEach(markerLocalPresets) { preset in
+                                            Text(preset.name).tag(SceneLivePresetTag.localRow(preset.id))
+                                        }
+                                    }
+                                }
+                            } else if !localPresets.isEmpty {
                                 Section {
                                     ForEach(localPresets) { preset in
                                         Text(preset.name).tag(SceneLivePresetTag.localRow(preset.id))
@@ -1804,6 +1785,7 @@ struct SceneLiveFilterSheet: View {
                             Divider().padding(.leading, 16)
                     filterRow(label: "Rating") {
                         filterChip("Any", isActive: minRating == 0) { minRating = 0; onApply() }
+                        filterChip("None", isActive: minRating == -1) { minRating = -1; onApply() }
                                 ForEach([5, 4, 3, 2, 1], id: \.self) { star in
                             filterChip("\(star)★", isActive: minRating == star) { minRating = star; onApply() }
                         }

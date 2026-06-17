@@ -10,38 +10,55 @@ import SwiftUI
 @MainActor
 struct TVSearchView: View {
     @StateObject private var viewModel = StashDBViewModel()
+    @ObservedObject private var configManager = ServerConfigManager.shared
 
     @State private var searchQuery: String = ""
     @State private var hasSearched: Bool = false
     @FocusState private var isSearchFieldFocused: Bool
     @State private var searchDebounceTask: Task<Void, Never>?
 
+    private var hasValidConfig: Bool { configManager.activeConfig?.hasValidConfig == true }
+
     private var isSearchBusy: Bool {
-        viewModel.isLoadingScenes || viewModel.isLoadingPerformers
+        viewModel.isLoadingScenes || viewModel.isLoadingPerformers ||
+        viewModel.isLoadingStudios || viewModel.isLoadingTags ||
+        viewModel.isLoadingGroups
+    }
+
+    private var hasAnyResults: Bool {
+        !viewModel.scenes.isEmpty || !viewModel.performers.isEmpty ||
+        !viewModel.studios.isEmpty || !viewModel.tags.isEmpty ||
+        !viewModel.groups.isEmpty
     }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 44) {
-                searchBar
+        Group {
+            if !hasValidConfig {
+                TVConnectionErrorView(title: "Server not reachable", subtitle: "Add a server in Settings.") {}
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 44) {
+                        searchBar
 
-                if isSearchBusy {
-                    loadingBlock
-                } else if hasSearched && viewModel.scenes.isEmpty && viewModel.performers.isEmpty {
-                    emptyResultsBlock
-                } else if hasSearched {
-                    if !viewModel.scenes.isEmpty {
-                        scenesResultSection
+                        if isSearchBusy && !hasAnyResults {
+                            loadingBlock
+                        } else if hasSearched && !hasAnyResults {
+                            emptyResultsBlock
+                        } else if hasSearched {
+                            if !viewModel.scenes.isEmpty { scenesResultSection }
+                            if !viewModel.performers.isEmpty { performersResultSection }
+                            if !viewModel.studios.isEmpty { studiosResultSection }
+                            if !viewModel.tags.isEmpty { tagsResultSection }
+                            if !viewModel.groups.isEmpty { groupsResultSection }
+                        } else {
+                            placeholderBlock
+                        }
                     }
-                    if !viewModel.performers.isEmpty {
-                        performersResultSection
-                    }
-                } else {
-                    placeholderBlock
+                    .padding(.vertical, 48)
+                    .padding(.horizontal, 40)
                 }
+                .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60) }
             }
-            .padding(.vertical, 48)
-            .padding(.horizontal, 40)
         }
         .background(Color.appBackground)
         .onAppear {
@@ -181,8 +198,11 @@ struct TVSearchView: View {
 
     private func runSearch(trimmed: String) {
         hasSearched = true
-        viewModel.fetchScenes(sortBy: StashDBViewModel.SceneSortOption.dateDesc, searchQuery: trimmed)
-        viewModel.fetchPerformers(sortBy: StashDBViewModel.PerformerSortOption.nameAsc, searchQuery: trimmed)
+        viewModel.fetchScenes(sortBy: .dateDesc, searchQuery: trimmed)
+        viewModel.fetchPerformers(sortBy: .nameAsc, searchQuery: trimmed)
+        viewModel.fetchStudios(sortBy: .nameAsc, searchQuery: trimmed)
+        viewModel.fetchTags(sortBy: .nameAsc, searchQuery: trimmed)
+        viewModel.fetchGroups(sortBy: .nameAsc, searchQuery: trimmed)
     }
 
     // MARK: - Scenes Results
@@ -216,6 +236,65 @@ struct TVSearchView: View {
                         }
                         .frame(width: 400)
                     }
+                }
+                .padding(.horizontal, 50)
+                .padding(.vertical, 20)
+            }
+        }
+    }
+
+    // MARK: - Studios / Tags / Groups / Galleries Results
+
+    private var studiosResultSection: some View {
+        resultSection(title: "Studios", systemImage: "building.2.fill", count: viewModel.studios.count) {
+            ForEach(viewModel.studios) { studio in
+                NavigationLink(destination: TVStudioDetailView(studioId: studio.id, studioName: studio.name).tvExitDismissable()) {
+                    TVStudioCardView(studio: studio)
+                }
+                .buttonStyle(.card)
+            }
+        }
+    }
+
+    private var tagsResultSection: some View {
+        resultSection(title: "Tags", systemImage: "tag.fill", count: viewModel.tags.count) {
+            ForEach(viewModel.tags) { tag in
+                NavigationLink(destination: TVTagDetailView(tagId: tag.id, tagName: tag.name).tvExitDismissable()) {
+                    TVTagCardView(tag: tag)
+                }
+                .buttonStyle(.card)
+            }
+        }
+    }
+
+    private var groupsResultSection: some View {
+        resultSection(title: "Groups", systemImage: "rectangle.stack.fill", count: viewModel.groups.count) {
+            ForEach(viewModel.groups) { group in
+                NavigationLink(destination: TVGroupDetailView(groupId: group.id, groupName: group.name).tvExitDismissable()) {
+                    TVGroupCardView(group: group)
+                }
+                .buttonStyle(.card)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func resultSection<Content: View>(title: String, systemImage: String, count: Int, @ViewBuilder content: () -> Content) -> some View {
+        VStack(alignment: .leading, spacing: 18) {
+            HStack(spacing: 12) {
+                Image(systemName: systemImage)
+                    .font(.title3)
+                    .foregroundColor(AppearanceManager.shared.tintColor)
+                Text(title)
+                    .font(.title2).fontWeight(.bold).foregroundColor(.white)
+                Text("\(count)")
+                    .font(.callout).foregroundColor(.white.opacity(0.4))
+            }
+            .padding(.horizontal, 50)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 30) {
+                    content()
                 }
                 .padding(.horizontal, 50)
                 .padding(.vertical, 20)

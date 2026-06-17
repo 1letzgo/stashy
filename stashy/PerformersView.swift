@@ -9,8 +9,8 @@
 import SwiftUI
 
 
-struct PerformersView: View {
-    @StateObject private var viewModel = StashDBViewModel()
+private struct PerformersViewContent: View {
+    @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var configManager = ServerConfigManager.shared
     @ObservedObject private var appearance = AppearanceManager.shared
     @State private var scrollPosition: String? = nil
@@ -113,7 +113,7 @@ struct PerformersView: View {
     }
 
     private var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive
+        selectedFilter != nil || isLiveFilterActive || !catalogPresetRowSelection.isEmpty
     }
 
     private var sortedServerPerformerFilters: [StashDBViewModel.SavedFilter] {
@@ -373,7 +373,8 @@ struct PerformersView: View {
         showDeleteCatalogPresetAlert = false
     }
 
-    init(initialSort: StashDBViewModel.PerformerSortOption? = nil) {
+    init(viewModel: StashDBViewModel, initialSort: StashDBViewModel.PerformerSortOption? = nil) {
+        self.viewModel = viewModel
         let savedSort = StashDBViewModel.PerformerSortOption(rawValue: TabManager.shared.getSortOption(for: .performers) ?? "")
         _selectedSortOption = State(initialValue: initialSort ?? savedSort ?? .sceneCountDesc)
     }
@@ -869,6 +870,24 @@ struct PerformerRowView: View {
 
     var body: some View {
         PerformerCardView(performer: performer)
+    }
+}
+
+struct PerformersView: View {
+    @StateObject private var ownedViewModel = StashDBViewModel()
+    let catalogBrowserViewModel: StashDBViewModel?
+    let initialSort: StashDBViewModel.PerformerSortOption?
+
+    init(initialSort: StashDBViewModel.PerformerSortOption? = nil, catalogBrowserViewModel: StashDBViewModel? = nil) {
+        self.catalogBrowserViewModel = catalogBrowserViewModel
+        self.initialSort = initialSort
+    }
+
+    var body: some View {
+        PerformersViewContent(
+            viewModel: catalogBrowserViewModel ?? ownedViewModel,
+            initialSort: initialSort
+        )
     }
 }
 

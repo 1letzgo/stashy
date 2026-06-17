@@ -2,79 +2,38 @@
 
 #if !os(tvOS)
 import SwiftUI
-import AVFoundation
-import KSPlayer
+import AVKit
 
 struct SceneVideoPlayerCard: View {
     @Binding var activeScene: Scene
     @Binding var player: AVPlayer?
     @Binding var isPlaybackStarted: Bool
+    @Binding var isFullscreen: Bool
     @Binding var isPreviewing: Bool
-    @Binding var isHeaderExpanded: Bool
-    @Binding var showingAddMarkerSheet: Bool
-    @Binding var capturedMarkerTime: Double
-    @Binding var playbackSpeed: Double
-    
-    @ObservedObject var viewModel: StashDBViewModel
+
     @ObservedObject var appearanceManager = AppearanceManager.shared
-    @ObservedObject var handyManager = HandyManager.shared
-    @ObservedObject var buttplugManager = ButtplugManager.shared
-    @ObservedObject var loveSpouseManager = LoveSpouseManager.shared
-    
-    var ksCoordinator: KSVideoPlayer.Coordinator
-    /// Signed playback URL for KSPlayer (same semantics as `createPlayer`).
-    var scenePlaybackSignedURL: URL?
 
-    // Preview state
     @State private var previewPlayer: AVPlayer?
-    @State private var isPressing = false
-    @State private var showStashSyncSheet = false
-    @State private var showingEditTitleSheet = false
 
-    // Closure for externally handled actions like seeking and playback start
     var onSeek: (Double) -> Void
     var onStartPlayback: (Bool) -> Void
-    var onTitleUpdated: ((String?, String?) -> Void)?
-    
+
     var body: some View {
         VStack(spacing: 0) {
             videoPlayerArea
-            infoSection
+            markerScrollView
         }
         .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
-        .overlay(expandToggleOverlay, alignment: .bottomTrailing)
-        .sheet(isPresented: $showStashSyncSheet) {
-            #if !os(tvOS)
-            StashSyncSheet()
-                .presentationDetents([PresentationDetent.medium, PresentationDetent.large])
-                .presentationDragIndicator(Visibility.visible)
-            #endif
-        }
-        .sheet(isPresented: $showingEditTitleSheet) {
-            EditSceneTitleSheet(
-                sceneId: activeScene.id,
-                currentTitle: activeScene.title,
-                currentDetails: activeScene.details,
-                viewModel: viewModel
-            ) { newTitle, newDetails in
-                onTitleUpdated?(newTitle, newDetails)
-            }
-        }
     }
 
     @ViewBuilder
     private var videoPlayerArea: some View {
         VStack(spacing: 0) {
             if activeScene.videoURL != nil {
-                if isPlaybackStarted, let playbackURL = scenePlaybackSignedURL {
-                    KSVideoPlayer(coordinator: ksCoordinator, url: playbackURL, options: stashSceneKSOptions())
-                        .onStateChanged { layer, _ in
-                            if let ks = layer.player as? KSAVPlayer, player !== ks.player {
-                                player = ks.player
-                            }
-                        }
+                if isPlaybackStarted, let player = player {
+                    VideoPlayerView(player: player, isFullscreen: $isFullscreen)
                         .aspectRatio(16/9, contentMode: .fit)
                         .frame(maxWidth: .infinity)
                         .clipShape(
@@ -163,7 +122,6 @@ struct SceneVideoPlayerCard: View {
             )
         )
         .onLongPressGesture(minimumDuration: 0.15, pressing: { pressing in
-            isPressing = pressing
             if pressing { startPreview() } else { stopPreview() }
         }, perform: {})
     }
@@ -241,8 +199,131 @@ struct SceneVideoPlayerCard: View {
             )
     }
 
+    private var markerStripTopPadding: CGFloat {
+        let playing = isPlaybackStarted && player != nil
+        return playing ? 10 : 8
+    }
+
     @ViewBuilder
-    private var infoSection: some View {
+    private var markerScrollView: some View {
+        if let markers = activeScene.sceneMarkers, !markers.isEmpty {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(markers.sorted { $0.seconds < $1.seconds }) { marker in
+                        Button(action: { onSeek(marker.seconds) }) {
+                            markerThumbnail(marker)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+            }
+            .padding(.top, markerStripTopPadding)
+            .padding(.bottom, 8)
+        }
+    }
+
+    @ViewBuilder
+    private func markerThumbnail(_ marker: SceneMarker) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            ZStack(alignment: .bottomTrailing) {
+                if let url = marker.thumbnailURL {
+                    CustomAsyncImage(url: url) { @MainActor loader in
+                        if let image = loader.image {
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 80, height: 45)
+                                .clipped()
+                        } else {
+                            Rectangle()
+                                .fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                                .frame(width: 80, height: 45)
+                                .skeleton()
+                        }
+                    }
+                } else {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.2))
+                        .frame(width: 80, height: 45)
+                        .overlay(Image(systemName: "bookmark").foregroundColor(.secondary))
+                }
+                
+                // Timestamp label
+                Text(formatTime(marker.seconds))
+                    .font(.system(size: 8))
+                    .fontWeight(.bold)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
+                    .foregroundColor(.white)
+                    .clipShape(Capsule())
+                    .padding(2)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 4))
+            
+            // Marker Title
+            Text(marker.title ?? "Marker at \(formatTime(marker.seconds))")
+                .font(.system(size: 10))
+                .fontWeight(.medium)
+                .lineLimit(2)
+                .frame(width: 80, alignment: .leading)
+        }
+    }
+    
+    private func formatTime(_ seconds: Double) -> String {
+        let hours = Int(seconds) / 3600
+        let minutes = (Int(seconds) % 3600) / 60
+        let secs = Int(seconds) % 60
+        
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, secs)
+        } else {
+            return String(format: "%d:%02d", minutes, secs)
+        }
+    }
+    
+    private func startPreview() {
+        guard let previewURL = activeScene.previewURL else { return }
+        if previewPlayer == nil {
+            previewPlayer = createMutedPreviewPlayer(for: previewURL)
+        }
+        withAnimation(.easeIn(duration: 0.2)) {
+            isPreviewing = true
+        }
+        previewPlayer?.play()
+    }
+    
+    private func stopPreview() {
+        withAnimation(.easeOut(duration: 0.2)) {
+            isPreviewing = false
+        }
+        previewPlayer?.pause()
+        previewPlayer?.seek(to: CMTime.zero)
+    }
+
+}
+
+// MARK: - Scene metadata (separate card under the player)
+
+struct SceneDetailMetadataCard: View {
+    @Binding var activeScene: Scene
+    @Binding var player: AVPlayer?
+    @Binding var isHeaderExpanded: Bool
+    @Binding var showingAddMarkerSheet: Bool
+    @Binding var capturedMarkerTime: Double
+    @Binding var playbackSpeed: Double
+
+    @ObservedObject var viewModel: StashDBViewModel
+    @ObservedObject var appearanceManager = AppearanceManager.shared
+
+    @State private var showStashSyncSheet = false
+    @State private var showingEditTitleSheet = false
+
+    var onSeek: (Double) -> Void
+    var onTitleUpdated: ((String?, String?) -> Void)?
+
+    var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .top) {
@@ -266,11 +347,11 @@ struct SceneVideoPlayerCard: View {
                 if activeScene.sceneDuration != nil || activeScene.date != nil {
                     HStack {
                         if let duration = activeScene.sceneDuration {
-                            Text("Duration: \(formatTime(duration))")
+                            Text("Duration: \(formatMetaTime(duration))")
                         }
-                        
+
                         Spacer()
-                        
+
                         if let date = activeScene.date {
                             Text("Released: \(date)")
                         }
@@ -280,9 +361,8 @@ struct SceneVideoPlayerCard: View {
                 }
             }
 
-            markerScrollView
             metadataSwipeBar
-            
+
             if let details = activeScene.details, !details.isEmpty {
                 Text(details)
                     .font(.body)
@@ -295,6 +375,23 @@ struct SceneVideoPlayerCard: View {
         .padding(12)
         .padding(.bottom, (activeScene.details?.isEmpty ?? true) ? 0 : 20)
         .background(Color.secondaryAppBackground)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .cardShadow()
+        .overlay(alignment: .bottomTrailing) {
+            if let details = activeScene.details, !details.isEmpty {
+                Button(action: {
+                    withAnimation(.spring()) { isHeaderExpanded.toggle() }
+                }) {
+                    Image(systemName: isHeaderExpanded ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(appearanceManager.tintColor)
+                        .padding(6)
+                        .background(appearanceManager.tintColor.opacity(0.1))
+                        .clipShape(Circle())
+                }
+                .padding(8)
+            }
+        }
         .onChange(of: player) { _, newPlayer in
             if let item = newPlayer?.currentItem {
                 StashVideoSyncManager.shared.setup(for: item)
@@ -305,23 +402,20 @@ struct SceneVideoPlayerCard: View {
                 StashVideoSyncManager.shared.setup(for: item)
             }
         }
-    }
-
-    @ViewBuilder
-    private var markerScrollView: some View {
-        if let markers = activeScene.sceneMarkers, !markers.isEmpty {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(markers.sorted { $0.seconds < $1.seconds }) { marker in
-                        Button(action: { onSeek(marker.seconds) }) {
-                            markerThumbnail(marker)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 12)
+        .sheet(isPresented: $showStashSyncSheet) {
+            StashSyncSheet()
+                .presentationDetents([PresentationDetent.medium, PresentationDetent.large])
+                .presentationDragIndicator(Visibility.visible)
+        }
+        .sheet(isPresented: $showingEditTitleSheet) {
+            EditSceneTitleSheet(
+                sceneId: activeScene.id,
+                currentTitle: activeScene.title,
+                currentDetails: activeScene.details,
+                viewModel: viewModel
+            ) { newTitle, newDetails in
+                onTitleUpdated?(newTitle, newDetails)
             }
-            .padding(.horizontal, -12)
         }
     }
 
@@ -330,15 +424,15 @@ struct SceneVideoPlayerCard: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(spacing: 0) {
                 ratingMenu
-                
+
                 Spacer(minLength: 4)
                 oCounterButton
-                
+
                 if let playCount = activeScene.playCount, playCount > 0 {
                     Spacer(minLength: 4)
                     infoPill(icon: "play.circle", text: "\(playCount)")
                 }
-                
+
                 Spacer(minLength: 4)
                 addMarkerButton
                 Spacer(minLength: 4)
@@ -347,7 +441,6 @@ struct SceneVideoPlayerCard: View {
                     Spacer(minLength: 4)
                     stashSyncButton
                 }
-
             }
             .frame(maxWidth: .infinity)
         }
@@ -403,7 +496,6 @@ struct SceneVideoPlayerCard: View {
         .buttonStyle(.plain)
     }
 
-
     @ViewBuilder
     private var ratingMenu: some View {
         HStack(spacing: 4) {
@@ -413,16 +505,13 @@ struct SceneVideoPlayerCard: View {
                 size: 14,
                 spacing: 2,
                 onRatingChanged: { newRating in
-                    // Optimistic UI: Update locally immediately
                     let originalScene = activeScene
                     DispatchQueue.main.async {
                         activeScene = activeScene.withRating(newRating)
                     }
-                    
-                    // Perform server update
+
                     viewModel.updateSceneRating(sceneId: activeScene.id, rating100: newRating) { success in
                         if !success {
-                            // Revert on failure
                             DispatchQueue.main.async {
                                 activeScene = originalScene
                                 ToastManager.shared.show("Failed to update rating", icon: "exclamationmark.triangle", style: .error)
@@ -439,42 +528,121 @@ struct SceneVideoPlayerCard: View {
         .clipShape(Capsule())
     }
 
+    private func switchPlayerStream(to url: URL) {
+        guard let player = player else { return }
+        let currentTime = player.currentTime()
+        let wasPlaying = (player.rate > 0) || (player.timeControlStatus == .playing)
+
+        let newItem = makeVODPlayerItem(for: url)
+        player.replaceCurrentItem(with: newItem)
+        player.seek(to: currentTime, toleranceBefore: .positiveInfinity, toleranceAfter: .positiveInfinity)
+        player.rate = Float(playbackSpeed)
+        if wasPlaying { player.play() }
+
+        StashVideoSyncManager.shared.setup(for: newItem)
+    }
+
+    private func resolutionFromLabel(_ label: String) -> Int? {
+        let cleaned = label.lowercased()
+            .replacingOccurrences(of: "p", with: "")
+            .replacingOccurrences(of: " ", with: "")
+        return Int(cleaned)
+    }
+
+    private func sortByResolutionDesc(_ a: SceneStream, _ b: SceneStream) -> Bool {
+        (resolutionFromLabel(a.label) ?? 0) > (resolutionFromLabel(b.label) ?? 0)
+    }
+
+    private var currentStreamURLString: String? {
+        (player?.currentItem?.asset as? AVURLAsset)?.url.absoluteString
+    }
+
+    private func isCurrentlyPlaying(_ stream: SceneStream) -> Bool {
+        guard let current = currentStreamURLString else { return false }
+        guard let lhs = URLComponents(string: current),
+              let rhs = URLComponents(string: stream.url) else {
+            return current == stream.url
+        }
+        return lhs.host == rhs.host && lhs.path == rhs.path
+    }
 
     @ViewBuilder
     private var qualityMenu: some View {
-        if let streams = activeScene.streams, !streams.isEmpty {
+        let streams = activeScene.streams ?? []
+        let hls = streams.filter { $0.mime_type == "application/vnd.apple.mpegurl" }
+            .sorted(by: sortByResolutionDesc)
+        let mp4 = streams.filter { $0.mime_type == "video/mp4" }
+            .filter { !$0.label.lowercased().contains("mkv") }
+            .sorted(by: sortByResolutionDesc)
+        let directStreamURL: URL? = {
+            guard let path = activeScene.paths?.stream else { return nil }
+            return URL(string: path)
+        }()
+
+        if !hls.isEmpty || !mp4.isEmpty || directStreamURL != nil {
             Menu {
-                ForEach(streams.filter { $0.mime_type == "application/vnd.apple.mpegurl" }.sorted(by: { s1, s2 in 
-                    let r1 = Int(s1.label.lowercased().replacingOccurrences(of: "p", with: "")) ?? 0
-                    let r2 = Int(s2.label.lowercased().replacingOccurrences(of: "p", with: "")) ?? 0
-                    return r1 > r2
-                }), id: \.url) { stream in
-                    Button(action: {
-                        if let url = URL(string: stream.url) {
-                            let currentTime = player?.currentTime() ?? .zero
-                            let wasPlaying = player?.rate ?? 0 > 0
-                            let authenticatedURL = signedURL(url) ?? url
-                            let asset = AVURLAsset(url: authenticatedURL, options: ["AVURLAssetHTTPHeaderFieldsKey": ["ApiKey": ServerConfigManager.shared.activeConfig?.secureApiKey ?? ""]])
-                            let newItem = AVPlayerItem(asset: asset)
-                            player?.replaceCurrentItem(with: newItem)
-                            player?.seek(to: currentTime)
-                            player?.rate = Float(playbackSpeed)
-                            if wasPlaying { player?.play() }
+                if !hls.isEmpty {
+                    Section("HLS · Adaptive") {
+                        ForEach(hls, id: \.url) { stream in
+                            Button(action: {
+                                if let url = URL(string: stream.url) { switchPlayerStream(to: url) }
+                            }) {
+                                Label {
+                                    Text(stream.label)
+                                } icon: {
+                                    if isCurrentlyPlaying(stream) {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
                         }
-                    }) {
-                        HStack {
-                            Text(stream.label)
-                            if let urlAsset = player?.currentItem?.asset as? AVURLAsset, urlAsset.url.absoluteString == stream.url {
-                                Image(systemName: "checkmark")
+                    }
+                }
+                if !mp4.isEmpty {
+                    Section("MP4 · Transcoded") {
+                        ForEach(mp4, id: \.url) { stream in
+                            Button(action: {
+                                if let url = URL(string: stream.url) { switchPlayerStream(to: url) }
+                            }) {
+                                Label {
+                                    Text(stream.label)
+                                } icon: {
+                                    if isCurrentlyPlaying(stream) {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                if let directURL = directStreamURL {
+                    Section("Original") {
+                        Button(action: { switchPlayerStream(to: directURL) }) {
+                            let res = activeScene.files?.first?.height
+                            let label: String = {
+                                guard let h = res else { return "Direct Stream" }
+                                if h >= 2160 { return "Original · 4K" }
+                                if h >= 1080 { return "Original · 1080p" }
+                                if h >= 720 { return "Original · 720p" }
+                                return "Original · \(h)p"
+                            }()
+                            Label {
+                                Text(label)
+                            } icon: {
+                                if let current = currentStreamURLString,
+                                   let direct = URL(string: directURL.absoluteString),
+                                   URLComponents(string: current)?.path == URLComponents(url: direct, resolvingAgainstBaseURL: false)?.path {
+                                    Image(systemName: "checkmark")
+                                }
                             }
                         }
                     }
                 }
             } label: {
                 let currentLabel: String = {
-                    if let asset = player?.currentItem?.asset as? AVURLAsset,
-                       let activeStream = streams.first(where: { $0.url == asset.url.absoluteString }) {
-                        return activeStream.label
+                    if let current = currentStreamURLString,
+                       let active = streams.first(where: { isCurrentlyPlaying($0) || $0.url == current }) {
+                        return active.label
                     }
                     if let firstFile = activeScene.files?.first, let height = firstFile.height {
                         return height >= 2160 ? "4K" : (height >= 1080 ? "1080p" : (height >= 720 ? "720p" : "\(height)p"))
@@ -489,93 +657,6 @@ struct SceneVideoPlayerCard: View {
         }
     }
 
-    @ViewBuilder
-    private var expandToggleOverlay: some View {
-        if let details = activeScene.details, !details.isEmpty {
-            Button(action: {
-                withAnimation(.spring()) { isHeaderExpanded.toggle() }
-            }) {
-                Image(systemName: isHeaderExpanded ? "chevron.up" : "chevron.down")
-                    .font(.system(size: 10, weight: .bold))
-                    .foregroundColor(appearanceManager.tintColor)
-                    .padding(6)
-                    .background(appearanceManager.tintColor.opacity(0.1))
-                    .clipShape(Circle())
-            }
-            .padding(8)
-        }
-    }
-
-    @ViewBuilder
-    private func markerThumbnail(_ marker: SceneMarker) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            ZStack(alignment: .bottomTrailing) {
-                if let url = marker.thumbnailURL {
-                    CustomAsyncImage(url: url) { @MainActor loader in
-                        if let image = loader.image {
-                            image
-                                .resizable()
-                                .scaledToFill()
-                                .frame(width: 80, height: 45)
-                                .clipped()
-                        } else {
-                            Rectangle()
-                                .fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-                                .frame(width: 80, height: 45)
-                                .skeleton()
-                        }
-                    }
-                } else {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.2))
-                        .frame(width: 80, height: 45)
-                        .overlay(Image(systemName: "bookmark").foregroundColor(.secondary))
-                }
-                
-                // Timestamp label
-                Text(formatTime(marker.seconds))
-                    .font(.system(size: 8))
-                    .fontWeight(.bold)
-                    .padding(.horizontal, 4)
-                    .padding(.vertical, 1)
-                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                    .foregroundColor(.white)
-                    .clipShape(Capsule())
-                    .padding(2)
-            }
-            .clipShape(RoundedRectangle(cornerRadius: 4))
-            
-            // Marker Title
-            Text(marker.title ?? "Marker at \(formatTime(marker.seconds))")
-                .font(.system(size: 10))
-                .fontWeight(.medium)
-                .lineLimit(2)
-                .frame(width: 80, alignment: .leading)
-        }
-    }
-    
-    private func stashSceneKSOptions() -> KSOptions {
-        let o = KSOptions()
-        o.preferredForwardBufferDuration = 2
-        o.canStartPictureInPictureAutomaticallyFromInline = TabManager.shared.isPiPEnabled
-        if let key = ServerConfigManager.shared.activeConfig?.secureApiKey, !key.isEmpty {
-            o.appendHeader(["ApiKey": key])
-        }
-        return o
-    }
-
-    private func formatTime(_ seconds: Double) -> String {
-        let hours = Int(seconds) / 3600
-        let minutes = (Int(seconds) % 3600) / 60
-        let secs = Int(seconds) % 60
-        
-        if hours > 0 {
-            return String(format: "%d:%02d:%02d", hours, minutes, secs)
-        } else {
-            return String(format: "%d:%02d", minutes, secs)
-        }
-    }
-    
     @ViewBuilder
     private func infoPill(icon: String, text: String, color: Color = Color.pillAccent) -> some View {
         HStack(spacing: 4) {
@@ -592,26 +673,18 @@ struct SceneVideoPlayerCard: View {
         .foregroundColor(color)
         .clipShape(Capsule())
     }
-    
-    private func startPreview() {
-        guard let previewURL = activeScene.previewURL else { return }
-        if previewPlayer == nil {
-            previewPlayer = createMutedPreviewPlayer(for: previewURL)
-        }
-        withAnimation(.easeIn(duration: 0.2)) {
-            isPreviewing = true
-        }
-        previewPlayer?.play()
-    }
-    
-    private func stopPreview() {
-        withAnimation(.easeOut(duration: 0.2)) {
-            isPreviewing = false
-        }
-        previewPlayer?.pause()
-        previewPlayer?.seek(to: CMTime.zero)
-    }
 
+    private func formatMetaTime(_ seconds: Double) -> String {
+        let hours = Int(seconds) / 3600
+        let minutes = (Int(seconds) % 3600) / 60
+        let secs = Int(seconds) % 60
+
+        if hours > 0 {
+            return String(format: "%d:%02d:%02d", hours, minutes, secs)
+        } else {
+            return String(format: "%d:%02d", minutes, secs)
+        }
+    }
 }
 
 struct EditSceneTitleSheet: View {

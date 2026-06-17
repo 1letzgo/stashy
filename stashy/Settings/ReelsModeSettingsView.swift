@@ -89,30 +89,10 @@ struct ReelsModeSettingsView: View {
                             .padding(.top, 4)
 
                             if modeConfig.type == .pics {
-                                reelsSettingRow(title: "Crop to 4:5 / 16:9") {
-                                    Toggle("", isOn: Binding(
-                                        get: { UserDefaults.standard.object(forKey: "stashline_crop_enabled") as? Bool ?? true },
-                                        set: { UserDefaults.standard.set($0, forKey: "stashline_crop_enabled") }
-                                    ))
-                                    .labelsHidden()
-                                    .tint(appearanceManager.tintColor)
-                                }
-                                .padding(.top, 4)
-
                                 reelsSettingRow(title: "Load Full Images") {
                                     Toggle("", isOn: Binding(
                                         get: { UserDefaults.standard.object(forKey: "stashline_load_full_images") as? Bool ?? true },
                                         set: { UserDefaults.standard.set($0, forKey: "stashline_load_full_images") }
-                                    ))
-                                    .labelsHidden()
-                                    .tint(appearanceManager.tintColor)
-                                }
-                                .padding(.top, 4)
-
-                                reelsSettingRow(title: "Group by Orientation") {
-                                    Toggle("", isOn: Binding(
-                                        get: { UserDefaults.standard.object(forKey: "stashline_group_by_orientation") as? Bool ?? true },
-                                        set: { UserDefaults.standard.set($0, forKey: "stashline_group_by_orientation") }
                                     ))
                                     .labelsHidden()
                                     .tint(appearanceManager.tintColor)
@@ -221,46 +201,73 @@ struct ReelsModeSettingsView: View {
 
     @ViewBuilder
     private func filterPicker(for type: ReelsModeType) -> some View {
-        let filterMode: StashDBViewModel.FilterMode = {
-            switch type {
-            case .scenes, .markers: return .scenes
-            case .clips: return .images
-            case .previews: return .scenes
-            case .pics: return .images
-            }
-        }()
-
-        let filters = viewModel.savedFilters.values
-            .filter { $0.mode == filterMode }
+        let sceneFilters = viewModel.savedFilters.values
+            .filter { $0.mode == .scenes }
+            .sorted { $0.name < $1.name }
+        let markerFilters = viewModel.savedFilters.values
+            .filter { $0.mode == .sceneMarkers }
             .sorted { $0.name < $1.name }
 
-        if filters.isEmpty && !viewModel.isLoadingSavedFilters {
-            Text("No filters found")
-                .foregroundColor(.secondary)
-                .font(.subheadline)
-        } else {
-            switch type {
-            case .scenes, .markers:
-                // Markers use the same saved scene filters and the same reels default as Scenes (not `sceneMarkers` / `defaultMarkerFilterId`).
+        switch type {
+        case .scenes:
+            if sceneFilters.isEmpty && !viewModel.isLoadingSavedFilters {
+                Text("No filters found")
+                    .foregroundColor(.secondary)
+                    .font(.subheadline)
+            } else {
                 Picker("", selection: Binding(
                     get: { tabManager.getDefaultFilterId(for: .reels) ?? "" },
                     set: { newId in
                         if newId.isEmpty {
                             tabManager.setDefaultFilter(for: .reels, filterId: nil, filterName: nil)
-                        } else if let filter = filters.first(where: { $0.id == newId }) {
+                        } else if let filter = sceneFilters.first(where: { $0.id == newId }) {
                             tabManager.setDefaultFilter(for: .reels, filterId: filter.id, filterName: filter.name)
                         }
                     }
                 )) {
                     Text("None").tag("")
-                    ForEach(filters) { filter in
+                    ForEach(sceneFilters) { filter in
                         Text(filter.name).tag(filter.id)
                     }
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
+            }
 
-            case .clips:
+        case .markers:
+            if markerFilters.isEmpty && !viewModel.isLoadingSavedFilters {
+                Text("No filters found")
+                    .foregroundColor(.secondary)
+                    .font(.subheadline)
+            } else {
+                Picker("", selection: Binding(
+                    get: { tabManager.getDefaultMarkerFilterId(for: .reels) ?? "" },
+                    set: { newId in
+                        if newId.isEmpty {
+                            tabManager.setDefaultMarkerFilter(for: .reels, filterId: nil, filterName: nil)
+                        } else if let filter = markerFilters.first(where: { $0.id == newId }) {
+                            tabManager.setDefaultMarkerFilter(for: .reels, filterId: filter.id, filterName: filter.name)
+                        }
+                    }
+                )) {
+                    Text("None").tag("")
+                    ForEach(markerFilters) { filter in
+                        Text(filter.name).tag(filter.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+
+        case .clips:
+            let filters = viewModel.savedFilters.values
+                .filter { $0.mode == .images }
+                .sorted { $0.name < $1.name }
+            if filters.isEmpty && !viewModel.isLoadingSavedFilters {
+                Text("No filters found")
+                    .foregroundColor(.secondary)
+                    .font(.subheadline)
+            } else {
                 Picker("", selection: Binding(
                     get: { tabManager.getDefaultClipFilterId(for: .reels) ?? "" },
                     set: { newId in
@@ -278,27 +285,42 @@ struct ReelsModeSettingsView: View {
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
+            }
 
-            case .previews:
+        case .previews:
+            if sceneFilters.isEmpty && !viewModel.isLoadingSavedFilters {
+                Text("No filters found")
+                    .foregroundColor(.secondary)
+                    .font(.subheadline)
+            } else {
                 Picker("", selection: Binding(
                     get: { tabManager.getDefaultPreviewFilterId(for: .reels) ?? "" },
                     set: { newId in
                         if newId.isEmpty {
                             tabManager.setDefaultPreviewFilter(for: .reels, filterId: nil, filterName: nil)
-                        } else if let filter = filters.first(where: { $0.id == newId }) {
+                        } else if let filter = sceneFilters.first(where: { $0.id == newId }) {
                             tabManager.setDefaultPreviewFilter(for: .reels, filterId: filter.id, filterName: filter.name)
                         }
                     }
                 )) {
                     Text("None").tag("")
-                    ForEach(filters) { filter in
+                    ForEach(sceneFilters) { filter in
                         Text(filter.name).tag(filter.id)
                     }
                 }
                 .pickerStyle(.menu)
                 .labelsHidden()
+            }
 
-            case .pics:
+        case .pics:
+            let filters = viewModel.savedFilters.values
+                .filter { $0.mode == .images }
+                .sorted { $0.name < $1.name }
+            if filters.isEmpty && !viewModel.isLoadingSavedFilters {
+                Text("No filters found")
+                    .foregroundColor(.secondary)
+                    .font(.subheadline)
+            } else {
                 Picker("", selection: Binding(
                     get: { tabManager.getDefaultFilterId(for: .stashline) ?? "" },
                     set: { newId in

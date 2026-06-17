@@ -2,11 +2,24 @@
 import SwiftUI
 import AVKit
 
+/// Dashboard; mit ``catalogBrowserViewModel`` dasselbe VM wie die anderen Katalog-Tabs (Daten bleiben beim Unter-Tab-Wechsel warm).
 struct HomeView: View {
-    @StateObject private var viewModel = StashDBViewModel()
+    @StateObject private var ownedViewModel = StashDBViewModel()
+    let catalogBrowserViewModel: StashDBViewModel?
+
+    init(catalogBrowserViewModel: StashDBViewModel? = nil) {
+        self.catalogBrowserViewModel = catalogBrowserViewModel
+    }
+
+    var body: some View {
+        HomeViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel)
+    }
+}
+
+private struct HomeViewContent: View {
+    @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
-    @ObservedObject var appearanceManager = AppearanceManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
 
     var body: some View {
@@ -44,6 +57,11 @@ struct HomeView: View {
                     viewModel.initializeServerConnection()
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PerformerImageUpdated"))) { notification in
+                guard let performerId = notification.userInfo?["performerId"] as? String,
+                      let newPath = notification.userInfo?["newImagePath"] as? String else { return }
+                viewModel.patchPerformerImageInLists(performerId: performerId, newImagePath: newPath)
+            }
     }
 
     @ViewBuilder
@@ -53,16 +71,16 @@ struct HomeView: View {
                 let activeRows = tabManager.homeRows.filter { $0.isEnabled }
                 let firstRowId = activeRows.first?.id
                 let firstSceneRowId = activeRows.first(where: { $0.type != .statistics })?.id
-                
+
                 ForEach(tabManager.homeRows) { row in
                     if row.isEnabled {
                         if row.type == .statistics {
                             HomeStatisticsRowView(viewModel: viewModel, isFirst: row.id == firstRowId)
                         } else {
-                            HomeRowView(config: row, 
-                                       viewModel: viewModel, 
-                                       isLarge: row.id == firstSceneRowId,
-                                       isFirst: row.id == firstRowId)
+                            HomeRowView(config: row,
+                                        viewModel: viewModel,
+                                        isLarge: row.id == firstSceneRowId,
+                                        isFirst: row.id == firstRowId)
                         }
                     }
                 }

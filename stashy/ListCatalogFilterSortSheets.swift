@@ -1087,6 +1087,7 @@ struct StudiosCatalogFilterSortSheet: View {
             Divider().padding(.leading, 16)
             CatalogFilterRow(label: "Rating") {
                 CatalogFilterChip(title: "Any", isActive: liveMinRating == 0) { liveMinRating = 0; onApply() }
+                CatalogFilterChip(title: "None", isActive: liveMinRating == -1) { liveMinRating = -1; onApply() }
                 ForEach([5, 4, 3, 2, 1], id: \.self) { star in
                     CatalogFilterChip(title: "\(star)★", isActive: liveMinRating == star) {
                         liveMinRating = star
@@ -1362,6 +1363,7 @@ struct GalleriesCatalogFilterSortSheet: View {
             Divider().padding(.leading, 16)
             CatalogFilterRow(label: "Rating") {
                 CatalogFilterChip(title: "Any", isActive: liveMinRating == 0) { liveMinRating = 0; onApply() }
+                CatalogFilterChip(title: "None", isActive: liveMinRating == -1) { liveMinRating = -1; onApply() }
                 ForEach([5, 4, 3, 2, 1], id: \.self) { star in
                     CatalogFilterChip(title: "\(star)★", isActive: liveMinRating == star) {
                         liveMinRating = star
@@ -1455,7 +1457,10 @@ struct ImagesCatalogFilterSortSheet: View {
     var serverFilters: [StashDBViewModel.SavedFilter]
     var localPresets: [ImageListLiveFilterPreset]
     @Binding var selectedPresetRowId: String
+    var filterMenuTitleFallback: String? = nil
     var liveChipRowsVisible: Bool
+    /// Hidden for Reels clips (`fetchClips` pins `path` and ignores live `path`).
+    var showMediaTypeFilter: Bool = true
     var sortOption: StashDBViewModel.ImageSortOption
     var onSortChange: (StashDBViewModel.ImageSortOption) -> Void
     @Binding var liveMinRating: Int
@@ -1464,6 +1469,7 @@ struct ImagesCatalogFilterSortSheet: View {
     @Binding var liveOCounterTag: String?
     @Binding var liveStudioIds: [String]
     @Binding var liveTagIds: [String]
+    @Binding var liveMediaKind: ImageListMediaKind
     var studioPickerOptions: [Studio]
     var studioPickerLoading: Bool
     var onStudioPickerSectionAppear: () -> Void
@@ -1480,12 +1486,32 @@ struct ImagesCatalogFilterSortSheet: View {
     @ObservedObject private var appearance = AppearanceManager.shared
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
 
+    private var filterMenuCollapsedTitle: String {
+        if selectedPresetRowId.isEmpty { return "None" }
+        if let sid = ListLivePresetTag.parseServerId(selectedPresetRowId),
+           let f = serverFilters.first(where: { $0.id == sid }) {
+            return f.name
+        }
+        if let ls = ListLivePresetTag.parseLocalUUIDString(selectedPresetRowId),
+           let uuid = UUID(uuidString: ls),
+           let p = localPresets.first(where: { $0.id == uuid }) {
+            return p.name
+        }
+        if let fb = filterMenuTitleFallback?.trimmingCharacters(in: .whitespacesAndNewlines), !fb.isEmpty {
+            return fb
+        }
+        return "None"
+    }
+
     var body: some View {
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     filterPickerCard
                     imageSortCard
+                    if showMediaTypeFilter {
+                        imageMediaTypeCard
+                    }
                     if liveChipRowsVisible {
                         imageLiveChipsCard
                     } else {
@@ -1533,27 +1559,33 @@ struct ImagesCatalogFilterSortSheet: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
                 .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-            Picker("Filter", selection: $selectedPresetRowId) {
-                Text("None").tag("")
-                if !serverFilters.isEmpty {
-                    Section {
-                        ForEach(serverFilters) { f in
-                            Text(f.name).tag(ListLivePresetTag.serverRow(f.id))
-                        }
+            Menu {
+                Button("None") {
+                    selectedPresetRowId = ""
+                }
+                ForEach(serverFilters) { f in
+                    Button(f.name) {
+                        selectedPresetRowId = ListLivePresetTag.serverRow(f.id)
                     }
                 }
-                if !localPresets.isEmpty {
-                    Section {
-                        ForEach(localPresets) { preset in
-                            Text(preset.name).tag(ListLivePresetTag.localRow(preset.id))
-                        }
+                ForEach(localPresets) { preset in
+                    Button(preset.name) {
+                        selectedPresetRowId = ListLivePresetTag.localRow(preset.id)
                     }
                 }
+            } label: {
+                HStack(spacing: 6) {
+                    Spacer(minLength: 0)
+                    Text(filterMenuCollapsedTitle)
+                        .font(.body)
+                        .foregroundColor(appearance.tintColor)
+                        .lineLimit(1)
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(appearance.tintColor)
+                }
+                .frame(maxWidth: .infinity, alignment: .trailing)
             }
-            .pickerStyle(.menu)
-            .labelsHidden()
-            .tint(appearance.tintColor)
-            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 10)
@@ -1621,6 +1653,27 @@ struct ImagesCatalogFilterSortSheet: View {
         .padding(.horizontal, 16)
     }
 
+    private var imageMediaTypeCard: some View {
+        HStack(alignment: .center, spacing: 12) {
+            Text("Type")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.secondary)
+                .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+            HStack(spacing: 6) {
+                CatalogFilterChip(title: "Any", isActive: liveMediaKind == .all) { liveMediaKind = .all; onApply() }
+                CatalogFilterChip(title: "Image", isActive: liveMediaKind == .stillImage) { liveMediaKind = .stillImage; onApply() }
+                CatalogFilterChip(title: "Video", isActive: liveMediaKind == .video) { liveMediaKind = .video; onApply() }
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondaryAppBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 16)
+    }
+
     private var imageLiveChipsCard: some View {
         VStack(spacing: 0) {
             CatalogNamedEntityLiveFilterMultiPickerRow(
@@ -1651,6 +1704,7 @@ struct ImagesCatalogFilterSortSheet: View {
             Divider().padding(.leading, 16)
             CatalogFilterRow(label: "Rating") {
                 CatalogFilterChip(title: "Any", isActive: liveMinRating == 0) { liveMinRating = 0; onApply() }
+                CatalogFilterChip(title: "None", isActive: liveMinRating == -1) { liveMinRating = -1; onApply() }
                 ForEach([5, 4, 3, 2, 1], id: \.self) { star in
                     CatalogFilterChip(title: "\(star)★", isActive: liveMinRating == star) {
                         liveMinRating = star
@@ -1708,14 +1762,16 @@ struct SceneLiveChipRowState: Equatable {
     var groupIds: [String] = []
 
     var isLiveFilterActive: Bool {
-        minRating > 0 || organized != nil || interactive != nil || orientation != nil
+        minRating != 0 || organized != nil || interactive != nil || orientation != nil
             || performerCount != nil || resolution != nil || performerFavorite != nil || oCounterTag != nil
             || !studioIds.isEmpty || !tagIds.isEmpty || !groupIds.isEmpty
     }
 
     func activeLiveFilterDict() -> [String: Any] {
         var dict: [String: Any] = [:]
-        if minRating > 0 {
+        if minRating == -1 {
+            dict["rating100"] = ["modifier": "IS_NULL"]
+        } else if minRating > 0 {
             dict["rating100"] = ["value": (minRating * 20), "modifier": "EQUALS"]
         }
         if let org = organized { dict["organized"] = org }
@@ -1762,6 +1818,11 @@ struct SceneLiveChipRowState: Equatable {
         if !groupIds.isEmpty {
             dict["groups"] = ["modifier": "INCLUDES", "value": groupIds]
         }
+        if minRating == -1 {
+            dict["rating100"] = ["modifier": "IS_NULL"]
+        } else if minRating > 0, dict["rating100"] == nil {
+            dict["rating100"] = ["value": (minRating * 20), "modifier": "EQUALS"]
+        }
         return dict
     }
 
@@ -1781,8 +1842,15 @@ struct SceneLiveChipRowState: Equatable {
 
     mutating func mapLiveFragmentToChips(_ frag: [String: Any]) {
         let frag = FilterMapper.sanitize(frag, isMarker: false)
-        if let rating = frag["rating100"] as? [String: Any], let raw = rating["value"], let v = Self.intFromLiveJSON(raw) {
-            minRating = max(0, min(5, v / 20))
+        if let rating = frag["rating100"] as? [String: Any] {
+            let mod = (rating["modifier"] as? String) ?? ""
+            if mod == "IS_NULL" {
+                minRating = -1
+            } else if let raw = rating["value"], let v = Self.intFromLiveJSON(raw) {
+                minRating = max(0, min(5, v / 20))
+            } else {
+                minRating = 0
+            }
         } else {
             minRating = 0
         }

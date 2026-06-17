@@ -1,0 +1,8 @@
+# Schlankes List-Fragment für findScenes (Grid/Karten). Detail lädt via findScene + SceneFields nach.
+fragment SceneListFields on Scene {
+  id title date organized resume_time play_count o_counter rating100 created_at updated_at interactive
+  studio { id name updated_at }
+  performers { id name birthdate scene_count gallery_count o_counter updated_at }
+  files { id path format width height duration video_codec audio_codec bit_rate frame_rate }
+  paths { screenshot preview stream webp vtt sprite funscript interactive_heatmap caption }
+}

@@ -10,9 +10,30 @@ import SwiftUI
 
 struct ImagesView: View {
     let gallery: Gallery?
-    
-    @StateObject private var viewModel = StashDBViewModel()
+    @StateObject private var ownedViewModel = StashDBViewModel()
+    let catalogBrowserViewModel: StashDBViewModel?
     @StateObject private var imageListFilters: DetailLinkedImagesFilterModel
+
+    init(gallery: Gallery? = nil, catalogBrowserViewModel: StashDBViewModel? = nil) {
+        self.gallery = gallery
+        self.catalogBrowserViewModel = catalogBrowserViewModel
+        let scope: DetailLinkedImagesScope = gallery.map { .gallery($0.id) } ?? .catalogRoot
+        _imageListFilters = StateObject(wrappedValue: DetailLinkedImagesFilterModel(scope: scope))
+    }
+
+    var body: some View {
+        ImagesViewBody(
+            gallery: gallery,
+            viewModel: gallery != nil ? ownedViewModel : (catalogBrowserViewModel ?? ownedViewModel),
+            imageListFilters: imageListFilters
+        )
+    }
+}
+
+private struct ImagesViewBody: View {
+    let gallery: Gallery?
+    @ObservedObject var viewModel: StashDBViewModel
+    @ObservedObject var imageListFilters: DetailLinkedImagesFilterModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
     @EnvironmentObject private var coordinator: NavigationCoordinator
@@ -25,12 +46,6 @@ struct ImagesView: View {
     @State private var selectedImageIds: Set<String> = []
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
-    
-    init(gallery: Gallery? = nil) {
-        self.gallery = gallery
-        let scope: DetailLinkedImagesScope = gallery.map { .gallery($0.id) } ?? .catalogRoot
-        _imageListFilters = StateObject(wrappedValue: DetailLinkedImagesFilterModel(scope: scope))
-    }
     
     // Dynamic Columns to match GalleriesView
     private var columns: [GridItem] {
@@ -270,6 +285,14 @@ struct ImagesView: View {
                         Image(systemName: "slider.horizontal.3")
                             .font(.system(size: 18, weight: .semibold))
                             .foregroundColor(catalogFilterSortFABActive ? appearanceManager.tintColor : .primary)
+                            .overlay(alignment: .topTrailing) {
+                                if catalogFilterSortFABActive {
+                                    Circle()
+                                        .fill(appearanceManager.tintColor)
+                                        .frame(width: 7, height: 7)
+                                        .offset(x: 3, y: -3)
+                                }
+                            }
                     }
                     .frame(maxWidth: .infinity)
                 }
@@ -288,7 +311,9 @@ struct ImagesView: View {
             serverFilters: imageListFilters.sortedServerImageFilters(viewModel: viewModel),
             localPresets: imageListFilters.localCatalogPresets,
             selectedPresetRowId: $imageListFilters.catalogPresetRowSelection,
+            filterMenuTitleFallback: imageListFilters.selectedFilter?.name,
             liveChipRowsVisible: imageListFilters.imageLiveChipRowsVisible,
+            showMediaTypeFilter: imageListFilters.showImageMediaTypeFilter,
             sortOption: imageListFilters.selectedSortOption,
             onSortChange: { changeSortOption(to: $0) },
             liveMinRating: $imageListFilters.liveFilterMinRating,
@@ -297,6 +322,7 @@ struct ImagesView: View {
             liveOCounterTag: $imageListFilters.liveFilterOCounterTag,
             liveStudioIds: $imageListFilters.liveFilterStudioIds,
             liveTagIds: $imageListFilters.liveFilterTagIds,
+            liveMediaKind: $imageListFilters.liveFilterMediaKind,
             studioPickerOptions: imageListFilters.studioPickerOptions,
             studioPickerLoading: imageListFilters.studioPickerLoading,
             onStudioPickerSectionAppear: { imageListFilters.loadStudioPickerOptions(viewModel: viewModel) },
@@ -336,6 +362,7 @@ struct ImagesView: View {
             imageListFilters.catalogPresetRowSelection = sel
             imageListFilters.refreshLocalPresets()
             imageListFilters.applyCatalogPresetSelectionFromSheetIfNeeded(viewModel: viewModel)
+            imageListFilters.applyResolvedCatalogPresetPickerRowIfNeeded(viewModel: viewModel)
         }
     }
     

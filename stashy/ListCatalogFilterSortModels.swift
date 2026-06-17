@@ -25,6 +25,42 @@ func sceneLiveOCounterCriterion(from tag: String) -> [String: Any]? {
     return ["value": v, "modifier": parts[0]]
 }
 
+// MARK: - Image list media type (live `image_filter.path` regex)
+
+/// Live chip for Stash `findImages` via `path` / `MATCHES_REGEX`.
+enum ImageListMediaKind: String, CaseIterable, Identifiable, Equatable {
+    case all
+    case stillImage
+    case video
+
+    var id: String { rawValue }
+
+    /// Regex value for `ImageFilterType.path` with modifier `MATCHES_REGEX`.
+    static let stillImagePathRegex = "(?i)\\.(jpe?g|png|webp|gif)$"
+    static let videoPathRegex = "(?i)\\.(mp4|mov|m4v|webm|mkv)$"
+
+    var pathCriterion: [String: Any]? {
+        switch self {
+        case .all:
+            return nil
+        case .stillImage:
+            return ["value": Self.stillImagePathRegex, "modifier": "MATCHES_REGEX"]
+        case .video:
+            return ["value": Self.videoPathRegex, "modifier": "MATCHES_REGEX"]
+        }
+    }
+
+    /// Restores chip state from a saved `liveFragment` `path` criterion (ignores unknown regexes).
+    static func fromPathFragment(_ path: Any?) -> ImageListMediaKind? {
+        guard let path = path as? [String: Any],
+              (path["modifier"] as? String) == "MATCHES_REGEX",
+              let value = path["value"] as? String else { return nil }
+        if value == stillImagePathRegex { return .stillImage }
+        if value == videoPathRegex { return .video }
+        return nil
+    }
+}
+
 // MARK: - Preset picker row ids (`""` | `server:<stashId>` | `local:<uuid>`)
 
 enum ListLivePresetTag {
@@ -654,6 +690,101 @@ enum ImageListLiveFilterPresetStore {
     }
 
     static func upsert(_ preset: ImageListLiveFilterPreset) {
+        var all = loadPresets()
+        if let idx = all.firstIndex(where: { $0.id == preset.id }) {
+            all[idx] = preset
+        } else {
+            all.append(preset)
+        }
+        all.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        saveAll(all)
+    }
+
+    static func remove(id: UUID) {
+        var all = loadPresets()
+        all.removeAll { $0.id == id }
+        saveAll(all)
+    }
+}
+
+// MARK: - Marker catalog local presets (scene-style live chips + `SceneMarkerSortOption`)
+
+struct MarkerLiveFilterPreset: Codable, Identifiable, Equatable {
+    let id: UUID
+    var name: String
+    var createdAt: Date
+    var sortRaw: String
+    var baseSavedFilterId: String?
+    var liveFragmentJSON: String
+
+    init(
+        id: UUID = UUID(),
+        name: String,
+        createdAt: Date = Date(),
+        sort: StashDBViewModel.SceneMarkerSortOption,
+        baseSavedFilterId: String?,
+        liveFragment: [String: Any]
+    ) {
+        self.id = id
+        self.name = name
+        self.createdAt = createdAt
+        self.sortRaw = sort.rawValue
+        self.baseSavedFilterId = baseSavedFilterId
+        if JSONSerialization.isValidJSONObject(liveFragment),
+           let data = try? JSONSerialization.data(withJSONObject: liveFragment, options: []),
+           let json = String(data: data, encoding: .utf8) {
+            self.liveFragmentJSON = json
+        } else {
+            self.liveFragmentJSON = "{}"
+        }
+    }
+
+    var sort: StashDBViewModel.SceneMarkerSortOption {
+        StashDBViewModel.SceneMarkerSortOption(rawValue: sortRaw)
+            ?? StashDBViewModel.SceneMarkerSortOption(rawValue: TabManager.shared.getSortOption(for: .markers) ?? "") ?? .createdAtDesc
+    }
+
+    var liveFragment: [String: Any] {
+        guard let data = liveFragmentJSON.data(using: .utf8),
+              let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            return [:]
+        }
+        return obj
+    }
+
+    func renamed(_ newName: String) -> MarkerLiveFilterPreset {
+        MarkerLiveFilterPreset(
+            id: id,
+            name: newName,
+            createdAt: createdAt,
+            sort: sort,
+            baseSavedFilterId: baseSavedFilterId,
+            liveFragment: liveFragment
+        )
+    }
+}
+
+enum MarkerLiveFilterPresetStore {
+    private static func storageKey(serverId: UUID) -> String {
+        "stashy_marker_catalog_live_filter_presets_\(serverId.uuidString)"
+    }
+
+    static func loadPresets() -> [MarkerLiveFilterPreset] {
+        guard let serverId = ServerConfigManager.shared.activeConfig?.id else { return [] }
+        let key = storageKey(serverId: serverId)
+        guard let data = UserDefaults.standard.data(forKey: key) else { return [] }
+        return (try? JSONDecoder().decode([MarkerLiveFilterPreset].self, from: data)) ?? []
+    }
+
+    private static func saveAll(_ presets: [MarkerLiveFilterPreset]) {
+        guard let serverId = ServerConfigManager.shared.activeConfig?.id else { return }
+        let key = storageKey(serverId: serverId)
+        if let data = try? JSONEncoder().encode(presets) {
+            UserDefaults.standard.set(data, forKey: key)
+        }
+    }
+
+    static func upsert(_ preset: MarkerLiveFilterPreset) {
         var all = loadPresets()
         if let idx = all.firstIndex(where: { $0.id == preset.id }) {
             all[idx] = preset
