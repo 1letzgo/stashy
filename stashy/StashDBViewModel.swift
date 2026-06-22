@@ -252,8 +252,21 @@ class StashDBViewModel: ObservableObject {
         let message: String
     }
 
+    private var performerImageUpdatedObserver: NSObjectProtocol?
+
     init() {
         NotificationCenter.default.addObserver(self, selector: #selector(handleServerChange), name: NSNotification.Name("ServerConfigChanged"), object: nil)
+
+        performerImageUpdatedObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("PerformerImageUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self,
+                  let performerId = notification.userInfo?["performerId"] as? String,
+                  let newImagePath = notification.userInfo?["newImagePath"] as? String else { return }
+            self.patchPerformerImageInLists(performerId: performerId, newImagePath: newImagePath)
+        }
         
         // Initial connection test if config exists
         if let config = ServerConfigManager.shared.loadConfig(), config.hasValidConfig {
@@ -262,6 +275,9 @@ class StashDBViewModel: ObservableObject {
     }
     
     deinit {
+        if let performerImageUpdatedObserver {
+            NotificationCenter.default.removeObserver(performerImageUpdatedObserver)
+        }
         NotificationCenter.default.removeObserver(self)
     }
 
@@ -1241,12 +1257,14 @@ class StashDBViewModel: ObservableObject {
         }
     }
 
-    /// Updates performer profile image path in dashboard rows and the main performers list (in-memory sync after mutation).
+    /// Updates performer profile image path across in-memory lists after a gallery/image mutation.
     func patchPerformerImageInLists(performerId: String, newImagePath: String) {
         for key in homeRowPerformers.keys {
             guard var row = homeRowPerformers[key] else { continue }
             if let idx = row.firstIndex(where: { $0.id == performerId }) {
-                row[idx].imagePath = newImagePath
+                var p = row[idx]
+                p.imagePath = newImagePath
+                row[idx] = p
                 homeRowPerformers[key] = row
             }
         }
@@ -1254,6 +1272,32 @@ class StashDBViewModel: ObservableObject {
             var p = performers[idx]
             p.imagePath = newImagePath
             performers[idx] = p
+        }
+
+        var images = allImages
+        var didChangeImages = false
+        for i in images.indices {
+            guard var mutablePerformers = images[i].performers,
+                  let pIndex = mutablePerformers.firstIndex(where: { $0.id == performerId }) else { continue }
+            mutablePerformers[pIndex].image_path = newImagePath
+            images[i].performers = mutablePerformers
+            didChangeImages = true
+        }
+        if didChangeImages {
+            allImages = images
+        }
+
+        var updatedGalleries = galleries
+        var didChangeGalleries = false
+        for i in updatedGalleries.indices {
+            guard var mutablePerformers = updatedGalleries[i].performers,
+                  let pIndex = mutablePerformers.firstIndex(where: { $0.id == performerId }) else { continue }
+            mutablePerformers[pIndex].image_path = newImagePath
+            updatedGalleries[i].performers = mutablePerformers
+            didChangeGalleries = true
+        }
+        if didChangeGalleries {
+            galleries = updatedGalleries
         }
     }
 
@@ -4837,6 +4881,7 @@ class StashDBViewModel: ObservableObject {
     @Published var isLoadingClips = false
     @Published var hasMoreClips = true
     private var currentClipsPage = 1
+    private let clipsPerPage = 20
     private var currentClipSortOption: ImageSortOption = .dateDesc
     private var currentClipFilter: SavedFilter?
 
@@ -5030,7 +5075,7 @@ class StashDBViewModel: ObservableObject {
         }
         
         let page = isInitialLoad ? 1 : currentClipsPage + 1
-        let perPage = 40
+        let perPage = clipsPerPage
 
         // Filter for video-like and animated extensions
         // Regex: .*\.(mp4|gif|mov|webm|m4v|mkv|webp)$ (case insensitive usually requires flags, but Stash regex is Go-flavor? or PCRE?)
@@ -7669,23 +7714,15 @@ struct Performer: Codable, Identifiable, Equatable {
     
     // Computed property for thumbnail URL
     var thumbnailURL: URL? {
-        // If imagePath is already an absolute string (like our manually busted URL), use it
         if let path = imagePath, (path.starts(with: "http://") || path.starts(with: "https://")) {
             return signedURL(URL(string: path))
         }
-        
-        // ... (existing implementation)
-        print("🖼️ PERFORMER THUMBNAIL DEBUG for performer \(id):")
-        
-        // Get server config
+
         guard let config = ServerConfigManager.shared.loadConfig() else {
-            print("🖼️ No server config")
             return nil
         }
-        
-        // Generate thumbnail URL using the provided format: /performer/[ID]/image
+
         let thumbnailURLString = "\(config.baseURL)/performer/\(id)/image"
-        
         return signedURL(URL(string: thumbnailURLString))
     }
 }

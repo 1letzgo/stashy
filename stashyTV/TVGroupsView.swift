@@ -34,7 +34,7 @@ struct TVGroupsView: View {
             if !hasValidConfig {
                 TVConnectionErrorView(title: "Server not reachable", subtitle: "Add a server in Settings.") { reload() }
             } else if viewModel.groups.isEmpty && (viewModel.errorMessage?.isEmpty == false) {
-                TVConnectionErrorView(title: "Server not reachable", subtitle: viewModel.errorMessage) { reload() }
+                TVConnectionErrorView(title: "Error loading groups", subtitle: viewModel.errorMessage) { reload() }
             } else if viewModel.isLoadingGroups && viewModel.groups.isEmpty {
                 loadingView
             } else if viewModel.groups.isEmpty {
@@ -43,9 +43,10 @@ struct TVGroupsView: View {
                 contentGrid
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground)
         .onChange(of: viewModel.groups.first?.id) { oldID, newID in
-            if oldID != newID {
+            if oldID != newID, let newID {
                 focusedGroupID = newID
             }
         }
@@ -57,13 +58,8 @@ struct TVGroupsView: View {
         }
         .onAppear {
             guard hasValidConfig else { return }
-            viewModel.fetchSavedFilters()
-            if selectedFilter == nil, let filterId = tabManager.getDefaultFilterId(for: .groups) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    if let filter = viewModel.savedFilters[filterId] {
-                        selectedFilter = filter
-                    }
-                }
+            viewModel.fetchSavedFilters { _ in
+                applyDefaultFilterIfNeeded()
             }
             if viewModel.groups.isEmpty {
                 viewModel.fetchGroups(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
@@ -81,6 +77,13 @@ struct TVGroupsView: View {
     }
 
     private var hasValidConfig: Bool { configManager.activeConfig?.hasValidConfig == true }
+
+    private func applyDefaultFilterIfNeeded() {
+        guard selectedFilter == nil,
+              let filterId = tabManager.getDefaultFilterId(for: .groups),
+              let filter = viewModel.savedFilters[filterId] else { return }
+        selectedFilter = filter
+    }
 
     private func reload() {
         guard hasValidConfig else { return }
@@ -108,10 +111,20 @@ struct TVGroupsView: View {
         case .nameAsc: return "Name (A-Z)"
         case .nameDesc: return "Name (Z-A)"
         case .sceneCountDesc: return "Most Scenes"
+        case .sceneCountAsc: return "Least Scenes"
+        case .galleryCountDesc: return "Most Galleries"
+        case .galleryCountAsc: return "Least Galleries"
+        case .performerCountDesc: return "Most Performers"
+        case .performerCountAsc: return "Least Performers"
+        case .dateDesc: return "Newest First"
+        case .dateAsc: return "Oldest First"
+        case .ratingDesc: return "Highest Rated"
+        case .ratingAsc: return "Lowest Rated"
         case .createdAtDesc: return "Recently Added"
+        case .createdAtAsc: return "Oldest Added"
         case .updatedAtDesc: return "Recently Updated"
+        case .updatedAtAsc: return "Least Recently Updated"
         case .random: return "Random"
-        default: return option.displayName
         }
     }
 
@@ -185,12 +198,20 @@ struct TVGroupsView: View {
     private var sortMenu: some View {
         Menu {
             Section("Sort By") {
+                sortButton(option: .random)
+                Divider()
                 sortButton(option: .nameAsc)
                 sortButton(option: .nameDesc)
                 sortButton(option: .sceneCountDesc)
+                sortButton(option: .sceneCountAsc)
+                sortButton(option: .dateDesc)
+                sortButton(option: .dateAsc)
+                sortButton(option: .ratingDesc)
+                sortButton(option: .ratingAsc)
                 sortButton(option: .createdAtDesc)
+                sortButton(option: .createdAtAsc)
                 sortButton(option: .updatedAtDesc)
-                sortButton(option: .random)
+                sortButton(option: .updatedAtAsc)
             }
         } label: {
             HStack(spacing: 12) {
@@ -260,6 +281,7 @@ struct TVGroupDetailView: View {
 
     @StateObject private var viewModel = StashDBViewModel()
     @State private var groupDetail: StashGroup?
+    @State private var isLoadingGroup: Bool = false
     @State private var coverSide: CoverSide = .front
 
     private enum CoverSide: String, CaseIterable {
@@ -288,7 +310,7 @@ struct TVGroupDetailView: View {
     private func renderDetail<T: TVDetailItem>(item: T) -> some View {
         TVGenericDetailView(
             item: item,
-            isLoading: viewModel.isLoadingGroups && viewModel.groups.isEmpty,
+            isLoading: isLoadingGroup,
             heroAspectRatio: 16/9,
             placeholderSystemImage: "rectangle.stack.fill",
             heroImageOverride: AnyView(groupHeroImage()),
@@ -327,10 +349,17 @@ struct TVGroupDetailView: View {
             additionalContent: { EmptyView() }
         )
         .onAppear {
-            viewModel.fetchGroup(groupId: groupId) { group in
-                self.groupDetail = group
-                if coverSide == .back, (group?.back_image_path == nil) {
-                    coverSide = .front
+            if groupDetail == nil && !isLoadingGroup {
+                isLoadingGroup = true
+                viewModel.fetchGroup(groupId: groupId) { group in
+                    self.groupDetail = group
+                    self.isLoadingGroup = false
+                    // Wenn die gewählte Cover-Seite kein Bild hat, zur anderen wechseln.
+                    if coverSide == .back && group?.back_image_path == nil {
+                        coverSide = .front
+                    } else if coverSide == .front && group?.front_image_path == nil {
+                        coverSide = .back
+                    }
                 }
             }
             viewModel.fetchGroupScenes(groupId: groupId, isInitialLoad: true)

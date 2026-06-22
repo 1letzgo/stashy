@@ -1293,15 +1293,15 @@ struct TagDetailView: View {
                     
                     Spacer()
                     
-                    // Social Button (Top Right)
+                    // Feeds Button (Top Right)
                     if tabManager.tabs.first(where: { $0.id == .reels })?.isVisible ?? true {
                         Button(action: {
                             coordinator.navigateToReels(tags: [selectedTag], mode: nil)
                         }) {
                             HStack(spacing: 4) {
-                                Image(systemName: "sparkles.tv")
+                                Image(systemName: AppTab.reels.icon)
                                     .font(.system(size: 12, weight: .bold))
-                                Text("Social")
+                                Text("Feeds")
                                     .font(.system(size: 11, weight: .bold))
                             }
                             .foregroundColor(Color.pillAccent)

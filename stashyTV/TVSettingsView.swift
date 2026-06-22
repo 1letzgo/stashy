@@ -259,6 +259,21 @@ struct TVSettingsView: View {
                 Text("Saved filters from your Stash server that will be applied automatically when opening each tab.")
             }
 
+            // MARK: - Tab Visibility
+            Section {
+                tabVisibilityRow(.scenes, label: "Scenes", icon: "film.fill")
+                tabVisibilityRow(.performers, label: "Performers", icon: "person.3.fill")
+                tabVisibilityRow(.studios, label: "Studios", icon: "building.2.fill")
+                tabVisibilityRow(.tags, label: "Tags", icon: "tag.fill")
+                tabVisibilityRow(.groups, label: "Groups", icon: "rectangle.stack.fill")
+                tabVisibilityRow(.galleries, label: "Galleries", icon: "photo.stack.fill")
+                tabVisibilityRow(.images, label: "Images", icon: "photo.fill")
+            } header: {
+                Text("Visible Tabs")
+            } footer: {
+                Text("Choose which tabs appear in the top navigation bar.")
+            }
+
             // MARK: - About
             Section {
                 HStack {
@@ -319,6 +334,23 @@ struct TVSettingsView: View {
         configManager.saveConfig(server)
     }
 
+    @ViewBuilder
+    private func tabVisibilityRow(_ tab: AppTab, label: String, icon: String) -> some View {
+        let isVisible = tabManager.tabs.first(where: { $0.id == tab })?.isVisible ?? true
+        Toggle(isOn: Binding(
+            get: { isVisible },
+            set: { _ in tabManager.toggle(tab) }
+        )) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .foregroundColor(appearanceManager.tintColor)
+                    .frame(width: 28)
+                Text(label)
+            }
+        }
+        .tint(appearanceManager.tintColor)
+    }
+
     private func colorsEqual(_ a: Color, _ b: Color, tolerance: CGFloat = 0.01) -> Bool {
         let ua = UIColor(a)
         let ub = UIColor(b)
@@ -349,7 +381,7 @@ struct TVSettingsView: View {
     // MARK: - Reusable Sort Row Shell
 
     private func sortRowShell<Content: View>(
-        label: String, icon: String, current: String,
+        label: String, current: String,
         @ViewBuilder content: @escaping () -> Content
     ) -> some View {
         HStack {
@@ -371,7 +403,7 @@ struct TVSettingsView: View {
             get: { StashDBViewModel.SceneSortOption(rawValue: tabManager.getPersistentSortOption(for: .scenes) ?? "") ?? .dateDesc },
             set: { tabManager.setPersistentSortOption(for: .scenes, option: $0.rawValue) }
         )
-        return sortRowShell(label: "Scenes", icon: "film", current: binding.wrappedValue.displayName) {
+        return sortRowShell(label: "Scenes", current: binding.wrappedValue.displayName) {
             Button(action: { binding.wrappedValue = .random }) {
                 HStack { Text("Random"); if binding.wrappedValue == .random { Spacer(); Image(systemName: "checkmark") } }
             }
@@ -442,7 +474,7 @@ struct TVSettingsView: View {
             get: { StashDBViewModel.PerformerSortOption(rawValue: tabManager.getPersistentSortOption(for: .performers) ?? "") ?? .nameAsc },
             set: { tabManager.setPersistentSortOption(for: .performers, option: $0.rawValue) }
         )
-        return sortRowShell(label: "Performers", icon: "person.3", current: binding.wrappedValue.displayName) {
+        return sortRowShell(label: "Performers", current: binding.wrappedValue.displayName) {
             Button(action: { binding.wrappedValue = .random }) {
                 HStack { Text("Random"); if binding.wrappedValue == .random { Spacer(); Image(systemName: "checkmark") } }
             }
@@ -505,7 +537,7 @@ struct TVSettingsView: View {
             get: { StashDBViewModel.StudioSortOption(rawValue: tabManager.getPersistentSortOption(for: .studios) ?? "") ?? .nameAsc },
             set: { tabManager.setPersistentSortOption(for: .studios, option: $0.rawValue) }
         )
-        return sortRowShell(label: "Studios", icon: "building.2", current: binding.wrappedValue.displayName) {
+        return sortRowShell(label: "Studios", current: binding.wrappedValue.displayName) {
             Button(action: { binding.wrappedValue = .random }) {
                 HStack { Text("Random"); if binding.wrappedValue == .random { Spacer(); Image(systemName: "checkmark") } }
             }
@@ -552,7 +584,7 @@ struct TVSettingsView: View {
             get: { StashDBViewModel.TagSortOption(rawValue: tabManager.getPersistentSortOption(for: .tags) ?? "") ?? .nameAsc },
             set: { tabManager.setPersistentSortOption(for: .tags, option: $0.rawValue) }
         )
-        return sortRowShell(label: "Tags", icon: "tag", current: binding.wrappedValue.displayName) {
+        return sortRowShell(label: "Tags", current: binding.wrappedValue.displayName) {
             Menu("Name") {
                 Button(action: { binding.wrappedValue = .nameAsc }) {
                     HStack { Text("A → Z"); if binding.wrappedValue == .nameAsc { Spacer(); Image(systemName: "checkmark") } }
@@ -595,7 +627,7 @@ struct TVSettingsView: View {
             get: { StashDBViewModel.GroupSortOption(rawValue: tabManager.getPersistentSortOption(for: .groups) ?? "") ?? .nameAsc },
             set: { tabManager.setPersistentSortOption(for: .groups, option: $0.rawValue) }
         )
-        return sortRowShell(label: "Groups", icon: "rectangle.stack", current: binding.wrappedValue.displayName) {
+        return sortRowShell(label: "Groups", current: binding.wrappedValue.displayName) {
             Button(action: { binding.wrappedValue = .random }) {
                 HStack { Text("Random"); if binding.wrappedValue == .random { Spacer(); Image(systemName: "checkmark") } }
             }
@@ -830,6 +862,12 @@ struct TVServerFormView: View {
         }
 
     private func save() {
+        // Wenn Login-Auth gewählt aber noch kein Key geholt wurde: erst fetchen, dann speichern.
+        if authMethod == .login && apiKey.isEmpty && !username.isEmpty && !password.isEmpty {
+            fetchKeyViaLogin(saveAfterFetch: true)
+            return
+        }
+
         let parsed = ServerConfig.parseHostAndPort(address)
         let finalAddress = parsed.host
         let finalPort = !port.isEmpty ? port : parsed.port
@@ -846,7 +884,7 @@ struct TVServerFormView: View {
         onSave(config)
     }
     
-    private func fetchKeyViaLogin() {
+    private func fetchKeyViaLogin(saveAfterFetch: Bool = false) {
         let parsed = ServerConfig.parseHostAndPort(address)
         let finalAddress = parsed.host
         let finalPort = !port.isEmpty ? port : parsed.port
@@ -872,9 +910,11 @@ struct TVServerFormView: View {
                 await MainActor.run {
                     self.apiKey = fetchedKey
                     self.isFetchingKey = false
-                    self.authMethod = .apiKey
-                    self.username = ""
-                    self.password = ""
+                    // Auth-Method nicht wechseln – User bleibt im Login-Flow.
+                    // Username/Password behalten für eventuelle Retry.
+                    if saveAfterFetch {
+                        self.save()
+                    }
                 }
             } catch {
                 await MainActor.run {

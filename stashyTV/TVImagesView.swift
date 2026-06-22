@@ -1,43 +1,42 @@
 //
-//  TVPerformersView.swift
+//  TVImagesView.swift
 //  stashyTV
 //
-//  Performers grid for tvOS
+//  Images grid for tvOS
 //
 
 import SwiftUI
 
-struct TVPerformersView: View {
+struct TVImagesView: View {
     @StateObject private var viewModel = StashDBViewModel()
     @ObservedObject private var configManager = ServerConfigManager.shared
     @ObservedObject private var tabManager = TabManager.shared
-    @State private var sortBy: StashDBViewModel.PerformerSortOption
+    @State private var sortBy: StashDBViewModel.ImageSortOption
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
-    @FocusState private var focusedPerformerID: String?
+    @FocusState private var focusedImageID: String?
 
     init() {
-        let defaultSort = StashDBViewModel.PerformerSortOption(rawValue: TabManager.shared.getSortOption(for: .performers) ?? "") ?? .nameAsc
+        let defaultSort = StashDBViewModel.ImageSortOption(rawValue: TabManager.shared.getSortOption(for: .images) ?? "") ?? .dateDesc
         _sortBy = State(initialValue: defaultSort)
     }
 
     private let columns = [
-        GridItem(.fixed(260), spacing: 40),
-        GridItem(.fixed(260), spacing: 40),
-        GridItem(.fixed(260), spacing: 40),
-        GridItem(.fixed(260), spacing: 40),
-        GridItem(.fixed(260), spacing: 40),
-        GridItem(.fixed(260), spacing: 40)
+        GridItem(.fixed(300), spacing: 30),
+        GridItem(.fixed(300), spacing: 30),
+        GridItem(.fixed(300), spacing: 30),
+        GridItem(.fixed(300), spacing: 30),
+        GridItem(.fixed(300), spacing: 30)
     ]
 
     var body: some View {
         VStack(spacing: 0) {
             if !hasValidConfig {
                 TVConnectionErrorView(title: "Server not reachable", subtitle: "Add a server in Settings.") { reload() }
-            } else if viewModel.performers.isEmpty && (viewModel.errorMessage?.isEmpty == false) {
-                TVConnectionErrorView(title: "Error loading performers", subtitle: viewModel.errorMessage) { reload() }
-            } else if viewModel.isLoadingPerformers && viewModel.performers.isEmpty {
+            } else if viewModel.allImages.isEmpty && (viewModel.imageFindListError?.isEmpty == false) {
+                TVConnectionErrorView(title: "Error loading images", subtitle: viewModel.imageFindListError) { reload() }
+            } else if viewModel.isLoadingImages && viewModel.allImages.isEmpty {
                 loadingView
-            } else if viewModel.performers.isEmpty {
+            } else if viewModel.allImages.isEmpty {
                 emptyView
             } else {
                 contentGrid
@@ -45,33 +44,33 @@ struct TVPerformersView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground)
-        .onChange(of: viewModel.performers.first?.id) { oldID, newID in
+        .onChange(of: viewModel.allImages.first?.id) { oldID, newID in
             if oldID != newID, let newID {
-                focusedPerformerID = newID
+                focusedImageID = newID
             }
         }
         .onChange(of: sortBy) { _, newValue in
-            viewModel.fetchPerformers(sortBy: newValue, isInitialLoad: true, filter: selectedFilter)
+            viewModel.fetchImages(sortBy: newValue, isInitialLoad: true, filter: selectedFilter)
         }
         .onChange(of: selectedFilter) { _, newValue in
-            viewModel.fetchPerformers(sortBy: sortBy, isInitialLoad: true, filter: newValue)
+            viewModel.fetchImages(sortBy: sortBy, isInitialLoad: true, filter: newValue)
         }
         .onAppear {
             guard hasValidConfig else { return }
             viewModel.fetchSavedFilters { _ in
                 applyDefaultFilterIfNeeded()
             }
-            if viewModel.performers.isEmpty {
-                viewModel.fetchPerformers(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
+            if viewModel.allImages.isEmpty {
+                viewModel.fetchImages(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
             selectedFilter = nil
-            viewModel.fetchPerformers(sortBy: sortBy, isInitialLoad: true, filter: nil)
+            viewModel.fetchImages(sortBy: sortBy, isInitialLoad: true, filter: nil)
         }
         .onReceive(NotificationCenter.default.publisher(for: .stashServerInitializationFinished)) { _ in
-            if hasValidConfig && viewModel.performers.isEmpty {
-                viewModel.fetchPerformers(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
+            if hasValidConfig && viewModel.allImages.isEmpty {
+                viewModel.fetchImages(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
             }
         }
     }
@@ -80,7 +79,7 @@ struct TVPerformersView: View {
 
     private func applyDefaultFilterIfNeeded() {
         guard selectedFilter == nil,
-              let filterId = tabManager.getDefaultFilterId(for: .performers),
+              let filterId = tabManager.getDefaultFilterId(for: .images),
               let filter = viewModel.savedFilters[filterId] else { return }
         selectedFilter = filter
     }
@@ -88,11 +87,10 @@ struct TVPerformersView: View {
     private func reload() {
         guard hasValidConfig else { return }
         viewModel.testConnection()
-        viewModel.fetchPerformers(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
+        viewModel.fetchImages(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
     }
 
-
-    private func sortButton(option: StashDBViewModel.PerformerSortOption) -> some View {
+    private func sortButton(option: StashDBViewModel.ImageSortOption) -> some View {
         Button {
             sortBy = option
         } label: {
@@ -106,22 +104,18 @@ struct TVPerformersView: View {
         }
     }
 
-    private func label(for option: StashDBViewModel.PerformerSortOption) -> String {
+    private func label(for option: StashDBViewModel.ImageSortOption) -> String {
         switch option {
-        case .nameAsc: return "Name (A-Z)"
-        case .nameDesc: return "Name (Z-A)"
-        case .sceneCountDesc: return "Most Scenes"
-        case .sceneCountAsc: return "Least Scenes"
-        case .birthdateDesc: return "Youngest First"
-        case .birthdateAsc: return "Oldest First"
+        case .titleAsc: return "Title (A-Z)"
+        case .titleDesc: return "Title (Z-A)"
+        case .dateDesc: return "Newest First"
+        case .dateAsc: return "Oldest First"
+        case .ratingDesc: return "Highest Rated"
+        case .ratingAsc: return "Lowest Rated"
         case .createdAtDesc: return "Recently Added"
         case .createdAtAsc: return "Oldest Added"
         case .updatedAtDesc: return "Recently Updated"
         case .updatedAtAsc: return "Least Recently Updated"
-        case .oCountDesc: return "O Count (High-Low)"
-        case .oCountAsc: return "O Count (Low-High)"
-        case .ratingDesc: return "Highest Rated"
-        case .ratingAsc: return "Lowest Rated"
         case .random: return "Random"
         }
     }
@@ -131,7 +125,7 @@ struct TVPerformersView: View {
         Spacer()
         VStack(spacing: 20) {
             ProgressView().scaleEffect(1.5)
-            Text("Loading performers…")
+            Text("Loading images…")
                 .font(.title3)
                 .foregroundColor(.white.opacity(0.4))
         }
@@ -143,15 +137,15 @@ struct TVPerformersView: View {
     private var emptyView: some View {
         Spacer()
         VStack(spacing: 32) {
-            Image(systemName: "person.3")
+            Image(systemName: "photo")
                 .font(.system(size: 80))
                 .foregroundColor(.white.opacity(0.1))
-            
-            Text("No Performers Found")
+            Text("No Images Found")
                 .font(.title2)
                 .fontWeight(.semibold)
                 .foregroundColor(.white.opacity(0.3))
         }
+        .frame(maxWidth: .infinity)
         Spacer()
     }
 
@@ -164,22 +158,21 @@ struct TVPerformersView: View {
                     filterMenu: { filterMenu }
                 )
 
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 40) {
-                    ForEach(viewModel.performers) { performer in
-                        NavigationLink(destination: TVPerformerDetailView(performerId: performer.id, performerName: performer.name).tvExitDismissable()) {
-                            TVPerformerCardView(performer: performer)
+                LazyVGrid(columns: columns, alignment: .leading, spacing: 30) {
+                    ForEach(viewModel.allImages.filter { !$0.isAnimated }) { image in
+                        NavigationLink(destination: TVImageDetailView(imageId: image.id, imageTitle: image.title ?? "Untitled").tvExitDismissable()) {
+                            TVImageCardView(image: image)
                         }
                         .buttonStyle(.card)
-                        .focused($focusedPerformerID, equals: performer.id)
-                        .frame(width: 260) // Fixed width for item container
+                        .focused($focusedImageID, equals: image.id)
                         .onAppear {
-                            if performer.id == viewModel.performers.last?.id && viewModel.hasMorePerformers {
-                                viewModel.loadMorePerformers()
+                            if image.id == viewModel.allImages.last?.id && viewModel.hasMoreImages {
+                                viewModel.loadMoreImages()
                             }
                         }
                     }
 
-                    if viewModel.isLoadingMorePerformers {
+                    if viewModel.isLoadingImages && !viewModel.allImages.isEmpty {
                         ProgressView()
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 40)
@@ -198,14 +191,10 @@ struct TVPerformersView: View {
             Section("Sort By") {
                 sortButton(option: .random)
                 Divider()
-                sortButton(option: .nameAsc)
-                sortButton(option: .nameDesc)
-                sortButton(option: .sceneCountDesc)
-                sortButton(option: .sceneCountAsc)
-                sortButton(option: .birthdateDesc)
-                sortButton(option: .birthdateAsc)
-                sortButton(option: .oCountDesc)
-                sortButton(option: .oCountAsc)
+                sortButton(option: .titleAsc)
+                sortButton(option: .titleDesc)
+                sortButton(option: .dateDesc)
+                sortButton(option: .dateAsc)
                 sortButton(option: .ratingDesc)
                 sortButton(option: .ratingAsc)
                 sortButton(option: .createdAtDesc)
@@ -239,14 +228,14 @@ struct TVPerformersView: View {
                     }
                 }
             }
-            
-            let performerFilters = viewModel.savedFilters.values
-                .filter { $0.mode == .performers }
+
+            let imageFilters = viewModel.savedFilters.values
+                .filter { $0.mode == .images }
                 .sorted { $0.name < $1.name }
-            
-            if !performerFilters.isEmpty {
+
+            if !imageFilters.isEmpty {
                 Divider()
-                ForEach(performerFilters) { filter in
+                ForEach(imageFilters) { filter in
                     Button {
                         selectedFilter = filter
                     } label: {

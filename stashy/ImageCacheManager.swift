@@ -224,18 +224,36 @@ class ImageCache {
         }
     }
 
+    /// Common `width` query values used for performer thumbnails across the app.
+    private static let performerThumbnailWidths = [200, 320, 640]
+
+    private func invalidateURLStrings(_ urlStrings: [String]) {
+        for urlString in urlStrings {
+            guard let url = URL(string: urlString) else { continue }
+            removeObject(forKey: url as NSURL)
+        }
+    }
+
+    private func performerImageCacheURLVariants(for baseURLString: String) -> [String] {
+        var variants = [baseURLString]
+        for width in Self.performerThumbnailWidths {
+            let separator = baseURLString.contains("?") ? "&" : "?"
+            variants.append("\(baseURLString)\(separator)width=\(width)")
+        }
+        return variants
+    }
+
     /// After a performer profile image mutation, drop cached `/performer/{id}/image` and the new image URL
-    /// so views using default or busted URLs refetch instead of reusing stale pixels.
+    /// (including common `width=` variants) so views refetch instead of reusing stale or empty cache entries.
     func invalidatePerformerProfileImage(performerId: String, newImagePath: String?) {
         let config = ServerConfigManager.shared.activeConfig ?? ServerConfigManager.shared.loadConfig()
         guard let config, config.hasValidConfig else { return }
         let defaultURLString = "\(config.baseURL)/performer/\(performerId)/image"
-        if let u = URL(string: defaultURLString) {
-            removeObject(forKey: u as NSURL)
+        var toInvalidate = performerImageCacheURLVariants(for: defaultURLString)
+        if let newImagePath {
+            toInvalidate.append(contentsOf: performerImageCacheURLVariants(for: newImagePath))
         }
-        if let newImagePath, let u = URL(string: newImagePath) {
-            removeObject(forKey: u as NSURL)
-        }
+        invalidateURLStrings(toInvalidate)
     }
 
     private func imageCost(_ image: UIImage) -> Int {
@@ -283,10 +301,17 @@ class ImageLoader: ObservableObject {
             queue: .main
         ) { [weak self] note in
             guard let self,
-                  let performerId = note.userInfo?["performerId"] as? String,
-                  let u = self.url,
-                  Self.urlIndicatesPerformerProfileImage(u, performerId: performerId) else { return }
-            self.updateURL(u, force: true)
+                  let performerId = note.userInfo?["performerId"] as? String else { return }
+            let newImagePath = note.userInfo?["newImagePath"] as? String
+            Task { @MainActor in
+                guard let u = self.url,
+                      Self.shouldRefreshForPerformerImageUpdate(
+                        currentURL: u,
+                        performerId: performerId,
+                        newImagePath: newImagePath
+                      ) else { return }
+                self.updateURL(u, force: true)
+            }
         }
 
         // Synchronous memory cache check — avoids any loading flash for warm-cache hits
@@ -300,10 +325,17 @@ class ImageLoader: ObservableObject {
     }
 
     /// True when this URL loads the Stash performer portrait for `performerId` (default path
-    /// or query-suffixed variants). Custom `image_path` URLs are handled via `thumbnailURL` changes
-    /// on the model; this catches the canonical `/performer/{id}/image` endpoint used by feeds.
-    private static func urlIndicatesPerformerProfileImage(_ u: URL, performerId: String) -> Bool {
-        u.path.contains("/performer/\(performerId)/")
+    /// or query-suffixed variants), or a custom `image_path` that was just assigned to that performer.
+    nonisolated private static func shouldRefreshForPerformerImageUpdate(
+        currentURL: URL,
+        performerId: String,
+        newImagePath: String?
+    ) -> Bool {
+        if currentURL.path.contains("/performer/\(performerId)/") {
+            return true
+        }
+        guard let newImagePath, let newURL = URL(string: newImagePath) else { return false }
+        return currentURL.path == newURL.path
     }
 
     func updateURL(_ newURL: URL?, force: Bool = false) {

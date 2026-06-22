@@ -18,10 +18,6 @@ struct TVDashboardView: View {
     @State private var topRatedScenes: [Scene] = []
     @State private var randomScenes: [Scene] = []
 
-    // Hero background for the top row (Continue Watching)
-    @FocusState private var focusedHeroSceneID: String?
-    @State private var heroScene: Scene?
-    
     @State private var isLoadingPlayed: Bool = true
     @State private var isLoadingReleased: Bool = true
     @State private var isLoadingAdded: Bool = true
@@ -29,10 +25,7 @@ struct TVDashboardView: View {
     @State private var isLoadingRandom: Bool = true
 
     var body: some View {
-        ZStack(alignment: .top) {
-            dashboardHeroBackground
-                .ignoresSafeArea()
-
+        Group {
             if !hasValidConfig {
                 TVConnectionErrorView(title: "Server not reachable", subtitle: "Add a server in Settings.") { loadData() }
             } else {
@@ -55,102 +48,75 @@ struct TVDashboardView: View {
         .onReceive(NotificationCenter.default.publisher(for: .stashServerInitializationFinished)) { _ in
             loadData()
         }
-        .onChange(of: focusedHeroSceneID) { _, newValue in
-            guard let id = newValue else { return }
-            if let match = recentlyPlayedScenes.first(where: { $0.id == id }) {
-                heroScene = match
-            }
-        }
     }
     
     // MARK: - Content Rows
     
     private var contentRows: some View {
         VStack(alignment: .leading, spacing: 50) {
-            HStack {
-                Spacer()
-                Button {
-                    refreshAll()
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "arrow.clockwise")
-                        Text("Refresh")
+            if isLoadingPlayed || isLoadingReleased || isLoadingAdded || isLoadingTopRated || isLoadingRandom {
+                if recentContentIsEmpty {
+                    HStack {
+                        Spacer()
+                        ProgressView()
+                            .scaleEffect(1.5)
+                        Spacer()
                     }
-                    .padding(.horizontal, 18)
-                    .padding(.vertical, 6)
+                    .padding(.top, 40)
                 }
-                .buttonStyle(.card)
             }
-            .padding(.horizontal, 60)
 
-            if isLoadingPlayed && isLoadingReleased && isLoadingAdded {
-                HStack {
-                    Spacer()
-                    ProgressView()
-                        .scaleEffect(1.5)
-                    Spacer()
-                }
-                .padding(.top, 40)
-            } else {
-                if !recentlyPlayedScenes.isEmpty {
-                    sceneRow(
-                        title: "Continue Watching",
-                        scenes: recentlyPlayedScenes,
-                        sortBy: .lastPlayedAtDesc,
-                        cardWidth: 560,
-                        cardHeight: 315
-                    , isHeroRow: true)
-                }
+            if !recentlyPlayedScenes.isEmpty {
+                sceneRow(
+                    title: "Continue Watching",
+                    scenes: recentlyPlayedScenes,
+                    sortBy: .lastPlayedAtDesc,
+                    cardWidth: 560,
+                    cardHeight: 315
+                )
+            }
 
-                if !recentlyReleasedScenes.isEmpty {
-                    sceneRow(
-                        title: "New Releases",
-                        scenes: recentlyReleasedScenes,
-                        sortBy: .dateDesc
-                    )
-                }
+            if !recentlyReleasedScenes.isEmpty {
+                sceneRow(
+                    title: "New Releases",
+                    scenes: recentlyReleasedScenes,
+                    sortBy: .dateDesc
+                )
+            }
 
-                if !recentlyAddedScenes.isEmpty {
-                    sceneRow(
-                        title: "Recently Added",
-                        scenes: recentlyAddedScenes,
-                        sortBy: .createdAtDesc
-                    )
-                }
+            if !recentlyAddedScenes.isEmpty {
+                sceneRow(
+                    title: "Recently Added",
+                    scenes: recentlyAddedScenes,
+                    sortBy: .createdAtDesc
+                )
+            }
 
-                if !topRatedScenes.isEmpty {
-                    sceneRow(
-                        title: "Top Rated",
-                        scenes: topRatedScenes,
-                        sortBy: .ratingDesc
-                    )
-                }
+            if !topRatedScenes.isEmpty {
+                sceneRow(
+                    title: "Top Rated",
+                    scenes: topRatedScenes,
+                    sortBy: .ratingDesc
+                )
+            }
 
-                if !randomScenes.isEmpty {
-                    sceneRow(
-                        title: "Random Picks",
-                        scenes: randomScenes,
-                        sortBy: .random
-                    )
-                }
+            if !randomScenes.isEmpty {
+                sceneRow(
+                    title: "Random Picks",
+                    scenes: randomScenes,
+                    sortBy: .random
+                )
             }
         }
         .padding(.bottom, 80)
     }
 
-    private func refreshAll() {
-        // Reset state and fetch from scratch.
-        recentlyPlayedScenes = []
-        recentlyReleasedScenes = []
-        recentlyAddedScenes = []
-        topRatedScenes = []
-        randomScenes = []
-        isLoadingPlayed = true
-        isLoadingReleased = true
-        isLoadingAdded = true
-        isLoadingTopRated = true
-        isLoadingRandom = true
-        loadData()
+    private var recentContentIsEmpty: Bool {
+        recentlyPlayedScenes.isEmpty
+            && recentlyReleasedScenes.isEmpty
+            && recentlyAddedScenes.isEmpty
+            && topRatedScenes.isEmpty
+            && randomScenes.isEmpty
     }
 
     private var hasValidConfig: Bool { configManager.activeConfig?.hasValidConfig == true }
@@ -174,9 +140,6 @@ struct TVDashboardView: View {
         viewModel.fetchScenesForHomeRow(config: playedConfig, limit: 15) { scenes in
             recentlyPlayedScenes = scenes
             isLoadingPlayed = false
-            if heroScene == nil {
-                heroScene = scenes.first
-            }
         }
 
         isLoadingReleased = true
@@ -235,7 +198,7 @@ struct TVDashboardView: View {
     // MARK: - Scene Row
 
     @ViewBuilder
-    private func sceneRow(title: String, scenes: [Scene], sortBy: StashDBViewModel.SceneSortOption, cardWidth: CGFloat = 400, cardHeight: CGFloat = 225, isHeroRow: Bool = false) -> some View {
+    private func sceneRow(title: String, scenes: [Scene], sortBy: StashDBViewModel.SceneSortOption, cardWidth: CGFloat = 400, cardHeight: CGFloat = 225) -> some View {
         VStack(alignment: .leading, spacing: 18) {
             // Section heading (Static)
             Text(title)
@@ -249,18 +212,10 @@ struct TVDashboardView: View {
                 HStack(spacing: 30) {
                     ForEach(scenes) { scene in
                         VStack(alignment: .leading, spacing: 10) {
-                            if isHeroRow {
-                                NavigationLink(destination: TVSceneDetailView(sceneId: scene.id).tvExitDismissable()) {
-                                    TVSceneCardView(scene: scene, width: cardWidth + 10, height: cardHeight + 5)
-                                }
-                                .buttonStyle(.card)
-                                .focused($focusedHeroSceneID, equals: scene.id)
-                            } else {
-                                NavigationLink(destination: TVSceneDetailView(sceneId: scene.id).tvExitDismissable()) {
-                                    TVSceneCardView(scene: scene, width: cardWidth + 10, height: cardHeight + 5)
-                                }
-                                .buttonStyle(.card)
+                            NavigationLink(destination: TVSceneDetailView(sceneId: scene.id).tvExitDismissable()) {
+                                TVSceneCardView(scene: scene, width: cardWidth + 10, height: cardHeight + 5)
                             }
+                            .buttonStyle(.card)
                             
                             TVSceneCardTitleView(scene: scene)
                         }
@@ -287,45 +242,6 @@ struct TVDashboardView: View {
                 .padding(.horizontal, 50)
                 .padding(.vertical, 20)
             }
-        }
-    }
-
-    // MARK: - Hero Background (Top Row)
-
-    @ViewBuilder
-    private var dashboardHeroBackground: some View {
-        // Only show hero if we have a scene to feature
-        if let scene = heroScene, let url = scene.thumbnailURL {
-            ZStack {
-                CustomAsyncImage(url: url) { loader in
-                    if let image = loader.image {
-                        image
-                            .resizable()
-                            .scaledToFill()
-                            .frame(maxWidth: .infinity, maxHeight: 520)
-                            .clipped()
-                    } else {
-                        Color.appBackground
-                            .frame(maxWidth: .infinity, maxHeight: 520)
-                    }
-                }
-                .blur(radius: 18)
-                .opacity(0.55)
-
-                // Fade into app background
-                LinearGradient(
-                    colors: [
-                        Color.appBackground.opacity(0.15),
-                        Color.appBackground.opacity(0.75),
-                        Color.appBackground
-                    ],
-                    startPoint: .top,
-                    endPoint: .bottom
-                )
-                .frame(maxWidth: .infinity, maxHeight: 560)
-            }
-        } else {
-            Color.appBackground
         }
     }
 }

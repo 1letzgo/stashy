@@ -444,68 +444,6 @@ struct TVSceneDetailView: View {
         return "SD"
     }
 
-    // MARK: - Metadata Row
-
-    @ViewBuilder
-    private func metadataRow(scene: Scene) -> some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 20) {
-                // Duration
-                if let duration = scene.sceneDuration, duration > 0 {
-                    metadataPill(icon: "clock", text: formattedDuration(duration))
-                }
-
-                // Rating
-                if let rating100 = scene.rating100, rating100 > 0 {
-                    HStack(spacing: 6) {
-                        ForEach(0..<5, id: \.self) { index in
-                            let starValue = Double(index + 1) * 20.0
-                            let rating = Double(rating100)
-                            Image(systemName: rating >= starValue ? "star.fill" :
-                                  (rating >= starValue - 10 ? "star.leadinghalf.filled" : "star"))
-                                .font(.title3)
-                                .foregroundColor(.yellow)
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .background(Color.white.opacity(0.06))
-                    .clipShape(RoundedRectangle(cornerRadius: 10))
-                }
-
-                // Play Count
-                if let playCount = scene.playCount, playCount > 0 {
-                    metadataPill(icon: "play.circle", text: "\(playCount) views")
-                }
-
-                // O-Counter
-                if let oCounter = scene.oCounter, oCounter > 0 {
-                    metadataPill(icon: "heart.circle", text: "\(oCounter)")
-                }
-
-                // Resolution
-                if let file = scene.files?.first, let w = file.width, let h = file.height {
-                    metadataPill(icon: "aspectratio", text: "\(w)×\(h)")
-                }
-            }
-        }
-    }
-
-    private func metadataPill(icon: String, text: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.title3)
-                .foregroundColor(AppearanceManager.shared.tintColor)
-            Text(text)
-                .font(.title3)
-                .foregroundColor(.white.opacity(0.7))
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .background(Color.white.opacity(0.06))
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-    }
-
     // MARK: - Playback
 
     private func startPlayback(for scene: Scene, at timestamp: Double? = nil) {
@@ -705,16 +643,6 @@ struct TVSceneDetailView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 20)
         }
-    }
-
-    private var studioPlaceholder: some View {
-        Rectangle()
-            .fill(Color.gray.opacity(0.08))
-            .overlay(
-                Image(systemName: "building.2.fill")
-                    .font(.system(size: 36))
-                    .foregroundColor(.white.opacity(0.12))
-            )
     }
 
     @ViewBuilder

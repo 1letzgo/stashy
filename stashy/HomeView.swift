@@ -57,11 +57,6 @@ private struct HomeViewContent: View {
                     viewModel.initializeServerConnection()
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PerformerImageUpdated"))) { notification in
-                guard let performerId = notification.userInfo?["performerId"] as? String,
-                      let newPath = notification.userInfo?["newImagePath"] as? String else { return }
-                viewModel.patchPerformerImageInLists(performerId: performerId, newImagePath: newPath)
-            }
     }
 
     @ViewBuilder

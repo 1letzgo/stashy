@@ -60,15 +60,12 @@ struct TVTagCardView: View {
     @ViewBuilder
     private var thumbnailView: some View {
         if let thumbnailURL = tag.thumbnailURL {
-            AsyncImage(url: thumbnailURL) { phase in
-                switch phase {
-                case .empty:
-                    Rectangle().fill(tagColor).overlay(ProgressView().scaleEffect(0.8))
-                case .success(let image):
+            CustomAsyncImage(url: thumbnailURL) { loader in
+                if let image = loader.image {
                     image.resizable().scaledToFill()
-                case .failure:
-                    placeholderView
-                @unknown default:
+                } else if loader.isLoading {
+                    Rectangle().fill(tagColor).overlay(ProgressView().scaleEffect(0.8))
+                } else {
                     placeholderView
                 }
             }

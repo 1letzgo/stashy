@@ -45,6 +45,11 @@ struct TVServerDetailView: View {
         .onReceive(NotificationCenter.default.publisher(for: .stashServerInitializationFinished)) { _ in
             viewModel.testConnection()
         }
+        .onChange(of: viewModel.isLoading) { _, isLoading in
+            if !isLoading {
+                isTesting = false
+            }
+        }
     }
 
     private func headerSection(config: ServerConfig) -> some View {
@@ -95,9 +100,6 @@ struct TVServerDetailView: View {
             Button {
                 isTesting = true
                 viewModel.testConnection()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-                    isTesting = false
-                }
             } label: {
                 HStack(spacing: 10) {
                     if isTesting { ProgressView() } else { Image(systemName: "arrow.clockwise") }
@@ -107,6 +109,7 @@ struct TVServerDetailView: View {
                 .padding(.vertical, 8)
             }
             .buttonStyle(.card)
+            .disabled(isTesting)
         }
     }
 

@@ -32,7 +32,7 @@ struct TVTagsView: View {
             if !hasValidConfig {
                 TVConnectionErrorView(title: "Server not reachable", subtitle: "Add a server in Settings.") { reload() }
             } else if viewModel.tags.isEmpty && (viewModel.errorMessage?.isEmpty == false) {
-                TVConnectionErrorView(title: "Server not reachable", subtitle: viewModel.errorMessage) { reload() }
+                TVConnectionErrorView(title: "Error loading tags", subtitle: viewModel.errorMessage) { reload() }
             } else if viewModel.isLoadingTags && viewModel.tags.isEmpty {
                 loadingView
             } else if viewModel.tags.isEmpty {
@@ -41,9 +41,10 @@ struct TVTagsView: View {
                 contentGrid
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground)
         .onChange(of: viewModel.tags.first?.id) { oldID, newID in
-            if oldID != newID {
+            if oldID != newID, let newID {
                 focusedTagID = newID
             }
         }
@@ -55,13 +56,8 @@ struct TVTagsView: View {
         }
         .onAppear {
             guard hasValidConfig else { return }
-            viewModel.fetchSavedFilters()
-            if selectedFilter == nil, let filterId = tabManager.getDefaultFilterId(for: .tags) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    if let filter = viewModel.savedFilters[filterId] {
-                        selectedFilter = filter
-                    }
-                }
+            viewModel.fetchSavedFilters { _ in
+                applyDefaultFilterIfNeeded()
             }
             if viewModel.tags.isEmpty {
                 viewModel.fetchTags(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
@@ -79,6 +75,13 @@ struct TVTagsView: View {
     }
 
     private var hasValidConfig: Bool { configManager.activeConfig?.hasValidConfig == true }
+
+    private func applyDefaultFilterIfNeeded() {
+        guard selectedFilter == nil,
+              let filterId = tabManager.getDefaultFilterId(for: .tags),
+              let filter = viewModel.savedFilters[filterId] else { return }
+        selectedFilter = filter
+    }
 
     private func reload() {
         guard hasValidConfig else { return }
@@ -106,10 +109,12 @@ struct TVTagsView: View {
         case .nameAsc: return "Name (A-Z)"
         case .nameDesc: return "Name (Z-A)"
         case .sceneCountDesc: return "Most Scenes"
+        case .sceneCountAsc: return "Least Scenes"
         case .createdAtDesc: return "Recently Added"
+        case .createdAtAsc: return "Oldest Added"
         case .updatedAtDesc: return "Recently Updated"
+        case .updatedAtAsc: return "Least Recently Updated"
         case .random: return "Random"
-        default: return option.displayName
         }
     }
 
@@ -183,12 +188,16 @@ struct TVTagsView: View {
     private var sortMenu: some View {
         Menu {
             Section("Sort By") {
+                sortButton(option: .random)
+                Divider()
                 sortButton(option: .nameAsc)
                 sortButton(option: .nameDesc)
                 sortButton(option: .sceneCountDesc)
+                sortButton(option: .sceneCountAsc)
                 sortButton(option: .createdAtDesc)
+                sortButton(option: .createdAtAsc)
                 sortButton(option: .updatedAtDesc)
-                sortButton(option: .random)
+                sortButton(option: .updatedAtAsc)
             }
         } label: {
             HStack(spacing: 12) {
@@ -260,12 +269,6 @@ struct TVTagDetailView: View {
     @State private var loadedTag: Tag?
     @State private var isLoadingTag: Bool = false
 
-    private var tagColor: Color {
-        let hash = abs(tagName.hashValue)
-        let hue = Double(hash % 360) / 360.0
-        return Color(hue: hue, saturation: 0.35, brightness: 0.3)
-    }
-
     private let sceneColumns = [
         GridItem(.fixed(410), spacing: 40),
         GridItem(.fixed(410), spacing: 40),
@@ -287,7 +290,7 @@ struct TVTagDetailView: View {
     private func renderDetail<T: TVDetailItem>(item: T) -> some View {
         TVGenericDetailView(
             item: item,
-            isLoading: isLoadingTag || (viewModel.isLoadingTags && viewModel.tags.isEmpty),
+            isLoading: isLoadingTag,
             heroAspectRatio: 16/9,
             placeholderSystemImage: "tag.fill",
             scenes: viewModel.tagScenes,

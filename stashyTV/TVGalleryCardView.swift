@@ -1,25 +1,19 @@
 //
-//  TVGroupCardView.swift
+//  TVGalleryCardView.swift
 //  stashyTV
 //
-//  Group card for tvOS — Unified style
+//  Gallery card for tvOS
 //
 
 import SwiftUI
 
-struct TVGroupCardView: View {
-    let group: StashGroup
-
-    private var groupColor: Color {
-        let hash = abs(group.name.hashValue)
-        let hue = Double(hash % 360) / 360.0
-        return Color(hue: hue, saturation: 0.35, brightness: 0.3)
-    }
+struct TVGalleryCardView: View {
+    let gallery: Gallery
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
             thumbnailView
-                .frame(width: 260, height: 390)
+                .frame(width: 410, height: 230)
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
@@ -30,20 +24,24 @@ struct TVGroupCardView: View {
             )
             .clipShape(RoundedRectangle(cornerRadius: 10))
 
-            if group.sceneCountDisplay > 0 {
-                Text("\(group.sceneCountDisplay)")
-                    .font(.system(size: 14, weight: .bold))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 6)
-                    .background(Color.black.opacity(0.6))
-                    .clipShape(RoundedRectangle(cornerRadius: 8))
-                    .padding(12)
+            if let count = gallery.imageCount, count > 0 {
+                HStack(spacing: 4) {
+                    Image(systemName: "photo")
+                        .font(.system(size: 12))
+                    Text("\(count)")
+                        .font(.system(size: 14, weight: .bold))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(Color.black.opacity(0.6))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .padding(12)
             }
 
             VStack {
                 Spacer()
-                Text(group.name)
+                Text(gallery.displayName)
                     .font(.body)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
@@ -52,17 +50,19 @@ struct TVGroupCardView: View {
                     .padding(12)
             }
         }
-        .frame(width: 260, height: 390)
+        .frame(width: 410, height: 230)
     }
 
     @ViewBuilder
     private var thumbnailView: some View {
-        if let thumbnailURL = group.thumbnailURL {
+        if let thumbnailURL = gallery.thumbnailURL {
             CustomAsyncImage(url: thumbnailURL) { loader in
                 if let image = loader.image {
                     image.resizable().scaledToFill()
                 } else if loader.isLoading {
-                    Rectangle().fill(groupColor).overlay(ProgressView().scaleEffect(0.8))
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.08))
+                        .overlay(ProgressView().scaleEffect(0.8))
                 } else {
                     placeholderView
                 }
@@ -74,11 +74,11 @@ struct TVGroupCardView: View {
 
     private var placeholderView: some View {
         Rectangle()
-            .fill(groupColor)
+            .fill(Color.gray.opacity(0.08))
             .overlay(
-                Image(systemName: "rectangle.stack.fill")
-                    .font(.system(size: 32))
-                    .foregroundColor(.white.opacity(0.4))
+                Image(systemName: "photo.stack")
+                    .font(.system(size: 36))
+                    .foregroundColor(.white.opacity(0.12))
             )
     }
 }

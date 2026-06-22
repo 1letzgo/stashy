@@ -32,7 +32,7 @@ struct TVStudiosView: View {
             if !hasValidConfig {
                 TVConnectionErrorView(title: "Server not reachable", subtitle: "Add a server in Settings.") { reload() }
             } else if viewModel.studios.isEmpty && (viewModel.errorMessage?.isEmpty == false) {
-                TVConnectionErrorView(title: "Server not reachable", subtitle: viewModel.errorMessage) { reload() }
+                TVConnectionErrorView(title: "Error loading studios", subtitle: viewModel.errorMessage) { reload() }
             } else if viewModel.isLoadingStudios && viewModel.studios.isEmpty {
                 loadingView
             } else if viewModel.studios.isEmpty {
@@ -41,9 +41,10 @@ struct TVStudiosView: View {
                 contentGrid
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground)
         .onChange(of: viewModel.studios.first?.id) { oldID, newID in
-            if oldID != newID {
+            if oldID != newID, let newID {
                 focusedStudioID = newID
             }
         }
@@ -55,13 +56,8 @@ struct TVStudiosView: View {
         }
         .onAppear {
             guard hasValidConfig else { return }
-            viewModel.fetchSavedFilters()
-            if selectedFilter == nil, let filterId = tabManager.getDefaultFilterId(for: .studios) {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    if let filter = viewModel.savedFilters[filterId] {
-                        selectedFilter = filter
-                    }
-                }
+            viewModel.fetchSavedFilters { _ in
+                applyDefaultFilterIfNeeded()
             }
             if viewModel.studios.isEmpty {
                 viewModel.fetchStudios(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
@@ -79,6 +75,13 @@ struct TVStudiosView: View {
     }
 
     private var hasValidConfig: Bool { configManager.activeConfig?.hasValidConfig == true }
+
+    private func applyDefaultFilterIfNeeded() {
+        guard selectedFilter == nil,
+              let filterId = tabManager.getDefaultFilterId(for: .studios),
+              let filter = viewModel.savedFilters[filterId] else { return }
+        selectedFilter = filter
+    }
 
     private func reload() {
         guard hasValidConfig else { return }
@@ -106,10 +109,12 @@ struct TVStudiosView: View {
         case .nameAsc: return "Name (A-Z)"
         case .nameDesc: return "Name (Z-A)"
         case .sceneCountDesc: return "Most Scenes"
+        case .sceneCountAsc: return "Least Scenes"
         case .createdAtDesc: return "Recently Added"
+        case .createdAtAsc: return "Oldest Added"
         case .updatedAtDesc: return "Recently Updated"
+        case .updatedAtAsc: return "Least Recently Updated"
         case .random: return "Random"
-        default: return option.displayName
         }
     }
 
@@ -183,12 +188,16 @@ struct TVStudiosView: View {
     private var sortMenu: some View {
         Menu {
             Section("Sort By") {
+                sortButton(option: .random)
+                Divider()
                 sortButton(option: .nameAsc)
                 sortButton(option: .nameDesc)
                 sortButton(option: .sceneCountDesc)
+                sortButton(option: .sceneCountAsc)
                 sortButton(option: .createdAtDesc)
+                sortButton(option: .createdAtAsc)
                 sortButton(option: .updatedAtDesc)
-                sortButton(option: .random)
+                sortButton(option: .updatedAtAsc)
             }
         } label: {
             HStack(spacing: 12) {

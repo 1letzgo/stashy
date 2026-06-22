@@ -23,6 +23,7 @@ class NavigationCoordinator: ObservableObject {
     @Published var reelsPerformer: ScenePerformer?
     @Published var reelsTags: [Tag] = []
     @Published var reelsTargetMode: String? = nil
+    @Published var reelsNavigationToken = UUID()
 
     // StashLine Navigation
     @Published var stashlinePath = NavigationPath()
@@ -163,7 +164,7 @@ class NavigationCoordinator: ObservableObject {
         self.reelsPerformer = performer
         self.reelsTags = tags
         self.reelsTargetMode = mode
-
+        self.reelsNavigationToken = UUID()
         self.reelsTabID = UUID() // Force reset stack if needed
         self.selectedTab = .reels
     }

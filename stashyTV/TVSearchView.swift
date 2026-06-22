@@ -84,7 +84,7 @@ struct TVSearchView: View {
                 .font(.title2)
                 .foregroundStyle(.secondary)
 
-            TextField("Szenen, Performer …", text: $searchQuery)
+            TextField("Scenes, Performers …", text: $searchQuery)
                 .font(.title3)
                 .foregroundStyle(.primary)
                 .focused($isSearchFieldFocused)
@@ -104,7 +104,7 @@ struct TVSearchView: View {
                         .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
-                .accessibilityLabel("Eingabe löschen")
+                .accessibilityLabel("Clear input")
             }
         }
         .padding(.vertical, 22)
@@ -119,7 +119,7 @@ struct TVSearchView: View {
             VStack(spacing: 16) {
                 ProgressView()
                     .scaleEffect(1.5)
-                Text("Suche läuft …")
+                Text("Searching …")
                     .font(.title3)
                     .foregroundColor(.white.opacity(0.4))
             }
@@ -135,10 +135,10 @@ struct TVSearchView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 56))
                     .foregroundColor(.white.opacity(0.12))
-                Text("Keine Treffer für „\(searchQuery)“")
+                Text("No results for \"\(searchQuery)\"")
                     .font(.title3)
                     .foregroundColor(.white.opacity(0.4))
-                Button("Suche anpassen") {
+                Button("Refine Search") {
                     isSearchFieldFocused = true
                 }
                 .buttonStyle(.bordered)
@@ -155,10 +155,10 @@ struct TVSearchView: View {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 56))
                     .foregroundColor(.white.opacity(0.12))
-                Text("Stash-Bibliothek durchsuchen")
+                Text("Search your Stash library")
                     .font(.title3)
                     .foregroundColor(.white.opacity(0.4))
-                Text("Mindestens zwei Zeichen, Remote oder Diktat.")
+                Text("Type at least two characters. Remote or dictation supported.")
                     .font(.callout)
                     .foregroundColor(.white.opacity(0.25))
                     .multilineTextAlignment(.center)
@@ -213,7 +213,7 @@ struct TVSearchView: View {
                 Image(systemName: "film.fill")
                     .font(.title3)
                     .foregroundColor(AppearanceManager.shared.tintColor)
-                Text("Szenen")
+                Text("Scenes")
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.white)
@@ -310,7 +310,7 @@ struct TVSearchView: View {
                 Image(systemName: "person.2.fill")
                     .font(.title3)
                     .foregroundColor(AppearanceManager.shared.tintColor)
-                Text("Performer")
+                Text("Performers")
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.white)

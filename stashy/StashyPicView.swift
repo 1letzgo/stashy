@@ -317,18 +317,6 @@ struct StashLineView: View {
                 p.image_path = newPath
                 performerFilter = p
             }
-            // Patch allImages so future rebuilds have the correct URL.
-            // Must replace the whole array: mutating `allImages[i].performers` in place
-            // does not reliably trigger `@Published` / SwiftUI updates.
-            var images = viewModel.allImages
-            for i in images.indices {
-                if var mutablePerformers = images[i].performers,
-                   let pIndex = mutablePerformers.firstIndex(where: { $0.id == targetId }) {
-                    mutablePerformers[pIndex].image_path = newPath
-                    images[i].performers = mutablePerformers
-                }
-            }
-            viewModel.allImages = images
             // Update cachedPosts in-place so the avatar refreshes without
             // replacing the array (which would cause the scroll view to jump).
             cachedPosts = cachedPosts.map { post in

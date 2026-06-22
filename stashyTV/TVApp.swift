@@ -114,7 +114,9 @@ final class TVSecurityManager: ObservableObject {
         UserDefaults.standard.set(hash, forKey: kHash)
         isPinSet = true
         isPinLockEnabled = true
-        isAppLocked = true
+        // isAppLocked NICHT hier setzen – die Sperre greift beim nächsten
+        // scenePhase-Wechsel (Background/Launch). Setzen hier würde den
+        // Lock-Screen über den Settings aufschlagen (Flackern).
     }
 
     func removePin() {
@@ -208,6 +210,12 @@ struct TVPasscodeEntryView: View {
                     errorMessage = nil
                 }
             }
+        }
+        .onExitCommand {
+            // Menu/Back-Taste darf die PIN-Sperre NICHT umgehen.
+            // Fehler-Feedback statt dismiss.
+            errorMessage = "Enter PIN to unlock"
+            shakeTrigger.toggle()
         }
         .onAppear {
             // Ensure the lock is actually active when shown.
@@ -311,6 +319,10 @@ struct TVPasscodeSetupView: View {
         }
         .onAppear {
             isFocused = true
+        }
+        .onExitCommand {
+            // Setup kann jederzeit über Menu/Back abgebrochen werden.
+            isPresented = false
         }
     }
 }
@@ -559,13 +571,33 @@ struct TVServerSetupView: View {
         isTesting = true
         errorMessage = nil
 
-        // Save and activate the config
-        configManager.addOrUpdateServer(config)
-        configManager.saveConfig(config)
+        // Erst Verbindung testen, dann erst speichern/aktivieren.
+        let testVM = StashDBViewModel()
+        testVM.testConnection(with: config)
 
-        // Give a brief moment for the config to propagate
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+        // testConnection läuft asynchron (Combine). Pollen bis fertig, max 15s.
+        checkTestResult(testVM: testVM, config: config, deadline: Date().addingTimeInterval(15))
+    }
+
+    private func checkTestResult(testVM: StashDBViewModel, config: ServerConfig, deadline: Date) {
+        if !testVM.isLoading {
             isTesting = false
+            if testVM.isServerConnected {
+                configManager.addOrUpdateServer(config)
+                configManager.saveConfig(config)
+            } else {
+                errorMessage = testVM.errorMessage
+                    ?? "Could not reach \(config.baseURL). Check address, port and protocol."
+            }
+            return
+        }
+        if Date() >= deadline {
+            isTesting = false
+            errorMessage = "Connection timed out. Check address, port and protocol."
+            return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            self.checkTestResult(testVM: testVM, config: config, deadline: deadline)
         }
     }
     
@@ -597,10 +629,8 @@ struct TVServerSetupView: View {
                 await MainActor.run {
                     self.apiKey = fetchedKey
                     self.isFetchingKey = false
-                    self.authMethod = .apiKey
-                    self.username = ""
-                    self.password = ""
-                    // Focus API key field after fetch?
+                    // Auth-Method nicht wechseln – User bleibt im Login-Flow.
+                    // Username/Password behalten für eventuelle Retry.
                 }
             } catch {
                 await MainActor.run {

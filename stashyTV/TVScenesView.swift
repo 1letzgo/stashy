@@ -51,7 +51,7 @@ struct TVScenesView: View {
             if !hasValidConfig {
                 TVConnectionErrorView(title: "Server not reachable", subtitle: "Add a server in Settings.") { reload() }
             } else if viewModel.scenes.isEmpty && (viewModel.errorMessage?.isEmpty == false) {
-                TVConnectionErrorView(title: "Server not reachable", subtitle: viewModel.errorMessage) { reload() }
+                TVConnectionErrorView(title: "Error loading scenes", subtitle: viewModel.errorMessage) { reload() }
             } else if viewModel.isLoadingScenes && viewModel.scenes.isEmpty {
                 loadingView
             } else if viewModel.scenes.isEmpty {
@@ -60,9 +60,10 @@ struct TVScenesView: View {
                 contentGrid
             }
         }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground)
         .onChange(of: viewModel.scenes.first?.id) { oldID, newID in
-            if oldID != newID {
+            if oldID != newID, let newID {
                 focusedSceneID = newID
             }
         }
@@ -74,16 +75,8 @@ struct TVScenesView: View {
         }
         .onAppear {
             guard hasValidConfig else { return }
-            viewModel.fetchSavedFilters()
-            // Apply default filter from TabManager if none selected yet
-            if selectedFilter == nil, let filterId = tabManager.getDefaultFilterId(for: .scenes) {
-                viewModel.fetchSavedFilters()
-                // Defer to allow savedFilters to populate
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                    if let filter = viewModel.savedFilters[filterId] {
-                        selectedFilter = filter
-                    }
-                }
+            viewModel.fetchSavedFilters { _ in
+                applyDefaultFilterIfNeeded()
             }
             if viewModel.scenes.isEmpty {
                 viewModel.fetchScenes(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
@@ -101,6 +94,13 @@ struct TVScenesView: View {
     }
 
     private var hasValidConfig: Bool { configManager.activeConfig?.hasValidConfig == true }
+
+    private func applyDefaultFilterIfNeeded() {
+        guard selectedFilter == nil,
+              let filterId = tabManager.getDefaultFilterId(for: .scenes),
+              let filter = viewModel.savedFilters[filterId] else { return }
+        selectedFilter = filter
+    }
 
     private func reload() {
         guard hasValidConfig else { return }
@@ -126,14 +126,22 @@ struct TVScenesView: View {
     private func label(for option: StashDBViewModel.SceneSortOption) -> String {
         switch option {
         case .dateDesc: return "Recently Released"
+        case .dateAsc: return "Oldest First"
         case .createdAtDesc: return "Recently Added"
+        case .createdAtAsc: return "Oldest Added"
         case .lastPlayedAtDesc: return "Recently Played"
+        case .lastPlayedAtAsc: return "Least Recently Played"
         case .titleAsc: return "Title (A-Z)"
+        case .titleDesc: return "Title (Z-A)"
         case .durationDesc: return "Longest First"
+        case .durationAsc: return "Shortest First"
         case .playCountDesc: return "Most Viewed"
+        case .playCountAsc: return "Least Viewed"
+        case .oCounterDesc: return "O Count (High-Low)"
+        case .oCounterAsc: return "O Count (Low-High)"
         case .ratingDesc: return "Highest Rated"
+        case .ratingAsc: return "Lowest Rated"
         case .random: return "Random"
-        default: return option.displayName
         }
     }
 
@@ -220,14 +228,24 @@ struct TVScenesView: View {
     private var sortMenu: some View {
         Menu {
             Section("Sort By") {
-                sortButton(option: .dateDesc)
-                sortButton(option: .createdAtDesc)
-                sortButton(option: .lastPlayedAtDesc)
-                sortButton(option: .titleAsc)
-                sortButton(option: .durationDesc)
-                sortButton(option: .playCountDesc)
-                sortButton(option: .ratingDesc)
                 sortButton(option: .random)
+                Divider()
+                sortButton(option: .dateDesc)
+                sortButton(option: .dateAsc)
+                sortButton(option: .createdAtDesc)
+                sortButton(option: .createdAtAsc)
+                sortButton(option: .lastPlayedAtDesc)
+                sortButton(option: .lastPlayedAtAsc)
+                sortButton(option: .titleAsc)
+                sortButton(option: .titleDesc)
+                sortButton(option: .durationDesc)
+                sortButton(option: .durationAsc)
+                sortButton(option: .playCountDesc)
+                sortButton(option: .playCountAsc)
+                sortButton(option: .oCounterDesc)
+                sortButton(option: .oCounterAsc)
+                sortButton(option: .ratingDesc)
+                sortButton(option: .ratingAsc)
             }
         } label: {
             HStack(spacing: 12) {

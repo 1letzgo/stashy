@@ -346,14 +346,13 @@ struct PerformerDetailView: View {
             loadPerformerMetadata()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PerformerImageUpdated"))) { notification in
-            if let targetId = notification.userInfo?["performerId"] as? String,
-               let newPath = notification.userInfo?["newImagePath"] as? String {
-                if performer.id == targetId {
-                    performer.imagePath = newPath
-                }
-                if fullPerformer?.id == targetId {
-                    fullPerformer?.imagePath = newPath
-                }
+            guard let targetId = notification.userInfo?["performerId"] as? String,
+                  let newPath = notification.userInfo?["newImagePath"] as? String else { return }
+            if performer.id == targetId {
+                performer.imagePath = newPath
+            }
+            if fullPerformer?.id == targetId {
+                fullPerformer?.imagePath = newPath
             }
         }
         .navigationTitle("")
@@ -869,16 +868,16 @@ struct PerformerDetailView: View {
                     
                     Spacer()
                     
-                    // Social Button (Top Right)
+                    // Feeds Button (Top Right)
                     if tabManager.tabs.first(where: { $0.id == .reels })?.isVisible ?? true {
                         Button(action: {
                             let sp = ScenePerformer(id: displayPerformer.id, name: displayPerformer.name, birthdate: displayPerformer.birthdate, sceneCount: displayPerformer.sceneCount, galleryCount: displayPerformer.galleryCount, oCounter: displayPerformer.oCounter, updatedAt: nil)
                             coordinator.navigateToReels(performer: sp, mode: nil)
                         }) {
                             HStack(spacing: 4) {
-                                Image(systemName: "sparkles.tv")
+                                Image(systemName: AppTab.reels.icon)
                                     .font(.system(size: 12, weight: .bold))
-                                Text("Social")
+                                Text("Feeds")
                                     .font(.system(size: 11, weight: .bold))
                             }
                             .foregroundColor(Color.pillAccent)

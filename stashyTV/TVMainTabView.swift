@@ -62,6 +62,18 @@ struct TVMainTabView: View {
                         .withTVDestinations()
                 }
             }
+            if isVisible(.galleries) {
+                Tab("Galleries", systemImage: "photo.stack.fill") {
+                    NavigationStack { TVGalleriesView() }
+                        .withTVDestinations()
+                }
+            }
+            if isVisible(.images) {
+                Tab("Images", systemImage: "photo.fill") {
+                    NavigationStack { TVImagesView() }
+                        .withTVDestinations()
+                }
+            }
             Tab("Search", systemImage: "magnifyingglass") {
                 NavigationStack { TVSearchView() }
                     .withTVDestinations()

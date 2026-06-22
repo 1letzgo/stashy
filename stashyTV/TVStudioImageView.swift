@@ -63,6 +63,18 @@ struct TVStudioImageView: View {
             )
     }
 
+    private static let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 15
+        config.timeoutIntervalForResource = 30
+        config.waitsForConnectivity = false
+        return URLSession(
+            configuration: config,
+            delegate: TVStudioImageSSLDelegate(),
+            delegateQueue: nil
+        )
+    }()
+
     private func loadImage() async {
         guard let url = imageURL else {
             imageLoadState = .failure
@@ -71,14 +83,14 @@ struct TVStudioImageView: View {
 
         do {
             var request = URLRequest(url: url)
-            request.timeoutInterval = 30.0
+            request.timeoutInterval = 15.0
 
             if let config = ServerConfigManager.shared.loadConfig(),
                let apiKey = config.secureApiKey, !apiKey.isEmpty {
                 request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
             }
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await Self.session.data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
                 imageLoadState = .failure
@@ -235,5 +247,50 @@ private struct TVPocketSVGView: UIViewRepresentable {
         uiView.setNeedsLayout()
         uiView.layoutIfNeeded()
         uiView.setNeedsDisplay()
+    }
+}
+
+// MARK: - SSL Delegate for local servers with self-signed certificates
+
+final class TVStudioImageSSLDelegate: NSObject, URLSessionDelegate {
+    nonisolated func urlSession(
+        _ session: URLSession,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+              let trust = challenge.protectionSpace.serverTrust else {
+            completionHandler(.performDefaultHandling, nil)
+            return
+        }
+
+        let host = challenge.protectionSpace.host
+        let isLocal = host == "localhost"
+            || host == "127.0.0.1"
+            || host.hasPrefix("192.168.")
+            || host.hasPrefix("10.")
+            || host.hasPrefix("172.16.")
+            || host.hasPrefix("172.17.")
+            || host.hasPrefix("172.18.")
+            || host.hasPrefix("172.19.")
+            || host.hasPrefix("172.20.")
+            || host.hasPrefix("172.21.")
+            || host.hasPrefix("172.22.")
+            || host.hasPrefix("172.23.")
+            || host.hasPrefix("172.24.")
+            || host.hasPrefix("172.25.")
+            || host.hasPrefix("172.26.")
+            || host.hasPrefix("172.27.")
+            || host.hasPrefix("172.28.")
+            || host.hasPrefix("172.29.")
+            || host.hasPrefix("172.30.")
+            || host.hasPrefix("172.31.")
+            || host == "gole.tz"
+
+        if isLocal {
+            completionHandler(.useCredential, URLCredential(trust: trust))
+        } else {
+            completionHandler(.performDefaultHandling, nil)
+        }
     }
 }

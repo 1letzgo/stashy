@@ -132,7 +132,6 @@
 		E909C6E8F4744C4D939F78BD /* GraphQLQueries.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFGQ000042F28A0000000004 /* GraphQLQueries.swift */; };
 		F0A11E1B0B0B0B0B0B0B0B01 /* PocketSVG in Frameworks */ = {isa = PBXBuildFile; productRef = 1A2B3C4D5E6F708192A3B4C5 /* PocketSVG */; };
 		F0A11E1B0B0B0B0B0B0B0B02 /* PocketSVG in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 1A2B3C4D5E6F708192A3B4C5 /* PocketSVG */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		B1A2C3D4E5F60718293A4B5C5 /* KSPlayer in Frameworks */ = {isa = PBXBuildFile; productRef = B1A2C3D4E5F60718293A4B5C4 /* KSPlayer */; };
 		F21C93AC1160498EB0A17AF4 /* GalleryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E672F2A6386004CA019 /* GalleryRepository.swift */; };
 		F4BF2858338E42E6AA292FCC /* PerformersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB392F1832E8007C2090 /* PerformersView.swift */; };
 		F6BC02EF04794FCAA2460E89 /* PerformerRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E682F2A6386004CA019 /* PerformerRepository.swift */; };
@@ -247,7 +246,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				B1A2C3D4E5F60718293A4B5C5 /* KSPlayer in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -424,7 +422,6 @@
 				08FB778DFE84155DC02AAC07 /* Sources */,
 				08FB7791FE84155DC02AAC07 /* Frameworks */,
 				08FB7792FE84155DC02AAC07 /* Resources */,
-				E7F1C9B62F10EA1E004BBEB5 /* Patch Embedded Framework Bundle IDs */,
 			);
 			buildRules = (
 			);
@@ -432,7 +429,6 @@
 			);
 			name = stashy;
 			packageProductDependencies = (
-				B1A2C3D4E5F60718293A4B5C4 /* KSPlayer */,
 			);
 			productName = stashy;
 			productReference = DFE504602E8A8E6F00323FF0 /* stashy.app */;
@@ -488,7 +484,6 @@
 			mainGroup = 08FB778CFE84155DC02AAC07;
 			packageReferences = (
 				0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "PocketSVG" */,
-				B1A2C3D4E5F60718293A4B5C2 /* XCRemoteSwiftPackageReference "KSPlayer" */,
 			);
 			productRefGroup = 08FB778CFE84155DC02AAC07;
 			projectDirPath = "";
@@ -538,26 +533,7 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 			shellPath = /bin/sh;
-			shellScript = "$PROJECT_DIR/stashy/scripts/bump_version.sh \n";
-		};
-		E7F1C9B62F10EA1E004BBEB5 /* Patch Embedded Framework Bundle IDs */ = {
-			isa = PBXShellScriptBuildPhase;
-			alwaysOutOfDate = 1;
-			buildActionMask = 2147483647;
-			files = (
-			);
-			inputFileListPaths = (
-			);
-			inputPaths = (
-			);
-			name = "Patch Embedded Framework Bundle IDs";
-			outputFileListPaths = (
-			);
-			outputPaths = (
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-			shellPath = /bin/sh;
-			shellScript = "\"$PROJECT_DIR\"/stashy/scripts/patch_embedded_framework_bundle_ids.sh\n";
+			shellScript = "\"$PROJECT_DIR\"/stashy/scripts/bump_version.sh\n";
 		};
 /* End PBXShellScriptBuildPhase section */
 
@@ -910,7 +886,7 @@
 					"@executable_path/Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 1.6;
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -952,7 +928,7 @@
 					"@executable_path/Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 1.6;
+				MARKETING_VERSION = 2.0;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1009,14 +985,6 @@
 				minimumVersion = 2.6.0;
 			};
 		};
-		B1A2C3D4E5F60718293A4B5C2 /* XCRemoteSwiftPackageReference "KSPlayer" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/kingslay/KSPlayer.git";
-			requirement = {
-				kind = branch;
-				branch = main;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1024,11 +992,6 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "PocketSVG" */;
 			productName = PocketSVG;
-		};
-		B1A2C3D4E5F60718293A4B5C4 /* KSPlayer */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = B1A2C3D4E5F60718293A4B5C2 /* XCRemoteSwiftPackageReference "KSPlayer" */;
-			productName = KSPlayer;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

@@ -467,14 +467,6 @@ private struct PerformersViewContent: View {
                     changeSortOption(to: newSort)
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PerformerImageUpdated"))) { notification in
-                if let targetId = notification.userInfo?["performerId"] as? String,
-                   let newPath = notification.userInfo?["newImagePath"] as? String {
-                    if let index = viewModel.performers.firstIndex(where: { $0.id == targetId }) {
-                        viewModel.performers[index].imagePath = newPath
-                    }
-                }
-            }
             .onChange(of: viewModel.savedFilters) { oldValue, newValue in
                 if selectedFilter == nil {
                     if let defaultId = TabManager.shared.getDefaultFilterId(for: .performers),

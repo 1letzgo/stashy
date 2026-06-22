@@ -1746,9 +1746,19 @@ struct ReelsViewBody: View {
                 handleOnAppear()
             }
             .onChange(of: coordinator.selectedTab) { _, newTab in
-                if newTab != .reels {
+                if newTab == .reels {
+                    if reelsMode == .pics {
+                        reelsStashLineHostRetained = true
+                    }
+                    if !isInitialized {
+                        handleOnAppear()
+                    }
+                } else {
                     reelsStopPlaybackAndAccessories()
                 }
+            }
+            .onChange(of: coordinator.reelsNavigationToken) { _, _ in
+                applyPendingReelsNavigationFromCoordinator()
             }
             .sceneLiveUpdates(using: viewModel)
             .onChange(of: isMenuOpen) { _, newValue in
@@ -2058,7 +2068,7 @@ struct ReelsViewBody: View {
                 }
             }
 
-            let stashLineHostInTree = isInitialized && (reelsMode == .pics || reelsStashLineHostRetained)
+            let stashLineHostInTree = reelsMode == .pics || reelsStashLineHostRetained
 
             if stashLineHostInTree {
                 StashLineView(
@@ -2074,11 +2084,7 @@ struct ReelsViewBody: View {
                 .allowsHitTesting(reelsMode == .pics)
             }
 
-            if reelsMode == .pics {
-                if !stashLineHostInTree {
-                    StandardLoadingView(message: "Loading StashLine...")
-                }
-            } else {
+            if reelsMode != .pics {
                 let isLoading = viewModel.isLoading && isListEmpty
 
                 if isLoading {
@@ -2252,7 +2258,117 @@ struct ReelsViewBody: View {
         }
     }
 
+    private var firstEnabledReelsMode: ReelsMode {
+        ReelsMode(from: tabManager.enabledReelsModes.first ?? .scenes)
+    }
+
+    /// Consumes ``NavigationCoordinator`` reels navigation (performer/tag/mode) even when
+    /// ``isInitialized`` is already true — e.g. Feeds button from Tag/Performer detail.
+    @discardableResult
+    private func applyPendingReelsNavigationFromCoordinator() -> Bool {
+        let initialPerformer = coordinator.reelsPerformer
+        let initialTags = coordinator.reelsTags
+        let picsPerformer = coordinator.picsPerformerFilter
+        let targetModeStr = coordinator.reelsTargetMode
+
+        guard picsPerformer != nil
+            || targetModeStr != nil
+            || initialPerformer != nil
+            || !initialTags.isEmpty else {
+            return false
+        }
+
+        if let modeStr = targetModeStr {
+            coordinator.reelsTargetMode = nil
+            if let mode = ReelsMode(rawValue: modeStr) {
+                reelsMode = mode
+            } else if modeStr == "Pics" {
+                reelsMode = .pics
+            }
+        }
+
+        if let performer = picsPerformer {
+            coordinator.picsPerformerFilter = nil
+            coordinator.reelsPerformer = nil
+            coordinator.reelsTags = []
+            reelsMode = .pics
+            applySettings(sortBy: .dateDesc, sceneFilter: nil, performer: performer.toScenePerformer(), clearSceneFilter: true)
+            isInitialized = true
+            return true
+        }
+
+        if initialPerformer != nil || !initialTags.isEmpty {
+            coordinator.reelsPerformer = nil
+            coordinator.reelsTags = []
+
+            let targetMode = firstEnabledReelsMode
+            reelsMode = targetMode
+
+            if targetMode == .pics {
+                selectedPerformer = initialPerformer
+                selectedTags = initialTags
+                reelsPicsImageFilters.reelsStashLinePerformerId = initialPerformer?.id
+                if !initialTags.isEmpty {
+                    reelsPicsImageFilters.liveFilterTagIds = initialTags.map(\.id)
+                    reelsPicsImageFilters.applyLiveFilter(viewModel: viewModel)
+                } else if initialPerformer != nil {
+                    reelsPicsImageFilters.refetchImages(viewModel: viewModel, initial: true)
+                }
+                reelsSyncFilterSheetPresetAndLiveChips(savedFilters: viewModel.savedFilters)
+                isInitialized = true
+                return true
+            }
+
+            switch targetMode {
+            case .scenes:
+                let savedSortStr = TabManager.shared.getReelsDefaultSort(for: .scenes)
+                let savedSort = StashDBViewModel.SceneSortOption(rawValue: savedSortStr ?? "") ?? .random
+                var baseFilter = selectedFilter
+                if baseFilter == nil, let defId = TabManager.shared.getDefaultFilterId(for: .reels) {
+                    baseFilter = viewModel.savedFilters[defId]
+                }
+                applySettings(sortBy: savedSort, sceneFilter: baseFilter, performer: initialPerformer, tags: initialTags, mode: .scenes)
+            case .markers:
+                let savedSortStr = TabManager.shared.getReelsDefaultSort(for: .markers)
+                let savedSort = StashDBViewModel.SceneMarkerSortOption(rawValue: savedSortStr ?? "") ?? .random
+                var baseFilter = selectedMarkerFilter
+                if baseFilter == nil, let defId = TabManager.shared.getDefaultMarkerFilterId(for: .reels) {
+                    baseFilter = viewModel.savedFilters[defId]
+                }
+                applySettings(markerSortBy: savedSort, markerFilter: baseFilter, performer: initialPerformer, tags: initialTags, mode: .markers)
+            case .previews:
+                let savedSortStr = TabManager.shared.getReelsDefaultSort(for: .previews)
+                let savedSort = StashDBViewModel.SceneSortOption(rawValue: savedSortStr ?? "") ?? .random
+                var baseFilter = selectedPreviewFilter
+                if baseFilter == nil, let defId = TabManager.shared.getDefaultPreviewFilterId(for: .reels) {
+                    baseFilter = viewModel.savedFilters[defId]
+                }
+                applySettings(previewSortBy: savedSort, previewFilter: baseFilter, performer: initialPerformer, tags: initialTags, mode: .previews)
+            case .clips:
+                let savedSortStr = TabManager.shared.getReelsDefaultSort(for: .clips)
+                let savedSort = StashDBViewModel.ImageSortOption(rawValue: savedSortStr ?? "") ?? .random
+                var clipF = reelsClipImageFilters.selectedFilter
+                if clipF == nil, let defId = TabManager.shared.getDefaultClipFilterId(for: .reels) {
+                    clipF = viewModel.savedFilters[defId]
+                }
+                reelsClipImageFilters.selectedFilter = clipF
+                applySettings(clipSortBy: savedSort, clipFilter: clipF, performer: initialPerformer, tags: initialTags, mode: .clips)
+            case .pics:
+                break
+            }
+            reelsSyncFilterSheetPresetAndLiveChips(savedFilters: viewModel.savedFilters)
+            isInitialized = true
+            return true
+        }
+
+        return false
+    }
+
     private func handleOnAppear() {
+        if reelsMode == .pics {
+            reelsStashLineHostRetained = true
+        }
+
         UIApplication.shared.isIdleTimerDisabled = true
         reelsClipImageFilters.externalRefetchClips = { vm in
             refetchReelsClipsFromModel(vm)
@@ -2279,6 +2395,10 @@ struct ReelsViewBody: View {
 
         if viewModel.savedFilters.isEmpty {
             viewModel.fetchSavedFilters()
+        }
+
+        if applyPendingReelsNavigationFromCoordinator() {
+            return
         }
 
         // After the first full setup, re-onAppear (navigation pop from a pushed
@@ -2347,91 +2467,7 @@ struct ReelsViewBody: View {
             }
         }
 
-        // Determine initial state from coordinator
-        let initialPerformer: ScenePerformer? = coordinator.reelsPerformer
-        let initialTags: [Tag] = coordinator.reelsTags
-        let picsPerformer: GalleryPerformer? = coordinator.picsPerformerFilter
-        let targetModeStr: String? = coordinator.reelsTargetMode
-        
-        // Priority 0: Target mode navigation
-        if let modeStr = targetModeStr {
-            coordinator.reelsTargetMode = nil
-            if let mode = ReelsMode(rawValue: modeStr) {
-                currentEffectiveMode = mode
-                self.reelsMode = mode
-            } else if modeStr == "Pics" {
-                currentEffectiveMode = .pics
-                self.reelsMode = .pics
-            }
-        }
-
-        // Priority 0.5: Pics mode navigation from performer detail (legacy check)
-        if let performer = picsPerformer {
-            coordinator.picsPerformerFilter = nil
-            reelsMode = .pics
-            applySettings(sortBy: .dateDesc, sceneFilter: nil, performer: performer.toScenePerformer(), clearSceneFilter: true)
-            isInitialized = true
-            return
-        }
-        
-        // Priority 0.75: If effective mode is Pics and we have a performer from nav context,
-        // set performer BEFORE body renders StashLineView to avoid an unfiltered initial load.
-        if currentEffectiveMode == .pics, let performer = initialPerformer {
-            coordinator.reelsPerformer = nil
-            coordinator.reelsTags = []
-            reelsMode = .pics
-            selectedPerformer = performer
-            selectedTags = []
-            isInitialized = true
-            return
-        }
-
-        // Priority 1: Navigation Context
-        if initialPerformer != nil || !initialTags.isEmpty {
-            coordinator.reelsPerformer = nil
-            coordinator.reelsTags = []
-
-            switch currentEffectiveMode {
-            case .scenes:
-                let savedSortStr = TabManager.shared.getReelsDefaultSort(for: .scenes)
-                let savedSort = StashDBViewModel.SceneSortOption(rawValue: savedSortStr ?? "") ?? .random
-                var baseFilter = selectedFilter
-                if baseFilter == nil, let defId = TabManager.shared.getDefaultFilterId(for: .reels) {
-                    baseFilter = viewModel.savedFilters[defId]
-                }
-                applySettings(sortBy: savedSort, sceneFilter: baseFilter, performer: initialPerformer, tags: initialTags, mode: .scenes)
-            case .markers:
-                let savedSortStr = TabManager.shared.getReelsDefaultSort(for: .markers)
-                let savedSort = StashDBViewModel.SceneMarkerSortOption(rawValue: savedSortStr ?? "") ?? .random
-                var baseFilter = selectedMarkerFilter
-                if baseFilter == nil, let defId = TabManager.shared.getDefaultMarkerFilterId(for: .reels) {
-                    baseFilter = viewModel.savedFilters[defId]
-                }
-                applySettings(markerSortBy: savedSort, markerFilter: baseFilter, performer: initialPerformer, tags: initialTags, mode: .markers)
-            case .previews:
-                let savedSortStr = TabManager.shared.getReelsDefaultSort(for: .previews)
-                let savedSort = StashDBViewModel.SceneSortOption(rawValue: savedSortStr ?? "") ?? .random
-                var baseFilter = selectedPreviewFilter
-                if baseFilter == nil, let defId = TabManager.shared.getDefaultPreviewFilterId(for: .reels) {
-                    baseFilter = viewModel.savedFilters[defId]
-                }
-                applySettings(previewSortBy: savedSort, previewFilter: baseFilter, performer: initialPerformer, tags: initialTags, mode: .previews)
-            case .clips:
-                let savedSortStr = TabManager.shared.getReelsDefaultSort(for: .clips)
-                let savedSort = StashDBViewModel.ImageSortOption(rawValue: savedSortStr ?? "") ?? .random
-                var clipF = reelsClipImageFilters.selectedFilter
-                if clipF == nil, let defId = TabManager.shared.getDefaultClipFilterId(for: .reels) {
-                    clipF = viewModel.savedFilters[defId]
-                }
-                reelsClipImageFilters.selectedFilter = clipF
-                applySettings(clipSortBy: savedSort, clipFilter: clipF, performer: initialPerformer, tags: initialTags, mode: .clips)
-            case .pics:
-                break
-            }
-            reelsSyncFilterSheetPresetAndLiveChips(savedFilters: viewModel.savedFilters)
-            isInitialized = true
-        } else {
-            let isCurrentlyEmpty: Bool = {
+        let isCurrentlyEmpty: Bool = {
                 switch reelsMode {
                 case .scenes: return viewModel.scenes.isEmpty
                 case .markers: return viewModel.sceneMarkers.isEmpty
@@ -2514,7 +2550,6 @@ struct ReelsViewBody: View {
                     reelsSyncFilterSheetPresetAndLiveChips(savedFilters: viewModel.savedFilters)
                 }
             }
-        }
         isInitialized = true
     }
 
@@ -2569,6 +2604,7 @@ struct ReelsViewBody: View {
             let fid = sessionFilterId(for: .previews) ?? TabManager.shared.getDefaultPreviewFilterId(for: .reels)
             selectedPreviewFilter = (fid != nil ? viewModel.savedFilters[fid!] : nil)
         case .pics:
+            reelsStashLineHostRetained = true
             let sortRaw = sessionSortRaw(for: .pics) ?? TabManager.shared.getSortOption(for: .stashline) ?? ""
             reelsPicsImageFilters.selectedSortOption = StashDBViewModel.ImageSortOption(rawValue: sortRaw) ?? reelsPicsImageFilters.selectedSortOption
             let fid = sessionFilterId(for: .pics) ?? TabManager.shared.getDefaultFilterId(for: .stashline)

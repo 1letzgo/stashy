@@ -1,6 +1,7 @@
 
 #if !os(tvOS)
 import SwiftUI
+import UIKit
 
 extension Array {
     subscript(safe index: Index) -> Element? {
@@ -10,8 +11,21 @@ extension Array {
 
 // MARK: - Card dimension helpers
 
+private let homeHeroCardWidthFraction: CGFloat = 0.8
+private let homeHeroCardFixedWidth: CGFloat = 280
+
+func homeHeroCardWidth(screenWidth: CGFloat) -> CGFloat {
+    let screenHeight = UIScreen.main.bounds.height
+    let isPortrait = screenHeight > screenWidth
+    let isPhone = UIDevice.current.userInterfaceIdiom == .phone
+    if isPhone && isPortrait {
+        return screenWidth * homeHeroCardWidthFraction
+    }
+    return homeHeroCardFixedWidth
+}
+
 func homeCardWidth(for config: HomeRowConfig, isLarge: Bool, screenWidth: CGFloat) -> CGFloat {
-    if isLarge { return 280 }
+    if isLarge { return homeHeroCardWidth(screenWidth: screenWidth) }
     switch config.type {
     case .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating:
         return 125 * 2 / 3

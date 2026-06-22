@@ -176,17 +176,14 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                 heroImageOverride
             } else
             if let thumbnailURL = item?.thumbnailURL {
-                AsyncImage(url: thumbnailURL) { phase in
-                    switch phase {
-                    case .empty:
+                CustomAsyncImage(url: thumbnailURL) { loader in
+                    if let image = loader.image {
+                        image.resizable().scaledToFill()
+                    } else if loader.isLoading {
                         Rectangle()
                             .fill(Color.gray.opacity(0.08))
                             .overlay(ProgressView())
-                    case .success(let image):
-                        image.resizable().scaledToFill()
-                    case .failure:
-                        placeholderView
-                    @unknown default:
+                    } else {
                         placeholderView
                     }
                 }

@@ -7,7 +7,6 @@
 
 #if !os(tvOS) && !os(watchOS)
 import UIKit
-import KSPlayer
 
 @main
 class AppDelegate: UIResponder, UIApplicationDelegate {
@@ -15,8 +14,6 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var backgroundSessionCompletionHandler: (() -> Void)?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // KSAVPlayer keeps AVPlayer / AVPlayerItem so StashVideoSync (video output + audio tap) keeps working.
-        KSOptions.secondPlayerType = KSAVPlayer.self
         return true
     }
 

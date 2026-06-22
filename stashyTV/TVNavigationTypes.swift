@@ -48,6 +48,16 @@ struct TVGroupLink: Hashable {
     let name: String
 }
 
+struct TVGalleryLink: Hashable {
+    let id: String
+    let title: String
+}
+
+struct TVImageLink: Hashable {
+    let id: String
+    let title: String
+}
+
 struct TVSceneListLink: Hashable {
     let sortBy: StashDBViewModel.SceneSortOption
 }
@@ -98,6 +108,14 @@ struct TVNavigationDestinations: ViewModifier {
             }
             .navigationDestination(for: TVGroupLink.self) { link in
                 TVGroupDetailView(groupId: link.id, groupName: link.name)
+                    .tvExitDismissable()
+            }
+            .navigationDestination(for: TVGalleryLink.self) { link in
+                TVGalleryDetailView(galleryId: link.id, galleryTitle: link.title)
+                    .tvExitDismissable()
+            }
+            .navigationDestination(for: TVImageLink.self) { link in
+                TVImageDetailView(imageId: link.id, imageTitle: link.title)
                     .tvExitDismissable()
             }
             .navigationDestination(for: TVSceneListLink.self) { link in

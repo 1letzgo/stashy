@@ -119,19 +119,16 @@ struct TVSceneCardView: View {
     @ViewBuilder
     private var thumbnailView: some View {
         if let thumbnailURL = scene.thumbnailURL {
-            AsyncImage(url: thumbnailURL) { phase in
-                switch phase {
-                case .empty:
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.08))
-                        .overlay(ProgressView().scaleEffect(0.8))
-                case .success(let image):
+            CustomAsyncImage(url: thumbnailURL) { loader in
+                if let image = loader.image {
                     image
                         .resizable()
                         .scaledToFill()
-                case .failure:
-                    placeholderView
-                @unknown default:
+                } else if loader.isLoading {
+                    Rectangle()
+                        .fill(Color.gray.opacity(0.08))
+                        .overlay(ProgressView().scaleEffect(0.8))
+                } else {
                     placeholderView
                 }
             }
@@ -167,8 +164,22 @@ struct TVSceneCardView: View {
 
 struct TVSceneCardTitleView: View {
     let scene: Scene
-    
+
     var body: some View {
-        EmptyView()
+        VStack(alignment: .leading, spacing: 2) {
+            if let date = scene.date, !date.isEmpty {
+                Text(date)
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.5))
+                    .lineLimit(1)
+            }
+            if !scene.performers.isEmpty {
+                Text(scene.performers.prefix(3).map { $0.name }.joined(separator: ", "))
+                    .font(.caption)
+                    .foregroundColor(.white.opacity(0.4))
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }

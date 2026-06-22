@@ -66,31 +66,23 @@ struct UniversalSearchView: View {
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PerformerImageUpdated"))) { notification in
-                if let targetId = notification.userInfo?["performerId"] as? String,
-                   let newPath = notification.userInfo?["newImagePath"] as? String {
-                    
-                    // 1. Update main performers list
-                    for i in 0..<performers.count {
-                        if performers[i].id == targetId {
-                            performers[i].imagePath = newPath
-                        }
-                    }
-                    
-                    // 2. Update performers inside scenes (ScenePerformer doesn't have imagePath, it uses id-based URL)
-                    // We don't need to update it here as the URL is stable or uses updatedAt.
-                    
-                    // 3. Update performers inside galleries
-                    for i in 0..<galleries.count {
-                        if var mutablePerformers = galleries[i].performers,
-                           let pIndex = mutablePerformers.firstIndex(where: { $0.id == targetId }) {
-                            mutablePerformers[pIndex].image_path = newPath
-                            galleries[i].performers = mutablePerformers
-                        }
-                    }
+                guard let targetId = notification.userInfo?["performerId"] as? String,
+                      let newPath = notification.userInfo?["newImagePath"] as? String else { return }
 
-                    // 4. Update performers inside markers' scenes
-                    // MarkerScene uses ScenePerformer which doesn't have imagePath.
+                var updatedPerformers = performers
+                for i in updatedPerformers.indices where updatedPerformers[i].id == targetId {
+                    updatedPerformers[i].imagePath = newPath
                 }
+                performers = updatedPerformers
+
+                var updatedGalleries = galleries
+                for i in updatedGalleries.indices {
+                    guard var mutablePerformers = updatedGalleries[i].performers,
+                          let pIndex = mutablePerformers.firstIndex(where: { $0.id == targetId }) else { continue }
+                    mutablePerformers[pIndex].image_path = newPath
+                    updatedGalleries[i].performers = mutablePerformers
+                }
+                galleries = updatedGalleries
             }
         }
     }

@@ -13,10 +13,10 @@ struct HomeSceneCardView: View {
     @State private var isPreviewing = false
 
     private var cardWidth: CGFloat {
-        isLarge ? 280 : 125 * 16 / 9
+        isLarge ? homeHeroCardWidth(screenWidth: screenWidth) : 125 * 16 / 9
     }
     private var cardHeight: CGFloat {
-        isLarge ? 280 * 9 / 16 : 125
+        isLarge ? cardWidth * 9 / 16 : 125
     }
 
     var body: some View {
