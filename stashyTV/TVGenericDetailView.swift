@@ -169,9 +169,11 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
 
     @ViewBuilder
     private var heroImage: some View {
-        Button {
-            // Focusable hero image
-        } label: {
+        // Reine Anzeige — früher ein leerer `Button { } .buttonStyle(.card)`,
+        // der auf tvOS Parallax/Card-Scale erzeugte und Selektierbarkeit
+        // suggerierte, ohne dass beim Select etwas passierte. Jetzt nicht mehr
+        // fokusierbar.
+        Group {
             if let heroImageOverride {
                 heroImageOverride
             } else
@@ -191,7 +193,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                 placeholderView
             }
         }
-        .buttonStyle(.card)
+        .focusable(false)
         .frame(width: 400 * heroAspectRatio, height: 400)
         .clipped()
         .clipShape(RoundedRectangle(cornerRadius: 14))

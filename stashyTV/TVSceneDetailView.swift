@@ -128,6 +128,11 @@ struct TVSceneDetailView: View {
                     // Failsafe — save progress falls fullScreenCover ohne `onDismiss` weggeht.
                     playerViewModel.saveProgress()
                 }
+            } else {
+                // Fallback, wenn der Player nicht erzeugt werden konnte oder fehlschlägt.
+                TVPlayerErrorView(error: playerViewModel.error) {
+                    playerViewModel.isShowingPlayer = false
+                }
             }
         }
     }
@@ -782,8 +787,16 @@ class TVPlayerViewModel: ObservableObject {
     }
 
     deinit {
+        // Defensive cleanup: falls `clear()` vor Dealloc nicht aufgerufen wurde
+        // (z.B. Parent-View wird während fullScreenCover entfernt), verhindern
+        // wir hier leaking Observer / Timer und späte KVO-Callbacks auf toten VMs.
         if let t = willResignActiveObserver { NotificationCenter.default.removeObserver(t) }
         if let t = didEnterBackgroundObserver { NotificationCenter.default.removeObserver(t) }
+        removeTimeJumpedObserver()
+        statusObserver = nil
+        progressTimer = nil
+        scrubSettleWorkItem?.cancel()
+        scrubSettleWorkItem = nil
     }
 
     func setupPlayer(url: URL, sceneId: String, viewModel: StashDBViewModel, startAt timestamp: Double = 0) {
@@ -938,5 +951,39 @@ struct TVVideoPlayerView: View {
         .onDisappear {
             onDisappear?()
         }
+    }
+}
+
+// MARK: - Player Error Fallback (fullScreenCover)
+
+/// Wird angezeigt, wenn `setupPlayer` `isShowingPlayer = true` gesetzt hat, der
+/// `AVPlayer` aber nicht erzeugt werden konnte oder `.failed` ist — ohne diese
+/// View bliebe das fullScreenCover leer und ohne Dismiss-Affordance.
+private struct TVPlayerErrorView: View {
+    let error: Error?
+    let onDismiss: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            VStack(spacing: 24) {
+                Image(systemName: "exclamationmark.triangle")
+                    .font(.system(size: 80))
+                    .foregroundColor(.white.opacity(0.4))
+                Text("Unable to play this scene")
+                    .font(.title2)
+                    .foregroundColor(.white.opacity(0.7))
+                if let error {
+                    Text(error.localizedDescription)
+                        .font(.callout)
+                        .foregroundColor(.white.opacity(0.4))
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 80)
+                }
+                Button("Close", action: onDismiss)
+                    .font(.title3)
+            }
+        }
+        .onExitCommand { onDismiss() }
     }
 }

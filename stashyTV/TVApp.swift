@@ -352,13 +352,12 @@ private struct TVPinPad: View {
                     }
                     .buttonStyle(.bordered)
                 } else {
-                    // Left spacer (invisible but keeps grid)
-                    Button(action: {}) {
-                        Text("")
-                            .frame(width: 140, height: 80)
-                    }
-                    .buttonStyle(.bordered)
-                    .hidden()
+                    // Linker Spacer, der das Raster ausbalanciert. Auf tvOS darf
+                    // er NICHT fokusierbar sein, sonst fungiert der unsichtbare
+                    // Button als Focus-Falle (Fokus springt nach PIN-Eingabe hierhin).
+                    Color.clear
+                        .frame(width: 140, height: 80)
+                        .focusable(false)
                 }
 
                 digitButton("0")

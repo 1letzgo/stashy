@@ -191,7 +191,7 @@ struct TVGroupsView: View {
                 .padding(.bottom, 80)
             }
         }
-        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60) }
+        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60).focusable(false) }
     }
 
     @ViewBuilder

@@ -48,6 +48,12 @@ struct TVImageDetailView: View {
         .onAppear {
             loadImages()
         }
+        .onChange(of: viewModel.allImages) { _, allImages in
+            // Starrer 1.0s-Timer raced bei langsamen Verbindungen und ließ die
+            // View schwarz/leer. Stattdessen: sobald die Bilder vom Fetch
+            // zurückkommen, sofort zuweisen.
+            applyImages(allImages)
+        }
     }
 
     @ViewBuilder
@@ -89,21 +95,24 @@ struct TVImageDetailView: View {
         hasLoaded = true
 
         if !viewModel.allImages.isEmpty {
-            images = viewModel.allImages.filter { !$0.isAnimated }
-            currentIndex = max(0, images.firstIndex(where: { $0.id == imageId }) ?? 0)
+            applyImages(viewModel.allImages)
             return
         }
 
         if !viewModel.galleryImages.isEmpty {
-            images = viewModel.galleryImages.filter { !$0.isAnimated }
-            currentIndex = max(0, images.firstIndex(where: { $0.id == imageId }) ?? 0)
+            applyImages(viewModel.galleryImages)
             return
         }
 
+        // Fetch anstoßen; das `.onChange(of: viewModel.allImages)` übernimmt
+        // die Zuweisung, sobald die Daten da sind.
         viewModel.fetchImages(sortBy: .dateDesc, isInitialLoad: true)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.0) {
-            self.images = viewModel.allImages.filter { !$0.isAnimated }
-            self.currentIndex = max(0, self.images.firstIndex(where: { $0.id == self.imageId }) ?? 0)
-        }
+    }
+
+    private func applyImages(_ source: [StashImage]) {
+        let nonAnimated = source.filter { !$0.isAnimated }
+        guard !nonAnimated.isEmpty else { return }
+        images = nonAnimated
+        currentIndex = max(0, images.firstIndex(where: { $0.id == imageId }) ?? 0)
     }
 }

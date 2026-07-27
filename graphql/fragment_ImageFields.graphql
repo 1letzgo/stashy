@@ -2,9 +2,9 @@ fragment ImageFields on Image {
   id title rating100 organized o_counter date created_at updated_at
   paths { thumbnail preview image }
   visual_files {
-    ... on BaseFile { __typename path }
-    ... on ImageFile { __typename path height width }
-    ... on VideoFile { __typename path height width duration }
+    ... on BaseFile { __typename path basename }
+    ... on ImageFile { __typename path height width basename }
+    ... on VideoFile { __typename path height width duration basename }
   }
   galleries { id title }
   performers { id name image_path }

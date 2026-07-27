@@ -56,6 +56,8 @@
 		A1ED4C0212345678901234AB /* EditModeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ED4C0112345678901234AB /* EditModeSettingsView.swift */; };
 		A1SP1C0012345678901234AB /* StashyPicView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1SP1C0112345678901234AB /* StashyPicView.swift */; };
 		A1SP1C0212345678901234AB /* StashyPicView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1SP1C0112345678901234AB /* StashyPicView.swift */; };
+		A1IMGDS012345678901234AB /* StashImageDateSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1IMGDS022345678901234AB /* StashImageDateSort.swift */; };
+		A1IMGDS032345678901234AB /* StashImageDateSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1IMGDS022345678901234AB /* StashImageDateSort.swift */; };
 		A448F31312224C5CA0763758 /* SceneTagsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E762F2A6392004CA019 /* SceneTagsCard.swift */; };
 		A519E23C8BE040F79C6EFE18 /* ImagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF4A022B2F1E8B6800E5EAFB /* ImagesView.swift */; };
 		A8FA63740E8A43609EDB1AAD /* AppearanceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB312F1831C7007C2090 /* AppearanceManager.swift */; };
@@ -169,6 +171,7 @@
 		971A00022F999002 /* HotOrNotToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotOrNotToolsView.swift; sourceTree = "<group>"; };
 		A1ED4C0112345678901234AB /* EditModeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditModeSettingsView.swift; sourceTree = "<group>"; };
 		A1SP1C0112345678901234AB /* StashyPicView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyPicView.swift; sourceTree = "<group>"; };
+		A1IMGDS022345678901234AB /* StashImageDateSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashImageDateSort.swift; sourceTree = "<group>"; };
 		AA0000022E8A9C0000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CA7A10D02F500000 /* ListCatalogFilterSortModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListCatalogFilterSortModels.swift; sourceTree = "<group>"; };
 		CA7A10D32F500002 /* ListCatalogFilterSortSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListCatalogFilterSortSheets.swift; sourceTree = "<group>"; };
@@ -301,6 +304,7 @@
 				DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */,
 				DF4A022B2F1E8B6800E5EAFB /* ImagesView.swift */,
 				A1SP1C0112345678901234AB /* StashyPicView.swift */,
+				A1IMGDS022345678901234AB /* StashImageDateSort.swift */,
 				DFE5045D2E8A8C2000323FF2 /* PerformerDetailView.swift */,
 				DF22BB392F1832E8007C2090 /* PerformersView.swift */,
 				DF22BB1B2F16743C007C2090 /* ReelsView.swift */,
@@ -594,6 +598,7 @@
 				DF22BB1F2F16743C007C2090 /* DownloadsView.swift in Sources */,
 				DF4A022C2F1E8B6900E5EAFB /* ImagesView.swift in Sources */,
 				A1SP1C0012345678901234AB /* StashyPicView.swift in Sources */,
+				A1IMGDS012345678901234AB /* StashImageDateSort.swift in Sources */,
 				DF22BB202F16743C007C2090 /* GalleriesView.swift in Sources */,
 				DF22BB222F16743C007C2090 /* ReelsView.swift in Sources */,
 				DF22BB232F16743C007C2090 /* SharedUtilities.swift in Sources */,
@@ -644,6 +649,7 @@
 				F4BF2858338E42E6AA292FCC /* PerformersView.swift in Sources */,
 				A519E23C8BE040F79C6EFE18 /* ImagesView.swift in Sources */,
 				A1SP1C0212345678901234AB /* StashyPicView.swift in Sources */,
+				A1IMGDS032345678901234AB /* StashImageDateSort.swift in Sources */,
 				BB58741767674753BACDD0BA /* HomeRowView.swift in Sources */,
 				42AECC4BE2264997B0333A90 /* HomeSceneCardView.swift in Sources */,
 				BFFDBA13C2414AB6B3120A34 /* HomeStatisticsRowView.swift in Sources */,
@@ -820,7 +826,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.0;
+				MARKETING_VERSION = 2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -850,7 +856,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.0;
+				MARKETING_VERSION = 2.1;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -886,7 +892,7 @@
 					"@executable_path/Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 2.0;
+				MARKETING_VERSION = 2.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -928,7 +934,7 @@
 					"@executable_path/Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 2.0;
+				MARKETING_VERSION = 2.0.1;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

@@ -4782,9 +4782,11 @@ class StashDBViewModel: ObservableObject {
         ]
 
         // Static path filter: exclude animated/video types (for StashLine mode)
+        let includeGifs = UserDefaults.standard.object(forKey: "stashline_include_gifs") as? Bool ?? false
+        let staticExtensions = includeGifs ? "jpg|jpeg|png|webp|gif" : "jpg|jpeg|png|webp"
         let staticFilter: [String: Any] = [
             "path": [
-                "value": "(?i)\\.(jpg|jpeg|png|webp)$",
+                "value": "(?i)\\.(\(staticExtensions))$",
                 "modifier": "MATCHES_REGEX"
             ]
         ]
@@ -8090,6 +8092,7 @@ struct ImageFile: Codable, Equatable {
     let height: Int?
     let width: Int?
     let duration: Double?
+    let basename: String?
 }
 
 struct ImageGallery: Codable, Identifiable, Equatable {
@@ -8166,18 +8169,41 @@ struct StashImage: Codable, Identifiable, Equatable {
     }
 
     var fileExtension: String? {
+        if let basename = visual_files?.first?.basename, !basename.isEmpty {
+            let ext = (basename as NSString).pathExtension
+            if !ext.isEmpty { return ext.uppercased() }
+        }
+
         // Primary: Use 'visual_files' array if available
         if let path = visual_files?.first?.path {
-            return URL(fileURLWithPath: path).pathExtension.uppercased()
+            let ext = URL(fileURLWithPath: path).pathExtension
+            if !ext.isEmpty { return ext.uppercased() }
         }
         
         // Fallback: Use 'paths.image'
         if let imagePath = paths?.image {
             let cleanPath = imagePath.components(separatedBy: "?").first ?? imagePath
-            return URL(fileURLWithPath: cleanPath).pathExtension.uppercased()
+            let ext = URL(fileURLWithPath: cleanPath).pathExtension
+            if !ext.isEmpty { return ext.uppercased() }
         }
         
         return nil
+    }
+
+    var isGifFile: Bool {
+        if fileExtension?.uppercased() == "GIF" { return true }
+        let candidates = [
+            visual_files?.first?.basename,
+            visual_files?.first?.path,
+            paths?.image,
+            paths?.preview,
+            paths?.thumbnail,
+            title
+        ].compactMap { $0 }
+        return candidates.contains { candidate in
+            let base = (candidate.components(separatedBy: "?").first ?? candidate).lowercased()
+            return base.hasSuffix(".gif")
+        }
     }
     
     var formattedDate: String {

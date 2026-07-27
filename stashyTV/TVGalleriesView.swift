@@ -184,7 +184,7 @@ struct TVGalleriesView: View {
                 .padding(.bottom, 80)
             }
         }
-        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60) }
+        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60).focusable(false) }
     }
 
     @ViewBuilder
@@ -333,6 +333,15 @@ struct TVGalleryDetailView: View {
         .onAppear {
             loadGalleryData()
         }
+        .onChange(of: viewModel.galleries) { _, galleries in
+            // Statt fixem 0.5s-Timer die Galerie zuweisen, sobald die Liste
+            // vom Fetch zurückkommt — vermeidet Race bei langsamen Verbindungen,
+            // bei denen der Timer leer lieferte und `gallery` nil blieb.
+            if gallery == nil, let match = galleries.first(where: { $0.id == galleryId }) {
+                gallery = match
+                isLoadingGallery = false
+            }
+        }
     }
 
     @ViewBuilder
@@ -411,13 +420,16 @@ struct TVGalleryDetailView: View {
     }
 
     private func loadGalleryData() {
+        // Vorab prüfen, ob die Galerie bereits in der (ggf. noch nicht geleerten)
+        // Liste enthalten ist — dann kein Refetch nötig.
+        if gallery == nil, let match = viewModel.galleries.first(where: { $0.id == galleryId }) {
+            gallery = match
+        }
         if !isLoadingGallery && gallery == nil {
             isLoadingGallery = true
             viewModel.fetchGalleries(sortBy: .titleAsc, isInitialLoad: true)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                self.gallery = viewModel.galleries.first(where: { $0.id == galleryId })
-                self.isLoadingGallery = false
-            }
+            // Die eigentliche Zuweisung übernimmt `.onChange(of: viewModel.galleries)`,
+            // sobald der Fetch zurückkommt — kein fixer Timer mehr, der raced.
         }
         viewModel.fetchGalleryImages(galleryId: galleryId, isInitialLoad: true)
     }

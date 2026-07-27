@@ -302,7 +302,7 @@ struct TVSettingsView: View {
         }
             // Prevent the last rows from being clipped behind the Tab bar / safe area.
             .safeAreaInset(edge: .bottom) {
-                Color.clear.frame(height: 80)
+                Color.clear.frame(height: 80).focusable(false)
             }
             .sheet(isPresented: $showingAddServer) {
                 TVServerFormView(server: nil) { newServer in

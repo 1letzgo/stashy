@@ -10,6 +10,21 @@ import SwiftUI
 
 enum CatalogFilterSortSheetLayout {
     static let labelColumnWidth: CGFloat = 80
+    /// Matches Asc/Desc chip row so Filter and Sort cards share the same height.
+    static let controlCardMinHeight: CGFloat = 52
+}
+
+extension View {
+    /// Shared chrome for Filter / Sort control cards in catalog sheets.
+    func catalogFilterSortControlCardChrome() -> some View {
+        self
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .frame(maxWidth: .infinity, minHeight: CatalogFilterSortSheetLayout.controlCardMinHeight, alignment: .center)
+            .background(Color.secondaryAppBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, 16)
+    }
 }
 
 // MARK: - Shared chips / rows
@@ -586,12 +601,7 @@ struct PerformersCatalogFilterSortSheet: View {
             .tint(appearance.tintColor)
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
+        .catalogFilterSortControlCardChrome()
     }
 
     private var performerSortCard: some View {
@@ -648,12 +658,7 @@ struct PerformersCatalogFilterSortSheet: View {
             .labelsHidden()
             .tint(appearance.tintColor)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
+        .catalogFilterSortControlCardChrome()
     }
 
     private var performerLiveChipsCard: some View {
@@ -828,12 +833,7 @@ struct TagsCatalogFilterSortSheet: View {
             .tint(appearance.tintColor)
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
+        .catalogFilterSortControlCardChrome()
     }
 
     private var tagSortCard: some View {
@@ -886,12 +886,7 @@ struct TagsCatalogFilterSortSheet: View {
             .labelsHidden()
             .tint(appearance.tintColor)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
+        .catalogFilterSortControlCardChrome()
     }
 
     private var tagLiveChipsCard: some View {
@@ -1011,12 +1006,7 @@ struct StudiosCatalogFilterSortSheet: View {
             .tint(appearance.tintColor)
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
+        .catalogFilterSortControlCardChrome()
     }
 
     private var studioSortCard: some View {
@@ -1069,12 +1059,7 @@ struct StudiosCatalogFilterSortSheet: View {
             .labelsHidden()
             .tint(appearance.tintColor)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
+        .catalogFilterSortControlCardChrome()
     }
 
     private var studioLiveChipsCard: some View {
@@ -1279,12 +1264,7 @@ struct GalleriesCatalogFilterSortSheet: View {
             .tint(appearance.tintColor)
             .frame(maxWidth: .infinity, alignment: .trailing)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
+        .catalogFilterSortControlCardChrome()
     }
 
     private var gallerySortCard: some View {
@@ -1337,12 +1317,7 @@ struct GalleriesCatalogFilterSortSheet: View {
             .labelsHidden()
             .tint(appearance.tintColor)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
+        .catalogFilterSortControlCardChrome()
     }
 
     private var galleryLiveChipsCard: some View {
@@ -1587,12 +1562,7 @@ struct ImagesCatalogFilterSortSheet: View {
                 .frame(maxWidth: .infinity, alignment: .trailing)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
+        .catalogFilterSortControlCardChrome()
     }
 
     private var imageSortCard: some View {
@@ -1645,12 +1615,7 @@ struct ImagesCatalogFilterSortSheet: View {
             .labelsHidden()
             .tint(appearance.tintColor)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
+        .catalogFilterSortControlCardChrome()
     }
 
     private var imageMediaTypeCard: some View {
@@ -1666,12 +1631,7 @@ struct ImagesCatalogFilterSortSheet: View {
             }
             Spacer(minLength: 0)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
+        .catalogFilterSortControlCardChrome()
     }
 
     private var imageLiveChipsCard: some View {

@@ -53,6 +53,24 @@ struct ReelsModeSettingsView: View {
                 Text("Immersive Scaling stretches content to fill the full screen when orientation matches the video. Continuous Play automatically advances to the next video instead of looping.")
             }
             .listRowBackground(Color.secondaryAppBackground)
+
+            Section {
+                Toggle("Square Crop (1:1)", isOn: Binding(
+                    get: { UserDefaults.standard.object(forKey: "stashline_square_crop") as? Bool ?? false },
+                    set: { UserDefaults.standard.set($0, forKey: "stashline_square_crop") }
+                ))
+                .tint(appearanceManager.tintColor)
+                Toggle("Include GIFs", isOn: Binding(
+                    get: { UserDefaults.standard.object(forKey: "stashline_include_gifs") as? Bool ?? false },
+                    set: { UserDefaults.standard.set($0, forKey: "stashline_include_gifs") }
+                ))
+                .tint(appearanceManager.tintColor)
+            } header: {
+                Text("Pics Feed")
+            } footer: {
+                Text("Crops images to a square from the center. Multi-image groups show a thumbnail carousel below. GIFs appear as still thumbnails in the feed and animate in fullscreen.")
+            }
+            .listRowBackground(Color.secondaryAppBackground)
             
             Section {
                 ForEach(tabManager.reelsModes) { modeConfig in

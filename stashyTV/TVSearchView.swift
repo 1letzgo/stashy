@@ -57,15 +57,17 @@ struct TVSearchView: View {
                     .padding(.vertical, 48)
                     .padding(.horizontal, 40)
                 }
-                .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60) }
+                .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60).focusable(false) }
             }
         }
         .background(Color.appBackground)
-        .onAppear {
-            // Kurz verzögern, damit die Fokus-Engine den Tab gewählt hat.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                isSearchFieldFocused = true
-            }
+        .task {
+            // Statt fixem 0.2s-`asyncAfter`, das sich mit dem `onAppear`-Rendering
+            // verschieben kann: kurz dem Runloop Zeit lassen, dann fokussieren.
+            // `task` wird beim Disappear automatisch abgebrochen, sodass kein
+            // Fokus-Steal nach Verlassen des Tabs mehr passiert.
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            isSearchFieldFocused = true
         }
         .onChange(of: searchQuery) { _, newValue in
             scheduleDebouncedSearch(newValue)

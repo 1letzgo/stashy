@@ -1194,7 +1194,7 @@ struct GalleryItemView: View {
 
 struct FullScreenImageView: View {
     @Binding var images: [StashImage]
-    @State var selectedImageId: String
+    let selectedImageId: String
     var onLoadMore: (() -> Void)?
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @StateObject private var viewModel = StashDBViewModel()
@@ -1209,111 +1209,123 @@ struct FullScreenImageView: View {
     @State private var showingSetPerformerImagePicker = false
     @State private var performerImageTargetPerformers: [GalleryPerformer] = []
 
-    var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
+    init(images: Binding<[StashImage]>, selectedImageId: String, onLoadMore: (() -> Void)? = nil) {
+        self._images = images
+        self.selectedImageId = selectedImageId
+        self.onLoadMore = onLoadMore
+        self._currentVisibleId = State(initialValue: selectedImageId)
+    }
 
-            ScrollView(.vertical, showsIndicators: false) {
-                LazyVStack(spacing: 0) {
-                    ForEach(Array(images.enumerated()), id: \.element.id) { index, image in
-                        GalleryItemView(
-                            image: image,
-                            isMuted: $isMuted,
-                            viewModel: viewModel,
-                            images: $images,
-                            showUI: $showUI,
-                            isZoomed: $isMediaZoomed,
-                            onInteraction: { }
-                        )
-                        .scrollDisabled(isMediaZoomed)
-                        .containerRelativeFrame([.horizontal, .vertical])
-                        .background(Color.black)
-                        .id(image.id)
-                        .onAppear {
-                            if image.id == images.last?.id {
-                                onLoadMore?()
+    var body: some View {
+        ScrollViewReader { proxy in
+            ZStack {
+                Color.black.ignoresSafeArea()
+
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVStack(spacing: 0) {
+                        ForEach(Array(images.enumerated()), id: \.element.id) { index, image in
+                            GalleryItemView(
+                                image: image,
+                                isMuted: $isMuted,
+                                viewModel: viewModel,
+                                images: $images,
+                                showUI: $showUI,
+                                isZoomed: $isMediaZoomed,
+                                onInteraction: { }
+                            )
+                            .scrollDisabled(isMediaZoomed)
+                            .containerRelativeFrame([.horizontal, .vertical])
+                            .background(Color.black)
+                            .id(image.id)
+                            .onAppear {
+                                if image.id == images.last?.id {
+                                    onLoadMore?()
+                                }
                             }
                         }
                     }
+                    .scrollTargetLayout()
                 }
-                .scrollTargetLayout()
+                .scrollDisabled(isMediaZoomed)
+                .scrollTargetBehavior(.paging)
+                .scrollPosition(id: $currentVisibleId)
+                .scrollContentBackground(.hidden)
+                .background(Color.black)
+                .onScrollPhaseChange { oldPhase, newPhase in
+                    // Scrolling no longer affects UI visibility
+                }
+                .onChange(of: showUI) { _, newValue in
+                    // UI state changes are now purely manual
+                }
+                .ignoresSafeArea()
             }
-            .scrollDisabled(isMediaZoomed)
-            .scrollTargetBehavior(.paging)
-            .scrollPosition(id: $currentVisibleId)
-            .scrollContentBackground(.hidden)
-            .background(Color.black)
-            .onScrollPhaseChange { oldPhase, newPhase in
-                // Scrolling no longer affects UI visibility
-            }
-            .onChange(of: showUI) { _, newValue in
-                // UI state changes are now purely manual
-            }
+            .background(Color.black.ignoresSafeArea())
             .ignoresSafeArea()
-        }
-        .background(Color.black.ignoresSafeArea())
-        .ignoresSafeArea()
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .ignoresSafeArea()
-        .onDisappear {
-            showUI = true
-        }
-        .toolbarColorScheme(.dark, for: .navigationBar)
-        .toolbar(showUI ? .visible : .hidden, for: .navigationBar)
-        .toolbar(.hidden, for: .tabBar)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                HStack(spacing: 16) {
-                    Button {
-                        shareCurrentImage()
-                    } label: {
-                        Image(systemName: "square.and.arrow.up")
-                            .foregroundColor(appearanceManager.tintColor)
-                    }
-                    let targetId = currentVisibleId ?? selectedImageId
-                    if let currentImage = images.first(where: { $0.id == targetId }),
-                       let performers = currentImage.performers, !performers.isEmpty {
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .ignoresSafeArea()
+            .onDisappear {
+                showUI = true
+            }
+            .task(id: selectedImageId) {
+                currentVisibleId = selectedImageId
+                try? await Task.sleep(for: .milliseconds(80))
+                currentVisibleId = selectedImageId
+                proxy.scrollTo(selectedImageId, anchor: .top)
+            }
+            .toolbarColorScheme(.dark, for: .navigationBar)
+            .toolbar(showUI ? .visible : .hidden, for: .navigationBar)
+            .toolbar(.hidden, for: .tabBar)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    HStack(spacing: 16) {
                         Button {
-                            performerImageTargetPerformers = performers
-                            showingSetPerformerImagePicker = true
+                            shareCurrentImage()
                         } label: {
-                            Image(systemName: "person.crop.circle.badge.plus")
+                            Image(systemName: "square.and.arrow.up")
+                                .foregroundColor(appearanceManager.tintColor)
+                        }
+                        let targetId = currentVisibleId ?? selectedImageId
+                        if let currentImage = images.first(where: { $0.id == targetId }),
+                           let performers = currentImage.performers, !performers.isEmpty {
+                            Button {
+                                performerImageTargetPerformers = performers
+                                showingSetPerformerImagePicker = true
+                            } label: {
+                                Image(systemName: "person.crop.circle.badge.plus")
+                                    .foregroundColor(appearanceManager.tintColor)
+                            }
+                        }
+                        Button(role: .destructive) {
+                            showingDeleteConfirmation = true
+                        } label: {
+                            Image(systemName: "trash")
                                 .foregroundColor(appearanceManager.tintColor)
                         }
                     }
-                    Button(role: .destructive) {
-                        showingDeleteConfirmation = true
-                    } label: {
-                        Image(systemName: "trash")
-                            .foregroundColor(appearanceManager.tintColor)
+                }
+            }
+            .sheet(isPresented: $showingShare) {
+                ShareSheet(items: shareItems)
+            }
+            .alert("Set as Performer Image?", isPresented: $showingSetPerformerImagePicker) {
+                ForEach(performerImageTargetPerformers) { performer in
+                    Button("Okay") {
+                        setPerformerImage(performer: performer)
                     }
                 }
+                Button("Cancel", role: .cancel) { }
+            } message: {
+                Text("Update the profile picture for the selected performer.")
             }
-        }
-        .sheet(isPresented: $showingShare) {
-            ShareSheet(items: shareItems)
-        }
-        .alert("Set as Performer Image?", isPresented: $showingSetPerformerImagePicker) {
-            ForEach(performerImageTargetPerformers) { performer in
-                Button("Okay") {
-                    setPerformerImage(performer: performer)
+            .alert("Really delete image?", isPresented: $showingDeleteConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) {
+                    deleteCurrentImage()
                 }
+            } message: {
+                Text("This image will be permanently deleted. This action cannot be undone.")
             }
-            Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Update the profile picture for the selected performer.")
-        }
-        .alert("Really delete image?", isPresented: $showingDeleteConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
-                deleteCurrentImage()
-            }
-        } message: {
-            Text("This image will be permanently deleted. This action cannot be undone.")
-        }
-        .onAppear {
-            currentVisibleId = selectedImageId
         }
     }
 

@@ -28,14 +28,14 @@ struct StashLineView: View {
     @State private var programmaticScrollRowId: String?
     @State private var cachedPosts: [StashLinePost] = []
     /// Vollbild-Galerie auf Feed-Ebene (nicht pro `LazyVStack`-Zeile).
-    @State private var isFullScreenPresented = false
     @State private var fullScreenImages: [StashImage] = []
-    @State private var fullScreenSelectedImageId: String = ""
+    @State private var fullScreenPresentation: StashLineFullScreenPresentation?
     @State private var lastFullScreenImageIds: Set<String> = []
     /// Performer-Detail wie die Bild-Galerie: `fullScreenCover` auf Feed-Ebene (kein Push / kein Scroll-Sprung).
     @State private var performerDetailPresented: GalleryPerformer?
     @State private var sessionKeyCache: [String: String] = [:] // imageId -> sessionKey ("" if absent)
     @State private var shouldScrollToTopAfterReload: Bool = false
+    @AppStorage("stashline_include_gifs") private var includeGifsInTimeline = false
     init(
         performerFilter: GalleryPerformer? = nil,
         isEmbedded: Bool = false,
@@ -256,7 +256,7 @@ struct StashLineView: View {
             // Im embedded Reels-Pics-Mode hat der Parent bereits aus der Session restored;
             // hier nicht mehr mit TabManager-Defaults überschreiben.
             if !usesExternalListFilters {
-                let sortStr = TabManager.shared.getSortOption(for: .stashline) ?? "createdAtDesc"
+                let sortStr = TabManager.shared.getSortOption(for: .stashline) ?? "dateDesc"
                 if let sort = StashDBViewModel.ImageSortOption(rawValue: sortStr) {
                     stashLineListFilters.selectedSortOption = sort
                 }
@@ -335,20 +335,23 @@ struct StashLineView: View {
         .onChange(of: performerFilter) { _, _ in
             performSearch()
         }
+        .onChange(of: includeGifsInTimeline) { _, _ in
+            performSearch()
+        }
         .onChange(of: externalPerformerFilter) { _, newValue in
             performerFilter = newValue
         }
-        .fullScreenCover(isPresented: $isFullScreenPresented) {
+        .fullScreenCover(item: $fullScreenPresentation) { presentation in
             NavigationStack {
                 FullScreenImageView(
                     images: $fullScreenImages,
-                    selectedImageId: fullScreenSelectedImageId,
+                    selectedImageId: presentation.selectedImageId,
                     onLoadMore: nil
                 )
                 .toolbar {
                     ToolbarItem(placement: .navigationBarLeading) {
                         Button {
-                            isFullScreenPresented = false
+                            fullScreenPresentation = nil
                         } label: {
                             Image(systemName: "xmark")
                                 .font(.system(size: 14, weight: .bold))
@@ -466,11 +469,7 @@ struct StashLineView: View {
     }
 
     private func computeGroupedPosts() -> [StashLinePost] {
-        // Future grouping rules (requested):
-        // - Group while sorting by Date, Created, or Name (title).
-        // - Grouping is *consecutive*: iterate the already-sorted list and keep
-        //   appending as long as performer-set + gallery-set + session (when present) stay identical.
-        // - Under Date or Name sort we re-order within the primary bucket so sets stay contiguous.
+        // Group when performer, gallery, created (day) and session key match; split on different session.
         let shouldGroupConsecutively: Bool = {
             switch stashLineListFilters.selectedSortOption {
             case .dateAsc, .dateDesc, .createdAtAsc, .createdAtDesc, .titleAsc, .titleDesc:
@@ -480,159 +479,29 @@ struct StashLineView: View {
             }
         }()
 
-        func performerKey(_ image: StashImage) -> String {
-            let ids = (image.performers ?? []).map(\.id).sorted()
-            return ids.joined(separator: ",")
-        }
-
-        func galleryKey(_ image: StashImage) -> String {
-            // Use only the first (alphabetically) gallery ID so images that share
-            // a gallery but also belong to other galleries still group together.
-            return (image.galleries ?? []).map(\.id).sorted().first ?? ""
-        }
-
-        func sessionKey(_ image: StashImage) -> String {
-            // Optional grouping discriminator: if the stash-generated filename contains
-            // a session timestamp between "_-_" and the trailing "_<digits>", use it.
-            // Example: "042_-_2026-01-12_12-39-43_0.jpg" -> "2026-01-12_12-39-43"
-            if let cached = sessionKeyCache[image.id] { return cached }
-            let path = image.visual_files?.first?.path ?? image.paths?.image
-            guard let path else {
-                sessionKeyCache[image.id] = ""
-                return ""
-            }
-            let filename = URL(fileURLWithPath: path).deletingPathExtension().lastPathComponent
-            // Fast pre-check to avoid regex unless it can possibly match.
-            guard filename.contains("_-_") else {
-                sessionKeyCache[image.id] = ""
-                return ""
-            }
-            guard let match = filename.range(of: #"(?<=_-_).+(?=_\d+$)"#, options: .regularExpression) else {
-                sessionKeyCache[image.id] = ""
-                return ""
-            }
-            let key = String(filename[match])
-            sessionKeyCache[image.id] = key
-            return key
-        }
-
-        /// Order within a merged set: lexicographic order of the **full file name** (last path component), not only the trailing `_0` / `_1` index.
-        func fileNameSortKey(_ image: StashImage) -> String {
-            let raw = image.visual_files?.first?.path ?? image.paths?.image ?? ""
-            guard !raw.isEmpty else { return "" }
-            let path = raw.components(separatedBy: "?").first ?? raw
-            return URL(fileURLWithPath: path).lastPathComponent
-        }
-
-        func withinGroupSort(_ a: StashImage, _ b: StashImage) -> Bool {
-            let fa = fileNameSortKey(a)
-            let fb = fileNameSortKey(b)
-            if fa != fb { return fa.localizedStandardCompare(fb) == .orderedAscending }
-            return a.id < b.id
-        }
-
-        // Segment key:
-        // - Always uses performer set
-        // - Uses sessionKey when available (best discriminator for "image sets")
-        // - Falls back to primary gallery only when sessionKey is missing
-        func groupKey(_ image: StashImage) -> String {
-            let session = sessionKey(image)
-            if !session.isEmpty {
-                return "\(performerKey(image))|\(galleryKey(image))|\(session)"
-            }
-            return "\(performerKey(image))|\(galleryKey(image))"
-        }
-
+        // Date+filename order is applied in `fetchImages`; preserve that here for grouping.
         guard shouldGroupConsecutively else {
-            // No grouping in other sorts: keep the feed exactly as delivered.
             return viewModel.allImages.map { StashLinePost(images: [$0]) }
         }
 
-        // Local tie-breakers for "Sort by Date":
-        // Stash often returns images with identical `date` in an arbitrary order
-        // (e.g. many galleries on the same day interleaved). Since our grouping
-        // is consecutive, we re-order *within the same date bucket* to keep
-        // galleries/sets contiguous, without changing the overall date ordering.
-        let imagesForGrouping: [StashImage] = {
-            switch stashLineListFilters.selectedSortOption {
-            case .titleAsc, .titleDesc:
-                let ascending = (stashLineListFilters.selectedSortOption == .titleAsc)
-                func titleKey(_ img: StashImage) -> String {
-                    img.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-                }
-                return viewModel.allImages.sorted { a, b in
-                    let xa = titleKey(a)
-                    let xb = titleKey(b)
-                    if xa != xb {
-                        return ascending ? (xa.localizedStandardCompare(xb) == .orderedAscending)
-                            : (xa.localizedStandardCompare(xb) == .orderedDescending)
-                    }
+        let imagesForGrouping = viewModel.allImages
 
-                    let ga = galleryKey(a)
-                    let gb = galleryKey(b)
-                    if ga != gb { return ga < gb }
-
-                    let sa = sessionKey(a)
-                    let sb = sessionKey(b)
-                    if sa != sb { return sa < sb }
-
-                    return withinGroupSort(a, b)
-                }
-            case .dateAsc, .dateDesc:
-                let ascending = (stashLineListFilters.selectedSortOption == .dateAsc)
-                func timeKey(_ img: StashImage) -> String {
-                    // When sorting by date, fall back to createdAt if date missing.
-                    // Both are ISO-like strings, so lexical compare is stable enough here.
-                    return (img.date?.isEmpty == false ? img.date! : (img.createdAt ?? ""))
-                }
-                return viewModel.allImages.sorted { a, b in
-                    let ta = timeKey(a)
-                    let tb = timeKey(b)
-                    if ta != tb { return ascending ? (ta < tb) : (ta > tb) }
-
-                    let ga = galleryKey(a)
-                    let gb = galleryKey(b)
-                    if ga != gb { return ga < gb }
-
-                    let sa = sessionKey(a)
-                    let sb = sessionKey(b)
-                    if sa != sb { return sa < sb }
-
-                    return withinGroupSort(a, b)
-                }
-            default:
-                return viewModel.allImages
-            }
-        }()
-
-        var posts: [StashLinePost] = []
-        var currentKey: String? = nil
-        var buffer: [StashImage] = []
-
-        func flush() {
-            guard !buffer.isEmpty else { return }
-            defer { buffer.removeAll(keepingCapacity: true) }
-            posts.append(StashLinePost(images: buffer.sorted(by: withinGroupSort)))
-        }
+        var groupedImages: [String: [StashImage]] = [:]
+        var groupOrder: [String] = []
 
         for image in imagesForGrouping {
-            let key = groupKey(image)
-            if currentKey == nil {
-                currentKey = key
-                buffer = [image]
-                continue
+            let key = StashImageFilenameKeys.groupKey(for: image, sessionCache: &sessionKeyCache)
+            if groupedImages[key] == nil {
+                groupOrder.append(key)
+                groupedImages[key] = []
             }
-            if key == currentKey {
-                buffer.append(image)
-            } else {
-                flush()
-                currentKey = key
-                buffer = [image]
-            }
+            groupedImages[key]?.append(image)
         }
-        flush()
 
-        return posts
+        return groupOrder.compactMap { key in
+            guard let images = groupedImages[key], !images.isEmpty else { return nil }
+            return StashLinePost(images: images.sorted(by: StashImageFilenameKeys.withinGroupSort))
+        }
     }
 
     private var feedContent: some View {
@@ -647,9 +516,8 @@ struct StashLineView: View {
                             onPerformerTap?(performer)
                         } : nil, onRequestFullScreen: { images, selectedId in
                             fullScreenImages = images
-                            fullScreenSelectedImageId = selectedId
                             lastFullScreenImageIds = Set(images.map(\.id))
-                            isFullScreenPresented = true
+                            fullScreenPresentation = StashLineFullScreenPresentation(selectedImageId: selectedId)
                         }, onRequestPerformerDetail: { performerDetailPresented = $0 })
                         .id(post.id)
                         .onAppear {
@@ -686,6 +554,11 @@ struct StashLineView: View {
 
 // MARK: - Post Model
 
+private struct StashLineFullScreenPresentation: Identifiable {
+    let id = UUID()
+    let selectedImageId: String
+}
+
 struct StashLinePost: Identifiable {
     let id: String
     let images: [StashImage]
@@ -716,17 +589,25 @@ struct StashLinePostView: View {
     @State private var heartOpacity: Double = 0
     @State private var oCounters: [String: Int]
     @State private var ratings: [String: Int]
-    @State private var carouselIndex = 0
+    @State private var visibleCarouselImageId: String
     @State private var isExpanded = false
     /// Bei mehreren Bildern: Seitenverhältnis der Gruppe im expandierten Zustand bleibt vom **hier** gewählten Bild,
     /// bis erneut doppelt getippt wird — unabhängig vom Wischen zu anderen Seiten.
     @State private var expandedHeightAnchorIndex: Int? = nil
     @AppStorage("stashline_load_full_images") private var loadFullImages: Bool = true
+    @AppStorage("stashline_square_crop") private var squareCrop = false
 
     private let actionIconSize: CGFloat = 16
+    private let setThumbnailSize: CGFloat = 52
     private let actionIconFrame: CGFloat = 22
 
-    var image: StashImage { post.images[carouselIndex] }
+    private var carouselIndex: Int {
+        post.images.firstIndex(where: { $0.id == visibleCarouselImageId }) ?? 0
+    }
+
+    var image: StashImage {
+        post.images.first(where: { $0.id == visibleCarouselImageId }) ?? post.images[0]
+    }
     var localOCounter: Int { oCounters[image.id] ?? image.o_counter ?? 0 }
     var localRating: Int { ratings[image.id] ?? image.rating100 ?? 0 }
     
@@ -752,6 +633,7 @@ struct StashLinePostView: View {
         self.onRequestPerformerDetail = onRequestPerformerDetail
         self._oCounters = State(initialValue: [:])
         self._ratings = State(initialValue: [:])
+        self._visibleCarouselImageId = State(initialValue: post.images.first?.id ?? "")
     }
 
     var body: some View {
@@ -763,18 +645,25 @@ struct StashLinePostView: View {
             imageArea
                 .overlay(alignment: .bottom) { actionBar }
                 .overlay(alignment: .topLeading) {
-                    Button {
-                        onRequestFullScreen?(post.images, image.id)
-                    } label: {
-                        Image(systemName: "arrow.up.left.and.arrow.down.right")
-                            .font(.system(size: 12, weight: .semibold))
-                            .foregroundColor(.white)
-                            .padding(8)
-                            .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                            .clipShape(Circle())
+                    if !squareCrop {
+                        Button {
+                            onRequestFullScreen?(post.images, image.id)
+                        } label: {
+                            Image(systemName: "arrow.up.left.and.arrow.down.right")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.white)
+                                .padding(8)
+                                .background(Color.black.opacity(DesignTokens.Opacity.badge))
+                                .clipShape(Circle())
+                        }
+                        .padding(.top, image.isGifFile ? 42 : 10)
+                        .padding(.leading, 10)
                     }
-                    .padding(10)
                 }
+
+            if squareCrop && post.isSet {
+                setThumbnailCarousel
+            }
 
             HStack(alignment: .top) {
                 if let title = image.title, !title.isEmpty {
@@ -971,6 +860,10 @@ struct StashLinePostView: View {
         return nativeAspectRatio(for: anchor)
     }
 
+    private var displayAspectRatio: CGFloat {
+        squareCrop ? 1.0 : groupDisplayAspectRatio
+    }
+
     private func nativeAspectRatio(for img: StashImage) -> CGFloat {
         if let w = img.visual_files?.first?.width, let h = img.visual_files?.first?.height, h > 0 {
             return CGFloat(w) / CGFloat(h)
@@ -981,6 +874,7 @@ struct StashLinePostView: View {
     /// Doppel-Tap auf einer Carousel-Seite bzw. dem Einzelbild: Expand/Collapse und klare Zuordnung zum Seitenindex
     /// (vermeidet, dass `scrollPosition` und äußeres Tap-Gesture noch auf Seite 1 stehen, obwohl Seite 2 sichtbar ist).
     private func handleStashLineImageDoubleTap(carouselPageIndex index: Int) {
+        guard !squareCrop else { return }
         guard post.images.indices.contains(index) else { return }
         withAnimation(.easeInOut(duration: 0.25)) {
             if post.isSet {
@@ -989,10 +883,10 @@ struct StashLinePostView: View {
                         isExpanded = false
                         expandedHeightAnchorIndex = nil
                     } else {
-                        carouselIndex = index
+                        visibleCarouselImageId = post.images[index].id
                     }
                 } else {
-                    carouselIndex = index
+                    visibleCarouselImageId = post.images[index].id
                     expandedHeightAnchorIndex = index
                     isExpanded = true
                 }
@@ -1003,37 +897,54 @@ struct StashLinePostView: View {
         }
     }
 
+    private func openFullScreen(imageId: String) {
+        onRequestFullScreen?(post.images, imageId)
+    }
+
+    /// Feed always shows still thumbnails for GIFs; full animation is fullscreen-only.
+    private func feedImageURL(for img: StashImage) -> URL? {
+        if img.isGifFile {
+            return img.thumbnailURL
+        }
+        return loadFullImages ? (img.imageURL ?? img.previewURL ?? img.thumbnailURL) : img.thumbnailURL
+    }
+
+    private var gifBadgeLabel: some View {
+        Text("GIF")
+            .font(.caption2).fontWeight(.semibold)
+            .foregroundColor(.white)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.black.opacity(DesignTokens.Opacity.badge))
+            .clipShape(Capsule())
+            .padding(8)
+    }
+
     private var imageArea: some View {
         ZStack(alignment: .bottom) {
             if post.isSet {
                 ZStack(alignment: .topTrailing) {
-                    GeometryReader { geo in
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            LazyHStack(spacing: 0) {
-                                ForEach(Array(post.images.enumerated()), id: \.offset) { index, img in
-                                    singleImageView(img)
-                                        .frame(width: geo.size.width, height: geo.size.height)
-                                        .scrollTransition(.interactive, axis: .horizontal) { content, phase in
-                                            content.opacity(phase.isIdentity ? 1 : 0.97)
-                                        }
-                                        .id(index)
-                                        .contentShape(Rectangle())
-                                        .onTapGesture(count: 2) {
-                                            handleStashLineImageDoubleTap(carouselPageIndex: index)
-                                        }
+                    TabView(selection: $visibleCarouselImageId) {
+                        ForEach(post.images) { img in
+                            singleImageView(img)
+                                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                .contentShape(Rectangle())
+                                .onTapGesture(count: 2) {
+                                    if !squareCrop,
+                                       let index = post.images.firstIndex(where: { $0.id == img.id }) {
+                                        handleStashLineImageDoubleTap(carouselPageIndex: index)
+                                    }
                                 }
-                            }
-                            .scrollTargetLayout()
+                                .onTapGesture {
+                                    if squareCrop {
+                                        openFullScreen(imageId: img.id)
+                                    }
+                                }
+                                .tag(img.id)
                         }
-                        .scrollTargetBehavior(.viewAligned)
-                        .scrollPosition(id: Binding(
-                            get: { carouselIndex },
-                            set: { carouselIndex = $0 ?? 0 }
-                        ))
-                        .frame(width: geo.size.width, height: geo.size.height)
                     }
-                    .aspectRatio(groupDisplayAspectRatio, contentMode: .fit)
-                    .clipped()
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .aspectRatio(displayAspectRatio, contentMode: .fit)
 
                     // Page indicator pill — top right
                     Text("\(carouselIndex + 1)/\(post.images.count)")
@@ -1051,10 +962,17 @@ struct StashLinePostView: View {
                         .frame(width: geo.size.width, height: geo.size.height)
                         .contentShape(Rectangle())
                         .onTapGesture(count: 2) {
-                            handleStashLineImageDoubleTap(carouselPageIndex: 0)
+                            if !squareCrop {
+                                handleStashLineImageDoubleTap(carouselPageIndex: 0)
+                            }
+                        }
+                        .onTapGesture {
+                            if squareCrop {
+                                openFullScreen(imageId: image.id)
+                            }
                         }
                 }
-                .aspectRatio(groupDisplayAspectRatio, contentMode: .fit)
+                .aspectRatio(displayAspectRatio, contentMode: .fit)
                 .clipped()
             }
 
@@ -1070,22 +988,34 @@ struct StashLinePostView: View {
         }
         .frame(maxWidth: .infinity)
         .clipped()
+        .overlay(alignment: .topLeading) {
+            if image.isGifFile {
+                gifBadgeLabel
+            }
+        }
     }
 
     @ViewBuilder
     private func singleImageView(_ img: StashImage) -> some View {
         ZStack {
             Color.studioHeaderGray
-            let url = loadFullImages ? (img.imageURL ?? img.previewURL ?? img.thumbnailURL) : img.thumbnailURL
-            if let url {
+            if let url = feedImageURL(for: img) {
                 CustomAsyncImage(url: url) { loader in
                     if loader.isLoading {
                         ProgressView().frame(maxWidth: .infinity)
                     } else if let loaded = loader.image {
-                        loaded
-                            .resizable()
-                            .scaledToFit()
-                            .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        Group {
+                            if squareCrop {
+                                loaded
+                                    .resizable()
+                                    .scaledToFill()
+                            } else {
+                                loaded
+                                    .resizable()
+                                    .scaledToFit()
+                            }
+                        }
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
                     } else {
                         Image(systemName: "photo").font(.system(size: 40)).foregroundColor(.secondary)
                             .frame(maxWidth: .infinity)
@@ -1097,7 +1027,72 @@ struct StashLinePostView: View {
             }
         }
         .clipped()
-        .allowsHitTesting(false)
+    }
+
+    private var setThumbnailCarousel: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(Array(post.images.enumerated()), id: \.offset) { index, img in
+                        Button {
+                            withAnimation(.easeInOut(duration: 0.2)) {
+                                visibleCarouselImageId = img.id
+                            }
+                        } label: {
+                            setThumbnail(for: img, isSelected: img.id == visibleCarouselImageId)
+                        }
+                        .buttonStyle(.plain)
+                        .id(img.id)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+            }
+            .onChange(of: visibleCarouselImageId) { _, newId in
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    proxy.scrollTo(newId, anchor: .center)
+                }
+            }
+            .onAppear {
+                proxy.scrollTo(visibleCarouselImageId, anchor: .center)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func setThumbnail(for img: StashImage, isSelected: Bool) -> some View {
+        let borderWidth: CGFloat = isSelected ? 2 : 0
+        let size = setThumbnailSize - borderWidth * 2
+
+        ZStack {
+            Color.studioHeaderGray
+            if let url = img.thumbnailURL {
+                CustomAsyncImage(url: url) { loader in
+                    if loader.isLoading {
+                        ProgressView().scaleEffect(0.6)
+                    } else if let loaded = loader.image {
+                        loaded
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        Image(systemName: "photo")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                }
+            } else {
+                Image(systemName: "photo")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
+        .overlay {
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
+                .stroke(appearanceManager.tintColor, lineWidth: borderWidth)
+        }
+        .frame(width: setThumbnailSize, height: setThumbnailSize)
     }
 
     // MARK: - Action Bar

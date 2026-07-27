@@ -1738,12 +1738,7 @@ struct SceneLiveFilterSheet: View {
                         .tint(appearance.tintColor)
                         .frame(maxWidth: .infinity, alignment: .trailing)
                     }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color.secondaryAppBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .padding(.horizontal, 16)
+                    .catalogFilterSortControlCardChrome()
 
                     if useMarkerSort {
                         markerSortControlsCard
@@ -1974,12 +1969,7 @@ struct SceneLiveFilterSheet: View {
             .accessibilityLabel("Sort field")
             .tint(appearance.tintColor)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
+        .catalogFilterSortControlCardChrome()
     }
 
     private var sortControlsCard: some View {
@@ -2043,12 +2033,7 @@ struct SceneLiveFilterSheet: View {
             .accessibilityLabel("Sort field")
             .tint(appearance.tintColor)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
+        .catalogFilterSortControlCardChrome()
     }
 
     @ViewBuilder
