@@ -504,7 +504,7 @@ struct SceneDetailView: View {
         guard let videoURL = activeScene.videoURL else { return }
 
         if player == nil {
-            print("🎬 Player initializing with URL: \(videoURL.absoluteString)")
+            print("🎬 Player initializing with URL: \(redactedURLString(videoURL))")
             player = createPlayer(for: videoURL)
             player?.isMuted = isMuted
             addTimeObserverIfNeeded()

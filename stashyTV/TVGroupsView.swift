@@ -135,7 +135,7 @@ struct TVGroupsView: View {
             ProgressView().scaleEffect(1.5)
             Text("Loading groups…")
                 .font(.title3)
-                .foregroundColor(.white.opacity(0.4))
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         Spacer()
@@ -147,12 +147,12 @@ struct TVGroupsView: View {
         VStack(spacing: 32) {
             Image(systemName: "rectangle.stack")
                 .font(.system(size: 80))
-                .foregroundColor(.white.opacity(0.1))
+                .foregroundColor(.secondary)
             
             Text("No Groups Found")
                 .font(.title2)
                 .fontWeight(.semibold)
-                .foregroundColor(.white.opacity(0.3))
+                .foregroundStyle(.secondary)
         }
         Spacer()
     }
@@ -325,7 +325,7 @@ struct TVGroupDetailView: View {
                     GridItem(.flexible(), alignment: .leading)
                 ], alignment: .leading, spacing: 12) {
                     if groupDetail != nil {
-                        Text("Cover").font(.title3).foregroundColor(.white.opacity(0.4))
+                        Text("Cover").font(.title3).foregroundStyle(.secondary)
                         HStack(spacing: 14) {
                             ForEach(CoverSide.allCases, id: \.self) { side in
                                 Button {
@@ -341,7 +341,7 @@ struct TVGroupDetailView: View {
                         }
                     }
                     if viewModel.totalGroupScenes > 0 {
-                        Text("Scenes").font(.title3).foregroundColor(.white.opacity(0.4))
+                        Text("Scenes").font(.title3).foregroundStyle(.secondary)
                         Text("\(viewModel.totalGroupScenes)").font(.title3).foregroundColor(.white)
                     }
                 }

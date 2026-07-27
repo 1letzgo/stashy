@@ -128,7 +128,7 @@ struct TVGalleriesView: View {
             ProgressView().scaleEffect(1.5)
             Text("Loading galleries…")
                 .font(.title3)
-                .foregroundColor(.white.opacity(0.4))
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         Spacer()
@@ -140,11 +140,11 @@ struct TVGalleriesView: View {
         VStack(spacing: 32) {
             Image(systemName: "photo.stack")
                 .font(.system(size: 80))
-                .foregroundColor(.white.opacity(0.1))
+                .foregroundColor(.secondary)
             Text("No Galleries Found")
                 .font(.title2)
                 .fontWeight(.semibold)
-                .foregroundColor(.white.opacity(0.3))
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         Spacer()
@@ -302,10 +302,10 @@ struct TVGalleryDetailView: View {
                         VStack(spacing: 16) {
                             Image(systemName: "photo")
                                 .font(.system(size: 48))
-                                .foregroundColor(.white.opacity(0.12))
+                                .foregroundColor(.secondary)
                             Text("No images in this gallery")
                                 .font(.title3)
-                                .foregroundColor(.white.opacity(0.4))
+                                .foregroundStyle(.secondary)
                         }
                         Spacer()
                     }
@@ -313,7 +313,7 @@ struct TVGalleryDetailView: View {
                 } else {
                     LazyVGrid(columns: imageColumns, alignment: .leading, spacing: 30) {
                         ForEach(viewModel.galleryImages.filter { !$0.isAnimated }) { image in
-                            NavigationLink(destination: TVImageDetailView(imageId: image.id, imageTitle: image.title ?? "Untitled").tvExitDismissable()) {
+                            NavigationLink(destination: TVImageDetailView(imageId: image.id, imageTitle: image.title ?? "Untitled", galleryId: galleryId)) {
                                 TVImageCardView(image: image)
                             }
                             .buttonStyle(.card)
@@ -366,7 +366,7 @@ struct TVGalleryDetailView: View {
                     .overlay(
                         Image(systemName: "photo.stack")
                             .font(.system(size: 56))
-                            .foregroundColor(.white.opacity(0.12))
+                            .foregroundColor(.secondary)
                     )
                     .frame(width: 400, height: 225)
                     .clipShape(RoundedRectangle(cornerRadius: 14))
@@ -385,27 +385,27 @@ struct TVGalleryDetailView: View {
                         if let details = gallery.details, !details.isEmpty {
                             Text(details)
                                 .font(.body)
-                                .foregroundColor(.white.opacity(0.5))
+                                .foregroundStyle(.secondary)
                                 .lineLimit(6)
                         }
 
                         Divider()
-                            .background(Color.white.opacity(0.1))
+                            .background(Color.secondary)
 
                         LazyVGrid(columns: [
                             GridItem(.fixed(240), alignment: .leading),
                             GridItem(.flexible(), alignment: .leading)
                         ], alignment: .leading, spacing: 12) {
                             if let count = gallery.imageCount {
-                                Text("Images").font(.title3).foregroundColor(.white.opacity(0.4))
+                                Text("Images").font(.title3).foregroundStyle(.secondary)
                                 Text("\(count)").font(.title3).foregroundColor(.white)
                             }
                             if let date = gallery.date, !date.isEmpty {
-                                Text("Date").font(.title3).foregroundColor(.white.opacity(0.4))
+                                Text("Date").font(.title3).foregroundStyle(.secondary)
                                 Text(date).font(.title3).foregroundColor(.white)
                             }
                             if let studio = gallery.studio {
-                                Text("Studio").font(.title3).foregroundColor(.white.opacity(0.4))
+                                Text("Studio").font(.title3).foregroundStyle(.secondary)
                                 Text(studio.name).font(.title3).foregroundColor(.white)
                             }
                         }

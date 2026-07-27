@@ -125,7 +125,7 @@ struct TVStudiosView: View {
             ProgressView().scaleEffect(1.5)
             Text("Loading studios…")
                 .font(.title3)
-                .foregroundColor(.white.opacity(0.4))
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         Spacer()
@@ -137,12 +137,12 @@ struct TVStudiosView: View {
         VStack(spacing: 32) {
             Image(systemName: "building.2")
                 .font(.system(size: 80))
-                .foregroundColor(.white.opacity(0.1))
+                .foregroundColor(.secondary)
             
             Text("No Studios Found")
                 .font(.title2)
                 .fontWeight(.semibold)
-                .foregroundColor(.white.opacity(0.3))
+                .foregroundStyle(.secondary)
         }
         Spacer()
     }
@@ -181,7 +181,7 @@ struct TVStudiosView: View {
                 .padding(.bottom, 80)
             }
         }
-        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60) }
+        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60).focusable(false) }
     }
 
     @ViewBuilder

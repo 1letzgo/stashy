@@ -21,6 +21,14 @@ struct TVSceneDetailView: View {
     @State private var isLoadingStreams = true
     @State private var hasAddedPlay = false
     @State private var selectedQuality: StreamingQuality? = nil
+    @State private var showingRatingPicker = false
+    @State private var showingQualityPicker = false
+    @FocusState private var focusedHeroAction: HeroAction?
+
+    private enum HeroAction: Hashable {
+        case play
+        case restart
+    }
 
     /// Same idea as iOS `ScenesView`: list/detail only treat transport/config as “connection” errors.
     private var hasValidActiveServer: Bool {
@@ -111,14 +119,11 @@ struct TVSceneDetailView: View {
             }
         }
         .onPlayPauseCommand {
-            if sceneDetail != nil {
-                if playerViewModel.player?.rate == 0 {
-                    playerViewModel.player?.play()
-                } else {
-                    playerViewModel.player?.pause()
-                }
-            }
+            // On the detail surface: start playback. Native VideoPlayer owns Play/Pause in cover.
+            guard let scene = sceneDetail, !playerViewModel.isShowingPlayer else { return }
+            startPlayback(for: scene)
         }
+        .defaultFocus($focusedHeroAction, .play)
         .fullScreenCover(isPresented: $playerViewModel.isShowingPlayer, onDismiss: {
             playerViewModel.clear()
             loadData()
@@ -143,10 +148,10 @@ struct TVSceneDetailView: View {
             Spacer(minLength: 300)
             Image(systemName: "exclamationmark.triangle")
                 .font(.system(size: 64))
-                .foregroundColor(.white.opacity(0.12))
+                .foregroundColor(.secondary)
             Text("Failed to load scene details")
                 .font(.title2)
-                .foregroundColor(.white.opacity(0.4))
+                .foregroundStyle(.secondary)
             Button("Retry") {
                 retryConnectionAndReload()
             }
@@ -327,104 +332,123 @@ struct TVSceneDetailView: View {
             .foregroundColor(.white.opacity(0.9))
             .padding(.top, 8)
 
-            // 5. Action Buttons & Info Pills Row
-            HStack(spacing: 20) {
-                // Play Action
-                Button {
+            // 5. Action Buttons — playback group | meta group
+            HStack(alignment: .center, spacing: 20) {
+                heroCardButton(focus: .play, disabled: !hasStream || (isWaiting && !hasStream)) {
                     startPlayback(for: scene)
                 } label: {
-                    HStack(spacing: 12) {
-                        if isWaiting && !hasStream {
-                            ProgressView()
-                            Text("Loading")
-                        } else if hasStream {
-                            Image(systemName: "play.fill")
-                            Text(hasProgress ? "Resume" : "Play")
-                        } else {
-                            Image(systemName: "xmark.circle")
-                            Text("No Stream")
-                        }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                    heroActionLabel(
+                        icon: isWaiting && !hasStream ? nil : (hasStream ? "play.fill" : "xmark.circle"),
+                        title: {
+                            if isWaiting && !hasStream { return "Loading" }
+                            if hasStream { return hasProgress ? "Resume" : "Play" }
+                            return "No Stream"
+                        }(),
+                        showProgress: isWaiting && !hasStream
+                    )
                 }
-                .disabled(!hasStream || (isWaiting && !hasStream))
 
-                // Restart Action
                 if hasProgress {
-                    Button {
+                    heroCardButton(focus: .restart) {
                         startPlayback(for: scene, at: 0)
                     } label: {
-                        HStack(spacing: 12) {
-                            Image(systemName: "arrow.counterclockwise")
-                            Text("Restart")
+                        heroActionLabel(icon: "arrow.counterclockwise", title: "Restart")
+                    }
+                }
+
+                Rectangle()
+                    .fill(Color.white.opacity(0.28))
+                    .frame(width: 3, height: Self.heroButtonHeight)
+                    .padding(.horizontal, 8)
+                    .focusable(false)
+                    .accessibilityHidden(true)
+
+                heroCardButton {
+                    viewModel.incrementOCounter(sceneId: scene.id) { newCount in
+                        guard let count = newCount else { return }
+                        if let current = sceneDetail {
+                            sceneDetail = current.withOCounter(count)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
                     }
-                }
-
-                // O-Counter
-                Button {
-                    viewModel.incrementOCounter(sceneId: scene.id)
                 } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "heart.circle.fill")
-                        Text("\(scene.oCounter ?? 0)")
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                    heroActionLabel(icon: "heart.circle.fill", title: "\(scene.oCounter ?? 0)")
                 }
 
-                // Rating
-                Menu {
+                heroCardButton {
+                    showingRatingPicker = true
+                } label: {
+                    heroActionLabel(icon: "star.fill", title: ratingLabel(for: scene))
+                }
+                .confirmationDialog("Rating", isPresented: $showingRatingPicker, titleVisibility: .visible) {
                     ForEach((0...5).reversed(), id: \.self) { stars in
-                        Button {
+                        Button(stars == 0 ? "No Rating" : String(repeating: "★", count: stars)) {
                             let value: Int? = (stars == 0) ? nil : (stars * 20)
-                            viewModel.updateSceneRating(sceneId: scene.id, rating100: value) { _ in }
-                        } label: {
-                            HStack {
-                                if stars == 0 { Text("No Rating") }
-                                else { Text(String(repeating: "★", count: stars)) }
-                                if currentRatingStars(scene) == stars { Spacer(); Image(systemName: "checkmark") }
+                            viewModel.updateSceneRating(sceneId: scene.id, rating100: value) { _ in
+                                if let current = sceneDetail {
+                                    sceneDetail = current.withRating(value)
+                                }
                             }
                         }
                     }
-                } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "star.fill")
-                        Text(ratingLabel(for: scene))
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                    Button("Cancel", role: .cancel) {}
                 }
-                .buttonStyle(.card)
 
-                // Quality
-                Menu {
-                    ForEach(StreamingQuality.allCases, id: \.self) { q in
-                        Button {
-                            selectedQuality = q
-                        } label: {
-                            HStack {
-                                Text(q.displayName)
-                                if currentQuality == q { Spacer(); Image(systemName: "checkmark") }
-                            }
-                        }
-                    }
+                heroCardButton {
+                    showingQualityPicker = true
                 } label: {
-                    HStack(spacing: 8) {
-                        Image(systemName: "rectangle.stack")
-                        Text(currentQuality.displayName)
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
+                    heroActionLabel(icon: "rectangle.stack", title: currentQuality.displayName)
                 }
-                .buttonStyle(.card)
+                .confirmationDialog("Quality", isPresented: $showingQualityPicker, titleVisibility: .visible) {
+                    ForEach(StreamingQuality.allCases, id: \.self) { q in
+                        Button(q.displayName) { selectedQuality = q }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                }
             }
             .padding(.top, 16)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private static let heroButtonWidth: CGFloat = 250
+    private static let heroButtonHeight: CGFloat = 72
+
+    @ViewBuilder
+    private func heroCardButton(
+        focus: HeroAction? = nil,
+        disabled: Bool = false,
+        action: @escaping () -> Void,
+        @ViewBuilder label: () -> some View
+    ) -> some View {
+        let button = Button(action: action, label: label)
+            .frame(width: Self.heroButtonWidth, height: Self.heroButtonHeight)
+            .buttonStyle(.card)
+            .disabled(disabled)
+        if let focus {
+            button.focused($focusedHeroAction, equals: focus)
+        } else {
+            button
+        }
+    }
+
+    @ViewBuilder
+    private func heroActionLabel(icon: String?, title: String, showProgress: Bool = false) -> some View {
+        HStack(spacing: 12) {
+            if showProgress {
+                ProgressView()
+            } else if let icon {
+                Image(systemName: icon)
+                    .font(.title3)
+                    .imageScale(.medium)
+            }
+            Text(title)
+                .font(.headline)
+                .fontWeight(.semibold)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .contentShape(Rectangle())
     }
 
     private var currentQuality: StreamingQuality {
@@ -558,12 +582,12 @@ struct TVSceneDetailView: View {
                                             .frame(width: 260, height: 146)
                                             .overlay(Image(systemName: "bookmark")
                                                 .font(.largeTitle)
-                                                .foregroundColor(.white.opacity(0.12)))
+                                                .foregroundColor(.secondary))
                                     }
                                 
                                     // Timestamp
                                     Text(formattedDuration(marker.seconds))
-                                        .font(.system(size: 11, weight: .bold, design: .monospaced))
+                                        .font(.caption2)
                                         .foregroundColor(.white)
                                         .padding(.horizontal, 7)
                                         .padding(.vertical, 3)
@@ -673,7 +697,7 @@ struct TVSceneDetailView: View {
             .overlay(
                 Image(systemName: "person.fill")
                     .font(.system(size: 32))
-                    .foregroundColor(.white.opacity(0.12))
+                    .foregroundColor(.secondary)
             )
     }
 
@@ -721,7 +745,7 @@ struct TVSceneDetailView: View {
                 Text("\(count)")
                     .font(.caption)
                     .fontWeight(.bold)
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundStyle(.secondary)
                     .padding(.horizontal, 8)
                     .padding(.vertical, 3)
                     .background(Color.white.opacity(0.06))
@@ -800,7 +824,7 @@ class TVPlayerViewModel: ObservableObject {
     }
 
     func setupPlayer(url: URL, sceneId: String, viewModel: StashDBViewModel, startAt timestamp: Double = 0) {
-        print("🚀 TV PLAYER VM: Setting up player for URL: \(url.absoluteString) at \(timestamp)s")
+        print("🚀 TV PLAYER VM: Setting up player for URL: \(redactedURLString(url)) at \(timestamp)s")
         self.sceneId = sceneId
         self.viewModel = viewModel
         self.didApplyInitialPlayback = false
@@ -969,14 +993,14 @@ private struct TVPlayerErrorView: View {
             VStack(spacing: 24) {
                 Image(systemName: "exclamationmark.triangle")
                     .font(.system(size: 80))
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundStyle(.secondary)
                 Text("Unable to play this scene")
                     .font(.title2)
                     .foregroundColor(.white.opacity(0.7))
                 if let error {
                     Text(error.localizedDescription)
                         .font(.callout)
-                        .foregroundColor(.white.opacity(0.4))
+                        .foregroundStyle(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 80)
                 }

@@ -9,21 +9,104 @@ import SwiftUI
 import UIKit
 
 struct TVSettingsView: View {
-    @ObservedObject private var configManager = ServerConfigManager.shared
     @ObservedObject private var appearanceManager = AppearanceManager.shared
-    @ObservedObject private var tabManager = TabManager.shared
-    @StateObject private var filterViewModel = StashDBViewModel()
-    @StateObject private var securityManager = TVSecurityManager.shared
-
-    @State private var showingAddServer = false
-    @State private var editingServer: ServerConfig?
-    @State private var showingSetPasscode = false
 
     var body: some View {
         List {
-            // MARK: - Current Server
-            // tvOS: must be focusable so ↑ from the first Saved Server row can leave the list
-            // toward the tab bar; a plain HStack is skipped by the focus engine.
+            // First row must be focusable so ↑ from Settings can reach the tab bar.
+            Section {
+                NavigationLink {
+                    TVServersSettingsView()
+                } label: {
+                    settingsRow(title: "Servers", icon: "server.rack", subtitle: "Active & saved servers")
+                }
+
+                NavigationLink {
+                    TVAppearanceSettingsView()
+                } label: {
+                    settingsRow(title: "Appearance", icon: "paintbrush.fill", subtitle: "Accent color")
+                }
+
+                NavigationLink {
+                    TVSecuritySettingsView()
+                } label: {
+                    settingsRow(title: "Security", icon: "lock.fill", subtitle: "PIN lock")
+                }
+
+                NavigationLink {
+                    TVPlaybackSettingsView()
+                } label: {
+                    settingsRow(title: "Playback", icon: "play.rectangle.fill", subtitle: "Streaming quality")
+                }
+            } header: {
+                Text("General")
+            }
+
+            Section {
+                NavigationLink {
+                    TVDefaultSortSettingsView()
+                } label: {
+                    settingsRow(title: "Default Sorting", icon: "arrow.up.arrow.down", subtitle: "Per-tab sort order")
+                }
+
+                NavigationLink {
+                    TVDefaultFilterSettingsView()
+                } label: {
+                    settingsRow(title: "Default Filters", icon: "line.3.horizontal.decrease.circle", subtitle: "Saved filters per tab")
+                }
+
+                NavigationLink {
+                    TVTabVisibilitySettingsView()
+                } label: {
+                    settingsRow(title: "Visible Tabs", icon: "rectangle.3.group.fill", subtitle: "Top navigation")
+                }
+            } header: {
+                Text("Content")
+            }
+
+            Section {
+                NavigationLink {
+                    TVAboutSettingsView()
+                } label: {
+                    settingsRow(title: "About", icon: "info.circle", subtitle: "Version & build")
+                }
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 80).focusable(false)
+        }
+        .background(Color.appBackground)
+    }
+
+    private func settingsRow(title: String, icon: String, subtitle: String) -> some View {
+        HStack(spacing: 20) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundColor(appearanceManager.tintColor)
+                .frame(width: 44)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(title)
+                    .font(.headline)
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+        }
+    }
+}
+
+// MARK: - Servers
+
+private struct TVServersSettingsView: View {
+    @ObservedObject private var configManager = ServerConfigManager.shared
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+
+    @State private var showingAddServer = false
+    @State private var editingServer: ServerConfig?
+
+    var body: some View {
+        List {
             Section {
                 if let config = configManager.activeConfig {
                     NavigationLink {
@@ -63,11 +146,10 @@ struct TVSettingsView: View {
                 Text("Active Server")
             }
 
-            // MARK: - Saved Servers
             Section {
                 ForEach(configManager.savedServers) { server in
                     Button {
-                        switchToServer(server)
+                        configManager.saveConfig(server)
                     } label: {
                         HStack(spacing: 16) {
                             VStack(alignment: .leading, spacing: 4) {
@@ -104,8 +186,38 @@ struct TVSettingsView: View {
             } header: {
                 Text("Saved Servers")
             }
+        }
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 80).focusable(false)
+        }
+        .sheet(isPresented: $showingAddServer) {
+            TVServerFormView(server: nil) { newServer in
+                configManager.addOrUpdateServer(newServer)
+                configManager.saveConfig(newServer)
+                showingAddServer = false
+            }
+        }
+        .sheet(item: $editingServer) { server in
+            TVServerFormView(server: server) { updatedServer in
+                configManager.addOrUpdateServer(updatedServer)
+                if updatedServer.id == configManager.activeConfig?.id {
+                    configManager.saveConfig(updatedServer)
+                }
+                editingServer = nil
+            }
+        }
+        .background(Color.appBackground)
+        .navigationTitle("Servers")
+    }
+}
 
-            // MARK: - Appearance
+// MARK: - Appearance
+
+private struct TVAppearanceSettingsView: View {
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+
+    var body: some View {
+        List {
             Section {
                 VStack(alignment: .leading, spacing: 16) {
                     Text("Accent Color")
@@ -131,8 +243,42 @@ struct TVSettingsView: View {
             } header: {
                 Text("Appearance")
             }
+        }
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 80).focusable(false)
+        }
+        .background(Color.appBackground)
+        .navigationTitle("Appearance")
+    }
 
-            // MARK: - Security (PIN Lock)
+    private func colorsEqual(_ a: Color, _ b: Color, tolerance: CGFloat = 0.01) -> Bool {
+        let ua = UIColor(a)
+        let ub = UIColor(b)
+
+        var ar: CGFloat = 0, ag: CGFloat = 0, ab: CGFloat = 0, aa: CGFloat = 0
+        var br: CGFloat = 0, bg: CGFloat = 0, bb: CGFloat = 0, ba: CGFloat = 0
+
+        guard ua.getRed(&ar, green: &ag, blue: &ab, alpha: &aa),
+              ub.getRed(&br, green: &bg, blue: &bb, alpha: &ba) else {
+            return String(describing: a) == String(describing: b)
+        }
+
+        return abs(ar - br) <= tolerance
+            && abs(ag - bg) <= tolerance
+            && abs(ab - bb) <= tolerance
+            && abs(aa - ba) <= tolerance
+    }
+}
+
+// MARK: - Security
+
+private struct TVSecuritySettingsView: View {
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @StateObject private var securityManager = TVSecurityManager.shared
+    @State private var showingSetPasscode = false
+
+    var body: some View {
+        List {
             Section {
                 Toggle(
                     "Enable PIN Lock",
@@ -140,7 +286,6 @@ struct TVSettingsView: View {
                         get: { securityManager.isPinLockEnabled && securityManager.isPinSet },
                         set: { enabled in
                             if enabled {
-                                // Start setup flow if not set yet
                                 if !securityManager.isPinSet {
                                     showingSetPasscode = true
                                 } else {
@@ -168,8 +313,26 @@ struct TVSettingsView: View {
             } footer: {
                 Text("The app will require your PIN each time it is opened and whenever it returns from the background.")
             }
+        }
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 80).focusable(false)
+        }
+        .fullScreenCover(isPresented: $showingSetPasscode) {
+            TVPasscodeSetupView(isPresented: $showingSetPasscode)
+                .presentationBackground(Color.black)
+        }
+        .background(Color.appBackground)
+        .navigationTitle("Security")
+    }
+}
 
-            // MARK: - Playback
+// MARK: - Playback
+
+private struct TVPlaybackSettingsView: View {
+    @ObservedObject private var configManager = ServerConfigManager.shared
+
+    var body: some View {
+        List {
             Section {
                 if let config = configManager.activeConfig {
                     HStack {
@@ -197,32 +360,6 @@ struct TVSettingsView: View {
                                 .foregroundColor(.secondary)
                         }
                     }
-
-                    HStack {
-                        Text("Reels Quality")
-                        Spacer()
-                        Menu {
-                            ForEach(StreamingQuality.allCases, id: \.self) { quality in
-                                Button {
-                                    var updated = config
-                                    updated.reelsQuality = quality
-                                    configManager.saveConfig(updated)
-                                    configManager.addOrUpdateServer(updated)
-                                } label: {
-                                    HStack {
-                                        Text(quality.displayName)
-                                        if config.reelsQuality == quality {
-                                            Spacer()
-                                            Image(systemName: "checkmark")
-                                        }
-                                    }
-                                }
-                            }
-                        } label: {
-                            Text(config.reelsQuality.displayName)
-                                .foregroundColor(.secondary)
-                        }
-                    }
                 } else {
                     Text("Connect to a server to configure quality.")
                         .foregroundStyle(.secondary)
@@ -230,10 +367,24 @@ struct TVSettingsView: View {
             } header: {
                 Text("Playback")
             } footer: {
-                Text("\"Original\" streams MP4 files directly for best seeking performance. Lower qualities use HLS transcoding. Reels Quality is separately used for short autoplay previews if available.")
+                Text("\"Original\" streams MP4 files directly for best seeking performance. Lower qualities use HLS transcoding.")
             }
+        }
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 80).focusable(false)
+        }
+        .background(Color.appBackground)
+        .navigationTitle("Playback")
+    }
+}
 
-            // MARK: - Default Sort
+// MARK: - Default Sorting
+
+private struct TVDefaultSortSettingsView: View {
+    @ObservedObject private var tabManager = TabManager.shared
+
+    var body: some View {
+        List {
             Section {
                 sceneSortRow
                 performerSortRow
@@ -245,140 +396,13 @@ struct TVSettingsView: View {
             } footer: {
                 Text("The sort order used when opening each tab.")
             }
-
-            // MARK: - Default Filter
-            Section {
-                tvFilterRow(label: "Scenes", icon: "film", tab: .scenes, mode: .scenes)
-                tvFilterRow(label: "Performers", icon: "person.3", tab: .performers, mode: .performers)
-                tvFilterRow(label: "Studios", icon: "building.2", tab: .studios, mode: .studios)
-                tvFilterRow(label: "Tags", icon: "tag", tab: .tags, mode: .tags)
-                tvFilterRow(label: "Groups", icon: "rectangle.stack", tab: .groups, mode: .groups)
-            } header: {
-                Text("Default Filters")
-            } footer: {
-                Text("Saved filters from your Stash server that will be applied automatically when opening each tab.")
-            }
-
-            // MARK: - Tab Visibility
-            Section {
-                tabVisibilityRow(.scenes, label: "Scenes", icon: "film.fill")
-                tabVisibilityRow(.performers, label: "Performers", icon: "person.3.fill")
-                tabVisibilityRow(.studios, label: "Studios", icon: "building.2.fill")
-                tabVisibilityRow(.tags, label: "Tags", icon: "tag.fill")
-                tabVisibilityRow(.groups, label: "Groups", icon: "rectangle.stack.fill")
-                tabVisibilityRow(.galleries, label: "Galleries", icon: "photo.stack.fill")
-                tabVisibilityRow(.images, label: "Images", icon: "photo.fill")
-            } header: {
-                Text("Visible Tabs")
-            } footer: {
-                Text("Choose which tabs appear in the top navigation bar.")
-            }
-
-            // MARK: - About
-            Section {
-                HStack {
-                    Text("App")
-                    Spacer()
-                    Text("stashy for Apple TV")
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack {
-                    Text("Version")
-                    Spacer()
-                    Text(appVersion)
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack {
-                    Text("Build")
-                    Spacer()
-                    Text(buildNumber)
-                        .foregroundStyle(.secondary)
-                }
-            } header: {
-                Text("About")
-            }
         }
-            // Prevent the last rows from being clipped behind the Tab bar / safe area.
-            .safeAreaInset(edge: .bottom) {
-                Color.clear.frame(height: 80).focusable(false)
-            }
-            .sheet(isPresented: $showingAddServer) {
-                TVServerFormView(server: nil) { newServer in
-                    configManager.addOrUpdateServer(newServer)
-                    configManager.saveConfig(newServer)
-                    showingAddServer = false
-                }
-            }
-            .fullScreenCover(isPresented: $showingSetPasscode) {
-                TVPasscodeSetupView(isPresented: $showingSetPasscode)
-                    .presentationBackground(Color.black)
-            }
-            .sheet(item: $editingServer) { server in
-                TVServerFormView(server: server) { updatedServer in
-                    configManager.addOrUpdateServer(updatedServer)
-                    if updatedServer.id == configManager.activeConfig?.id {
-                        configManager.saveConfig(updatedServer)
-                    }
-                    editingServer = nil
-                }
-            }
-            .onAppear {
-                filterViewModel.fetchSavedFilters()
-            }
-            .background(Color.appBackground)
-    }
-
-    private func switchToServer(_ server: ServerConfig) {
-        configManager.saveConfig(server)
-    }
-
-    @ViewBuilder
-    private func tabVisibilityRow(_ tab: AppTab, label: String, icon: String) -> some View {
-        let isVisible = tabManager.tabs.first(where: { $0.id == tab })?.isVisible ?? true
-        Toggle(isOn: Binding(
-            get: { isVisible },
-            set: { _ in tabManager.toggle(tab) }
-        )) {
-            HStack(spacing: 12) {
-                Image(systemName: icon)
-                    .foregroundColor(appearanceManager.tintColor)
-                    .frame(width: 28)
-                Text(label)
-            }
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 80).focusable(false)
         }
-        .tint(appearanceManager.tintColor)
+        .background(Color.appBackground)
+        .navigationTitle("Default Sorting")
     }
-
-    private func colorsEqual(_ a: Color, _ b: Color, tolerance: CGFloat = 0.01) -> Bool {
-        let ua = UIColor(a)
-        let ub = UIColor(b)
-
-        var ar: CGFloat = 0, ag: CGFloat = 0, ab: CGFloat = 0, aa: CGFloat = 0
-        var br: CGFloat = 0, bg: CGFloat = 0, bb: CGFloat = 0, ba: CGFloat = 0
-
-        guard ua.getRed(&ar, green: &ag, blue: &ab, alpha: &aa),
-              ub.getRed(&br, green: &bg, blue: &bb, alpha: &ba) else {
-            // Fallback: compare description if colors aren't convertible (shouldn't happen for presets)
-            return String(describing: a) == String(describing: b)
-        }
-
-        return abs(ar - br) <= tolerance
-            && abs(ag - bg) <= tolerance
-            && abs(ab - bb) <= tolerance
-            && abs(aa - ba) <= tolerance
-    }
-
-    private var appVersion: String {
-        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
-    }
-
-    private var buildNumber: String {
-        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
-    }
-
-    // MARK: - Reusable Sort Row Shell
 
     private func sortRowShell<Content: View>(
         label: String, current: String,
@@ -395,8 +419,6 @@ struct TVSettingsView: View {
             }
         }
     }
-
-    // MARK: - Scenes Sort
 
     private var sceneSortRow: some View {
         let binding = Binding<StashDBViewModel.SceneSortOption>(
@@ -467,8 +489,6 @@ struct TVSettingsView: View {
         }
     }
 
-    // MARK: - Performers Sort
-
     private var performerSortRow: some View {
         let binding = Binding<StashDBViewModel.PerformerSortOption>(
             get: { StashDBViewModel.PerformerSortOption(rawValue: tabManager.getPersistentSortOption(for: .performers) ?? "") ?? .nameAsc },
@@ -530,8 +550,6 @@ struct TVSettingsView: View {
         }
     }
 
-    // MARK: - Studios Sort
-
     private var studioSortRow: some View {
         let binding = Binding<StashDBViewModel.StudioSortOption>(
             get: { StashDBViewModel.StudioSortOption(rawValue: tabManager.getPersistentSortOption(for: .studios) ?? "") ?? .nameAsc },
@@ -577,8 +595,6 @@ struct TVSettingsView: View {
         }
     }
 
-    // MARK: - Tags Sort
-
     private var tagSortRow: some View {
         let binding = Binding<StashDBViewModel.TagSortOption>(
             get: { StashDBViewModel.TagSortOption(rawValue: tabManager.getPersistentSortOption(for: .tags) ?? "") ?? .nameAsc },
@@ -620,8 +636,6 @@ struct TVSettingsView: View {
         }
     }
 
-    // MARK: - Groups Sort
-
     private var groupSortRow: some View {
         let binding = Binding<StashDBViewModel.GroupSortOption>(
             get: { StashDBViewModel.GroupSortOption(rawValue: tabManager.getPersistentSortOption(for: .groups) ?? "") ?? .nameAsc },
@@ -658,8 +672,37 @@ struct TVSettingsView: View {
             }
         }
     }
+}
 
-    // MARK: - Filter Row
+// MARK: - Default Filters
+
+private struct TVDefaultFilterSettingsView: View {
+    @ObservedObject private var tabManager = TabManager.shared
+    @StateObject private var filterViewModel = StashDBViewModel()
+
+    var body: some View {
+        List {
+            Section {
+                tvFilterRow(label: "Scenes", icon: "film", tab: .scenes, mode: .scenes)
+                tvFilterRow(label: "Performers", icon: "person.3", tab: .performers, mode: .performers)
+                tvFilterRow(label: "Studios", icon: "building.2", tab: .studios, mode: .studios)
+                tvFilterRow(label: "Tags", icon: "tag", tab: .tags, mode: .tags)
+                tvFilterRow(label: "Groups", icon: "rectangle.stack", tab: .groups, mode: .groups)
+            } header: {
+                Text("Default Filters")
+            } footer: {
+                Text("Saved filters from your Stash server that will be applied automatically when opening each tab.")
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 80).focusable(false)
+        }
+        .onAppear {
+            filterViewModel.fetchSavedFilters()
+        }
+        .background(Color.appBackground)
+        .navigationTitle("Default Filters")
+    }
 
     @ViewBuilder
     private func tvFilterRow(label: String, icon: String, tab: AppTab, mode: StashDBViewModel.FilterMode) -> some View {
@@ -700,6 +743,99 @@ struct TVSettingsView: View {
                     .foregroundColor(.secondary)
             }
         }
+    }
+}
+
+// MARK: - Visible Tabs
+
+private struct TVTabVisibilitySettingsView: View {
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @ObservedObject private var tabManager = TabManager.shared
+
+    var body: some View {
+        List {
+            Section {
+                tabVisibilityRow(.scenes, label: "Scenes", icon: "film.fill")
+                tabVisibilityRow(.performers, label: "Performers", icon: "person.3.fill")
+                tabVisibilityRow(.studios, label: "Studios", icon: "building.2.fill")
+                tabVisibilityRow(.tags, label: "Tags", icon: "tag.fill")
+                tabVisibilityRow(.groups, label: "Groups", icon: "rectangle.stack.fill")
+                tabVisibilityRow(.galleries, label: "Galleries", icon: "photo.stack.fill")
+                tabVisibilityRow(.images, label: "Images", icon: "photo.fill")
+            } header: {
+                Text("Visible Tabs")
+            } footer: {
+                Text("Choose which tabs appear in the top navigation bar.")
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 80).focusable(false)
+        }
+        .background(Color.appBackground)
+        .navigationTitle("Visible Tabs")
+    }
+
+    @ViewBuilder
+    private func tabVisibilityRow(_ tab: AppTab, label: String, icon: String) -> some View {
+        let isVisible = tabManager.tabs.first(where: { $0.id == tab })?.isVisible ?? true
+        Toggle(isOn: Binding(
+            get: { isVisible },
+            set: { _ in tabManager.toggle(tab) }
+        )) {
+            HStack(spacing: 12) {
+                Image(systemName: icon)
+                    .foregroundColor(appearanceManager.tintColor)
+                    .frame(width: 28)
+                Text(label)
+            }
+        }
+        .tint(appearanceManager.tintColor)
+    }
+}
+
+// MARK: - About
+
+private struct TVAboutSettingsView: View {
+    var body: some View {
+        List {
+            Section {
+                HStack {
+                    Text("App")
+                    Spacer()
+                    Text("stashy for Apple TV")
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Text("Version")
+                    Spacer()
+                    Text(appVersion)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack {
+                    Text("Build")
+                    Spacer()
+                    Text(buildNumber)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("About")
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 80).focusable(false)
+        }
+        .background(Color.appBackground)
+        .navigationTitle("About")
+    }
+
+    private var appVersion: String {
+        Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0"
+    }
+
+    private var buildNumber: String {
+        Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
     }
 }
 

@@ -68,6 +68,7 @@ struct MainTabView: View {
             .tint(appearanceManager.tintColor)
             .withToasts()
             .onAppear {
+                ServerConfigManager.shared.scrubPlaintextAPIKeysFromDisk()
                 checkConfiguration()
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AuthError401"))) { _ in
@@ -106,7 +107,7 @@ struct MainTabView: View {
                     title: Text("Welcome to stashy"),
                     message: Text("Please configure your Stash server to get started."),
                     dismissButton: .default(Text("Go to Settings")) {
-                        coordinator.selectedTab = .catalogue
+                        coordinator.selectedTab = .settings
                     }
                 )
             case .invalidConfig:
@@ -114,7 +115,7 @@ struct MainTabView: View {
                     title: Text("Incomplete Setup"),
                     message: Text("Your server configuration is missing some details."),
                     dismissButton: .default(Text("Check Settings")) {
-                        coordinator.selectedTab = .catalogue
+                        coordinator.selectedTab = .settings
                     }
                 )
             case .authExpired:
@@ -122,7 +123,7 @@ struct MainTabView: View {
                     title: Text("Authentication Required"),
                     message: Text("Your API key is invalid or expired. Please check your server configuration."),
                     dismissButton: .default(Text("Update API Key")) {
-                        coordinator.selectedTab = .catalogue
+                        coordinator.selectedTab = .settings
                     }
                 )
             default:

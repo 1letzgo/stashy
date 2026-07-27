@@ -146,7 +146,7 @@ struct TVPasscodeEntryView: View {
     @State private var pin: String = ""
     @State private var errorMessage: String?
     @State private var shakeTrigger: Bool = false
-    @FocusState private var isFocused: Bool
+    @FocusState private var focusedDigit: String?
 
     var body: some View {
         ZStack {
@@ -191,7 +191,7 @@ struct TVPasscodeEntryView: View {
                         if !pin.isEmpty { pin.removeLast() }
                     },
                     onCancel: nil,
-                    isFocused: $isFocused
+                    isFocused: $focusedDigit
                 )
                 .padding(.bottom, 60)
             }
@@ -220,7 +220,7 @@ struct TVPasscodeEntryView: View {
         .onAppear {
             // Ensure the lock is actually active when shown.
             securityManager.lock()
-            isFocused = true
+            focusedDigit = "5"
         }
     }
 }
@@ -234,7 +234,7 @@ struct TVPasscodeSetupView: View {
     @State private var confirm: String = ""
     @State private var errorMessage: String?
     @State private var shakeTrigger: Bool = false
-    @FocusState private var isFocused: Bool
+    @FocusState private var focusedDigit: String?
 
     var body: some View {
         ZStack {
@@ -287,7 +287,7 @@ struct TVPasscodeSetupView: View {
                         }
                     },
                     onCancel: { isPresented = false },
-                    isFocused: $isFocused
+                    isFocused: $focusedDigit
                 )
 
                 Spacer()
@@ -318,7 +318,7 @@ struct TVPasscodeSetupView: View {
             }
         }
         .onAppear {
-            isFocused = true
+            focusedDigit = "5"
         }
         .onExitCommand {
             // Setup kann jederzeit über Menu/Back abgebrochen werden.
@@ -331,15 +331,17 @@ private struct TVPinPad: View {
     let onDigit: (String) -> Void
     let onDelete: () -> Void
     let onCancel: (() -> Void)?
-    var isFocused: FocusState<Bool>.Binding
+    var isFocused: FocusState<String?>.Binding
+
+    private let digits = ["1","2","3","4","5","6","7","8","9","0"]
 
     var body: some View {
         VStack(spacing: 18) {
             ForEach(0..<3, id: \.self) { row in
                 HStack(spacing: 18) {
                     ForEach(1..<4, id: \.self) { col in
-                        let number = row * 3 + col
-                        digitButton("\(number)")
+                        let number = "\(row * 3 + col)"
+                        digitButton(number)
                     }
                 }
             }
@@ -352,9 +354,6 @@ private struct TVPinPad: View {
                     }
                     .buttonStyle(.bordered)
                 } else {
-                    // Linker Spacer, der das Raster ausbalanciert. Auf tvOS darf
-                    // er NICHT fokusierbar sein, sonst fungiert der unsichtbare
-                    // Button als Focus-Falle (Fokus springt nach PIN-Eingabe hierhin).
                     Color.clear
                         .frame(width: 140, height: 80)
                         .focusable(false)
@@ -371,6 +370,11 @@ private struct TVPinPad: View {
             }
         }
         .frame(maxWidth: 600)
+        .onAppear {
+            if isFocused.wrappedValue == nil {
+                isFocused.wrappedValue = "5"
+            }
+        }
     }
 
     private func digitButton(_ digit: String) -> some View {
@@ -382,7 +386,7 @@ private struct TVPinPad: View {
                 .frame(width: 140, height: 80)
         }
         .buttonStyle(.borderedProminent)
-        .focused(isFocused)
+        .focused(isFocused, equals: digit)
     }
 }
 

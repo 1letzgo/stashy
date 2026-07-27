@@ -17,6 +17,8 @@ class ImageCache {
     private let memoryCache = NSCache<NSURL, UIImage>()
     private let fileManager = FileManager.default
     private let baseDiskCacheDirectory: URL
+    /// Protects `_cachedServerCacheDirectory` / `lastCleanupDate` — `loadObject` runs off-main.
+    private let stateLock = NSLock()
     private var _cachedServerCacheDirectory: URL?
     private var lastCleanupDate: Date?
     private var performerImageObserver: NSObjectProtocol?
@@ -59,20 +61,34 @@ class ImageCache {
     }
     
     private var currentServerCacheDirectory: URL {
+        stateLock.lock()
         if let cached = _cachedServerCacheDirectory {
+            stateLock.unlock()
             return cached
         }
+        stateLock.unlock()
+
+        // Resolve / mkdir outside the lock (may touch ServerConfigManager + disk).
         let serverId = ServerConfigManager.shared.activeConfig?.id.uuidString ?? "default"
         let dir = baseDiskCacheDirectory.appendingPathComponent(serverId)
         if !fileManager.fileExists(atPath: dir.path) {
             try? fileManager.createDirectory(at: dir, withIntermediateDirectories: true)
         }
+
+        stateLock.lock()
+        if let cached = _cachedServerCacheDirectory {
+            stateLock.unlock()
+            return cached
+        }
         _cachedServerCacheDirectory = dir
+        stateLock.unlock()
         return dir
     }
     
     func resetServerCachePath() {
+        stateLock.lock()
         _cachedServerCacheDirectory = nil
+        stateLock.unlock()
     }
     
     /// Creates a stable cache key by stripping variable query parameters (like ?t=timestamp)
@@ -134,7 +150,7 @@ class ImageCache {
             return image
         }
         
-        // 2. Disk Cache
+        // 2. Disk Cache (prefer `loadObject` from async contexts to avoid main-thread I/O)
         let fileURL = cacheFileURL(for: key)
         if fileManager.fileExists(atPath: fileURL.path) {
             if let data = try? Data(contentsOf: fileURL), let image = UIImage(data: data) {
@@ -143,6 +159,28 @@ class ImageCache {
             }
         }
         return nil
+    }
+
+    /// Memory + disk lookup with disk I/O off the calling thread.
+    func loadObject(forKey key: NSURL) async -> UIImage? {
+        let stableKey = stableMemoryCacheKey(for: key)
+        if let image = memoryCache.object(forKey: stableKey) {
+            return image
+        }
+        let fileURL = cacheFileURL(for: key)
+        let data = await Task.detached(priority: .utility) {
+            try? Data(contentsOf: fileURL)
+        }.value
+        guard let data, let image = UIImage(data: data) else { return nil }
+        memoryCache.setObject(image, forKey: stableKey, cost: imageCost(image))
+        return image
+    }
+
+    func loadData(forKey key: NSURL) async -> Data? {
+        let fileURL = cacheFileURL(for: key)
+        return await Task.detached(priority: .utility) {
+            try? Data(contentsOf: fileURL)
+        }.value
     }
     
     func setData(_ data: Data, forKey key: NSURL) {
@@ -156,15 +194,16 @@ class ImageCache {
         // Compute file URL on the current context (before detaching)
         let fileURL = cacheFileURL(for: key)
         let shouldCleanup: Bool
+        stateLock.lock()
         if let lastCleanup = lastCleanupDate {
             shouldCleanup = Date().timeIntervalSince(lastCleanup) > 60 * 60 * 4
         } else {
             shouldCleanup = true
         }
-        
         if shouldCleanup {
             lastCleanupDate = Date()
         }
+        stateLock.unlock()
         
         let serverDir = currentServerCacheDirectory
         
@@ -205,13 +244,30 @@ class ImageCache {
     
     func clearCache() {
         memoryCache.removeAllObjects()
+        resetServerCachePath()
         try? fileManager.removeItem(at: baseDiskCacheDirectory)
         createBaseDiskCacheDirectory()
     }
     
     func clearCurrentServerCache() {
+        let dir = currentServerCacheDirectory
         memoryCache.removeAllObjects()
-        try? fileManager.removeItem(at: currentServerCacheDirectory)
+        try? fileManager.removeItem(at: dir)
+        resetServerCachePath()
+    }
+
+    func clearCache(forServerID serverID: UUID) {
+        let dir = baseDiskCacheDirectory.appendingPathComponent(serverID.uuidString)
+        try? fileManager.removeItem(at: dir)
+        stateLock.lock()
+        let matches = _cachedServerCacheDirectory?.lastPathComponent == serverID.uuidString
+        if matches {
+            _cachedServerCacheDirectory = nil
+        }
+        stateLock.unlock()
+        if matches {
+            memoryCache.removeAllObjects()
+        }
     }
 
     /// Drops memory and disk entries for this URL’s **stable** cache key (volatile query params stripped).
@@ -363,12 +419,10 @@ class ImageLoader: ObservableObject {
             // Check cancellation
             if Task.isCancelled { return }
             
-            // 1. Check Memory/Disk Cache for UIImage (Fastest)
-            // object(forKey already checks both memory and disk)
-            if let cachedUIImage = ImageCache.shared.object(forKey: url as NSURL) {
+            // 1. Memory/Disk cache — disk I/O off main actor
+            if let cachedUIImage = await ImageCache.shared.loadObject(forKey: url as NSURL) {
                 if Task.isCancelled { return }
-                // Also fetch raw data for GIF support
-                self.imageData = ImageCache.shared.data(forKey: url as NSURL)
+                self.imageData = await ImageCache.shared.loadData(forKey: url as NSURL)
                 self.image = Image(uiImage: cachedUIImage)
                 self.isLoading = false
                 return

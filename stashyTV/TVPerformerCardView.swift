@@ -26,7 +26,7 @@ struct TVPerformerCardView: View {
 
             if performer.sceneCount > 0 {
                 Text("\(performer.sceneCount)")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.caption.weight(.bold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -83,7 +83,7 @@ struct TVPerformerCardView: View {
             .overlay(
                 Image(systemName: "person.fill")
                     .font(.system(size: 40))
-                    .foregroundColor(.white.opacity(0.12))
+                    .foregroundColor(.secondary)
             )
     }
 }

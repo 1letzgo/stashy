@@ -20,14 +20,23 @@ class SecurityManager: ObservableObject {
     @Published var isAppLocked: Bool = false
     @Published var isPasscodeSet: Bool = false
     @Published var isPiPActive: Bool = false
+    /// Seconds remaining in lockout after failed attempts; 0 when unlocked for entry.
+    @Published private(set) var lockoutRemainingSeconds: Int = 0
     
     private let kBiometricsEnabled = "kBiometricsEnabled"
     private let kAutoLockOnBackground = "kAutoLockOnBackground"
+    private let kFailedAttempts = "kPasscodeFailedAttempts"
+    private let kLockoutUntil = "kPasscodeLockoutUntil"
+    
+    private var lockoutTimer: Timer?
     
     private init() {
         self.isBiometricsEnabled = UserDefaults.standard.bool(forKey: kBiometricsEnabled)
         self.autoLockOnBackground = UserDefaults.standard.bool(forKey: kAutoLockOnBackground)
-        self.isPasscodeSet = KeychainManager.shared.loadAppPasscode() != nil
+        // Triggers legacy plaintext → hash migration if needed.
+        self.isPasscodeSet = KeychainManager.shared.hasAppPasscode()
+        
+        refreshLockoutState()
         
         // Lock initially if passcode is set
         if isPasscodeSet {
@@ -36,7 +45,7 @@ class SecurityManager: ObservableObject {
     }
     
     func checkPasscodeStatus() {
-        self.isPasscodeSet = KeychainManager.shared.loadAppPasscode() != nil
+        self.isPasscodeSet = KeychainManager.shared.hasAppPasscode()
     }
     
     func lock() {
@@ -47,11 +56,16 @@ class SecurityManager: ObservableObject {
     
     func unlock() {
         isAppLocked = false
+        resetFailedAttempts()
     }
     
     func setPasscode(_ passcode: String) {
-        if KeychainManager.shared.saveAppPasscode(passcode) {
+        guard passcode.count == 4, passcode.allSatisfy(\.isNumber) else { return }
+        let salt = UUID().uuidString
+        let hash = KeychainManager.sha256Hex(passcode + ":" + salt)
+        if KeychainManager.shared.saveAppPasscodeHash(salt: salt, hash: hash) {
             isPasscodeSet = true
+            resetFailedAttempts()
         }
     }
     
@@ -60,12 +74,79 @@ class SecurityManager: ObservableObject {
             isPasscodeSet = false
             isAppLocked = false
             isBiometricsEnabled = false
+            resetFailedAttempts()
         }
     }
     
+    /// Verifies PIN against salted hash. Enforces progressive lockout after failures.
     func verifyPasscode(_ input: String) -> Bool {
-        guard let saved = KeychainManager.shared.loadAppPasscode() else { return false }
-        return saved == input
+        refreshLockoutState()
+        guard lockoutRemainingSeconds == 0 else { return false }
+        guard input.count == 4 else { return false }
+        guard let record = KeychainManager.shared.loadAppPasscodeRecord() else { return false }
+        
+        let candidate = KeychainManager.sha256Hex(input + ":" + record.salt)
+        if candidate == record.hash {
+            resetFailedAttempts()
+            return true
+        }
+        
+        registerFailedAttempt()
+        return false
+    }
+    
+    var isLockedOut: Bool {
+        refreshLockoutState()
+        return lockoutRemainingSeconds > 0
+    }
+    
+    private func registerFailedAttempt() {
+        let attempts = UserDefaults.standard.integer(forKey: kFailedAttempts) + 1
+        UserDefaults.standard.set(attempts, forKey: kFailedAttempts)
+        
+        // Lock after every 5 failures: 30s, 1m, 2m, 5m, then 15m capped.
+        guard attempts % 5 == 0 else { return }
+        let tier = attempts / 5
+        let delays: [TimeInterval] = [30, 60, 120, 300, 900]
+        let delay = delays[min(tier, delays.count) - 1]
+        let until = Date().addingTimeInterval(delay)
+        UserDefaults.standard.set(until.timeIntervalSince1970, forKey: kLockoutUntil)
+        refreshLockoutState()
+        startLockoutTimerIfNeeded()
+    }
+    
+    private func resetFailedAttempts() {
+        UserDefaults.standard.removeObject(forKey: kFailedAttempts)
+        UserDefaults.standard.removeObject(forKey: kLockoutUntil)
+        lockoutRemainingSeconds = 0
+        lockoutTimer?.invalidate()
+        lockoutTimer = nil
+    }
+    
+    private func refreshLockoutState() {
+        let untilTs = UserDefaults.standard.double(forKey: kLockoutUntil)
+        guard untilTs > 0 else {
+            lockoutRemainingSeconds = 0
+            return
+        }
+        let remaining = Int(ceil(untilTs - Date().timeIntervalSince1970))
+        if remaining <= 0 {
+            UserDefaults.standard.removeObject(forKey: kLockoutUntil)
+            lockoutRemainingSeconds = 0
+            lockoutTimer?.invalidate()
+            lockoutTimer = nil
+        } else {
+            lockoutRemainingSeconds = remaining
+        }
+    }
+    
+    func startLockoutTimerIfNeeded() {
+        refreshLockoutState()
+        guard lockoutRemainingSeconds > 0 else { return }
+        lockoutTimer?.invalidate()
+        lockoutTimer = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in
+            self?.refreshLockoutState()
+        }
     }
     
     func authenticateWithBiometrics(completion: @escaping (Bool) -> Void) {

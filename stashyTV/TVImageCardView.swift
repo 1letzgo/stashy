@@ -22,10 +22,10 @@ struct TVImageCardView: View {
             if let rating = image.rating100, rating > 0 {
                 HStack(spacing: 3) {
                     Image(systemName: "star.fill")
-                        .font(.system(size: 10))
+                        .font(.caption2)
                         .foregroundColor(.yellow)
                     Text(String(format: "%.1f", Double(rating) / 20.0))
-                        .font(.system(size: 12, weight: .bold))
+                        .font(.caption2)
                         .foregroundColor(.white)
                 }
                 .padding(.horizontal, 10)
@@ -63,7 +63,7 @@ struct TVImageCardView: View {
             .overlay(
                 Image(systemName: "photo")
                     .font(.system(size: 32))
-                    .foregroundColor(.white.opacity(0.12))
+                    .foregroundColor(.secondary)
             )
     }
 }

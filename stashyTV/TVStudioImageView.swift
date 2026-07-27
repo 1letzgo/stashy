@@ -1,6 +1,7 @@
 import SwiftUI
 import PocketSVG
 import UIKit
+import Network
 
 /// tvOS studio image view with hybrid support (PNG/JPG + SVG).
 struct TVStudioImageView: View {
@@ -59,7 +60,7 @@ struct TVStudioImageView: View {
             .overlay(
                 Image(systemName: "building.2.fill")
                     .font(.system(size: 48))
-                    .foregroundColor(.white.opacity(0.12))
+                    .foregroundColor(.secondary)
             )
     }
 
@@ -265,27 +266,18 @@ final class TVStudioImageSSLDelegate: NSObject, URLSessionDelegate {
         }
 
         let host = challenge.protectionSpace.host
-        let isLocal = host == "localhost"
-            || host == "127.0.0.1"
-            || host.hasPrefix("192.168.")
-            || host.hasPrefix("10.")
-            || host.hasPrefix("172.16.")
-            || host.hasPrefix("172.17.")
-            || host.hasPrefix("172.18.")
-            || host.hasPrefix("172.19.")
-            || host.hasPrefix("172.20.")
-            || host.hasPrefix("172.21.")
-            || host.hasPrefix("172.22.")
-            || host.hasPrefix("172.23.")
-            || host.hasPrefix("172.24.")
-            || host.hasPrefix("172.25.")
-            || host.hasPrefix("172.26.")
-            || host.hasPrefix("172.27.")
-            || host.hasPrefix("172.28.")
-            || host.hasPrefix("172.29.")
-            || host.hasPrefix("172.30.")
-            || host.hasPrefix("172.31.")
-            || host == "gole.tz"
+        let isLocal: Bool = {
+            if host == "localhost" || host == "127.0.0.1" || host == "::1" { return true }
+            if host == "gole.tz" { return true }
+            // Only treat literal IPv4 private ranges as local — never DNS prefix matches.
+            guard let ipv4 = IPv4Address(host) else { return false }
+            let octets = ipv4.rawValue
+            let a = octets[0], b = octets[1]
+            if a == 10 { return true }
+            if a == 192 && b == 168 { return true }
+            if a == 172 && (16...31).contains(b) { return true }
+            return false
+        }()
 
         if isLocal {
             completionHandler(.useCredential, URLCredential(trust: trust))

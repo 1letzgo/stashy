@@ -34,7 +34,7 @@ struct TVTagCardView: View {
 
             if let sceneCount = tag.sceneCount, sceneCount > 0 {
                 Text("\(sceneCount)")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.caption.weight(.bold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -80,7 +80,7 @@ struct TVTagCardView: View {
             .overlay(
                 Image(systemName: "tag.fill")
                     .font(.system(size: 32))
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundStyle(.secondary)
             )
     }
 }

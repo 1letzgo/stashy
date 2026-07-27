@@ -45,6 +45,41 @@ func signedURL(_ url: URL?) -> URL? {
     return comps?.url ?? url
 }
 
+/// Strips `apikey` query items so URLs are safe to log or send to third parties.
+func urlByRemovingApiKeyQuery(_ url: URL) -> URL {
+    guard var comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
+          let items = comps.queryItems, !items.isEmpty else { return url }
+    let filtered = items.filter { $0.name.lowercased() != "apikey" }
+    comps.queryItems = filtered.isEmpty ? nil : filtered
+    return comps.url ?? url
+}
+
+/// Redacted absolute string for logs (hides `apikey` values).
+func redactedURLString(_ url: URL) -> String {
+    guard var comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
+          let items = comps.queryItems, !items.isEmpty else {
+        return url.absoluteString
+    }
+    comps.queryItems = items.map { item in
+        item.name.lowercased() == "apikey"
+            ? URLQueryItem(name: item.name, value: "***")
+            : item
+    }
+    return comps.url?.absoluteString ?? url.absoluteString
+}
+
+/// Funscript / media download request using `ApiKey` header instead of query secrets.
+func authenticatedStashRequest(for url: URL) -> URLRequest {
+    let cleanURL = urlByRemovingApiKeyQuery(url)
+    var request = URLRequest(url: cleanURL)
+    if let key = ServerConfigManager.shared.activeConfig?.secureApiKey?
+        .trimmingCharacters(in: .whitespacesAndNewlines),
+       !key.isEmpty {
+        request.setValue(key, forHTTPHeaderField: "ApiKey")
+    }
+    return request
+}
+
 private var _cachedIsTestFlight: Bool?
 
 func isTestFlightBuild() -> Bool {
@@ -171,7 +206,9 @@ func createPlayer(for url: URL) -> AVPlayer {
     }
 
     let playerItem = makeVODPlayerItem(for: url)
-    print("🎬 VIDEO PLAYER: Creating player for URL: \((playerItem.asset as? AVURLAsset)?.url.absoluteString ?? url.absoluteString)")
+    #if DEBUG
+    print("🎬 VIDEO PLAYER: Creating player for URL: \(redactedURLString((playerItem.asset as? AVURLAsset)?.url ?? url))")
+    #endif
 
     let player = AVPlayer(playerItem: playerItem)
     // Scrubbing responsiveness: `automaticallyWaitsToMinimizeStalling` makes

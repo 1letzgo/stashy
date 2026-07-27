@@ -47,10 +47,12 @@ struct ReelsModeSettingsView: View {
             Section {
                 Toggle("Immersive Video Scaling", isOn: $tabManager.reelsFillHeight)
                     .tint(appearanceManager.tintColor)
+                Toggle("Intelligent Zoom", isOn: $tabManager.reelsIntelligentZoom)
+                    .tint(appearanceManager.tintColor)
                 Toggle("Continuous Play", isOn: $tabManager.reelsContinuousPlay)
                     .tint(appearanceManager.tintColor)
             } footer: {
-                Text("Immersive Scaling stretches content to fill the full screen when orientation matches the video. Continuous Play automatically advances to the next video instead of looping.")
+                Text("Immersive Scaling fills the screen when orientation matches. Intelligent Zoom uses on-device Vision to frame the action when landscape video plays in portrait (Scenes, Markers, Clips, Previews). Continuous Play advances instead of looping.")
             }
             .listRowBackground(Color.secondaryAppBackground)
 
@@ -65,10 +67,26 @@ struct ReelsModeSettingsView: View {
                     set: { UserDefaults.standard.set($0, forKey: "stashline_include_gifs") }
                 ))
                 .tint(appearanceManager.tintColor)
+                Toggle("Group into sets", isOn: Binding(
+                    get: { UserDefaults.standard.object(forKey: "stashline_group_sets") as? Bool ?? true },
+                    set: { UserDefaults.standard.set($0, forKey: "stashline_group_sets") }
+                ))
+                .tint(appearanceManager.tintColor)
+                Picker("Set fallback", selection: Binding(
+                    get: {
+                        UserDefaults.standard.string(forKey: "stashline_group_fallback")
+                            ?? StashImageSetGroupingPolicy.sessionThenMeta.rawValue
+                    },
+                    set: { UserDefaults.standard.set($0, forKey: "stashline_group_fallback") }
+                )) {
+                    ForEach(StashImageSetGroupingPolicy.allCases, id: \.rawValue) { policy in
+                        Text(policy.displayName).tag(policy.rawValue)
+                    }
+                }
             } header: {
                 Text("Pics Feed")
             } footer: {
-                Text("Crops images to a square from the center. Multi-image groups show a thumbnail carousel below. GIFs appear as still thumbnails in the feed and animate in fullscreen.")
+                Text("Crops images to a square from the center. Multi-image groups show a thumbnail carousel below. GIFs appear as still thumbnails in the feed and animate in fullscreen. Sets use a filename session timestamp when present; otherwise images with the same created day, performers, and galleries are grouped.")
             }
             .listRowBackground(Color.secondaryAppBackground)
             

@@ -8,6 +8,10 @@ struct PasscodeEntryView: View {
     @State private var errorMessage: String?
     @State private var shakeTrigger: Bool = false
     
+    private var isLockedOut: Bool {
+        securityManager.lockoutRemainingSeconds > 0
+    }
+    
     var body: some View {
         VStack(spacing: 0) {
             
@@ -23,7 +27,12 @@ struct PasscodeEntryView: View {
                     .font(.title2)
                     .fontWeight(.semibold)
                 
-                if let error = errorMessage {
+                if isLockedOut {
+                    Text("Too many attempts. Try again in \(securityManager.lockoutRemainingSeconds)s")
+                        .foregroundColor(.red)
+                        .font(.caption)
+                        .multilineTextAlignment(.center)
+                } else if let error = errorMessage {
                     Text(error)
                         .foregroundColor(.red)
                         .font(.caption)
@@ -58,7 +67,7 @@ struct PasscodeEntryView: View {
                 
                 HStack(spacing: 0) {
                     Group {
-                        if securityManager.isBiometricsEnabled {
+                        if securityManager.isBiometricsEnabled && !isLockedOut {
                             Button(action: {
                                 securityManager.authenticateWithBiometrics { _ in }
                             }) {
@@ -87,10 +96,13 @@ struct PasscodeEntryView: View {
                             .frame(height: 70)
                             .frame(maxWidth: .infinity)
                     }
+                    .disabled(isLockedOut)
                 }
             }
             .frame(maxWidth: .infinity)
             .foregroundColor(.primary)
+            .opacity(isLockedOut ? 0.4 : 1)
+            .allowsHitTesting(!isLockedOut)
             .padding(.bottom, 30)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -101,17 +113,22 @@ struct PasscodeEntryView: View {
                 if securityManager.verifyPasscode(newValue) {
                     securityManager.unlock()
                 } else {
-                    errorMessage = "Wrong Passcode"
+                    errorMessage = isLockedOut
+                        ? "Too many attempts. Try again in \(securityManager.lockoutRemainingSeconds)s"
+                        : "Wrong Passcode"
                     shakeTrigger.toggle()
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                         passcode = ""
-                        errorMessage = nil
+                        if !isLockedOut {
+                            errorMessage = nil
+                        }
                     }
                 }
             }
         }
         .onAppear {
-            if securityManager.isBiometricsEnabled {
+            securityManager.startLockoutTimerIfNeeded()
+            if securityManager.isBiometricsEnabled && !isLockedOut {
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
                     securityManager.authenticateWithBiometrics { _ in }
                 }
@@ -121,6 +138,7 @@ struct PasscodeEntryView: View {
     
     private func button(for number: String) -> some View {
         Button(action: {
+            guard !isLockedOut else { return }
             if passcode.count < 4 {
                 passcode.append(number)
             }
@@ -136,5 +154,6 @@ struct PasscodeEntryView: View {
                         .frame(width: 70, height: 70)
                 )
         }
+        .disabled(isLockedOut)
     }
 }

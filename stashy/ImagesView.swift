@@ -191,18 +191,16 @@ private struct ImagesViewBody: View {
                  }
             }
 
-            // Wie GalleriesView: bei gesetztem Standard-Filter erst laden, wenn Saved Filters da sind
-            // (oder kein Standard), sonst bleibt die Liste leer ohne Request → kein „Server not reachable“.
-            if gallery != nil, viewModel.galleryImages.isEmpty {
+            if gallery == nil, !coordinator.activeSearchText.isEmpty {
+                viewModel.currentImageSearchQuery = coordinator.activeSearchText
+                coordinator.activeSearchText = ""
+                imageListFilters.refetchImages(viewModel: viewModel, initial: true)
+            } else if gallery != nil, viewModel.galleryImages.isEmpty {
                 imageListFilters.refetchImages(viewModel: viewModel, initial: true)
             } else if gallery == nil, viewModel.allImages.isEmpty {
                 if TabManager.shared.getDefaultFilterId(for: .images) == nil || !viewModel.savedFilters.isEmpty {
                     imageListFilters.refetchImages(viewModel: viewModel, initial: true)
                 }
-            }
-
-            if gallery == nil, !coordinator.activeSearchText.isEmpty {
-                coordinator.activeSearchText = ""
             }
 
             viewModel.fetchSavedFilters()

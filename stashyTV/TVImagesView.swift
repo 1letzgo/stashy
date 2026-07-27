@@ -127,7 +127,7 @@ struct TVImagesView: View {
             ProgressView().scaleEffect(1.5)
             Text("Loading images…")
                 .font(.title3)
-                .foregroundColor(.white.opacity(0.4))
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         Spacer()
@@ -139,11 +139,11 @@ struct TVImagesView: View {
         VStack(spacing: 32) {
             Image(systemName: "photo")
                 .font(.system(size: 80))
-                .foregroundColor(.white.opacity(0.1))
+                .foregroundColor(.secondary)
             Text("No Images Found")
                 .font(.title2)
                 .fontWeight(.semibold)
-                .foregroundColor(.white.opacity(0.3))
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         Spacer()
@@ -160,7 +160,7 @@ struct TVImagesView: View {
 
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 30) {
                     ForEach(viewModel.allImages.filter { !$0.isAnimated }) { image in
-                        NavigationLink(destination: TVImageDetailView(imageId: image.id, imageTitle: image.title ?? "Untitled").tvExitDismissable()) {
+                        NavigationLink(destination: TVImageDetailView(imageId: image.id, imageTitle: image.title ?? "Untitled")) {
                             TVImageCardView(image: image)
                         }
                         .buttonStyle(.card)

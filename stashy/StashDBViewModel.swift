@@ -557,6 +557,15 @@ class StashDBViewModel: ObservableObject {
     var imageStaticPathFilter: Bool = false
     var imagePerformerIdFilter: String? = nil
     var currentImageLiveFilter: [String: Any] = [:]
+    /// Free-text find filter (`q`) for catalog Images deep-link / search.
+    var currentImageSearchQuery: String = ""
+
+    /// Bumped on initial fetch / server reset so stale completions are ignored.
+    private var imagesFetchGeneration = 0
+    private var clipsFetchGeneration = 0
+    private var scenesFetchGeneration = 0
+    private var previewsFetchGeneration = 0
+    private var markersFetchGeneration = 0
 
     /// Last filter/live used for `fetchGalleryImages` (pagination keeps same criteria).
     private var galleryImagesActiveGalleryId: String = ""
@@ -1106,6 +1115,9 @@ class StashDBViewModel: ObservableObject {
         galleries = []
         tags = []
         allImages = []
+        clips = []
+        previews = []
+        sceneMarkers = []
         
         homeRowScenes = [:]
         homeRowPerformers = [:]
@@ -1149,9 +1161,12 @@ class StashDBViewModel: ObservableObject {
         currentTagPage = 1
         currentGalleryPage = 1
         currentImagePage = 1
+        currentClipsPage = 1
         currentGroupPage = 1
         currentGroupScenePage = 1
         currentGroupGalleryPage = 1
+        currentMarkerPage = 1
+        currentPreviewPage = 1
         
         hasMoreScenes = true
         hasMorePerformers = true
@@ -1159,17 +1174,28 @@ class StashDBViewModel: ObservableObject {
         hasMoreTags = true
         hasMoreGalleries = true
         hasMoreImages = true
+        hasMoreClips = true
         hasMoreGroups = true
         hasMoreGroupScenes = true
         hasMoreGroupGalleries = true
+        hasMoreMarkers = true
+        hasMorePreviews = true
+        
+        isLoadingClips = false
+        isLoadingImages = false
+        isLoadingMoreScenes = false
+        clearReelsCriterionFrozenSnapshots()
+        
+        imagesFetchGeneration += 1
+        clipsFetchGeneration += 1
+        scenesFetchGeneration += 1
+        previewsFetchGeneration += 1
+        markersFetchGeneration += 1
         
         currentSceneSortOption = .dateDesc
         currentSceneFilter = nil
         
-        currentMarkerPage = 1
-        hasMoreMarkers = true
         currentMarkerSortOption = .createdAtDesc
-        sceneMarkers = []
         
         currentPerformerSortOption = .nameAsc
         currentPerformerFilter = nil
@@ -1182,7 +1208,12 @@ class StashDBViewModel: ObservableObject {
         currentGalleryLiveFilter = [:]
         
         currentImageSortOption = .dateDesc
+        currentImageFilter = nil
         currentImageLiveFilter = [:]
+        currentImageSearchQuery = ""
+        currentClipSortOption = .dateDesc
+        currentClipFilter = nil
+        currentClipLiveFilter = [:]
         currentTagSortOption = .nameAsc
         
         currentPerformerGalleryPage = 1
@@ -1309,6 +1340,9 @@ class StashDBViewModel: ObservableObject {
         // Remove from gallery images
         galleryImages.removeAll { $0.id == id }
         totalGalleryImages = max(0, totalGalleryImages - 1)
+
+        clips.removeAll { $0.id == id }
+        totalClips = max(0, totalClips - 1)
     }
 
     /// Updates just the resume time of a scene in place
@@ -2182,11 +2216,13 @@ class StashDBViewModel: ObservableObject {
     
     func fetchScenes(sortBy: SceneSortOption = .dateDesc, searchQuery: String = "", isInitialLoad: Bool = true, filter: SavedFilter? = nil, liveFilter: [String: Any]? = nil) {
         if isInitialLoad {
+            scenesFetchGeneration += 1
             // Reset pagination
             currentScenePage = 1
             scenes = [] // Clear scenes to show loading state
             totalScenes = 0
             isLoadingScenes = true
+            isLoadingMoreScenes = false
             hasMoreScenes = true
             currentSceneSortOption = sortBy
             currentSceneFilter = filter
@@ -2199,21 +2235,23 @@ class StashDBViewModel: ObservableObject {
 
         errorMessage = nil
         let page = isInitialLoad ? 1 : currentScenePage + 1
-        loadScenesPage(page: page, sortBy: currentSceneSortOption, searchQuery: currentSceneSearchQuery)
+        loadScenesPage(page: page, sortBy: currentSceneSortOption, searchQuery: currentSceneSearchQuery, fetchGeneration: scenesFetchGeneration)
     }
 
     func loadMoreScenes() {
         guard !isLoadingMoreScenes && hasMoreScenes else { return }
-        currentScenePage += 1
-        loadScenesPage(page: currentScenePage, sortBy: currentSceneSortOption, searchQuery: currentSceneSearchQuery)
+        let page = currentScenePage + 1
+        loadScenesPage(page: page, sortBy: currentSceneSortOption, searchQuery: currentSceneSearchQuery, fetchGeneration: scenesFetchGeneration)
     }
 
     func fetchPreviews(sortBy: SceneSortOption = .dateDesc, searchQuery: String = "", isInitialLoad: Bool = true, filter: SavedFilter? = nil, liveFilter: [String: Any]? = nil) {
         if isInitialLoad {
+            previewsFetchGeneration += 1
             currentPreviewPage = 1
             previews = []
             totalPreviews = 0
             isLoadingPreviews = true
+            isLoadingMorePreviews = false
             hasMorePreviews = true
             currentPreviewSortOption = sortBy
             currentPreviewFilter = filter
@@ -2226,16 +2264,17 @@ class StashDBViewModel: ObservableObject {
 
         errorMessage = nil
         let page = isInitialLoad ? 1 : currentPreviewPage + 1
-        loadScenesPage(page: page, sortBy: currentPreviewSortOption, searchQuery: currentPreviewSearchQuery, previewOnly: true)
+        loadScenesPage(page: page, sortBy: currentPreviewSortOption, searchQuery: currentPreviewSearchQuery, previewOnly: true, fetchGeneration: previewsFetchGeneration)
     }
 
     func loadMorePreviews() {
         guard !isLoadingMorePreviews && hasMorePreviews else { return }
-        currentPreviewPage += 1
-        loadScenesPage(page: currentPreviewPage, sortBy: currentPreviewSortOption, searchQuery: currentPreviewSearchQuery, previewOnly: true)
+        let page = currentPreviewPage + 1
+        loadScenesPage(page: page, sortBy: currentPreviewSortOption, searchQuery: currentPreviewSearchQuery, previewOnly: true, fetchGeneration: previewsFetchGeneration)
     }
 
     func fetchSceneMarkers(sortBy: SceneMarkerSortOption = .createdAtDesc, searchQuery: String = "", filter: SavedFilter? = nil, liveFilter: [String: Any]? = nil) {
+        markersFetchGeneration += 1
         currentMarkerPage = 1
         currentMarkerSortOption = sortBy
         currentMarkerSearchQuery = searchQuery
@@ -2245,16 +2284,16 @@ class StashDBViewModel: ObservableObject {
         sceneMarkers = []
         isLoading = true // Set global loading for initial markers load
         
-        loadMarkersPage(page: currentMarkerPage, sortBy: sortBy, searchQuery: searchQuery)
+        loadMarkersPage(page: currentMarkerPage, sortBy: sortBy, searchQuery: searchQuery, fetchGeneration: markersFetchGeneration)
     }
 
     func loadMoreMarkers() {
         guard !isLoadingMarkers && hasMoreMarkers else { return }
-        currentMarkerPage += 1
-        loadMarkersPage(page: currentMarkerPage, sortBy: currentMarkerSortOption, searchQuery: currentMarkerSearchQuery)
+        let page = currentMarkerPage + 1
+        loadMarkersPage(page: page, sortBy: currentMarkerSortOption, searchQuery: currentMarkerSearchQuery, fetchGeneration: markersFetchGeneration)
     }
 
-    private func loadMarkersPage(page: Int, sortBy: SceneMarkerSortOption, searchQuery: String = "") {
+    private func loadMarkersPage(page: Int, sortBy: SceneMarkerSortOption, searchQuery: String = "", fetchGeneration: Int) {
         let isInitialLoad = (page == 1)
         if isInitialLoad {
             isLoading = true
@@ -2308,6 +2347,7 @@ class StashDBViewModel: ObservableObject {
         performGraphQLQuery(query: bodyString) { (response: MarkersResponse?) in
             if let result = response?.data?.findSceneMarkers {
                 DispatchQueue.main.async {
+                    guard fetchGeneration == self.markersFetchGeneration else { return }
                     if isInitialLoad {
                         self.sceneMarkers = result.scene_markers ?? []
                         self.totalSceneMarkers = result.count
@@ -2325,6 +2365,7 @@ class StashDBViewModel: ObservableObject {
                 }
             } else {
                 DispatchQueue.main.async {
+                    guard fetchGeneration == self.markersFetchGeneration else { return }
                     self.isLoadingMarkers = false
                     self.isLoading = false
                     self.errorMessage = "Could not load markers"
@@ -2333,7 +2374,7 @@ class StashDBViewModel: ObservableObject {
         }
     }
 
-    private func loadScenesPage(page: Int, sortBy: SceneSortOption, searchQuery: String = "", previewOnly: Bool = false) {
+    private func loadScenesPage(page: Int, sortBy: SceneSortOption, searchQuery: String = "", previewOnly: Bool = false, fetchGeneration: Int) {
         let isInitialLoad = (page == 1)
         if !previewOnly {
             if isInitialLoad {
@@ -2415,6 +2456,8 @@ class StashDBViewModel: ObservableObject {
         performGraphQLQuery(query: bodyString) { (response: AltScenesResponse?) in
             if let scenesResult = response?.data?.findScenes {
                 DispatchQueue.main.async {
+                    let expectedGen = previewOnly ? self.previewsFetchGeneration : self.scenesFetchGeneration
+                    guard fetchGeneration == expectedGen else { return }
                     if previewOnly {
                         // Client-side filter: only keep scenes that actually have a preview path from the server
                         let scenesWithPreview = scenesResult.scenes.filter { scene in
@@ -2434,8 +2477,8 @@ class StashDBViewModel: ObservableObject {
                         self.currentPreviewPage = page
                         // If the filtered result is still empty but there are more pages, fetch next page automatically
                         if self.previews.isEmpty && hasMore {
-                            self.currentPreviewPage += 1
-                            self.loadScenesPage(page: self.currentPreviewPage, sortBy: self.currentPreviewSortOption, searchQuery: self.currentPreviewSearchQuery, previewOnly: true)
+                            let nextPage = page + 1
+                            self.loadScenesPage(page: nextPage, sortBy: self.currentPreviewSortOption, searchQuery: self.currentPreviewSearchQuery, previewOnly: true, fetchGeneration: fetchGeneration)
                             return
                         }
                         if isInitialLoad {
@@ -2457,6 +2500,7 @@ class StashDBViewModel: ObservableObject {
                         
                         // Check if there are more pages
                         self.hasMoreScenes = scenesResult.scenes.count == self.scenesPerPage
+                        self.currentScenePage = page
                         
                         if isInitialLoad {
                             self.isLoadingScenes = false
@@ -2468,6 +2512,8 @@ class StashDBViewModel: ObservableObject {
                 }
             } else {
                 DispatchQueue.main.async {
+                    let expectedGen = previewOnly ? self.previewsFetchGeneration : self.scenesFetchGeneration
+                    guard fetchGeneration == expectedGen else { return }
                     if previewOnly {
                         if isInitialLoad {
                             self.isLoadingPreviews = false
@@ -4749,6 +4795,7 @@ class StashDBViewModel: ObservableObject {
         print("🖼️ fetchImages called, sortBy: \(sortBy.rawValue), isInitialLoad: \(isInitialLoad)")
 
         if isInitialLoad {
+            imagesFetchGeneration += 1
             currentImagePage = 1
             allImages = []
             totalImages = 0
@@ -4766,16 +4813,20 @@ class StashDBViewModel: ObservableObject {
 
         currentImageSortOption = sortBy
         let page = isInitialLoad ? 1 : currentImagePage + 1
+        let requestGeneration = imagesFetchGeneration
 
         let query = GraphQLQueries.queryWithFragments("findImages")
 
         let perPage = 100
-        let filterDict: [String: Any] = [
+        var filterDict: [String: Any] = [
             "page": page,
             "per_page": perPage,
             "sort": sortBy.sortField == "random" ? randomSort(.images) : sortBy.sortField,
             "direction": sortBy.direction
         ]
+        if !currentImageSearchQuery.isEmpty {
+            filterDict["q"] = currentImageSearchQuery
+        }
 
         var variables: [String: Any] = [
             "filter": filterDict
@@ -4844,11 +4895,14 @@ class StashDBViewModel: ObservableObject {
         performGraphQLQuery(query: bodyString, clearsGlobalErrorMessageOnStart: false) { (response: GalleryImagesResponse?) in
             if let result = response?.data?.findImages {
                 DispatchQueue.main.async {
+                    guard requestGeneration == self.imagesFetchGeneration else { return }
                     if isInitialLoad {
                         self.allImages = result.images
                         self.totalImages = result.count
                     } else {
-                        self.allImages.append(contentsOf: result.images)
+                        let existingIds = Set(self.allImages.map(\.id))
+                        let newImages = result.images.filter { !existingIds.contains($0.id) }
+                        self.allImages.append(contentsOf: newImages)
                     }
                     
                     self.hasMoreImages = result.images.count == perPage
@@ -4859,6 +4913,7 @@ class StashDBViewModel: ObservableObject {
                 }
             } else {
                 DispatchQueue.main.async {
+                    guard requestGeneration == self.imagesFetchGeneration else { return }
                     self.isLoadingImages = false
                     let msg = self.errorMessage ?? "Could not load images"
                     self.imageFindListError = msg
@@ -5063,6 +5118,7 @@ class StashDBViewModel: ObservableObject {
 
     func fetchClips(sortBy: ImageSortOption = .dateDesc, filter: SavedFilter? = nil, isInitialLoad: Bool = true, liveFilter: [String: Any]? = nil) {
         if isInitialLoad {
+            clipsFetchGeneration += 1
             currentClipsPage = 1
             clips = []
             totalClips = 0
@@ -5078,6 +5134,7 @@ class StashDBViewModel: ObservableObject {
         
         let page = isInitialLoad ? 1 : currentClipsPage + 1
         let perPage = clipsPerPage
+        let requestGeneration = clipsFetchGeneration
 
         // Filter for video-like and animated extensions
         // Regex: .*\.(mp4|gif|mov|webm|m4v|mkv|webp)$ (case insensitive usually requires flags, but Stash regex is Go-flavor? or PCRE?)
@@ -5145,6 +5202,7 @@ class StashDBViewModel: ObservableObject {
         performGraphQLQuery(query: bodyString) { (response: GalleryImagesResponse?) in
             if let result = response?.data?.findImages {
                 DispatchQueue.main.async {
+                    guard requestGeneration == self.clipsFetchGeneration else { return }
                     if isInitialLoad {
                         self.clips = result.images
                         self.totalClips = result.count
@@ -5161,6 +5219,7 @@ class StashDBViewModel: ObservableObject {
                 }
             } else {
                 DispatchQueue.main.async {
+                    guard requestGeneration == self.clipsFetchGeneration else { return }
                     self.isLoadingClips = false
                 }
             }
@@ -5219,6 +5278,8 @@ class StashDBViewModel: ObservableObject {
                     return
                 }
 
+                self?.removeImage(id: imageId)
+
                 // Post notification so other views can update
                 NotificationCenter.default.post(
                     name: NSNotification.Name("ImageDeleted"),
@@ -5226,7 +5287,7 @@ class StashDBViewModel: ObservableObject {
                     userInfo: ["imageId": imageId]
                 )
 
-                // 3) Delete the underlying files
+                // 3) Delete the underlying files (best-effort; DB entity is already gone)
                 guard let self, !fileIds.isEmpty else {
                     print("✅ IMAGE DELETE: Success for image \(imageId) (no files to delete)")
                     completion(true)
@@ -5237,9 +5298,9 @@ class StashDBViewModel: ObservableObject {
                     if success {
                         print("✅ IMAGE DELETE: Deleted files for image \(imageId)")
                     } else {
-                        print("❌ IMAGE DELETE: Image destroyed but file deletion failed for \(imageId)")
+                        print("⚠️ IMAGE DELETE: Image destroyed but file deletion failed for \(imageId)")
                     }
-                    completion(success)
+                    completion(true)
                 }
             }
         }
@@ -5402,39 +5463,15 @@ class StashDBViewModel: ObservableObject {
     }
     
     private func performGraphQLMutationSilent(query: String, completion: @escaping ([String: StashJSONValue]?) -> Void) {
-        guard let config = ServerConfigManager.shared.loadConfig() else {
-            completion(nil)
-            return
-        }
-        
-        guard let url = URL(string: "\(config.baseURL)/graphql") else {
-            print("❌ Invalid URL in performGraphQLMutationSilent: \(config.baseURL)")
-            completion(nil)
-            return
-        }
-        
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        if let apiKey = config.secureApiKey, !apiKey.isEmpty {
-            request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
-        }
-        
-        request.httpBody = query.data(using: .utf8)
-        
-        URLSession.shared.dataTask(with: request) { data, _, _ in
-            guard let data = data else {
-                Task { @MainActor in completion(nil) }
-                return
+        // Route through GraphQLClient so server-switch cancelAllRequests() covers mutations.
+        GraphQLClient.shared.execute(query: query) { (result: Result<[String: StashJSONValue], GraphQLNetworkError>) in
+            switch result {
+            case .success(let decoded):
+                completion(decoded)
+            case .failure:
+                completion(nil)
             }
-            
-            do {
-                let decoded = try JSONDecoder().decode([String: StashJSONValue].self, from: data)
-                Task { @MainActor in completion(decoded) }
-            } catch {
-                Task { @MainActor in completion(nil) }
-            }
-        }.resume()
+        }
     }
     
     private func performGraphQLQuery<T: Decodable>(query: String, clearsGlobalErrorMessageOnStart: Bool = true, completion: @escaping (T?) -> Void) {
@@ -9197,12 +9234,10 @@ class HandyManager: ObservableObject {
     // MARK: - Funscript / HSSP
 
     func setupScene(funscriptURL: URL, at seconds: Double? = nil) {
-        print("📲 Handy v3: setupScene \(funscriptURL.absoluteString)")
+        #if DEBUG
+        print("📲 Handy v3: setupScene \(redactedURLString(funscriptURL))")
+        #endif
         isStashSyncMode = false
-
-        let urlString = funscriptURL.absoluteString
-        let isLocal = urlString.contains("127.0.0.1") || urlString.contains("localhost")
-            || urlString.contains("192.168.") || urlString.contains("10.")
 
         guard isConnected else {
             checkConnection { [weak self] connected in
@@ -9213,38 +9248,22 @@ class HandyManager: ObservableObject {
         }
 
         isSyncing = false
-        statusMessage = "Setting up sync..."
-
-        if isLocal {
-            statusMessage = "Uploading script..."
-            uploadToHandyCloud(localUrl: funscriptURL) { [weak self] publicUrl in
-                if let publicUrl = publicUrl {
-                    self?.executeHSSPSetup(url: publicUrl, at: seconds)
-                } else {
-                    DispatchQueue.main.async { self?.statusMessage = "Upload Failed" }
-                }
-            }
-            return
-        }
-
-        // Public URL override
-        if !publicUrl.isEmpty,
-           let publicBase = URL(string: publicUrl),
-           var comps = URLComponents(url: funscriptURL, resolvingAgainstBaseURL: false) {
-            comps.host = publicBase.host
-            comps.scheme = publicBase.scheme
-            comps.port = publicBase.port
-            if let newUrl = comps.url {
-                executeHSSPSetup(url: newUrl, at: seconds)
-                return
+        // Always download with ApiKey header and upload to Handy Cloud.
+        // Never send Stash URLs (especially with ?apikey=) to handyfeeling.com.
+        statusMessage = "Uploading script..."
+        uploadToHandyCloud(sourceUrl: funscriptURL) { [weak self] publicUrl in
+            if let publicUrl = publicUrl {
+                self?.executeHSSPSetup(url: publicUrl, at: seconds)
+            } else {
+                DispatchQueue.main.async { self?.statusMessage = "Upload Failed" }
             }
         }
-
-        executeHSSPSetup(url: funscriptURL, at: seconds)
     }
 
     private func executeHSSPSetup(url: URL, at seconds: Double?) {
-        print("📲 Handy v3: HSSP setup → \(url.absoluteString)")
+        #if DEBUG
+        print("📲 Handy v3: HSSP setup → \(redactedURLString(url))")
+        #endif
         sendRequest(path: "/mode2", method: "PUT", params: ["mode": 1]) { [weak self] result in
             guard let self = self else { return }
             switch result {
@@ -9257,16 +9276,22 @@ class HandyManager: ObservableObject {
                     DispatchQueue.main.async {
                         switch result {
                         case .success(let data):
+                            #if DEBUG
                             if let str = String(data: data, encoding: .utf8) {
                                 print("📲 Handy v3: HSSP setup response: \(str)")
                             }
+                            #endif
                             self.isSyncing = true
                             self.statusMessage = "Synced & Ready"
+                            #if DEBUG
                             print("✅ Handy v3: HSSP setup successful")
+                            #endif
                             if let seconds = seconds { self.play(at: seconds) }
                         case .failure(let error):
                             self.statusMessage = "Sync Failed"
+                            #if DEBUG
                             print("❌ Handy v3: HSSP setup failed: \(error.localizedDescription)")
+                            #endif
                         }
                     }
                 }
@@ -9274,33 +9299,52 @@ class HandyManager: ObservableObject {
         }
     }
 
-    private func uploadToHandyCloud(localUrl: URL, completion: @escaping (URL?) -> Void) {
-        print("📲 Handy v3 Bridge: downloading \(localUrl.absoluteString)...")
-        URLSession.shared.dataTask(with: localUrl) { data, _, error in
+    /// Downloads funscript with ApiKey header (never relies on query secrets for third-party handoff).
+    private func authenticatedFunscriptRequest(from url: URL) -> URLRequest {
+        authenticatedStashRequest(for: url)
+    }
+
+    private func uploadToHandyCloud(sourceUrl: URL, completion: @escaping (URL?) -> Void) {
+        #if DEBUG
+        print("📲 Handy v3 Bridge: downloading \(redactedURLString(sourceUrl))...")
+        #endif
+        let request = authenticatedFunscriptRequest(from: sourceUrl)
+        URLSession.shared.dataTask(with: request) { data, response, error in
             guard let data = data, error == nil else {
+                #if DEBUG
                 let errMsg = error?.localizedDescription ?? "no data"
                 print("❌ Handy v3 Bridge: download failed: \(errMsg)")
+                #endif
+                completion(nil)
+                return
+            }
+            if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
+                #if DEBUG
+                print("❌ Handy v3 Bridge: download HTTP \(http.statusCode)")
+                #endif
                 completion(nil)
                 return
             }
             let boundary = "Boundary-\(UUID().uuidString)"
-            var request = URLRequest(url: URL(string: "https://www.handyfeeling.com/api/sync/upload")!)
-            request.httpMethod = "POST"
-            request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+            var uploadRequest = URLRequest(url: URL(string: "https://www.handyfeeling.com/api/sync/upload")!)
+            uploadRequest.httpMethod = "POST"
+            uploadRequest.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
             var body = Data()
             body.append("--\(boundary)\r\n".data(using: .utf8)!)
             body.append("Content-Disposition: form-data; name=\"syncFile\"; filename=\"script.funscript\"\r\n".data(using: .utf8)!)
             body.append("Content-Type: application/json\r\n\r\n".data(using: .utf8)!)
             body.append(data)
             body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
-            request.httpBody = body
-            URLSession.shared.dataTask(with: request) { data, response, _ in
+            uploadRequest.httpBody = body
+            URLSession.shared.dataTask(with: uploadRequest) { data, response, _ in
                 guard let data = data,
                       (response as? HTTPURLResponse)?.statusCode == 200,
                       let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                       let urlStr = json["url"] as? String,
                       let remoteUrl = URL(string: urlStr) else {
+                    #if DEBUG
                     print("❌ Handy v3 Bridge: upload failed")
+                    #endif
                     completion(nil)
                     return
                 }
@@ -9543,7 +9587,7 @@ class ButtplugManager: ObservableObject {
         }
         
         statusMessage = "Loading Script..."
-        URLSession.shared.dataTask(with: funscriptURL) { [weak self] data, response, error in
+        URLSession.shared.dataTask(with: authenticatedStashRequest(for: funscriptURL)) { [weak self] data, response, error in
             guard let self = self, let data = data else { return }
             
             do {
@@ -9874,7 +9918,7 @@ class LoveSpouseManager: NSObject, ObservableObject {
         isStashSyncMode = false // EXCLUSIVITY
         guard isEnabled else { return }
         statusMessage = "Loading Script..."
-        URLSession.shared.dataTask(with: funscriptURL) { [weak self] data, response, error in
+        URLSession.shared.dataTask(with: authenticatedStashRequest(for: funscriptURL)) { [weak self] data, response, error in
             guard let self = self else { return }
 
             if let error = error {
@@ -9884,13 +9928,13 @@ class LoveSpouseManager: NSObject, ObservableObject {
             }
 
             if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-                print("❌ LoveSpouse: Funscript fetch returned HTTP \(http.statusCode) for \(funscriptURL)")
+                print("❌ LoveSpouse: Funscript fetch returned HTTP \(http.statusCode) for \(redactedURLString(funscriptURL))")
                 DispatchQueue.main.async { self.statusMessage = "Script Error (\(http.statusCode))" }
                 return
             }
 
             guard let data = data, !data.isEmpty else {
-                print("❌ LoveSpouse: Funscript data empty for \(funscriptURL)")
+                print("❌ LoveSpouse: Funscript data empty for \(redactedURLString(funscriptURL))")
                 DispatchQueue.main.async { self.statusMessage = "Script Empty" }
                 return
             }

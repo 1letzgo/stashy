@@ -27,9 +27,9 @@ struct TVGalleryCardView: View {
             if let count = gallery.imageCount, count > 0 {
                 HStack(spacing: 4) {
                     Image(systemName: "photo")
-                        .font(.system(size: 12))
+                        .font(.caption2)
                     Text("\(count)")
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.caption.weight(.bold))
                 }
                 .foregroundColor(.white)
                 .padding(.horizontal, 12)
@@ -78,7 +78,7 @@ struct TVGalleryCardView: View {
             .overlay(
                 Image(systemName: "photo.stack")
                     .font(.system(size: 36))
-                    .foregroundColor(.white.opacity(0.12))
+                    .foregroundColor(.secondary)
             )
     }
 }

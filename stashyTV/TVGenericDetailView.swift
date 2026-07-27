@@ -74,12 +74,12 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                                 if let details = item.details, !details.isEmpty {
                                     Text(details)
                                         .font(.body)
-                                        .foregroundColor(.white.opacity(0.5))
+                                        .foregroundStyle(.secondary)
                                         .lineLimit(6)
                                 }
 
                                 Divider()
-                                    .background(Color.white.opacity(0.1))
+                                    .background(Color.secondary)
 
                                 infoGrid(item)
                             }
@@ -109,7 +109,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                             Text("\(totalScenes)")
                                 .font(.caption)
                                 .fontWeight(.bold)
-                                .foregroundColor(.white.opacity(0.4))
+                                .foregroundStyle(.secondary)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 3)
                                 .background(Color.white.opacity(0.06))
@@ -131,10 +131,10 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                             VStack(spacing: 16) {
                                 Image(systemName: "film")
                                     .font(.system(size: 48))
-                                    .foregroundColor(.white.opacity(0.12))
+                                    .foregroundColor(.secondary)
                                 Text("No scenes found")
                                     .font(.title3)
-                                    .foregroundColor(.white.opacity(0.4))
+                                    .foregroundStyle(.secondary)
                             }
                             Spacer()
                         }
@@ -205,7 +205,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
             .overlay(
                 Image(systemName: placeholderSystemImage)
                     .font(.system(size: 56))
-                    .foregroundColor(.white.opacity(0.12))
+                    .foregroundColor(.secondary)
             )
     }
 }

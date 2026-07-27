@@ -289,6 +289,12 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(reelsFillHeight, forKey: reelsFillHeightKey)
         }
     }
+    /// Markers feed: smart subject crop for landscape clips on portrait phones.
+    @Published var reelsIntelligentZoom: Bool = false {
+        didSet {
+            UserDefaults.standard.set(reelsIntelligentZoom, forKey: reelsIntelligentZoomKey)
+        }
+    }
     @Published var reelsContinuousPlay: Bool = false {
         didSet {
             UserDefaults.standard.set(reelsContinuousPlay, forKey: reelsContinuousPlayKey)
@@ -330,6 +336,7 @@ class TabManager: ObservableObject {
     private let reelsModesKey = "ReelsModesConfig"
     private let toolsKey = "ToolsConfig"
     private let reelsFillHeightKey = "ReelsFillHeight"
+    private let reelsIntelligentZoomKey = "ReelsIntelligentZoom"
     private let reelsContinuousPlayKey = "ReelsContinuousPlay"
     private let isPiPEnabledKey = "isPiPEnabled"
     private let dashboardHeroSizeKey = "DashboardHeroSize"
@@ -357,6 +364,7 @@ class TabManager: ObservableObject {
         loadReelsModes()
         loadTools()
         self.reelsFillHeight = UserDefaults.standard.object(forKey: reelsFillHeightKey) as? Bool ?? true
+        self.reelsIntelligentZoom = UserDefaults.standard.bool(forKey: reelsIntelligentZoomKey)
         self.reelsContinuousPlay = UserDefaults.standard.bool(forKey: reelsContinuousPlayKey)
         self.isPiPEnabled = UserDefaults.standard.object(forKey: isPiPEnabledKey) as? Bool ?? true
         if let heroSizeRaw = UserDefaults.standard.string(forKey: dashboardHeroSizeKey),

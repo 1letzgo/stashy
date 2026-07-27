@@ -315,6 +315,36 @@ class ServerConfigManager: ObservableObject {
         }
         return nil
     }
+
+    /// Move any leftover plaintext `apiKey` fields into Keychain and re-persist configs without secrets.
+    func scrubPlaintextAPIKeysFromDisk() {
+        #if !os(tvOS)
+        var changed = false
+
+        if var active = loadConfig(), let key = active.apiKey, !key.isEmpty {
+            KeychainManager.shared.migrateAPIKeyIfNeeded(from: active)
+            active.apiKey = nil
+            if let encoded = try? JSONEncoder().encode(active) {
+                UserDefaults.standard.set(encoded, forKey: activeConfigKey)
+                self.activeConfig = active
+                changed = true
+            }
+        }
+
+        var servers = getSavedServers()
+        for i in servers.indices {
+            if let key = servers[i].apiKey, !key.isEmpty {
+                KeychainManager.shared.migrateAPIKeyIfNeeded(from: servers[i])
+                servers[i].apiKey = nil
+                changed = true
+            }
+        }
+        if changed {
+            saveServersList(servers)
+            print("🧹 Scrubbed plaintext API keys from UserDefaults")
+        }
+        #endif
+    }
     
     // MARK: - Saved Servers Management
     // Helper to load from UserDefaults
@@ -368,6 +398,14 @@ class ServerConfigManager: ObservableObject {
                 }
             }
         }
+
+        for index in indexSet where index < servers.count {
+            let id = servers[index].id
+            #if !os(tvOS)
+            _ = KeychainManager.shared.deleteAPIKey(forServerID: id)
+            #endif
+            ImageCache.shared.clearCache(forServerID: id)
+        }
         
         servers.remove(atOffsets: indexSet)
         saveServersList(servers)
@@ -378,6 +416,11 @@ class ServerConfigManager: ObservableObject {
         if let active = activeConfig, active.id == id {
             clearActiveConfig()
         }
+        
+        #if !os(tvOS)
+        _ = KeychainManager.shared.deleteAPIKey(forServerID: id)
+        #endif
+        ImageCache.shared.clearCache(forServerID: id)
         
         var servers = getSavedServers()
         servers.removeAll { $0.id == id }

@@ -29,7 +29,7 @@ struct TVServerDetailView: View {
                 } else {
                     Text("No server configured.")
                         .font(.title3)
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundStyle(.secondary)
                         .padding(.top, 60)
                 }
                 Spacer(minLength: 80)
@@ -121,7 +121,6 @@ struct TVServerDetailView: View {
                 row(label: "Port", value: port)
             }
             row(label: "Default Quality", value: config.defaultQuality.displayName)
-            row(label: "Reels Quality", value: config.reelsQuality.displayName)
             row(label: "API Key", value: (config.secureApiKey?.isEmpty == false) ? "•••• configured" : "Not set")
         }
         .padding(20)

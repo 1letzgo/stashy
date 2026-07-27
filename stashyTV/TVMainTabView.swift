@@ -16,8 +16,8 @@ struct TVMainTabView: View {
     @ObservedObject private var tabManager = TabManager.shared
 
     private func isVisible(_ tab: AppTab) -> Bool {
-        // Wenn der Tab gar nicht im TabManager registriert ist, betrachten wir ihn als sichtbar
-        // (z. B. weil die iOS-Konfiguration ihn nicht kennt). Sonst dem User-Wunsch folgen.
+        // Home (catalogue) always stays on tvOS top bar — iOS sub-tab visibility must not hide it.
+        if tab == .catalogue { return true }
         if let entry = tabManager.tabs.first(where: { $0.id == tab }) {
             return entry.isVisible
         }
@@ -74,7 +74,7 @@ struct TVMainTabView: View {
                         .withTVDestinations()
                 }
             }
-            Tab("Search", systemImage: "magnifyingglass") {
+            Tab("Search", systemImage: "magnifyingglass", role: .search) {
                 NavigationStack { TVSearchView() }
                     .withTVDestinations()
             }

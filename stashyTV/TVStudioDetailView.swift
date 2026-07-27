@@ -42,21 +42,21 @@ struct TVStudioDetailView: View {
                     GridItem(.fixed(240), alignment: .leading),
                     GridItem(.flexible(), alignment: .leading)
                 ], alignment: .leading, spacing: 12) {
-                    Text("Scenes").font(.title3).foregroundColor(.white.opacity(0.4))
+                    Text("Scenes").font(.title3).foregroundStyle(.secondary)
                     Text("\(studio.sceneCount)").font(.title3).foregroundColor(.white)
 
                     if let performerCount = studio.performerCount, performerCount > 0 {
-                        Text("Performers").font(.title3).foregroundColor(.white.opacity(0.4))
+                        Text("Performers").font(.title3).foregroundStyle(.secondary)
                         Text("\(performerCount)").font(.title3).foregroundColor(.white)
                     }
 
                     if let galleryCount = studio.galleryCount, galleryCount > 0 {
-                        Text("Galleries").font(.title3).foregroundColor(.white.opacity(0.4))
+                        Text("Galleries").font(.title3).foregroundStyle(.secondary)
                         Text("\(galleryCount)").font(.title3).foregroundColor(.white)
                     }
 
                     if let rating = studio.rating100 {
-                        Text("Rating").font(.title3).foregroundColor(.white.opacity(0.4))
+                        Text("Rating").font(.title3).foregroundStyle(.secondary)
                         HStack(spacing: 5) {
                             Image(systemName: "star.fill").foregroundColor(.yellow)
                             Text(String(format: "%.1f", Double(rating) / 20.0)).font(.title3).foregroundColor(.white)
@@ -64,12 +64,12 @@ struct TVStudioDetailView: View {
                     }
 
                     if studio.favorite == true {
-                        Text("Favorite").font(.title3).foregroundColor(.white.opacity(0.4))
+                        Text("Favorite").font(.title3).foregroundStyle(.secondary)
                         Image(systemName: "heart.fill").foregroundColor(.red).font(.title3)
                     }
 
                     if let url = studio.url, !url.isEmpty {
-                        Text("URL").font(.title3).foregroundColor(.white.opacity(0.4))
+                        Text("URL").font(.title3).foregroundStyle(.secondary)
                         Text(url)
                             .font(.callout)
                             .foregroundColor(AppearanceManager.shared.tintColor)

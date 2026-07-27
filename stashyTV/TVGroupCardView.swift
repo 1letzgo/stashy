@@ -32,7 +32,7 @@ struct TVGroupCardView: View {
 
             if group.sceneCountDisplay > 0 {
                 Text("\(group.sceneCountDisplay)")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.caption.weight(.bold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -78,7 +78,7 @@ struct TVGroupCardView: View {
             .overlay(
                 Image(systemName: "rectangle.stack.fill")
                     .font(.system(size: 32))
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundStyle(.secondary)
             )
     }
 }

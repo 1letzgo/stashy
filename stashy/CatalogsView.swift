@@ -366,6 +366,12 @@ private struct GroupsViewContent: View {
         }
         .onAppear {
             viewModel.fetchSavedFilters()
+
+            if !coordinator.activeSearchText.isEmpty {
+                searchText = coordinator.activeSearchText
+                isSearchVisible = true
+                coordinator.activeSearchText = ""
+            }
             
             // Initial fetch if empty
             if viewModel.groups.isEmpty {

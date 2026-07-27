@@ -74,6 +74,7 @@ struct TVDashboardView: View {
                     cardWidth: 560,
                     cardHeight: 315
                 )
+                .focusSection()
             }
 
             if !recentlyReleasedScenes.isEmpty {
@@ -82,6 +83,7 @@ struct TVDashboardView: View {
                     scenes: recentlyReleasedScenes,
                     sortBy: .dateDesc
                 )
+                .focusSection()
             }
 
             if !recentlyAddedScenes.isEmpty {
@@ -90,6 +92,7 @@ struct TVDashboardView: View {
                     scenes: recentlyAddedScenes,
                     sortBy: .createdAtDesc
                 )
+                .focusSection()
             }
 
             if !topRatedScenes.isEmpty {
@@ -98,6 +101,7 @@ struct TVDashboardView: View {
                     scenes: topRatedScenes,
                     sortBy: .ratingDesc
                 )
+                .focusSection()
             }
 
             if !randomScenes.isEmpty {
@@ -106,6 +110,22 @@ struct TVDashboardView: View {
                     scenes: randomScenes,
                     sortBy: .random
                 )
+                .focusSection()
+            }
+
+            if !isLoadingPlayed && !isLoadingReleased && !isLoadingAdded && !isLoadingTopRated && !isLoadingRandom && recentContentIsEmpty {
+                VStack(spacing: 24) {
+                    Image(systemName: "film.stack")
+                        .font(.largeTitle)
+                        .foregroundStyle(.secondary)
+                    Text("No scenes to show yet")
+                        .font(.title2)
+                        .foregroundStyle(.secondary)
+                    Button("Reload") { loadData() }
+                        .font(.title3)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.top, 120)
             }
         }
         .padding(.bottom, 80)

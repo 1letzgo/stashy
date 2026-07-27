@@ -14,6 +14,7 @@ struct TVSearchView: View {
 
     @State private var searchQuery: String = ""
     @State private var hasSearched: Bool = false
+    @State private var didAutoFocusSearchField: Bool = false
     @FocusState private var isSearchFieldFocused: Bool
     @State private var searchDebounceTask: Task<Void, Never>?
 
@@ -34,7 +35,9 @@ struct TVSearchView: View {
     var body: some View {
         Group {
             if !hasValidConfig {
-                TVConnectionErrorView(title: "Server not reachable", subtitle: "Add a server in Settings.") {}
+                TVConnectionErrorView(title: "Server not reachable", subtitle: "Add a server in Settings.") {
+                    viewModel.testConnection()
+                }
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 44) {
@@ -45,11 +48,11 @@ struct TVSearchView: View {
                         } else if hasSearched && !hasAnyResults {
                             emptyResultsBlock
                         } else if hasSearched {
-                            if !viewModel.scenes.isEmpty { scenesResultSection }
-                            if !viewModel.performers.isEmpty { performersResultSection }
-                            if !viewModel.studios.isEmpty { studiosResultSection }
-                            if !viewModel.tags.isEmpty { tagsResultSection }
-                            if !viewModel.groups.isEmpty { groupsResultSection }
+                            if !viewModel.scenes.isEmpty { scenesResultSection.focusSection() }
+                            if !viewModel.performers.isEmpty { performersResultSection.focusSection() }
+                            if !viewModel.studios.isEmpty { studiosResultSection.focusSection() }
+                            if !viewModel.tags.isEmpty { tagsResultSection.focusSection() }
+                            if !viewModel.groups.isEmpty { groupsResultSection.focusSection() }
                         } else {
                             placeholderBlock
                         }
@@ -62,12 +65,12 @@ struct TVSearchView: View {
         }
         .background(Color.appBackground)
         .task {
-            // Statt fixem 0.2s-`asyncAfter`, das sich mit dem `onAppear`-Rendering
-            // verschieben kann: kurz dem Runloop Zeit lassen, dann fokussieren.
-            // `task` wird beim Disappear automatisch abgebrochen, sodass kein
-            // Fokus-Steal nach Verlassen des Tabs mehr passiert.
+            // Only autofocus on first visit of this tab instance — not when
+            // returning from a pushed detail (avoids stealing focus from results).
+            guard !didAutoFocusSearchField else { return }
             try? await Task.sleep(nanoseconds: 200_000_000)
             isSearchFieldFocused = true
+            didAutoFocusSearchField = true
         }
         .onChange(of: searchQuery) { _, newValue in
             scheduleDebouncedSearch(newValue)
@@ -123,7 +126,7 @@ struct TVSearchView: View {
                     .scaleEffect(1.5)
                 Text("Searching …")
                     .font(.title3)
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundStyle(.secondary)
             }
             Spacer()
         }
@@ -136,10 +139,10 @@ struct TVSearchView: View {
             VStack(spacing: 20) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 56))
-                    .foregroundColor(.white.opacity(0.12))
+                    .foregroundColor(.secondary)
                 Text("No results for \"\(searchQuery)\"")
                     .font(.title3)
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundStyle(.secondary)
                 Button("Refine Search") {
                     isSearchFieldFocused = true
                 }
@@ -156,13 +159,13 @@ struct TVSearchView: View {
             VStack(spacing: 16) {
                 Image(systemName: "magnifyingglass")
                     .font(.system(size: 56))
-                    .foregroundColor(.white.opacity(0.12))
+                    .foregroundColor(.secondary)
                 Text("Search your Stash library")
                     .font(.title3)
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundStyle(.secondary)
                 Text("Type at least two characters. Remote or dictation supported.")
                     .font(.callout)
-                    .foregroundColor(.white.opacity(0.25))
+                    .foregroundStyle(.secondary)
                     .multilineTextAlignment(.center)
             }
             Spacer()
@@ -221,7 +224,7 @@ struct TVSearchView: View {
                     .foregroundColor(.white)
                 Text("\(viewModel.scenes.count)")
                     .font(.callout)
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 50)
 
@@ -290,7 +293,7 @@ struct TVSearchView: View {
                 Text(title)
                     .font(.title2).fontWeight(.bold).foregroundColor(.white)
                 Text("\(count)")
-                    .font(.callout).foregroundColor(.white.opacity(0.4))
+                    .font(.callout).foregroundStyle(.secondary)
             }
             .padding(.horizontal, 50)
 
@@ -318,7 +321,7 @@ struct TVSearchView: View {
                     .foregroundColor(.white)
                 Text("\(viewModel.performers.count)")
                     .font(.callout)
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundStyle(.secondary)
             }
             .padding(.horizontal, 50)
 

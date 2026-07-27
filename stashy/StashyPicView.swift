@@ -36,6 +36,8 @@ struct StashLineView: View {
     @State private var sessionKeyCache: [String: String] = [:] // imageId -> sessionKey ("" if absent)
     @State private var shouldScrollToTopAfterReload: Bool = false
     @AppStorage("stashline_include_gifs") private var includeGifsInTimeline = false
+    @AppStorage("stashline_group_sets") private var groupIntoSets = true
+    @AppStorage("stashline_group_fallback") private var groupFallbackRaw = StashImageSetGroupingPolicy.sessionThenMeta.rawValue
     init(
         performerFilter: GalleryPerformer? = nil,
         isEmbedded: Bool = false,
@@ -63,12 +65,17 @@ struct StashLineView: View {
         stashLineListFilters.refetchImages(viewModel: viewModel, initial: true)
     }
 
+    private var groupingPolicy: StashImageSetGroupingPolicy {
+        StashImageSetGroupingPolicy(rawValue: groupFallbackRaw) ?? .sessionThenMeta
+    }
+
     /// Ein Trigger statt mehrerer `onChange`-Kaskaden — vermeidet doppelte `computeGroupedPosts()`-Läufe pro Update.
     private var stashLineGroupingFingerprint: String {
         let imgs = viewModel.allImages
         let head = imgs.first?.id ?? ""
-        let tail = imgs.last?.id ?? ""
-        return "\(stashLineListFilters.selectedSortOption.rawValue)|\(imgs.count)|\(head)|\(tail)"
+        let mid = imgs.count > 2 ? imgs[imgs.count / 2].id : ""
+        let tailSample = imgs.suffix(5).map(\.id).joined(separator: ",")
+        return "\(stashLineListFilters.selectedSortOption.rawValue)|\(groupIntoSets)|\(groupFallbackRaw)|\(imgs.count)|\(head)|\(mid)|\(tailSample)"
     }
 
     /// Nach Filter-/Sort-/Live-Wechsel: bei nächstem Ende von `isLoadingImages` auf den ersten Post der neu geladenen Liste springen.
@@ -329,7 +336,7 @@ struct StashLineView: View {
                     mutableImg.performers = mutablePerformers
                     return mutableImg
                 }
-                return StashLinePost(images: updatedImages)
+                return StashLinePost(id: post.id, images: updatedImages)
             }
         }
         .onChange(of: performerFilter) { _, _ in
@@ -469,39 +476,14 @@ struct StashLineView: View {
     }
 
     private func computeGroupedPosts() -> [StashLinePost] {
-        // Group when performer, gallery, created (day) and session key match; split on different session.
-        let shouldGroupConsecutively: Bool = {
-            switch stashLineListFilters.selectedSortOption {
-            case .dateAsc, .dateDesc, .createdAtAsc, .createdAtDesc, .titleAsc, .titleDesc:
-                return true
-            default:
-                return false
-            }
-        }()
-
-        // Date+filename order is applied in `fetchImages`; preserve that here for grouping.
-        guard shouldGroupConsecutively else {
-            return viewModel.allImages.map { StashLinePost(images: [$0]) }
-        }
-
-        let imagesForGrouping = viewModel.allImages
-
-        var groupedImages: [String: [StashImage]] = [:]
-        var groupOrder: [String] = []
-
-        for image in imagesForGrouping {
-            let key = StashImageFilenameKeys.groupKey(for: image, sessionCache: &sessionKeyCache)
-            if groupedImages[key] == nil {
-                groupOrder.append(key)
-                groupedImages[key] = []
-            }
-            groupedImages[key]?.append(image)
-        }
-
-        return groupOrder.compactMap { key in
-            guard let images = groupedImages[key], !images.isEmpty else { return nil }
-            return StashLinePost(images: images.sorted(by: StashImageFilenameKeys.withinGroupSort))
-        }
+        let built = StashImageFilenameKeys.buildPosts(
+            from: viewModel.allImages,
+            sort: stashLineListFilters.selectedSortOption,
+            policy: groupingPolicy,
+            groupEnabled: groupIntoSets,
+            sessionCache: &sessionKeyCache
+        )
+        return built.map { StashLinePost(id: $0.id, images: $0.images) }
     }
 
     private var feedContent: some View {
@@ -563,9 +545,15 @@ struct StashLinePost: Identifiable {
     let id: String
     let images: [StashImage]
 
+    /// Stable feed identity — prefer `groupKey` from `StashImageFilenameKeys.buildPosts`.
+    init(id: String, images: [StashImage]) {
+        self.id = id
+        self.images = images
+    }
+
     init(images: [StashImage]) {
         self.images = images
-        self.id = images.map(\.id).sorted().joined(separator: "-")
+        self.id = images.first.map { "single|\($0.id)" } ?? UUID().uuidString
     }
 
     var primaryImage: StashImage { images[0] }
@@ -634,6 +622,12 @@ struct StashLinePostView: View {
         self._oCounters = State(initialValue: [:])
         self._ratings = State(initialValue: [:])
         self._visibleCarouselImageId = State(initialValue: post.images.first?.id ?? "")
+    }
+
+    private func preserveVisibleCarouselIfPossible() {
+        let ids = Set(post.images.map(\.id))
+        if ids.contains(visibleCarouselImageId) { return }
+        visibleCarouselImageId = post.images.first?.id ?? ""
     }
 
     var body: some View {
@@ -707,9 +701,10 @@ struct StashLinePostView: View {
             Spacer().frame(height: 12)
             Divider()
         }
+        .onChange(of: post.images.map(\.id)) { _, _ in
+            preserveVisibleCarouselIfPossible()
+        }
     }
-
-    // MARK: - Header
 
     private var postHeader: some View {
         let performers = image.performers ?? []

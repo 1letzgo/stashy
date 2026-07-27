@@ -56,6 +56,8 @@ struct TVGalleryLink: Hashable {
 struct TVImageLink: Hashable {
     let id: String
     let title: String
+    /// When non-nil, viewer browses this gallery instead of the global library.
+    var galleryId: String? = nil
 }
 
 struct TVSceneListLink: Hashable {
@@ -77,7 +79,7 @@ private struct TVExitCommandDismiss: ViewModifier {
 }
 
 extension View {
-    /// Menu-/Back-Verhalten: eine Ebene zurück statt App verlassen (siehe `TVNavigationDestinations`).
+    /// Menu-/Back: eine Ebene zurück statt App verlassen.
     func tvExitDismissable() -> some View {
         modifier(TVExitCommandDismiss())
     }
@@ -85,8 +87,8 @@ extension View {
 
 // MARK: - Centralised Navigation Destinations
 
-/// Apply to the root view of each NavigationStack so every child view can
-/// push any destination without knowing about the surrounding stack.
+/// Optional typed destinations (kept for path-based pushes). Browse grids use
+/// `NavigationLink(destination:)` — value-based links are unreliable in tvOS LazyVGrid.
 struct TVNavigationDestinations: ViewModifier {
     func body(content: Content) -> some View {
         content
@@ -115,8 +117,11 @@ struct TVNavigationDestinations: ViewModifier {
                     .tvExitDismissable()
             }
             .navigationDestination(for: TVImageLink.self) { link in
-                TVImageDetailView(imageId: link.id, imageTitle: link.title)
-                    .tvExitDismissable()
+                TVImageDetailView(
+                    imageId: link.id,
+                    imageTitle: link.title,
+                    galleryId: link.galleryId
+                )
             }
             .navigationDestination(for: TVSceneListLink.self) { link in
                 TVScenesView(sortBy: link.sortBy)

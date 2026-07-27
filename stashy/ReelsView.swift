@@ -1047,11 +1047,23 @@ struct ReelsViewBody: View {
                 }
                 return false
             case .clip(let c):
+                // Metadata width/height can ignore container rotation; prefer caller
+                // using AVPlayer `presentationSize` when available.
                 if let file = c.visual_files?.first {
                     return (file.height ?? 0) > (file.width ?? 0)
                 }
                 return false
             case .preview(let s): return s.isPortrait
+            }
+        }
+
+        /// Still / preview image used for Vision focus analysis.
+        var intelligentZoomImageURL: URL? {
+            switch self {
+            case .scene(let s): return s.thumbnailURL
+            case .marker(let m): return m.thumbnailURL
+            case .clip(let c): return c.thumbnailURL ?? c.previewURL ?? c.imageURL
+            case .preview(let s): return s.thumbnailURL
             }
         }
         
@@ -1444,17 +1456,17 @@ struct ReelsViewBody: View {
         // Preview items live in viewModel.previews, not viewModel.scenes
         if case .preview(let scene) = item {
             let sceneId = scene.id
+            let originalRating = viewModel.previews.first(where: { $0.id == sceneId })?.rating100
             if let index = viewModel.previews.firstIndex(where: { $0.id == sceneId }) {
-                let originalRating = viewModel.previews[index].rating100
                 viewModel.previews[index] = viewModel.previews[index].withRating(newRating)
-                if let r = newRating {
-                    viewModel.updateSceneRating(sceneId: sceneId, rating100: r) { success in
-                        if !success {
-                            DispatchQueue.main.async {
-                                viewModel.previews[index] = viewModel.previews[index].withRating(originalRating)
-                                ToastManager.shared.show("Failed to save rating", icon: "exclamationmark.triangle", style: .error)
-                            }
+            }
+            viewModel.updateSceneRating(sceneId: sceneId, rating100: newRating) { success in
+                if !success {
+                    DispatchQueue.main.async {
+                        if let revertIndex = viewModel.previews.firstIndex(where: { $0.id == sceneId }) {
+                            viewModel.previews[revertIndex] = viewModel.previews[revertIndex].withRating(originalRating)
                         }
+                        ToastManager.shared.show("Failed to save rating", icon: "exclamationmark.triangle", style: .error)
                     }
                 }
             }
@@ -1466,54 +1478,52 @@ struct ReelsViewBody: View {
         else if case .marker(let marker) = item { targetSceneId = marker.scene?.id }
 
         if let sceneId = targetSceneId {
-            // 1. Optimistic Update for Scene List
-            if let sceneIndex = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
-                let originalRating = viewModel.scenes[sceneIndex].rating100
-                viewModel.scenes[sceneIndex] = viewModel.scenes[sceneIndex].withRating(newRating)
+            let originalSceneRating = viewModel.scenes.first(where: { $0.id == sceneId })?.rating100
+            let originalMarkerRatings: [(id: String, rating: Int?)] = viewModel.sceneMarkers.compactMap { marker in
+                guard marker.scene?.id == sceneId else { return nil }
+                return (marker.id, marker.scene?.rating100)
+            }
 
-                if let r = newRating {
-                    viewModel.updateSceneRating(sceneId: sceneId, rating100: r) { success in
-                        if !success {
-                            DispatchQueue.main.async {
-                                viewModel.scenes[sceneIndex] = viewModel.scenes[sceneIndex].withRating(originalRating)
-                                ToastManager.shared.show("Failed to save rating", icon: "exclamationmark.triangle", style: .error)
+            if let sceneIndex = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
+                viewModel.scenes[sceneIndex] = viewModel.scenes[sceneIndex].withRating(newRating)
+            }
+            for marker in viewModel.sceneMarkers where marker.scene?.id == sceneId {
+                if let idx = viewModel.sceneMarkers.firstIndex(where: { $0.id == marker.id }),
+                   let markerScene = viewModel.sceneMarkers[idx].scene {
+                    viewModel.sceneMarkers[idx] = viewModel.sceneMarkers[idx].withScene(markerScene.withRating(newRating))
+                }
+            }
+
+            viewModel.updateSceneRating(sceneId: sceneId, rating100: newRating) { success in
+                if !success {
+                    DispatchQueue.main.async {
+                        if let revertIndex = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
+                            viewModel.scenes[revertIndex] = viewModel.scenes[revertIndex].withRating(originalSceneRating)
+                        }
+                        for entry in originalMarkerRatings {
+                            if let revertIndex = viewModel.sceneMarkers.firstIndex(where: { $0.id == entry.id }),
+                               let markerScene = viewModel.sceneMarkers[revertIndex].scene {
+                                viewModel.sceneMarkers[revertIndex] = viewModel.sceneMarkers[revertIndex]
+                                    .withScene(markerScene.withRating(entry.rating))
                             }
                         }
+                        ToastManager.shared.show("Failed to save rating", icon: "exclamationmark.triangle", style: .error)
                     }
                 }
             }
-
-            // 2. Optimistic Update for Scene Markers
-            let markerIndices = viewModel.sceneMarkers.enumerated().compactMap { index, marker in
-                marker.scene?.id == sceneId ? index : nil
-            }
-
-            for index in markerIndices {
-                if let markerScene = viewModel.sceneMarkers[index].scene {
-                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withRating(newRating))
-                }
-            }
-
-            // If not in scenes list
-            if !viewModel.scenes.contains(where: { $0.id == sceneId }) {
-                if let r = newRating {
-                    viewModel.updateSceneRating(sceneId: sceneId, rating100: r) { _ in }
-                }
-            }
         } else if case .clip(let image) = item {
-            // 3. Optimistic Update for Clips List
-            if let clipIndex = viewModel.clips.firstIndex(where: { $0.id == image.id }) {
-                let originalRating = viewModel.clips[clipIndex].rating100
+            let imageId = image.id
+            let originalRating = viewModel.clips.first(where: { $0.id == imageId })?.rating100
+            if let clipIndex = viewModel.clips.firstIndex(where: { $0.id == imageId }) {
                 viewModel.clips[clipIndex] = viewModel.clips[clipIndex].withRating(newRating)
-                
-                if let r = newRating {
-                    viewModel.updateImageRating(imageId: image.id, rating100: r) { success in
-                        if !success {
-                            DispatchQueue.main.async {
-                                viewModel.clips[clipIndex] = viewModel.clips[clipIndex].withRating(originalRating)
-                                ToastManager.shared.show("Failed to save rating", icon: "exclamationmark.triangle", style: .error)
-                            }
+            }
+            viewModel.updateImageRating(imageId: imageId, rating100: newRating) { success in
+                if !success {
+                    DispatchQueue.main.async {
+                        if let revertIndex = viewModel.clips.firstIndex(where: { $0.id == imageId }) {
+                            viewModel.clips[revertIndex] = viewModel.clips[revertIndex].withRating(originalRating)
                         }
+                        ToastManager.shared.show("Failed to save rating", icon: "exclamationmark.triangle", style: .error)
                     }
                 }
             }
@@ -1524,19 +1534,21 @@ struct ReelsViewBody: View {
         // Preview items live in viewModel.previews, not viewModel.scenes
         if case .preview(let scene) = item {
             let sceneId = scene.id
+            let originalCount = viewModel.previews.first(where: { $0.id == sceneId })?.oCounter ?? 0
             if let index = viewModel.previews.firstIndex(where: { $0.id == sceneId }) {
-                let originalCount = viewModel.previews[index].oCounter ?? 0
                 viewModel.previews[index] = viewModel.previews[index].withOCounter(newCount)
-                viewModel.incrementOCounter(sceneId: sceneId) { returnedCount in
+            }
+            viewModel.incrementOCounter(sceneId: sceneId) { returnedCount in
+                DispatchQueue.main.async {
                     if let count = returnedCount {
-                        DispatchQueue.main.async {
-                            viewModel.previews[index] = viewModel.previews[index].withOCounter(count)
+                        if let idx = viewModel.previews.firstIndex(where: { $0.id == sceneId }) {
+                            viewModel.previews[idx] = viewModel.previews[idx].withOCounter(count)
                         }
                     } else {
-                        DispatchQueue.main.async {
-                            viewModel.previews[index] = viewModel.previews[index].withOCounter(originalCount)
-                            ToastManager.shared.show("Counter update failed", icon: "exclamationmark.triangle", style: .error)
+                        if let idx = viewModel.previews.firstIndex(where: { $0.id == sceneId }) {
+                            viewModel.previews[idx] = viewModel.previews[idx].withOCounter(originalCount)
                         }
+                        ToastManager.shared.show("Counter update failed", icon: "exclamationmark.triangle", style: .error)
                     }
                 }
             }
@@ -1548,77 +1560,68 @@ struct ReelsViewBody: View {
         else if case .marker(let marker) = item { targetSceneId = marker.scene?.id }
 
         if let sceneId = targetSceneId {
-            // 1. Scene List Update
+            let originalSceneCount = viewModel.scenes.first(where: { $0.id == sceneId })?.oCounter ?? 0
+            let originalMarkerCounts: [(id: String, count: Int)] = viewModel.sceneMarkers.compactMap { marker in
+                guard marker.scene?.id == sceneId else { return nil }
+                return (marker.id, marker.scene?.oCounter ?? 0)
+            }
+
             if let index = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
-                let originalCount = viewModel.scenes[index].oCounter ?? 0
                 viewModel.scenes[index] = viewModel.scenes[index].withOCounter(newCount)
-                
-                viewModel.incrementOCounter(sceneId: sceneId) { returnedCount in
+            }
+            for entry in originalMarkerCounts {
+                if let idx = viewModel.sceneMarkers.firstIndex(where: { $0.id == entry.id }),
+                   let markerScene = viewModel.sceneMarkers[idx].scene {
+                    viewModel.sceneMarkers[idx] = viewModel.sceneMarkers[idx].withScene(markerScene.withOCounter(newCount))
+                }
+            }
+
+            // One mutation for scene + all related markers
+            viewModel.incrementOCounter(sceneId: sceneId) { returnedCount in
+                DispatchQueue.main.async {
                     if let count = returnedCount {
-                        DispatchQueue.main.async {
-                            viewModel.scenes[index] = viewModel.scenes[index].withOCounter(count)
+                        if let idx = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
+                            viewModel.scenes[idx] = viewModel.scenes[idx].withOCounter(count)
+                        }
+                        for entry in originalMarkerCounts {
+                            if let idx = viewModel.sceneMarkers.firstIndex(where: { $0.id == entry.id }),
+                               let markerScene = viewModel.sceneMarkers[idx].scene {
+                                viewModel.sceneMarkers[idx] = viewModel.sceneMarkers[idx]
+                                    .withScene(markerScene.withOCounter(count))
+                            }
                         }
                     } else {
-                        DispatchQueue.main.async {
-                            viewModel.scenes[index] = viewModel.scenes[index].withOCounter(originalCount)
-                            ToastManager.shared.show("Counter update failed", icon: "exclamationmark.triangle", style: .error)
+                        if let idx = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
+                            viewModel.scenes[idx] = viewModel.scenes[idx].withOCounter(originalSceneCount)
                         }
-                    }
-                }
-            }
-            
-            // 2. Scene Markers Update
-            let markerIndices = viewModel.sceneMarkers.enumerated().compactMap { index, marker in
-                marker.scene?.id == sceneId ? index : nil
-            }
-            
-            for index in markerIndices {
-                if let markerScene = viewModel.sceneMarkers[index].scene {
-                    let originalCount = markerScene.oCounter ?? 0
-                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withOCounter(newCount))
-                    
-                    // If NOT already handled by scene list update
-                    if !viewModel.scenes.contains(where: { $0.id == sceneId }) {
-                         viewModel.incrementOCounter(sceneId: sceneId) { returnedCount in
-                            if let count = returnedCount {
-                                DispatchQueue.main.async {
-                                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withOCounter(count))
-                                }
-                            } else {
-                                DispatchQueue.main.async {
-                                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withOCounter(originalCount))
-                                }
+                        for entry in originalMarkerCounts {
+                            if let idx = viewModel.sceneMarkers.firstIndex(where: { $0.id == entry.id }),
+                               let markerScene = viewModel.sceneMarkers[idx].scene {
+                                viewModel.sceneMarkers[idx] = viewModel.sceneMarkers[idx]
+                                    .withScene(markerScene.withOCounter(entry.count))
                             }
-                         }
+                        }
+                        ToastManager.shared.show("Counter update failed", icon: "exclamationmark.triangle", style: .error)
                     }
                 }
             }
-            
-            // 3. Fallback (if not in any list)
-            if !viewModel.scenes.contains(where: { $0.id == sceneId }) && markerIndices.isEmpty {
-                viewModel.incrementOCounter(sceneId: sceneId) { _ in }
-            }
-            
         } else if case .clip(let image) = item {
-            // 4. Clip Update
-            if let index = viewModel.clips.firstIndex(where: { $0.id == image.id }) {
-                let originalCount = viewModel.clips[index].o_counter ?? 0
-                
-                // Optimistic Update
+            let imageId = image.id
+            let originalCount = viewModel.clips.first(where: { $0.id == imageId })?.o_counter ?? 0
+            if let index = viewModel.clips.firstIndex(where: { $0.id == imageId }) {
                 viewModel.clips[index] = viewModel.clips[index].withOCounter(newCount)
-                
-                viewModel.incrementImageOCounter(imageId: image.id) { returnedCount in
+            }
+            viewModel.incrementImageOCounter(imageId: imageId) { returnedCount in
+                DispatchQueue.main.async {
                     if let count = returnedCount {
-                        DispatchQueue.main.async {
-                            viewModel.clips[index] = viewModel.clips[index].withOCounter(count)
+                        if let idx = viewModel.clips.firstIndex(where: { $0.id == imageId }) {
+                            viewModel.clips[idx] = viewModel.clips[idx].withOCounter(count)
                         }
                     } else {
-                        DispatchQueue.main.async {
-                            if let revertIndex = viewModel.clips.firstIndex(where: { $0.id == image.id }) {
-                                viewModel.clips[revertIndex] = viewModel.clips[revertIndex].withOCounter(originalCount)
-                            }
-                            ToastManager.shared.show("Counter update failed", icon: "exclamationmark.triangle", style: .error)
+                        if let revertIndex = viewModel.clips.firstIndex(where: { $0.id == imageId }) {
+                            viewModel.clips[revertIndex] = viewModel.clips[revertIndex].withOCounter(originalCount)
                         }
+                        ToastManager.shared.show("Counter update failed", icon: "exclamationmark.triangle", style: .error)
                     }
                 }
             }
@@ -1631,80 +1634,69 @@ struct ReelsViewBody: View {
         
         if case .scene(let scene) = item {
             let sceneId = scene.id
-            // 1. Scene List Update
+            let originalSceneCount = viewModel.scenes.first(where: { $0.id == sceneId })?.playCount ?? 0
+            let originalMarkerCounts: [(id: String, count: Int)] = viewModel.sceneMarkers.compactMap { marker in
+                guard marker.scene?.id == sceneId else { return nil }
+                return (marker.id, marker.scene?.playCount ?? 0)
+            }
+
             if let index = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
-                let originalCount = viewModel.scenes[index].playCount ?? 0
                 viewModel.scenes[index] = viewModel.scenes[index].withPlayCount(newCount)
-                
-                viewModel.addScenePlay(sceneId: sceneId) { returnedCount in
+            }
+            for entry in originalMarkerCounts {
+                if let idx = viewModel.sceneMarkers.firstIndex(where: { $0.id == entry.id }),
+                   let markerScene = viewModel.sceneMarkers[idx].scene {
+                    viewModel.sceneMarkers[idx] = viewModel.sceneMarkers[idx].withScene(markerScene.withPlayCount(newCount))
+                }
+            }
+
+            viewModel.addScenePlay(sceneId: sceneId) { returnedCount in
+                DispatchQueue.main.async {
                     if let count = returnedCount {
-                        DispatchQueue.main.async {
-                            viewModel.scenes[index] = viewModel.scenes[index].withPlayCount(count)
+                        if let idx = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
+                            viewModel.scenes[idx] = viewModel.scenes[idx].withPlayCount(count)
+                        }
+                        for entry in originalMarkerCounts {
+                            if let idx = viewModel.sceneMarkers.firstIndex(where: { $0.id == entry.id }),
+                               let markerScene = viewModel.sceneMarkers[idx].scene {
+                                viewModel.sceneMarkers[idx] = viewModel.sceneMarkers[idx]
+                                    .withScene(markerScene.withPlayCount(count))
+                            }
                         }
                     } else {
-                        DispatchQueue.main.async {
-                            viewModel.scenes[index] = viewModel.scenes[index].withPlayCount(originalCount)
-                            ToastManager.shared.show("View count update failed", icon: "exclamationmark.triangle", style: .error)
+                        if let idx = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
+                            viewModel.scenes[idx] = viewModel.scenes[idx].withPlayCount(originalSceneCount)
                         }
-                    }
-                }
-            }
-            
-            // 2. Scene Markers Update (associated scene count)
-            let markerIndices = viewModel.sceneMarkers.enumerated().compactMap { index, marker in
-                marker.scene?.id == sceneId ? index : nil
-            }
-            
-            for index in markerIndices {
-                if let markerScene = viewModel.sceneMarkers[index].scene {
-                    let originalCount = markerScene.playCount ?? 0
-                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withPlayCount(newCount))
-                    
-                    // If NOT already handled by scene list update
-                    if !viewModel.scenes.contains(where: { $0.id == sceneId }) {
-                         viewModel.addScenePlay(sceneId: sceneId) { returnedCount in
-                            if let count = returnedCount {
-                                DispatchQueue.main.async {
-                                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withPlayCount(count))
-                                }
-                            } else {
-                                DispatchQueue.main.async {
-                                    viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withScene(markerScene.withPlayCount(originalCount))
-                                }
+                        for entry in originalMarkerCounts {
+                            if let idx = viewModel.sceneMarkers.firstIndex(where: { $0.id == entry.id }),
+                               let markerScene = viewModel.sceneMarkers[idx].scene {
+                                viewModel.sceneMarkers[idx] = viewModel.sceneMarkers[idx]
+                                    .withScene(markerScene.withPlayCount(entry.count))
                             }
-                         }
+                        }
+                        ToastManager.shared.show("View count update failed", icon: "exclamationmark.triangle", style: .error)
                     }
                 }
-            }
-            
-            // 3. Fallback (if not in any list)
-            if !viewModel.scenes.contains(where: { $0.id == sceneId }) && markerIndices.isEmpty {
-                viewModel.addScenePlay(sceneId: sceneId) { _ in }
             }
         } else if case .marker(let marker) = item {
-            // MARKER Play Count Update (The fix)
             let markerId = marker.id
-            
-            // 1. Optimistic Update for Scene Markers List
+            let originalCount = viewModel.sceneMarkers.first(where: { $0.id == markerId })?.playCount ?? 0
             if let index = viewModel.sceneMarkers.firstIndex(where: { $0.id == markerId }) {
-                let originalCount = viewModel.sceneMarkers[index].playCount ?? 0
                 viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withPlayCount(newCount)
-                
-                viewModel.addSceneMarkerPlay(markerId: markerId) { returnedCount in
+            }
+            viewModel.addSceneMarkerPlay(markerId: markerId) { returnedCount in
+                DispatchQueue.main.async {
                     if let count = returnedCount {
-                        DispatchQueue.main.async {
-                            viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withPlayCount(count)
+                        if let idx = viewModel.sceneMarkers.firstIndex(where: { $0.id == markerId }) {
+                            viewModel.sceneMarkers[idx] = viewModel.sceneMarkers[idx].withPlayCount(count)
                         }
                     } else {
-                        DispatchQueue.main.async {
-                            viewModel.sceneMarkers[index] = viewModel.sceneMarkers[index].withPlayCount(originalCount)
-                            ToastManager.shared.show("Marker view count update failed", icon: "exclamationmark.triangle", style: .error)
+                        if let idx = viewModel.sceneMarkers.firstIndex(where: { $0.id == markerId }) {
+                            viewModel.sceneMarkers[idx] = viewModel.sceneMarkers[idx].withPlayCount(originalCount)
                         }
+                        ToastManager.shared.show("Marker view count update failed", icon: "exclamationmark.triangle", style: .error)
                     }
                 }
-            } else {
-                // 2. Fallback (if not in current list)
-            viewModel.addSceneMarkerPlay(markerId: markerId) { _ in }
             }
         }
     }
@@ -2997,6 +2989,23 @@ struct ReelsViewBody: View {
             .frame(maxWidth: .infinity)
             .contentShape(Rectangle())
 
+            // 3b — Intelligent Zoom (landscape video on portrait phone)
+            if reelsMode != .pics {
+                Button {
+                    #if !os(tvOS)
+                    HapticManager.selection()
+                    #endif
+                    tabManager.reelsIntelligentZoom.toggle()
+                } label: {
+                    Image(systemName: tabManager.reelsIntelligentZoom ? "viewfinder.circle.fill" : "viewfinder.circle")
+                        .foregroundColor(tabManager.reelsIntelligentZoom ? appearanceManager.tintColor : .white)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.plain)
+                .contentShape(Rectangle())
+                .accessibilityLabel("Intelligent Zoom")
+            }
+
             // 4 — Mute
             Button {
                 if isVideo { isMuted.toggle() }
@@ -3454,19 +3463,71 @@ struct ReelItemView: View {
     @State private var isFastForwarding = false
     var onInteraction: () -> Void
     @StateObject private var videoSurfaceReadiness = ReelItemVideoSurfaceReadiness()
+    /// Subject focus for intelligent crop; `nil` until analyzed / when disabled.
+    @State private var intelligentFocus: CGPoint? = nil
+    @State private var intelligentZoomTask: Task<Void, Never>? = nil
+    /// Live decoded size (accounts for clip rotation / preferredTransform).
+    @State private var playbackPresentationSize: CGSize? = nil
 
     private var shouldFill: Bool {
+        let isPortraitDevice = UIScreen.main.bounds.height > UIScreen.main.bounds.width
+        // Intelligent zoom implies fill for landscape content on portrait phones
+        if usesIntelligentZoom { return true }
+
         // Only fill if the setting is enabled
         guard tabManager.reelsFillHeight else { return false }
-        
-        let isPortraitDevice = UIScreen.main.bounds.height > UIScreen.main.bounds.width
+
         if isPortraitDevice {
-            // In portrait device: fill if item is portrait
-            return item.isPortrait
+            return !effectiveContentIsLandscape
         } else {
-            // In landscape device: fill if item is landscape (exclude GIFs which might look bad stretched too much)
-            return !item.isPortrait
+            return effectiveContentIsLandscape
         }
+    }
+
+    /// True when playing pixels are wider than tall (rotation-aware for clips).
+    private var effectiveContentIsLandscape: Bool {
+        if let size = playbackPresentationSize, size.width > 1, size.height > 1 {
+            return size.width > size.height
+        }
+        return !item.isPortrait
+    }
+
+    /// Landscape video + portrait phone + toggle (Scenes / Markers / Clips / Previews).
+    private var usesIntelligentZoom: Bool {
+        #if !os(tvOS)
+        guard tabManager.reelsIntelligentZoom else { return false }
+        guard !item.isAnimated else { return false }
+        if case .clip(let c) = item, !c.isVideo { return false }
+        let isPortraitDevice = UIScreen.main.bounds.height > UIScreen.main.bounds.width
+        return isPortraitDevice && effectiveContentIsLandscape
+        #else
+        return false
+        #endif
+    }
+
+    private var contentPixelSize: CGSize? {
+        if let size = playbackPresentationSize, size.width > 1, size.height > 1 {
+            return size
+        }
+        switch item {
+        case .scene(let s):
+            if let w = s.files?.first?.width, let h = s.files?.first?.height {
+                return CGSize(width: CGFloat(w), height: CGFloat(h))
+            }
+        case .marker(let m):
+            if let w = m.scene?.files?.first?.width, let h = m.scene?.files?.first?.height {
+                return CGSize(width: CGFloat(w), height: CGFloat(h))
+            }
+        case .clip(let c):
+            if let w = c.visual_files?.first?.width, let h = c.visual_files?.first?.height {
+                return CGSize(width: CGFloat(w), height: CGFloat(h))
+            }
+        case .preview(let s):
+            if let w = s.files?.first?.width, let h = s.files?.first?.height {
+                return CGSize(width: CGFloat(w), height: CGFloat(h))
+            }
+        }
+        return nil
     }
 
     
@@ -3514,6 +3575,7 @@ extension ReelItemView {
                     setupPlayer()
                     onInteraction()
                     if item.isAnimated { startAnimationAdvanceTimer() }
+                    refreshIntelligentZoomIfNeeded()
                 } else {
                     // Deferred autoplay: after a filter change, onAppear can run before
                     // `currentVisibleSceneId` is set. Retry shortly if this row became active.
@@ -3521,6 +3583,7 @@ extension ReelItemView {
                         if isActive && isPlaying && !isRotating && !isUserScrolling {
                             if player == nil { setupPlayer() }
                             player?.play()
+                            refreshIntelligentZoomIfNeeded()
                         }
                     }
                 }
@@ -3532,6 +3595,8 @@ extension ReelItemView {
                 guard !isActive else { return }
                 cleanupPlayer()
                 cancelAnimationAdvanceTimer()
+                intelligentZoomTask?.cancel()
+                intelligentZoomTask = nil
             }
             .onReceive(NotificationCenter.default.publisher(for: .reelsPauseAllPlayers)) { _ in
                 // Robust pause: when paging/scrolling starts, pause immediately even if
@@ -3548,6 +3613,7 @@ extension ReelItemView {
                     if isPlaying && !isRotating { player?.play() }
                     onInteraction()
                     if item.isAnimated { startAnimationAdvanceTimer() }
+                    refreshIntelligentZoomIfNeeded()
                     // Deferred play: ensure player starts even if isPlaying binding
                     // hasn't propagated yet (e.g. after filter change resets state).
                     DispatchQueue.main.async {
@@ -3556,6 +3622,7 @@ extension ReelItemView {
                         }
                     }
                 } else {
+                    intelligentZoomTask?.cancel()
                     if isUserScrolling {
                         player?.pause()
                         cancelAnimationAdvanceTimer()
@@ -3564,6 +3631,23 @@ extension ReelItemView {
                         cancelAnimationAdvanceTimer()
                     }
                 }
+            }
+            .onChange(of: tabManager.reelsIntelligentZoom) { _, enabled in
+                if enabled {
+                    refreshIntelligentZoomIfNeeded(force: true)
+                } else {
+                    // Sofort rauszoomen: Focus nil → PlayerView restored gravity + full bounds.
+                    intelligentZoomTask?.cancel()
+                    intelligentZoomTask = nil
+                    intelligentFocus = nil
+                }
+            }
+            .onChange(of: playbackPresentationSize?.width) { _, _ in
+                // Clips often flip landscape↔portrait per file via rotation metadata.
+                refreshIntelligentZoomIfNeeded(force: true)
+            }
+            .onChange(of: playbackPresentationSize?.height) { _, _ in
+                refreshIntelligentZoomIfNeeded(force: true)
             }
             .onChange(of: isUserScrolling) { _, scrolling in
                 if scrolling {
@@ -3702,6 +3786,9 @@ extension ReelItemView {
                                 FullScreenVideoPlayer(
                                     player: player,
                                     videoGravity: shouldFill ? .resizeAspectFill : .resizeAspect,
+                                    focusNormalized: usesIntelligentZoom ? (intelligentFocus ?? CGPoint(x: 0.5, y: 0.38)) : nil,
+                                    intelligentZoomFactor: 1.15,
+                                    contentSize: contentPixelSize,
                                     onLayerReady: { layer in
                                         videoSurfaceReadiness.bind(layer: layer)
                                     }
@@ -3897,6 +3984,33 @@ extension ReelItemView {
     }
     
     
+    private func refreshIntelligentZoomIfNeeded(force: Bool = false) {
+        #if !os(tvOS)
+        guard usesIntelligentZoom else {
+            intelligentFocus = nil
+            return
+        }
+        if intelligentFocus != nil && !force { return }
+
+        intelligentZoomTask?.cancel()
+        // v3: genital/hip focus + XY; shared across modes
+        let cacheKey = "reel-focus-v3-\(item.id)"
+        guard let url = item.intelligentZoomImageURL else {
+            intelligentFocus = CGPoint(x: 0.5, y: 0.38)
+            return
+        }
+        intelligentZoomTask = Task {
+            let point = await IntelligentCropAnalyzer.focus(fromImageURL: url, cacheKey: cacheKey)
+            guard !Task.isCancelled else { return }
+            await MainActor.run {
+                withAnimation(.easeInOut(duration: 0.25)) {
+                    intelligentFocus = CGPoint(x: point.x, y: point.y)
+                }
+            }
+        }
+        #endif
+    }
+
     func setupPlayer() {
         // Animations don't need AVPlayer
         guard !item.isAnimated else { return }
@@ -4064,6 +4178,9 @@ extension ReelItemView {
             if self.isActive, let d = player.currentItem?.duration.seconds, d > 0, !d.isNaN {
                 self.scrubberState.duration = d
             }
+
+            // Rotation-aware size (especially clips): preferredTransform → presentationSize
+            self.syncPlaybackPresentationSize(from: player)
         }
         
         // Increment play count (initial)
@@ -4095,6 +4212,10 @@ extension ReelItemView {
             p.replaceCurrentItem(with: nil)
         }
         player = nil
+        playbackPresentationSize = nil
+        intelligentFocus = nil
+        intelligentZoomTask?.cancel()
+        intelligentZoomTask = nil
     }
 
     /// Re-creates the periodic time observer so it captures the current `self`
@@ -4115,6 +4236,15 @@ extension ReelItemView {
             if self.isActive, let d = player.currentItem?.duration.seconds, d > 0, !d.isNaN {
                 self.scrubberState.duration = d
             }
+            self.syncPlaybackPresentationSize(from: player)
+        }
+    }
+
+    private func syncPlaybackPresentationSize(from player: AVPlayer) {
+        let size = player.currentItem?.presentationSize ?? .zero
+        guard size.width > 1, size.height > 1 else { return }
+        if playbackPresentationSize != size {
+            playbackPresentationSize = size
         }
     }
 

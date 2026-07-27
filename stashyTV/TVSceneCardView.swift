@@ -36,7 +36,7 @@ struct TVSceneCardView: View {
                 HStack(alignment: .top) {
                     if let studio = scene.studio {
                         Text(studio.name.uppercased())
-                            .font(.system(size: 14, weight: .bold, design: .rounded))
+                            .font(.caption.weight(.bold))
                             .foregroundColor(.white)
                             .tracking(1)
                             .lineLimit(1)
@@ -50,7 +50,7 @@ struct TVSceneCardView: View {
                     
                     if let duration = scene.sceneDuration ?? scene.duration, duration > 0 {
                         Text(formatDuration(duration))
-                            .font(.system(size: 14, weight: .bold, design: .monospaced))
+                            .font(.caption.weight(.bold).monospaced())
                             .foregroundColor(.white)
                             .padding(.horizontal, 12)
                             .padding(.vertical, 6)
@@ -77,10 +77,10 @@ struct TVSceneCardView: View {
                     if let rating = scene.rating100, rating > 0 {
                         HStack(spacing: 3) {
                             Image(systemName: "star.fill")
-                                .font(.system(size: 10))
+                                .font(.caption2)
                                 .foregroundColor(.yellow)
                             Text(String(format: "%.1f", Double(rating) / 20.0))
-                                .font(.system(size: 12, weight: .bold))
+                                .font(.caption2)
                                 .foregroundColor(.white)
                         }
                     }
@@ -143,7 +143,7 @@ struct TVSceneCardView: View {
             .overlay(
                 Image(systemName: "film")
                     .font(.system(size: 36))
-                    .foregroundColor(.white.opacity(0.12))
+                    .foregroundColor(.secondary)
             )
     }
 
@@ -170,13 +170,13 @@ struct TVSceneCardTitleView: View {
             if let date = scene.date, !date.isEmpty {
                 Text(date)
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.5))
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             if !scene.performers.isEmpty {
                 Text(scene.performers.prefix(3).map { $0.name }.joined(separator: ", "))
                     .font(.caption)
-                    .foregroundColor(.white.opacity(0.4))
+                    .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
         }

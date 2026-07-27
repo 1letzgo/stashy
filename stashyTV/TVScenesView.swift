@@ -153,7 +153,7 @@ struct TVScenesView: View {
                 .scaleEffect(1.5)
             Text("Loading scenes…")
                 .font(.title3)
-                .foregroundColor(.white.opacity(0.4))
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         Spacer()
@@ -165,11 +165,11 @@ struct TVScenesView: View {
         VStack(spacing: 24) {
             Image(systemName: "film")
                 .font(.system(size: 56))
-                .foregroundColor(.white.opacity(0.12))
+                .foregroundColor(.secondary)
             Text("No scenes found")
                 .font(.title2)
                 .fontWeight(.medium)
-                .foregroundColor(.white.opacity(0.4))
+                .foregroundStyle(.secondary)
             Button {
                 viewModel.fetchScenes(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
             } label: {

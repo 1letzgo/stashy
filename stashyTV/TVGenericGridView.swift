@@ -51,7 +51,7 @@ struct TVGenericGridView<Item: TVGridItem, Card: View, Header: View>: View {
                     ProgressView().scaleEffect(1.5)
                     Text(loadingText)
                         .font(.title3)
-                        .foregroundColor(.white.opacity(0.4))
+                        .foregroundStyle(.secondary)
                 }
                 Spacer()
                     .frame(height: 100)
@@ -64,12 +64,12 @@ struct TVGenericGridView<Item: TVGridItem, Card: View, Header: View>: View {
                     VStack(spacing: 32) {
                         Image(systemName: emptyImage)
                             .font(.system(size: 80))
-                            .foregroundColor(.white.opacity(0.1))
+                            .foregroundColor(.secondary)
                         
                         Text(emptyText)
                             .font(.title2)
                             .fontWeight(.semibold)
-                            .foregroundColor(.white.opacity(0.3))
+                            .foregroundStyle(.secondary)
                     }
                     Spacer()
                 } else {

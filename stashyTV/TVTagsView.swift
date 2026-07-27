@@ -125,7 +125,7 @@ struct TVTagsView: View {
             ProgressView().scaleEffect(1.5)
             Text("Loading tags…")
                 .font(.title3)
-                .foregroundColor(.white.opacity(0.4))
+                .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
         Spacer()
@@ -137,12 +137,12 @@ struct TVTagsView: View {
         VStack(spacing: 24) {
             Image(systemName: "tag")
                 .font(.system(size: 80))
-                .foregroundColor(.white.opacity(0.1))
+                .foregroundColor(.secondary)
             
             Text("No Tags Found")
                 .font(.title2)
                 .fontWeight(.semibold)
-                .foregroundColor(.white.opacity(0.3))
+                .foregroundStyle(.secondary)
         }
         Spacer()
     }
@@ -304,7 +304,7 @@ struct TVTagDetailView: View {
                     GridItem(.flexible(), alignment: .leading)
                 ], alignment: .leading, spacing: 12) {
                     if viewModel.totalTagScenes > 0 {
-                        Text("Scenes").font(.title3).foregroundColor(.white.opacity(0.4))
+                        Text("Scenes").font(.title3).foregroundStyle(.secondary)
                         Text("\(viewModel.totalTagScenes)").font(.title3).foregroundColor(.white)
                     }
                 }

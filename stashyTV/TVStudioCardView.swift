@@ -26,7 +26,7 @@ struct TVStudioCardView: View {
 
             if studio.sceneCount > 0 {
                 Text("\(studio.sceneCount)")
-                    .font(.system(size: 14, weight: .bold))
+                    .font(.caption.weight(.bold))
                     .foregroundColor(.white)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 6)
@@ -49,10 +49,10 @@ struct TVStudioCardView: View {
                     if let rating = studio.rating100 {
                         HStack(spacing: 3) {
                             Image(systemName: "star.fill")
-                                .font(.system(size: 10))
+                                .font(.caption2)
                                 .foregroundColor(.yellow)
                             Text(String(format: "%.1f", Double(rating) / 20.0))
-                                .font(.system(size: 12, weight: .bold))
+                                .font(.caption2)
                                 .foregroundColor(.white)
                         }
                     }
@@ -82,7 +82,7 @@ struct TVStudioCardView: View {
             .overlay(
                 Image(systemName: "building.2.fill")
                     .font(.system(size: 40))
-                    .foregroundColor(.white.opacity(0.12))
+                    .foregroundColor(.secondary)
             )
     }
 }

@@ -39,30 +39,30 @@ struct TVPerformerDetailView: View {
                     GridItem(.flexible(), alignment: .leading)
                 ], alignment: .leading, spacing: 12) {
                     if let gender = performer.gender, !gender.isEmpty {
-                        Text("Gender").font(.title3).foregroundColor(.white.opacity(0.4))
+                        Text("Gender").font(.title3).foregroundStyle(.secondary)
                         Text(gender.capitalized).font(.title3).foregroundColor(.white)
                     }
 
                     if let country = performer.country, !country.isEmpty {
-                        Text("Country").font(.title3).foregroundColor(.white.opacity(0.4))
+                        Text("Country").font(.title3).foregroundStyle(.secondary)
                         Text(country).font(.title3).foregroundColor(.white)
                     }
 
                     if let ethnicity = performer.ethnicity, !ethnicity.isEmpty {
-                        Text("Ethnicity").font(.title3).foregroundColor(.white.opacity(0.4))
+                        Text("Ethnicity").font(.title3).foregroundStyle(.secondary)
                         Text(ethnicity.capitalized).font(.title3).foregroundColor(.white)
                     }
 
                     if let birthdate = performer.birthdate, !birthdate.isEmpty {
-                        Text("Birthdate").font(.title3).foregroundColor(.white.opacity(0.4))
+                        Text("Birthdate").font(.title3).foregroundStyle(.secondary)
                         Text(birthdate).font(.title3).foregroundColor(.white)
                     }
 
-                    Text("Scenes").font(.title3).foregroundColor(.white.opacity(0.4))
+                    Text("Scenes").font(.title3).foregroundStyle(.secondary)
                     Text("\(performer.sceneCount)").font(.title3).foregroundColor(.white)
 
                     if let rating = performer.rating100 {
-                        Text("Rating").font(.title3).foregroundColor(.white.opacity(0.4))
+                        Text("Rating").font(.title3).foregroundStyle(.secondary)
                         HStack(spacing: 5) {
                             Image(systemName: "star.fill").foregroundColor(.yellow)
                             Text(String(format: "%.1f", Double(rating) / 20.0)).font(.title3).foregroundColor(.white)
@@ -70,7 +70,7 @@ struct TVPerformerDetailView: View {
                     }
 
                     if performer.favorite == true {
-                        Text("Favorite").font(.title3).foregroundColor(.white.opacity(0.4))
+                        Text("Favorite").font(.title3).foregroundStyle(.secondary)
                         Image(systemName: "heart.fill").foregroundColor(.red).font(.title3)
                     }
                 }
