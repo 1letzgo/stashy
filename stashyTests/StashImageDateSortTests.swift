@@ -106,10 +106,32 @@ struct StashImageDateSortTests {
         #expect(posts.count == 2)
     }
 
-    @Test func withinGroupSortsByFilename() {
-        let a = makeImage(id: "2", basename: "b.jpg")
-        let b = makeImage(id: "1", basename: "a.jpg")
-        #expect(StashImageFilenameKeys.withinGroupSort(b, a))
+    @Test func buildPostsPreservesAPIOrderNotFilename() {
+        var cache: [String: String] = [:]
+        // API order is z then a; filename sort would have flipped them.
+        let images = [
+            makeImage(id: "2", basename: "z_-_2026-01-12_12-39-43_1.jpg", performerIds: ["p1"], galleryIds: ["g1"]),
+            makeImage(id: "1", basename: "a_-_2026-01-12_12-39-43_0.jpg", performerIds: ["p1"], galleryIds: ["g1"]),
+        ]
+        let posts = StashImageFilenameKeys.buildPosts(
+            from: images, sort: .dateDesc, policy: .sessionThenMeta, groupEnabled: true, sessionCache: &cache
+        )
+        #expect(posts.count == 1)
+        #expect(posts[0].images.map(\.id) == ["2", "1"])
+    }
+
+    @Test func buildPostsPreservesInterleavedAPIPostOrder() {
+        var cache: [String: String] = [:]
+        let images = [
+            makeImage(id: "solo", basename: "solo.jpg", date: "2026-03-01", performerIds: [], galleryIds: []),
+            makeImage(id: "b", basename: "b.jpg", date: "2026-03-01", performerIds: ["p1"], galleryIds: ["g1"]),
+            makeImage(id: "a", basename: "a.jpg", date: "2026-03-01", performerIds: ["p1"], galleryIds: ["g1"]),
+        ]
+        let posts = StashImageFilenameKeys.buildPosts(
+            from: images, sort: .dateDesc, policy: .sessionThenMeta, groupEnabled: true, sessionCache: &cache
+        )
+        #expect(posts.map(\.id) == ["single|solo", "meta|2026-03-01|p1|g1"])
+        #expect(posts[1].images.map(\.id) == ["b", "a"])
     }
 
     @Test func multiPerformerExactMatchGroups() {

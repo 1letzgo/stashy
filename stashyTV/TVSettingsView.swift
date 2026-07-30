@@ -16,25 +16,25 @@ struct TVSettingsView: View {
             // First row must be focusable so ↑ from Settings can reach the tab bar.
             Section {
                 NavigationLink {
-                    TVServersSettingsView()
+                    TVServersSettingsView().tvExitDismissable()
                 } label: {
                     settingsRow(title: "Servers", icon: "server.rack", subtitle: "Active & saved servers")
                 }
 
                 NavigationLink {
-                    TVAppearanceSettingsView()
+                    TVAppearanceSettingsView().tvExitDismissable()
                 } label: {
                     settingsRow(title: "Appearance", icon: "paintbrush.fill", subtitle: "Accent color")
                 }
 
                 NavigationLink {
-                    TVSecuritySettingsView()
+                    TVSecuritySettingsView().tvExitDismissable()
                 } label: {
                     settingsRow(title: "Security", icon: "lock.fill", subtitle: "PIN lock")
                 }
 
                 NavigationLink {
-                    TVPlaybackSettingsView()
+                    TVPlaybackSettingsView().tvExitDismissable()
                 } label: {
                     settingsRow(title: "Playback", icon: "play.rectangle.fill", subtitle: "Streaming quality")
                 }
@@ -44,19 +44,19 @@ struct TVSettingsView: View {
 
             Section {
                 NavigationLink {
-                    TVDefaultSortSettingsView()
+                    TVDefaultSortSettingsView().tvExitDismissable()
                 } label: {
                     settingsRow(title: "Default Sorting", icon: "arrow.up.arrow.down", subtitle: "Per-tab sort order")
                 }
 
                 NavigationLink {
-                    TVDefaultFilterSettingsView()
+                    TVDefaultFilterSettingsView().tvExitDismissable()
                 } label: {
                     settingsRow(title: "Default Filters", icon: "line.3.horizontal.decrease.circle", subtitle: "Saved filters per tab")
                 }
 
                 NavigationLink {
-                    TVTabVisibilitySettingsView()
+                    TVTabVisibilitySettingsView().tvExitDismissable()
                 } label: {
                     settingsRow(title: "Visible Tabs", icon: "rectangle.3.group.fill", subtitle: "Top navigation")
                 }
@@ -66,7 +66,7 @@ struct TVSettingsView: View {
 
             Section {
                 NavigationLink {
-                    TVAboutSettingsView()
+                    TVAboutSettingsView().tvExitDismissable()
                 } label: {
                     settingsRow(title: "About", icon: "info.circle", subtitle: "Version & build")
                 }

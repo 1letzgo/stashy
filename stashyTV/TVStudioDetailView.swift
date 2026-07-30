@@ -36,7 +36,7 @@ struct TVStudioDetailView: View {
             isLoadingScenes: viewModel.isLoadingStudioScenes,
             totalScenes: viewModel.totalStudioScenes,
             hasMoreScenes: viewModel.hasMoreStudioScenes,
-            loadMoreScenes: { viewModel.fetchStudioScenes(studioId: studioId, isInitialLoad: false) },
+            loadMoreScenes: { viewModel.loadMoreStudioScenes(studioId: studioId) },
             infoGrid: { studio in
                 LazyVGrid(columns: [
                     GridItem(.fixed(240), alignment: .leading),

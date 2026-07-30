@@ -42,18 +42,32 @@ struct TVDashboardView: View {
             }
         }
         .background(Color.appBackground)
-        .onAppear { loadData() }
+        .onAppear { loadData(forceRefresh: true) }
         // Nicht auf `ServerConfigChanged` laden: `handleServerChange` bricht alle GraphQL-Tasks ab —
         // ein sofortiges `loadData()` würde nur leer/cancelled enden. Stattdessen nach init neu laden.
         .onReceive(NotificationCenter.default.publisher(for: .stashServerInitializationFinished)) { _ in
-            loadData()
+            loadData(forceRefresh: true)
         }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneResumeTimeUpdated"))) { _ in
+            refreshContinueWatching()
+        }
+        .sceneLiveUpdates(using: viewModel)
     }
     
     // MARK: - Content Rows
     
     private var contentRows: some View {
         VStack(alignment: .leading, spacing: 50) {
+            HStack {
+                Spacer()
+                Button {
+                    loadData(forceRefresh: true)
+                } label: {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+            }
+            .padding(.horizontal, 50)
+
             if isLoadingPlayed || isLoadingReleased || isLoadingAdded || isLoadingTopRated || isLoadingRandom {
                 if recentContentIsEmpty {
                     HStack {
@@ -121,7 +135,7 @@ struct TVDashboardView: View {
                     Text("No scenes to show yet")
                         .font(.title2)
                         .foregroundStyle(.secondary)
-                    Button("Reload") { loadData() }
+                    Button("Reload") { loadData(forceRefresh: true) }
                         .font(.title3)
                 }
                 .frame(maxWidth: .infinity)
@@ -143,12 +157,13 @@ struct TVDashboardView: View {
 
     // MARK: - Data Loading
 
-    private func loadData() {
+    private func loadData(forceRefresh: Bool = false) {
         guard hasValidConfig else { return }
-        fetchHomeRows()
+        fetchHomeRows(forceRefresh: forceRefresh)
     }
 
-    private func fetchHomeRows() {
+    private func refreshContinueWatching() {
+        guard hasValidConfig else { return }
         isLoadingPlayed = true
         let playedConfig = HomeRowConfig(
             id: UUID(),
@@ -157,7 +172,22 @@ struct TVDashboardView: View {
             sortOrder: 0,
             type: .lastPlayed
         )
-        viewModel.fetchScenesForHomeRow(config: playedConfig, limit: 15) { scenes in
+        viewModel.fetchScenesForHomeRow(config: playedConfig, limit: 15, forceRefresh: true) { scenes in
+            recentlyPlayedScenes = scenes
+            isLoadingPlayed = false
+        }
+    }
+
+    private func fetchHomeRows(forceRefresh: Bool) {
+        isLoadingPlayed = true
+        let playedConfig = HomeRowConfig(
+            id: UUID(),
+            title: "Recently Played",
+            isEnabled: true,
+            sortOrder: 0,
+            type: .lastPlayed
+        )
+        viewModel.fetchScenesForHomeRow(config: playedConfig, limit: 15, forceRefresh: forceRefresh) { scenes in
             recentlyPlayedScenes = scenes
             isLoadingPlayed = false
         }
@@ -170,7 +200,7 @@ struct TVDashboardView: View {
             sortOrder: 1,
             type: .newest3Min
         )
-        viewModel.fetchScenesForHomeRow(config: releasedConfig, limit: 15) { scenes in
+        viewModel.fetchScenesForHomeRow(config: releasedConfig, limit: 15, forceRefresh: forceRefresh) { scenes in
             recentlyReleasedScenes = scenes
             isLoadingReleased = false
         }
@@ -183,7 +213,7 @@ struct TVDashboardView: View {
             sortOrder: 2,
             type: .lastAdded3Min
         )
-        viewModel.fetchScenesForHomeRow(config: addedConfig, limit: 15) { scenes in
+        viewModel.fetchScenesForHomeRow(config: addedConfig, limit: 15, forceRefresh: forceRefresh) { scenes in
             recentlyAddedScenes = scenes
             isLoadingAdded = false
         }
@@ -196,7 +226,7 @@ struct TVDashboardView: View {
             sortOrder: 3,
             type: .topRating3Min
         )
-        viewModel.fetchScenesForHomeRow(config: topRatedConfig, limit: 15) { scenes in
+        viewModel.fetchScenesForHomeRow(config: topRatedConfig, limit: 15, forceRefresh: forceRefresh) { scenes in
             topRatedScenes = scenes
             isLoadingTopRated = false
         }
@@ -209,7 +239,7 @@ struct TVDashboardView: View {
             sortOrder: 4,
             type: .random
         )
-        viewModel.fetchScenesForHomeRow(config: randomConfig, limit: 15) { scenes in
+        viewModel.fetchScenesForHomeRow(config: randomConfig, limit: 15, forceRefresh: forceRefresh) { scenes in
             randomScenes = scenes
             isLoadingRandom = false
         }
@@ -232,10 +262,9 @@ struct TVDashboardView: View {
                 HStack(spacing: 30) {
                     ForEach(scenes) { scene in
                         VStack(alignment: .leading, spacing: 10) {
-                            NavigationLink(destination: TVSceneDetailView(sceneId: scene.id).tvExitDismissable()) {
+                            TVNavButton(value: TVSceneLink(sceneId: scene.id)) {
                                 TVSceneCardView(scene: scene, width: cardWidth + 10, height: cardHeight + 5)
                             }
-                            .buttonStyle(.card)
                             
                             TVSceneCardTitleView(scene: scene)
                         }
@@ -243,7 +272,7 @@ struct TVDashboardView: View {
                     }
 
                     // See All Card at the end
-                    NavigationLink(destination: TVScenesView(sortBy: sortBy).tvExitDismissable()) {
+                    TVNavButton(value: TVSceneListLink(sortBy: sortBy)) {
                         VStack(spacing: 20) {
                             Image(systemName: "arrow.right.circle.fill")
                                 .font(.system(size: 60))
@@ -257,7 +286,6 @@ struct TVDashboardView: View {
                         .background(Color.white.opacity(0.05))
                         .clipShape(RoundedRectangle(cornerRadius: 12))
                     }
-                    .buttonStyle(.card)
                 }
                 .padding(.horizontal, 50)
                 .padding(.vertical, 20)

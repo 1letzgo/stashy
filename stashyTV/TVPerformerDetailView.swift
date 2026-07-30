@@ -32,7 +32,7 @@ struct TVPerformerDetailView: View {
             isLoadingScenes: viewModel.isLoadingPerformerScenes,
             totalScenes: viewModel.totalPerformerScenes,
             hasMoreScenes: viewModel.hasMorePerformerScenes,
-            loadMoreScenes: { viewModel.fetchPerformerScenes(performerId: performerId, isInitialLoad: false) },
+            loadMoreScenes: { viewModel.loadMorePerformerScenes(performerId: performerId) },
             infoGrid: { performer in
                 LazyVGrid(columns: [
                     GridItem(.fixed(240), alignment: .leading),

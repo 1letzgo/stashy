@@ -161,15 +161,15 @@ struct TVPerformersView: View {
             VStack(alignment: .leading, spacing: 0) {
                 STVHeaderView(
                     sortMenu: { sortMenu },
-                    filterMenu: { filterMenu }
+                    filterMenu: { filterMenu },
+                    onRefresh: { reload() }
                 )
 
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 40) {
                     ForEach(viewModel.performers) { performer in
-                        NavigationLink(destination: TVPerformerDetailView(performerId: performer.id, performerName: performer.name).tvExitDismissable()) {
+                        TVNavButton(value: TVPerformerLink(id: performer.id, name: performer.name)) {
                             TVPerformerCardView(performer: performer)
                         }
-                        .buttonStyle(.card)
                         .focused($focusedPerformerID, equals: performer.id)
                         .frame(width: 260) // Fixed width for item container
                         .onAppear {

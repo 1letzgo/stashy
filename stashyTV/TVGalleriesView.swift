@@ -156,15 +156,15 @@ struct TVGalleriesView: View {
             VStack(alignment: .leading, spacing: 0) {
                 STVHeaderView(
                     sortMenu: { sortMenu },
-                    filterMenu: { filterMenu }
+                    filterMenu: { filterMenu },
+                    onRefresh: { reload() }
                 )
 
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 40) {
                     ForEach(viewModel.galleries) { gallery in
-                        NavigationLink(destination: TVGalleryDetailView(galleryId: gallery.id, galleryTitle: gallery.displayName).tvExitDismissable()) {
+                        TVNavButton(value: TVGalleryLink(id: gallery.id, title: gallery.displayName)) {
                             TVGalleryCardView(gallery: gallery)
                         }
-                        .buttonStyle(.card)
                         .focused($focusedGalleryID, equals: gallery.id)
                         .frame(width: 410)
                         .onAppear {
@@ -275,6 +275,14 @@ struct TVGalleryDetailView: View {
     @StateObject private var viewModel = StashDBViewModel()
     @State private var gallery: Gallery?
     @State private var isLoadingGallery: Bool = false
+    @State private var presentedImage: TVImageLink?
+    @FocusState private var emptyFocus: Bool
+    @Environment(\.dismiss) private var dismiss
+
+    /// Still images for the grid — GIFs hidden; still WebP kept (tvOS can decode still WebP).
+    private var displayImages: [StashImage] {
+        viewModel.galleryImages.filter { !$0.isGifFile && !$0.isVideo }
+    }
 
     private let imageColumns = [
         GridItem(.fixed(300), spacing: 30),
@@ -296,29 +304,48 @@ struct TVGalleryDetailView: View {
                         Spacer()
                     }
                     .padding(.vertical, 60)
-                } else if viewModel.galleryImages.isEmpty {
+                } else if viewModel.galleryImages.isEmpty || displayImages.isEmpty {
                     HStack {
                         Spacer()
                         VStack(spacing: 16) {
                             Image(systemName: "photo")
                                 .font(.system(size: 48))
                                 .foregroundColor(.secondary)
-                            Text("No images in this gallery")
+                            Text(viewModel.galleryImages.isEmpty
+                                  ? "No images in this gallery"
+                                  : "No supported images in this gallery")
                                 .font(.title3)
                                 .foregroundStyle(.secondary)
+                            if !viewModel.galleryImages.isEmpty && displayImages.isEmpty {
+                                Text("Only unsupported or animated formats (e.g. GIF) were found.")
+                                    .font(.body)
+                                    .foregroundStyle(.tertiary)
+                                    .multilineTextAlignment(.center)
+                                    .padding(.horizontal, 80)
+                            }
+                            // Focus anchor so Menu/Back hits tvExitDismissable instead of exiting the app.
+                            Button("Back") { dismiss() }
+                                .focused($emptyFocus)
                         }
                         Spacer()
                     }
                     .padding(.vertical, 60)
+                    .onAppear { emptyFocus = true }
                 } else {
                     LazyVGrid(columns: imageColumns, alignment: .leading, spacing: 30) {
-                        ForEach(viewModel.galleryImages.filter { !$0.isAnimated }) { image in
-                            NavigationLink(destination: TVImageDetailView(imageId: image.id, imageTitle: image.title ?? "Untitled", galleryId: galleryId)) {
+                        ForEach(displayImages) { image in
+                            Button {
+                                presentedImage = TVImageLink(
+                                    id: image.id,
+                                    title: image.title ?? "Untitled",
+                                    galleryId: galleryId
+                                )
+                            } label: {
                                 TVImageCardView(image: image)
                             }
                             .buttonStyle(.card)
                             .onAppear {
-                                if image.id == viewModel.galleryImages.last?.id && viewModel.hasMoreGalleryImages {
+                                if image.id == displayImages.last?.id && viewModel.hasMoreGalleryImages {
                                     viewModel.fetchGalleryImages(galleryId: galleryId, isInitialLoad: false)
                                 }
                             }
@@ -330,6 +357,9 @@ struct TVGalleryDetailView: View {
             .padding(.bottom, 80)
         }
         .background(Color.appBackground)
+        .fullScreenCover(item: $presentedImage) { link in
+            TVImageDetailView(imageId: link.id, imageTitle: link.title, galleryId: link.galleryId)
+        }
         .onAppear {
             loadGalleryData()
         }

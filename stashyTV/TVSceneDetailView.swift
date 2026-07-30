@@ -623,7 +623,7 @@ struct TVSceneDetailView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 30) {
                     ForEach(performers) { performer in
-                        NavigationLink(destination: TVPerformerDetailView(performerId: performer.id, performerName: performer.name).tvExitDismissable()) {
+                        TVNavButton(value: TVPerformerLink(id: performer.id, name: performer.name)) {
                             VStack(alignment: .leading, spacing: 12) {
                                 performerThumbnail(performer: performer)
                                     .frame(width: 180, height: 270)
@@ -638,7 +638,6 @@ struct TVSceneDetailView: View {
                             }
                             .frame(width: 180)
                         }
-                        .buttonStyle(.card)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -652,7 +651,7 @@ struct TVSceneDetailView: View {
         VStack(alignment: .leading, spacing: 16) {
             sectionHeading(icon: "building.2.fill", title: "Studio")
 
-            NavigationLink(destination: TVStudioDetailView(studioId: studio.id, studioName: studio.name).tvExitDismissable()) {
+            TVNavButton(value: TVStudioLink(id: studio.id, name: studio.name)) {
                 VStack(alignment: .leading, spacing: 12) {
                     ZStack {
                         TVStudioImageView(studioId: studio.id, studioName: studio.name, contentMode: .fit)
@@ -668,7 +667,6 @@ struct TVSceneDetailView: View {
                 }
                 .frame(width: 320)
             }
-            .buttonStyle(.card)
             .padding(.horizontal, 20)
             .padding(.vertical, 20)
         }
@@ -711,13 +709,12 @@ struct TVSceneDetailView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 30) {
                     ForEach(tags) { tag in
-                        NavigationLink(destination: TVTagDetailView(tagId: tag.id, tagName: tag.name).tvExitDismissable()) {
+                        TVNavButton(value: TVTagLink(id: tag.id, name: tag.name)) {
                             Text(tag.name)
                                 .font(.headline)
                                 .padding(.horizontal, 24)
                                 .padding(.vertical, 12)
                         }
-                        .buttonStyle(.card)
                     }
                 }
                 .padding(.horizontal, 20)
@@ -936,6 +933,11 @@ class TVPlayerViewModel: ObservableObject {
         if currentTime > 0 {
             print("💾 TV PLAYER VM: Saving progress: \(currentTime)s for \(sceneId)")
             viewModel.updateSceneResumeTime(sceneId: sceneId, resumeTime: currentTime)
+            NotificationCenter.default.post(
+                name: NSNotification.Name("SceneResumeTimeUpdated"),
+                object: nil,
+                userInfo: ["sceneId": sceneId, "resumeTime": currentTime]
+            )
         }
     }
 

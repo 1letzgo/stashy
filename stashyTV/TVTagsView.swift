@@ -153,15 +153,15 @@ struct TVTagsView: View {
             VStack(alignment: .leading, spacing: 0) {
                 STVHeaderView(
                     sortMenu: { sortMenu },
-                    filterMenu: { filterMenu }
+                    filterMenu: { filterMenu },
+                    onRefresh: { reload() }
                 )
 
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 40) {
                     ForEach(viewModel.tags) { tag in
-                        NavigationLink(destination: TVTagDetailView(tagId: tag.id, tagName: tag.name).tvExitDismissable()) {
+                        TVNavButton(value: TVTagLink(id: tag.id, name: tag.name)) {
                             TVTagCardView(tag: tag)
                         }
-                        .buttonStyle(.card)
                         .focused($focusedTagID, equals: tag.id)
                         .frame(width: 400) // Fixed width for item container
                         .onAppear {
@@ -297,7 +297,7 @@ struct TVTagDetailView: View {
             isLoadingScenes: viewModel.isLoadingTagScenes,
             totalScenes: viewModel.totalTagScenes,
             hasMoreScenes: viewModel.hasMoreTagScenes,
-            loadMoreScenes: { viewModel.fetchTagScenes(tagId: tagId, isInitialLoad: false) },
+            loadMoreScenes: { viewModel.loadMoreTagScenes(tagId: tagId) },
             infoGrid: { _ in
                 LazyVGrid(columns: [
                     GridItem(.fixed(240), alignment: .leading),

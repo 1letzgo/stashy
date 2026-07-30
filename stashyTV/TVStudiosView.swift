@@ -153,15 +153,15 @@ struct TVStudiosView: View {
             VStack(alignment: .leading, spacing: 0) {
                 STVHeaderView(
                     sortMenu: { sortMenu },
-                    filterMenu: { filterMenu }
+                    filterMenu: { filterMenu },
+                    onRefresh: { reload() }
                 )
 
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 40) {
                     ForEach(viewModel.studios) { studio in
-                        NavigationLink(destination: TVStudioDetailView(studioId: studio.id, studioName: studio.name).tvExitDismissable()) {
+                        TVNavButton(value: TVStudioLink(id: studio.id, name: studio.name)) {
                             TVStudioCardView(studio: studio)
                         }
-                        .buttonStyle(.card)
                         .focused($focusedStudioID, equals: studio.id)
                         .frame(width: 410) // Fixed width for item container
                         .onAppear {

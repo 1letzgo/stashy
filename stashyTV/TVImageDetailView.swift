@@ -168,13 +168,14 @@ struct TVImageDetailView: View {
     }
 
     private func applyImages(_ source: [StashImage]) {
-        let nonAnimated = source.filter { !$0.isAnimated }
-        guard !nonAnimated.isEmpty else {
+        // Keep still WebP; hide GIF/video. Matches tvOS grid filtering.
+        let viewable = source.filter { !$0.isGifFile && !$0.isVideo }
+        guard !viewable.isEmpty else {
             if !isLoading { loadFailed = true }
             return
         }
         let previousId = images.indices.contains(currentIndex) ? images[currentIndex].id : imageId
-        images = nonAnimated
+        images = viewable
         isLoading = false
         loadFailed = false
         currentIndex = max(0, images.firstIndex(where: { $0.id == previousId || $0.id == imageId }) ?? 0)

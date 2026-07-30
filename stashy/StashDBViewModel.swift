@@ -3137,6 +3137,9 @@ class StashDBViewModel: ObservableObject {
         liveFilter: [String: Any]? = nil,
         searchQuery: String? = nil
     ) {
+        // Prevent parallel page loads (tvOS detail grids fire onAppear aggressively).
+        if !isInitialLoad && isLoadingPerformerScenes { return }
+
         if isInitialLoad {
             currentPerformerScenePage = 1
             currentPerformerSceneSortOption = sortBy
@@ -3655,6 +3658,8 @@ class StashDBViewModel: ObservableObject {
         liveFilter: [String: Any]? = nil,
         searchQuery: String? = nil
     ) {
+        if !isInitialLoad && isLoadingStudioScenes { return }
+
         if isInitialLoad {
             currentStudioScenePage = 1
             currentStudioSceneSortOption = sortBy
@@ -4229,6 +4234,8 @@ class StashDBViewModel: ObservableObject {
         liveFilter: [String: Any]? = nil,
         searchQuery: String? = nil
     ) {
+        if !isInitialLoad && isLoadingGroupScenes { return }
+
         if isInitialLoad {
             currentGroupScenePage = 1
             currentGroupSceneSortOption = sortBy
@@ -4420,6 +4427,8 @@ class StashDBViewModel: ObservableObject {
         liveFilter: [String: Any]? = nil,
         searchQuery: String? = nil
     ) {
+        if !isInitialLoad && isLoadingTagScenes { return }
+
         if isInitialLoad {
             currentTagScenePage = 1
             currentTagSceneSortOption = sortBy

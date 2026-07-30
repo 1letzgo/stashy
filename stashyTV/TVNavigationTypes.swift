@@ -53,7 +53,7 @@ struct TVGalleryLink: Hashable {
     let title: String
 }
 
-struct TVImageLink: Hashable {
+struct TVImageLink: Hashable, Identifiable {
     let id: String
     let title: String
     /// When non-nil, viewer browses this gallery instead of the global library.
@@ -64,15 +64,78 @@ struct TVSceneListLink: Hashable {
     let sortBy: StashDBViewModel.SceneSortOption
 }
 
+// MARK: - Navigation path environment
+
+private struct TVNavigationPathKey: EnvironmentKey {
+    static let defaultValue: Binding<NavigationPath>? = nil
+}
+
+extension EnvironmentValues {
+    var tvNavigationPath: Binding<NavigationPath>? {
+        get { self[TVNavigationPathKey.self] }
+        set { self[TVNavigationPathKey.self] = newValue }
+    }
+}
+
+/// Per-tab stack: stable `NavigationPath` + destinations registered inside the stack.
+struct TVTabStack<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+    @State private var path = NavigationPath()
+
+    var body: some View {
+        NavigationStack(path: $path) {
+            content()
+                .withTVDestinations()
+        }
+        .environment(\.tvNavigationPath, $path)
+    }
+}
+
+/// Push a typed destination onto the tab's `NavigationPath` (reliable on tvOS grids).
+struct TVNavButton<Value: Hashable, Label: View>: View {
+    let value: Value
+    var buttonStyleCard: Bool = true
+    @Environment(\.tvNavigationPath) private var path
+    @ViewBuilder var label: () -> Label
+
+    var body: some View {
+        Button {
+            path?.wrappedValue.append(value)
+        } label: {
+            label()
+        }
+        .modifier(TVOptionalCardButtonStyle(enabled: buttonStyleCard))
+    }
+}
+
+private struct TVOptionalCardButtonStyle: ViewModifier {
+    let enabled: Bool
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if enabled {
+            content.buttonStyle(.card)
+        } else {
+            content.buttonStyle(.plain)
+        }
+    }
+}
+
 // MARK: - tvOS Exit/Menu handling
 
-/// On tvOS the Menu button triggers an "exit" command. If we don't handle it in deep stacks,
-/// the system may jump out to the app root / close the app instead of popping one level.
+/// On tvOS the Menu button triggers an "exit" command. Prefer popping the tab
+/// `NavigationPath`; fall back to `dismiss` only when the view is presented.
 private struct TVExitCommandDismiss: ViewModifier {
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.isPresented) private var isPresented
+    @Environment(\.tvNavigationPath) private var path
 
     func body(content: Content) -> some View {
         content.onExitCommand {
+            if let path, !path.wrappedValue.isEmpty {
+                path.wrappedValue.removeLast()
+                return
+            }
+            guard isPresented else { return }
             dismiss()
         }
     }
@@ -122,6 +185,7 @@ struct TVNavigationDestinations: ViewModifier {
                     imageTitle: link.title,
                     galleryId: link.galleryId
                 )
+                .tvExitDismissable()
             }
             .navigationDestination(for: TVSceneListLink.self) { link in
                 TVScenesView(sortBy: link.sortBy)

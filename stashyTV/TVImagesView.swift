@@ -13,7 +13,12 @@ struct TVImagesView: View {
     @ObservedObject private var tabManager = TabManager.shared
     @State private var sortBy: StashDBViewModel.ImageSortOption
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
+    @State private var presentedImage: TVImageLink?
     @FocusState private var focusedImageID: String?
+
+    private var displayImages: [StashImage] {
+        viewModel.allImages.filter { !$0.isGifFile && !$0.isVideo }
+    }
 
     init() {
         let defaultSort = StashDBViewModel.ImageSortOption(rawValue: TabManager.shared.getSortOption(for: .images) ?? "") ?? .dateDesc
@@ -155,18 +160,21 @@ struct TVImagesView: View {
             VStack(alignment: .leading, spacing: 0) {
                 STVHeaderView(
                     sortMenu: { sortMenu },
-                    filterMenu: { filterMenu }
+                    filterMenu: { filterMenu },
+                    onRefresh: { reload() }
                 )
 
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 30) {
-                    ForEach(viewModel.allImages.filter { !$0.isAnimated }) { image in
-                        NavigationLink(destination: TVImageDetailView(imageId: image.id, imageTitle: image.title ?? "Untitled")) {
+                    ForEach(displayImages) { image in
+                        Button {
+                            presentedImage = TVImageLink(id: image.id, title: image.title ?? "Untitled")
+                        } label: {
                             TVImageCardView(image: image)
                         }
                         .buttonStyle(.card)
                         .focused($focusedImageID, equals: image.id)
                         .onAppear {
-                            if image.id == viewModel.allImages.last?.id && viewModel.hasMoreImages {
+                            if image.id == displayImages.last?.id && viewModel.hasMoreImages {
                                 viewModel.loadMoreImages()
                             }
                         }
@@ -183,6 +191,9 @@ struct TVImagesView: View {
             }
         }
         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60).focusable(false) }
+        .fullScreenCover(item: $presentedImage) { link in
+            TVImageDetailView(imageId: link.id, imageTitle: link.title, galleryId: link.galleryId)
+        }
     }
 
     @ViewBuilder

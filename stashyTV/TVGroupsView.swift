@@ -163,15 +163,15 @@ struct TVGroupsView: View {
             VStack(alignment: .leading, spacing: 0) {
                 STVHeaderView(
                     sortMenu: { sortMenu },
-                    filterMenu: { filterMenu }
+                    filterMenu: { filterMenu },
+                    onRefresh: { reload() }
                 )
 
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 40) {
                     ForEach(viewModel.groups) { group in
-                        NavigationLink(destination: TVGroupDetailView(groupId: group.id, groupName: group.name).tvExitDismissable()) {
+                        TVNavButton(value: TVGroupLink(id: group.id, name: group.name)) {
                             TVGroupCardView(group: group)
                         }
-                        .buttonStyle(.card)
                         .focused($focusedGroupID, equals: group.id)
                         .frame(width: 260) // Fixed width for item container
                         .onAppear {
@@ -318,7 +318,7 @@ struct TVGroupDetailView: View {
             isLoadingScenes: viewModel.isLoadingGroupScenes,
             totalScenes: viewModel.totalGroupScenes,
             hasMoreScenes: viewModel.hasMoreGroupScenes,
-            loadMoreScenes: { viewModel.fetchGroupScenes(groupId: groupId, isInitialLoad: false) },
+            loadMoreScenes: { viewModel.loadMoreGroupScenes(groupId: groupId) },
             infoGrid: { _ in
                 LazyVGrid(columns: [
                     GridItem(.fixed(240), alignment: .leading),

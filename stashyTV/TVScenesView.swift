@@ -189,16 +189,16 @@ struct TVScenesView: View {
             VStack(alignment: .leading, spacing: 0) {
                 STVHeaderView(
                     sortMenu: { sortMenu },
-                    filterMenu: { filterMenu }
+                    filterMenu: { filterMenu },
+                    onRefresh: { reload() }
                 )
 
                 LazyVGrid(columns: columns, alignment: .leading, spacing: 40) {
                     ForEach(viewModel.scenes) { scene in
                         VStack(alignment: .leading, spacing: 10) {
-                            NavigationLink(destination: TVSceneDetailView(sceneId: scene.id).tvExitDismissable()) {
+                            TVNavButton(value: TVSceneLink(sceneId: scene.id)) {
                                 TVSceneCardView(scene: scene)
                             }
-                            .buttonStyle(.card)
                             .focused($focusedSceneID, equals: scene.id)
                             .onAppear {
                                 if scene.id == viewModel.scenes.last?.id && viewModel.hasMoreScenes {

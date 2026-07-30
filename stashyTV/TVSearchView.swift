@@ -232,10 +232,9 @@ struct TVSearchView: View {
                 HStack(spacing: 30) {
                     ForEach(viewModel.scenes) { scene in
                         VStack(alignment: .leading, spacing: 10) {
-                            NavigationLink(destination: TVSceneDetailView(sceneId: scene.id).tvExitDismissable()) {
+                            TVNavButton(value: TVSceneLink(sceneId: scene.id)) {
                                 TVSceneCardView(scene: scene)
                             }
-                            .buttonStyle(.card)
 
                             TVSceneCardTitleView(scene: scene)
                         }
@@ -253,10 +252,9 @@ struct TVSearchView: View {
     private var studiosResultSection: some View {
         resultSection(title: "Studios", systemImage: "building.2.fill", count: viewModel.studios.count) {
             ForEach(viewModel.studios) { studio in
-                NavigationLink(destination: TVStudioDetailView(studioId: studio.id, studioName: studio.name).tvExitDismissable()) {
+                TVNavButton(value: TVStudioLink(id: studio.id, name: studio.name)) {
                     TVStudioCardView(studio: studio)
                 }
-                .buttonStyle(.card)
             }
         }
     }
@@ -264,10 +262,9 @@ struct TVSearchView: View {
     private var tagsResultSection: some View {
         resultSection(title: "Tags", systemImage: "tag.fill", count: viewModel.tags.count) {
             ForEach(viewModel.tags) { tag in
-                NavigationLink(destination: TVTagDetailView(tagId: tag.id, tagName: tag.name).tvExitDismissable()) {
+                TVNavButton(value: TVTagLink(id: tag.id, name: tag.name)) {
                     TVTagCardView(tag: tag)
                 }
-                .buttonStyle(.card)
             }
         }
     }
@@ -275,10 +272,9 @@ struct TVSearchView: View {
     private var groupsResultSection: some View {
         resultSection(title: "Groups", systemImage: "rectangle.stack.fill", count: viewModel.groups.count) {
             ForEach(viewModel.groups) { group in
-                NavigationLink(destination: TVGroupDetailView(groupId: group.id, groupName: group.name).tvExitDismissable()) {
+                TVNavButton(value: TVGroupLink(id: group.id, name: group.name)) {
                     TVGroupCardView(group: group)
                 }
-                .buttonStyle(.card)
             }
         }
     }
@@ -328,10 +324,9 @@ struct TVSearchView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 30) {
                     ForEach(viewModel.performers) { performer in
-                        NavigationLink(destination: TVPerformerDetailView(performerId: performer.id, performerName: performer.name).tvExitDismissable()) {
+                        TVNavButton(value: TVPerformerLink(id: performer.id, name: performer.name)) {
                             TVPerformerCardView(performer: performer)
                         }
-                        .buttonStyle(.card)
                     }
                 }
                 .padding(.horizontal, 50)

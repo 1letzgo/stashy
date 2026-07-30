@@ -2,7 +2,8 @@
 //  StashImageDateSort.swift
 //  stashy
 //
-//  Filename / session helpers and set grouping for Pics (StashLine) feed.
+//  Session helpers and set grouping for Pics (StashLine) feed.
+//  Feed order always trusts the Stash API (no client-side filename reorder).
 
 import Foundation
 
@@ -111,26 +112,6 @@ enum StashImageFilenameKeys {
         return a.isSubset(of: b) || b.isSubset(of: a)
     }
 
-    static func fileNameSortKey(_ image: StashImage) -> String {
-        guard let raw = filenameCandidates(for: image).first else { return "" }
-        return filenameStem(from: raw)
-    }
-
-    /// Always ascending — used for Pics carousel frame order inside a set.
-    static func withinGroupSort(_ a: StashImage, _ b: StashImage) -> Bool {
-        compareFileNames(a, b, ascending: true)
-    }
-
-    static func compareFileNames(_ a: StashImage, _ b: StashImage, ascending: Bool) -> Bool {
-        let fa = fileNameSortKey(a)
-        let fb = fileNameSortKey(b)
-        if fa != fb {
-            let ordered = fa.localizedStandardCompare(fb) == .orderedAscending
-            return ascending ? ordered : !ordered
-        }
-        return ascending ? (a.id < b.id) : (a.id > b.id)
-    }
-
     static func supportsGrouping(for sort: StashDBViewModel.ImageSortOption) -> Bool {
         switch sort {
         case .dateAsc, .dateDesc, .createdAtAsc, .createdAtDesc, .titleAsc, .titleDesc:
@@ -140,21 +121,7 @@ enum StashImageFilenameKeys {
         }
     }
 
-    /// Primary API sort bucket — used for a light contiguity reorder within the same day/title.
-    static func sortBucket(for image: StashImage, sort: StashDBViewModel.ImageSortOption) -> String {
-        switch sort {
-        case .dateAsc, .dateDesc:
-            return createdDayKey(for: image)
-        case .createdAtAsc, .createdAtDesc:
-            return image.createdAt.map { String($0.prefix(10)) } ?? createdDayKey(for: image)
-        case .titleAsc, .titleDesc:
-            return image.title ?? ""
-        default:
-            return ""
-        }
-    }
-
-    /// Preliminary key for contiguity sorting. Meta uses day+gallery+exact performers;
+    /// Preliminary key for set identity. Meta uses day+gallery+exact performers;
     /// final posts may further merge compatible multi-performer subsets.
     static func groupKey(
         for image: StashImage,
@@ -179,45 +146,9 @@ enum StashImageFilenameKeys {
         return "meta|\(day)|\(performers)|\(galleries)"
     }
 
-    /// Reorders images so frames that share a set key sit together within each API sort bucket.
-    static func contiguityOrdered(
-        _ images: [StashImage],
-        sort: StashDBViewModel.ImageSortOption,
-        policy: StashImageSetGroupingPolicy,
-        sessionCache: inout [String: String]
-    ) -> [StashImage] {
-        guard images.count > 1 else { return images }
-
-        var bucketOrder: [String] = []
-        var buckets: [String: [StashImage]] = [:]
-        for image in images {
-            let bucket = sortBucket(for: image, sort: sort)
-            if buckets[bucket] == nil {
-                bucketOrder.append(bucket)
-                buckets[bucket] = []
-            }
-            buckets[bucket]?.append(image)
-        }
-
-        var result: [StashImage] = []
-        result.reserveCapacity(images.count)
-        for bucket in bucketOrder {
-            guard var items = buckets[bucket] else { continue }
-            items.sort { a, b in
-                let ka = groupKey(for: a, policy: policy, sessionCache: &sessionCache)
-                let kb = groupKey(for: b, policy: policy, sessionCache: &sessionCache)
-                if ka != kb {
-                    return ka.localizedStandardCompare(kb) == .orderedAscending
-                }
-                return withinGroupSort(a, b)
-            }
-            result.append(contentsOf: items)
-        }
-        return result
-    }
-
     /// Builds feed posts with stable ids. Session keys merge exactly; meta merges same
     /// day+galleries when performer sets are equal or subsets (multi-performer safe).
+    /// Post order and frame order inside sets follow API appearance order.
     static func buildPosts(
         from images: [StashImage],
         sort: StashDBViewModel.ImageSortOption,
@@ -229,12 +160,10 @@ enum StashImageFilenameKeys {
             return images.map { (id: "single|\($0.id)", images: [$0]) }
         }
 
-        let ordered = contiguityOrdered(images, sort: sort, policy: policy, sessionCache: &sessionCache)
-
         var sessionGroups: [String: [StashImage]] = [:]
         var metaCandidates: [StashImage] = []
 
-        for image in ordered {
+        for image in images {
             let session = sessionKey(for: image, cache: &sessionCache)
             if !session.isEmpty {
                 let key = "session|\(session)"
@@ -263,7 +192,7 @@ enum StashImageFilenameKeys {
         }
 
         return orderedPostsPreservingAppearance(
-            ordered: ordered,
+            ordered: images,
             sessionGroups: sessionGroups,
             metaById: metaById,
             sessionCache: &sessionCache,
@@ -349,8 +278,7 @@ enum StashImageFilenameKeys {
                 let key = "session|\(session)"
                 guard !seen.contains(key) else { continue }
                 seen.insert(key)
-                var imgs = sessionGroups[key] ?? [image]
-                imgs.sort(by: withinGroupSort)
+                let imgs = sessionGroups[key] ?? [image]
                 result.append((id: key, images: imgs))
                 continue
             }
@@ -358,8 +286,7 @@ enum StashImageFilenameKeys {
             if let metaId = imageToMetaId[image.id] {
                 guard !seen.contains(metaId) else { continue }
                 seen.insert(metaId)
-                var imgs = metaById[metaId] ?? [image]
-                imgs.sort(by: withinGroupSort)
+                let imgs = metaById[metaId] ?? [image]
                 result.append((id: metaId, images: imgs))
                 continue
             }
