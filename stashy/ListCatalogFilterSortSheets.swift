@@ -27,6 +27,38 @@ extension View {
     }
 }
 
+/// Playback toggles for Feeds Filter & Sort sheets (moved out of Settings → Feeds).
+struct FeedsPlaybackSettingsCard: View {
+    @ObservedObject private var tabManager = TabManager.shared
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            VStack(spacing: 0) {
+                Toggle("Immersive Video Scaling", isOn: $tabManager.reelsFillHeight)
+                    .tint(appearance.tintColor)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                Divider().padding(.leading, 16)
+                Toggle("Continuous Play", isOn: $tabManager.reelsContinuousPlay)
+                    .tint(appearance.tintColor)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.secondaryAppBackground)
+            .clipShape(RoundedRectangle(cornerRadius: 12))
+            .padding(.horizontal, 16)
+
+            Text("Immersive Scaling fills the area above the tab bar when orientation matches. Continuous Play advances instead of looping.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .padding(.horizontal, 32)
+                .padding(.bottom, 4)
+        }
+    }
+}
+
 // MARK: - Shared chips / rows
 
 struct CatalogFilterChip: View {
@@ -1457,6 +1489,8 @@ struct ImagesCatalogFilterSortSheet: View {
     var onRequestSaveAs: () -> Void
     var onRequestRename: () -> Void
     var onRequestDelete: () -> Void
+    /// When `true`, shows Immersive Scaling / Continuous Play (Feeds clips sheet).
+    var showsFeedsPlaybackSettings: Bool = false
 
     @ObservedObject private var appearance = AppearanceManager.shared
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
@@ -1486,6 +1520,9 @@ struct ImagesCatalogFilterSortSheet: View {
                     imageSortCard
                     if showMediaTypeFilter {
                         imageMediaTypeCard
+                    }
+                    if showsFeedsPlaybackSettings {
+                        FeedsPlaybackSettingsCard()
                     }
                     if liveChipRowsVisible {
                         imageLiveChipsCard

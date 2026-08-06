@@ -136,17 +136,13 @@ struct CatalogsView: View {
         .navigationBarHidden(true)
         // Swipe-back can desync UIKit/SwiftUI stacks; menu switches must always clear details.
         .popNavigationToRootOnChange(coordinator.catalogueSubTab)
-        .safeAreaInset(edge: .top, spacing: 0) {
+        .stashyCustomChromeInset(spacing: 0) {
             if showTabSwitcher {
-                VStack(spacing: 0) {
+                StashySectionChromeBar {
                     CatalogCategoryRow(tabs: sortedVisibleTabs, selection: selectedTabBinding)
                         .padding(.horizontal, StashyExpandingDock.edgePadding)
                         .padding(.vertical, 6)
-
-                    Divider().overlay(Color.white.opacity(0.15))
                 }
-                .background(.bar)
-                .colorScheme(.dark)
             }
         }
     }
@@ -725,7 +721,7 @@ struct GroupDetailView: View {
     /// Groups have no favorite field in the Stash API.
     @ViewBuilder
     private var groupDetailNavBar: some View {
-        VStack(spacing: 0) {
+        StashySectionChromeBar {
             HStack(spacing: 8) {
                 Button {
                     dismiss()
@@ -813,10 +809,7 @@ struct GroupDetailView: View {
             .padding(.horizontal, StashyExpandingDock.edgePadding)
             .padding(.vertical, 8)
 
-            Divider().overlay(Color.white.opacity(0.15))
         }
-        .background(.bar)
-        .colorScheme(.dark)
     }
 
     @ViewBuilder
@@ -1012,7 +1005,7 @@ struct GroupDetailView: View {
         .sceneLiveUpdates(using: viewModel)
         .hideSystemNavigationBarForCustomChrome()
         .enableSwipeBackWhenNavBarHidden()
-        .safeAreaInset(edge: .top, spacing: 0) {
+        .stashyCustomChromeInset(spacing: 0) {
             groupDetailNavBar
         }
         .sheet(isPresented: $showingEditGroupSheet) {

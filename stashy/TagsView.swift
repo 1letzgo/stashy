@@ -803,7 +803,7 @@ struct TagDetailView: View {
     /// Custom top chrome (Performer/Studio template): Back · section icons · Favorite · Edit.
     @ViewBuilder
     private var tagDetailNavBar: some View {
-        VStack(spacing: 0) {
+        StashySectionChromeBar {
             HStack(spacing: 8) {
                 Button {
                     dismiss()
@@ -915,10 +915,7 @@ struct TagDetailView: View {
             .padding(.horizontal, StashyExpandingDock.edgePadding)
             .padding(.vertical, 8)
 
-            Divider().overlay(Color.white.opacity(0.15))
         }
-        .background(.bar)
-        .colorScheme(.dark)
     }
 
     private func toggleFavorite() {
@@ -1088,7 +1085,7 @@ struct TagDetailView: View {
         .sceneLiveUpdates(using: viewModel)
         .hideSystemNavigationBarForCustomChrome()
         .enableSwipeBackWhenNavBarHidden()
-        .safeAreaInset(edge: .top, spacing: 0) {
+        .stashyCustomChromeInset(spacing: 0) {
             tagDetailNavBar
         }
         .sheet(isPresented: $showingEditTagSheet) {

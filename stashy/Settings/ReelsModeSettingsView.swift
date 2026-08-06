@@ -45,16 +45,6 @@ struct ReelsModeSettingsView: View {
             .listRowBackground(Color.secondaryAppBackground)
 
             Section {
-                Toggle("Immersive Video Scaling", isOn: $tabManager.reelsFillHeight)
-                    .tint(appearanceManager.tintColor)
-                Toggle("Continuous Play", isOn: $tabManager.reelsContinuousPlay)
-                    .tint(appearanceManager.tintColor)
-            } footer: {
-                Text("Immersive Scaling fills the area above the tab bar when orientation matches. Continuous Play advances instead of looping.")
-            }
-            .listRowBackground(Color.secondaryAppBackground)
-
-            Section {
                 ForEach(tabManager.configurableReelsModes) { modeConfig in
                     VStack(alignment: .leading, spacing: 0) {
                         // Header

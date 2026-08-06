@@ -67,7 +67,7 @@ struct SceneDetailView: View {
     /// Custom top chrome: Back · Download.
     @ViewBuilder
     private var sceneDetailNavBar: some View {
-        VStack(spacing: 0) {
+        StashySectionChromeBar {
             HStack(spacing: 8) {
                 Button {
                     dismiss()
@@ -91,11 +91,7 @@ struct SceneDetailView: View {
             .frame(minHeight: chromePillHeight)
             .padding(.horizontal, StashyExpandingDock.edgePadding)
             .padding(.vertical, 8)
-
-            Divider().overlay(Color.white.opacity(0.15))
         }
-        .background(.bar)
-        .colorScheme(.dark)
     }
 
     @ViewBuilder
@@ -348,7 +344,7 @@ struct SceneDetailView: View {
             .applyAppBackground()
             .hideSystemNavigationBarForCustomChrome()
             .enableSwipeBackWhenNavBarHidden()
-            .safeAreaInset(edge: .top, spacing: 0) {
+            .stashyCustomChromeInset(spacing: 0) {
                 sceneDetailNavBar
             }
             .modifier(SceneDetailAlertModifier(

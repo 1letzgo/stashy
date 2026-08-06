@@ -1247,13 +1247,17 @@ struct FullScreenImageView: View {
             .enableSwipeBackWhenNavBarHidden()
             .toolbar(showUI ? .automatic : .hidden, for: .tabBar)
             .safeAreaInset(edge: .top, spacing: 0) {
-                if showUI {
+                if showUI, !StashyChromePlacement.prefersBottom {
                     fullScreenImageNavBar
                         .transition(.opacity)
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
                 VStack(spacing: 0) {
+                    if showUI, StashyChromePlacement.prefersBottom {
+                        fullScreenImageNavBar
+                            .transition(.opacity)
+                    }
                     feedsStyleInfoOverlay(currentImage: currentImage)
                     feedsStyleScrubberBar(currentImage: currentImage)
                 }
@@ -1448,7 +1452,7 @@ struct FullScreenImageView: View {
         let stars = max(0, min(5, Int(round(Double(rating100) / 20.0))))
         let performers = image?.performers ?? []
 
-        VStack(spacing: 0) {
+        StashySectionChromeBar {
             HStack(spacing: 8) {
                 Button {
                     dismiss()
@@ -1559,11 +1563,7 @@ struct FullScreenImageView: View {
             .frame(height: chromePillHeight)
             .padding(.horizontal, StashyExpandingDock.edgePadding)
             .padding(.vertical, 6)
-
-            Divider().overlay(Color.white.opacity(0.15))
         }
-        .background(.bar)
-        .colorScheme(.dark)
     }
 
     private func updateCurrentRating(_ newRating: Int) {

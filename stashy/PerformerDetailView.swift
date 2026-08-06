@@ -319,7 +319,7 @@ struct PerformerDetailView: View {
     /// Custom top chrome: Back · section icons · Favorite · Edit (edit mode). Feeds lives in the header.
     @ViewBuilder
     private var performerDetailNavBar: some View {
-        VStack(spacing: 0) {
+        StashySectionChromeBar {
             HStack(spacing: 8) {
                 Button {
                     dismiss()
@@ -431,10 +431,7 @@ struct PerformerDetailView: View {
             .padding(.horizontal, StashyExpandingDock.edgePadding)
             .padding(.vertical, 8)
 
-            Divider().overlay(Color.white.opacity(0.15))
         }
-        .background(.bar)
-        .colorScheme(.dark)
     }
 
     private func toggleFavorite() {
@@ -514,7 +511,7 @@ struct PerformerDetailView: View {
         }
         .hideSystemNavigationBarForCustomChrome()
         .enableSwipeBackWhenNavBarHidden()
-        .safeAreaInset(edge: .top, spacing: 0) {
+        .stashyCustomChromeInset(spacing: 0) {
             performerDetailNavBar
         }
         .sheet(isPresented: $showingEditPerformerSheet) {

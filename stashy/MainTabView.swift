@@ -275,16 +275,12 @@ struct ToolsView: View {
         }
         .navigationBarHidden(true)
         .popNavigationToRootOnChange(coordinator.toolsSubTab)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(spacing: 0) {
+        .stashyCustomChromeInset(spacing: 0) {
+            StashySectionChromeBar {
                 toolsCategoryRow
                     .padding(.horizontal, StashyExpandingDock.edgePadding)
                     .padding(.vertical, 6)
-
-                Divider().overlay(Color.white.opacity(0.15))
             }
-            .background(.bar)
-            .colorScheme(.dark)
         }
     }
 

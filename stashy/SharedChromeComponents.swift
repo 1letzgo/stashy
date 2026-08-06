@@ -143,6 +143,36 @@ private struct NavigationPopToRootOnChange: UIViewControllerRepresentable {
     }
 }
 
+/// iPad places custom chrome above the tab bar; iPhone keeps it under the status bar.
+enum StashyChromePlacement {
+    static var prefersBottom: Bool {
+        UIDevice.current.userInterfaceIdiom == .pad
+    }
+
+    static var edge: VerticalEdge {
+        prefersBottom ? .bottom : .top
+    }
+}
+
+/// Section dock (Home / Tools / Settings) with divider on the correct side for top vs bottom placement.
+struct StashySectionChromeBar<Content: View>: View {
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        VStack(spacing: 0) {
+            if StashyChromePlacement.prefersBottom {
+                Divider().overlay(Color.white.opacity(0.15))
+                content()
+            } else {
+                content()
+                Divider().overlay(Color.white.opacity(0.15))
+            }
+        }
+        .background(.bar)
+        .colorScheme(.dark)
+    }
+}
+
 extension View {
     /// Hides the system navigation bar for custom chrome and restores edge swipe-to-pop.
     func enableSwipeBackWhenNavBarHidden() -> some View {
@@ -157,6 +187,14 @@ extension View {
             .navigationBarBackButtonHidden(true)
             .toolbar(.hidden, for: .navigationBar)
             .toolbarBackground(.hidden, for: .navigationBar)
+    }
+
+    /// Custom chrome inset: top on iPhone, bottom on iPad.
+    func stashyCustomChromeInset<V: View>(
+        spacing: CGFloat = 0,
+        @ViewBuilder content: @escaping () -> V
+    ) -> some View {
+        safeAreaInset(edge: StashyChromePlacement.edge, spacing: spacing, content: content)
     }
 
     /// Clears pushed detail screens when a catalogue / tools menu section changes.

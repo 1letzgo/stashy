@@ -140,7 +140,7 @@ struct StudioDetailView: View {
     /// Custom top chrome (PerformerDetail template): Back · section icons · Favorite · Edit.
     @ViewBuilder
     private var studioDetailNavBar: some View {
-        VStack(spacing: 0) {
+        StashySectionChromeBar {
             HStack(spacing: 8) {
                 Button {
                     dismiss()
@@ -252,10 +252,7 @@ struct StudioDetailView: View {
             .padding(.horizontal, StashyExpandingDock.edgePadding)
             .padding(.vertical, 8)
 
-            Divider().overlay(Color.white.opacity(0.15))
         }
-        .background(.bar)
-        .colorScheme(.dark)
     }
 
     private func toggleFavorite() {
@@ -509,7 +506,7 @@ struct StudioDetailView: View {
         .sceneLiveUpdates(using: viewModel)
         .hideSystemNavigationBarForCustomChrome()
         .enableSwipeBackWhenNavBarHidden()
-        .safeAreaInset(edge: .top, spacing: 0) {
+        .stashyCustomChromeInset(spacing: 0) {
             studioDetailNavBar
         }
         .sheet(isPresented: $showingEditStudioSheet) {

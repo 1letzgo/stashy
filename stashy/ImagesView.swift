@@ -268,7 +268,7 @@ private struct ImagesViewBody: View {
         } message: {
             Text("These images will be permanently deleted. This action cannot be undone.")
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
+        .stashyCustomChromeInset(spacing: 0) {
             if isOpenedGallery {
                 openedGalleryNavBar
             }
@@ -404,7 +404,7 @@ private struct ImagesViewBody: View {
     /// Custom top chrome for opened galleries: Back · Edit (title lives in the header card).
     @ViewBuilder
     private var openedGalleryNavBar: some View {
-        VStack(spacing: 0) {
+        StashySectionChromeBar {
             HStack(spacing: 8) {
                 Button {
                     dismiss()
@@ -446,11 +446,7 @@ private struct ImagesViewBody: View {
             .frame(minHeight: chromePillHeight)
             .padding(.horizontal, StashyExpandingDock.edgePadding)
             .padding(.vertical, 8)
-
-            Divider().overlay(Color.white.opacity(0.15))
         }
-        .background(.bar)
-        .colorScheme(.dark)
     }
 
     /// Performer/Tag-style detail header for an opened gallery.

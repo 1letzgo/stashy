@@ -27,7 +27,8 @@ struct StashyTopNavNameDropdownRow: View {
             accessibilityHint: menuAccessibilityHint,
             onSelect: onSelect
         )
-        .padding(.bottom, 4)
+        // Keep a little air toward content: below when top-placed, above when bottom-placed (iPad).
+        .padding(StashyChromePlacement.prefersBottom ? .top : .bottom, 4)
         .accessibilityElement(children: .contain)
         .accessibilityLabel(title)
     }

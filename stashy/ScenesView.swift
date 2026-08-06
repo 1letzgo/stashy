@@ -1713,6 +1713,8 @@ struct SceneLiveFilterSheet: View {
     var onRequestSaveAs: () -> Void
     var onRequestRename: () -> Void
     var onRequestDelete: () -> Void
+    /// When `true`, shows Immersive Scaling / Continuous Play (Feeds only).
+    var showsFeedsPlaybackSettings: Bool = false
     /// When `false`, hides the scene sort card (e.g. when ``useMarkerSort`` shows marker sort instead).
     var showsSortControls: Bool = true
     /// When `true`, shows marker sort (Asc/Desc + field); scene sort bindings are ignored for the sort card.
@@ -1770,6 +1772,10 @@ struct SceneLiveFilterSheet: View {
                         markerSortControlsCard
                     } else if showsSortControls {
                         sortControlsCard
+                    }
+
+                    if showsFeedsPlaybackSettings {
+                        FeedsPlaybackSettingsCard()
                     }
 
                 VStack(spacing: 0) {

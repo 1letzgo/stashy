@@ -1964,6 +1964,7 @@ struct ReelsViewBody: View {
                 showReelsSceneRenameAlert = true
             },
             onRequestDelete: { showReelsSceneDeleteAlert = true },
+            showsFeedsPlaybackSettings: true,
             showsSortControls: reelsMode != .markers,
             useMarkerSort: reelsMode == .markers,
             markerSortOption: $selectedMarkerSortOption,
@@ -2190,7 +2191,8 @@ struct ReelsViewBody: View {
                 }
                 reelsClipImageFilters.showRenameCatalogPresetAlert = true
             },
-            onRequestDelete: { reelsClipImageFilters.showDeleteCatalogPresetAlert = true }
+            onRequestDelete: { reelsClipImageFilters.showDeleteCatalogPresetAlert = true },
+            showsFeedsPlaybackSettings: true
         )
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
@@ -2232,19 +2234,25 @@ struct ReelsViewBody: View {
         .ignoresSafeArea(reelsPremiumContentSafeAreaRegions)
         .navigationBarHidden(true)
         .safeAreaInset(edge: .top, spacing: 0) {
-            reelsNavBar(currentItem: currentVisibleReelItem)
-                .allowsHitTesting(isUIVisible)
+            if !StashyChromePlacement.prefersBottom {
+                reelsNavBar(currentItem: currentVisibleReelItem)
+                    .allowsHitTesting(isUIVisible)
+            }
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if !reelsBottomChromeSuppressed {
-                let currentItem = currentVisibleReelItem
-                VStack(spacing: 0) {
+            let currentItem = currentVisibleReelItem
+            VStack(spacing: 0) {
+                if StashyChromePlacement.prefersBottom {
+                    reelsNavBar(currentItem: currentItem)
+                        .allowsHitTesting(isUIVisible)
+                }
+                if !reelsBottomChromeSuppressed {
                     reelsInfoOverlay(currentItem: currentItem)
                     reelsScrubberBar(currentItem: currentItem)
                 }
-                // Scrubber / info overlay must stay interactive whenever the chrome is visible.
-                .allowsHitTesting(isUIVisible)
             }
+            // Scrubber / info overlay must stay interactive whenever the chrome is visible.
+            .allowsHitTesting(isUIVisible)
         }
         .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
             ReelsTabBarLayout.invalidateCache()
@@ -3333,7 +3341,7 @@ struct ReelsViewBody: View {
                 }
             }
         } label: {
-            HStack(spacing: 4) {
+            HStack(spacing: 8) {
                 Image(systemName: reelsMode.icon)
                     .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
                     .frame(width: StashyExpandingDock.iconSize, height: StashyExpandingDock.iconSize)

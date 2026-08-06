@@ -65,16 +65,12 @@ struct SettingsView: View {
         }
         .applyAppBackground()
         .navigationBarHidden(true)
-        .safeAreaInset(edge: .top, spacing: 0) {
-            VStack(spacing: 0) {
+        .stashyCustomChromeInset(spacing: 0) {
+            StashySectionChromeBar {
                 SettingsCategoryRow(selection: $selectedSection)
                     .padding(.horizontal, StashyExpandingDock.edgePadding)
                     .padding(.vertical, 6)
-
-                Divider().overlay(Color.white.opacity(0.15))
             }
-            .background(.bar)
-            .colorScheme(.dark)
         }
         .sheet(isPresented: $showingAddServerSheet) {
             NavigationView {

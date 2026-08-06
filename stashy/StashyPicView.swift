@@ -142,8 +142,8 @@ struct StashLineView: View {
         .navigationBarHidden(true)
         .enableSwipeBackWhenNavBarHidden()
         .if(!isEmbedded && performerFilter != nil) { view in
-            view.safeAreaInset(edge: .top, spacing: 0) {
-                VStack(spacing: 0) {
+            view.stashyCustomChromeInset(spacing: 0) {
+                StashySectionChromeBar {
                     HStack(spacing: 8) {
                         Button(action: { dismiss() }) {
                             HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
@@ -164,11 +164,7 @@ struct StashLineView: View {
                     .frame(minHeight: StashyExpandingDock.activeHeight)
                     .padding(.horizontal, StashyExpandingDock.edgePadding)
                     .padding(.vertical, 8)
-
-                    Divider().overlay(Color.white.opacity(0.15))
                 }
-                .background(.bar)
-                .colorScheme(.dark)
             }
         }
         .floatingActionBar(isPresented: true, catalogChrome: CatalogFloatingChromeState(hasActiveServerConfig: configManager.activeConfig != nil, primaryListIsEmpty: viewModel.allImages.isEmpty, errorMessage: viewModel.errorMessage, imageFindListError: viewModel.imageFindListError)) {
