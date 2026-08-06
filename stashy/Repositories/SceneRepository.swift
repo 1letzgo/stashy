@@ -47,8 +47,8 @@ protocol SceneRepositoryProtocol {
     /// Fetches a single scene by ID
     func fetchSceneDetails(sceneId: String) async throws -> Scene?
     
-    /// Updates the resume time for a scene
-    func updateResumeTime(sceneId: String, resumeTime: Double) async throws -> Bool
+    /// Updates resume time and/or adds watched seconds via `sceneSaveActivity`
+    func updateResumeTime(sceneId: String, resumeTime: Double, playDuration: Double) async throws -> Bool
     
     /// Increments the play count for a scene
     func addPlay(sceneId: String) async throws -> Bool
@@ -216,17 +216,19 @@ class SceneRepository: SceneRepositoryProtocol {
     
     // MARK: - Update Resume Time
     
-    func updateResumeTime(sceneId: String, resumeTime: Double) async throws -> Bool {
+    func updateResumeTime(sceneId: String, resumeTime: Double, playDuration: Double = 0) async throws -> Bool {
         let formattedTime = String(format: "%.2f", resumeTime)
+        let formattedDuration = String(format: "%.2f", max(0, playDuration))
         let mutation = """
-        mutation SceneSaveActivity($id: ID!, $resume_time: Float) {
-            sceneSaveActivity(id: $id, resume_time: $resume_time, playDuration: 0)
+        mutation SceneSaveActivity($id: ID!, $resume_time: Float, $playDuration: Float) {
+            sceneSaveActivity(id: $id, resume_time: $resume_time, playDuration: $playDuration)
         }
         """
         
         let variables: [String: Any] = [
             "id": sceneId,
-            "resume_time": Double(formattedTime) ?? resumeTime
+            "resume_time": Double(formattedTime) ?? resumeTime,
+            "playDuration": Double(formattedDuration) ?? max(0, playDuration)
         ]
         
         do {

@@ -49,6 +49,7 @@ struct SceneDetailView: View {
     @State private var playbackSpeed: Double = 1.0
     @State private var currentPlaybackTime: Double = 0
     @State private var timeObserverToken: Any?
+    @State private var playbackActivityTracker = ScenePlaybackActivityTracker()
     /// True while the user is actively dragging the heatmap scrubber. Used to
     /// suppress redundant work (sync restarts, play-state side-effects) during
     /// high-frequency seeks.
@@ -488,35 +489,49 @@ struct SceneDetailView: View {
         }
         stopPreview()
         removeTimeObserver()
-        
-        let currentTime = player?.currentTime().seconds
-        let effectiveResumeTime = (currentTime != nil && currentTime! > 0) ? currentTime! : activeScene.resumeTime
-        
-        if let resumeTime = effectiveResumeTime, resumeTime > 0 {
-            let sceneId = activeScene.id
-            if currentTime != nil && currentTime! > 0 {
-                viewModel.updateSceneResumeTime(sceneId: sceneId, resumeTime: resumeTime) { success in
-                    if success {
-                        DispatchQueue.main.async {
-                            NotificationCenter.default.post(name: NSNotification.Name("SceneResumeTimeUpdated"), object: nil, userInfo: ["sceneId": sceneId, "resumeTime": resumeTime])
-                        }
-                    }
-                }
-            } else {
-                NotificationCenter.default.post(name: NSNotification.Name("SceneResumeTimeUpdated"), object: nil, userInfo: ["sceneId": sceneId, "resumeTime": resumeTime])
+
+        if let player {
+            let currentTime = player.currentTime().seconds
+            let duration = player.currentItem?.duration.seconds ?? activeScene.sceneDuration ?? 0
+            if currentTime.isFinite, currentTime >= 0 {
+                playbackActivityTracker.setPosition(currentTime: currentTime, duration: duration)
             }
         }
+        // Flush watched seconds + resume (clears resume at ≥98% like Stash web).
+        ensurePlaybackActivityConfigured()
+        playbackActivityTracker.stop()
     }
 
     private func handlePeriodicSync() {
         if isDeleting { return }
         if let player = player, player.timeControlStatus == .playing {
             let currentTime = player.currentTime().seconds
-            if currentTime > 0 {
-                viewModel.updateSceneResumeTime(sceneId: activeScene.id, resumeTime: currentTime)
-            }
+            let duration = player.currentItem?.duration.seconds ?? activeScene.sceneDuration ?? 0
+            playbackActivityTracker.setPosition(currentTime: currentTime, duration: duration)
             if !hasAddedPlay, currentTime > 1 {
                 registerScenePlay()
+            }
+        }
+    }
+
+    private func ensurePlaybackActivityConfigured() {
+        let sceneId = activeScene.id
+        let vm = viewModel
+        playbackActivityTracker.updatesResumeTime = true
+        playbackActivityTracker.onSave = { resumeTime, playDuration in
+            vm.updateSceneResumeTime(
+                sceneId: sceneId,
+                resumeTime: resumeTime,
+                playDuration: playDuration
+            ) { success in
+                guard success, let resumeTime else { return }
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("SceneResumeTimeUpdated"),
+                        object: nil,
+                        userInfo: ["sceneId": sceneId, "resumeTime": resumeTime]
+                    )
+                }
             }
         }
     }
@@ -529,13 +544,18 @@ struct SceneDetailView: View {
         // the user is actively dragging; `commitScrub` handles the resume.
         if isScrubbing { return }
         let currentTime = player.currentTime().seconds
+        let duration = player.currentItem?.duration.seconds ?? activeScene.sceneDuration ?? 0
+        playbackActivityTracker.setPosition(currentTime: currentTime, duration: duration)
+        ensurePlaybackActivityConfigured()
 
         if status == .paused {
+            playbackActivityTracker.stop()
             StashSyncManager.shared.stop()
             if handyManager.isSyncing || handyManager.isStashSyncMode { handyManager.pause() }
             if buttplugManager.isSyncing || buttplugManager.isStashSyncMode { buttplugManager.pause() }
             if loveSpouseManager.isSyncing || loveSpouseManager.isStashSyncMode { loveSpouseManager.pause() }
         } else if status == .playing {
+            playbackActivityTracker.start()
             ensureVideoAnalysis(for: player.currentItem)
             let stashSyncActive = handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode
             if stashSyncActive { StashSyncManager.shared.start() }
@@ -590,6 +610,8 @@ struct SceneDetailView: View {
             let seconds = time.seconds
             if seconds >= 0 {
                 currentPlaybackTime = seconds
+                let duration = player.currentItem?.duration.seconds ?? activeScene.sceneDuration ?? 0
+                playbackActivityTracker.setPosition(currentTime: seconds, duration: duration)
             }
             if !hasAddedPlay, seconds > 1 {
                 registerScenePlay()

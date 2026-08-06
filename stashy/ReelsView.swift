@@ -3510,6 +3510,15 @@ struct ReelItemView: View {
     @StateObject private var videoSurfaceReadiness = ReelItemVideoSurfaceReadiness()
     /// Live decoded size (accounts for clip rotation / preferredTransform).
     @State private var playbackPresentationSize: CGSize? = nil
+    @State private var playbackActivityTracker = ScenePlaybackActivityTracker()
+
+    /// Scenes + markers contribute watch time to the parent scene; previews/clips do not.
+    private var tracksPlaybackActivity: Bool {
+        switch item {
+        case .scene, .marker: return true
+        case .preview, .clip: return false
+        }
+    }
 
     private var shouldFill: Bool {
         // Only fill if the setting is enabled
@@ -3606,6 +3615,8 @@ extension ReelItemView {
                 // `currentVisibleSceneId` (and thus `isActive`) hasn't updated yet.
                 player?.pause()
                 player?.rate = 0
+                syncPlaybackActivityPosition()
+                playbackActivityTracker.stop()
             }
             .onChange(of: isMuted) { _, newValue in
                 player?.isMuted = newValue
@@ -3722,9 +3733,12 @@ extension ReelItemView {
                     if !isRotating {
                         ReelsPlayerRegistry.playIfAllowed(player)
                         videoSurfaceReadiness.notePlaybackStarted()
+                        startPlaybackActivityTrackingIfNeeded()
                     }
                 } else {
                     player?.pause()
+                    syncPlaybackActivityPosition()
+                    playbackActivityTracker.stop()
                 }
             }
             .onReceive(scrubberState.$seekTarget) { target in
@@ -4166,11 +4180,19 @@ extension ReelItemView {
 
             // Rotation-aware size (especially clips): preferredTransform → presentationSize
             self.syncPlaybackPresentationSize(from: player)
+            self.syncPlaybackActivityPosition(from: player)
+            if self.isPlaying && self.isPlaybackActive && !self.isRotating {
+                self.startPlaybackActivityTrackingIfNeeded()
+            }
         }
         
         // Increment play count (initial)
         DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
             incrementPlayCount()
+        }
+
+        if isPlaying && isPlaybackActive && !isRotating {
+            startPlaybackActivityTrackingIfNeeded()
         }
     }
     
@@ -4179,9 +4201,53 @@ extension ReelItemView {
             onPlayCountChanged(currentCount + 1)
         }
     }
+
+    private func configurePlaybackActivityTracker() {
+        guard tracksPlaybackActivity, let sceneId = item.sceneID else { return }
+        let vm = viewModel
+        playbackActivityTracker.updatesResumeTime = {
+            if case .scene = item { return true }
+            return false
+        }()
+        playbackActivityTracker.onSave = { resumeTime, playDuration in
+            guard playDuration > 0 || resumeTime != nil else { return }
+            vm.updateSceneResumeTime(
+                sceneId: sceneId,
+                resumeTime: resumeTime,
+                playDuration: playDuration
+            ) { success in
+                guard success, let resumeTime else { return }
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("SceneResumeTimeUpdated"),
+                        object: nil,
+                        userInfo: ["sceneId": sceneId, "resumeTime": resumeTime]
+                    )
+                }
+            }
+        }
+    }
+
+    private func startPlaybackActivityTrackingIfNeeded() {
+        guard tracksPlaybackActivity, item.sceneID != nil else { return }
+        guard !ReelsPlayerRegistry.isPlaybackSuspended else { return }
+        configurePlaybackActivityTracker()
+        syncPlaybackActivityPosition()
+        playbackActivityTracker.start()
+    }
+
+    private func syncPlaybackActivityPosition(from player: AVPlayer? = nil) {
+        guard tracksPlaybackActivity else { return }
+        let p = player ?? self.player
+        let current = p?.currentTime().seconds ?? scrubberState.time
+        let duration = p?.currentItem?.duration.seconds ?? scrubberState.duration
+        playbackActivityTracker.setPosition(currentTime: current, duration: duration)
+    }
     
     func cleanupPlayer() {
         playerSetupGeneration &+= 1
+        syncPlaybackActivityPosition()
+        playbackActivityTracker.stop()
         player?.pause()
         if let timeObserver = timeObserver {
             player?.removeTimeObserver(timeObserver)
@@ -4219,6 +4285,10 @@ extension ReelItemView {
                 self.scrubberState.duration = d
             }
             self.syncPlaybackPresentationSize(from: player)
+            self.syncPlaybackActivityPosition(from: player)
+            if self.isPlaying && self.isPlaybackActive && !self.isRotating {
+                self.startPlaybackActivityTrackingIfNeeded()
+            }
         }
     }
 

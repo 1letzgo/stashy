@@ -5479,39 +5479,72 @@ class StashDBViewModel: ObservableObject {
         }
     }
     
-    func updateSceneResumeTime(sceneId: String, resumeTime: Double, completion: ((Bool) -> Void)? = nil) {
-        let formattedTime = String(format: "%.2f", resumeTime)
-        let mutation = """
-        {
-          "query": "mutation SceneSaveActivity($id: ID!, $resume_time: Float) { sceneSaveActivity(id: $id, resume_time: $resume_time, playDuration: 0) }",
-          "variables": {
-            "id": "\(sceneId)",
-            "resume_time": \(formattedTime)
-          }
+    /// Syncs playback activity to Stash. `playDuration` is **added** to the scene's total watch time.
+    /// Pass `resumeTime: nil` to update only play duration (e.g. marker streams).
+    func updateSceneResumeTime(
+        sceneId: String,
+        resumeTime: Double?,
+        playDuration: Double = 0,
+        completion: ((Bool) -> Void)? = nil
+    ) {
+        let formattedDuration = String(format: "%.2f", max(0, playDuration))
+        let mutation: String
+        if let resumeTime {
+            let formattedTime = String(format: "%.2f", resumeTime)
+            mutation = """
+            {
+              "query": "mutation SceneSaveActivity($id: ID!, $resume_time: Float, $playDuration: Float) { sceneSaveActivity(id: $id, resume_time: $resume_time, playDuration: $playDuration) }",
+              "variables": {
+                "id": "\(sceneId)",
+                "resume_time": \(formattedTime),
+                "playDuration": \(formattedDuration)
+              }
+            }
+            """
+        } else {
+            mutation = """
+            {
+              "query": "mutation SceneSaveActivity($id: ID!, $playDuration: Float) { sceneSaveActivity(id: $id, playDuration: $playDuration) }",
+              "variables": {
+                "id": "\(sceneId)",
+                "playDuration": \(formattedDuration)
+              }
+            }
+            """
         }
-        """
-        
+
         performGraphQLMutationSilent(query: mutation) { result in
             if let result = result {
                 if let data = result["data"]?.value as? [String: Any],
                    let _ = data["sceneSaveActivity"] {
-                    // Success
-                    DispatchQueue.main.async {
-                        completion?(true)
+                    if let resumeTime {
+                        DispatchQueue.main.async {
+                            self.updateSceneResumeTime(id: sceneId, newResumeTime: resumeTime)
+                            completion?(true)
+                        }
+                    } else {
+                        DispatchQueue.main.async {
+                            completion?(true)
+                        }
                     }
                 } else if let errors = result["errors"] {
-                    print("❌ RESUME SAVE ERROR for scene \(sceneId): \(errors)")
+                    print("❌ ACTIVITY SAVE ERROR for scene \(sceneId): \(errors)")
                     DispatchQueue.main.async {
                         completion?(false)
                     }
                 }
             } else {
-                print("❌ RESUME SAVE FAILED for scene \(sceneId)")
+                print("❌ ACTIVITY SAVE FAILED for scene \(sceneId)")
                 DispatchQueue.main.async {
                     completion?(false)
                 }
             }
         }
+    }
+
+    /// Convenience: resume-only save (play duration delta 0).
+    func updateSceneResumeTime(sceneId: String, resumeTime: Double, completion: ((Bool) -> Void)? = nil) {
+        updateSceneResumeTime(sceneId: sceneId, resumeTime: resumeTime, playDuration: 0, completion: completion)
     }
     
     func fetchSceneDetails(sceneId: String, completion: @escaping (Scene?) -> Void) {

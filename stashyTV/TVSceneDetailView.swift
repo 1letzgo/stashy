@@ -931,12 +931,19 @@ class TVPlayerViewModel: ObservableObject {
         
         let currentTime = player.currentTime().seconds
         if currentTime > 0 {
+            // Prefer the dedicated activity tracker when available; otherwise at least
+            // persist resume. Play-duration deltas are accumulated on iOS Scene Detail / Feeds.
             print("💾 TV PLAYER VM: Saving progress: \(currentTime)s for \(sceneId)")
-            viewModel.updateSceneResumeTime(sceneId: sceneId, resumeTime: currentTime)
+            let duration = player.currentItem?.duration.seconds ?? 0
+            var resume = currentTime
+            if duration.isFinite, duration > 0, (100.0 / duration) * currentTime >= 98 {
+                resume = 0
+            }
+            viewModel.updateSceneResumeTime(sceneId: sceneId, resumeTime: resume, playDuration: 0)
             NotificationCenter.default.post(
                 name: NSNotification.Name("SceneResumeTimeUpdated"),
                 object: nil,
-                userInfo: ["sceneId": sceneId, "resumeTime": currentTime]
+                userInfo: ["sceneId": sceneId, "resumeTime": resume]
             )
         }
     }

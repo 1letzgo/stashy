@@ -223,6 +223,89 @@ func createPlayer(for url: URL) -> AVPlayer {
     return player
 }
 
+// MARK: - Scene playback activity (play_duration / resume_time)
+
+/// Accumulates watched seconds and syncs deltas via `sceneSaveActivity`, matching Stash web `trackActivity`.
+@MainActor
+final class ScenePlaybackActivityTracker {
+    /// Called with `(resumeTime?, playDurationDelta)`. `resumeTime` is `nil` when resume should not be updated.
+    var onSave: ((_ resumeTime: Double?, _ playDurationDelta: Double) -> Void)?
+    /// When false, only `playDuration` is sent (e.g. marker streams should not overwrite scene resume).
+    var updatesResumeTime: Bool = true
+
+    private var timer: Timer?
+    private var totalPlayDuration: Double = 0
+    private var pendingPlayDuration: Double = 0
+    private var currentTime: Double = 0
+    private var duration: Double = 0
+    private let tickInterval: TimeInterval = 1
+    private let sendIntervalSeconds: Int = 10
+    /// Stash clears resume when playback is ≥ 98% complete.
+    private let completedResumePercent: Double = 98
+
+    func setPosition(currentTime: Double, duration: Double) {
+        if currentTime.isFinite, currentTime >= 0 {
+            self.currentTime = currentTime
+        }
+        if duration.isFinite, duration > 0 {
+            self.duration = duration
+        }
+    }
+
+    func start() {
+        guard timer == nil else { return }
+        let timer = Timer(timeInterval: tickInterval, repeats: true) { [weak self] _ in
+            Task { @MainActor in
+                self?.tick()
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        self.timer = timer
+    }
+
+    func stop() {
+        guard timer != nil else { return }
+        timer?.invalidate()
+        timer = nil
+        flush()
+    }
+
+    func reset() {
+        stop()
+        totalPlayDuration = 0
+        pendingPlayDuration = 0
+        currentTime = 0
+        duration = 0
+    }
+
+    /// Force a save (e.g. view disappear) even if the 10s interval has not elapsed.
+    func flush() {
+        guard totalPlayDuration > 0 else { return }
+        let delta = pendingPlayDuration
+        pendingPlayDuration = 0
+
+        var resume: Double? = nil
+        if updatesResumeTime {
+            resume = currentTime
+            if duration > 0 {
+                let percentCompleted = (100.0 / duration) * currentTime
+                if percentCompleted >= completedResumePercent {
+                    resume = 0
+                }
+            }
+        }
+        onSave?(resume, delta)
+    }
+
+    private func tick() {
+        totalPlayDuration += tickInterval
+        pendingPlayDuration += tickInterval
+        if Int(totalPlayDuration.rounded(.down)) % sendIntervalSeconds == 0 {
+            flush()
+        }
+    }
+}
+
 /// Creates a muted preview player that doesn't interrupt other audio
 func createMutedPreviewPlayer(for url: URL) -> AVPlayer {
     do {
