@@ -13,6 +13,7 @@ import AVKit
 // Card-based view for grid layout
 struct SceneCardView: View {
     let scene: Scene
+    var aspectRatio: CGFloat = 16.0 / 9.0
     @ObservedObject var appearanceManager = AppearanceManager.shared
     
     // Preview Video State
@@ -70,10 +71,9 @@ struct SceneCardView: View {
                 }
             }, perform: {})
             
-            // Ensure full height for the card
-            // Aspect Ratio 16:9 forced by invisible color
+            // Ensure full height for the card (default 16:9; catalog can pass 1:1)
             Color.clear
-                .aspectRatio(16/9, contentMode: .fit) 
+                .aspectRatio(aspectRatio, contentMode: .fit) 
             
             // Top Overlay (Studio and Date)
             VStack {
@@ -190,6 +190,7 @@ struct SceneCardView: View {
         .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
+        .id(aspectRatio)
         .onDisappear {
             stopPreview()
         }

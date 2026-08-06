@@ -681,7 +681,7 @@ private struct HotOrNotBattleColumn: View {
         if let url = model.thumbnailURL(for: performer) {
             CustomAsyncImage(url: url) { loader in
                 if loader.isLoading {
-                    ProgressView()
+                    InlineSpinner(scale: .medium)
                 } else if let image = loader.image {
                     image.resizable().scaledToFill()
                 } else {
@@ -796,7 +796,7 @@ private struct HotOrNotGauntletStarterPickCard: View {
         if let url = model.thumbnailURL(for: performer) {
             CustomAsyncImage(url: url) { loader in
                 if loader.isLoading {
-                    ProgressView()
+                    InlineSpinner(scale: .medium)
                 } else if let image = loader.image {
                     image.resizable().scaledToFill()
                 } else {
@@ -1746,13 +1746,13 @@ struct HotOrNotToolsView: View {
 
     /// Single bottom chrome: duel modes + Charts + pool (replaces separate mode picker + old segmented Duel/Charts bar).
     private var hotOrNotBottomChrome: some View {
-        VStack(spacing: 8) {
-            HStack(spacing: 8) {
+        VStack(spacing: DesignTokens.Spacing.xs) {
+            HStack(spacing: DesignTokens.Spacing.xs) {
                 hotOrNotDuelModeChip(.headToHead)
                 hotOrNotDuelModeChip(.placement)
                 hotOrNotDuelModeChip(.champion)
             }
-            HStack(spacing: 10) {
+            HStack(spacing: StashyExpandingDock.itemSpacing) {
                 hotOrNotChartsChip
                     .frame(maxWidth: .infinity)
                 Button {
@@ -1760,28 +1760,28 @@ struct HotOrNotToolsView: View {
                     showPoolSettings = true
                 } label: {
                     Image(systemName: "gearshape.fill")
-                        .font(.system(size: 17, weight: .semibold))
+                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
                         .foregroundStyle(.primary)
-                        .frame(width: 36, height: 36)
+                        .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Pool settings")
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .padding(.horizontal, DesignTokens.Chrome.fabInnerPadding)
+        .padding(.vertical, DesignTokens.Spacing.xs)
         .background(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
                 .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
+                .floatingShadow()
         )
         .overlay(
             RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.primary.opacity(0.07), lineWidth: 0.5)
+                .stroke(Color.primary.opacity(DesignTokens.Chrome.strokeOpacity), lineWidth: 0.5)
         )
-        .padding(.horizontal, 16)
-        .padding(.bottom, 6)
+        .padding(.horizontal, DesignTokens.Chrome.fabOuterPadding)
+        .padding(.bottom, DesignTokens.Chrome.fabBottomPadding)
     }
 
     private func hotOrNotDuelModeChip(_ mode: HotOrNotViewModel.DuelMode) -> some View {
@@ -1799,7 +1799,7 @@ struct HotOrNotToolsView: View {
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
+                .frame(height: StashyExpandingDock.activeHeight)
                 .padding(.horizontal, 4)
                 .background(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
@@ -1825,7 +1825,7 @@ struct HotOrNotToolsView: View {
                 .font(.system(size: 13, weight: selected ? .semibold : .medium))
                 .foregroundStyle(selected ? Color.primary : Color.secondary)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 8)
+                .frame(height: StashyExpandingDock.activeHeight)
                 .background(
                     RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .fill(selected ? appearance.tintColor.opacity(0.32) : Color.primary.opacity(0.06))
@@ -1843,8 +1843,8 @@ struct HotOrNotToolsView: View {
     private var placementStarterInline: some View {
         VStack(spacing: 10) {
             if model.isLoadingPlacementStarters && model.placementStarters.isEmpty {
-                ProgressView()
-                    .padding(.vertical, 28)
+                StandardLoadingView(message: "Loading starters...")
+                    .frame(minHeight: 220)
             } else if model.placementStarters.isEmpty {
                 ContentUnavailableView(
                     "No starters",
@@ -1908,8 +1908,8 @@ struct HotOrNotToolsView: View {
                 } else if model.needsPlacementStarterSelection {
                     placementStarterInline
                 } else if model.isLoadingPair && model.left == nil {
-                    ProgressView("Loading pair…")
-                        .padding(.top, 40)
+                    StandardLoadingView(message: "Loading pair...")
+                        .frame(minHeight: 320)
                 } else if let l = model.left, let r = model.right {
                     HStack(alignment: .top, spacing: 10) {
                         VStack(spacing: 10) {
@@ -1947,8 +1947,7 @@ struct HotOrNotToolsView: View {
     private var leaderboardContent: some View {
         Group {
             if model.isLoadingBoard && model.leaderboard.isEmpty {
-                ProgressView("Loading charts…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                StandardLoadingView(message: "Loading charts...")
             } else {
                 ScrollView {
                     LazyVStack(spacing: 10) {
@@ -1961,9 +1960,7 @@ struct HotOrNotToolsView: View {
                             .buttonStyle(.plain)
                         }
                         if model.leaderboardHasMore {
-                            ProgressView()
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 16)
+                            PaginationLoadingFooter()
                                 .onAppear {
                                     Task { await model.loadMoreLeaderboard() }
                                 }
@@ -2115,8 +2112,7 @@ private struct HotOrNotLeaderboardCard: View {
             if let url = model.thumbnailURL(for: performer) {
                 CustomAsyncImage(url: url) { loader in
                     if loader.isLoading {
-                        ProgressView()
-                            .scaleEffect(0.85)
+                        InlineSpinner(scale: .medium)
                     } else if let image = loader.image {
                         image.resizable().scaledToFill()
                     } else {

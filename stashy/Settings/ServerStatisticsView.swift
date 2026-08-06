@@ -25,34 +25,26 @@ struct ServerStatisticsView: View {
                     if let stats = viewModel.statistics {
                         Section("Catalogs") {
 #if canImport(Charts)
-                            CatalogsBarChart(data: [
-                                .init(title: "Scenes", value: stats.sceneCount),
-                                .init(title: "Galleries", value: stats.galleryCount),
-                                .init(title: "Images", value: stats.imageCount),
-                                .init(title: "Markers", value: stats.sceneMarkerCount ?? 0),
-                                .init(title: "Studios", value: stats.studioCount),
-                                .init(title: "Groups", value: stats.groupCount),
-                                .init(title: "Tags", value: stats.tagCount),
-                            ])
-                            .listRowInsets(EdgeInsets(top: 10, leading: 0, bottom: 10, trailing: 0))
+                            CatalogsBarChart(data: catalogEntries(from: stats))
+                                .listRowInsets(EdgeInsets(top: 10, leading: 0, bottom: 10, trailing: 0))
 #else
-                            statRow("Scenes", value: "\(stats.sceneCount)")
-                            statRow("Galleries", value: "\(stats.galleryCount)")
-                            statRow("Images", value: "\(stats.imageCount)")
-                            statRow("Markers", value: "\(stats.sceneMarkerCount ?? 0)")
-                            statRow("Studios", value: "\(stats.studioCount)")
-                            statRow("Groups", value: "\(stats.groupCount)")
-                            statRow("Tags", value: "\(stats.tagCount)")
+                            ForEach(catalogEntries(from: stats), id: \.title) { entry in
+                                statRow(entry.title, value: "\(entry.value)")
+                            }
 #endif
                         }
                         .listRowBackground(Color.secondaryAppBackground)
 
                         Section("Usage") {
-                            statRow("Total Size", value: formatBytes(stats.scenesSize))
-                            statRow("Total Duration", value: formatDuration(stats.scenesDuration))
-                            statRow("Total O-Count", value: "\(stats.totalOCount)")
-                            statRow("Total Play Count", value: "\(stats.totalPlayCount)")
+                            statRow("Scenes Size", value: formatBytes(stats.scenesSize))
+                            statRow("Images Size", value: formatBytes(stats.imagesSize))
+                            statRow("Total Size", value: formatBytes(stats.scenesSize + stats.imagesSize))
+                            statRow("Library Duration", value: formatDuration(stats.scenesDuration))
+                            statRow("Watch Time", value: formatDuration(stats.totalPlayDuration))
+                            statRow("Play Count", value: "\(stats.totalPlayCount)")
                             statRow("Scenes Played", value: "\(stats.scenesPlayed)")
+                            statRow("Played Share", value: formatPlayedShare(played: stats.scenesPlayed, total: stats.sceneCount))
+                            statRow("Total O-Count", value: "\(stats.totalOCount)")
                         }
                         .listRowBackground(Color.secondaryAppBackground)
 
@@ -63,17 +55,18 @@ struct ServerStatisticsView: View {
                                 HStack { Spacer(); ProgressView("Loading gender distribution..."); Spacer() }
                                     .padding(.vertical, 8)
                             } else {
-                                let sorted = viewModel.performerGenderCounts
-                                    .filter { $0.value > 0 }
-                                    .sorted { lhs, rhs in
-                                        if lhs.value != rhs.value { return lhs.value > rhs.value }
-                                        return lhs.key.localizedCaseInsensitiveCompare(rhs.key) == .orderedAscending
-                                    }
+                                let sorted = sortedGenderCounts(viewModel.performerGenderCounts)
 
                                 if sorted.isEmpty {
                                     Text("No gender data available.")
                                         .foregroundColor(.secondary)
                                 } else {
+#if canImport(Charts)
+                                    GenderBarChart(data: sorted.map {
+                                        GenderBarChart.Entry(title: displayGender($0.key), value: $0.value)
+                                    })
+                                    .listRowInsets(EdgeInsets(top: 10, leading: 0, bottom: 10, trailing: 0))
+#else
                                     ForEach(sorted, id: \.key) { gender, count in
                                         HStack {
                                             Text(displayGender(gender))
@@ -82,6 +75,7 @@ struct ServerStatisticsView: View {
                                                 .foregroundColor(.secondary)
                                         }
                                     }
+#endif
                                 }
                             }
                         }
@@ -100,6 +94,27 @@ struct ServerStatisticsView: View {
         .onAppear { reload() }
     }
 
+    private func catalogEntries(from stats: Statistics) -> [CatalogStatEntry] {
+        [
+            .init(title: "Scenes", value: stats.sceneCount),
+            .init(title: "Galleries", value: stats.galleryCount),
+            .init(title: "Images", value: stats.imageCount),
+            .init(title: "Markers", value: stats.sceneMarkerCount ?? 0),
+            .init(title: "Studios", value: stats.studioCount),
+            .init(title: "Groups", value: stats.groupCount),
+            .init(title: "Tags", value: stats.tagCount),
+        ]
+    }
+
+    private func sortedGenderCounts(_ counts: [String: Int]) -> [(key: String, value: Int)] {
+        counts
+            .filter { $0.value > 0 }
+            .sorted { lhs, rhs in
+                if lhs.value != rhs.value { return lhs.value > rhs.value }
+                return lhs.key.localizedCaseInsensitiveCompare(rhs.key) == .orderedAscending
+            }
+    }
+
     private func reload() {
         hasAttemptedLoad = true
         didFailLoad = false
@@ -108,7 +123,10 @@ struct ServerStatisticsView: View {
                 self.didFailLoad = !success
             }
         }
-        viewModel.fetchPerformerGenderCounts()
+        // Gender aggregation pages all performers; keep warm when Tools sub-tabs switch.
+        if viewModel.performerGenderCounts.isEmpty {
+            viewModel.fetchPerformerGenderCounts()
+        }
     }
 
     private func displayGender(_ rawKey: String) -> String {
@@ -122,7 +140,6 @@ struct ServerStatisticsView: View {
         case "NON_BINARY", "NON-BINARY", "NONBINARY": return "Non-binary"
         case "UNKNOWN", "UNSPECIFIED": return "Unknown"
         default:
-            // Fallback: pretty-print unknown keys like "GENDERQUEER" / "SOME_VALUE"
             let pretty = key
                 .replacingOccurrences(of: "_", with: " ")
                 .lowercased()
@@ -153,18 +170,23 @@ struct ServerStatisticsView: View {
         let minutes = (total % 3600) / 60
         return "\(hours)h \(minutes)m"
     }
+
+    private func formatPlayedShare(played: Int, total: Int) -> String {
+        guard total > 0 else { return "—" }
+        let percent = (Double(played) / Double(total)) * 100
+        return String(format: "%.0f%%", percent)
+    }
+}
+
+private struct CatalogStatEntry: Identifiable {
+    var id: String { title }
+    let title: String
+    let value: Int
 }
 
 #if canImport(Charts)
 private struct CatalogsBarChart: View {
-    struct Entry: Identifiable {
-        let id = UUID()
-        let title: String
-        let value: Int
-    }
-
-    let data: [Entry]
-    @Environment(\.colorScheme) private var colorScheme
+    let data: [CatalogStatEntry]
 
     var body: some View {
         let maxValue = max(data.map(\.value).max() ?? 1, 1)
@@ -193,7 +215,7 @@ private struct CatalogsBarChart: View {
                 AxisMarks(position: .leading, values: .automatic(desiredCount: 4))
             }
             .chartXAxis {
-                AxisMarks(position: .bottom) { value in
+                AxisMarks(position: .bottom) { _ in
                     AxisValueLabel()
                         .font(.caption2)
                         .foregroundStyle(.secondary)
@@ -202,6 +224,54 @@ private struct CatalogsBarChart: View {
             .frame(height: 180)
             .padding(.horizontal, 12)
         }
+    }
+}
+
+private struct GenderBarChart: View {
+    struct Entry: Identifiable {
+        var id: String { title }
+        let title: String
+        let value: Int
+    }
+
+    let data: [Entry]
+
+    var body: some View {
+        let maxValue = max(data.map(\.value).max() ?? 1, 1)
+        let chartHeight = max(CGFloat(data.count) * 28, 80)
+
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Gender distribution")
+                .font(.caption)
+                .foregroundColor(.secondary)
+
+            Chart(data) { entry in
+                BarMark(
+                    x: .value("Count", entry.value),
+                    y: .value("Gender", entry.title)
+                )
+                .foregroundStyle(Color.accentColor)
+                .cornerRadius(4)
+                .annotation(position: .trailing, alignment: .center) {
+                    Text("\(entry.value)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.secondary)
+                }
+            }
+            .chartXScale(domain: 0...Double(maxValue))
+            .chartXAxis {
+                AxisMarks(values: .automatic(desiredCount: 4))
+            }
+            .chartYAxis {
+                AxisMarks { _ in
+                    AxisValueLabel()
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .frame(height: chartHeight)
+        }
+        .padding(.vertical, 4)
     }
 }
 #endif

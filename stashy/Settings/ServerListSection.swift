@@ -97,7 +97,7 @@ struct ServerListRow: View {
                 }
                 .contentShape(Rectangle())
             }
-            .buttonStyle(PlainButtonStyle())
+            .buttonStyle(.plain)
 
             NavigationLink(destination: ServerDetailView(server: server, viewModel: viewModel)) {
                 EmptyView()

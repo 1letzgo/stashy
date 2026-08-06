@@ -158,17 +158,46 @@ struct HomeRowView: View {
 
     @ViewBuilder
     private var headerRow: some View {
-        NavigationLink(destination: destinationView) {
+        Button(action: openCatalogCategory) {
             HStack(spacing: 4) {
                 Text(config.title)
                     .font(.headline)
                     .foregroundColor(isLarge ? .white : .primary)
-                Spacer()
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(isLarge ? .white.opacity(0.7) : .secondary)
+                Spacer(minLength: 0)
             }
             .padding(.horizontal, 12)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    /// Switch Home catalogue sub-tab (menu selection) instead of pushing a nested list.
+    private func openCatalogCategory() {
+        switch config.type {
+        case .newPerformers:
+            coordinator.navigateToPerformers(sort: .createdAtDesc)
+        case .performersHighestSceneCount:
+            coordinator.navigateToPerformers(sort: .sceneCountDesc)
+        case .performersHighestOCount:
+            coordinator.navigateToPerformers(sort: .oCountDesc)
+        case .performersHighestRating:
+            coordinator.navigateToPerformers(sort: .ratingDesc)
+        case .newStudios:
+            coordinator.navigateToStudios(sort: .createdAtDesc)
+        case .studiosHighestSceneCount:
+            coordinator.navigateToStudios(sort: .sceneCountDesc)
+        case .newGalleries:
+            coordinator.navigateToGalleries(sort: .createdAtDesc)
+        case .recentlyUpdatedGalleries:
+            coordinator.navigateToGalleries(sort: .updatedAtDesc)
+        case .galleriesHighestImageCount:
+            coordinator.navigateToGalleries(sort: .imageCountDesc)
+        default:
+            coordinator.navigateToScenes(sort: sortOption())
+        }
     }
 
     // MARK: - States
@@ -272,23 +301,6 @@ struct HomeRowView: View {
             .buttonStyle(.plain)
             .frame(width: width)
             .id(id)
-    }
-
-    // MARK: - Navigation destination
-
-    @ViewBuilder
-    private var destinationView: some View {
-        switch config.type {
-        case .newPerformers:               PerformersView(initialSort: .createdAtDesc)
-        case .performersHighestSceneCount: PerformersView(initialSort: .sceneCountDesc)
-        case .performersHighestOCount:     PerformersView(initialSort: .oCountDesc)
-        case .performersHighestRating:   PerformersView(initialSort: .ratingDesc)
-        case .newStudios:                  StudiosView(initialSort: .createdAtDesc)
-        case .studiosHighestSceneCount:    StudiosView(initialSort: .sceneCountDesc)
-        case .newGalleries:                GalleriesView(initialSort: .createdAtDesc)
-        case .recentlyUpdatedGalleries:    GalleriesView(initialSort: .updatedAtDesc)
-        default:                           ScenesView(sort: sortOption())
-        }
     }
 
     // MARK: - Load logic

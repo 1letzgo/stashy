@@ -31,8 +31,20 @@ enum DesignTokens {
         static let card = ShadowStyle(color: .black.opacity(0.1), radius: 4, x: 0, y: 2)
         /// Subtle shadow for list items
         static let subtle = ShadowStyle(color: .black.opacity(0.05), radius: 2, x: 0, y: 1)
-        /// Strong shadow for floating elements
-        static let floating = ShadowStyle(color: .black.opacity(0.15), radius: 10, x: 0, y: 5)
+        /// Floating action / chrome bars (matches `FloatingActionBar`)
+        static let floating = ShadowStyle(color: .black.opacity(0.12), radius: 6, x: 0, y: 2)
+    }
+
+    // MARK: - Chrome (FAB / dock-aligned controls)
+
+    enum Chrome {
+        static let fabHeight: CGFloat = 36
+        static let fabInnerPadding: CGFloat = Spacing.md
+        static let fabOuterPadding: CGFloat = Spacing.xl
+        static let fabBottomPadding: CGFloat = 6
+        static let fabIconSize: CGFloat = 18
+        static let fabActiveDot: CGFloat = 7
+        static let strokeOpacity: Double = 0.07
     }
 
     // MARK: - Spacing

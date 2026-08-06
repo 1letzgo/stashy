@@ -50,15 +50,13 @@ struct MainTabView: View {
                     }
                 }
             )) {
-                // Dynamic Configurable Tabs using new Tab API
                 ForEach(tabManager.visibleTabs) { tab in
                     Tab(tab.title, systemImage: tab.icon, value: tab) {
                         view(for: tab)
                             .tint(appearanceManager.tintColor)
                     }
                 }
-                
-                // iOS 18+ Search tab with dedicated role
+
                 Tab("Search", systemImage: "magnifyingglass", value: AppTab.search, role: .search) {
                     UniversalSearchView()
                         .applyAppBackground()
@@ -72,15 +70,14 @@ struct MainTabView: View {
                 checkConfiguration()
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("AuthError401"))) { _ in
-                // Navigate to Home on 401 errors
                 coordinator.selectedTab = .catalogue
                 warningType = .authExpired
                 showConfigWarning = true
             }
             .onChange(of: coordinator.selectedTab) { oldTab, newTab in
-                // Fallback wenn `ReelsView` beim Tab-Wechsel keinen eigenen Teardown auslöst.
                 guard oldTab == .reels, newTab != .reels else { return }
-                ReelsPlayerRegistry.pauseAll()
+                // Suspend before audio teardown so deferred Reel `play()` races cannot restart audio.
+                ReelsPlayerRegistry.suspendPlayback()
                 NotificationCenter.default.post(name: Notification.Name("ReelsPauseAllPlayers"), object: nil)
                 try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             }
@@ -215,16 +212,16 @@ struct ToolsView: View {
     @EnvironmentObject private var coordinator: NavigationCoordinator
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @ObservedObject private var tabManager = TabManager.shared
+    /// Shared across Tools sub-tabs so Statistics stay warm when switching Downloads / Statistics / Match.
+    @StateObject private var statisticsViewModel = StashDBViewModel()
     
     enum ToolsTab: String, CaseIterable {
-        case server = "Server"
         case downloads = "Downloads"
         case statistics = "Statistics"
         case hotOrNot = "Match"
         
         var icon: String {
             switch self {
-            case .server: return "server.rack"
             case .downloads: return "square.and.arrow.down"
             case .statistics: return "chart.bar.fill"
             case .hotOrNot: return "flame.fill"
@@ -233,13 +230,13 @@ struct ToolsView: View {
     }
     
     private var sortedTabs: [ToolsTab] {
-        // Use persisted order from Settings → Tools
+        // Use persisted order from Settings → Tools (Server lives under Settings)
         tabManager.enabledTools.compactMap { item in
             switch item {
-            case .server: return .server
             case .downloads: return .downloads
             case .statistics: return .statistics
             case .hotOrNot: return .hotOrNot
+            case .server: return nil
             }
         }
     }
@@ -250,7 +247,7 @@ struct ToolsView: View {
         }
         return sortedTabs.first ?? .downloads
     }
-    
+
     private var selectedTabBinding: Binding<ToolsTab> {
         Binding(
             get: { effectiveTab },
@@ -261,72 +258,58 @@ struct ToolsView: View {
     var body: some View {
         Group {
             switch effectiveTab {
-            case .server:
-                ToolsServerView()
             case .downloads:
                 DownloadsView()
             case .statistics:
-                ToolsStatisticsView()
+                ToolsStatisticsView(viewModel: statisticsViewModel)
             case .hotOrNot:
                 HotOrNotToolsView()
             }
         }
         .onAppear {
-            if coordinator.toolsSubTab == "Hot or Not" {
-                coordinator.toolsSubTab = ToolsTab.hotOrNot.rawValue
+            if coordinator.toolsSubTab == "Hot or Not" || coordinator.toolsSubTab == "Server" {
+                coordinator.toolsSubTab = (sortedTabs.first ?? .downloads).rawValue
+            } else if ToolsTab(rawValue: coordinator.toolsSubTab) == nil || !sortedTabs.contains(where: { $0.rawValue == coordinator.toolsSubTab }) {
+                coordinator.toolsSubTab = (sortedTabs.first ?? .downloads).rawValue
             }
         }
         .navigationBarHidden(true)
+        .popNavigationToRootOnChange(coordinator.toolsSubTab)
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
                 toolsCategoryRow
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, StashyExpandingDock.edgePadding)
                     .padding(.vertical, 6)
-                
+
                 Divider().overlay(Color.white.opacity(0.15))
             }
             .background(.bar)
             .colorScheme(.dark)
         }
     }
-    
+
     private var toolsCategoryRow: some View {
-        HStack(spacing: 8) {
-            Text(effectiveTab.rawValue)
-                .font(.system(size: 18, weight: .semibold))
-                .lineLimit(1)
-                .frame(width: 120, alignment: .leading)
-            
-            Spacer()
-            
-            HStack(spacing: 8) {
-                ForEach(sortedTabs, id: \.self) { tab in
-                    toolTabButton(tab: tab, isActive: tab == effectiveTab)
-                        .frame(width: 44)
-                }
+        StashyTopNavNameDropdownRow(
+            title: "Tools",
+            items: sortedTabs.map {
+                StashyNavMenuItem(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon)
+            },
+            selectionID: effectiveTab.rawValue,
+            titleColor: .white,
+            menuAccessibilityLabel: "Tool",
+            menuAccessibilityHint: "Chooses which tool to show"
+        ) { id in
+            if let tab = ToolsTab(rawValue: id) {
+                selectedTabBinding.wrappedValue = tab
             }
         }
-        .frame(maxWidth: .infinity)
-    }
-    
-    private func toolTabButton(tab: ToolsTab, isActive: Bool) -> some View {
-        Button(action: { selectedTabBinding.wrappedValue = tab }) {
-            Image(systemName: tab.icon)
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundColor(isActive ? .white : .primary)
-                .frame(height: 32)
-                .frame(maxWidth: .infinity)
-                .background(
-                    RoundedRectangle(cornerRadius: 9)
-                        .fill(isActive ? appearanceManager.tintColor : Color.clear)
-                )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(tab.rawValue)
     }
 }
 
-private struct ToolsServerView: View {
+struct ToolsServerView: View {
+    /// When true, omits navigation chrome for embedding in Settings segments.
+    var embedded: Bool = false
+
     @ObservedObject private var configManager = ServerConfigManager.shared
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @StateObject private var viewModel = StashDBViewModel()
@@ -433,16 +416,7 @@ private struct ToolsServerView: View {
                     }
                     .listRowBackground(Color.secondaryAppBackground)
                 }
-                .navigationTitle("Server")
                 .scrollContentBackground(.hidden)
-                .alert(alertTitle, isPresented: $showAlert) {
-                    Button("OK", role: .cancel) { }
-                } message: {
-                    Text(alertMessage)
-                }
-                .onAppear {
-                    viewModel.testConnection()
-                }
             } else {
                 VStack(spacing: 16) {
                     Spacer()
@@ -452,13 +426,26 @@ private struct ToolsServerView: View {
                     Text("No active server")
                         .font(.title3)
                         .fontWeight(.bold)
-                    Text("Select a server in Settings to use server tools.")
+                    Text(embedded
+                          ? "Select a server under Main first."
+                          : "Select a server first to use server tasks.")
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .modifier(ToolsServerChromeModifier(embedded: embedded))
+        .alert(alertTitle, isPresented: $showAlert) {
+            Button("OK", role: .cancel) { }
+        } message: {
+            Text(alertMessage)
+        }
+        .onAppear {
+            if activeServer != nil {
+                viewModel.testConnection()
             }
         }
     }
@@ -504,9 +491,25 @@ private struct ToolsServerView: View {
     }
 }
 
+private struct ToolsServerChromeModifier: ViewModifier {
+    let embedded: Bool
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if embedded {
+            content
+        } else {
+            content
+                .navigationTitle("Server Tasks")
+                .navigationBarTitleDisplayMode(.inline)
+                .applyAppBackground()
+        }
+    }
+}
+
 private struct ToolsStatisticsView: View {
+    @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject private var configManager = ServerConfigManager.shared
-    @StateObject private var viewModel = StashDBViewModel()
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     
     var body: some View {

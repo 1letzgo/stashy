@@ -249,6 +249,59 @@ struct DownloadDetailView: View {
     @State private var isHeaderExpanded = false
     @State private var isMuted = !isHeadphonesConnected()
     @Environment(\.dismiss) var dismiss
+
+    private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
+
+    /// Custom top chrome: Back · Share.
+    @ViewBuilder
+    private var downloadDetailNavBar: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Button {
+                    dismiss()
+                } label: {
+                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        Text("Back")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                    .modifier(StashyChromePillStyle(height: chromePillHeight))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
+
+                Spacer(minLength: 8)
+
+                Button {
+                    HapticManager.light()
+                    let videoURL = downloadManager.getLocalVideoURL(for: downloaded)
+                    shareVideo(url: videoURL)
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                        .frame(
+                            width: StashyExpandingDock.circleSize,
+                            height: StashyExpandingDock.circleSize
+                        )
+                        .background(StashyExpandingDock.inactiveBackground)
+                        .clipShape(Capsule(style: .continuous))
+                        .contentShape(Capsule(style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Share")
+            }
+            .frame(minHeight: chromePillHeight)
+            .padding(.horizontal, StashyExpandingDock.edgePadding)
+            .padding(.vertical, 8)
+
+            Divider().overlay(Color.white.opacity(0.15))
+        }
+        .background(.bar)
+        .colorScheme(.dark)
+    }
     
     var body: some View {
         ScrollView {
@@ -453,19 +506,11 @@ struct DownloadDetailView: View {
             }
             .padding(16)
         }
-        .background(Color.appBackground)
-        .navigationTitle("Offline Scene")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .navigationBarTrailing) {
-                Button {
-                    let videoURL = downloadManager.getLocalVideoURL(for: downloaded)
-                    shareVideo(url: videoURL)
-                } label: {
-                    Image(systemName: "square.and.arrow.up")
-                        .foregroundColor(appearanceManager.tintColor)
-                }
-            }
+        .applyAppBackground()
+        .hideSystemNavigationBarForCustomChrome()
+        .enableSwipeBackWhenNavBarHidden()
+        .safeAreaInset(edge: .top, spacing: 0) {
+            downloadDetailNavBar
         }
     }
     

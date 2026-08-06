@@ -10,10 +10,11 @@ import SwiftUI
 
 
 struct StudioDetailView: View {
-    let studio: Studio
+    @State private var studio: Studio
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
     @StateObject private var viewModel = StashDBViewModel()
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var studioLiveFilterSheetPresented = false
     @StateObject private var linkedPerformers: DetailLinkedPerformersFilterModel
@@ -23,7 +24,11 @@ struct StudioDetailView: View {
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
     @State private var isFavorite: Bool = false
     @State private var isUpdatingFavorite: Bool = false
-    @State private var isHeaderExpanded = false // Added state for expansion
+    @State private var isHeaderExpanded = false
+    @State private var showingEditStudioSheet = false
+
+    private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
+    private var navActionGroupSpacing: CGFloat { 7 }
     
     enum DetailTab: String, CaseIterable {
         case scenes = "Scenes"
@@ -33,11 +38,23 @@ struct StudioDetailView: View {
         case tags = "Tags"
         case groups = "Groups"
         case images = "Images"
+
+        var icon: String {
+            switch self {
+            case .scenes: return "film"
+            case .galleries: return "photo.stack"
+            case .studios: return "building.2"
+            case .performers: return "person.fill"
+            case .tags: return "tag"
+            case .groups: return "rectangle.stack.fill"
+            case .images: return "photo"
+            }
+        }
     }
     @State private var selectedDetailTab: DetailTab
 
     init(studio: Studio) {
-        self.studio = studio
+        _studio = State(initialValue: studio)
         let sc = studio.sceneCount
         let gal = studio.galleryCount ?? 0
         _selectedDetailTab = State(initialValue: sc > 0 ? .scenes : (gal > 0 ? .galleries : .scenes))
@@ -106,20 +123,159 @@ struct StudioDetailView: View {
 
     @ViewBuilder
     private var studioScenesStack: some View {
-        VStack(spacing: 12) {
-            headerCard
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-            ScenesView(
-                hideTitle: true,
-                scope: .studio(studioId: studio.id),
-                sharedViewModel: viewModel,
-                externalLiveFilterSheetBinding: $studioLiveFilterSheetPresented,
-                showsFloatingFilterButton: false
+        ScenesView(
+            hideTitle: true,
+            scope: .studio(studioId: studio.id),
+            sharedViewModel: viewModel,
+            externalLiveFilterSheetBinding: $studioLiveFilterSheetPresented,
+            showsFloatingFilterButton: false,
+            scrollHeader: AnyView(
+                headerCard
+                    .padding(.horizontal, 16)
             )
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        }
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    /// Custom top chrome (PerformerDetail template): Back · section icons · Favorite · Edit.
+    @ViewBuilder
+    private var studioDetailNavBar: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Button {
+                    dismiss()
+                } label: {
+                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        Text("Back")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                    .modifier(StashyChromePillStyle(height: chromePillHeight))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
+
+                Spacer(minLength: 8)
+
+                if showTabSwitcher {
+                    HStack(spacing: 6) {
+                        ForEach(availableTabs, id: \.self) { tab in
+                            let isSelected = selectedDetailTab == tab
+                            Button {
+                                guard !isSelected else { return }
+                                HapticManager.light()
+                                withAnimation(StashyExpandingDock.selectionAnimation) {
+                                    selectedDetailTab = tab
+                                }
+                            } label: {
+                                Image(systemName: tab.icon)
+                                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                                    .foregroundColor(
+                                        isSelected
+                                            ? .white
+                                            : .white.opacity(StashyExpandingDock.inactiveIconOpacity)
+                                    )
+                                    .frame(
+                                        width: StashyExpandingDock.circleSize,
+                                        height: StashyExpandingDock.circleSize
+                                    )
+                                    .background {
+                                        Capsule(style: .continuous)
+                                            .fill(
+                                                isSelected
+                                                    ? appearanceManager.tintColor
+                                                    : StashyExpandingDock.inactiveBackground
+                                            )
+                                    }
+                                    .clipShape(Capsule(style: .continuous))
+                                    .contentShape(Capsule(style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(tab.rawValue)
+                            .accessibilityAddTraits(isSelected ? .isSelected : [])
+                        }
+                    }
+                }
+
+                if showTabSwitcher {
+                    Spacer()
+                        .frame(width: navActionGroupSpacing)
+                }
+
+                HStack(spacing: 6) {
+                    Button {
+                        toggleFavorite()
+                    } label: {
+                        Image(systemName: isFavorite ? "heart.fill" : "heart")
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                            .foregroundColor(
+                                isFavorite
+                                    ? .red
+                                    : .white.opacity(StashyExpandingDock.inactiveIconOpacity)
+                            )
+                            .frame(
+                                width: StashyExpandingDock.circleSize,
+                                height: StashyExpandingDock.circleSize
+                            )
+                            .background(StashyExpandingDock.inactiveBackground)
+                            .clipShape(Capsule(style: .continuous))
+                            .contentShape(Capsule(style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isUpdatingFavorite)
+                    .accessibilityLabel(isFavorite ? "Remove favorite" : "Add favorite")
+
+                    if appearanceManager.isEditModeEnabled {
+                        Button {
+                            HapticManager.light()
+                            showingEditStudioSheet = true
+                        } label: {
+                            Image(systemName: "pencil")
+                                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                                .frame(
+                                    width: StashyExpandingDock.circleSize,
+                                    height: StashyExpandingDock.circleSize
+                                )
+                                .background(StashyExpandingDock.inactiveBackground)
+                                .clipShape(Capsule(style: .continuous))
+                                .contentShape(Capsule(style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Edit studio")
+                    }
+                }
+            }
+            .frame(minHeight: chromePillHeight)
+            .padding(.horizontal, StashyExpandingDock.edgePadding)
+            .padding(.vertical, 8)
+
+            Divider().overlay(Color.white.opacity(0.15))
+        }
+        .background(.bar)
+        .colorScheme(.dark)
+    }
+
+    private func toggleFavorite() {
+        guard !isUpdatingFavorite else { return }
+        HapticManager.light()
+        isUpdatingFavorite = true
+        let newState = !isFavorite
+        withAnimation(DesignTokens.Animation.quick) { isFavorite = newState }
+
+        viewModel.toggleStudioFavorite(studioId: studio.id, favorite: newState) { success in
+            DispatchQueue.main.async {
+                if !success {
+                    isFavorite = !newState
+                    ToastManager.shared.show("Failed to update favorite", icon: "exclamationmark.triangle", style: .error)
+                } else {
+                    studio.favorite = newState
+                }
+                isUpdatingFavorite = false
+            }
+        }
     }
 
     @ViewBuilder
@@ -134,7 +290,7 @@ struct StudioDetailView: View {
                     } else if viewModel.isLoadingStudioGalleries {
                         loadingView(message: "Loading galleries...")
                     } else {
-                        emptyView(message: "No galleries found", icon: "photo.on.rectangle")
+                        InlineEmptyStateView(icon: "photo.on.rectangle", title: "No galleries found")
                     }
                 } else if selectedDetailTab == .studios {
                     studioGrid
@@ -323,6 +479,7 @@ struct StudioDetailView: View {
             // Fetch updated studio details (like favorite status) which might be missing from list view objects
             viewModel.fetchStudio(studioId: studio.id) { updatedStudio in
                 if let updated = updatedStudio {
+                    self.studio = updated
                     self.isFavorite = updated.favorite ?? false
                 } else {
                     self.isFavorite = studio.favorite ?? false
@@ -350,177 +507,53 @@ struct StudioDetailView: View {
             }
         }
         .sceneLiveUpdates(using: viewModel)
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text(studio.name)
-                    .font(.headline)
-                    .lineLimit(1)
-            }
-            
-            ToolbarItem(placement: .navigationBarTrailing) {
-                if showTabSwitcher {
-                    Menu {
-                        ForEach(availableTabs, id: \.self) { tab in
-                            Button(action: { 
-                                withAnimation(DesignTokens.Animation.quick) {
-                                    selectedDetailTab = tab 
-                                }
-                            }) {
-                                HStack {
-                                    Text(tab.rawValue)
-                                    if selectedDetailTab == tab {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(selectedDetailTab.rawValue)
-                                .font(.system(size: 14, weight: .semibold))
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 8, weight: .bold))
-                        }
-                        .foregroundColor(appearanceManager.tintColor)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(appearanceManager.tintColor.opacity(0.1))
-                        .clipShape(Capsule())
-                    }
-                }
+        .hideSystemNavigationBarForCustomChrome()
+        .enableSwipeBackWhenNavBarHidden()
+        .safeAreaInset(edge: .top, spacing: 0) {
+            studioDetailNavBar
+        }
+        .sheet(isPresented: $showingEditStudioSheet) {
+            EditStudioSheet(studio: studio, viewModel: viewModel) { updated in
+                studio = updated
             }
         }
         .floatingActionBar(isPresented: true, catalogChrome: studioDetailCatalogFloatingChromeForFooter) {
             HStack(spacing: 0) {
-                Button {
-                    guard !isUpdatingFavorite else { return }
-                    HapticManager.light()
-                    isUpdatingFavorite = true
-                    let newState = !isFavorite
-                    withAnimation(DesignTokens.Animation.quick) { isFavorite = newState }
-
-                    viewModel.toggleStudioFavorite(studioId: studio.id, favorite: newState) { success in
-                        DispatchQueue.main.async {
-                            if !success {
-                                isFavorite = !newState
-                                ToastManager.shared.show("Failed to update favorite", icon: "exclamationmark.triangle", style: .error)
-                            }
-                            isUpdatingFavorite = false
-                        }
-                    }
-                } label: {
-                    Image(systemName: isFavorite ? "heart.fill" : "heart")
-                        .foregroundColor(isFavorite ? .red : appearanceManager.tintColor)
-                }
-                .frame(maxWidth: .infinity)
-
                 if selectedDetailTab == .scenes {
-                    Button {
+                    CatalogFilterFABButton(isActive: true) {
                         HapticManager.light()
                         studioLiveFilterSheetPresented = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(appearanceManager.tintColor)
                     }
-                    .accessibilityLabel("Filter and sort")
                     .frame(maxWidth: .infinity)
                 } else if selectedDetailTab == .galleries {
-                    Button {
+                    CatalogFilterFABButton(isActive: linkedGalleries.catalogFilterSortFABActive) {
                         HapticManager.light()
                         linkedGalleries.showFilterSortSheet = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(linkedGalleries.catalogFilterSortFABActive ? appearanceManager.tintColor : .primary)
-                            .overlay(alignment: .topTrailing) {
-                                if linkedGalleries.catalogFilterSortFABActive {
-                                    Circle()
-                                        .fill(appearanceManager.tintColor)
-                                        .frame(width: 7, height: 7)
-                                        .offset(x: 3, y: -3)
-                                }
-                            }
                     }
-                    .accessibilityLabel("Filter and sort")
                     .frame(maxWidth: .infinity)
                 } else if selectedDetailTab == .performers {
-                    Button {
+                    CatalogFilterFABButton(isActive: linkedPerformers.catalogFilterSortFABActive) {
                         HapticManager.light()
                         linkedPerformers.showFilterSortSheet = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(linkedPerformers.catalogFilterSortFABActive ? appearanceManager.tintColor : .primary)
-                            .overlay(alignment: .topTrailing) {
-                                if linkedPerformers.catalogFilterSortFABActive {
-                                    Circle()
-                                        .fill(appearanceManager.tintColor)
-                                        .frame(width: 7, height: 7)
-                                        .offset(x: 3, y: -3)
-                                }
-                            }
                     }
-                    .accessibilityLabel("Filter and sort")
                     .frame(maxWidth: .infinity)
                 } else if selectedDetailTab == .tags {
-                    Button {
+                    CatalogFilterFABButton(isActive: linkedTags.catalogFilterSortFABActive) {
                         HapticManager.light()
                         linkedTags.showFilterSortSheet = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(linkedTags.catalogFilterSortFABActive ? appearanceManager.tintColor : .primary)
-                            .overlay(alignment: .topTrailing) {
-                                if linkedTags.catalogFilterSortFABActive {
-                                    Circle()
-                                        .fill(appearanceManager.tintColor)
-                                        .frame(width: 7, height: 7)
-                                        .offset(x: 3, y: -3)
-                                }
-                            }
                     }
-                    .accessibilityLabel("Filter and sort")
                     .frame(maxWidth: .infinity)
                 } else if selectedDetailTab == .studios {
-                    Button {
+                    CatalogFilterFABButton(isActive: linkedChildStudios.catalogFilterSortFABActive) {
                         HapticManager.light()
                         linkedChildStudios.showFilterSortSheet = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(linkedChildStudios.catalogFilterSortFABActive ? appearanceManager.tintColor : .primary)
-                            .overlay(alignment: .topTrailing) {
-                                if linkedChildStudios.catalogFilterSortFABActive {
-                                    Circle()
-                                        .fill(appearanceManager.tintColor)
-                                        .frame(width: 7, height: 7)
-                                        .offset(x: 3, y: -3)
-                                }
-                            }
                     }
-                    .accessibilityLabel("Filter and sort")
                     .frame(maxWidth: .infinity)
                 } else if selectedDetailTab == .images {
-                    Button {
+                    CatalogFilterFABButton(isActive: linkedImages.catalogFilterSortFABActive) {
                         HapticManager.light()
                         linkedImages.showFilterSortSheet = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(linkedImages.catalogFilterSortFABActive ? appearanceManager.tintColor : .primary)
-                            .overlay(alignment: .topTrailing) {
-                                if linkedImages.catalogFilterSortFABActive {
-                                    Circle()
-                                        .fill(appearanceManager.tintColor)
-                                        .frame(width: 7, height: 7)
-                                        .offset(x: 3, y: -3)
-                                }
-                            }
                     }
-                    .accessibilityLabel("Filter and sort")
                     .frame(maxWidth: .infinity)
                 }
             }
@@ -969,29 +1002,14 @@ struct StudioDetailView: View {
     private func loadingView(message: String) -> some View {
         VStack {
             Spacer()
-            ProgressView(message)
+            InlineSpinner(label: message)
             Spacer()
-        }.frame(height: 200)
-    }
-    
-    private func emptyView(message: String, icon: String) -> some View {
-        VStack(spacing: 16) {
-            Image(systemName: icon)
-                .font(.system(size: 64))
-                .foregroundColor(.secondary)
-            Text(message)
-                .font(.title3)
-                .foregroundColor(.secondary)
-        }.padding(.top, 40)
-    }
-    
-    private func loadingIndicator(message: String) -> some View {
-        VStack(spacing: 8) {
-            ProgressView()
-            Text(message).font(.caption).foregroundColor(.secondary)
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 20)
+        .frame(height: 200)
+    }
+
+    private func loadingIndicator(message: String) -> some View {
+        PaginationLoadingFooter(message: message)
     }
     
     private func loadData() {
@@ -1086,6 +1104,101 @@ struct StudioDetailView: View {
             if viewModel.isLoadingDetailImages { ProgressView().padding() }
             else if viewModel.hasMoreDetailImages {
                 Color.clear.onAppear { linkedImages.refetchImages(viewModel: viewModel, initial: false) }
+            }
+        }
+    }
+}
+
+// MARK: - Edit Studio Sheet
+
+struct EditStudioSheet: View {
+    let studio: Studio
+    @ObservedObject var viewModel: StashDBViewModel
+    var onComplete: (Studio) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+
+    @State private var name: String = ""
+    @State private var url: String = ""
+    @State private var details: String = ""
+    @State private var ratingText: String = ""
+    @State private var isSaving = false
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section("Identity") {
+                    TextField("Name", text: $name)
+                    TextField("URL", text: $url)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.URL)
+                    TextField("Rating (0–100)", text: $ratingText)
+                        .keyboardType(.numberPad)
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+
+                Section("Description") {
+                    TextEditor(text: $details)
+                        .frame(minHeight: 120)
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+            }
+            .navigationTitle("Edit Studio")
+            .navigationBarTitleDisplayMode(.inline)
+            .applyAppBackground()
+            .scrollContentBackground(.hidden)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") { save() }
+                        .disabled(isSaving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .tint(appearanceManager.tintColor)
+                }
+            }
+            .onAppear {
+                name = studio.name
+                url = studio.url ?? ""
+                details = studio.details ?? ""
+                ratingText = studio.rating100.map(String.init) ?? ""
+            }
+        }
+    }
+
+    private func optionalTrimmed(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func save() {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+        let rating = Int(ratingText.trimmingCharacters(in: .whitespacesAndNewlines)).map { min(100, max(0, $0)) }
+
+        isSaving = true
+        viewModel.updateStudioDetails(
+            studioId: studio.id,
+            name: trimmedName,
+            url: optionalTrimmed(url),
+            details: optionalTrimmed(details),
+            rating100: rating
+        ) { success in
+            DispatchQueue.main.async {
+                isSaving = false
+                if success {
+                    var updated = studio
+                    updated.name = trimmedName
+                    updated.url = optionalTrimmed(url)
+                    updated.details = optionalTrimmed(details)
+                    updated.rating100 = rating
+                    onComplete(updated)
+                    ToastManager.shared.show("Studio updated", icon: "checkmark.circle", style: .success)
+                    dismiss()
+                } else {
+                    ToastManager.shared.show("Failed to update studio", icon: "exclamationmark.triangle", style: .error)
+                }
             }
         }
     }

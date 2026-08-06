@@ -367,6 +367,8 @@ private struct ScenesViewContent: View {
     @State private var showDeletePresetAlert = false
     @State private var presetNameInput = ""
     var hideTitle: Bool = false
+    /// Optional content scrolled with the scene grid (e.g. performer detail header — not sticky).
+    var scrollHeader: AnyView? = nil
     /// Detail (Performer/Studio/Tag/Group): nur einmal `performSearch` als „leere Liste + gespeicherte Filter fertig“-Fallback — sonst Endlosschleife, wenn `savedFilters` oft neu veröffentlicht wird.
     @State private var didRunEmptyListSavedFilterFallback = false
 
@@ -475,10 +477,6 @@ private struct ScenesViewContent: View {
     /// Chips, saved scene filter, or a preset row in the sheet — drives FAB tint/dot now that toolbar filter/sort are gone.
     private var liveFilterFABHasSomethingSet: Bool {
         isLiveFilterActive || selectedFilter != nil || !liveSheetPresetSelection.isEmpty
-    }
-
-    private var liveFilterBarButtonTint: Color {
-        liveFilterFABHasSomethingSet ? appearanceManager.tintColor : .primary
     }
 
     /// Same resolution as Settings › Default Sorting for Scenes, then session sort, when a filter has no valid embedded sort.
@@ -929,13 +927,15 @@ private struct ScenesViewContent: View {
         hideTitle: Bool = false,
         scope: ScenesListScope = .catalog,
         externalLiveFilterSheetBinding: Binding<Bool>? = nil,
-        showsFloatingFilterButton: Bool = true
+        showsFloatingFilterButton: Bool = true,
+        scrollHeader: AnyView? = nil
     ) {
         self.viewModel = viewModel
         self.scope = scope
         self.externalLiveFilterSheetBinding = externalLiveFilterSheetBinding
         self.showsFloatingFilterButton = showsFloatingFilterButton
         self.hideTitle = hideTitle
+        self.scrollHeader = scrollHeader
         let defaultSort: StashDBViewModel.SceneSortOption = {
             if let sort { return sort }
             switch scope {
@@ -953,18 +953,10 @@ private struct ScenesViewContent: View {
     }
 
 
-    @Environment(\.verticalSizeClass) var verticalSizeClass
-    
-    // Dynamische Spalten basierend auf adaptivem Grid
+    @ObservedObject private var tabManager = TabManager.shared
+
     private var columns: [GridItem] {
-        if verticalSizeClass == .compact {
-             return [
-                 GridItem(.flexible(), spacing: 12),
-                 GridItem(.flexible(), spacing: 12)
-             ]
-        } else {
-             return [GridItem(.adaptive(minimum: 300), spacing: 12)]
-        }
+        tabManager.catalogCardColumns(for: CatalogCardColumnScope.scenes).gridItems()
     }
 
     // Safe sort change function
@@ -1117,7 +1109,7 @@ private struct ScenesViewContent: View {
                 } else if primarySceneListIsEmpty && viewModel.errorMessage != nil {
                     ConnectionErrorView { performSearch() }
                 } else if primarySceneListIsEmpty {
-                    emptyStateView
+                    scenesEmptyContent
                 } else {
                     scenesGrid
                 }
@@ -1168,24 +1160,24 @@ private struct ScenesViewContent: View {
             catalogChrome: CatalogFloatingChromeState(hasActiveServerConfig: configManager.activeConfig != nil, primaryListIsEmpty: primarySceneListIsEmpty, errorMessage: viewModel.errorMessage)
         ) {
             HStack(spacing: 0) {
-                Spacer(minLength: 0)
-                Button(action: { liveFilterSheetPresented.wrappedValue = true }) {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(liveFilterBarButtonTint)
-                            .overlay(alignment: .topTrailing) {
-                            if liveFilterFABHasSomethingSet {
-                                    Circle()
-                                        .fill(appearanceManager.tintColor)
-                                        .frame(width: 7, height: 7)
-                                        .offset(x: 3, y: -3)
-                                }
-                            }
+                let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.scenes)
+                CatalogFABIconButton(
+                    systemImage: cardColumns.toggleIcon,
+                    accessibilityLabel: cardColumns.accessibilityLabel,
+                    accessibilityHint: "Switches between one and two cards per row"
+                ) {
+                    withAnimation(DesignTokens.Animation.quick) {
+                        tabManager.toggleCatalogCardColumns(for: CatalogCardColumnScope.scenes)
                     }
-                .accessibilityLabel("Filter and sort")
-                Spacer(minLength: 0)
                 }
+                .frame(maxWidth: .infinity)
+
+                CatalogFilterFABButton(isActive: liveFilterFABHasSomethingSet) {
+                    liveFilterSheetPresented.wrappedValue = true
+                }
+                .frame(maxWidth: .infinity)
             }
+        }
         .sheet(isPresented: liveFilterSheetPresented) {
             SceneLiveFilterSheet(
                 serverSceneFilters: sortedServerSceneFilters,
@@ -1450,35 +1442,65 @@ private struct ScenesViewContent: View {
         )
     }
 
+    @ViewBuilder
+    private var scenesEmptyContent: some View {
+        if let scrollHeader {
+            ScrollView {
+                VStack(spacing: 12) {
+                    scrollHeader
+                    emptyStateView
+                }
+                // Match PerformerDetail non-scene tabs (`.padding(16)`).
+                .padding(.top, 16)
+            }
+            .background(Color.appBackground)
+            .refreshable { performSearch() }
+        } else {
+            emptyStateView
+        }
+    }
+
     private var scenesGrid: some View {
             ScrollView {
-                LazyVGrid(columns: columns, spacing: 12) {
-                ForEach(primaryScenes) { scene in
-                        NavigationLink(destination: SceneDetailView(scene: scene)) {
-                            SceneCardView(scene: scene)
-                                .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                        .id(scene.id)
+                let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.scenes)
+                VStack(spacing: 12) {
+                    if let scrollHeader {
+                        scrollHeader
                     }
+                    LazyVGrid(columns: columns, spacing: 12) {
+                    ForEach(primaryScenes) { scene in
+                            NavigationLink(destination: SceneDetailView(scene: scene)) {
+                                SceneCardView(
+                                    scene: scene,
+                                    aspectRatio: cardColumns.cardAspectRatio
+                                )
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                            .id(scene.id)
+                        }
 
-                    // Loading indicator for pagination
-                if isLoadingMorePrimary {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                } else if hasMorePrimary && !primaryScenes.isEmpty {
-                        // Invisible element to trigger loading more scenes
-                        Color.clear
-                            .frame(height: 1)
-                            .onAppear {
-                            loadMorePrimary()
+                        // Loading indicator for pagination
+                    if isLoadingMorePrimary {
+                            ProgressView()
+                                .frame(maxWidth: .infinity)
+                                .padding()
+                    } else if hasMorePrimary && !primaryScenes.isEmpty {
+                            // Invisible element to trigger loading more scenes
+                            Color.clear
+                                .frame(height: 1)
+                                .onAppear {
+                                loadMorePrimary()
+                            }
                         }
                     }
+                    // Force cell rebuild — LazyVGrid otherwise keeps stale square/16:9 sizes.
+                    .id(cardColumns)
+                    .padding(.horizontal, 16)
+                    .padding(.top, scrollHeader == nil ? 16 : 0)
                 }
-                .padding(.horizontal, 16)
-                .padding(.top, 16)
-                .padding(.bottom, 80) // Add padding so bar doesn't cover content
+                // Match PerformerDetail non-scene tabs (`.padding(16)`).
+                .padding(.top, scrollHeader != nil ? 16 : 0)
             }
             .background(Color.appBackground)
             .refreshable { performSearch() }
@@ -1495,6 +1517,7 @@ struct ScenesView: View {
     let scope: ScenesListScope
     let externalLiveFilterSheetBinding: Binding<Bool>?
     let showsFloatingFilterButton: Bool
+    let scrollHeader: AnyView?
 
     init(
         sort: StashDBViewModel.SceneSortOption? = nil,
@@ -1503,7 +1526,8 @@ struct ScenesView: View {
         scope: ScenesListScope = .catalog,
         sharedViewModel: StashDBViewModel? = nil,
         externalLiveFilterSheetBinding: Binding<Bool>? = nil,
-        showsFloatingFilterButton: Bool? = nil
+        showsFloatingFilterButton: Bool? = nil,
+        scrollHeader: AnyView? = nil
     ) {
         self.sort = sort
         self.filter = filter
@@ -1512,6 +1536,7 @@ struct ScenesView: View {
         self.sharedViewModel = sharedViewModel
         self.externalLiveFilterSheetBinding = externalLiveFilterSheetBinding
         self.showsFloatingFilterButton = showsFloatingFilterButton ?? (externalLiveFilterSheetBinding == nil)
+        self.scrollHeader = scrollHeader
     }
 
     var body: some View {
@@ -1522,7 +1547,8 @@ struct ScenesView: View {
             hideTitle: hideTitle,
             scope: scope,
             externalLiveFilterSheetBinding: externalLiveFilterSheetBinding,
-            showsFloatingFilterButton: showsFloatingFilterButton
+            showsFloatingFilterButton: showsFloatingFilterButton,
+            scrollHeader: scrollHeader
         )
     }
 

@@ -253,6 +253,8 @@ class StashDBViewModel: ObservableObject {
     }
 
     private var performerImageUpdatedObserver: NSObjectProtocol?
+    private var imageRatingUpdatedObserver: NSObjectProtocol?
+    private var imageOCounterUpdatedObserver: NSObjectProtocol?
 
     init() {
         NotificationCenter.default.addObserver(self, selector: #selector(handleServerChange), name: NSNotification.Name("ServerConfigChanged"), object: nil)
@@ -262,10 +264,35 @@ class StashDBViewModel: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] notification in
-            guard let self,
-                  let performerId = notification.userInfo?["performerId"] as? String,
+            guard let performerId = notification.userInfo?["performerId"] as? String,
                   let newImagePath = notification.userInfo?["newImagePath"] as? String else { return }
-            self.patchPerformerImageInLists(performerId: performerId, newImagePath: newImagePath)
+            Task { @MainActor in
+                self?.patchPerformerImageInLists(performerId: performerId, newImagePath: newImagePath)
+            }
+        }
+
+        imageRatingUpdatedObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("ImageRatingUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let imageId = notification.userInfo?["imageId"] as? String else { return }
+            let rating100 = notification.userInfo?["rating100"] as? Int
+            Task { @MainActor in
+                self?.patchImageRatingInLists(imageId: imageId, rating100: rating100)
+            }
+        }
+
+        imageOCounterUpdatedObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("ImageOCounterUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let imageId = notification.userInfo?["imageId"] as? String,
+                  let oCounter = notification.userInfo?["oCounter"] as? Int else { return }
+            Task { @MainActor in
+                self?.patchImageOCounterInLists(imageId: imageId, oCounter: oCounter)
+            }
         }
         
         // Initial connection test if config exists
@@ -277,6 +304,12 @@ class StashDBViewModel: ObservableObject {
     deinit {
         if let performerImageUpdatedObserver {
             NotificationCenter.default.removeObserver(performerImageUpdatedObserver)
+        }
+        if let imageRatingUpdatedObserver {
+            NotificationCenter.default.removeObserver(imageRatingUpdatedObserver)
+        }
+        if let imageOCounterUpdatedObserver {
+            NotificationCenter.default.removeObserver(imageOCounterUpdatedObserver)
         }
         NotificationCenter.default.removeObserver(self)
     }
@@ -1343,6 +1376,34 @@ class StashDBViewModel: ObservableObject {
 
         clips.removeAll { $0.id == id }
         totalClips = max(0, totalClips - 1)
+    }
+
+    /// Live-listener: patch `rating100` across in-memory image lists (FullScreen / feed sync).
+    func patchImageRatingInLists(imageId: String, rating100: Int?) {
+        func patch(_ list: inout [StashImage]) -> Bool {
+            guard let idx = list.firstIndex(where: { $0.id == imageId }) else { return false }
+            guard list[idx].rating100 != rating100 else { return false }
+            list[idx] = list[idx].withRating(rating100)
+            return true
+        }
+        _ = patch(&allImages)
+        _ = patch(&galleryImages)
+        _ = patch(&detailImages)
+        _ = patch(&clips)
+    }
+
+    /// Live-listener: patch `o_counter` across in-memory image lists (FullScreen / feed sync).
+    func patchImageOCounterInLists(imageId: String, oCounter: Int) {
+        func patch(_ list: inout [StashImage]) -> Bool {
+            guard let idx = list.firstIndex(where: { $0.id == imageId }) else { return false }
+            guard list[idx].o_counter != oCounter else { return false }
+            list[idx] = list[idx].withOCounter(oCounter)
+            return true
+        }
+        _ = patch(&allImages)
+        _ = patch(&galleryImages)
+        _ = patch(&detailImages)
+        _ = patch(&clips)
     }
 
     /// Updates just the resume time of a scene in place
@@ -5750,6 +5811,35 @@ struct GenerateData: Codable {
             }
         }
     }
+
+    /// Updates tag metadata shown on the detail screen (edit mode).
+    func updateTagDetails(
+        tagId: String,
+        name: String,
+        description: String?,
+        completion: @escaping (Bool) -> Void
+    ) {
+        let mutation = """
+        mutation TagUpdate($input: TagUpdateInput!) {
+            tagUpdate(input: $input) { id name description }
+        }
+        """
+        var input: [String: Any] = [
+            "id": tagId,
+            "name": name
+        ]
+        input["description"] = description ?? NSNull()
+
+        let variables: [String: Any] = ["input": input]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false)
+            return
+        }
+        performGraphQLQuery(query: bodyString) { (response: TagUpdateResponse?) in
+            completion(response?.data?.tagUpdate != nil)
+        }
+    }
     
     func showScene(sceneId: String) {
         // Implement logic to show scene details or play it
@@ -5778,6 +5868,14 @@ struct GenerateData: Codable {
         
         performGraphQLQuery(query: bodyString) { (response: ImageUpdateResponse?) in
             if let _ = response?.data?.imageUpdate {
+                DispatchQueue.main.async {
+                    self.patchImageRatingInLists(imageId: imageId, rating100: rating100)
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("ImageRatingUpdated"),
+                        object: nil,
+                        userInfo: ["imageId": imageId, "rating100": rating100 as Any]
+                    )
+                }
                 completion(true)
             } else {
                 completion(false)
@@ -5800,6 +5898,12 @@ struct GenerateData: Codable {
                let count = data["imageIncrementO"] as? Int {
                 print("✅ IMAGE O: Success for image \(imageId). New count: \(count)")
                 DispatchQueue.main.async {
+                    self.patchImageOCounterInLists(imageId: imageId, oCounter: count)
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("ImageOCounterUpdated"),
+                        object: nil,
+                        userInfo: ["imageId": imageId, "oCounter": count]
+                    )
                     completion?(count)
                 }
             } else {
@@ -5833,6 +5937,16 @@ struct GenerateData: Codable {
         
         performGraphQLQuery(query: bodyString) { (response: ImageUpdateResponse?) in
             if let _ = response?.data?.imageUpdate {
+                DispatchQueue.main.async {
+                    if let oCounter {
+                        self.patchImageOCounterInLists(imageId: imageId, oCounter: oCounter)
+                        NotificationCenter.default.post(
+                            name: NSNotification.Name("ImageOCounterUpdated"),
+                            object: nil,
+                            userInfo: ["imageId": imageId, "oCounter": oCounter]
+                        )
+                    }
+                }
                 completion(true)
             } else {
                 completion(false)
@@ -6334,6 +6448,67 @@ struct GenerateData: Codable {
         }
     }
 
+    /// Updates performer metadata shown on the detail screen (edit mode).
+    func updatePerformerDetails(
+        performerId: String,
+        name: String,
+        disambiguation: String?,
+        birthdate: String?,
+        country: String?,
+        gender: String?,
+        ethnicity: String?,
+        height: Int?,
+        weight: Int?,
+        measurements: String?,
+        fakeTits: String?,
+        penisLength: Double?,
+        careerLength: String?,
+        tattoos: String?,
+        piercings: String?,
+        aliasList: [String]?,
+        rating100: Int?,
+        completion: @escaping (Bool) -> Void
+    ) {
+        let mutation = """
+        mutation PerformerUpdate($input: PerformerUpdateInput!) {
+            performerUpdate(input: $input) {
+                id name disambiguation birthdate country gender ethnicity
+                height_cm weight measurements fake_tits penis_length
+                career_length tattoos piercings alias_list rating100
+            }
+        }
+        """
+        var input: [String: Any] = [
+            "id": performerId,
+            "name": name
+        ]
+        input["disambiguation"] = disambiguation ?? NSNull()
+        input["birthdate"] = birthdate ?? NSNull()
+        input["country"] = country ?? NSNull()
+        input["gender"] = gender ?? NSNull()
+        input["ethnicity"] = ethnicity ?? NSNull()
+        input["height_cm"] = height ?? NSNull()
+        input["weight"] = weight ?? NSNull()
+        input["measurements"] = measurements ?? NSNull()
+        input["fake_tits"] = fakeTits ?? NSNull()
+        input["penis_length"] = penisLength ?? NSNull()
+        input["career_length"] = careerLength ?? NSNull()
+        input["tattoos"] = tattoos ?? NSNull()
+        input["piercings"] = piercings ?? NSNull()
+        input["alias_list"] = aliasList ?? NSNull()
+        input["rating100"] = rating100 ?? NSNull()
+
+        let variables: [String: Any] = ["input": input]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false)
+            return
+        }
+        performGraphQLQuery(query: bodyString) { (response: PerformerUpdateResponse?) in
+            completion(response?.data?.performerUpdate != nil)
+        }
+    }
+
     func toggleStudioFavorite(studioId: String, favorite: Bool, completion: @escaping (Bool) -> Void) {
         let mutation = """
         mutation StudioUpdate($input: StudioUpdateInput!) {
@@ -6360,6 +6535,103 @@ struct GenerateData: Codable {
             } else {
                 completion(false)
             }
+        }
+    }
+
+    /// Updates studio metadata shown on the detail screen (edit mode).
+    func updateStudioDetails(
+        studioId: String,
+        name: String,
+        url: String?,
+        details: String?,
+        rating100: Int?,
+        completion: @escaping (Bool) -> Void
+    ) {
+        let mutation = """
+        mutation StudioUpdate($input: StudioUpdateInput!) {
+            studioUpdate(input: $input) { id name url details rating100 }
+        }
+        """
+        var input: [String: Any] = [
+            "id": studioId,
+            "name": name
+        ]
+        input["url"] = url ?? NSNull()
+        input["details"] = details ?? NSNull()
+        input["rating100"] = rating100 ?? NSNull()
+
+        let variables: [String: Any] = ["input": input]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false)
+            return
+        }
+        performGraphQLQuery(query: bodyString) { (response: StudioUpdateResponse?) in
+            completion(response?.data?.studioUpdate != nil)
+        }
+    }
+
+    /// Updates group metadata shown on the detail screen (edit mode).
+    func updateGroupDetails(
+        groupId: String,
+        name: String,
+        date: String?,
+        synopsis: String?,
+        rating100: Int?,
+        completion: @escaping (Bool) -> Void
+    ) {
+        let mutation = """
+        mutation GroupUpdate($input: GroupUpdateInput!) {
+            groupUpdate(input: $input) { id name date synopsis rating100 }
+        }
+        """
+        var input: [String: Any] = [
+            "id": groupId,
+            "name": name
+        ]
+        input["date"] = date ?? NSNull()
+        input["synopsis"] = synopsis ?? NSNull()
+        input["rating100"] = rating100 ?? NSNull()
+
+        let variables: [String: Any] = ["input": input]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false)
+            return
+        }
+        performGraphQLQuery(query: bodyString) { (response: GroupUpdateResponse?) in
+            completion(response?.data?.groupUpdate != nil)
+        }
+    }
+
+    /// Updates gallery metadata shown on the opened-gallery screen (edit mode).
+    func updateGalleryDetails(
+        galleryId: String,
+        title: String,
+        date: String?,
+        details: String?,
+        completion: @escaping (Bool) -> Void
+    ) {
+        let mutation = """
+        mutation GalleryUpdate($input: GalleryUpdateInput!) {
+            galleryUpdate(input: $input) { id title date details }
+        }
+        """
+        var input: [String: Any] = [
+            "id": galleryId,
+            "title": title
+        ]
+        input["date"] = date ?? NSNull()
+        input["details"] = details ?? NSNull()
+
+        let variables: [String: Any] = ["input": input]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false)
+            return
+        }
+        performGraphQLQuery(query: bodyString) { (response: GalleryUpdateResponse?) in
+            completion(response?.data?.galleryUpdate != nil)
         }
     }
 }
@@ -6614,6 +6886,20 @@ struct StudioUpdateResponse: Codable {
 }
 struct StudioUpdateData: Codable {
     let studioUpdate: UpdatedItem?
+}
+
+struct GroupUpdateResponse: Codable {
+    let data: GroupUpdateData?
+}
+struct GroupUpdateData: Codable {
+    let groupUpdate: UpdatedItem?
+}
+
+struct GalleryUpdateResponse: Codable {
+    let data: GalleryUpdateData?
+}
+struct GalleryUpdateData: Codable {
+    let galleryUpdate: UpdatedItem?
 }
 
 struct VersionResponse: Codable {
@@ -7721,26 +8007,26 @@ struct Performer: Codable, Identifiable, Equatable {
     var sceneCountDisplay: Int { sceneCount }
     var details: String? { nil } // Performers don't have a large details text in the same way
     let id: String
-    let name: String
-    let disambiguation: String?
-    let birthdate: String?
-    let country: String?
+    var name: String
+    var disambiguation: String?
+    var birthdate: String?
+    var country: String?
     var imagePath: String?
     let sceneCount: Int
     let galleryCount: Int?
-    let gender: String?
-    let ethnicity: String?
-    let height: Int? // height_cm
-    let weight: Int?
-    let measurements: String?
-    let fakeTits: String?
-    let penis_length: Double?
-    let careerLength: String?
-    let tattoos: String?
-    let piercings: String?
-    let aliasList: [String]?
+    var gender: String?
+    var ethnicity: String?
+    var height: Int? // height_cm
+    var weight: Int?
+    var measurements: String?
+    var fakeTits: String?
+    var penis_length: Double?
+    var careerLength: String?
+    var tattoos: String?
+    var piercings: String?
+    var aliasList: [String]?
     let favorite: Bool?
-    let rating100: Int?
+    var rating100: Int?
     let createdAt: String?
     let updatedAt: String?
     let oCounter: Int?
@@ -7824,17 +8110,17 @@ struct FindStudiosResult: Codable {
 struct Studio: Codable, Identifiable, Equatable {
     var sceneCountDisplay: Int { sceneCount }
     let id: String
-    let name: String
-    let url: String?
+    var name: String
+    var url: String?
     let sceneCount: Int
     let performerCount: Int?
     let galleryCount: Int?
     /// From `image_count` on `Studio` (GraphQL); used for studio picker ordering and display.
     let imageCount: Int?
-    let details: String?
+    var details: String?
     let imagePath: String?
-    let favorite: Bool?
-    let rating100: Int?
+    var favorite: Bool?
+    var rating100: Int?
     let createdAt: String?
     let updatedAt: String?
     
@@ -7899,15 +8185,15 @@ struct Tag: Codable, Identifiable, Equatable {
     var details: String? { description }
     var rating100: Int? { nil }
     let id: String
-    let name: String
-    let description: String?
+    var name: String
+    var description: String?
     let imagePath: String?
     let sceneCount: Int?
     let imageCount: Int?
     let galleryCount: Int?
     let sceneMarkerCount: Int?
     let performerCount: Int?
-    let favorite: Bool?
+    var favorite: Bool?
     let createdAt: String?
     let updatedAt: String?
     
@@ -7966,12 +8252,12 @@ struct ImagesData: Codable {
 
 struct StashGroup: Codable, Identifiable, Equatable {
     let id: String
-    let name: String
-    let synopsis: String?
-    let date: String?
+    var name: String
+    var synopsis: String?
+    var date: String?
     let scene_count: Int?
     let gallery_count: Int?
-    let rating100: Int?
+    var rating100: Int?
     let updatedAt: String?
     let front_image_path: String?
     let back_image_path: String?
@@ -8042,9 +8328,9 @@ struct FindGalleriesResult: Codable {
 
 struct Gallery: Codable, Identifiable, Equatable {
     let id: String
-    let title: String
-    let date: String?
-    let details: String?
+    var title: String
+    var date: String?
+    var details: String?
     let imageCount: Int?
     let organized: Bool?
     let createdAt: String?
@@ -8114,14 +8400,18 @@ struct GalleryPerformer: Codable, Identifiable, Equatable, Hashable {
     }
 
     var thumbnailURL: URL? {
-        guard let path = image_path, !path.isEmpty,
-              let config = ServerConfigManager.shared.loadConfig() else { return nil }
-        let separator = path.contains("?") ? "&" : "?"
-        let sized = "\(path)\(separator)width=200"
-        if sized.starts(with: "http://") || sized.starts(with: "https://") {
-            return signedURL(URL(string: sized))
+        if let path = image_path, !path.isEmpty,
+           let config = ServerConfigManager.shared.loadConfig() {
+            let separator = path.contains("?") ? "&" : "?"
+            let sized = "\(path)\(separator)width=200"
+            if sized.starts(with: "http://") || sized.starts(with: "https://") {
+                return signedURL(URL(string: sized))
+            }
+            return signedURL(URL(string: config.baseURL + sized))
         }
-        return signedURL(URL(string: config.baseURL + sized))
+        // Fallback when GraphQL omitted image_path (same endpoint as ScenePerformer).
+        guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
+        return signedURL(URL(string: "\(config.baseURL)/performer/\(id)/image"))
     }
 
     func toScenePerformer() -> ScenePerformer {

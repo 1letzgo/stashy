@@ -59,53 +59,101 @@ struct SceneDetailView: View {
     @State private var isPreviewing = false
     @State private var isPressing = false
     @State private var hasInitializedDevices = false
-    
-    // Extracted toolbar content to reduce body complexity
-    @ToolbarContentBuilder
-    private var sceneToolbarContent: some ToolbarContent {
-        ToolbarItem(placement: .navigationBarTrailing) {
-            HStack(spacing: 16) {
-                // Download Button
-                if downloadManager.isDownloaded(id: activeScene.id) {
-                    Image(systemName: "checkmark.circle.fill")
-                        .foregroundColor(.green)
-                } else if let activeDownload = downloadManager.activeDownloads[activeScene.id] {
-                    ZStack {
-                        Circle()
-                            .stroke(appearanceManager.tintColor.opacity(0.3), lineWidth: 2.5)
-                        
-                        // If we have a total size > 0, show determinate progress
-                        if activeDownload.totalSize > 0 {
-                            Circle()
-                                .trim(from: 0, to: activeDownload.progress)
-                                .stroke(appearanceManager.tintColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                                .rotationEffect(.degrees(-90))
-                                .animation(.linear, value: activeDownload.progress)
-                        } else {
-                            // Indeterminate state: Show a rotating segment
-                            Circle()
-                                .trim(from: 0, to: 0.25)
-                                .stroke(appearanceManager.tintColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
-                                .rotationEffect(.degrees(isDownloading ? 360 : 0))
-                                .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: isDownloading)
-                                .onAppear { isDownloading = true }
-                        }
-                    }
-                    .frame(width: 18, height: 18)
-                } else {
-                    Button {
-                        downloadManager.downloadScene(activeScene)
-                    } label: {
-                        Image(systemName: "square.and.arrow.down")
-                    }
-                }
 
-            }
-        }
-    }
-
+    private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
 
     @Environment(\.verticalSizeClass) var verticalSizeClass
+
+    /// Custom top chrome: Back · Download.
+    @ViewBuilder
+    private var sceneDetailNavBar: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Button {
+                    dismiss()
+                } label: {
+                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        Text("Back")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                    .modifier(StashyChromePillStyle(height: chromePillHeight))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
+
+                Spacer(minLength: 8)
+
+                sceneDownloadNavButton
+            }
+            .frame(minHeight: chromePillHeight)
+            .padding(.horizontal, StashyExpandingDock.edgePadding)
+            .padding(.vertical, 8)
+
+            Divider().overlay(Color.white.opacity(0.15))
+        }
+        .background(.bar)
+        .colorScheme(.dark)
+    }
+
+    @ViewBuilder
+    private var sceneDownloadNavButton: some View {
+        if downloadManager.isDownloaded(id: activeScene.id) {
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                .foregroundColor(.green)
+                .frame(
+                    width: StashyExpandingDock.circleSize,
+                    height: StashyExpandingDock.circleSize
+                )
+                .accessibilityLabel("Downloaded")
+        } else if let activeDownload = downloadManager.activeDownloads[activeScene.id] {
+            ZStack {
+                Circle()
+                    .stroke(Color.white.opacity(0.25), lineWidth: 2.5)
+
+                if activeDownload.totalSize > 0 {
+                    Circle()
+                        .trim(from: 0, to: activeDownload.progress)
+                        .stroke(appearanceManager.tintColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                        .rotationEffect(.degrees(-90))
+                        .animation(.linear, value: activeDownload.progress)
+                } else {
+                    Circle()
+                        .trim(from: 0, to: 0.25)
+                        .stroke(appearanceManager.tintColor, style: StrokeStyle(lineWidth: 2.5, lineCap: .round))
+                        .rotationEffect(.degrees(isDownloading ? 360 : 0))
+                        .animation(.linear(duration: 1).repeatForever(autoreverses: false), value: isDownloading)
+                        .onAppear { isDownloading = true }
+                }
+            }
+            .frame(
+                width: StashyExpandingDock.circleSize,
+                height: StashyExpandingDock.circleSize
+            )
+            .accessibilityLabel("Downloading")
+        } else {
+            Button {
+                HapticManager.light()
+                downloadManager.downloadScene(activeScene)
+            } label: {
+                Image(systemName: "arrow.down.doc")
+                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                    .frame(
+                        width: StashyExpandingDock.circleSize,
+                        height: StashyExpandingDock.circleSize
+                    )
+                    .background(StashyExpandingDock.inactiveBackground)
+                    .clipShape(Capsule(style: .continuous))
+                    .contentShape(Capsule(style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Save scene")
+        }
+    }
 
     // Extracted main content to use modular components
     private var mainContentView: some View {
@@ -297,11 +345,12 @@ struct SceneDetailView: View {
 
     var body: some View {
         mainContentView
-            .background(Color.appBackground)
-            .navigationTitle(scene.title ?? "Scene")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { sceneToolbarContent }
-            .toolbar(.visible, for: .navigationBar)
+            .applyAppBackground()
+            .hideSystemNavigationBarForCustomChrome()
+            .enableSwipeBackWhenNavBarHidden()
+            .safeAreaInset(edge: .top, spacing: 0) {
+                sceneDetailNavBar
+            }
             .modifier(SceneDetailAlertModifier(
                 showDeleteConfirmation: $showDeleteWithFilesConfirmation,
                 showingAddMarkerSheet: $showingAddMarkerSheet,

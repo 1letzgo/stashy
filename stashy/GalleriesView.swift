@@ -13,7 +13,6 @@ import AVFoundation
 private struct GalleriesViewContent: View {
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var configManager = ServerConfigManager.shared
-    @ObservedObject private var appearance = AppearanceManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
     @State private var selectedSortOption: StashDBViewModel.GallerySortOption = StashDBViewModel.GallerySortOption(rawValue: TabManager.shared.getSortOption(for: .galleries) ?? "") ?? .dateDesc
     @State private var selectedFilter: StashDBViewModel.SavedFilter? = nil
@@ -325,7 +324,7 @@ private struct GalleriesViewContent: View {
     }
 
     private func handleGalleryCatalogPresetSelectionChange(_ newId: String) {
-        guard showFilterSortSheet else { return }
+        // Sheet picker and floating-bar filter Menu both drive this.
         if newId.isEmpty {
             selectedFilter = nil
             clearGalleryLiveChipsOnly()
@@ -350,21 +349,10 @@ private struct GalleriesViewContent: View {
         _selectedSortOption = State(initialValue: initialSort ?? savedSort ?? .dateDesc)
     }
     
-    // Grid Setup
-    @Environment(\.horizontalSizeClass) var horizontalSizeClass
-    
-    // Dynamische Spalten
+    @ObservedObject private var tabManager = TabManager.shared
+
     private var columns: [GridItem] {
-        if horizontalSizeClass == .regular {
-            // iPad: 4 columns
-            return Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
-        } else {
-            // iPhone: 2 columns
-            return [
-                GridItem(.flexible(), spacing: 12),
-                GridItem(.flexible(), spacing: 12)
-            ]
-        }
+        tabManager.catalogCardColumns(for: CatalogCardColumnScope.galleries).gridItems()
     }
 
     // Safe sort change function
@@ -428,182 +416,309 @@ private struct GalleriesViewContent: View {
     }
 
     @ViewBuilder
-    private var galleriesCoreChrome: some View {
-        Group {
-            if configManager.activeConfig == nil {
-                ConnectionErrorView { performSearch() }
-            } else if viewModel.isLoadingGalleries && viewModel.galleries.isEmpty {
-                StandardLoadingView(message: "Loading galleries...")
-            } else if viewModel.galleries.isEmpty && viewModel.errorMessage != nil {
-                ConnectionErrorView { performSearch() }
-            } else if viewModel.galleries.isEmpty {
-                SharedEmptyStateView(
-                    icon: "photo.stack",
-                    title: "No galleries found",
-                    buttonText: "Reload",
-                    onRetry: { performSearch() }
-                )
-            } else {
-                ScrollView {
-                    LazyVGrid(columns: columns, spacing: 12) {
-                        ForEach(viewModel.galleries) { gallery in
-                            NavigationLink(destination: ImagesView(gallery: gallery)) {
-                                GalleryCardView(gallery: gallery)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        
-                        // Loading Indicator / Infinite Scroll
-                        if viewModel.isLoadingGalleries {
-                            ProgressView()
-                                .padding()
-                        } else if viewModel.hasMoreGalleries {
-                            Color.clear
-                                .frame(height: 1)
-                                .onAppear {
-                                    viewModel.loadMoreGalleries(searchQuery: searchText)
-                                }
-                        }
+    private var galleriesPrimaryContent: some View {
+        if configManager.activeConfig == nil {
+            ConnectionErrorView { performSearch() }
+        } else if viewModel.isLoadingGalleries && viewModel.galleries.isEmpty {
+            StandardLoadingView(message: "Loading galleries...")
+        } else if viewModel.galleries.isEmpty && viewModel.errorMessage != nil {
+            ConnectionErrorView { performSearch() }
+        } else if viewModel.galleries.isEmpty {
+            SharedEmptyStateView(
+                icon: "photo.stack",
+                title: "No galleries found",
+                buttonText: "Reload",
+                onRetry: { performSearch() }
+            )
+        } else {
+            galleriesGridScroll
+        }
+    }
+
+    private var galleriesGridScroll: some View {
+        let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.galleries)
+        return ScrollView {
+            LazyVGrid(columns: columns, spacing: 12) {
+                ForEach(viewModel.galleries) { gallery in
+                    NavigationLink(destination: ImagesView(gallery: gallery)) {
+                        GalleryCardView(
+                            gallery: gallery,
+                            aspectRatio: cardColumns.cardAspectRatio
+                        )
                     }
-                    .padding(16)
+                    .buttonStyle(.plain)
                 }
-                .background(Color.appBackground)
-                .refreshable { performSearch() }
-            }
-        }
-        .navigationTitle(hideTitle ? "" : "Galleries")
-        .navigationBarTitleDisplayMode(.inline)
-        .applyAppBackground()
-        .conditionalSearchable(isVisible: isSearchVisible, text: $searchText, prompt: "Search galleries...")
-        .onChange(of: searchText) { oldValue, newValue in
-            // Debounce
-            NSObject.cancelPreviousPerformRequests(withTarget: self)
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-                if newValue == self.searchText {
-                    performSearch()
-                }
-            }
-        }
-        .toolbar {
-            if !searchText.isEmpty {
-                ToolbarItem(placement: .principal) {
-                    Button(action: {
-                        searchText = ""
-                        performSearch()
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 10, weight: .bold))
-                            Text(searchText)
-                                .font(.system(size: 12, weight: .bold))
-                                .lineLimit(1)
+
+                if viewModel.isLoadingGalleries {
+                    ProgressView()
+                        .padding()
+                } else if viewModel.hasMoreGalleries {
+                    Color.clear
+                        .frame(height: 1)
+                        .onAppear {
+                            viewModel.loadMoreGalleries(searchQuery: searchText)
                         }
-                        .foregroundColor(.white.opacity(0.9))
-                        .padding(Edge.Set.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                        .clipShape(Capsule())
-                    }
                 }
             }
-            
+            .id(cardColumns)
+            .padding(16)
         }
-        .floatingActionBar(isPresented: true, catalogChrome: CatalogFloatingChromeState(hasActiveServerConfig: configManager.activeConfig != nil, primaryListIsEmpty: viewModel.galleries.isEmpty, errorMessage: viewModel.errorMessage)) {
-            HStack(spacing: 0) {
-                Spacer(minLength: 0)
+        .background(Color.appBackground)
+        .refreshable { performSearch() }
+    }
+
+    private var galleriesFloatingBarChrome: CatalogFloatingChromeState {
+        CatalogFloatingChromeState(
+            hasActiveServerConfig: configManager.activeConfig != nil,
+            primaryListIsEmpty: viewModel.galleries.isEmpty,
+            errorMessage: viewModel.errorMessage
+        )
+    }
+
+    @ViewBuilder
+    private var galleriesFloatingBarContent: some View {
+        let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.galleries)
+        let filterMenuActive = selectedFilter != nil || !catalogPresetRowSelection.isEmpty
+        HStack(spacing: 0) {
+            CatalogFABIconButton(
+                systemImage: cardColumns.toggleIcon,
+                accessibilityLabel: cardColumns.accessibilityLabel,
+                accessibilityHint: "Switches between one and two cards per row"
+            ) {
+                withAnimation(DesignTokens.Animation.quick) {
+                    tabManager.toggleCatalogCardColumns(for: CatalogCardColumnScope.galleries)
+                }
+            }
+            .frame(maxWidth: .infinity)
+
+            Menu {
                 Button {
-                    showFilterSortSheet = true
+                    catalogPresetRowSelection = ""
                 } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(catalogFilterSortFABActive ? appearance.tintColor : .primary)
-                        .overlay(alignment: .topTrailing) {
-                            if catalogFilterSortFABActive {
-                                Circle()
-                                    .fill(appearance.tintColor)
-                                    .frame(width: 7, height: 7)
-                                    .offset(x: 3, y: -3)
+                    HStack {
+                        Text("No Filter")
+                        if catalogPresetRowSelection.isEmpty && selectedFilter == nil {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+
+                let serverFilters = sortedServerGalleryFilters
+                if !serverFilters.isEmpty {
+                    Section("Saved Filters") {
+                        ForEach(serverFilters) { filter in
+                            Button {
+                                catalogPresetRowSelection = ListLivePresetTag.serverRow(filter.id)
+                            } label: {
+                                HStack {
+                                    Text(filter.name)
+                                    if catalogPresetRowSelection == ListLivePresetTag.serverRow(filter.id)
+                                        || (catalogPresetRowSelection.isEmpty && selectedFilter?.id == filter.id) {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
                             }
                         }
+                    }
                 }
-                .accessibilityLabel("Filter and sort")
-                Spacer(minLength: 0)
+
+                if !localCatalogPresets.isEmpty {
+                    Section("Presets") {
+                        ForEach(localCatalogPresets) { preset in
+                            Button {
+                                catalogPresetRowSelection = ListLivePresetTag.localRow(preset.id)
+                            } label: {
+                                HStack {
+                                    Text(preset.name)
+                                    if catalogPresetRowSelection == ListLivePresetTag.localRow(preset.id) {
+                                        Image(systemName: "checkmark")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            } label: {
+                CatalogQuickFilterFABLabel(isActive: filterMenuActive)
             }
+            .frame(maxWidth: .infinity)
+            .accessibilityLabel("Filter")
+            .accessibilityHint("Chooses a saved filter or preset")
+
+            CatalogFilterFABButton(isActive: catalogFilterSortFABActive) {
+                showFilterSortSheet = true
+            }
+            .frame(maxWidth: .infinity)
         }
-        .onAppear {
-            // Apply default sort option
-            let defaultSortStr = TabManager.shared.getSortOption(for: .galleries) ?? "dateDesc"
-            if let defaultSort = StashDBViewModel.GallerySortOption(rawValue: defaultSortStr) {
-                 selectedSortOption = defaultSort
-                 viewModel.currentGallerySortOption = defaultSort
+    }
+
+    private var galleriesCoreChrome: some View {
+        galleriesPrimaryContent
+            .navigationTitle(hideTitle ? "" : "Galleries")
+            .navigationBarTitleDisplayMode(.inline)
+            .applyAppBackground()
+            .conditionalSearchable(isVisible: isSearchVisible, text: $searchText, prompt: "Search galleries...")
+            .onChange(of: searchText) { _, newValue in
+                NSObject.cancelPreviousPerformRequests(withTarget: self)
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+                    if newValue == self.searchText {
+                        performSearch()
+                    }
+                }
             }
-            
-            // Check for search text from navigation
-            if !coordinator.activeSearchText.isEmpty {
-                searchText = coordinator.activeSearchText
-                isSearchVisible = true
-                coordinator.activeSearchText = ""
+            .toolbar {
+                if !searchText.isEmpty {
+                    ToolbarItem(placement: .principal) {
+                        Button {
+                            searchText = ""
+                            performSearch()
+                        } label: {
+                            HStack(spacing: 4) {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 10, weight: .bold))
+                                Text(searchText)
+                                    .font(.system(size: 12, weight: .bold))
+                                    .lineLimit(1)
+                            }
+                            .foregroundColor(.white.opacity(0.9))
+                            .padding(Edge.Set.horizontal, 10)
+                            .padding(.vertical, 8)
+                            .background(Color.black.opacity(DesignTokens.Opacity.badge))
+                            .clipShape(Capsule())
+                        }
+                    }
+                }
+            }
+            .floatingActionBar(isPresented: true, catalogChrome: galleriesFloatingBarChrome) {
+                galleriesFloatingBarContent
+            }
+            .onAppear(perform: handleGalleriesAppear)
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
+                handleGalleriesDefaultFilterChanged(notification)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultSortChanged"))) { notification in
+                handleGalleriesDefaultSortChanged(notification)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+                selectedFilter = nil
+                catalogPresetRowSelection = ""
+                clearGalleryLiveChipsOnly()
+                refreshGalleryLocalPresets()
                 performSearch()
-                viewModel.fetchSavedFilters()
-                return
             }
-            
-            if TabManager.shared.getDefaultFilterId(for: .galleries) == nil || !viewModel.savedFilters.isEmpty {
-                if viewModel.galleries.isEmpty {
-                    performSearch()
+            .onChange(of: viewModel.savedFilters) { _, newValue in
+                handleGalleriesSavedFiltersChanged(newValue)
+            }
+            .onChange(of: viewModel.isLoadingSavedFilters) { oldValue, isLoading in
+                if oldValue == true && isLoading == false, !viewModel.isLoadingGalleries {
+                    if applyGalleriesDefaultFilterFromSettingsIfNeeded(force: false) {
+                        performSearch()
+                    } else if viewModel.galleries.isEmpty, selectedFilter == nil {
+                        performSearch()
+                    }
                 }
             }
-            viewModel.fetchSavedFilters()
+    }
+
+    private func syncGalleryLiveChipsFromSelectedFilter() {
+        guard let f = selectedFilter else {
+            clearGalleryLiveChipsOnly()
+            return
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
-            if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.galleries.rawValue {
-                if let defaultId = TabManager.shared.getDefaultFilterId(for: .galleries),
-                   let newFilter = viewModel.savedFilters[defaultId] {
-                    selectedFilter = newFilter
-                } else {
-                    selectedFilter = nil
-                }
-                performSearch()
+        if let meta = f.stashyCatalogPresetMetadata {
+            if CatalogLiveChipFilterSupport.gallerySavedFilterSupportsLiveEditor(
+                meta.baseSavedFilterId.flatMap { viewModel.savedFilters[$0] }
+            ) {
+                mapGalleryLiveFragmentToChips(meta.liveFragment)
+            } else {
+                clearGalleryLiveChipsOnly()
             }
+            return
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultSortChanged"))) { notification in
-            if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.galleries.rawValue {
-                let newSort = StashDBViewModel.GallerySortOption(rawValue: TabManager.shared.getPersistentSortOption(for: .galleries) ?? "") ?? .dateDesc
-                changeSortOption(to: newSort)
-            }
+        if CatalogLiveChipFilterSupport.gallerySavedFilterSupportsLiveEditor(f), let raw = f.filterDict {
+            mapGalleryLiveFragmentToChips(raw)
+        } else {
+            clearGalleryLiveChipsOnly()
         }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+    }
+
+    /// Applies Settings → Default Filters for Galleries. Returns `true` if selection changed.
+    @discardableResult
+    private func applyGalleriesDefaultFilterFromSettingsIfNeeded(force: Bool) -> Bool {
+        if !force, selectedFilter != nil { return false }
+
+        if let defaultId = TabManager.shared.getDefaultFilterId(for: .galleries),
+           let filter = viewModel.savedFilters[defaultId] {
+            let already =
+                selectedFilter?.id == filter.id
+                && catalogPresetRowSelection == ListLivePresetTag.serverRow(filter.id)
+            selectedFilter = filter
+            catalogPresetRowSelection = ListLivePresetTag.serverRow(filter.id)
+            syncGalleryLiveChipsFromSelectedFilter()
+            return force || !already
+        }
+
+        if force {
+            let hadSelection = selectedFilter != nil || !catalogPresetRowSelection.isEmpty
             selectedFilter = nil
             catalogPresetRowSelection = ""
             clearGalleryLiveChipsOnly()
-            refreshGalleryLocalPresets()
+            return hadSelection
+        }
+        return false
+    }
+
+    private func handleGalleriesAppear() {
+        var forceRefresh = false
+        if let injectedSortStr = coordinator.activeSortOption,
+           let injectedSort = StashDBViewModel.GallerySortOption(rawValue: injectedSortStr) {
+            selectedSortOption = injectedSort
+            viewModel.currentGallerySortOption = injectedSort
+            coordinator.activeSortOption = nil
+            forceRefresh = true
+        } else {
+            let defaultSortStr = TabManager.shared.getSortOption(for: .galleries) ?? "dateDesc"
+            if let defaultSort = StashDBViewModel.GallerySortOption(rawValue: defaultSortStr) {
+                selectedSortOption = defaultSort
+                viewModel.currentGallerySortOption = defaultSort
+            }
+        }
+
+        if !coordinator.activeSearchText.isEmpty {
+            searchText = coordinator.activeSearchText
+            isSearchVisible = true
+            coordinator.activeSearchText = ""
+            performSearch()
+            viewModel.fetchSavedFilters()
+            return
+        }
+
+        let appliedDefault = applyGalleriesDefaultFilterFromSettingsIfNeeded(force: false)
+        let defaultPending = TabManager.shared.getDefaultFilterId(for: .galleries) != nil && viewModel.savedFilters.isEmpty
+        if !defaultPending, (forceRefresh || appliedDefault || viewModel.galleries.isEmpty) {
             performSearch()
         }
-        .onChange(of: viewModel.savedFilters) { oldValue, newValue in
-            // Apply default filter if set and none selected yet
-            if selectedFilter == nil {
-                if let defaultId = TabManager.shared.getDefaultFilterId(for: .galleries),
-                   let filter = newValue[defaultId] {
-                    selectedFilter = filter
-                    // Only fetch if empty to avoid resetting scroll
-                    if viewModel.galleries.isEmpty {
-                        performSearch()
-                    }
-                } else if !viewModel.isLoadingSavedFilters {
-                    // Default filter was set but not found, or filters finished loading and none match
-                    // Only fetch if empty
-                    if viewModel.galleries.isEmpty {
-                        performSearch()
-                    }
-                }
-            }
-        }
-        .onChange(of: viewModel.isLoadingSavedFilters) { oldValue, isLoading in
-            if oldValue == true && isLoading == false {
-                if viewModel.galleries.isEmpty && !viewModel.isLoadingGalleries && selectedFilter == nil {
-                    performSearch()
-                }
-            }
+        viewModel.fetchSavedFilters()
+    }
+
+    private func handleGalleriesDefaultFilterChanged(_ notification: Notification) {
+        guard let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.galleries.rawValue else { return }
+        _ = applyGalleriesDefaultFilterFromSettingsIfNeeded(force: true)
+        performSearch()
+    }
+
+    private func handleGalleriesDefaultSortChanged(_ notification: Notification) {
+        guard let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.galleries.rawValue else { return }
+        let newSort = StashDBViewModel.GallerySortOption(rawValue: TabManager.shared.getPersistentSortOption(for: .galleries) ?? "") ?? .dateDesc
+        changeSortOption(to: newSort)
+    }
+
+    private func handleGalleriesSavedFiltersChanged(_ newValue: [String: StashDBViewModel.SavedFilter]) {
+        _ = newValue
+        if applyGalleriesDefaultFilterFromSettingsIfNeeded(force: false) {
+            performSearch()
+        } else if !viewModel.isLoadingSavedFilters, viewModel.galleries.isEmpty, selectedFilter == nil {
+            performSearch()
         }
     }
 
@@ -681,15 +796,16 @@ struct GalleriesView: View {
 
 struct GalleryCardView: View {
     let gallery: Gallery
+    var aspectRatio: CGFloat = 1
     @ObservedObject var appearanceManager = AppearanceManager.shared
     
     var body: some View {
         Color.clear
-            .aspectRatio(1, contentMode: .fit)
+            .aspectRatio(aspectRatio, contentMode: .fit)
             .overlay(
                 GeometryReader { geometry in
                     ZStack(alignment: .bottomLeading) {
-                        // Image (Strictly filling the square)
+                        // Image (fills the card bounds)
                         ZStack {
                             Color.gray.opacity(0.2)
 
@@ -724,17 +840,18 @@ struct GalleryCardView: View {
                         )
                         .frame(height: geometry.size.height * 0.4)
                         
-                        // Badges Overlay Layer
+                        // Badges Overlay Layer — fixed fonts like SceneCardView / ImageThumbnailCard
                         VStack {
                             HStack(alignment: .top) {
                                 // Studio Badge (Top Left)
                                 if let studio = gallery.studio {
                                     Text(studio.name)
-                                        .font(.system(size: 9, weight: .bold))
+                                        .font(.caption)
+                                        .fontWeight(.medium)
                                         .lineLimit(1)
                                         .foregroundColor(.white)
-                                        .padding(Edge.Set.horizontal, 6)
-                                        .padding(.vertical, 3)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
                                         .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                         .clipShape(Capsule())
                                 }
@@ -742,34 +859,34 @@ struct GalleryCardView: View {
                                 Spacer()
                                 
                                 if let count = gallery.imageCount, count > 0 {
-                                    HStack(spacing: 2) {
+                                    HStack(spacing: 4) {
                                         Image(systemName: "photo.stack")
-                                            .font(.system(size: 8, weight: .bold))
+                                            .font(.caption)
+                                            .fontWeight(.medium)
                                         Text("\(count)")
-                                            .font(.system(size: 9, weight: .bold))
+                                            .font(.caption)
+                                            .fontWeight(.medium)
                                     }
                                     .foregroundColor(.white)
-                                    .padding(.horizontal, 5)
-                                    .padding(.vertical, 3)
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 4)
                                     .background(Color.black.opacity(DesignTokens.Opacity.badge))
                                     .clipShape(Capsule())
                                 }
                             }
-                            .padding(6)
+                            .padding(8)
                             
                             Spacer()
                             
                             HStack(alignment: .bottom) {
-                                // Info Section (Bottom Left Title)
                                 Text(gallery.displayName)
-                                   .font(.system(size: geometry.size.width * 0.08, weight: .bold))
-                                   .foregroundColor(.white)
-                                   .lineLimit(1)
-                                   .shadow(radius: 2)
-                                
-                                Spacer()
+                                    .font(.headline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.white)
+                                    .lineLimit(2)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .padding(8)
+                            .padding(12)
                         }
                     }
                 }
@@ -778,6 +895,7 @@ struct GalleryCardView: View {
             .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
             .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)) // Ensure hit testing works on entire card
             .cardShadow()
+            .id(aspectRatio)
     }
 }
 
@@ -791,17 +909,20 @@ struct GalleryItemView: View {
     @Environment(\.verticalSizeClass) var verticalSizeClass
     @Binding var showUI: Bool
     @Binding var isZoomed: Bool
+    /// Live binding (like Feeds `currentVisibleSceneId`) so the time-observer sees the active page.
+    @Binding var currentVisibleId: String?
+    let fallbackActiveId: String
+    @Binding var isPlaying: Bool
+    let scrubberState: ScrubberState
     var onInteraction: () -> Void
 
     // Playback State
     @State private var player: AVPlayer?
-    @State private var isPlaying = true
-    @State private var currentTime: Double = 0.0
-    @State private var duration: Double = 1.0
-    @State private var isSeeking = false
     @State private var timeObserver: Any?
-    @State private var showRatingOverlay = false
-    @State private var showTagsOverlay = false
+
+    private var isActiveItem: Bool {
+        image.id == (currentVisibleId ?? fallbackActiveId)
+    }
 
     private var isAnimatedImage: Bool {
         let ext = image.fileExtension?.uppercased()
@@ -832,7 +953,7 @@ struct GalleryItemView: View {
                                     .resizable()
                                     .aspectRatio(contentMode: .fit)
                             } else if loader.isLoading {
-                                ProgressView().tint(.white)
+                                InlineSpinner(tint: .white)
                             } else {
                                 Image(systemName: "exclamationmark.triangle").foregroundColor(.white)
                             }
@@ -854,7 +975,7 @@ struct GalleryItemView: View {
                                         .resizable()
                                         .aspectRatio(contentMode: .fit)
                                 } else {
-                                    ProgressView().tint(.white)
+                                    InlineSpinner(tint: .white)
                                 }
                             }
                         }
@@ -895,175 +1016,10 @@ struct GalleryItemView: View {
     }
 
 
-    @ViewBuilder
-    private var bottomOverlay: some View {
-        VStack(spacing: 0) {
-            // Tags overlay (toggled by button)
-            if showTagsOverlay {
-                if let tags = image.tags, !tags.isEmpty {
-                    ScrollView(Axis.Set.horizontal, showsIndicators: false) {
-                        HStack(spacing: 8) {
-                            ForEach(tags) { tag in
-                                Text("#\(tag.name)")
-                                    .font(.system(size: 12, weight: .semibold))
-                                    .foregroundColor(.white)
-                                    .padding(Edge.Set.horizontal, 8)
-                                    .padding(.vertical, 4)
-                                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                                    .clipShape(Capsule())
-                                    .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
-                            }
-                        }
-                        .padding(Edge.Set.horizontal, 16)
-                    }
-                    .padding(Edge.Set.bottom, 5)
-                    .transition(AnyTransition.move(edge: Edge.bottom).combined(with: .opacity))
-                }
-            }
-            
-            // Rating overlay (expands upward)
-            if showRatingOverlay {
-                let rating = image.rating100 ?? 0
-                HStack {
-                    StarRatingView(
-                        rating100: rating,
-                        isInteractive: true,
-                        size: 28,
-                        spacing: 10,
-                        isVertical: false
-                    ) { newRating in
-                        if let index = images.firstIndex(where: { $0.id == image.id }) {
-                            images[index] = images[index].withRating(newRating)
-                            viewModel.updateImageRating(imageId: image.id, rating100: newRating) { _ in }
-                        }
-                        onInteraction()
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                showRatingOverlay = false
-                            }
-                        }
-                    }
-                }
-                .padding(.vertical, 10)
-                .padding(Edge.Set.horizontal, 16)
-                .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                .clipShape(Capsule())
-                .padding(Edge.Set.bottom, 8)
-                .transition(AnyTransition.move(edge: Edge.bottom).combined(with: .opacity))
-            }
-            
-
-                // Performer and Title labels
-            VStack(alignment: .leading, spacing: 4) {
-                performerLabel
-                titleLabel
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(Edge.Set.horizontal, 16)
-            .padding(Edge.Set.bottom, 8)
-
-            // Full-width progress bar
-            if image.isVideo {
-                CustomVideoScrubber(
-                    value: Binding(get: { currentTime }, set: { val in
-                        currentTime = val
-                        seek(to: val)
-                    }),
-                    total: duration,
-                    onEditingChanged: { editing in
-                        isSeeking = editing
-                        if editing {
-                            player?.pause()
-                        } else {
-                            if isPlaying { player?.play() }
-                            onInteraction()
-                        }
-                    }
-                )
-                .padding(Edge.Set.horizontal, 0)
-                .padding(Edge.Set.bottom, 15)
-            }
-            
-            // Bottom row: Action buttons
-            HStack(alignment: .center, spacing: 0) {
-                Spacer()
-                
-                // Tags button
-                if let tags = image.tags, !tags.isEmpty {
-                    BottomBarButton(icon: "tag.fill", count: tags.count) {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                            showTagsOverlay.toggle()
-                            showRatingOverlay = false
-                        }
-                        onInteraction()
-                    }
-                    Spacer()
-                }
-                
-                // Rating
-                let rating = image.rating100 ?? 0
-                BottomBarButton(icon: "star", count: rating > 0 ? (rating / 20) : 0) {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        showRatingOverlay.toggle()
-                        showTagsOverlay = false
-                    }
-                    onInteraction()
-                }
-                
-                Spacer()
-                
-                // O-Counter
-                BottomBarButton(icon: AppearanceManager.shared.oCounterIcon, count: image.o_counter ?? 0) {
-                    if let index = images.firstIndex(where: { $0.id == image.id }) {
-                        viewModel.incrementImageOCounter(imageId: image.id) { returnedCount in
-                            if let count = returnedCount {
-                                images[index] = images[index].withOCounter(count)
-                            }
-                        }
-                    }
-                    onInteraction()
-                }
-                
-                Spacer()
-                
-                // Video Controls (Mute & Play/Pause - only for videos)
-                if image.isVideo {
-                    // Mute
-                    BottomBarButton(
-                        icon: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                        count: 0,
-                        hideCount: true
-                    ) {
-                        isMuted.toggle()
-                        onInteraction()
-                    }
-                    
-                    Spacer()
-                    
-                    // Play/Pause
-                    BottomBarButton(
-                        icon: isPlaying ? "pause.fill" : "play.fill",
-                        count: 0,
-                        hideCount: true
-                    ) {
-                        isPlaying.toggle()
-                        if isPlaying { player?.play() }
-                        else { player?.pause() }
-                        onInteraction()
-                    }
-                    Spacer()
-                }
-            }
-            .padding(Edge.Set.horizontal, 16)
-            .frame(height: 50)
-        }
-        .padding(.bottom, 30)
-    }
-
     var body: some View {
-        ZStack(alignment: .bottom) {
+        ZStack {
             mediaLayer
-            
+
             // Center Play Icon (only for videos, not animations)
             if !isAnimatedImage && image.isVideo && !isPlaying && showUI {
                 CenterPlayButton {
@@ -1072,17 +1028,13 @@ struct GalleryItemView: View {
                     onInteraction()
                 }
             }
-            
-            if showUI {
-                bottomOverlay
-                    .transition(AnyTransition.move(edge: Edge.bottom).combined(with: .opacity))
-            }
         }
         .background(Color.black)
         .onAppear {
             if image.isVideo {
                 setupPlayer()
             }
+            applyActivePlaybackState()
         }
         .onDisappear {
             player?.pause()
@@ -1094,55 +1046,63 @@ struct GalleryItemView: View {
         .onChange(of: isMuted) { _, newValue in
             player?.isMuted = newValue
         }
-    }
-
-    @ViewBuilder
-    private var performerLabel: some View {
-        if let performers = image.performers, let firstPerf = performers.first {
-            let performerObj = Performer(
-                id: firstPerf.id, name: firstPerf.name, disambiguation: nil, birthdate: nil, country: nil, imagePath: nil, sceneCount: 0, galleryCount: nil, gender: nil, ethnicity: nil, height: nil, weight: nil, measurements: nil, fakeTits: nil, penis_length: nil, careerLength: nil, tattoos: nil, piercings: nil, aliasList: nil, favorite: nil, rating100: nil, createdAt: nil, updatedAt: nil, oCounter: nil
-            )
-            NavigationLink(destination: PerformerDetailView(performer: performerObj)) {
-                Text(firstPerf.name)
-                    .font(.system(size: 17, weight: .bold))
-                    .foregroundColor(.white)
-                    .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
-            }
-            .buttonStyle(.plain)
+        .onChange(of: currentVisibleId) { _, _ in
+            applyActivePlaybackState()
         }
-    }
-
-    @ViewBuilder
-    private var titleLabel: some View {
-        HStack(spacing: 6) {
-            if let title = image.title, !title.isEmpty {
-                Text(title)
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(.white.opacity(0.9))
-                    .lineLimit(1)
-                    .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
-            } else if let galleries = image.galleries, let gallery = galleries.first {
-                let galleryObj = Gallery(id: gallery.id, title: gallery.title ?? "Gallery", date: nil, details: nil, imageCount: nil, organized: nil, createdAt: nil, updatedAt: nil, studio: nil, performers: nil, cover: nil)
-
-                NavigationLink(destination: ImagesView(gallery: galleryObj)) {
-                    Text(gallery.title ?? "Unknown Gallery")
-                        .font(.system(size: 15, weight: .medium))
-                        .foregroundColor(.white.opacity(0.9))
-                        .lineLimit(1)
-                        .shadow(color: .black.opacity(0.5), radius: 2, x: 0, y: 1)
+        .onChange(of: isPlaying) { _, playing in
+            guard isActiveItem else { return }
+            if playing { player?.play() }
+            else { player?.pause() }
+        }
+        .onReceive(scrubberState.$seekTarget) { target in
+            guard let t = target, isActiveItem, player != nil else { return }
+            seek(to: t)
+            DispatchQueue.main.async {
+                if scrubberState.seekTarget != nil {
+                    scrubberState.seekTarget = nil
                 }
-                .buttonStyle(.plain)
+            }
+        }
+        .onReceive(scrubberState.$seeking) { seeking in
+            guard isActiveItem else { return }
+            if seeking {
+                player?.pause()
+            } else if isPlaying {
+                player?.play()
+                onInteraction()
             }
         }
     }
-    
+
     // MARK: - Player Setup (matches ReelItemView.initPlayer)
+
+    private func applyActivePlaybackState() {
+        guard isActiveItem else {
+            player?.pause()
+            return
+        }
+        if image.isVideo {
+            // Seed duration from metadata so the bar isn't stuck at 0/1 before the first tick.
+            if let metaDuration = image.visual_files?.first?.duration, metaDuration > 0 {
+                scrubberState.duration = metaDuration
+            }
+            if isPlaying { player?.play() }
+            else { player?.pause() }
+        } else {
+            scrubberState.time = 0
+            scrubberState.duration = 1
+            scrubberState.seeking = false
+            scrubberState.seekTarget = nil
+        }
+    }
 
     private func initPlayer(with streamURL: URL) {
         let headers = ["ApiKey": ServerConfigManager.shared.activeConfig?.secureApiKey ?? ""]
         let authenticatedURL = signedURL(streamURL) ?? streamURL
         let asset = AVURLAsset(url: authenticatedURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
         let newItem = AVPlayerItem(asset: asset)
+        let scrubber = scrubberState
+        let itemId = image.id
 
         if let existingPlayer = self.player {
             // Reuse existing player to prevent FullScreenVideoPlayer re-renders
@@ -1159,23 +1119,32 @@ struct GalleryItemView: View {
         guard let player = self.player else { return }
 
         player.isMuted = isMuted
-        if isPlaying { player.play() }
+        if isActiveItem, isPlaying { player.play() }
+
+        if let metaDuration = image.visual_files?.first?.duration, metaDuration > 0, isActiveItem {
+            scrubber.duration = metaDuration
+        }
 
         // Loop on end
         NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { _ in
             player.seek(to: .zero)
-            player.play()
+            if itemId == (self.currentVisibleId ?? self.fallbackActiveId) {
+                player.play()
+                self.isPlaying = true
+            }
         }
 
-        // Time observer
+        // Time observer — read visible id via Binding so paging updates stay live (Feeds pattern).
         let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak player] time in
             guard let player = player else { return }
-            if !self.isSeeking {
-                self.currentTime = time.seconds
+            let activeId = self.currentVisibleId ?? self.fallbackActiveId
+            guard itemId == activeId else { return }
+            if !scrubber.seeking {
+                scrubber.time = time.seconds
             }
             if let d = player.currentItem?.duration.seconds, d > 0, !d.isNaN {
-                self.duration = d
+                scrubber.duration = d
             }
         }
     }
@@ -1188,6 +1157,9 @@ struct GalleryItemView: View {
     private func seek(to time: Double) {
         let cmTime = CMTime(seconds: time, preferredTimescale: 600)
         player?.seek(to: cmTime)
+        if isActiveItem {
+            scrubberState.time = time
+        }
     }
 }
 // MARK: - Full Screen Image View (Feeds-style vertical paging)
@@ -1208,6 +1180,8 @@ struct FullScreenImageView: View {
     @State private var showingShare = false
     @State private var showingSetPerformerImagePicker = false
     @State private var performerImageTargetPerformers: [GalleryPerformer] = []
+    @State private var currentItemIsPlaying = true
+    @State private var scrubberState = ScrubberState()
 
     init(images: Binding<[StashImage]>, selectedImageId: String, onLoadMore: (() -> Void)? = nil) {
         self._images = images
@@ -1215,6 +1189,14 @@ struct FullScreenImageView: View {
         self.onLoadMore = onLoadMore
         self._currentVisibleId = State(initialValue: selectedImageId)
     }
+
+    private var activeImageId: String { currentVisibleId ?? selectedImageId }
+
+    private var currentImage: StashImage? {
+        images.first(where: { $0.id == activeImageId })
+    }
+
+    private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
 
     var body: some View {
         ScrollViewReader { proxy in
@@ -1231,6 +1213,10 @@ struct FullScreenImageView: View {
                                 images: $images,
                                 showUI: $showUI,
                                 isZoomed: $isMediaZoomed,
+                                currentVisibleId: $currentVisibleId,
+                                fallbackActiveId: selectedImageId,
+                                isPlaying: $currentItemIsPlaying,
+                                scrubberState: scrubberState,
                                 onInteraction: { }
                             )
                             .scrollDisabled(isMediaZoomed)
@@ -1251,19 +1237,36 @@ struct FullScreenImageView: View {
                 .scrollPosition(id: $currentVisibleId)
                 .scrollContentBackground(.hidden)
                 .background(Color.black)
-                .onScrollPhaseChange { oldPhase, newPhase in
-                    // Scrolling no longer affects UI visibility
-                }
-                .onChange(of: showUI) { _, newValue in
-                    // UI state changes are now purely manual
-                }
                 .ignoresSafeArea()
             }
             .background(Color.black.ignoresSafeArea())
             .ignoresSafeArea()
-            .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
-            .ignoresSafeArea()
+            .navigationBarHidden(true)
+            .navigationBarBackButtonHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
+            .enableSwipeBackWhenNavBarHidden()
+            .toolbar(showUI ? .automatic : .hidden, for: .tabBar)
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if showUI {
+                    fullScreenImageNavBar
+                        .transition(.opacity)
+                }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(spacing: 0) {
+                    feedsStyleInfoOverlay(currentImage: currentImage)
+                    feedsStyleScrubberBar(currentImage: currentImage)
+                }
+                .allowsHitTesting(showUI)
+            }
+            .animation(.easeInOut(duration: 0.2), value: showUI)
+            .onChange(of: activeImageId) { _, _ in
+                currentItemIsPlaying = true
+                scrubberState.time = 0
+                scrubberState.duration = 1
+                scrubberState.seeking = false
+                scrubberState.seekTarget = nil
+            }
             .onDisappear {
                 showUI = true
             }
@@ -1272,38 +1275,6 @@ struct FullScreenImageView: View {
                 try? await Task.sleep(for: .milliseconds(80))
                 currentVisibleId = selectedImageId
                 proxy.scrollTo(selectedImageId, anchor: .top)
-            }
-            .toolbarColorScheme(.dark, for: .navigationBar)
-            .toolbar(showUI ? .visible : .hidden, for: .navigationBar)
-            .toolbar(.hidden, for: .tabBar)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    HStack(spacing: 16) {
-                        Button {
-                            shareCurrentImage()
-                        } label: {
-                            Image(systemName: "square.and.arrow.up")
-                                .foregroundColor(appearanceManager.tintColor)
-                        }
-                        let targetId = currentVisibleId ?? selectedImageId
-                        if let currentImage = images.first(where: { $0.id == targetId }),
-                           let performers = currentImage.performers, !performers.isEmpty {
-                            Button {
-                                performerImageTargetPerformers = performers
-                                showingSetPerformerImagePicker = true
-                            } label: {
-                                Image(systemName: "person.crop.circle.badge.plus")
-                                    .foregroundColor(appearanceManager.tintColor)
-                            }
-                        }
-                        Button(role: .destructive) {
-                            showingDeleteConfirmation = true
-                        } label: {
-                            Image(systemName: "trash")
-                                .foregroundColor(appearanceManager.tintColor)
-                        }
-                    }
-                }
             }
             .sheet(isPresented: $showingShare) {
                 ShareSheet(items: shareItems)
@@ -1325,6 +1296,311 @@ struct FullScreenImageView: View {
                 }
             } message: {
                 Text("This image will be permanently deleted. This action cannot be undone.")
+            }
+        }
+    }
+
+    /// Matches `ReelsView.reelsInfoOverlay` 1:1 (thumbnail · name - title · tags · mute/play).
+    @ViewBuilder
+    private func feedsStyleInfoOverlay(currentImage: StashImage?) -> some View {
+        let isVideo = currentImage.map { $0.isVideo && !$0.isAnimated } ?? false
+        VStack(alignment: .leading, spacing: 0) {
+            if let image = currentImage {
+                HStack(alignment: .center, spacing: 10) {
+                    if let performer = image.performers?.first {
+                        NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer())) {
+                            feedsPerformerThumbnail(performer)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                        HStack(alignment: .firstTextBaseline, spacing: 6) {
+                            if let performer = image.performers?.first {
+                                NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer())) {
+                                    Text(performer.name)
+                                        .font(.system(size: 15, weight: .bold))
+                                        .foregroundColor(.white)
+                                }
+                                .buttonStyle(.plain)
+                                .layoutPriority(1)
+                                Text("-")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                            if let title = image.title, !title.isEmpty {
+                                Text(title)
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.85))
+                                    .lineLimit(1)
+                            } else if let gallery = image.galleries?.first {
+                                let galleryObj = Gallery(
+                                    id: gallery.id,
+                                    title: gallery.title ?? "Gallery",
+                                    date: nil, details: nil, imageCount: nil, organized: nil,
+                                    createdAt: nil, updatedAt: nil, studio: nil, performers: nil, cover: nil
+                                )
+                                NavigationLink(destination: ImagesView(gallery: galleryObj)) {
+                                    Text(gallery.title ?? "Unknown Gallery")
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.85))
+                                        .lineLimit(1)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+
+                        let tags = image.tags ?? []
+                        Group {
+                            if !tags.isEmpty {
+                                ScrollView(.horizontal, showsIndicators: false) {
+                                    HStack(spacing: 6) {
+                                        ForEach(tags) { tag in
+                                            Text("#\(tag.name)")
+                                                .font(.system(size: 11, weight: .semibold))
+                                                .foregroundColor(.white.opacity(0.8))
+                                                .padding(.horizontal, 8)
+                                                .padding(.vertical, 3)
+                                                .background(Color.black.opacity(0.3))
+                                                .clipShape(Capsule())
+                                                .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                                        }
+                                    }
+                                }
+                            } else {
+                                Color.clear.opacity(0)
+                            }
+                        }
+                        .frame(height: 20)
+                    }
+
+                    HStack(spacing: 8) {
+                        ChromeCircleButton(
+                            systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                            enabled: isVideo,
+                            accessibilityLabel: isMuted ? "Ton an" : "Stumm"
+                        ) {
+                            if isVideo { isMuted.toggle() }
+                        }
+
+                        ChromeCircleButton(
+                            systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
+                            enabled: isVideo,
+                            accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
+                        ) {
+                            if isVideo { currentItemIsPlaying.toggle() }
+                        }
+                    }
+                    .fixedSize()
+                }
+                .padding(.horizontal, StashyExpandingDock.edgePadding)
+            }
+        }
+        .padding(.bottom, 2)
+        .colorScheme(.dark)
+        .opacity(showUI ? 1 : 0)
+        .animation(.easeInOut(duration: 0.2), value: showUI)
+    }
+
+    /// Matches `ReelsView.reelsScrubberBar` / `IsolatedScrubberBar`.
+    @ViewBuilder
+    private func feedsStyleScrubberBar(currentImage: StashImage?) -> some View {
+        if let image = currentImage {
+            if image.isAnimated || !image.isVideo {
+                EmptyView()
+            } else {
+                IsolatedScrubberBar(state: scrubberState, isUIVisible: showUI)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func feedsPerformerThumbnail(_ performer: GalleryPerformer) -> some View {
+        let size: CGFloat = StashyExpandingDock.circleSize
+        Circle()
+            .fill(appearanceManager.tintColor.opacity(0.2))
+            .frame(width: size, height: size)
+            .overlay {
+                if let url = performer.thumbnailURL {
+                    CustomAsyncImage(url: url) { loader in
+                        if let img = loader.image {
+                            img.resizable().scaledToFill()
+                        } else {
+                            Image(systemName: "person.fill")
+                                .foregroundColor(.white.opacity(0.7))
+                        }
+                    }
+                } else {
+                    Image(systemName: "person.fill")
+                        .foregroundColor(.white.opacity(0.7))
+                }
+            }
+            .clipShape(Circle())
+            .overlay(Circle().stroke(appearanceManager.tintColor, lineWidth: 2))
+    }
+
+    @ViewBuilder
+    private var fullScreenImageNavBar: some View {
+        let image = currentImage
+        let oCounter = image?.o_counter ?? 0
+        let rating100 = image?.rating100 ?? 0
+        let stars = max(0, min(5, Int(round(Double(rating100) / 20.0))))
+        let performers = image?.performers ?? []
+
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Button {
+                    dismiss()
+                } label: {
+                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        Text("Back")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                    .modifier(StashyChromePillStyle(height: chromePillHeight))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
+
+                Spacer(minLength: 8)
+
+                HStack(spacing: 6) {
+                    Button {
+                        shareCurrentImage()
+                    } label: {
+                        Image(systemName: "square.and.arrow.up")
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                            .modifier(StashyChromePillStyle(height: chromePillHeight, iconOnly: true))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Share")
+
+                    if !performers.isEmpty {
+                        Button {
+                            performerImageTargetPerformers = performers
+                            showingSetPerformerImagePicker = true
+                        } label: {
+                            Image(systemName: "person.crop.circle.badge.plus")
+                                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                                .modifier(StashyChromePillStyle(height: chromePillHeight, iconOnly: true))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Set as performer image")
+                    }
+
+                    Button {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        Image(systemName: "trash")
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                            .modifier(StashyChromePillStyle(height: chromePillHeight, iconOnly: true))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Delete")
+
+                    Menu {
+                        Button {
+                            updateCurrentRating(0)
+                        } label: {
+                            HStack {
+                                Text("Clear Rating")
+                                if stars == 0 { Image(systemName: "checkmark") }
+                            }
+                        }
+                        Divider()
+                        ForEach(1...5, id: \.self) { s in
+                            Button {
+                                updateCurrentRating(s * 20)
+                            } label: {
+                                HStack {
+                                    Text(String(repeating: "★", count: s))
+                                    if stars == s { Image(systemName: "checkmark") }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                                .foregroundColor(.white.opacity(stars > 0 ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
+                            Text("\(stars)")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                        }
+                        .modifier(StashyChromePillStyle(height: chromePillHeight))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Rating")
+
+                    Button {
+                        incrementCurrentOCounter()
+                    } label: {
+                        HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                            Image(systemName: oCounter > 0 ? AppearanceManager.shared.oCounterIconFilled : AppearanceManager.shared.oCounterIcon)
+                                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                                .foregroundColor(oCounter > 0 ? appearanceManager.tintColor : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                            Text("\(oCounter)")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                        }
+                        .modifier(StashyChromePillStyle(height: chromePillHeight))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("O-Counter")
+                }
+                .layoutPriority(1)
+            }
+            .frame(height: chromePillHeight)
+            .padding(.horizontal, StashyExpandingDock.edgePadding)
+            .padding(.vertical, 6)
+
+            Divider().overlay(Color.white.opacity(0.15))
+        }
+        .background(.bar)
+        .colorScheme(.dark)
+    }
+
+    private func updateCurrentRating(_ newRating: Int) {
+        let targetId = currentVisibleId ?? selectedImageId
+        guard let index = images.firstIndex(where: { $0.id == targetId }) else { return }
+        let imageId = images[index].id
+        let original = images[index].rating100
+        let ratingValue: Int? = newRating > 0 ? newRating : nil
+        images[index] = images[index].withRating(ratingValue)
+        viewModel.updateImageRating(imageId: imageId, rating100: ratingValue) { success in
+            if !success {
+                DispatchQueue.main.async {
+                    if let revertIndex = images.firstIndex(where: { $0.id == imageId }) {
+                        images[revertIndex] = images[revertIndex].withRating(original)
+                    }
+                    ToastManager.shared.show("Failed to save rating", icon: "exclamationmark.triangle", style: .error)
+                }
+            }
+        }
+    }
+
+    private func incrementCurrentOCounter() {
+        let targetId = currentVisibleId ?? selectedImageId
+        guard let index = images.firstIndex(where: { $0.id == targetId }) else { return }
+        let imageId = images[index].id
+        let originalCount = images[index].o_counter ?? 0
+        let newCount = originalCount + 1
+        images[index] = images[index].withOCounter(newCount)
+        viewModel.incrementImageOCounter(imageId: imageId) { returnedCount in
+            DispatchQueue.main.async {
+                guard let revertIndex = images.firstIndex(where: { $0.id == imageId }) else { return }
+                if let count = returnedCount {
+                    images[revertIndex] = images[revertIndex].withOCounter(count)
+                } else {
+                    images[revertIndex] = images[revertIndex].withOCounter(originalCount)
+                    ToastManager.shared.show("Failed to update O-Counter", icon: "exclamationmark.triangle", style: .error)
+                }
             }
         }
     }

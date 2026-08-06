@@ -28,7 +28,7 @@ struct SettingsView: View {
 
     enum SettingsSection: String, CaseIterable, Identifiable {
         case main = "Main"
-        case playback = "Playback"
+        case actions = "Actions"
         case design = "Design"
         case devices = "Devices"
         
@@ -36,33 +36,39 @@ struct SettingsView: View {
         
         var icon: String {
             switch self {
-            case .main: return "gearshape"
-            case .playback: return "play.fill"
-            case .design: return "paintbrush"
-            case .devices: return "bolt.horizontal"
+            case .main: return "gearshape.fill"
+            case .actions: return "server.rack"
+            case .design: return "paintbrush.fill"
+            case .devices: return "bolt.horizontal.fill"
             }
         }
     }
 
     var body: some View {
-        Form {
-            switch selectedSection {
-            case .main:
-                mainSettings
-            case .playback:
-                playbackSettings
-            case .design:
-                designSettings
-            case .devices:
-                devicesSettings
+        Group {
+            if selectedSection == .actions {
+                ToolsServerView(embedded: true)
+            } else {
+                Form {
+                    switch selectedSection {
+                    case .main:
+                        mainSettings
+                    case .design:
+                        designSettings
+                    case .devices:
+                        devicesSettings
+                    case .actions:
+                        EmptyView()
+                    }
+                }
             }
         }
         .applyAppBackground()
         .navigationBarHidden(true)
         .safeAreaInset(edge: .top, spacing: 0) {
             VStack(spacing: 0) {
-                settingsTopRow
-                    .padding(.horizontal, 16)
+                SettingsCategoryRow(selection: $selectedSection)
+                    .padding(.horizontal, StashyExpandingDock.edgePadding)
                     .padding(.vertical, 6)
 
                 Divider().overlay(Color.white.opacity(0.15))
@@ -108,38 +114,6 @@ struct SettingsView: View {
         }
     }
 
-    private var settingsTopRow: some View {
-        HStack(spacing: 8) {
-            Text(selectedSection.rawValue)
-                .font(.system(size: 18, weight: .semibold))
-                .lineLimit(1)
-                .frame(width: 120, alignment: .leading)
-
-            Spacer()
-
-            HStack(spacing: 8) {
-                ForEach(SettingsSection.allCases) { section in
-                    let isActive = section == selectedSection
-                    Button(action: {
-                        withAnimation(DesignTokens.Animation.quick) { selectedSection = section }
-                    }) {
-                        Image(systemName: section.icon)
-                            .font(.system(size: 15, weight: .semibold))
-                            .foregroundColor(isActive ? .white : .primary)
-                            .frame(width: 44, height: 32)
-                            .background(
-                                RoundedRectangle(cornerRadius: 9)
-                                    .fill(isActive ? appearanceManager.tintColor : Color.clear)
-                            )
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(section.rawValue)
-                }
-            }
-        }
-        .frame(maxWidth: .infinity)
-    }
-
     // MARK: - Section Content
 
     @ViewBuilder
@@ -159,27 +133,17 @@ struct SettingsView: View {
             onScan: { startLibraryScan() }
         )
 
+        if configManager.activeConfig != nil {
+            PlaybackSettingsSection()
+        }
+
         tipSection
         aboutSection
     }
 
     @ViewBuilder
-    private var playbackSettings: some View {
-        // 2. Playback
-        if configManager.activeConfig != nil {
-            PlaybackSettingsSection()
-        } else {
-            Section {
-                Text("Playback settings require an active server.")
-                    .foregroundColor(.secondary)
-            }
-            .listRowBackground(Color.secondaryAppBackground)
-        }
-    }
-
-    @ViewBuilder
     private var designSettings: some View {
-        // 3. Design: Appearance, Securtity, Content & Tabs, Default Settings
+        // Design: Appearance, Security, Content & Tabs, Default Settings
         Section(header: Text("Appearance")) {
             NavigationLink(destination: AppearanceSettingsView()) {
                 Label("Appearance", systemImage: "paintbrush")

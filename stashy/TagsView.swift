@@ -431,22 +431,9 @@ private struct TagsViewContent: View {
         .floatingActionBar(isPresented: true, catalogChrome: CatalogFloatingChromeState(hasActiveServerConfig: configManager.activeConfig != nil, primaryListIsEmpty: viewModel.tags.isEmpty, errorMessage: viewModel.errorMessage)) {
             HStack(spacing: 0) {
                 Spacer(minLength: 0)
-                Button {
+                CatalogFilterFABButton(isActive: catalogFilterSortFABActive) {
                     showFilterSortSheet = true
-                } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(catalogFilterSortFABActive ? appearanceManager.tintColor : .primary)
-                        .overlay(alignment: .topTrailing) {
-                            if catalogFilterSortFABActive {
-                                Circle()
-                                    .fill(appearanceManager.tintColor)
-                                    .frame(width: 7, height: 7)
-                                    .offset(x: 3, y: -3)
-                            }
-                        }
                 }
-                .accessibilityLabel("Filter and sort")
                 Spacer(minLength: 0)
             }
         }
@@ -571,7 +558,6 @@ private struct TagsViewContent: View {
                     }
                 }
                 .padding(16)
-                .padding(.bottom, 70) // Leave space for floating bar
             }
             .refreshable { performSearch() }
             .onAppear {
@@ -667,21 +653,29 @@ struct TagCardView: View {
 }
 
 struct TagDetailView: View {
-    let selectedTag: Tag
+    @State private var selectedTag: Tag
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
     @ObservedObject var tabManager = TabManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @EnvironmentObject var coordinator: NavigationCoordinator
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.verticalSizeClass) var verticalSizeClass
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var tagLiveFilterSheetPresented = false
     @State private var isFavorite: Bool = false
     @State private var isUpdatingFavorite: Bool = false
     @State private var isHeaderExpanded = false
+    @State private var showingEditTagSheet = false
     @StateObject private var linkedStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
+
+    private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
+    private var navActionGroupSpacing: CGFloat { 7 }
+    private var showsFeedsNavButton: Bool {
+        tabManager.tabs.first(where: { $0.id == .reels })?.isVisible ?? true
+    }
     
     enum DetailTab: String, CaseIterable {
         case scenes = "Scenes"
@@ -689,11 +683,21 @@ struct TagDetailView: View {
         case studios = "Studios"
         case groups = "Groups"
         case images = "Images"
+
+        var icon: String {
+            switch self {
+            case .scenes: return "film"
+            case .galleries: return "photo.stack"
+            case .studios: return "building.2"
+            case .groups: return "rectangle.stack.fill"
+            case .images: return "photo"
+            }
+        }
     }
     @State private var selectedDetailTab: DetailTab
 
     init(selectedTag: Tag) {
-        self.selectedTag = selectedTag
+        _selectedTag = State(initialValue: selectedTag)
         let sc = selectedTag.sceneCount ?? 0
         let gal = selectedTag.galleryCount ?? 0
         let initialTab: DetailTab = sc > 0 ? .scenes : (gal > 0 ? .galleries : .scenes)
@@ -782,20 +786,159 @@ struct TagDetailView: View {
 
     @ViewBuilder
     private var tagScenesStack: some View {
-        VStack(spacing: 12) {
-            tagHeaderView
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-            ScenesView(
-                hideTitle: true,
-                scope: .tag(tagId: selectedTag.id),
-                sharedViewModel: viewModel,
-                externalLiveFilterSheetBinding: $tagLiveFilterSheetPresented,
-                showsFloatingFilterButton: false
+        ScenesView(
+            hideTitle: true,
+            scope: .tag(tagId: selectedTag.id),
+            sharedViewModel: viewModel,
+            externalLiveFilterSheetBinding: $tagLiveFilterSheetPresented,
+            showsFloatingFilterButton: false,
+            scrollHeader: AnyView(
+                tagHeaderView
+                    .padding(.horizontal, 16)
             )
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        }
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    /// Custom top chrome (Performer/Studio template): Back · section icons · Favorite · Edit.
+    @ViewBuilder
+    private var tagDetailNavBar: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Button {
+                    dismiss()
+                } label: {
+                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        Text("Back")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                    .modifier(StashyChromePillStyle(height: chromePillHeight))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
+
+                Spacer(minLength: 8)
+
+                if showTabSwitcher {
+                    HStack(spacing: 6) {
+                        ForEach(availableTabs, id: \.self) { tab in
+                            let isSelected = selectedDetailTab == tab
+                            Button {
+                                guard !isSelected else { return }
+                                HapticManager.light()
+                                withAnimation(StashyExpandingDock.selectionAnimation) {
+                                    selectedDetailTab = tab
+                                }
+                            } label: {
+                                Image(systemName: tab.icon)
+                                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                                    .foregroundColor(
+                                        isSelected
+                                            ? .white
+                                            : .white.opacity(StashyExpandingDock.inactiveIconOpacity)
+                                    )
+                                    .frame(
+                                        width: StashyExpandingDock.circleSize,
+                                        height: StashyExpandingDock.circleSize
+                                    )
+                                    .background {
+                                        Capsule(style: .continuous)
+                                            .fill(
+                                                isSelected
+                                                    ? appearanceManager.tintColor
+                                                    : StashyExpandingDock.inactiveBackground
+                                            )
+                                    }
+                                    .clipShape(Capsule(style: .continuous))
+                                    .contentShape(Capsule(style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(tab.rawValue)
+                            .accessibilityAddTraits(isSelected ? .isSelected : [])
+                        }
+                    }
+                }
+
+                if showTabSwitcher {
+                    Spacer()
+                        .frame(width: navActionGroupSpacing)
+                }
+
+                HStack(spacing: 6) {
+                    Button {
+                        toggleFavorite()
+                    } label: {
+                        Image(systemName: isFavorite ? "heart.fill" : "heart")
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                            .foregroundColor(
+                                isFavorite
+                                    ? .red
+                                    : .white.opacity(StashyExpandingDock.inactiveIconOpacity)
+                            )
+                            .frame(
+                                width: StashyExpandingDock.circleSize,
+                                height: StashyExpandingDock.circleSize
+                            )
+                            .background(StashyExpandingDock.inactiveBackground)
+                            .clipShape(Capsule(style: .continuous))
+                            .contentShape(Capsule(style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isUpdatingFavorite)
+                    .accessibilityLabel(isFavorite ? "Remove favorite" : "Add favorite")
+
+                    if appearanceManager.isEditModeEnabled {
+                        Button {
+                            HapticManager.light()
+                            showingEditTagSheet = true
+                        } label: {
+                            Image(systemName: "pencil")
+                                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                                .frame(
+                                    width: StashyExpandingDock.circleSize,
+                                    height: StashyExpandingDock.circleSize
+                                )
+                                .background(StashyExpandingDock.inactiveBackground)
+                                .clipShape(Capsule(style: .continuous))
+                                .contentShape(Capsule(style: .continuous))
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Edit tag")
+                    }
+                }
+            }
+            .frame(minHeight: chromePillHeight)
+            .padding(.horizontal, StashyExpandingDock.edgePadding)
+            .padding(.vertical, 8)
+
+            Divider().overlay(Color.white.opacity(0.15))
+        }
+        .background(.bar)
+        .colorScheme(.dark)
+    }
+
+    private func toggleFavorite() {
+        guard !isUpdatingFavorite else { return }
+        HapticManager.light()
+        isUpdatingFavorite = true
+        let newState = !isFavorite
+        withAnimation(DesignTokens.Animation.quick) { isFavorite = newState }
+
+        viewModel.toggleTagFavorite(tagId: selectedTag.id, favorite: newState) { success in
+            DispatchQueue.main.async {
+                if !success {
+                    isFavorite = !newState
+                    ToastManager.shared.show("Failed to update favorite", icon: "exclamationmark.triangle", style: .error)
+                } else {
+                    selectedTag.favorite = newState
+                }
+                isUpdatingFavorite = false
+            }
+        }
     }
 
     @ViewBuilder
@@ -809,11 +952,11 @@ struct TagDetailView: View {
                         galleryGrid
                     } else if viewModel.isLoadingTagGalleries {
                         VStack {
-                            ProgressView()
+                            InlineSpinner()
                             Text("Loading galleries...").font(.caption).foregroundColor(.secondary)
                         }.padding(.top, 40)
                     } else {
-                        Text("No galleries found").foregroundColor(.secondary).padding(.top, 40)
+                        InlineEmptyStateView(icon: "photo.on.rectangle", title: "No galleries found")
                     }
                 } else if selectedDetailTab == .studios {
                     studioGrid
@@ -943,139 +1086,44 @@ struct TagDetailView: View {
             }
         }
         .sceneLiveUpdates(using: viewModel)
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text(selectedTag.name)
-                    .font(.headline)
-                    .lineLimit(1)
-            }
-
-            ToolbarItem(placement: .navigationBarTrailing) {
-                if showTabSwitcher {
-                    Menu {
-                        ForEach(availableTabs, id: \.self) { tab in
-                            Button(action: {
-                                withAnimation(DesignTokens.Animation.quick) {
-                                    selectedDetailTab = tab
-                                }
-                            }) {
-                                HStack {
-                                    Text(tab.rawValue)
-                                    if selectedDetailTab == tab {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(selectedDetailTab.rawValue)
-                                .font(.system(size: 14, weight: .semibold))
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 8, weight: .bold))
-                        }
-                        .foregroundColor(appearanceManager.tintColor)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(appearanceManager.tintColor.opacity(0.1))
-                        .clipShape(Capsule())
-                    }
-                }
+        .hideSystemNavigationBarForCustomChrome()
+        .enableSwipeBackWhenNavBarHidden()
+        .safeAreaInset(edge: .top, spacing: 0) {
+            tagDetailNavBar
+        }
+        .sheet(isPresented: $showingEditTagSheet) {
+            EditTagSheet(tag: selectedTag, viewModel: viewModel) { updated in
+                selectedTag = updated
             }
         }
-        .floatingActionBar(isPresented: true, catalogChrome: catalogFloatingChromeForFooter) {
+        .floatingActionBar(
+            isPresented: selectedDetailTab != .groups,
+            catalogChrome: catalogFloatingChromeForFooter
+        ) {
             HStack(spacing: 0) {
-                Button {
-                    guard !isUpdatingFavorite else { return }
-                    HapticManager.light()
-                    isUpdatingFavorite = true
-                    let newState = !isFavorite
-                    withAnimation(DesignTokens.Animation.quick) { isFavorite = newState }
-
-                    viewModel.toggleTagFavorite(tagId: selectedTag.id, favorite: newState) { success in
-                        DispatchQueue.main.async {
-                            if !success {
-                                isFavorite = !newState
-                                ToastManager.shared.show("Failed to update favorite", icon: "exclamationmark.triangle", style: .error)
-                            }
-                            isUpdatingFavorite = false
-                        }
-                    }
-                } label: {
-                    Image(systemName: isFavorite ? "heart.fill" : "heart")
-                        .foregroundColor(isFavorite ? .red : appearanceManager.tintColor)
-                }
-                .frame(maxWidth: .infinity)
-
                 if selectedDetailTab == .scenes {
-                    Button {
+                    CatalogFilterFABButton(isActive: true) {
                         HapticManager.light()
                         tagLiveFilterSheetPresented = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(appearanceManager.tintColor)
                     }
-                    .accessibilityLabel("Filter and sort")
                     .frame(maxWidth: .infinity)
                 } else if selectedDetailTab == .galleries {
-                    Button {
+                    CatalogFilterFABButton(isActive: linkedGalleries.catalogFilterSortFABActive) {
                         HapticManager.light()
                         linkedGalleries.showFilterSortSheet = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(linkedGalleries.catalogFilterSortFABActive ? appearanceManager.tintColor : .primary)
-                            .overlay(alignment: .topTrailing) {
-                                if linkedGalleries.catalogFilterSortFABActive {
-                                    Circle()
-                                        .fill(appearanceManager.tintColor)
-                                        .frame(width: 7, height: 7)
-                                        .offset(x: 3, y: -3)
-                                }
-                            }
                     }
-                    .accessibilityLabel("Filter and sort")
                     .frame(maxWidth: .infinity)
                 } else if selectedDetailTab == .studios {
-                    Button {
+                    CatalogFilterFABButton(isActive: linkedStudios.catalogFilterSortFABActive) {
                         HapticManager.light()
                         linkedStudios.showFilterSortSheet = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(linkedStudios.catalogFilterSortFABActive ? appearanceManager.tintColor : .primary)
-                            .overlay(alignment: .topTrailing) {
-                                if linkedStudios.catalogFilterSortFABActive {
-                                    Circle()
-                                        .fill(appearanceManager.tintColor)
-                                        .frame(width: 7, height: 7)
-                                        .offset(x: 3, y: -3)
-                                }
-                            }
                     }
-                    .accessibilityLabel("Filter and sort")
                     .frame(maxWidth: .infinity)
                 } else if selectedDetailTab == .images {
-                    Button {
+                    CatalogFilterFABButton(isActive: linkedImages.catalogFilterSortFABActive) {
                         HapticManager.light()
                         linkedImages.showFilterSortSheet = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(linkedImages.catalogFilterSortFABActive ? appearanceManager.tintColor : .primary)
-                            .overlay(alignment: .topTrailing) {
-                                if linkedImages.catalogFilterSortFABActive {
-                                    Circle()
-                                        .fill(appearanceManager.tintColor)
-                                        .frame(width: 7, height: 7)
-                                        .offset(x: 3, y: -3)
-                                }
-                            }
                     }
-                    .accessibilityLabel("Filter and sort")
                     .frame(maxWidth: .infinity)
                 }
             }
@@ -1248,9 +1296,10 @@ struct TagDetailView: View {
             linkedGalleries.refetchGalleries(viewModel: viewModel, initial: true)
         }
         
-        // Update favorite status from server
+        // Refresh tag metadata / favorite from server
         viewModel.fetchTag(tagId: selectedTag.id) { updatedTag in
             if let tag = updatedTag {
+                self.selectedTag = tag
                 self.isFavorite = tag.favorite ?? false
             }
         }
@@ -1283,7 +1332,7 @@ struct TagDetailView: View {
             
             // Details Section
             VStack(alignment: .leading, spacing: 4) {
-                // Header: Name and Stats
+                // Header: Name and Feeds (Edit / Favorite live in the custom navbar)
                 HStack(alignment: .top, spacing: 8) {
                     Text(selectedTag.name)
                         .font(.title2)
@@ -1293,8 +1342,7 @@ struct TagDetailView: View {
                     
                     Spacer()
                     
-                    // Feeds Button (Top Right)
-                    if tabManager.tabs.first(where: { $0.id == .reels })?.isVisible ?? true {
+                    if showsFeedsNavButton {
                         Button(action: {
                             coordinator.navigateToReels(tags: [selectedTag], mode: nil)
                         }) {
@@ -1475,6 +1523,84 @@ struct TagDetailView: View {
     
 }
 
+// MARK: - Edit Tag Sheet
+
+struct EditTagSheet: View {
+    let tag: Tag
+    @ObservedObject var viewModel: StashDBViewModel
+    var onComplete: (Tag) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+
+    @State private var name: String = ""
+    @State private var descriptionText: String = ""
+    @State private var isSaving = false
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section("Identity") {
+                    TextField("Name", text: $name)
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+
+                Section("Description") {
+                    TextEditor(text: $descriptionText)
+                        .frame(minHeight: 120)
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+            }
+            .navigationTitle("Edit Tag")
+            .navigationBarTitleDisplayMode(.inline)
+            .applyAppBackground()
+            .scrollContentBackground(.hidden)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") { save() }
+                        .disabled(isSaving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .tint(appearanceManager.tintColor)
+                }
+            }
+            .onAppear {
+                name = tag.name
+                descriptionText = tag.description ?? ""
+            }
+        }
+    }
+
+    private func save() {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+        let trimmedDescription = descriptionText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let descriptionValue: String? = trimmedDescription.isEmpty ? nil : trimmedDescription
+
+        isSaving = true
+        viewModel.updateTagDetails(
+            tagId: tag.id,
+            name: trimmedName,
+            description: descriptionValue
+        ) { success in
+            DispatchQueue.main.async {
+                isSaving = false
+                if success {
+                    var updated = tag
+                    updated.name = trimmedName
+                    updated.description = descriptionValue
+                    onComplete(updated)
+                    ToastManager.shared.show("Tag updated", icon: "checkmark.circle", style: .success)
+                    dismiss()
+                } else {
+                    ToastManager.shared.show("Failed to update tag", icon: "exclamationmark.triangle", style: .error)
+                }
+            }
+        }
+    }
+}
+
 struct TagImageView: View {
     let tag: Tag
     @ObservedObject var appearanceManager = AppearanceManager.shared
@@ -1497,7 +1623,7 @@ struct TagImageView: View {
             if loader.isLoading {
                 Rectangle()
                     .fill(appearanceManager.tintColor)
-                    .overlay(ProgressView().tint(.white))
+                    .overlay(InlineSpinner(tint: .white))
             } else if let image = loader.image {
                 image
                     .resizable()

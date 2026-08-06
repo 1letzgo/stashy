@@ -79,7 +79,7 @@ struct HomeStatisticsRowView: View {
             StatCard(title: "Tags", value: formatCount(stats.tagCount), icon: "tag", color: tabManager.useColoredStatistics ? .pink : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToTags() }
         case .groups:
-            StatCard(title: "Groups", value: formatCount(stats.movieCount), icon: "rectangle.stack.fill", color: tabManager.useColoredStatistics ? Color(red: 0.1, green: 0.7, blue: 0.9) : appearanceManager.tintColor)
+            StatCard(title: "Groups", value: formatCount(stats.groupCount), icon: "rectangle.stack.fill", color: tabManager.useColoredStatistics ? Color(red: 0.1, green: 0.7, blue: 0.9) : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToGroups() }
         case .markers:
             StatCard(title: "Markers", value: formatCount(stats.sceneMarkerCount ?? 0), icon: "bookmark.fill", color: tabManager.useColoredStatistics ? .red : appearanceManager.tintColor)
@@ -111,7 +111,7 @@ struct HomeStatisticsRowView: View {
             compactStatRow(title: "Tags", value: formatCount(stats.tagCount), icon: "tag", color: tabManager.useColoredStatistics ? .pink : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToTags() }
         case .groups:
-            compactStatRow(title: "Groups", value: formatCount(stats.movieCount), icon: "rectangle.stack.fill", color: tabManager.useColoredStatistics ? Color(red: 0.1, green: 0.7, blue: 0.9) : appearanceManager.tintColor)
+            compactStatRow(title: "Groups", value: formatCount(stats.groupCount), icon: "rectangle.stack.fill", color: tabManager.useColoredStatistics ? Color(red: 0.1, green: 0.7, blue: 0.9) : appearanceManager.tintColor)
                 .onTapGesture { coordinator.navigateToGroups() }
         case .markers:
             compactStatRow(title: "Markers", value: formatCount(stats.sceneMarkerCount ?? 0), icon: "bookmark.fill", color: tabManager.useColoredStatistics ? .red : appearanceManager.tintColor)

@@ -27,15 +27,30 @@ struct CatalogsView: View {
         
         var icon: String {
             switch self {
-            case .dashboard: return "chart.bar.fill"
+            case .dashboard: return "house.fill"
             case .scenes: return "film"
             case .images: return "photo"
             case .galleries: return "photo.stack"
-            case .performers: return "person.3"
+            case .performers: return "person.fill"
             case .studios: return "building.2"
             case .tags: return "tag"
             case .groups: return "rectangle.stack.fill"
             case .markers: return "bookmark.fill"
+            }
+        }
+
+        static func from(appTab: AppTab) -> CatalogsTab? {
+            switch appTab {
+            case .dashboard: return .dashboard
+            case .scenes: return .scenes
+            case .galleries: return .galleries
+            case .images: return .images
+            case .performers: return .performers
+            case .studios: return .studios
+            case .tags: return .tags
+            case .groups: return .groups
+            case .markers: return .markers
+            default: return nil
             }
         }
     }
@@ -66,11 +81,11 @@ struct CatalogsView: View {
             set: { coordinator.catalogueSubTab = $0.rawValue }
         )
     }
-    
+
     private var showTabSwitcher: Bool {
         sortedVisibleTabs.count > 1
     }
-    
+
     private var effectiveTab: CatalogsTab? {
         let visible = sortedVisibleTabs
         
@@ -81,10 +96,6 @@ struct CatalogsView: View {
         
         // Otherwise fallback to the first visible one (respecting sortOrder)
         return visible.first
-    }
-    
-    private var effectiveTabRaw: String {
-        coordinator.catalogueSubTab
     }
     
     var body: some View {
@@ -123,11 +134,13 @@ struct CatalogsView: View {
             }
         }
         .navigationBarHidden(true)
+        // Swipe-back can desync UIKit/SwiftUI stacks; menu switches must always clear details.
+        .popNavigationToRootOnChange(coordinator.catalogueSubTab)
         .safeAreaInset(edge: .top, spacing: 0) {
             if showTabSwitcher {
                 VStack(spacing: 0) {
                     CatalogCategoryRow(tabs: sortedVisibleTabs, selection: selectedTabBinding)
-                        .padding(.horizontal, 16)
+                        .padding(.horizontal, StashyExpandingDock.edgePadding)
                         .padding(.vertical, 6)
 
                     Divider().overlay(Color.white.opacity(0.15))
@@ -324,8 +337,8 @@ private struct GroupsViewContent: View {
                         }
                     } label: {
                         Image(systemName: "arrow.up.arrow.down")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(appearanceManager.tintColor)
+                            .font(.system(size: DesignTokens.Chrome.fabIconSize, weight: .semibold))
+                            .foregroundColor(.primary)
                     }
                     .frame(maxWidth: .infinity)
 
@@ -357,9 +370,7 @@ private struct GroupsViewContent: View {
                             }
                         }
                     } label: {
-                        Image(systemName: "line.3.horizontal.decrease")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(selectedFilter != nil ? appearanceManager.tintColor : .primary)
+                        CatalogQuickFilterFABLabel(isActive: selectedFilter != nil)
                     }
                     .frame(maxWidth: .infinity)
             }
@@ -450,7 +461,7 @@ private struct GroupsViewContent: View {
                         NavigationLink(destination: GroupDetailView(selectedGroup: group)) {
                             GroupCardView(group: group)
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .buttonStyle(.plain)
                         .id(group.id)
                         .simultaneousGesture(TapGesture().onEnded {
                             lastOpenedGroupId = group.id
@@ -591,18 +602,24 @@ struct GroupCardView: View {
 }
 
 struct GroupDetailView: View {
-    let selectedGroup: StashGroup
+    @State private var selectedGroup: StashGroup
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @EnvironmentObject var coordinator: NavigationCoordinator
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var groupLiveFilterSheetPresented = false
+    @State private var isHeaderExpanded = false
+    @State private var showingEditGroupSheet = false
     @StateObject private var linkedPerformers: DetailLinkedPerformersFilterModel
     @StateObject private var linkedTags: DetailLinkedTagsFilterModel
     @StateObject private var linkedStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
+
+    private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
+    private var navActionGroupSpacing: CGFloat { 7 }
     
     enum DetailTab: String, CaseIterable {
         case scenes = "Scenes"
@@ -611,11 +628,22 @@ struct GroupDetailView: View {
         case studios = "Studios"
         case tags = "Tags"
         case images = "Images"
+
+        var icon: String {
+            switch self {
+            case .scenes: return "film"
+            case .galleries: return "photo.stack"
+            case .performers: return "person.fill"
+            case .studios: return "building.2"
+            case .tags: return "tag"
+            case .images: return "photo"
+            }
+        }
     }
     @State private var selectedDetailTab: DetailTab
 
     init(selectedGroup: StashGroup) {
-        self.selectedGroup = selectedGroup
+        _selectedGroup = State(initialValue: selectedGroup)
         let sc = selectedGroup.scene_count ?? 0
         let gal = selectedGroup.gallery_count ?? 0
         _selectedDetailTab = State(initialValue: sc > 0 ? .scenes : (gal > 0 ? .galleries : .scenes))
@@ -682,20 +710,113 @@ struct GroupDetailView: View {
 
     @ViewBuilder
     private var groupScenesStack: some View {
-        VStack(spacing: 12) {
-            headerView
-                .padding(.horizontal, 16)
-                .padding(.top, 8)
-            ScenesView(
-                hideTitle: true,
-                scope: .group(groupId: selectedGroup.id),
-                sharedViewModel: viewModel,
-                externalLiveFilterSheetBinding: $groupLiveFilterSheetPresented,
-                showsFloatingFilterButton: false
-            )
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        }
+        ScenesView(
+            hideTitle: true,
+            scope: .group(groupId: selectedGroup.id),
+            sharedViewModel: viewModel,
+            externalLiveFilterSheetBinding: $groupLiveFilterSheetPresented,
+            showsFloatingFilterButton: false,
+            scrollHeader: AnyView(headerView)
+        )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    /// Custom top chrome (Performer/Studio template): Back · section icons · Edit.
+    /// Groups have no favorite field in the Stash API.
+    @ViewBuilder
+    private var groupDetailNavBar: some View {
+        VStack(spacing: 0) {
+            HStack(spacing: 8) {
+                Button {
+                    dismiss()
+                } label: {
+                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        Text("Back")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                    .modifier(StashyChromePillStyle(height: chromePillHeight))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
+
+                Spacer(minLength: 8)
+
+                if showTabSwitcher {
+                    HStack(spacing: 6) {
+                        ForEach(availableTabs, id: \.self) { tab in
+                            let isSelected = selectedDetailTab == tab
+                            Button {
+                                guard !isSelected else { return }
+                                HapticManager.light()
+                                withAnimation(StashyExpandingDock.selectionAnimation) {
+                                    selectedDetailTab = tab
+                                }
+                            } label: {
+                                Image(systemName: tab.icon)
+                                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                                    .foregroundColor(
+                                        isSelected
+                                            ? .white
+                                            : .white.opacity(StashyExpandingDock.inactiveIconOpacity)
+                                    )
+                                    .frame(
+                                        width: StashyExpandingDock.circleSize,
+                                        height: StashyExpandingDock.circleSize
+                                    )
+                                    .background {
+                                        Capsule(style: .continuous)
+                                            .fill(
+                                                isSelected
+                                                    ? appearanceManager.tintColor
+                                                    : StashyExpandingDock.inactiveBackground
+                                            )
+                                    }
+                                    .clipShape(Capsule(style: .continuous))
+                                    .contentShape(Capsule(style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(tab.rawValue)
+                            .accessibilityAddTraits(isSelected ? .isSelected : [])
+                        }
+                    }
+                }
+
+                if appearanceManager.isEditModeEnabled {
+                    if showTabSwitcher {
+                        Spacer()
+                            .frame(width: navActionGroupSpacing)
+                    }
+
+                    Button {
+                        HapticManager.light()
+                        showingEditGroupSheet = true
+                    } label: {
+                        Image(systemName: "pencil")
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                            .frame(
+                                width: StashyExpandingDock.circleSize,
+                                height: StashyExpandingDock.circleSize
+                            )
+                            .background(StashyExpandingDock.inactiveBackground)
+                            .clipShape(Capsule(style: .continuous))
+                            .contentShape(Capsule(style: .continuous))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Edit group")
+                }
+            }
+            .frame(minHeight: chromePillHeight)
+            .padding(.horizontal, StashyExpandingDock.edgePadding)
+            .padding(.vertical, 8)
+
+            Divider().overlay(Color.white.opacity(0.15))
+        }
+        .background(.bar)
+        .colorScheme(.dark)
     }
 
     @ViewBuilder
@@ -709,11 +830,11 @@ struct GroupDetailView: View {
                         galleryGrid
                     } else if viewModel.isLoadingGroupGalleries {
                         VStack {
-                            ProgressView()
+                            InlineSpinner()
                             Text("Loading galleries...").font(.caption).foregroundColor(.secondary)
                         }.padding(.top, 40)
                     } else {
-                        Text("No galleries found").foregroundColor(.secondary).padding(.top, 40)
+                        InlineEmptyStateView(icon: "photo.on.rectangle", title: "No galleries found")
                     }
                 } else if selectedDetailTab == .performers {
                     performerGrid
@@ -887,156 +1008,55 @@ struct GroupDetailView: View {
                 nonScenesGroupScroll
             }
         }
-        .background(Color.appBackground)
-        .navigationTitle("")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar {
-            ToolbarItem(placement: .principal) {
-                Text(selectedGroup.name)
-                    .font(.headline)
-                    .lineLimit(1)
-            }
-
-            ToolbarItem(placement: .navigationBarTrailing) {
-                if showTabSwitcher {
-                    Menu {
-                        ForEach(availableTabs, id: \.self) { tab in
-                            Button(action: {
-                                withAnimation(DesignTokens.Animation.quick) {
-                                    selectedDetailTab = tab
-                                }
-                            }) {
-                                HStack {
-                                    Text(tab.rawValue)
-                                    if selectedDetailTab == tab {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(selectedDetailTab.rawValue)
-                                .font(.system(size: 14, weight: .semibold))
-                            Image(systemName: "chevron.down")
-                                .font(.system(size: 8, weight: .bold))
-                        }
-                        .foregroundColor(appearanceManager.tintColor)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .background(appearanceManager.tintColor.opacity(0.1))
-                        .clipShape(Capsule())
-                    }
-                }
+        .applyAppBackground()
+        .sceneLiveUpdates(using: viewModel)
+        .hideSystemNavigationBarForCustomChrome()
+        .enableSwipeBackWhenNavBarHidden()
+        .safeAreaInset(edge: .top, spacing: 0) {
+            groupDetailNavBar
+        }
+        .sheet(isPresented: $showingEditGroupSheet) {
+            EditGroupSheet(group: selectedGroup, viewModel: viewModel) { updated in
+                selectedGroup = updated
             }
         }
         .floatingActionBar(isPresented: true, catalogChrome: groupDetailCatalogFloatingChromeForFooter) {
             HStack(spacing: 0) {
                 if selectedDetailTab == .scenes {
-                    Button {
+                    CatalogFilterFABButton(isActive: true) {
                         HapticManager.light()
                         groupLiveFilterSheetPresented = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(appearanceManager.tintColor)
                     }
-                    .accessibilityLabel("Filter and sort")
                     .frame(maxWidth: .infinity)
                 } else if selectedDetailTab == .galleries {
-                    Button {
+                    CatalogFilterFABButton(isActive: linkedGalleries.catalogFilterSortFABActive) {
                         HapticManager.light()
                         linkedGalleries.showFilterSortSheet = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(linkedGalleries.catalogFilterSortFABActive ? appearanceManager.tintColor : .primary)
-                            .overlay(alignment: .topTrailing) {
-                                if linkedGalleries.catalogFilterSortFABActive {
-                                    Circle()
-                                        .fill(appearanceManager.tintColor)
-                                        .frame(width: 7, height: 7)
-                                        .offset(x: 3, y: -3)
-                                }
-                            }
                     }
-                    .accessibilityLabel("Filter and sort")
                     .frame(maxWidth: .infinity)
                 } else if selectedDetailTab == .performers {
-                    Button {
+                    CatalogFilterFABButton(isActive: linkedPerformers.catalogFilterSortFABActive) {
                         HapticManager.light()
                         linkedPerformers.showFilterSortSheet = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(linkedPerformers.catalogFilterSortFABActive ? appearanceManager.tintColor : .primary)
-                            .overlay(alignment: .topTrailing) {
-                                if linkedPerformers.catalogFilterSortFABActive {
-                                    Circle()
-                                        .fill(appearanceManager.tintColor)
-                                        .frame(width: 7, height: 7)
-                                        .offset(x: 3, y: -3)
-                                }
-                            }
                     }
-                    .accessibilityLabel("Filter and sort")
                     .frame(maxWidth: .infinity)
                 } else if selectedDetailTab == .studios {
-                    Button {
+                    CatalogFilterFABButton(isActive: linkedStudios.catalogFilterSortFABActive) {
                         HapticManager.light()
                         linkedStudios.showFilterSortSheet = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(linkedStudios.catalogFilterSortFABActive ? appearanceManager.tintColor : .primary)
-                            .overlay(alignment: .topTrailing) {
-                                if linkedStudios.catalogFilterSortFABActive {
-                                    Circle()
-                                        .fill(appearanceManager.tintColor)
-                                        .frame(width: 7, height: 7)
-                                        .offset(x: 3, y: -3)
-                                }
-                            }
                     }
-                    .accessibilityLabel("Filter and sort")
                     .frame(maxWidth: .infinity)
                 } else if selectedDetailTab == .tags {
-                    Button {
+                    CatalogFilterFABButton(isActive: linkedTags.catalogFilterSortFABActive) {
                         HapticManager.light()
                         linkedTags.showFilterSortSheet = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(linkedTags.catalogFilterSortFABActive ? appearanceManager.tintColor : .primary)
-                            .overlay(alignment: .topTrailing) {
-                                if linkedTags.catalogFilterSortFABActive {
-                                    Circle()
-                                        .fill(appearanceManager.tintColor)
-                                        .frame(width: 7, height: 7)
-                                        .offset(x: 3, y: -3)
-                                }
-                            }
                     }
-                    .accessibilityLabel("Filter and sort")
                     .frame(maxWidth: .infinity)
                 } else if selectedDetailTab == .images {
-                    Button {
+                    CatalogFilterFABButton(isActive: linkedImages.catalogFilterSortFABActive) {
                         HapticManager.light()
                         linkedImages.showFilterSortSheet = true
-                    } label: {
-                        Image(systemName: "slider.horizontal.3")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(linkedImages.catalogFilterSortFABActive ? appearanceManager.tintColor : .primary)
-                            .overlay(alignment: .topTrailing) {
-                                if linkedImages.catalogFilterSortFABActive {
-                                    Circle()
-                                        .fill(appearanceManager.tintColor)
-                                        .frame(width: 7, height: 7)
-                                        .offset(x: 3, y: -3)
-                                }
-                            }
                     }
-                    .accessibilityLabel("Filter and sort")
                     .frame(maxWidth: .infinity)
                 }
             }
@@ -1044,6 +1064,12 @@ struct GroupDetailView: View {
         .onAppear {
             if viewModel.groupGalleries.isEmpty {
                 linkedGalleries.refetchGalleries(viewModel: viewModel, initial: true)
+            }
+
+            viewModel.fetchGroup(groupId: selectedGroup.id) { updated in
+                if let updated {
+                    selectedGroup = updated
+                }
             }
 
             viewModel.fetchSavedFilters()
@@ -1400,8 +1426,6 @@ struct GroupDetailView: View {
         .padding(.bottom, 32)
     }
 
-    @State private var isHeaderExpanded = false
-    
     private var headerView: some View {
         let collapsedHeight: CGFloat = 115
         let imageWidth: CGFloat = 72
@@ -1413,7 +1437,7 @@ struct GroupDetailView: View {
                     CustomAsyncImage(url: url) { loader in
                         if loader.isLoading {
                             Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-                                .overlay(ProgressView().scaleEffect(0.6))
+                                .overlay(InlineSpinner(scale: .compact))
                         } else if let image = loader.image {
                             image.resizable()
                                 .scaledToFill()
@@ -1533,6 +1557,101 @@ struct GroupDetailView: View {
             list.append((label: "RATING", value: "\(rating)%"))
         }
         return list
+    }
+}
+
+// MARK: - Edit Group Sheet
+
+struct EditGroupSheet: View {
+    let group: StashGroup
+    @ObservedObject var viewModel: StashDBViewModel
+    var onComplete: (StashGroup) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+
+    @State private var name: String = ""
+    @State private var date: String = ""
+    @State private var ratingText: String = ""
+    @State private var synopsis: String = ""
+    @State private var isSaving = false
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section("Identity") {
+                    TextField("Name", text: $name)
+                    TextField("Date (YYYY-MM-DD)", text: $date)
+                        .textInputAutocapitalization(.never)
+                        .keyboardType(.numbersAndPunctuation)
+                    TextField("Rating (0–100)", text: $ratingText)
+                        .keyboardType(.numberPad)
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+
+                Section("Synopsis") {
+                    TextEditor(text: $synopsis)
+                        .frame(minHeight: 120)
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+            }
+            .navigationTitle("Edit Group")
+            .navigationBarTitleDisplayMode(.inline)
+            .applyAppBackground()
+            .scrollContentBackground(.hidden)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarLeading) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button("Save") { save() }
+                        .disabled(isSaving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .tint(appearanceManager.tintColor)
+                }
+            }
+            .onAppear {
+                name = group.name
+                date = group.date ?? ""
+                ratingText = group.rating100.map(String.init) ?? ""
+                synopsis = group.synopsis ?? ""
+            }
+        }
+    }
+
+    private func optionalTrimmed(_ value: String) -> String? {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
+    }
+
+    private func save() {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else { return }
+        let rating = Int(ratingText.trimmingCharacters(in: .whitespacesAndNewlines)).map { min(100, max(0, $0)) }
+
+        isSaving = true
+        viewModel.updateGroupDetails(
+            groupId: group.id,
+            name: trimmedName,
+            date: optionalTrimmed(date),
+            synopsis: optionalTrimmed(synopsis),
+            rating100: rating
+        ) { success in
+            DispatchQueue.main.async {
+                isSaving = false
+                if success {
+                    var updated = group
+                    updated.name = trimmedName
+                    updated.date = optionalTrimmed(date)
+                    updated.synopsis = optionalTrimmed(synopsis)
+                    updated.rating100 = rating
+                    onComplete(updated)
+                    ToastManager.shared.show("Group updated", icon: "checkmark.circle", style: .success)
+                    dismiss()
+                } else {
+                    ToastManager.shared.show("Failed to update group", icon: "exclamationmark.triangle", style: .error)
+                }
+            }
+        }
     }
 }
 #endif

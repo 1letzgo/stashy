@@ -12,7 +12,6 @@ import SwiftUI
 private struct PerformersViewContent: View {
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var configManager = ServerConfigManager.shared
-    @ObservedObject private var appearance = AppearanceManager.shared
     @State private var scrollPosition: String? = nil
     @State private var shouldRestoreScroll = false
     @State private var selectedSortOption: StashDBViewModel.PerformerSortOption
@@ -551,22 +550,9 @@ private struct PerformersViewContent: View {
         .floatingActionBar(isPresented: true, catalogChrome: CatalogFloatingChromeState(hasActiveServerConfig: configManager.activeConfig != nil, primaryListIsEmpty: viewModel.performers.isEmpty, errorMessage: viewModel.errorMessage)) {
             HStack(spacing: 0) {
                 Spacer(minLength: 0)
-                Button {
+                CatalogFilterFABButton(isActive: catalogFilterSortFABActive) {
                     showFilterSortSheet = true
-                } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(catalogFilterSortFABActive ? appearance.tintColor : .primary)
-                        .overlay(alignment: .topTrailing) {
-                            if catalogFilterSortFABActive {
-                                Circle()
-                                    .fill(appearance.tintColor)
-                                    .frame(width: 7, height: 7)
-                                    .offset(x: 3, y: -3)
-                            }
-                        }
                 }
-                .accessibilityLabel("Filter and sort")
                 Spacer(minLength: 0)
             }
         }
@@ -643,6 +629,13 @@ private struct PerformersViewContent: View {
     }
 
     private func performersOnAppear() {
+        var forceRefresh = false
+        if let injectedSortStr = coordinator.activeSortOption,
+           let injectedSort = StashDBViewModel.PerformerSortOption(rawValue: injectedSortStr) {
+            selectedSortOption = injectedSort
+            coordinator.activeSortOption = nil
+            forceRefresh = true
+        }
         if !coordinator.activeSearchText.isEmpty {
             searchText = coordinator.activeSearchText
             isSearchVisible = true
@@ -652,7 +645,7 @@ private struct PerformersViewContent: View {
             return
         }
         if TabManager.shared.getDefaultFilterId(for: .performers) == nil || !viewModel.savedFilters.isEmpty {
-            if viewModel.performers.isEmpty {
+            if forceRefresh || viewModel.performers.isEmpty {
                 performSearch()
             }
         }
@@ -683,7 +676,7 @@ private struct PerformersViewContent: View {
                                         : .sceneCount
                             )
                         }
-                        .buttonStyle(PlainButtonStyle())
+                        .buttonStyle(.plain)
                         .id(performer.id)
                     }
 

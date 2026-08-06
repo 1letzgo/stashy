@@ -114,14 +114,16 @@ class NavigationCoordinator: ObservableObject {
         self.selectedTab = .catalogue
     }
     
-    func navigateToPerformers(search: String = "") {
+    func navigateToPerformers(sort: StashDBViewModel.PerformerSortOption? = nil, search: String = "") {
+        self.activeSortOption = sort?.rawValue
         self.activeSearchText = search
         self.catalogueTabID = UUID()
         self.catalogueSubTab = "Performers"
         self.selectedTab = .catalogue
     }
     
-    func navigateToStudios(search: String = "") {
+    func navigateToStudios(sort: StashDBViewModel.StudioSortOption? = nil, search: String = "") {
+        self.activeSortOption = sort?.rawValue
         self.activeSearchText = search
         self.catalogueTabID = UUID()
         self.catalogueSubTab = "Studios"
@@ -135,7 +137,8 @@ class NavigationCoordinator: ObservableObject {
         self.selectedTab = .catalogue
     }
     
-    func navigateToGalleries(search: String = "") {
+    func navigateToGalleries(sort: StashDBViewModel.GallerySortOption? = nil, search: String = "") {
+        self.activeSortOption = sort?.rawValue
         self.activeSearchText = search
         self.catalogueTabID = UUID()
         self.catalogueSubTab = "Galleries"
@@ -167,9 +170,11 @@ class NavigationCoordinator: ObservableObject {
         self.reelsPerformer = performer
         self.reelsTags = tags
         self.reelsTargetMode = mode
-        self.reelsNavigationToken = UUID()
-        self.reelsTabID = UUID() // Force reset stack if needed
+        // Remount before selecting the tab so a previous Feeds instance cannot
+        // consume (and clear) `reelsPerformer`, then get destroyed empty.
+        self.reelsTabID = UUID()
         self.selectedTab = .reels
+        self.reelsNavigationToken = UUID()
     }
 
     func navigateToStashLine(performer: GalleryPerformer) {
@@ -213,33 +218,19 @@ class NavigationCoordinator: ObservableObject {
 
 // MARK: - Connection Error
 struct ConnectionErrorView: View {
-    @ObservedObject var appearanceManager = AppearanceManager.shared
     var title: String = "Server not reachable"
     let onRetry: () -> Void
     var isDark: Bool = false
-    
+
     var body: some View {
-        VStack(spacing: 20) {
-            Spacer()
-            Image(systemName: "server.rack")
-                .font(.system(size: 64) )
-                .foregroundColor(appearanceManager.tintColor)
-            
-            Text(title)
-                .font(.title3)
-                .fontWeight(.bold)
-                .foregroundColor(isDark ? .white : .primary)
-            
-            Button(action: onRetry) {
-                Text("Retry Connection")
-                    .fontWeight(.semibold)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(appearanceManager.tintColor)
-            
-            Spacer()
-        }
-        .frame(maxWidth: .infinity)
+        StatusPlaceholderView(
+            icon: "server.rack",
+            title: title,
+            buttonText: "Retry Connection",
+            isDark: isDark,
+            fillsScreen: true,
+            onAction: onRetry
+        )
     }
 }
 
@@ -254,6 +245,14 @@ struct FullScreenVideoPlayer: UIViewRepresentable {
     var intelligentZoomFactor: CGFloat = 1.15
     /// Pixel size of the video content (required for intelligent framing).
     var contentSize: CGSize? = nil
+    /// Shrinks only the `AVPlayerLayer` from the top (e.g. below the status-bar safe area).
+    var topContentInset: CGFloat = 0
+    /// Shrinks only the `AVPlayerLayer` from the bottom (e.g. stop above the tab bar).
+    /// Does **not** change the UIView bounds — Feeds paging / hit-testing stay full-bleed.
+    var bottomContentInset: CGFloat = 0
+    /// When `videoGravity == .resizeAspect`, pin letterboxed content to the top of the draw rect
+    /// instead of centering (portrait Feeds with immersive off).
+    var topAlignAspectFit: Bool = false
     /// Optionaler Hook: erhält den frisch erzeugten `AVPlayerLayer` (für KVO auf `isReadyForDisplay`).
     /// Wird bspw. von `ReelItemVideoSurfaceReadiness` verwendet, um die Thumbnail-Überblendung
     /// erst beim **echten ersten Frame** zu starten — nicht schon bei `AVPlayerItem.status == .readyToPlay`.
@@ -265,20 +264,45 @@ struct FullScreenVideoPlayer: UIViewRepresentable {
         view.focusNormalized = focusNormalized
         view.intelligentZoomFactor = intelligentZoomFactor
         view.contentPixelSize = contentSize
+        view.topContentInset = topContentInset
+        view.bottomContentInset = bottomContentInset
+        view.topAlignAspectFit = topAlignAspectFit
         onLayerReady?(view.playerLayer)
         return view
     }
 
     func updateUIView(_ uiView: PlayerView, context: Context) {
-        if uiView.player != player {
+        let playerChanged = uiView.player !== player
+        if playerChanged {
             uiView.player = player
         }
+
+        let gravityChanged = uiView.intendedGravity != videoGravity
+        let zoomChanged = uiView.intelligentZoomFactor != intelligentZoomFactor
+        let sizeChanged = uiView.contentPixelSize != contentSize
+        let focusChanged = uiView.focusNormalized != focusNormalized
+        let topInsetChanged = uiView.topContentInset != topContentInset
+        let bottomInsetChanged = uiView.bottomContentInset != bottomContentInset
+        let topAlignChanged = uiView.topAlignAspectFit != topAlignAspectFit
+
         uiView.intendedGravity = videoGravity
         uiView.intelligentZoomFactor = intelligentZoomFactor
         uiView.contentPixelSize = contentSize
         // Always assign — clearing to nil must hard-reset framing.
         uiView.focusNormalized = focusNormalized
-        uiView.applyFramingNow()
+        uiView.topContentInset = topContentInset
+        uiView.bottomContentInset = bottomContentInset
+        uiView.topAlignAspectFit = topAlignAspectFit
+
+        // Avoid synchronous layout on every SwiftUI body pass (Feeds chrome / VM publishes).
+        if playerChanged || gravityChanged || zoomChanged || sizeChanged
+            || focusChanged || topInsetChanged || bottomInsetChanged || topAlignChanged {
+            uiView.applyFramingNow()
+        }
+        // Only re-bind when the player instance changes (avoids SwiftUI update storms).
+        if playerChanged {
+            onLayerReady?(uiView.playerLayer)
+        }
     }
 }
 
@@ -316,6 +340,31 @@ class PlayerView: UIView {
 
     var intelligentZoomFactor: CGFloat = 1.15
     var contentPixelSize: CGSize?
+    var topAlignAspectFit: Bool = false {
+        didSet {
+            if oldValue != topAlignAspectFit {
+                setNeedsLayout()
+            }
+        }
+    }
+
+    /// Top gap left black (safe area). Applied only to `avLayer.frame`, not the view bounds.
+    var topContentInset: CGFloat = 0 {
+        didSet {
+            if oldValue != topContentInset {
+                setNeedsLayout()
+            }
+        }
+    }
+
+    /// Bottom gap left black (tab bar). Applied only to `avLayer.frame`, not the view bounds.
+    var bottomContentInset: CGFloat = 0 {
+        didSet {
+            if oldValue != bottomContentInset {
+                setNeedsLayout()
+            }
+        }
+    }
 
     private var sizeObservation: NSKeyValueObservation?
 
@@ -357,6 +406,19 @@ class PlayerView: UIView {
         applyFraming()
     }
 
+    private func contentBounds(for bounds: CGRect) -> CGRect {
+        let top = max(0, topContentInset)
+        let bottom = max(0, bottomContentInset)
+        let height = max(1, bounds.height - top - bottom)
+        return CGRect(x: bounds.minX, y: bounds.minY + top, width: bounds.width, height: height)
+    }
+
+    private func resolvedVideoSize() -> CGSize {
+        if let s = contentPixelSize, s.width > 1, s.height > 1 { return s }
+        if let s = player?.currentItem?.presentationSize, s.width > 1, s.height > 1 { return s }
+        return .zero
+    }
+
     private func applyFraming() {
         let bounds = self.bounds
         CATransaction.begin()
@@ -368,27 +430,38 @@ class PlayerView: UIView {
             return
         }
 
+        let drawBounds = contentBounds(for: bounds)
+
         guard let focus = focusNormalized else {
-            // Zoom off: sublayer fills view, standard gravity.
+            // Letterbox pinned under the top inset (portrait Feeds, immersive off).
+            if topAlignAspectFit, intendedGravity == .resizeAspect {
+                let videoSize = resolvedVideoSize()
+                if videoSize.width > 1, videoSize.height > 1 {
+                    let scale = min(drawBounds.width / videoSize.width, drawBounds.height / videoSize.height)
+                    let w = videoSize.width * scale
+                    let h = videoSize.height * scale
+                    let x = drawBounds.minX + (drawBounds.width - w) / 2
+                    avLayer.videoGravity = .resize
+                    avLayer.frame = CGRect(x: x, y: drawBounds.minY, width: w, height: h)
+                    return
+                }
+            }
+            // Zoom off: sublayer fills the area between top/bottom insets.
             avLayer.videoGravity = intendedGravity
-            avLayer.frame = bounds
+            avLayer.frame = drawBounds
             return
         }
 
-        let videoSize: CGSize = {
-            if let s = contentPixelSize, s.width > 1, s.height > 1 { return s }
-            if let s = player?.currentItem?.presentationSize, s.width > 1, s.height > 1 { return s }
-            return .zero
-        }()
+        let videoSize = resolvedVideoSize()
         guard videoSize.width > 1, videoSize.height > 1 else {
             avLayer.videoGravity = intendedGravity
-            avLayer.frame = bounds
+            avLayer.frame = drawBounds
             return
         }
 
         // Stretch pixels 1:1 into framed rect; we size the rect ourselves.
         avLayer.videoGravity = .resize
-        let fillScale = max(bounds.width / videoSize.width, bounds.height / videoSize.height)
+        let fillScale = max(drawBounds.width / videoSize.width, drawBounds.height / videoSize.height)
         let scale = fillScale * max(intelligentZoomFactor, 1.0)
         let scaledW = videoSize.width * scale
         let scaledH = videoSize.height * scale
@@ -397,18 +470,17 @@ class PlayerView: UIView {
         // Vision y is bottom-left; layer y is top-left.
         let focusYFromTop = 1 - min(max(focus.y, 0), 1)
 
-        var originX = bounds.midX - focusX * scaledW
-        var originY = bounds.midY - focusYFromTop * scaledH
-        // Keep view covered (no letterboxing).
-        originX = min(max(originX, bounds.width - scaledW), 0)
-        originY = min(max(originY, bounds.height - scaledH), 0)
+        var originX = drawBounds.midX - focusX * scaledW
+        var originY = drawBounds.midY - focusYFromTop * scaledH
+        // Keep draw area covered (no letterboxing). drawBounds origin is (0,0).
+        originX = min(max(originX, drawBounds.width - scaledW), 0)
+        originY = min(max(originY, drawBounds.height - scaledH), 0)
         avLayer.frame = CGRect(x: originX, y: originY, width: scaledW, height: scaledH)
     }
 }
 
 // MARK: - Shared Empty State
 struct SharedEmptyStateView: View {
-    @ObservedObject var appearanceManager = AppearanceManager.shared
     var icon: String
     var title: String
     var buttonText: String
@@ -416,28 +488,14 @@ struct SharedEmptyStateView: View {
     var isDark: Bool = false
 
     var body: some View {
-        VStack(spacing: 20) {
-            Spacer()
-            Image(systemName: icon)
-                .font(.system(size: 64))
-                .foregroundColor(appearanceManager.tintColor)
-
-            Text(title)
-                .font(.title3)
-                .fontWeight(.bold)
-                .foregroundColor(isDark ? .white : .primary)
-
-            Button(action: onRetry) {
-                Text(buttonText)
-                    .fontWeight(.semibold)
-            }
-            .buttonStyle(.borderedProminent)
-            .tint(appearanceManager.tintColor)
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.appBackground)
+        StatusPlaceholderView(
+            icon: icon,
+            title: title,
+            buttonText: buttonText,
+            isDark: isDark,
+            fillsScreen: true,
+            onAction: onRetry
+        )
     }
 }
 

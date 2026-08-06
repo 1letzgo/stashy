@@ -511,22 +511,9 @@ private struct MarkersViewContent: View {
     private var markersFloatingFilterBar: some View {
         HStack(spacing: 0) {
             Spacer(minLength: 0)
-            Button {
+            CatalogFilterFABButton(isActive: catalogFilterSortFABActive) {
                 showFilterSortSheet = true
-            } label: {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(catalogFilterSortFABActive ? appearanceManager.tintColor : .primary)
-                    .overlay(alignment: .topTrailing) {
-                        if catalogFilterSortFABActive {
-                            Circle()
-                                .fill(appearanceManager.tintColor)
-                                .frame(width: 7, height: 7)
-                                .offset(x: 3, y: -3)
-                        }
-                    }
             }
-            .accessibilityLabel("Filter and sort")
             Spacer(minLength: 0)
         }
     }

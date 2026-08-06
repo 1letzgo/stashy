@@ -47,51 +47,15 @@ struct ReelsModeSettingsView: View {
             Section {
                 Toggle("Immersive Video Scaling", isOn: $tabManager.reelsFillHeight)
                     .tint(appearanceManager.tintColor)
-                Toggle("Intelligent Zoom", isOn: $tabManager.reelsIntelligentZoom)
-                    .tint(appearanceManager.tintColor)
                 Toggle("Continuous Play", isOn: $tabManager.reelsContinuousPlay)
                     .tint(appearanceManager.tintColor)
             } footer: {
-                Text("Immersive Scaling fills the screen when orientation matches. Intelligent Zoom uses on-device Vision to frame the action when landscape video plays in portrait (Scenes, Markers, Clips, Previews). Continuous Play advances instead of looping.")
+                Text("Immersive Scaling fills the area above the tab bar when orientation matches. Continuous Play advances instead of looping.")
             }
             .listRowBackground(Color.secondaryAppBackground)
 
             Section {
-                Toggle("Square Crop (1:1)", isOn: Binding(
-                    get: { UserDefaults.standard.object(forKey: "stashline_square_crop") as? Bool ?? false },
-                    set: { UserDefaults.standard.set($0, forKey: "stashline_square_crop") }
-                ))
-                .tint(appearanceManager.tintColor)
-                Toggle("Include GIFs", isOn: Binding(
-                    get: { UserDefaults.standard.object(forKey: "stashline_include_gifs") as? Bool ?? false },
-                    set: { UserDefaults.standard.set($0, forKey: "stashline_include_gifs") }
-                ))
-                .tint(appearanceManager.tintColor)
-                Toggle("Group into sets", isOn: Binding(
-                    get: { UserDefaults.standard.object(forKey: "stashline_group_sets") as? Bool ?? true },
-                    set: { UserDefaults.standard.set($0, forKey: "stashline_group_sets") }
-                ))
-                .tint(appearanceManager.tintColor)
-                Picker("Set fallback", selection: Binding(
-                    get: {
-                        UserDefaults.standard.string(forKey: "stashline_group_fallback")
-                            ?? StashImageSetGroupingPolicy.sessionThenMeta.rawValue
-                    },
-                    set: { UserDefaults.standard.set($0, forKey: "stashline_group_fallback") }
-                )) {
-                    ForEach(StashImageSetGroupingPolicy.allCases, id: \.rawValue) { policy in
-                        Text(policy.displayName).tag(policy.rawValue)
-                    }
-                }
-            } header: {
-                Text("Pics Feed")
-            } footer: {
-                Text("Crops images to a square from the center. Multi-image groups show a thumbnail carousel below. GIFs appear as still thumbnails in the feed and animate in fullscreen. Sets use a filename session timestamp when present; otherwise images with the same created day, performers, and galleries are grouped.")
-            }
-            .listRowBackground(Color.secondaryAppBackground)
-            
-            Section {
-                ForEach(tabManager.reelsModes) { modeConfig in
+                ForEach(tabManager.configurableReelsModes) { modeConfig in
                     VStack(alignment: .leading, spacing: 0) {
                         // Header
                         HStack {
@@ -123,18 +87,6 @@ struct ReelsModeSettingsView: View {
                                 filterPicker(for: modeConfig.type)
                             }
                             .padding(.top, 4)
-
-                            if modeConfig.type == .pics {
-                                reelsSettingRow(title: "Load Full Images") {
-                                    Toggle("", isOn: Binding(
-                                        get: { UserDefaults.standard.object(forKey: "stashline_load_full_images") as? Bool ?? true },
-                                        set: { UserDefaults.standard.set($0, forKey: "stashline_load_full_images") }
-                                    ))
-                                    .labelsHidden()
-                                    .tint(appearanceManager.tintColor)
-                                }
-                                .padding(.top, 4)
-                            }
                         }
                     }
                     .padding(.vertical, 6)
@@ -212,16 +164,7 @@ struct ReelsModeSettingsView: View {
             }
 
         case .pics:
-            let current = StashDBViewModel.ImageSortOption(rawValue: tabManager.getPersistentSortOption(for: .stashline) ?? "") ?? .dateDesc
-            Menu {
-                ForEach(StashDBViewModel.ImageSortOption.allCases, id: \.self) { option in
-                    Button(action: { tabManager.setPersistentSortOption(for: .stashline, option: option.rawValue) }) {
-                        HStack { Text(option.displayName); if option == current { Image(systemName: "checkmark") } }
-                    }
-                }
-            } label: {
-                pickerLabelText(current.displayName)
-            }
+            EmptyView()
         }
     }
 
@@ -349,32 +292,7 @@ struct ReelsModeSettingsView: View {
             }
 
         case .pics:
-            let filters = viewModel.savedFilters.values
-                .filter { $0.mode == .images }
-                .sorted { $0.name < $1.name }
-            if filters.isEmpty && !viewModel.isLoadingSavedFilters {
-                Text("No filters found")
-                    .foregroundColor(.secondary)
-                    .font(.subheadline)
-            } else {
-                Picker("", selection: Binding(
-                    get: { tabManager.getDefaultFilterId(for: .stashline) ?? "" },
-                    set: { newId in
-                        if newId.isEmpty {
-                            tabManager.setDefaultFilter(for: .stashline, filterId: nil, filterName: nil)
-                        } else if let filter = filters.first(where: { $0.id == newId }) {
-                            tabManager.setDefaultFilter(for: .stashline, filterId: filter.id, filterName: filter.name)
-                        }
-                    }
-                )) {
-                    Text("None").tag("")
-                    ForEach(filters) { filter in
-                        Text(filter.name).tag(filter.id)
-                    }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-            }
+            EmptyView()
         }
     }
 }

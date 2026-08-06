@@ -95,19 +95,28 @@ struct StashLineView: View {
         cachedPosts = computeGroupedPosts()
     }
 
+    /// Live-listener from FullScreen rating / o_counter mutations — keep feed + open cover in sync.
+    private func patchCachedAndFullScreenImage(imageId: String, transform: (StashImage) -> StashImage) {
+        cachedPosts = cachedPosts.map { post in
+            guard post.images.contains(where: { $0.id == imageId }) else { return post }
+            return StashLinePost(id: post.id, images: post.images.map { $0.id == imageId ? transform($0) : $0 })
+        }
+        if let idx = fullScreenImages.firstIndex(where: { $0.id == imageId }) {
+            fullScreenImages[idx] = transform(fullScreenImages[idx])
+        }
+    }
+
     private var floatingBarContent: some View {
         HStack(spacing: 0) {
-            Button {
+            CatalogFilterFABButton(
+                isActive: stashLineListFilters.catalogFilterSortFABActive,
+                accessibilityLabel: "Filter und Sortierung"
+            ) {
                 stashLineListFilters.refreshLocalPresets()
                 stashLineListFilters.applyCatalogPresetSelectionFromSheetIfNeeded(viewModel: viewModel)
                 stashLineListFilters.showFilterSortSheet = true
-            } label: {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(stashLineListFilters.catalogFilterSortFABActive ? appearanceManager.tintColor : .primary)
-                    .frame(maxWidth: .infinity)
             }
-            .accessibilityLabel("Filter und Sortierung")
+            .frame(maxWidth: .infinity)
         }
     }
 
@@ -131,30 +140,30 @@ struct StashLineView: View {
             }
         }
         .navigationBarHidden(true)
-        .if(!isEmbedded) { view in
+        .enableSwipeBackWhenNavBarHidden()
+        .if(!isEmbedded && performerFilter != nil) { view in
             view.safeAreaInset(edge: .top, spacing: 0) {
                 VStack(spacing: 0) {
                     HStack(spacing: 8) {
-                        if performerFilter != nil {
-                            Button(action: { dismiss() }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "chevron.left")
-                                        .font(.system(size: 17, weight: .semibold))
-                                }
-                                .foregroundColor(appearanceManager.tintColor)
+                        Button(action: { dismiss() }) {
+                            HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                                Image(systemName: "chevron.left")
+                                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                                Text("Back")
+                                    .font(.subheadline.weight(.semibold))
                             }
-                            .buttonStyle(.plain)
+                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                            .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
                         }
-                        Text(performerFilter?.name ?? "StashLine")
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundColor(.white)
-                            .lineLimit(1)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Back")
+
+                        Spacer(minLength: 0)
                     }
                     .frame(maxWidth: .infinity)
-                    .frame(minHeight: 32)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 6)
+                    .frame(minHeight: StashyExpandingDock.activeHeight)
+                    .padding(.horizontal, StashyExpandingDock.edgePadding)
+                    .padding(.vertical, 8)
 
                     Divider().overlay(Color.white.opacity(0.15))
                 }
@@ -338,6 +347,16 @@ struct StashLineView: View {
                 }
                 return StashLinePost(id: post.id, images: updatedImages)
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ImageRatingUpdated"))) { notification in
+            guard let imageId = notification.userInfo?["imageId"] as? String else { return }
+            let rating100 = notification.userInfo?["rating100"] as? Int
+            patchCachedAndFullScreenImage(imageId: imageId) { $0.withRating(rating100) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ImageOCounterUpdated"))) { notification in
+            guard let imageId = notification.userInfo?["imageId"] as? String,
+                  let oCounter = notification.userInfo?["oCounter"] as? Int else { return }
+            patchCachedAndFullScreenImage(imageId: imageId) { $0.withOCounter(oCounter) }
         }
         .onChange(of: performerFilter) { _, _ in
             performSearch()
@@ -653,6 +672,17 @@ struct StashLinePostView: View {
                         .padding(.top, image.isGifFile ? 42 : 10)
                         .padding(.leading, 10)
                     }
+                }
+                .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ImageRatingUpdated"))) { notification in
+                    guard let imageId = notification.userInfo?["imageId"] as? String,
+                          post.images.contains(where: { $0.id == imageId }) else { return }
+                    ratings[imageId] = notification.userInfo?["rating100"] as? Int ?? 0
+                }
+                .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ImageOCounterUpdated"))) { notification in
+                    guard let imageId = notification.userInfo?["imageId"] as? String,
+                          let oCounter = notification.userInfo?["oCounter"] as? Int,
+                          post.images.contains(where: { $0.id == imageId }) else { return }
+                    oCounters[imageId] = oCounter
                 }
 
             if squareCrop && post.isSet {
@@ -1064,7 +1094,7 @@ struct StashLinePostView: View {
             if let url = img.thumbnailURL {
                 CustomAsyncImage(url: url) { loader in
                     if loader.isLoading {
-                        ProgressView().scaleEffect(0.6)
+                        InlineSpinner(scale: .compact)
                     } else if let loaded = loader.image {
                         loaded
                             .resizable()

@@ -125,6 +125,9 @@ func isHeadphonesConnected() -> Bool {
 /// `SceneDetailView` publishes changes (resume time, play count, deletions) through
 /// `NotificationCenter`. Views that display scenes should apply `sceneLiveUpdates(using:)`
 /// so they update in-place when navigating back.
+///
+/// Image FullScreen rating / o_counter use the parallel notifications
+/// `ImageRatingUpdated` / `ImageOCounterUpdated`, observed in `StashDBViewModel`.
 struct SceneLiveUpdatesModifier: ViewModifier {
     @ObservedObject var viewModel: StashDBViewModel
 
@@ -422,13 +425,17 @@ struct StandardLoadingView: View {
 struct AnimatedWebView: UIViewRepresentable {
     let data: Data
     var fillMode: Bool = false
+    /// Leaves a black band at the top (e.g. status-bar safe area). WebView bounds stay full-size.
+    var topInset: CGFloat = 0
+    /// Leaves a black band at the bottom (e.g. tab bar). WebView bounds stay full-size.
+    var bottomInset: CGFloat = 0
     
     func makeCoordinator() -> Coordinator {
         Coordinator()
     }
     
     class Coordinator {
-        var lastDataHash: Int?
+        var lastRenderKey: String?
     }
     
     func makeUIView(context: Context) -> WKWebView {
@@ -446,17 +453,20 @@ struct AnimatedWebView: UIViewRepresentable {
     }
     
     func updateUIView(_ uiView: WKWebView, context: Context) {
-        let currentHash = data.hashValue
-        if context.coordinator.lastDataHash == currentHash {
+        let top = max(0, topInset)
+        let bottom = max(0, bottomInset)
+        let renderKey = "\(data.hashValue)|\(fillMode)|\(Int(top.rounded()))|\(Int(bottom.rounded()))"
+        if context.coordinator.lastRenderKey == renderKey {
             return
         }
-        context.coordinator.lastDataHash = currentHash
+        context.coordinator.lastRenderKey = renderKey
         
         // Determine MIME type
         let mimeType = isWebP(data) ? "image/webp" : "image/gif"
         
         let base64 = data.base64EncodedString()
         let objectFit = fillMode ? "cover" : "contain"
+        let verticalInset = top + bottom
         
         let html = """
         <!DOCTYPE html>
@@ -471,12 +481,13 @@ struct AnimatedWebView: UIViewRepresentable {
                     background-color: black;
                     display: flex;
                     justify-content: center;
-                    align-items: center;
+                    align-items: flex-start;
                     overflow: hidden;
+                    padding-top: \(top)px;
                 }
                 img {
                     width: 100vw;
-                    height: 100vh;
+                    height: calc(100vh - \(verticalInset)px);
                     object-fit: \(objectFit);
                     display: block;
                 }
@@ -496,6 +507,9 @@ struct AnimatedWebView: UIViewRepresentable {
 
 
 /// A wrapper around UIScrollView that provides pinch-to-zoom and panning for any SwiftUI view.
+///
+/// Uses a small `UIScrollView` subclass so vertical paging of the parent Feeds `ScrollView`
+/// is not swallowed when zoom scale is 1 (pan gesture simply does not begin).
 struct ZoomableScrollView<Content: View>: UIViewRepresentable {
     private var content: Content
     private var onTap: ((CGPoint) -> Void)?
@@ -509,8 +523,8 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         self.content = content()
     }
     
-    func makeUIView(context: Context) -> UIScrollView {
-        let scrollView = UIScrollView()
+    func makeUIView(context: Context) -> PassThroughZoomScrollView {
+        let scrollView = PassThroughZoomScrollView()
         scrollView.delegate = context.coordinator
         scrollView.maximumZoomScale = 5.0
         scrollView.minimumZoomScale = 1.0
@@ -553,11 +567,15 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         return scrollView
     }
     
-    func updateUIView(_ uiView: UIScrollView, context: Context) {
+    func updateUIView(_ uiView: PassThroughZoomScrollView, context: Context) {
         context.coordinator.hostingController.rootView = content
         context.coordinator.onTap = onTap
         context.coordinator.onLongPress = onLongPress
         context.coordinator.isZoomed = $isZoomed
+        // Parent clears `isZoomed` on page/mode change — reset scale so pan pass-through works again.
+        if !isZoomed, uiView.zoomScale != uiView.minimumZoomScale {
+            uiView.setZoomScale(uiView.minimumZoomScale, animated: false)
+        }
     }
     
     func makeCoordinator() -> Coordinator {
@@ -633,6 +651,18 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
             let y = center.y - (height / 2.0)
             return CGRect(x: x, y: y, width: width, height: height)
         }
+    }
+}
+
+/// At zoom == 1, pans do not begin here so Feeds paging + the scrubber own those gestures.
+/// Pinch / double-tap zoom and pan-while-zoomed keep working.
+final class PassThroughZoomScrollView: UIScrollView {
+    override func gestureRecognizerShouldBegin(_ gestureRecognizer: UIGestureRecognizer) -> Bool {
+        if gestureRecognizer == panGestureRecognizer, zoomScale <= minimumZoomScale + 0.001 {
+            // No free pan at 1x — vertical → pager, horizontal → scrubber / other UI.
+            return false
+        }
+        return super.gestureRecognizerShouldBegin(gestureRecognizer)
     }
 }
 
@@ -848,7 +878,11 @@ struct BottomBarButton: View {
             action()
         }) {
             Image(systemName: icon)
-                .font(.system(size: 26, weight: .bold))
+                #if !os(tvOS)
+                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                #else
+                .font(.system(size: 18, weight: .semibold))
+                #endif
                 .foregroundColor(.white)
                 .shadow(color: .black.opacity(0.8), radius: 2, x: 0, y: 1)
                 .overlay(alignment: .topTrailing) {
@@ -865,7 +899,11 @@ struct BottomBarButton: View {
                             .shadow(color: .black.opacity(0.3), radius: 2)
                     }
                 }
-            .frame(width: 44, height: 44)
+            #if !os(tvOS)
+            .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
+            #else
+            .frame(width: 40, height: 40)
+            #endif
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

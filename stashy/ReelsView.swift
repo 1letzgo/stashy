@@ -15,9 +15,86 @@ private extension Notification.Name {
     static let reelsPauseAllPlayers = Notification.Name("ReelsPauseAllPlayers")
 }
 
+/// Reads the on-screen tab bar overlap without changing SwiftUI safe-area / paging layout.
+@MainActor
+enum ReelsTabBarLayout {
+    /// Avoid walking the VC hierarchy on every SwiftUI body pass (Feeds fill mode).
+    private static var cachedOverlap: CGFloat?
+    private static var cacheTimestamp: CFAbsoluteTime = 0
+    private static let cacheTTL: CFAbsoluteTime = 0.5
+
+    private static func keyWindow() -> UIWindow? {
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        let scene = scenes.first(where: { $0.activationState == .foregroundActive }) ?? scenes.first
+        return scene?.keyWindow
+            ?? scene?.windows.first(where: \.isKeyWindow)
+            ?? scene?.windows.first
+    }
+
+    static func invalidateCache() {
+        cachedOverlap = nil
+        cacheTimestamp = 0
+    }
+
+    static func topInset() -> CGFloat {
+        keyWindow()?.safeAreaInsets.top ?? 0
+    }
+
+    static func overlapFromBottom() -> CGFloat {
+        let now = CFAbsoluteTimeGetCurrent()
+        if let cachedOverlap, now - cacheTimestamp < cacheTTL {
+            return cachedOverlap
+        }
+
+        guard let window = keyWindow() else { return 0 }
+
+        func tabBar(from vc: UIViewController?) -> UITabBar? {
+            guard let vc else { return nil }
+            if let tab = vc as? UITabBarController { return tab.tabBar }
+            for child in vc.children {
+                if let bar = tabBar(from: child) { return bar }
+            }
+            return tabBar(from: vc.presentedViewController)
+        }
+
+        let value: CGFloat
+        if let bar = tabBar(from: window.rootViewController),
+           !bar.isHidden,
+           bar.alpha > 0.01,
+           bar.bounds.height > 1 {
+            let frameInWindow = bar.convert(bar.bounds, to: window)
+            value = max(0, window.bounds.maxY - frameInWindow.minY)
+        } else {
+            // Fallback before UITabBar is attached: standard bar + home indicator.
+            value = 49 + window.safeAreaInsets.bottom
+        }
+
+        cachedOverlap = value
+        cacheTimestamp = now
+        return value
+    }
+}
+
+/// Bottom chrome heights for immersive video fill (scrubber + tab bar; no capsule bar).
+@MainActor
+enum ReelsImmersiveChromeLayout {
+    /// Video bottom inset so fill ends flush with the scrubber bottom (above tab bar).
+    static func videoBottomInset() -> CGFloat {
+        ReelsTabBarLayout.overlapFromBottom()
+    }
+}
+
 enum ReelsPlayerRegistry {
     private static let players = NSHashTable<AVPlayer>.weakObjects()
     private static let lock = NSLock()
+    /// When true, Feeds left the visible tab — block deferred `play()` / stream-upgrade races.
+    private static var _isSuspended = false
+
+    static var isPlaybackSuspended: Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        return _isSuspended
+    }
 
     static func register(_ player: AVPlayer) {
         lock.lock()
@@ -35,7 +112,38 @@ enum ReelsPlayerRegistry {
         lock.lock()
         let all = players.allObjects
         lock.unlock()
-        all.forEach { $0.pause() }
+        for player in all {
+            player.pause()
+            player.rate = 0
+        }
+    }
+
+    /// Hard stop for tab leave: pause every registered player and reject further `playIfAllowed` until resume.
+    static func suspendPlayback() {
+        lock.lock()
+        _isSuspended = true
+        let all = players.allObjects
+        lock.unlock()
+        for player in all {
+            player.pause()
+            player.rate = 0
+        }
+    }
+
+    static func resumePlayback() {
+        lock.lock()
+        _isSuspended = false
+        lock.unlock()
+    }
+
+    /// Safe play entry point for Reel rows — no-op while Feeds is backgrounded/suspended.
+    static func playIfAllowed(_ player: AVPlayer?) {
+        guard let player else { return }
+        lock.lock()
+        let suspended = _isSuspended
+        lock.unlock()
+        guard !suspended else { return }
+        player.play()
     }
 }
 
@@ -60,7 +168,8 @@ enum ReelsSessionRAM {
             if key.hasPrefix("reels_last_visible_")
                 || key.hasPrefix("reels_session_sort_")
                 || key.hasPrefix("reels_session_filter_")
-                || key.hasPrefix("reels_session_random_seed_") {
+                || key.hasPrefix("reels_session_random_seed_")
+                || key.hasPrefix("reels_playback_checkpoint_") {
                 ud.removeObject(forKey: key)
             }
         }
@@ -117,13 +226,6 @@ struct ReelsViewBody: View {
         scope: .reelsClips,
         initialSort: StashDBViewModel.ImageSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .clips) ?? "") ?? .random
     )
-    /// Pics nutzt dasselbe Filter-Model wie StashLine, wird aber **am Parent gehalten** —
-    /// damit überlebt der gewählte Filter / Sort den Wechsel zwischen Reels-Modi
-    /// (analog zu `reelsClipImageFilters`). Wird per `externalListFilters:` an `StashLineView` gereicht.
-    @StateObject private var reelsPicsImageFilters = DetailLinkedImagesFilterModel(
-        scope: .reelsStashLine,
-        initialSort: StashDBViewModel.ImageSortOption(rawValue: TabManager.shared.getSortOption(for: .stashline) ?? "") ?? .dateDesc
-    )
     @State private var selectedPreviewFilter: StashDBViewModel.SavedFilter?
     @State private var showReelsSceneFilterSheet = false
     /// While the scene-style filter sheet hydrates UI (migration / saved-filter list), ignore preset `onChange` so we do not refetch the Reels timeline.
@@ -160,9 +262,6 @@ struct ReelsViewBody: View {
     @State private var scrubberState = ScrubberState()
     @State private var isInitialized = false
     @State private var playTrigger = 0  // Incremented when first item should autoplay
-    /// Nach erstem Besuch von Reels-Pics bleibt `StashLineView` im View-Baum (wie nach Tab zu Settings),
-    /// damit Scroll-Position nicht durch `if reelsMode == .pics` zerstört wird.
-    @State private var reelsStashLineHostRetained = false
     @State private var pendingRestoreId: String? = nil
     @State private var shouldScrollToTopAfterCriterionChange: Bool = false
 
@@ -193,7 +292,6 @@ struct ReelsViewBody: View {
             case .markers: return selectedMarkerSortOption.rawValue
             case .clips: return reelsClipImageFilters.selectedSortOption.rawValue
             case .previews: return selectedSortOption.rawValue
-            case .pics: return reelsPicsImageFilters.selectedSortOption.rawValue
             }
         }()
         if let raw = sortRaw {
@@ -211,8 +309,6 @@ struct ReelsViewBody: View {
                 return reelsClipImageFilters.selectedFilter?.id
             case .previews:
                 return selectedPreviewFilter?.id
-            case .pics:
-                return reelsPicsImageFilters.selectedFilter?.id
             }
         }()
         if let id = filterId, !id.isEmpty {
@@ -359,8 +455,6 @@ struct ReelsViewBody: View {
             }
         case .clips:
             reelsSyncClipCatalogPresetPickerSelection()
-        case .pics:
-            break
         }
     }
 
@@ -386,7 +480,7 @@ struct ReelsViewBody: View {
             var previewChips = reelsPreviewLiveChips
             previewChips.syncLiveChipsToMatchSelectedFilter(selectedPreviewFilter, savedFilters: savedFilters)
             reelsPreviewLiveChips = previewChips
-        case .clips, .pics:
+        case .clips:
             break
         }
     }
@@ -722,14 +816,12 @@ struct ReelsViewBody: View {
     }
 
     /// Maps a ReelsMode to the VM's per-kind random-seed bucket.
-    /// Pics has no random sort; returns nil.
     private func seedKind(for mode: ReelsMode) -> StashDBViewModel.RandomSeedKind? {
         switch mode {
         case .scenes: return .scenes
         case .markers: return .markers
         case .clips: return .images   // clips are served via findImages
         case .previews: return .previews
-        case .pics: return nil
         }
     }
 
@@ -766,7 +858,6 @@ struct ReelsViewBody: View {
         case .markers: return "marker"
         case .clips: return "clip"
         case .previews: return "preview"
-        case .pics: return nil
         }
     }
 
@@ -782,6 +873,36 @@ struct ReelsViewBody: View {
         guard let prefix = expectedPrefix(for: mode) else { return }
         guard let id = currentVisibleSceneId, id.hasPrefix("\(prefix)-") else { return }
         savePosition(id, for: mode)
+    }
+
+    private func reelsPlaybackCheckpointKey(for mode: ReelsMode) -> String {
+        let serverID = ServerConfigManager.shared.activeConfig?.id.uuidString ?? "default"
+        return "reels_playback_checkpoint_\(serverID)_\(mode.rawValue)"
+    }
+
+    /// Persists `itemId|seconds` so resume can seek only when the same item is still active.
+    private func savePlaybackCheckpoint(for mode: ReelsMode) {
+        guard let id = currentVisibleSceneId else {
+            ReelsSessionRAM.setString(nil, forKey: reelsPlaybackCheckpointKey(for: mode))
+            return
+        }
+        let time = scrubberState.time
+        guard time.isFinite, time > 0.25 else {
+            ReelsSessionRAM.setString(nil, forKey: reelsPlaybackCheckpointKey(for: mode))
+            return
+        }
+        ReelsSessionRAM.setString("\(id)|\(time)", forKey: reelsPlaybackCheckpointKey(for: mode))
+    }
+
+    /// Applies a matching checkpoint to the scrubber (seek happens via `seekTarget` on the active row).
+    private func applySavedPlaybackCheckpointIfMatching() {
+        guard let raw = ReelsSessionRAM.string(forKey: reelsPlaybackCheckpointKey(for: reelsMode)),
+              let sep = raw.lastIndex(of: "|") else { return }
+        let id = String(raw[..<sep])
+        let time = Double(raw[raw.index(after: sep)...]) ?? 0
+        guard id == currentVisibleSceneId, time.isFinite, time > 0.25 else { return }
+        scrubberState.time = time
+        scrubberState.seekTarget = time
     }
 
     private func restorePositionIfAvailable(for mode: ReelsMode, forceIfPrefixMismatch: Bool) {
@@ -839,8 +960,6 @@ struct ReelsViewBody: View {
         case .previews:
             guard viewModel.hasMorePreviews, !viewModel.isLoadingMorePreviews else { return }
             viewModel.loadMorePreviews()
-        case .pics:
-            pendingRestoreId = nil
         }
     }
 
@@ -873,7 +992,6 @@ struct ReelsViewBody: View {
         case markers = "Markers"
         case clips = "Clips"
         case previews = "Previews"
-        case pics = "Pics"
         
         var icon: String {
             switch self {
@@ -881,7 +999,6 @@ struct ReelsViewBody: View {
             case .markers: return "bookmark.fill"
             case .clips: return "photo.on.rectangle.angled"
             case .previews: return "play.rectangle.on.rectangle.fill"
-            case .pics: return "camera.fill"
             }
         }
         
@@ -891,7 +1008,6 @@ struct ReelsViewBody: View {
             case .markers: return .markers
             case .clips: return .clips
             case .previews: return .previews
-            case .pics: return .pics
             }
         }
         
@@ -901,7 +1017,7 @@ struct ReelsViewBody: View {
             case .markers: self = .markers
             case .clips: self = .clips
             case .previews: self = .previews
-            case .pics: self = .pics
+            case .pics: self = .scenes // Codable migration: legacy Pics → Scenes
             }
         }
     }
@@ -1057,16 +1173,6 @@ struct ReelsViewBody: View {
             }
         }
 
-        /// Still / preview image used for Vision focus analysis.
-        var intelligentZoomImageURL: URL? {
-            switch self {
-            case .scene(let s): return s.thumbnailURL
-            case .marker(let m): return m.thumbnailURL
-            case .clip(let c): return c.thumbnailURL ?? c.previewURL ?? c.imageURL
-            case .preview(let s): return s.thumbnailURL
-            }
-        }
-        
         var rating100: Int? {
             switch self {
             case .scene(let s): return s.rating100
@@ -1140,7 +1246,6 @@ struct ReelsViewBody: View {
         case .markers: return viewModel.sceneMarkers.filter { $0.stream != nil && !$0.stream!.isEmpty }.map { ReelItemData.marker($0) }
         case .clips: return viewModel.clips.map { ReelItemData.clip($0) }
         case .previews: return viewModel.previews.map { ReelItemData.preview($0) }
-        case .pics: return []
         }
     }
 
@@ -1156,8 +1261,6 @@ struct ReelsViewBody: View {
             applySettings(clipSortBy: reelsClipImageFilters.selectedSortOption, clipFilter: reelsClipImageFilters.selectedFilter, performer: performer, tags: selectedTags)
         case .previews:
             applySettings(previewSortBy: selectedSortOption, previewFilter: selectedPreviewFilter, performer: performer, tags: selectedTags)
-        case .pics:
-            applySettings(sortBy: selectedSortOption, sceneFilter: selectedFilter, performer: performer, tags: selectedTags)
         }
     }
 
@@ -1171,8 +1274,6 @@ struct ReelsViewBody: View {
             applySettings(clipSortBy: reelsClipImageFilters.selectedSortOption, clipFilter: reelsClipImageFilters.selectedFilter, performer: selectedPerformer, tags: newTags)
         case .previews:
             applySettings(previewSortBy: selectedSortOption, previewFilter: selectedPreviewFilter, performer: selectedPerformer, tags: newTags)
-        case .pics:
-            applySettings(sortBy: selectedSortOption, sceneFilter: selectedFilter, performer: selectedPerformer, tags: newTags)
         }
     }
 
@@ -1186,8 +1287,6 @@ struct ReelsViewBody: View {
             applySettings(clipSortBy: reelsClipImageFilters.selectedSortOption, clipFilter: reelsClipImageFilters.selectedFilter, performer: nil, tags: selectedTags)
         case .previews:
             applySettings(previewSortBy: selectedSortOption, previewFilter: selectedPreviewFilter, performer: nil, tags: selectedTags)
-        case .pics:
-            applySettings(sortBy: selectedSortOption, sceneFilter: selectedFilter, performer: nil, tags: selectedTags)
         }
     }
 
@@ -1279,8 +1378,6 @@ struct ReelsViewBody: View {
                     usedFrozenRestore = true
                     currentVisibleSceneId = vid
                 }
-            case .pics:
-                break
             }
         }
 
@@ -1294,8 +1391,6 @@ struct ReelsViewBody: View {
                 viewModel.takeReelsFrozenMarkersSnapshot(visibleItemId: currentVisibleSceneId)
             case .previews:
                 viewModel.takeReelsFrozenPreviewsSnapshot(visibleItemId: currentVisibleSceneId)
-            case .pics:
-                break
             }
             // Entering a criterion overlay (performer/tags) should start at the top of the
             // newly filtered timeline. Keep the old position only in the frozen snapshot.
@@ -1383,8 +1478,6 @@ struct ReelsViewBody: View {
                 )
             case .previews:
                 viewModel.fetchPreviews(sortBy: selectedSortOption, isInitialLoad: true, filter: mergedPreviewFilter, liveFilter: sceneLiveForPreviews)
-            case .pics:
-                break
             }
         }
 
@@ -1437,8 +1530,6 @@ struct ReelsViewBody: View {
                 if let firstId = viewModel.clips.first?.id { newId = "clip-\(firstId)" }
             case .previews:
                 if let firstId = viewModel.previews.first?.id { newId = "preview-\(firstId)" }
-            case .pics:
-                break
             }
             if let id = newId {
                 // Show first item while paging walks toward pendingRestoreId in
@@ -1707,7 +1798,35 @@ struct ReelsViewBody: View {
         case .markers: return viewModel.sceneMarkers.isEmpty
         case .clips: return viewModel.clips.isEmpty
         case .previews: return viewModel.previews.isEmpty
-        case .pics: return false
+        }
+    }
+
+    /// Mode-specific loading — `viewModel.isLoading` is not set by `fetchScenes` and hid the spinner.
+    private var isFeedLoading: Bool {
+        switch reelsMode {
+        case .scenes: return viewModel.isLoadingScenes
+        case .markers: return viewModel.isLoadingMarkers
+        case .clips: return viewModel.isLoadingClips
+        case .previews: return viewModel.isLoadingPreviews || viewModel.isLoading
+        }
+    }
+
+    /// Lookup without remapping the entire feed list (chrome reads this every body pass).
+    private var currentVisibleReelItem: ReelItemData? {
+        guard let id = currentVisibleSceneId else { return nil }
+        switch reelsMode {
+        case .scenes:
+            let raw = id.hasPrefix("scene-") ? String(id.dropFirst("scene-".count)) : id
+            return viewModel.scenes.first(where: { $0.id == raw }).map { .scene($0) }
+        case .markers:
+            let raw = id.hasPrefix("marker-") ? String(id.dropFirst("marker-".count)) : id
+            return viewModel.sceneMarkers.first(where: { $0.id == raw }).map { .marker($0) }
+        case .clips:
+            let raw = id.hasPrefix("clip-") ? String(id.dropFirst("clip-".count)) : id
+            return viewModel.clips.first(where: { $0.id == raw }).map { .clip($0) }
+        case .previews:
+            let raw = id.hasPrefix("preview-") ? String(id.dropFirst("preview-".count)) : id
+            return viewModel.previews.first(where: { $0.id == raw }).map { .preview($0) }
         }
     }
 
@@ -1720,8 +1839,7 @@ struct ReelsViewBody: View {
     /// bleibt die System-Safe-Area aktiv, damit zentrierte States (`ConnectionErrorView`, Loading)
     /// mit der oberen `safeAreaInset`-Nav-Leiste fluchten und nicht „nach oben rutschen“.
     private var reelsPremiumContentSafeAreaRegions: SafeAreaRegions {
-        if reelsMode == .pics { return [] }
-        let awaitingFeed = isListEmpty && (viewModel.isLoading || viewModel.errorMessage != nil)
+        let awaitingFeed = isListEmpty && (isFeedLoading || viewModel.errorMessage != nil)
         if awaitingFeed { return [] }
         return .all
     }
@@ -1737,30 +1855,41 @@ struct ReelsViewBody: View {
             .onAppear {
                 handleOnAppear()
             }
-            .onChange(of: coordinator.selectedTab) { _, newTab in
+            .onChange(of: coordinator.selectedTab) { oldTab, newTab in
                 if newTab == .reels {
-                    if reelsMode == .pics {
-                        reelsStashLineHostRetained = true
+                    // Prefer pending performer/tag navigation over plain resume.
+                    if applyPendingReelsNavigationFromCoordinator() {
+                        return
                     }
                     if !isInitialized {
                         handleOnAppear()
+                    } else {
+                        reelsResumePlaybackAfterReturn()
                     }
-                } else {
+                } else if oldTab == .reels {
                     reelsStopPlaybackAndAccessories()
                 }
             }
             .onChange(of: coordinator.reelsNavigationToken) { _, _ in
+                // Ignore token updates while Feeds is not visible — otherwise an
+                // off-tab / soon-remounted instance clears `reelsPerformer` too early.
+                guard coordinator.selectedTab == .reels else { return }
                 applyPendingReelsNavigationFromCoordinator()
             }
             .sceneLiveUpdates(using: viewModel)
             .onChange(of: isMenuOpen) { _, newValue in
                 guard newValue else { return }
                 DispatchQueue.main.asyncAfter(deadline: .now() + 5.0) {
-                    isMenuOpen = false
+                    // Clear both flags — leaving rating overlay true would re-lock menus.
+                    self.isMenuOpen = false
+                    self.currentItemShowRatingOverlay = false
                 }
             }
             .onDisappear {
-                reelsStopPlaybackAndAccessories()
+                // Tab switches often skip `onDisappear`; still needed for push/pop within Feeds.
+                if coordinator.selectedTab == .reels {
+                    reelsStopPlaybackAndAccessories()
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
                 handleDefaultFilterChanged(notification)
@@ -1870,90 +1999,15 @@ struct ReelsViewBody: View {
         }
     }
 
-    @ViewBuilder
     private var premiumContentBase: some View {
-        premiumContentLayout
-            // `.automatic` (statt `.visible`), damit gepushte Children wie `FullScreenImageView`
-            // ihre eigene `.toolbar(.hidden, for: .tabBar)`-Einstellung durchsetzen können.
-            // Ein explizites `.visible` am NavigationStack-Root überschreibt sonst Pushed-Views.
-            .toolbar(reelsMode == .pics || isUIVisible ? .automatic : .hidden, for: .tabBar)
-            .sheet(isPresented: $showStashSyncSheet) {
-                #if !os(tvOS)
-                StashSyncSheet()
-                    .presentationDetents([.medium, .large])
-                    .presentationDragIndicator(.visible)
-                #endif
-            }
-            .sheet(isPresented: $showReelsSceneFilterSheet) {
-                reelsSceneStyleFilterSheet
-            }
-            .sheet(isPresented: $reelsClipImageFilters.showFilterSortSheet) {
-                ImagesCatalogFilterSortSheet(
-                    serverFilters: reelsClipImageFilters.sortedServerImageFilters(viewModel: viewModel),
-                    localPresets: reelsClipImageFilters.localCatalogPresets,
-                    selectedPresetRowId: $reelsClipImageFilters.catalogPresetRowSelection,
-                    filterMenuTitleFallback: reelsClipImageFilters.selectedFilter?.name,
-                    liveChipRowsVisible: reelsClipImageFilters.imageLiveChipRowsVisible,
-                    showMediaTypeFilter: reelsClipImageFilters.showImageMediaTypeFilter,
-                    sortOption: reelsClipImageFilters.selectedSortOption,
-                    onSortChange: { new in
-                        reelsClipImageFilters.changeSortOption(to: new, viewModel: viewModel)
-                        refetchReelsClipsFromModel(viewModel)
-                    },
-                    liveMinRating: $reelsClipImageFilters.liveFilterMinRating,
-                    livePerformerFavorite: $reelsClipImageFilters.liveFilterPerformerFavorite,
-                    liveOrganized: $reelsClipImageFilters.liveFilterOrganized,
-                    liveOCounterTag: $reelsClipImageFilters.liveFilterOCounterTag,
-                    liveStudioIds: $reelsClipImageFilters.liveFilterStudioIds,
-                    liveTagIds: $reelsClipImageFilters.liveFilterTagIds,
-                    liveMediaKind: $reelsClipImageFilters.liveFilterMediaKind,
-                    studioPickerOptions: reelsClipImageFilters.studioPickerOptions,
-                    studioPickerLoading: reelsClipImageFilters.studioPickerLoading,
-                    onStudioPickerSectionAppear: { reelsClipImageFilters.loadStudioPickerOptions(viewModel: viewModel) },
-                    tagPickerOptions: reelsClipImageFilters.tagPickerOptions,
-                    tagPickerLoading: reelsClipImageFilters.tagPickerLoading,
-                    onTagPickerSectionAppear: { reelsClipImageFilters.loadTagPickerOptions(viewModel: viewModel) },
-                    onApply: {
-                        refetchReelsClipsFromModel(viewModel)
-                    },
-                    onReset: {
-                        reelsClipImageFilters.catalogPresetRowSelection = ""
-                        reelsClipImageFilters.selectedFilter = nil
-                        reelsClipImageFilters.clearLiveChipsOnly()
-                        refetchReelsClipsFromModel(viewModel)
-                    },
-                    onRequestSave: { reelsClipImageFilters.savePresetOverwrite(viewModel: viewModel) },
-                    onRequestSaveAs: {
-                        reelsClipImageFilters.catalogPresetNameInput = ""
-                        reelsClipImageFilters.showSaveAsCatalogPresetAlert = true
-                    },
-                    onRequestRename: {
-                        if let sid = ListLivePresetTag.parseServerId(reelsClipImageFilters.catalogPresetRowSelection),
-                           let n = viewModel.savedFilters[sid]?.name {
-                            reelsClipImageFilters.renameCatalogPresetInput = n
-                        } else if let ls = ListLivePresetTag.parseLocalUUIDString(reelsClipImageFilters.catalogPresetRowSelection),
-                                  let uuid = UUID(uuidString: ls),
-                                  let p = reelsClipImageFilters.localCatalogPresets.first(where: { $0.id == uuid }) {
-                            reelsClipImageFilters.renameCatalogPresetInput = p.name
-                        }
-                        reelsClipImageFilters.showRenameCatalogPresetAlert = true
-                    },
-                    onRequestDelete: { reelsClipImageFilters.showDeleteCatalogPresetAlert = true }
-                )
-                .presentationDragIndicator(.visible)
-                .presentationBackground(Color.appBackground)
-                .onAppear {
-                    reelsClipFilterSheetHydrating = true
-                    var sel = reelsClipImageFilters.catalogPresetRowSelection
-                    ListLivePresetTag.migrateLegacySelection(&sel)
-                    reelsClipImageFilters.catalogPresetRowSelection = sel
-                    reelsClipImageFilters.refreshLocalPresets()
-                    reelsSyncClipCatalogPresetPickerSelection()
-                    Task { @MainActor in
-                        reelsClipFilterSheetHydrating = false
-                    }
-                }
-            }
+        let withClipAlerts = applyPremiumClipAlerts(premiumContentWithSheets)
+        let withSceneAlerts = applyPremiumSceneAlerts(withClipAlerts)
+        let withModeLifecycle = applyPremiumModeLifecycle(withSceneAlerts)
+        return applyPremiumListLifecycle(withModeLifecycle)
+    }
+
+    private func applyPremiumClipAlerts<V: View>(_ content: V) -> some View {
+        content
             .alert("Speichern unter", isPresented: $reelsClipImageFilters.showSaveAsCatalogPresetAlert) {
                 TextField("Name", text: $reelsClipImageFilters.catalogPresetNameInput)
                 Button("Speichern") {
@@ -1981,6 +2035,10 @@ struct ReelsViewBody: View {
             } message: {
                 Text(reelsClipImageFilters.deletePresetConfirmationText(viewModel: viewModel))
             }
+    }
+
+    private func applyPremiumSceneAlerts<V: View>(_ content: V) -> some View {
+        content
             .alert("Speichern unter", isPresented: $showReelsSceneSaveAsAlert) {
                 TextField("Name", text: $reelsScenePresetNameInput)
                 Button("Speichern") { reelsSaveSceneLivePresetAs(name: reelsScenePresetNameInput) }
@@ -2001,56 +2059,157 @@ struct ReelsViewBody: View {
             } message: {
                 Text(reelsSceneDeletePresetConfirmationText)
             }
+    }
+
+    private func applyPremiumModeLifecycle<V: View>(_ content: V) -> some View {
+        content
             .onChange(of: reelsClipImageFilters.catalogPresetRowSelection) { _, newId in
                 guard reelsClipImageFilters.showFilterSortSheet, !reelsClipFilterSheetHydrating else { return }
                 reelsClipImageFilters.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .onChange(of: reelsMode) { oldValue, newValue in handleModeChange(from: oldValue, to: newValue) }
-            .onChange(of: currentVisibleSceneId) { _, _ in
-                isMenuOpen = false
-                if reelsMode == .clips {
-                    reelsSyncClipCatalogPresetPickerSelection()
-                }
-                // Avoid turning playback on mid-gesture: `scrollPosition` can update before paging settles,
-                // which would briefly attach/play the next row's player (flash). Resume is handled in `onScrollPhaseChange(.idle)`.
-                if !isUserScrollingReels {
-                    currentItemIsPlaying = true
-                }
-                currentItemShowRatingOverlay = false
-                scrubberState.time = 0.0
-                scrubberState.duration = 1.0
-                scrubberState.seeking = false
-                scrubberState.seekTarget = nil
-                // Don't overwrite the saved session position while we are still paging
-                // towards a restore target (page 2+). Otherwise we would persist item 1.
-                if pendingRestoreId == nil {
-                    saveCurrentPositionIfPossible(for: reelsMode)
-                }
+            .onChange(of: reelsMode) { oldValue, newValue in
+                handleModeChange(from: oldValue, to: newValue)
             }
-            .onChange(of: viewModel.scenes.first?.id) { _, _ in autoSelectFirstItem(); continuePagedRestoreIfNeeded() }
-            .onChange(of: viewModel.sceneMarkers.first?.id) { _, _ in autoSelectFirstItem(); continuePagedRestoreIfNeeded() }
-            .onChange(of: viewModel.clips.first?.id) { _, _ in autoSelectFirstItem(); continuePagedRestoreIfNeeded() }
-            .onChange(of: viewModel.previews.first?.id) { _, _ in autoSelectFirstItem(); continuePagedRestoreIfNeeded() }
-            // Also react to total count changes (e.g. page 2+ appends) so paged restore
-            // keeps walking toward pendingRestoreId even while reelsListView is still
-            // mounting after a filter reset. The items.count onChange inside
-            // reelsListView can miss the initial 0→N transition while the loading
-            // overlay is visible.
-            .onChange(of: viewModel.scenes.count) { _, _ in continuePagedRestoreIfNeeded() }
-            .onChange(of: viewModel.sceneMarkers.count) { _, _ in continuePagedRestoreIfNeeded() }
-            .onChange(of: viewModel.clips.count) { _, _ in continuePagedRestoreIfNeeded() }
-            .onChange(of: viewModel.previews.count) { _, _ in continuePagedRestoreIfNeeded() }
-            .modifier(ReelsPicsFiltersPersistObserver(
-                filterId: reelsPicsImageFilters.selectedFilter?.id,
-                sortOption: reelsPicsImageFilters.selectedSortOption,
-                isPicsMode: reelsMode == .pics,
-                save: { saveSessionState(for: .pics) }
-            ))
+            .onChange(of: currentVisibleSceneId) { _, _ in
+                handleCurrentVisibleSceneIdChanged()
+            }
+    }
+
+    private func applyPremiumListLifecycle<V: View>(_ content: V) -> some View {
+        let firstSceneId = viewModel.scenes.first?.id
+        let firstMarkerId = viewModel.sceneMarkers.first?.id
+        let firstClipId = viewModel.clips.first?.id
+        let firstPreviewId = viewModel.previews.first?.id
+        let sceneCount = viewModel.scenes.count
+        let markerCount = viewModel.sceneMarkers.count
+        let clipCount = viewModel.clips.count
+        let previewCount = viewModel.previews.count
+        return content
+            .onChange(of: firstSceneId) { _, _ in autoSelectFirstItem(); continuePagedRestoreIfNeeded() }
+            .onChange(of: firstMarkerId) { _, _ in autoSelectFirstItem(); continuePagedRestoreIfNeeded() }
+            .onChange(of: firstClipId) { _, _ in autoSelectFirstItem(); continuePagedRestoreIfNeeded() }
+            .onChange(of: firstPreviewId) { _, _ in autoSelectFirstItem(); continuePagedRestoreIfNeeded() }
+            .onChange(of: sceneCount) { _, _ in continuePagedRestoreIfNeeded() }
+            .onChange(of: markerCount) { _, _ in continuePagedRestoreIfNeeded() }
+            .onChange(of: clipCount) { _, _ in continuePagedRestoreIfNeeded() }
+            .onChange(of: previewCount) { _, _ in continuePagedRestoreIfNeeded() }
+    }
+
+    private func handleCurrentVisibleSceneIdChanged() {
+        isMenuOpen = false
+        // New page: drop zoom lock so Feeds paging is not stuck disabled.
+        isMediaZoomed = false
+        if reelsMode == .clips {
+            reelsSyncClipCatalogPresetPickerSelection()
+        }
+        // Avoid turning playback on mid-gesture: `scrollPosition` can update before paging settles,
+        // which would briefly attach/play the next row's player (flash). Resume is handled in `onScrollPhaseChange(.idle)`.
+        if !isUserScrollingReels {
+            currentItemIsPlaying = true
+        }
+        currentItemShowRatingOverlay = false
+        scrubberState.time = 0.0
+        scrubberState.duration = 1.0
+        scrubberState.seeking = false
+        scrubberState.seekTarget = nil
+        // Don't overwrite the saved session position while we are still paging
+        // towards a restore target (page 2+). Otherwise we would persist item 1.
+        if pendingRestoreId == nil {
+            saveCurrentPositionIfPossible(for: reelsMode)
+        }
+    }
+
+    private var premiumContentWithSheets: some View {
+        premiumContentLayout
+            // `.automatic` (statt `.visible`), damit gepushte Children ihre eigene
+            // Tab-Bar-Sichtbarkeit (z. B. `FullScreenImageView`) durchsetzen können.
+            .toolbar(isUIVisible ? .automatic : .hidden, for: .tabBar)
+            .sheet(isPresented: $showStashSyncSheet) {
+                #if !os(tvOS)
+                StashSyncSheet()
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+                #endif
+            }
+            .sheet(isPresented: $showReelsSceneFilterSheet) {
+                reelsSceneStyleFilterSheet
+            }
+            .sheet(isPresented: $reelsClipImageFilters.showFilterSortSheet) {
+                reelsClipFilterSortSheet
+            }
+    }
+
+    private var reelsClipFilterSortSheet: some View {
+        ImagesCatalogFilterSortSheet(
+            serverFilters: reelsClipImageFilters.sortedServerImageFilters(viewModel: viewModel),
+            localPresets: reelsClipImageFilters.localCatalogPresets,
+            selectedPresetRowId: $reelsClipImageFilters.catalogPresetRowSelection,
+            filterMenuTitleFallback: reelsClipImageFilters.selectedFilter?.name,
+            liveChipRowsVisible: reelsClipImageFilters.imageLiveChipRowsVisible,
+            showMediaTypeFilter: reelsClipImageFilters.showImageMediaTypeFilter,
+            sortOption: reelsClipImageFilters.selectedSortOption,
+            onSortChange: { new in
+                reelsClipImageFilters.changeSortOption(to: new, viewModel: viewModel)
+                refetchReelsClipsFromModel(viewModel)
+            },
+            liveMinRating: $reelsClipImageFilters.liveFilterMinRating,
+            livePerformerFavorite: $reelsClipImageFilters.liveFilterPerformerFavorite,
+            liveOrganized: $reelsClipImageFilters.liveFilterOrganized,
+            liveOCounterTag: $reelsClipImageFilters.liveFilterOCounterTag,
+            liveStudioIds: $reelsClipImageFilters.liveFilterStudioIds,
+            liveTagIds: $reelsClipImageFilters.liveFilterTagIds,
+            liveMediaKind: $reelsClipImageFilters.liveFilterMediaKind,
+            studioPickerOptions: reelsClipImageFilters.studioPickerOptions,
+            studioPickerLoading: reelsClipImageFilters.studioPickerLoading,
+            onStudioPickerSectionAppear: { reelsClipImageFilters.loadStudioPickerOptions(viewModel: viewModel) },
+            tagPickerOptions: reelsClipImageFilters.tagPickerOptions,
+            tagPickerLoading: reelsClipImageFilters.tagPickerLoading,
+            onTagPickerSectionAppear: { reelsClipImageFilters.loadTagPickerOptions(viewModel: viewModel) },
+            onApply: {
+                refetchReelsClipsFromModel(viewModel)
+            },
+            onReset: {
+                reelsClipImageFilters.catalogPresetRowSelection = ""
+                reelsClipImageFilters.selectedFilter = nil
+                reelsClipImageFilters.clearLiveChipsOnly()
+                refetchReelsClipsFromModel(viewModel)
+            },
+            onRequestSave: { reelsClipImageFilters.savePresetOverwrite(viewModel: viewModel) },
+            onRequestSaveAs: {
+                reelsClipImageFilters.catalogPresetNameInput = ""
+                reelsClipImageFilters.showSaveAsCatalogPresetAlert = true
+            },
+            onRequestRename: {
+                if let sid = ListLivePresetTag.parseServerId(reelsClipImageFilters.catalogPresetRowSelection),
+                   let n = viewModel.savedFilters[sid]?.name {
+                    reelsClipImageFilters.renameCatalogPresetInput = n
+                } else if let ls = ListLivePresetTag.parseLocalUUIDString(reelsClipImageFilters.catalogPresetRowSelection),
+                          let uuid = UUID(uuidString: ls),
+                          let p = reelsClipImageFilters.localCatalogPresets.first(where: { $0.id == uuid }) {
+                    reelsClipImageFilters.renameCatalogPresetInput = p.name
+                }
+                reelsClipImageFilters.showRenameCatalogPresetAlert = true
+            },
+            onRequestDelete: { reelsClipImageFilters.showDeleteCatalogPresetAlert = true }
+        )
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color.appBackground)
+        .onAppear {
+            reelsClipFilterSheetHydrating = true
+            var sel = reelsClipImageFilters.catalogPresetRowSelection
+            ListLivePresetTag.migrateLegacySelection(&sel)
+            reelsClipImageFilters.catalogPresetRowSelection = sel
+            reelsClipImageFilters.refreshLocalPresets()
+            reelsSyncClipCatalogPresetPickerSelection()
+            Task { @MainActor in
+                reelsClipFilterSheetHydrating = false
+            }
+        }
     }
 
     @ViewBuilder
     private var premiumContentLayout: some View {
-        let reelsFeedConnectionError = reelsMode != .pics && isListEmpty && viewModel.errorMessage != nil
+        let reelsFeedConnectionError = isListEmpty && viewModel.errorMessage != nil
         ZStack {
             Group {
                 if reelsFeedConnectionError {
@@ -2060,54 +2219,35 @@ struct ReelsViewBody: View {
                 }
             }
 
-            let stashLineHostInTree = reelsMode == .pics || reelsStashLineHostRetained
+            let isLoading = isFeedLoading && isListEmpty
 
-            if stashLineHostInTree {
-                StashLineView(
-                    performerFilter: selectedPerformer?.toGalleryPerformer(),
-                    isEmbedded: true,
-                    onPerformerTap: { performer in
-                        applyPerformerFilter(performer.toScenePerformer())
-                    },
-                    externalListFilters: reelsPicsImageFilters
-                )
-                .applyAppBackground()
-                .opacity(reelsMode == .pics ? 1 : 0)
-                .allowsHitTesting(reelsMode == .pics)
+            if isLoading {
+                loadingStateView
+            } else if isListEmpty && viewModel.errorMessage != nil {
+                errorStateView
+            } else {
+                reelsListView()
             }
-
-            if reelsMode != .pics {
-                let isLoading = viewModel.isLoading && isListEmpty
-
-                if isLoading {
-                    loadingStateView
-                } else if isListEmpty && viewModel.errorMessage != nil {
-                    errorStateView
-                } else {
-                    reelsListView()
-                }
-            }
-        }
-        .onChange(of: reelsMode) { _, newMode in
-            if newMode == .pics { reelsStashLineHostRetained = true }
         }
         .ignoresSafeArea(reelsPremiumContentSafeAreaRegions)
-        .allowsHitTesting(!isMenuOpen)
         .navigationBarHidden(true)
         .safeAreaInset(edge: .top, spacing: 0) {
-            reelsNavBar
+            reelsNavBar(currentItem: currentVisibleReelItem)
+                .allowsHitTesting(isUIVisible)
         }
         .safeAreaInset(edge: .bottom, spacing: 0) {
-            if reelsMode != .pics && !reelsBottomChromeSuppressed {
+            if !reelsBottomChromeSuppressed {
+                let currentItem = currentVisibleReelItem
                 VStack(spacing: 0) {
-                    reelsInfoOverlay
-                    reelsScrubberBar
-                    reelsCapsulesBar
+                    reelsInfoOverlay(currentItem: currentItem)
+                    reelsScrubberBar(currentItem: currentItem)
                 }
-                .contentShape(Rectangle())
-                .onTapGesture {}
+                // Scrubber / info overlay must stay interactive whenever the chrome is visible.
                 .allowsHitTesting(isUIVisible)
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
+            ReelsTabBarLayout.invalidateCache()
         }
     }
 
@@ -2132,8 +2272,6 @@ struct ReelsViewBody: View {
                 let newFilter = defaultId != nil ? viewModel.savedFilters[defaultId!] : nil
                 selectedPreviewFilter = newFilter
                 applySettings(previewSortBy: StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .previews) ?? "") ?? selectedSortOption, previewFilter: newFilter, performer: selectedPerformer, tags: selectedTags)
-            case .pics:
-                break
             }
             reelsSyncFilterSheetPresetAndLiveChips(savedFilters: viewModel.savedFilters)
         }
@@ -2146,7 +2284,6 @@ struct ReelsViewBody: View {
             case .markers: return viewModel.sceneMarkers.isEmpty
             case .clips: return viewModel.clips.isEmpty
             case .previews: return viewModel.previews.isEmpty
-            case .pics: return false
             }
         }()
 
@@ -2156,7 +2293,6 @@ struct ReelsViewBody: View {
             case .scenes: return selectedFilter == nil
             case .markers: return selectedMarkerFilter == nil
             case .previews: return selectedPreviewFilter == nil
-            case .pics: return true
             }
         }()
         let noLiveChipCriteria: Bool = {
@@ -2169,8 +2305,6 @@ struct ReelsViewBody: View {
                 return !reelsMarkerLiveChips.isLiveFilterActive
             case .previews:
                 return !reelsPreviewLiveChips.isLiveFilterActive
-            case .pics:
-                return true
             }
         }()
         let noCriteriaSet = noSavedSceneStyleFilter && noLiveChipCriteria && selectedPerformer == nil && selectedTags.isEmpty
@@ -2182,7 +2316,6 @@ struct ReelsViewBody: View {
                 case .markers: return TabManager.shared.getDefaultMarkerFilterId(for: .reels)
                 case .clips: return TabManager.shared.getDefaultClipFilterId(for: .reels)
                 case .previews: return TabManager.shared.getDefaultPreviewFilterId(for: .reels)
-                case .pics: return nil
                 }
             }()
 
@@ -2202,8 +2335,6 @@ struct ReelsViewBody: View {
                     case .previews:
                         selectedPreviewFilter = filter
                         applySettings(previewSortBy: StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .previews) ?? "") ?? selectedSortOption, previewFilter: filter, performer: selectedPerformer, tags: selectedTags)
-                    case .pics:
-                        break
                     }
                 } else {
                     let currentModeType = reelsMode.toModeType
@@ -2222,8 +2353,6 @@ struct ReelsViewBody: View {
                     case .previews:
                         let savedSort = StashDBViewModel.SceneSortOption(rawValue: savedSortStr ?? "") ?? .random
                         applySettings(previewSortBy: savedSort, previewFilter: nil, performer: selectedPerformer, tags: selectedTags, clearPreviewFilter: true)
-                    case .pics:
-                        break
                     }
                 }
                 reelsSyncFilterSheetPresetAndLiveChips(savedFilters: newValue)
@@ -2236,8 +2365,10 @@ struct ReelsViewBody: View {
     /// Pausiert alle registrierten Reels-`AVPlayer`, beendet Zubehör-Sync und gibt die Audio-Session frei.
     /// Wichtig beim **Haupttab-Wechsel weg von Feeds**: SwiftUI-`TabView` ruft hier oft kein `onDisappear` auf.
     private func reelsStopPlaybackAndAccessories() {
+        saveCurrentPositionIfPossible(for: reelsMode)
+        savePlaybackCheckpoint(for: reelsMode)
         currentItemIsPlaying = false
-        ReelsPlayerRegistry.pauseAll()
+        ReelsPlayerRegistry.suspendPlayback()
         NotificationCenter.default.post(name: .reelsPauseAllPlayers, object: nil)
         UIApplication.shared.isIdleTimerDisabled = false
         HandyManager.shared.stop()
@@ -2247,6 +2378,47 @@ struct ReelsViewBody: View {
             try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
             print("🎬 Reels: Audio deactivation error: \(error)")
+        }
+    }
+
+    /// Resume scroll item + mid-clip time and continue autoplay after returning to Feeds.
+    private func reelsResumePlaybackAfterReturn() {
+        guard coordinator.selectedTab == .reels else { return }
+
+        ReelsPlayerRegistry.resumePlayback()
+
+        // Tab leave mid-gesture / overlays can leave these stuck and block Feeds interaction.
+        isUserScrollingReels = false
+        isRotating = false
+        isMenuOpen = false
+        isMediaZoomed = false
+        currentItemShowRatingOverlay = false
+
+        UIApplication.shared.isIdleTimerDisabled = true
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("🎬 Reels: Audio resume error: \(error)")
+        }
+
+        // Ensure the last visible item is still selected (TabView usually keeps @State).
+        if currentVisibleSceneId == nil {
+            restorePositionIfAvailable(for: reelsMode, forceIfPrefixMismatch: false)
+            beginPagedRestoreIfNeeded()
+            autoSelectFirstItem()
+        }
+
+        // Play first so the layer can decode a frame; seek follows on the next tick.
+        currentItemIsPlaying = true
+        playTrigger += 1
+
+        DispatchQueue.main.async {
+            guard self.coordinator.selectedTab == .reels else { return }
+            self.isUserScrollingReels = false
+            self.currentItemIsPlaying = true
+            self.applySavedPlaybackCheckpointIfMatching()
+            self.playTrigger += 1
         }
     }
 
@@ -2260,11 +2432,9 @@ struct ReelsViewBody: View {
     private func applyPendingReelsNavigationFromCoordinator() -> Bool {
         let initialPerformer = coordinator.reelsPerformer
         let initialTags = coordinator.reelsTags
-        let picsPerformer = coordinator.picsPerformerFilter
         let targetModeStr = coordinator.reelsTargetMode
 
-        guard picsPerformer != nil
-            || targetModeStr != nil
+        guard targetModeStr != nil
             || initialPerformer != nil
             || !initialTags.isEmpty else {
             return false
@@ -2272,21 +2442,11 @@ struct ReelsViewBody: View {
 
         if let modeStr = targetModeStr {
             coordinator.reelsTargetMode = nil
-            if let mode = ReelsMode(rawValue: modeStr) {
+            if modeStr == "Pics" {
+                reelsMode = firstEnabledReelsMode
+            } else if let mode = ReelsMode(rawValue: modeStr) {
                 reelsMode = mode
-            } else if modeStr == "Pics" {
-                reelsMode = .pics
             }
-        }
-
-        if let performer = picsPerformer {
-            coordinator.picsPerformerFilter = nil
-            coordinator.reelsPerformer = nil
-            coordinator.reelsTags = []
-            reelsMode = .pics
-            applySettings(sortBy: .dateDesc, sceneFilter: nil, performer: performer.toScenePerformer(), clearSceneFilter: true)
-            isInitialized = true
-            return true
         }
 
         if initialPerformer != nil || !initialTags.isEmpty {
@@ -2295,21 +2455,6 @@ struct ReelsViewBody: View {
 
             let targetMode = firstEnabledReelsMode
             reelsMode = targetMode
-
-            if targetMode == .pics {
-                selectedPerformer = initialPerformer
-                selectedTags = initialTags
-                reelsPicsImageFilters.reelsStashLinePerformerId = initialPerformer?.id
-                if !initialTags.isEmpty {
-                    reelsPicsImageFilters.liveFilterTagIds = initialTags.map(\.id)
-                    reelsPicsImageFilters.applyLiveFilter(viewModel: viewModel)
-                } else if initialPerformer != nil {
-                    reelsPicsImageFilters.refetchImages(viewModel: viewModel, initial: true)
-                }
-                reelsSyncFilterSheetPresetAndLiveChips(savedFilters: viewModel.savedFilters)
-                isInitialized = true
-                return true
-            }
 
             switch targetMode {
             case .scenes:
@@ -2345,8 +2490,6 @@ struct ReelsViewBody: View {
                 }
                 reelsClipImageFilters.selectedFilter = clipF
                 applySettings(clipSortBy: savedSort, clipFilter: clipF, performer: initialPerformer, tags: initialTags, mode: .clips)
-            case .pics:
-                break
             }
             reelsSyncFilterSheetPresetAndLiveChips(savedFilters: viewModel.savedFilters)
             isInitialized = true
@@ -2357,26 +2500,19 @@ struct ReelsViewBody: View {
     }
 
     private func handleOnAppear() {
-        if reelsMode == .pics {
-            reelsStashLineHostRetained = true
-        }
-
         UIApplication.shared.isIdleTimerDisabled = true
+        ReelsPlayerRegistry.resumePlayback()
         reelsClipImageFilters.externalRefetchClips = { vm in
             refetchReelsClipsFromModel(vm)
         }
 
         ReelsSessionRAM.clearLegacyUserDefaultsIfNeeded()
         
-        // Audio Optimization: Only activate audio session for video modes.
-        // Pics/StashLine has no audio and should not steal iOS audio focus.
-        if reelsMode != .pics {
-            do {
-                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
-                try AVAudioSession.sharedInstance().setActive(true)
-            } catch {
-                print("🎬 Reels: Audio setup error: \(error)")
-            }
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            print("🎬 Reels: Audio setup error: \(error)")
         }
 
         // 0. Guard against rotation-triggered onAppear
@@ -2393,11 +2529,10 @@ struct ReelsViewBody: View {
             return
         }
 
-        // After the first full setup, re-onAppear (navigation pop from a pushed
-        // child ReelsView, sheet dismiss, etc.) must NOT re-run session restore /
-        // restorePosition / autoSelectFirstItem — that was resetting scroll to
-        // the first item even though @State was still correct.
+        // After the first full setup, re-onAppear must NOT re-run session restore /
+        // autoSelectFirstItem (that reset scroll). Just resume autoplay + seek.
         if isInitialized {
+            reelsResumePlaybackAfterReturn()
             return
         }
 
@@ -2433,13 +2568,6 @@ struct ReelsViewBody: View {
             if let fid = sessionFilterId(for: .previews) {
                 selectedPreviewFilter = viewModel.savedFilters[fid]
             }
-        case .pics:
-            if let raw = sessionSortRaw(for: .pics), let opt = StashDBViewModel.ImageSortOption(rawValue: raw) {
-                reelsPicsImageFilters.selectedSortOption = opt
-            }
-            if let fid = sessionFilterId(for: .pics) {
-                reelsPicsImageFilters.selectedFilter = viewModel.savedFilters[fid]
-            }
         }
 
         // IMPORTANT: Restore the session sort/filter BEFORE restoring scroll position.
@@ -2465,7 +2593,6 @@ struct ReelsViewBody: View {
                 case .markers: return viewModel.sceneMarkers.isEmpty
                 case .clips: return viewModel.clips.isEmpty
                 case .previews: return viewModel.previews.isEmpty
-                case .pics: return false
                 }
             }()
 
@@ -2477,7 +2604,6 @@ struct ReelsViewBody: View {
                     case .markers: return TabManager.shared.getDefaultMarkerFilterId(for: .reels)
                     case .clips: return TabManager.shared.getDefaultClipFilterId(for: .reels)
                     case .previews: return TabManager.shared.getDefaultPreviewFilterId(for: .reels)
-                    case .pics: return nil
                     }
                 }()
                     
@@ -2536,8 +2662,6 @@ struct ReelsViewBody: View {
                         }
                         selectedPreviewFilter = prevFilter
                         applySettings(previewSortBy: savedSort, previewFilter: prevFilter)
-                    case .pics:
-                        break
                     }
                     reelsSyncFilterSheetPresetAndLiveChips(savedFilters: viewModel.savedFilters)
                 }
@@ -2546,24 +2670,19 @@ struct ReelsViewBody: View {
     }
 
     private func handleModeChange(from oldValue: ReelsMode, to newValue: ReelsMode) {
-        // When switching sub-tabs (Scenes/Markers/Clips/Previews/Pics) always pause the
+        // When switching sub-tabs (Scenes/Markers/Clips/Previews) always pause the
         // currently playing item immediately. Autoplay for the new mode is handled by
         // autoSelectFirstItem -> currentVisibleSceneId change (which resets isPlaying).
         currentItemIsPlaying = false
+        // Zoom locks outer paging via `.scrollDisabled(isMediaZoomed)` — clear on mode switch
+        // so Clips/etc. are swipeable again after a pinch on Scenes.
+        isMediaZoomed = false
+        isUserScrollingReels = false
         // Some mode switches may not trigger a scrollPosition/currentVisibleSceneId change
         // (e.g. when the list is already populated). Ensure we resume playback intent
         // shortly after the mode switch so the active item can start playing again.
-        if newValue != .pics {
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                self.currentItemIsPlaying = true
-            }
-        } else {
-            // Switching into Pics: release audio focus immediately.
-            do {
-                try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-            } catch {
-                print("🎬 Reels: Audio deactivation error: \(error)")
-            }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+            self.currentItemIsPlaying = true
         }
 
         // Persist old mode position, then restore the last known position for the new mode.
@@ -2595,12 +2714,6 @@ struct ReelsViewBody: View {
             selectedSortOption = StashDBViewModel.SceneSortOption(rawValue: sortRaw) ?? selectedSortOption
             let fid = sessionFilterId(for: .previews) ?? TabManager.shared.getDefaultPreviewFilterId(for: .reels)
             selectedPreviewFilter = (fid != nil ? viewModel.savedFilters[fid!] : nil)
-        case .pics:
-            reelsStashLineHostRetained = true
-            let sortRaw = sessionSortRaw(for: .pics) ?? TabManager.shared.getSortOption(for: .stashline) ?? ""
-            reelsPicsImageFilters.selectedSortOption = StashDBViewModel.ImageSortOption(rawValue: sortRaw) ?? reelsPicsImageFilters.selectedSortOption
-            let fid = sessionFilterId(for: .pics) ?? TabManager.shared.getDefaultFilterId(for: .stashline)
-            reelsPicsImageFilters.selectedFilter = (fid != nil ? viewModel.savedFilters[fid!] : nil)
         }
 
         reelsSyncFilterSheetPresetAndLiveChips(for: newValue, savedFilters: viewModel.savedFilters)
@@ -2614,8 +2727,6 @@ struct ReelsViewBody: View {
             applySettings(clipSortBy: reelsClipImageFilters.selectedSortOption, clipFilter: reelsClipImageFilters.selectedFilter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
         case .previews:
             applySettings(previewSortBy: selectedSortOption, previewFilter: selectedPreviewFilter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
-        case .pics:
-            break
         }
     }
 
@@ -2636,8 +2747,6 @@ struct ReelsViewBody: View {
                 applySettings(clipSortBy: reelsClipImageFilters.selectedSortOption, clipFilter: reelsClipImageFilters.selectedFilter, performer: selectedPerformer, tags: selectedTags)
             case .previews:
                 applySettings(previewSortBy: selectedSortOption, previewFilter: selectedPreviewFilter, performer: selectedPerformer, tags: selectedTags)
-            case .pics:
-                break
             }
         })
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -2707,7 +2816,6 @@ struct ReelsViewBody: View {
                 case .markers: viewModel.loadMoreMarkers()
                 case .clips: viewModel.loadMoreClips()
                 case .previews: viewModel.loadMorePreviews()
-                case .pics: break
                 }
             }
         }
@@ -2809,271 +2917,147 @@ struct ReelsViewBody: View {
             withAnimation(nil) {
                 proxy.scrollTo(target, anchor: .top)
             }
-            if self.reelsMode != .pics {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
-                    self.currentItemIsPlaying = true
-                }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                self.currentItemIsPlaying = true
             }
         }
     }
 
 
-    @ViewBuilder
-    private var reelsNavBar: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 8) {
-                Text(reelsMode.rawValue)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(.white)
-                    .lineLimit(1)
-                    .frame(width: 120, alignment: .leading)
+    /// Match expanding-dock menu chrome.
+    private var reelsTopChromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
 
-                let enabledModes = tabManager.enabledReelsModes.map { ReelsMode(from: $0) }
-                HStack(spacing: 8) {
-                    ForEach(enabledModes, id: \.self) { mode in
-                        let isActive = mode == reelsMode
-                        Button(action: {
-                            withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                                reelsMode = mode
+    /// Top chrome: filter + mode · active filters/hashtags · O + rating
+    @ViewBuilder
+    private func reelsNavBar(currentItem: ReelItemData?) -> some View {
+        let oCounter = currentItem?.oCounter ?? 0
+        let rating100 = currentItem?.rating100 ?? 0
+        let stars = max(0, min(5, Int(round(Double(rating100) / 20.0))))
+
+        HStack(spacing: 8) {
+            HStack(spacing: 6) {
+                reelsModePill
+                reelsFilterSortPill
+            }
+            .fixedSize()
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    if let performer = selectedPerformer {
+                        Button(action: { applyClearPerformerOnly() }) {
+                            HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 11, weight: .bold))
+                                Text(performer.name)
+                                    .font(.subheadline.weight(.semibold))
+                                    .lineLimit(1)
                             }
+                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                            .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    ForEach(selectedTags) { tag in
+                        Button(action: {
+                            var newTags = selectedTags
+                            newTags.removeAll { $0.id == tag.id }
+                            applyTagsChange(newTags)
                         }) {
-                            Image(systemName: mode.icon)
-                                .font(.system(size: 15, weight: .semibold))
-                                .foregroundColor(isActive ? .white : .white.opacity(0.6))
-                                .frame(maxWidth: .infinity)
-                                .frame(height: 32)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 9)
-                                        .fill(isActive ? appearanceManager.tintColor : Color.clear)
-                                )
+                            HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                                Image(systemName: "xmark")
+                                    .font(.system(size: 11, weight: .bold))
+                                Text("#\(tag.name)")
+                                    .font(.subheadline.weight(.semibold))
+                                    .lineLimit(1)
+                            }
+                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                            .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
                         }
                         .buttonStyle(.plain)
                     }
                 }
             }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(height: reelsTopChromePillHeight)
 
-            // Active performer / tag pills
-            // Always reserve space for this row so the safeAreaInset height stays constant.
-            // Changing the inset height causes the paging ScrollView to re-layout,
-            // which displaces the active video and kills its player.
-            let hasFilters = selectedPerformer != nil || !selectedTags.isEmpty
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 8) {
-                    if let performer = selectedPerformer {
-                        Button(action: {
-                            applySettings(sortBy: selectedSortOption, sceneFilter: selectedFilter, performer: nil, tags: selectedTags)
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
-                                Text(performer.name).font(.system(size: 12, weight: .bold)).lineLimit(1)
-                            }
-                            .foregroundColor(.white.opacity(0.9))
-                            .padding(.horizontal, 10).padding(.vertical, 6)
-                            .background(Color.white.opacity(0.15))
-                            .clipShape(Capsule())
-                        }
-                    }
-                    ForEach(selectedTags) { tag in
-                        Button(action: {
-                            var newTags = selectedTags
-                            newTags.removeAll { $0.id == tag.id }
-                            applySettings(sortBy: selectedSortOption, sceneFilter: selectedFilter, performer: selectedPerformer, tags: newTags)
-                        }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "xmark").font(.system(size: 10, weight: .bold))
-                                Text("#\(tag.name)").font(.system(size: 12, weight: .bold)).lineLimit(1)
-                            }
-                            .foregroundColor(.white.opacity(0.9))
-                            .padding(.horizontal, 10).padding(.vertical, 6)
-                            .background(Color.white.opacity(0.15))
-                            .clipShape(Capsule())
-                        }
-                    }
-                }
-                .padding(.horizontal, 12)
-            }
-            .frame(height: hasFilters ? nil : 0)
-            .clipped()
-            .padding(.bottom, hasFilters ? 6 : 0)
-            .animation(.easeInOut(duration: 0.15), value: hasFilters)
-
-            Divider().overlay(Color.white.opacity(0.15))
-        }
-        .background(.bar)
-        .colorScheme(.dark)
-        .opacity(isUIVisible ? 1 : 0)
-        .animation(.easeInOut(duration: 0.2), value: isUIVisible)
-    }
-
-    /// Bottom capsule bar (filter, O, rating, mute, play) — lives in safeAreaInset with the scrubber
-    @ViewBuilder
-    private var reelsCapsulesBar: some View {
-        let currentItem = currentReelItems.first(where: { $0.id == currentVisibleSceneId })
-        // Default to true when no item matched (transitioning between filter results)
-        // to avoid showing strikethrough controls during brief loading gap.
-        let isVideo = currentItem == nil ? true : (currentItem?.videoURL != nil && !(currentItem?.isAnimated ?? true))
-
-        let oCounter = currentItem?.oCounter ?? 0
-
-        HStack(spacing: 0) {
-            // 1 — Filter & Sort (leftmost, same width as peers)
-            reelsFilterSortFAB
-                .frame(maxWidth: .infinity)
-                .contentShape(Rectangle())
-
-            // 2 — O-Counter
-            Button {
-                if let item = currentItem { handleOCounterChange(item: item, newCount: oCounter + 1) }
-            } label: {
-                HStack(spacing: 4) {
-                    Image(systemName: oCounter > 0 ? AppearanceManager.shared.oCounterIconFilled : AppearanceManager.shared.oCounterIcon)
-                        .foregroundColor(oCounter > 0 ? appearanceManager.tintColor : .white)
-                    Text("\(oCounter)")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(.white)
-                }
-                .opacity(oCounter == 0 ? 0.5 : 1.0)
-                .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.plain)
-            .contentShape(Rectangle())
-
-            // 3 — Rating
-            Group {
-                if let item = currentItem {
-                    let rating100 = item.rating100 ?? 0
-                    let stars = max(0, min(5, Int(round(Double(rating100) / 20.0))))
-
-                    Menu {
-                        Button(action: { handleRatingChange(item: item, newRating: 0) }) {
-                            HStack {
-                                Text("Clear Rating")
-                                if stars == 0 { Image(systemName: "checkmark") }
-                            }
-                        }
-                        Divider()
-                        ForEach(1...5, id: \.self) { s in
-                            Button(action: { handleRatingChange(item: item, newRating: s * 20) }) {
-                                HStack {
-                                    Text(String(repeating: "★", count: s))
-                                    if stars == s { Image(systemName: "checkmark") }
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "star.fill")
-                                .foregroundColor(.white.opacity(stars > 0 ? 1.0 : 0.7))
-                            Text("\(stars)")
-                                .font(.system(size: 13, weight: .semibold))
-                                .foregroundColor(.white)
-                        }
-                        .opacity(stars == 0 ? 0.5 : 1.0)
-                        .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.plain)
-                } else {
-                    HStack(spacing: 4) {
-                        Image(systemName: "star.fill")
-                            .foregroundColor(.white.opacity(0.35))
-                        Text("0")
-                            .font(.system(size: 13, weight: .semibold))
-                            .foregroundColor(.white.opacity(0.35))
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-            }
-            .frame(maxWidth: .infinity)
-            .contentShape(Rectangle())
-
-            // 3b — Intelligent Zoom (landscape video on portrait phone)
-            if reelsMode != .pics {
+            HStack(spacing: 6) {
                 Button {
-                    #if !os(tvOS)
-                    HapticManager.selection()
-                    #endif
-                    tabManager.reelsIntelligentZoom.toggle()
+                    if let item = currentItem {
+                        handleOCounterChange(item: item, newCount: oCounter + 1)
+                    }
                 } label: {
-                    Image(systemName: tabManager.reelsIntelligentZoom ? "viewfinder.circle.fill" : "viewfinder.circle")
-                        .foregroundColor(tabManager.reelsIntelligentZoom ? appearanceManager.tintColor : .white)
-                        .frame(maxWidth: .infinity)
+                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                        Image(systemName: oCounter > 0 ? AppearanceManager.shared.oCounterIconFilled : AppearanceManager.shared.oCounterIcon)
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                            .foregroundColor(oCounter > 0 ? appearanceManager.tintColor : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                        Text("\(oCounter)")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                    }
+                    .opacity(currentItem == nil ? 0.35 : 1.0)
+                    .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
                 }
                 .buttonStyle(.plain)
-                .contentShape(Rectangle())
-                .accessibilityLabel("Intelligent Zoom")
-            }
+                .disabled(currentItem == nil)
+                .accessibilityLabel("O-Counter")
 
-            // 4 — Mute
-            Button {
-                if isVideo { isMuted.toggle() }
-            } label: {
-                Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                    .foregroundColor(isVideo ? .white : .white.opacity(0.5))
-                    .frame(maxWidth: .infinity)
-                    .overlay(
-                        Group {
-                            if !isVideo {
-                                Rectangle()
-                                    .fill(Color.white.opacity(0.8))
-                                    .frame(width: 20, height: 1.5)
-                                    .rotationEffect(.degrees(-45))
+                Group {
+                    if let item = currentItem {
+                        Menu {
+                            Button(action: { handleRatingChange(item: item, newRating: 0) }) {
+                                HStack {
+                                    Text("Clear Rating")
+                                    if stars == 0 { Image(systemName: "checkmark") }
+                                }
                             }
-                        }
-                    )
-            }
-            .buttonStyle(.plain)
-            .disabled(!isVideo)
-            .contentShape(Rectangle())
-
-            // 5 — Play / Pause
-            Button {
-                if isVideo { currentItemIsPlaying.toggle() }
-            } label: {
-                Image(systemName: currentItemIsPlaying ? "pause.fill" : "play.fill")
-                    .foregroundColor(isVideo ? .white : .white.opacity(0.5))
-                    .frame(maxWidth: .infinity)
-                    .overlay(
-                        Group {
-                            if !isVideo {
-                                Rectangle()
-                                    .fill(Color.white.opacity(0.8))
-                                    .frame(width: 20, height: 1.5)
-                                    .rotationEffect(.degrees(-45))
+                            Divider()
+                            ForEach(1...5, id: \.self) { s in
+                                Button(action: { handleRatingChange(item: item, newRating: s * 20) }) {
+                                    HStack {
+                                        Text(String(repeating: "★", count: s))
+                                        if stars == s { Image(systemName: "checkmark") }
+                                    }
+                                }
                             }
+                        } label: {
+                            HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                                Image(systemName: "star.fill")
+                                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                                    .foregroundColor(.white.opacity(stars > 0 ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
+                                Text("\(stars)")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                            }
+                            .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
                         }
-                    )
+                        .buttonStyle(.plain)
+                    } else {
+                        HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                            Text("0")
+                                .font(.subheadline.weight(.semibold))
+                        }
+                        .foregroundColor(.white.opacity(0.35))
+                        .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
+                    }
+                }
+                .accessibilityLabel("Rating")
             }
-            .buttonStyle(.plain)
-            .disabled(!isVideo)
-            .contentShape(Rectangle())
+            .fixedSize()
         }
-        .font(.system(size: 17))
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .padding(.horizontal, 16)
-        .background(
-            Capsule()
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.12), radius: 6, y: 2)
-        )
-        .overlay(
-            Capsule()
-                .stroke(Color.primary.opacity(0.07), lineWidth: 0.5)
-        )
-        .frame(height: 36)
-        .padding(.horizontal, 16)
-        .padding(.bottom, 6)
+        .frame(height: reelsTopChromePillHeight)
+        .padding(.horizontal, StashyExpandingDock.edgePadding)
+        .padding(.vertical, 6)
         .colorScheme(.dark)
         .opacity(isUIVisible ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: isUIVisible)
     }
 
-    // MARK: - Scrubber bar (below capsules)
+    // MARK: - Scrubber bar
     @ViewBuilder
-    private var reelsScrubberBar: some View {
-        let currentItem = currentReelItems.first(where: { $0.id == currentVisibleSceneId })
+    private func reelsScrubberBar(currentItem: ReelItemData?) -> some View {
         if let item = currentItem {
             if item.isAnimated {
                 // GIFs don't have a scrubber; don't reserve scrubber space (it pushed the overlay too high).
@@ -3084,13 +3068,13 @@ struct ReelsViewBody: View {
         }
     }
 
-    /// Info overlay, positioned above the capsule bar
+    /// Info overlay above the scrubber (performer/title + item hashtags + mute/play circles).
     @ViewBuilder
-    private var reelsInfoOverlay: some View {
-        let currentItem = currentReelItems.first(where: { $0.id == currentVisibleSceneId })
+    private func reelsInfoOverlay(currentItem: ReelItemData?) -> some View {
+        let isVideo = currentItem.map { $0.videoURL != nil && !$0.isAnimated } ?? false
         VStack(alignment: .leading, spacing: 0) {
             if let item = currentItem {
-                HStack(alignment: .top, spacing: 10) {
+                HStack(alignment: .center, spacing: 10) {
                     if let performer = item.performers.first {
                         NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer())) {
                             performerThumbnail(performer)
@@ -3099,7 +3083,6 @@ struct ReelsViewBody: View {
                     }
 
                     VStack(alignment: .leading, spacing: 4) {
-                        // Performer - Title
                         HStack(alignment: .firstTextBaseline, spacing: 6) {
                             if let performer = item.performers.first {
                                 Button(action: { applyPerformerFilter(performer) }) {
@@ -3132,7 +3115,6 @@ struct ReelsViewBody: View {
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                        // Hashtags
                         let tags = item.tags
                         Group {
                             if !tags.isEmpty {
@@ -3162,20 +3144,36 @@ struct ReelsViewBody: View {
                                     }
                                 }
                             } else {
-                                // Reserve space so the title row doesn't drop for items without tags (e.g. Clips/GIFs).
                                 Color.clear.opacity(0)
                             }
                         }
                         .frame(height: 20)
                     }
+
+                    // Circular mute / play spanning title + hashtag rows
+                    HStack(spacing: 8) {
+                        ChromeCircleButton(
+                            systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                            enabled: isVideo,
+                            accessibilityLabel: isMuted ? "Ton an" : "Stumm"
+                        ) {
+                            if isVideo { isMuted.toggle() }
+                        }
+
+                        ChromeCircleButton(
+                            systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
+                            enabled: isVideo,
+                            accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
+                        ) {
+                            if isVideo { currentItemIsPlaying.toggle() }
+                        }
+                    }
+                    .fixedSize()
                 }
-                .padding(.horizontal, 12)
-
-
+                .padding(.horizontal, StashyExpandingDock.edgePadding)
             }
         }
-        // Sit directly above the capsule bar
-        .padding(.bottom, -6)
+        .padding(.bottom, 2)
         .colorScheme(.dark)
         .opacity(isUIVisible ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: isUIVisible)
@@ -3184,7 +3182,7 @@ struct ReelsViewBody: View {
 
     @ViewBuilder
     private func performerThumbnail(_ performer: ScenePerformer) -> some View {
-        let size: CGFloat = 36
+        let size: CGFloat = StashyExpandingDock.circleSize
         Circle()
             .fill(appearanceManager.tintColor.opacity(0.2))
             .frame(width: size, height: size)
@@ -3280,69 +3278,74 @@ struct ReelsViewBody: View {
             }
         }
 
-    private var reelsFilterSortFABActive: Bool {
-        switch reelsMode {
-        case .scenes:
-            return reelsSceneLiveChips.isLiveFilterActive || selectedFilter != nil || !reelsSceneLiveSheetPresetSelection.isEmpty
-        case .markers:
-            return reelsMarkerLiveChips.isLiveFilterActive || selectedMarkerFilter != nil || !reelsMarkerLiveSheetPresetSelection.isEmpty
-        case .previews:
-            return reelsPreviewLiveChips.isLiveFilterActive || selectedPreviewFilter != nil || !reelsPreviewLiveSheetPresetSelection.isEmpty
-        case .clips:
-            return reelsClipImageFilters.catalogFilterSortFABActive
-        case .pics:
-            return false
-        }
+    @ViewBuilder
+    private var reelsFilterSortFAB: some View {
+        reelsFilterSortPill
     }
 
     @ViewBuilder
-    private var reelsFilterSortFAB: some View {
-        if reelsMode == .pics {
-            EmptyView()
-        } else {
-            Button {
-                switch reelsMode {
-                case .scenes, .markers, .previews:
-                    reelsRefreshSceneLivePresets()
-                    SceneLivePresetTag.migrateLegacySelection(&reelsSceneLiveSheetPresetSelection)
-                    SceneLivePresetTag.migrateLegacySelection(&reelsMarkerLiveSheetPresetSelection)
-                    SceneLivePresetTag.migrateLegacySelection(&reelsPreviewLiveSheetPresetSelection)
-                    reelsSyncFilterSheetPresetRow()
-                    showReelsSceneFilterSheet = true
-                case .clips:
-                    reelsClipImageFilters.refreshLocalPresets()
-                    reelsSyncClipCatalogPresetPickerSelection()
-                    reelsClipImageFilters.showFilterSortSheet = true
-                case .pics:
-                    break
-                }
-            } label: {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundColor(reelsFilterSortFABActive ? appearanceManager.tintColor : .white)
+    private var reelsFilterSortPill: some View {
+        Button {
+            switch reelsMode {
+            case .scenes, .markers, .previews:
+                reelsRefreshSceneLivePresets()
+                SceneLivePresetTag.migrateLegacySelection(&reelsSceneLiveSheetPresetSelection)
+                SceneLivePresetTag.migrateLegacySelection(&reelsMarkerLiveSheetPresetSelection)
+                SceneLivePresetTag.migrateLegacySelection(&reelsPreviewLiveSheetPresetSelection)
+                reelsSyncFilterSheetPresetRow()
+                showReelsSceneFilterSheet = true
+            case .clips:
+                reelsClipImageFilters.refreshLocalPresets()
+                reelsSyncClipCatalogPresetPickerSelection()
+                reelsClipImageFilters.showFilterSortSheet = true
             }
-            .accessibilityLabel("Filter und Sortierung")
+        } label: {
+            Image(systemName: "slider.horizontal.3")
+                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                .frame(width: StashyExpandingDock.iconSize, height: StashyExpandingDock.iconSize)
+                .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight, iconOnly: true))
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Filter und Sortierung")
     }
 
     @ViewBuilder
     private var modeMenu: some View {
+        reelsModePill
+    }
+
+    @ViewBuilder
+    private var reelsModePill: some View {
+        let enabledModes = tabManager.enabledReelsModes.map { ReelsMode(from: $0) }
         Menu {
-            Picker("Mode", selection: $reelsMode) {
-                ForEach(tabManager.enabledReelsModes, id: \.self) { modeType in
-                    let mode = ReelsMode(from: modeType)
-                    Label(mode.rawValue, systemImage: mode.icon).tag(mode)
+            ForEach(enabledModes, id: \.self) { mode in
+                Button {
+                    guard mode != reelsMode else { return }
+                    #if !os(tvOS)
+                    HapticManager.selection()
+                    #endif
+                    withAnimation(.spring(response: 0.32, dampingFraction: 0.72)) {
+                        reelsMode = mode
+                    }
+                } label: {
+                    Label(mode.rawValue, systemImage: mode.icon)
                 }
             }
         } label: {
             HStack(spacing: 4) {
                 Image(systemName: reelsMode.icon)
-                    .fontWeight(.semibold)
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 8, weight: .bold))
+                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                    .frame(width: StashyExpandingDock.iconSize, height: StashyExpandingDock.iconSize)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 10, weight: .bold))
             }
-            .foregroundColor(.white)
+            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+            .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
         }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Feed")
+        .accessibilityValue(reelsMode.rawValue)
     }
 
 }
@@ -3362,39 +3365,73 @@ private final class ReelItemVideoSurfaceReadiness: ObservableObject {
     private weak var boundLayer: AVPlayerLayer?
 
     /// Auf Player-Wechsel reagieren (Item-Wechsel ⇒ Reset der Anzeige + neue Failure-Beobachtung).
+    ///
+    /// Wichtig beim Zurückkehren von Navigation (Profil etc.): `onAppear` ruft `observe` erneut auf.
+    /// Der Layer ist oft bereits `isReadyForDisplay == true` — KVO feuert dann nicht nochmal.
+    /// Früher wurde `showsDecodedVideo` blind auf `false` gesetzt → dauerhaft schwarzes Bild.
     func observe(player: AVPlayer?) {
         currentItemObservation?.invalidate()
         currentItemObservation = nil
         itemStatusObservation?.invalidate()
         itemStatusObservation = nil
-        showsDecodedVideo = false
 
-        guard let player else { return }
+        guard let player else {
+            showsDecodedVideo = false
+            return
+        }
 
-        currentItemObservation = player.observe(\.currentItem, options: [.initial, .new]) { [weak self] player, _ in
+        // Nur verstecken, wenn wirklich kein Frame bereitsteht.
+        if boundLayer?.isReadyForDisplay != true {
+            showsDecodedVideo = false
+        }
+
+        // Kein `.initial` — sonst wipen wir beim Re-Observe ein bereits sichtbares Frame weg.
+        currentItemObservation = player.observe(\.currentItem, options: [.new]) { [weak self] player, _ in
             DispatchQueue.main.async {
                 self?.showsDecodedVideo = false
                 self?.bindItemFailure(player.currentItem)
             }
         }
+        bindItemFailure(player.currentItem)
+        resyncFromBoundLayer()
     }
 
     /// Vom `FullScreenVideoPlayer` per `onLayerReady` aufgerufen — wir hängen uns dauerhaft an
     /// `AVPlayerLayer.isReadyForDisplay`. Sobald `true`, ist das erste Frame sichtbar → Thumbnail ausblenden.
     func bind(layer: AVPlayerLayer) {
-        if boundLayer === layer, layerReadyObservation != nil { return }
-        layerReadyObservation?.invalidate()
-        layerReadyObservation = nil
-        boundLayer = layer
+        if boundLayer !== layer || layerReadyObservation == nil {
+            layerReadyObservation?.invalidate()
+            layerReadyObservation = nil
+            boundLayer = layer
+            layerReadyObservation = layer.observe(\.isReadyForDisplay, options: [.initial, .new]) { [weak self] avLayer, _ in
+                DispatchQueue.main.async {
+                    if avLayer.isReadyForDisplay {
+                        self?.showsDecodedVideo = true
+                    }
+                }
+            }
+        }
+        // Immer aktuellen Stand übernehmen (gleiche Layer-Instanz nach Pop/Update).
+        resyncFromBoundLayer()
+    }
 
-        if layer.isReadyForDisplay {
+    /// Nach Pause/Navigation/Seek: sichtbaren Stand vom gebundenen Layer wiederherstellen.
+    func resyncFromBoundLayer() {
+        if let layer = boundLayer, layer.isReadyForDisplay {
             showsDecodedVideo = true
         }
-        layerReadyObservation = layer.observe(\.isReadyForDisplay, options: [.initial, .new]) { [weak self] avLayer, _ in
-            DispatchQueue.main.async {
-                if avLayer.isReadyForDisplay {
-                    self?.showsDecodedVideo = true
-                }
+    }
+
+    /// `opacity: 0` kann verhindern, dass `isReadyForDisplay` wieder `true` wird.
+    /// Nach Play kurz nachziehen — besser kurzer Flash als dauerhaft schwarz.
+    func notePlaybackStarted() {
+        resyncFromBoundLayer()
+        guard !showsDecodedVideo else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+            guard let self else { return }
+            self.resyncFromBoundLayer()
+            if !self.showsDecodedVideo, self.boundLayer != nil {
+                self.showsDecodedVideo = true
             }
         }
     }
@@ -3463,25 +3500,26 @@ struct ReelItemView: View {
     @State private var isFastForwarding = false
     var onInteraction: () -> Void
     @StateObject private var videoSurfaceReadiness = ReelItemVideoSurfaceReadiness()
-    /// Subject focus for intelligent crop; `nil` until analyzed / when disabled.
-    @State private var intelligentFocus: CGPoint? = nil
-    @State private var intelligentZoomTask: Task<Void, Never>? = nil
     /// Live decoded size (accounts for clip rotation / preferredTransform).
     @State private var playbackPresentationSize: CGSize? = nil
 
     private var shouldFill: Bool {
-        let isPortraitDevice = UIScreen.main.bounds.height > UIScreen.main.bounds.width
-        // Intelligent zoom implies fill for landscape content on portrait phones
-        if usesIntelligentZoom { return true }
-
         // Only fill if the setting is enabled
         guard tabManager.reelsFillHeight else { return false }
 
+        let isPortraitDevice = UIScreen.main.bounds.height > UIScreen.main.bounds.width
         if isPortraitDevice {
             return !effectiveContentIsLandscape
         } else {
             return effectiveContentIsLandscape
         }
+    }
+
+    /// Immersive fill stops at the scrubber bottom (above capsules + tab bar). When chrome is hidden, full height.
+    /// Applied only to the video layer / web image — not to page layout (keeps paging intact).
+    private var immersiveBottomInset: CGFloat {
+        guard shouldFill, isUIVisible else { return 0 }
+        return ReelsImmersiveChromeLayout.videoBottomInset()
     }
 
     /// True when playing pixels are wider than tall (rotation-aware for clips).
@@ -3492,46 +3530,6 @@ struct ReelItemView: View {
         return !item.isPortrait
     }
 
-    /// Landscape video + portrait phone + toggle (Scenes / Markers / Clips / Previews).
-    private var usesIntelligentZoom: Bool {
-        #if !os(tvOS)
-        guard tabManager.reelsIntelligentZoom else { return false }
-        guard !item.isAnimated else { return false }
-        if case .clip(let c) = item, !c.isVideo { return false }
-        let isPortraitDevice = UIScreen.main.bounds.height > UIScreen.main.bounds.width
-        return isPortraitDevice && effectiveContentIsLandscape
-        #else
-        return false
-        #endif
-    }
-
-    private var contentPixelSize: CGSize? {
-        if let size = playbackPresentationSize, size.width > 1, size.height > 1 {
-            return size
-        }
-        switch item {
-        case .scene(let s):
-            if let w = s.files?.first?.width, let h = s.files?.first?.height {
-                return CGSize(width: CGFloat(w), height: CGFloat(h))
-            }
-        case .marker(let m):
-            if let w = m.scene?.files?.first?.width, let h = m.scene?.files?.first?.height {
-                return CGSize(width: CGFloat(w), height: CGFloat(h))
-            }
-        case .clip(let c):
-            if let w = c.visual_files?.first?.width, let h = c.visual_files?.first?.height {
-                return CGSize(width: CGFloat(w), height: CGFloat(h))
-            }
-        case .preview(let s):
-            if let w = s.files?.first?.width, let h = s.files?.first?.height {
-                return CGSize(width: CGFloat(w), height: CGFloat(h))
-            }
-        }
-        return nil
-    }
-
-    
-    
     var body: some View {
         applyModifiers(mainContent)
     }
@@ -3575,15 +3573,14 @@ extension ReelItemView {
                     setupPlayer()
                     onInteraction()
                     if item.isAnimated { startAnimationAdvanceTimer() }
-                    refreshIntelligentZoomIfNeeded()
                 } else {
                     // Deferred autoplay: after a filter change, onAppear can run before
                     // `currentVisibleSceneId` is set. Retry shortly if this row became active.
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                        guard !ReelsPlayerRegistry.isPlaybackSuspended else { return }
                         if isActive && isPlaying && !isRotating && !isUserScrolling {
                             if player == nil { setupPlayer() }
-                            player?.play()
-                            refreshIntelligentZoomIfNeeded()
+                            ReelsPlayerRegistry.playIfAllowed(player)
                         }
                     }
                 }
@@ -3595,13 +3592,12 @@ extension ReelItemView {
                 guard !isActive else { return }
                 cleanupPlayer()
                 cancelAnimationAdvanceTimer()
-                intelligentZoomTask?.cancel()
-                intelligentZoomTask = nil
             }
             .onReceive(NotificationCenter.default.publisher(for: .reelsPauseAllPlayers)) { _ in
                 // Robust pause: when paging/scrolling starts, pause immediately even if
                 // `currentVisibleSceneId` (and thus `isActive`) hasn't updated yet.
                 player?.pause()
+                player?.rate = 0
             }
             .onChange(of: isMuted) { _, newValue in
                 player?.isMuted = newValue
@@ -3610,44 +3606,27 @@ extension ReelItemView {
                 if newValue {
                     guard !isUserScrolling else { return }
                     if player == nil { setupPlayer() } else { refreshTimeObserver() }
-                    if isPlaying && !isRotating { player?.play() }
+                    if isPlaying && !isRotating { ReelsPlayerRegistry.playIfAllowed(player) }
                     onInteraction()
                     if item.isAnimated { startAnimationAdvanceTimer() }
-                    refreshIntelligentZoomIfNeeded()
                     // Deferred play: ensure player starts even if isPlaying binding
                     // hasn't propagated yet (e.g. after filter change resets state).
                     DispatchQueue.main.async {
+                        guard !ReelsPlayerRegistry.isPlaybackSuspended else { return }
                         if self.isActive && self.isPlaying && !self.isRotating && !self.isUserScrolling {
-                            self.player?.play()
+                            ReelsPlayerRegistry.playIfAllowed(self.player)
                         }
                     }
                 } else {
-                    intelligentZoomTask?.cancel()
                     if isUserScrolling {
                         player?.pause()
+                        player?.rate = 0
                         cancelAnimationAdvanceTimer()
                     } else {
                         cleanupPlayer()
                         cancelAnimationAdvanceTimer()
                     }
                 }
-            }
-            .onChange(of: tabManager.reelsIntelligentZoom) { _, enabled in
-                if enabled {
-                    refreshIntelligentZoomIfNeeded(force: true)
-                } else {
-                    // Sofort rauszoomen: Focus nil → PlayerView restored gravity + full bounds.
-                    intelligentZoomTask?.cancel()
-                    intelligentZoomTask = nil
-                    intelligentFocus = nil
-                }
-            }
-            .onChange(of: playbackPresentationSize?.width) { _, _ in
-                // Clips often flip landscape↔portrait per file via rotation metadata.
-                refreshIntelligentZoomIfNeeded(force: true)
-            }
-            .onChange(of: playbackPresentationSize?.height) { _, _ in
-                refreshIntelligentZoomIfNeeded(force: true)
             }
             .onChange(of: isUserScrolling) { _, scrolling in
                 if scrolling {
@@ -3669,11 +3648,12 @@ extension ReelItemView {
                     return
                 }
                 if player == nil { setupPlayer() } else { refreshTimeObserver() }
-                if isPlaying && !isRotating { player?.play() }
+                if isPlaying && !isRotating { ReelsPlayerRegistry.playIfAllowed(player) }
                 onInteraction()
                 DispatchQueue.main.async {
+                    guard !ReelsPlayerRegistry.isPlaybackSuspended else { return }
                     if self.isActive && self.isPlaying && !self.isRotating && !self.isUserScrolling {
-                        self.player?.play()
+                        ReelsPlayerRegistry.playIfAllowed(self.player)
                     }
                 }
             }
@@ -3692,12 +3672,24 @@ extension ReelItemView {
                 guard isActive && !isUserScrolling else { return }
                 if player == nil { setupPlayer() }
                 if isPlaying && !isRotating {
-                    player?.play()
+                    ReelsPlayerRegistry.playIfAllowed(player)
+                    videoSurfaceReadiness.notePlaybackStarted()
+                } else {
+                    videoSurfaceReadiness.resyncFromBoundLayer()
+                }
+                // After nav pop the layer can keep the last frame; force a display refresh.
+                DispatchQueue.main.async {
+                    if self.isActive && self.isPlaying && !self.isRotating && !self.isUserScrolling {
+                        ReelsPlayerRegistry.playIfAllowed(self.player)
+                        self.videoSurfaceReadiness.notePlaybackStarted()
+                    } else {
+                        self.videoSurfaceReadiness.resyncFromBoundLayer()
+                    }
                 }
             }
             .onChange(of: isRotating) { _, newValue in
                 if !newValue && isPlaybackActive && isPlaying {
-                    player?.play()
+                    ReelsPlayerRegistry.playIfAllowed(player)
                 } else if newValue {
                     player?.pause()
                 }
@@ -3719,14 +3711,19 @@ extension ReelItemView {
             .onChange(of: isPlaying) { _, playing in
                 guard isPlaybackActive else { return }
                 if playing {
-                    if !isRotating { player?.play() }
+                    if !isRotating {
+                        ReelsPlayerRegistry.playIfAllowed(player)
+                        videoSurfaceReadiness.notePlaybackStarted()
+                    }
                 } else {
                     player?.pause()
                 }
             }
             .onReceive(scrubberState.$seekTarget) { target in
                 guard let t = target else { return }
-                guard isPlaybackActive else { return }
+                // Scrubber lives outside the pager; allow seek whenever this row is the active item
+                // (do not require `!isUserScrolling` — that flag can briefly be true during chrome drags).
+                guard isActive, player != nil else { return }
                 seek(to: t)
                 DispatchQueue.main.async {
                     if scrubberState.seekTarget != nil {
@@ -3735,11 +3732,11 @@ extension ReelItemView {
                 }
             }
             .onReceive(scrubberState.$seeking) { seeking in
-                guard isPlaybackActive else { return }
+                guard isActive else { return }
                 if seeking {
                     player?.pause()
-                } else if isPlaying {
-                    player?.play()
+                } else if isPlaying, !isUserScrolling {
+                    ReelsPlayerRegistry.playIfAllowed(player)
                     onInteraction()
                 }
             }
@@ -3756,17 +3753,22 @@ extension ReelItemView {
 
     @ViewBuilder
     private var mediaLayer: some View {
+        let bottomInset = immersiveBottomInset
         ZoomableScrollView(isZoomed: $isZoomed, onTap: handleMediaTap, onLongPress: handleLongPress) {
             ZStack {
+                Color.black
                 Group {
                     if item.isAnimated {
                         CustomAsyncImage(url: item.videoURL) { loader in
                             if let data = loader.imageData, isAnimatedData(data) {
-                                AnimatedWebView(data: data, fillMode: shouldFill)
+                                AnimatedWebView(data: data, fillMode: shouldFill, bottomInset: bottomInset)
                             } else if let img = loader.image {
                                 img
                                     .resizable()
                                     .aspectRatio(contentMode: shouldFill ? .fill : .fit)
+                                    // Visual-only inset; outer frame stays full-bleed for paging.
+                                    .padding(.bottom, bottomInset)
+                                    .clipped()
                             } else if loader.isLoading {
                                 ProgressView()
                                     .tint(.white)
@@ -3780,23 +3782,18 @@ extension ReelItemView {
                         // bis der Player das **erste echte Frame** dekodiert hat (`AVPlayerLayer.isReadyForDisplay`).
                         // Spart pro Karte einen `CustomAsyncImage`-Request + Render-Pass und vermeidet das Aufblitzen
                         // eines Standbilds vor dem Video.
-                        ZStack {
-                            Color.black
-                            if let player = player {
-                                FullScreenVideoPlayer(
-                                    player: player,
-                                    videoGravity: shouldFill ? .resizeAspectFill : .resizeAspect,
-                                    focusNormalized: usesIntelligentZoom ? (intelligentFocus ?? CGPoint(x: 0.5, y: 0.38)) : nil,
-                                    intelligentZoomFactor: 1.15,
-                                    contentSize: contentPixelSize,
-                                    onLayerReady: { layer in
-                                        videoSurfaceReadiness.bind(layer: layer)
-                                    }
-                                )
-                                    .opacity(videoSurfaceReadiness.showsDecodedVideo ? 1 : 0)
-                                    .animation(.easeInOut(duration: 0.18), value: videoSurfaceReadiness.showsDecodedVideo)
-                                    .allowsHitTesting(videoSurfaceReadiness.showsDecodedVideo)
-                            }
+                        if let player = player {
+                            FullScreenVideoPlayer(
+                                player: player,
+                                videoGravity: shouldFill ? .resizeAspectFill : .resizeAspect,
+                                bottomContentInset: bottomInset,
+                                onLayerReady: { layer in
+                                    videoSurfaceReadiness.bind(layer: layer)
+                                }
+                            )
+                                .opacity(videoSurfaceReadiness.showsDecodedVideo ? 1 : 0)
+                                .animation(.easeInOut(duration: 0.18), value: videoSurfaceReadiness.showsDecodedVideo)
+                                .allowsHitTesting(false)
                         }
                     }
                 }
@@ -3804,16 +3801,17 @@ extension ReelItemView {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .ignoresSafeArea()
+        // Top only — do not expand under the bottom scrubber/capsule inset (steals scrubber drags).
+        .ignoresSafeArea(edges: .top)
         .focusable(false)
         .focusEffectDisabled()
     }
 
     private func handleMediaTap(at location: CGPoint) {
         let screenHeight = UIScreen.main.bounds.height
-        // Ignore taps in the top navigation area and bottom floating bar area
+        // Ignore taps in the top chrome and bottom info/scrubber area
         if location.y > 0 && location.y < 120 { return }
-        if location.y > 0 && location.y > screenHeight - 180 { return }
+        if location.y > 0 && location.y > screenHeight - 160 { return }
         
         guard !isMenuOpen else { return }
         withAnimation(.spring(response: 0.4, dampingFraction: 0.8)) {
@@ -3866,7 +3864,7 @@ extension ReelItemView {
         if !item.isAnimated && !isPlaying && isUIVisible && !isUserScrolling {
             CenterPlayButton {
                 isPlaying = true
-                if !isRotating { player?.play() }
+                if !isRotating { ReelsPlayerRegistry.playIfAllowed(player) }
                 onInteraction()
             }
         }
@@ -3984,36 +3982,11 @@ extension ReelItemView {
     }
     
     
-    private func refreshIntelligentZoomIfNeeded(force: Bool = false) {
-        #if !os(tvOS)
-        guard usesIntelligentZoom else {
-            intelligentFocus = nil
-            return
-        }
-        if intelligentFocus != nil && !force { return }
-
-        intelligentZoomTask?.cancel()
-        // v3: genital/hip focus + XY; shared across modes
-        let cacheKey = "reel-focus-v3-\(item.id)"
-        guard let url = item.intelligentZoomImageURL else {
-            intelligentFocus = CGPoint(x: 0.5, y: 0.38)
-            return
-        }
-        intelligentZoomTask = Task {
-            let point = await IntelligentCropAnalyzer.focus(fromImageURL: url, cacheKey: cacheKey)
-            guard !Task.isCancelled else { return }
-            await MainActor.run {
-                withAnimation(.easeInOut(duration: 0.25)) {
-                    intelligentFocus = CGPoint(x: point.x, y: point.y)
-                }
-            }
-        }
-        #endif
-    }
-
     func setupPlayer() {
         // Animations don't need AVPlayer
         guard !item.isAnimated else { return }
+        // Off-tab: do not create/upgrade players (createPlayer would re-activate AVAudioSession).
+        guard !ReelsPlayerRegistry.isPlaybackSuspended else { return }
 
         // `onAppear` + scroll settle can both call `setupPlayer` in the same transition; avoid a second
         // `initPlayer`/generation bump (visible flash + duplicate stream work).
@@ -4021,7 +3994,7 @@ extension ReelItemView {
             refreshTimeObserver()
             updateBestStream(generation: playerSetupGeneration)
             if isPlaying && isPlaybackActive && !isRotating {
-                player?.play()
+                ReelsPlayerRegistry.playIfAllowed(player)
             }
             return
         }
@@ -4086,6 +4059,7 @@ extension ReelItemView {
     
     private func initPlayer(with streamURL: URL, generation: Int) {
         guard generation == playerSetupGeneration else { return }
+        guard !ReelsPlayerRegistry.isPlaybackSuspended else { return }
         let headers = ["ApiKey": ServerConfigManager.shared.activeConfig?.secureApiKey ?? ""]
         let authenticatedURL = signedURL(streamURL) ?? streamURL
         let asset = AVURLAsset(url: authenticatedURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
@@ -4113,7 +4087,7 @@ extension ReelItemView {
             // when the stream upgrade arrives.
             if isPlaybackActive && (wasPlaying || isPlaying) {
                 existingPlayer.seek(to: currentTime, toleranceBefore: .zero, toleranceAfter: .zero)
-                existingPlayer.play()
+                ReelsPlayerRegistry.playIfAllowed(existingPlayer)
             }
         } else {
             // First time player creation
@@ -4125,9 +4099,10 @@ extension ReelItemView {
         
         player.isMuted = isMuted
         if isPlaying && isPlaybackActive && !isRotating {
-            player.play()
+            ReelsPlayerRegistry.playIfAllowed(player)
         } else {
             player.pause()
+            player.rate = 0
         }
         
         if startTime > 0 {
@@ -4141,6 +4116,8 @@ extension ReelItemView {
         
         // Loop or Auto-Advance (Scenes and Clips)
         NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { _ in
+            // Tab leave can race with end-of-item; never restart audio off-Feeds.
+            guard !ReelsPlayerRegistry.isPlaybackSuspended, self.isPlaying, self.isPlaybackActive else { return }
             if TabManager.shared.reelsContinuousPlay {
                 self.onVideoEnded()
                 return
@@ -4151,18 +4128,18 @@ extension ReelItemView {
                 } else {
                     player.seek(to: .zero)
                 }
-                player.play()
+                ReelsPlayerRegistry.playIfAllowed(player)
                 incrementPlayCount()
             } else if case .clip = self.item {
                 player.seek(to: .zero)
-                player.play()
+                ReelsPlayerRegistry.playIfAllowed(player)
             } else if case .marker = self.item {
                 let start = self.item.startTime
                 player.seek(to: CMTime(seconds: start, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
-                player.play()
+                ReelsPlayerRegistry.playIfAllowed(player)
             } else if case .preview = self.item {
                 player.seek(to: .zero)
-                player.play()
+                ReelsPlayerRegistry.playIfAllowed(player)
             }
         }
         
@@ -4213,9 +4190,6 @@ extension ReelItemView {
         }
         player = nil
         playbackPresentationSize = nil
-        intelligentFocus = nil
-        intelligentZoomTask?.cancel()
-        intelligentZoomTask = nil
     }
 
     /// Re-creates the periodic time observer so it captures the current `self`
@@ -4250,7 +4224,15 @@ extension ReelItemView {
 
     func seek(to time: Double) {
         let cmTime = CMTime(seconds: time, preferredTimescale: 600)
-        player?.seek(to: cmTime)
+        guard let player else { return }
+        player.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero) { [weak player] _ in
+            DispatchQueue.main.async {
+                self.videoSurfaceReadiness.resyncFromBoundLayer()
+                if self.isPlaying && self.isPlaybackActive && !self.isRotating {
+                    ReelsPlayerRegistry.playIfAllowed(player)
+                }
+            }
+        }
     }
 
     private func startAnimationAdvanceTimer() {
@@ -4392,26 +4374,6 @@ struct ReelsView: View {
     }
 }
 
-// MARK: - Pics-Filter-Persist Observer
-/// Persistiert Pics-Filter/Sort in `ReelsSessionRAM`, sobald sie sich ändern und der aktive Reels-Modus `.pics` ist.
-/// Ausgelagert als ViewModifier, damit `ReelsViewBody.premiumContentBase` für den Swift-Type-Checker handhabbar bleibt.
-private struct ReelsPicsFiltersPersistObserver: ViewModifier {
-    let filterId: String?
-    let sortOption: StashDBViewModel.ImageSortOption
-    let isPicsMode: Bool
-    let save: () -> Void
-
-    func body(content: Content) -> some View {
-        content
-            .onChange(of: filterId) { _, _ in
-                if isPicsMode { save() }
-            }
-            .onChange(of: sortOption) { _, _ in
-                if isPicsMode { save() }
-            }
-    }
-}
-
 // MARK: - Scrubber Isolation
 class ScrubberState: ObservableObject {
     @Published var time: Double = 0.0
@@ -4433,7 +4395,7 @@ struct IsolatedScrubberBar: View {
                     state.seekTarget = val
                 }
             ),
-            total: state.duration,
+            total: max(state.duration, 0.001),
             onEditingChanged: { editing in
                 state.seeking = editing
             }
@@ -4442,6 +4404,7 @@ struct IsolatedScrubberBar: View {
         .padding(.bottom, 11)
         .colorScheme(.dark)
         .opacity(isUIVisible ? 1 : 0)
+        .allowsHitTesting(isUIVisible)
         .animation(.easeInOut(duration: 0.2), value: isUIVisible)
     }
 }

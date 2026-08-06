@@ -6,7 +6,15 @@ struct DefaultSortView: View {
 
     var visibleTabs: [TabConfig] {
         tabManager.tabs
-            .filter { $0.id != .settings && $0.id != .catalogue && $0.id != .media && $0.id != .downloads && $0.id != .dashboard && $0.id != .reels }
+            .filter {
+                $0.id != .settings
+                    && $0.id != .catalogue
+                    && $0.id != .media
+                    && $0.id != .downloads
+                    && $0.id != .dashboard
+                    && $0.id != .reels
+                    && $0.id != .stashline
+            }
             .sorted { $0.sortOrder < $1.sortOrder }
     }
 
@@ -43,7 +51,6 @@ struct DefaultSortView: View {
         case .galleries: galleriesSortRow(tab: tab)
         case .tags:     tagsSortRow(tab: tab)
         case .images:   imagesSortRow(tab: tab)
-        case .stashline: imagesSortRow(tab: tab)
         case .groups:   groupsSortRow(tab: tab)
         case .markers:  markersSortRow(tab: tab)
         default:        EmptyView()

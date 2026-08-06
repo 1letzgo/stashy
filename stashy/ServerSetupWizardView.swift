@@ -205,19 +205,14 @@ struct ServerSetupWizardView: View {
                                 Button(action: fetchKeyViaLogin) {
                                     HStack {
                                         if isFetchingKey {
-                                            ProgressView()
-                                                .scaleEffect(0.8)
+                                            InlineSpinner(scale: .medium)
                                                 .padding(.trailing, 4)
                                         }
                                         Text("Fetch API Key")
-                                            .fontWeight(.bold)
                                     }
-                                    .frame(maxWidth: .infinity)
-                                    .padding(.vertical, 12)
-                                    .background(username.isEmpty || password.isEmpty || isFetchingKey ? Color.gray.opacity(0.3) : appearanceManager.tintColor)
-                                    .foregroundColor(.white)
-                                    .cornerRadius(DesignTokens.CornerRadius.button)
                                 }
+                                .buttonStyle(PrimaryFilledButtonStyle())
+                                .opacity(username.isEmpty || password.isEmpty || isFetchingKey ? 0.45 : 1)
                                 .disabled(username.isEmpty || password.isEmpty || isFetchingKey)
                                 
                                 if let error = loginErrorMessage {
@@ -262,8 +257,7 @@ struct ServerSetupWizardView: View {
             case .notTested, .testing:
                 VStack(spacing: 16) {
                     if case .testing = connectionTestResult {
-                        ProgressView()
-                            .scaleEffect(2)
+                        InlineSpinner(scale: .large)
                             .padding(.bottom, 16)
                     } else {
                         Image(systemName: "antenna.radiowaves.left.and.right")

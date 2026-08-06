@@ -5,6 +5,59 @@
 import SwiftUI
 import Combine
 
+/// Catalog grid density for Scenes / Galleries / Images (1 or 2 cards per row).
+enum CatalogCardColumns: Int, CaseIterable, Codable {
+    case one = 1
+    case two = 2
+
+    var next: CatalogCardColumns { self == .one ? .two : .one }
+
+    /// Icon for the *current* layout (tap toggles to the other).
+    var toggleIcon: String {
+        switch self {
+        case .one: return "rectangle.grid.1x2"
+        case .two: return "square.grid.2x2"
+        }
+    }
+
+    var accessibilityLabel: String {
+        switch self {
+        case .one: return "One card per row"
+        case .two: return "Two cards per row"
+        }
+    }
+
+    /// 1/row → 16:9 · 2/row → 1:1
+    var cardAspectRatio: CGFloat {
+        switch self {
+        case .one: return 16.0 / 9.0
+        case .two: return 1.0
+        }
+    }
+
+    func gridItems(spacing: CGFloat = 12) -> [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: spacing), count: rawValue)
+    }
+}
+
+/// Independent persistence scopes for the 1/2-per-row toggle.
+enum CatalogCardColumnScope: String, CaseIterable, Codable {
+    case scenes
+    case galleries
+    case images
+    /// Image grid inside an opened gallery (`ImagesView(gallery:)`).
+    case openedGallery
+
+    static func from(appTab: AppTab) -> CatalogCardColumnScope? {
+        switch appTab {
+        case .scenes: return .scenes
+        case .galleries: return .galleries
+        case .images: return .images
+        default: return nil
+        }
+    }
+}
+
 enum AppTab: String, CaseIterable, Codable, Identifiable {
     case dashboard
     case studios
@@ -52,7 +105,7 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
         switch self {
         case .dashboard: return "house.fill"
         case .studios: return "building.2"
-        case .performers: return "person.3"
+        case .performers: return "person.fill"
         case .scenes: return "film"
         case .galleries: return "photo.stack"
         case .images: return "photo"
@@ -289,12 +342,6 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(reelsFillHeight, forKey: reelsFillHeightKey)
         }
     }
-    /// Markers feed: smart subject crop for landscape clips on portrait phones.
-    @Published var reelsIntelligentZoom: Bool = false {
-        didSet {
-            UserDefaults.standard.set(reelsIntelligentZoom, forKey: reelsIntelligentZoomKey)
-        }
-    }
     @Published var reelsContinuousPlay: Bool = false {
         didSet {
             UserDefaults.standard.set(reelsContinuousPlay, forKey: reelsContinuousPlayKey)
@@ -325,6 +372,8 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(useColoredStatistics, forKey: useColoredStatisticsKey)
         }
     }
+    /// Per-scope catalog card density (Scenes / Galleries / Images / opened gallery). Published for SwiftUI refresh.
+    @Published private(set) var catalogCardColumnsByScope: [CatalogCardColumnScope: CatalogCardColumns] = [:]
 
     // Session-only sort options (not persisted)
     private var sessionSortOptions: [AppTab: String] = [:]
@@ -336,13 +385,13 @@ class TabManager: ObservableObject {
     private let reelsModesKey = "ReelsModesConfig"
     private let toolsKey = "ToolsConfig"
     private let reelsFillHeightKey = "ReelsFillHeight"
-    private let reelsIntelligentZoomKey = "ReelsIntelligentZoom"
     private let reelsContinuousPlayKey = "ReelsContinuousPlay"
     private let isPiPEnabledKey = "isPiPEnabled"
     private let dashboardHeroSizeKey = "DashboardHeroSize"
     private let useCompactStatisticsKey = "useCompactStatistics"
     private let showDashboardHeroBackgroundKey = "showDashboardHeroBackground"
     private let useColoredStatisticsKey = "useColoredStatistics"
+    private let catalogCardColumnsKey = "CatalogCardColumns"
     
     init() {
         // Initial load based on currently active server
@@ -364,7 +413,6 @@ class TabManager: ObservableObject {
         loadReelsModes()
         loadTools()
         self.reelsFillHeight = UserDefaults.standard.object(forKey: reelsFillHeightKey) as? Bool ?? true
-        self.reelsIntelligentZoom = UserDefaults.standard.bool(forKey: reelsIntelligentZoomKey)
         self.reelsContinuousPlay = UserDefaults.standard.bool(forKey: reelsContinuousPlayKey)
         self.isPiPEnabled = UserDefaults.standard.object(forKey: isPiPEnabledKey) as? Bool ?? true
         if let heroSizeRaw = UserDefaults.standard.string(forKey: dashboardHeroSizeKey),
@@ -376,6 +424,78 @@ class TabManager: ObservableObject {
         self.useCompactStatistics = UserDefaults.standard.bool(forKey: useCompactStatisticsKey)
         self.showDashboardHeroBackground = UserDefaults.standard.object(forKey: showDashboardHeroBackgroundKey) as? Bool ?? true
         self.useColoredStatistics = UserDefaults.standard.object(forKey: useColoredStatisticsKey) as? Bool ?? true
+        loadCatalogCardColumns()
+    }
+
+    // MARK: - Catalog card columns (1 / 2 per row)
+
+    private func defaultCatalogCardColumns(for scope: CatalogCardColumnScope) -> CatalogCardColumns {
+        switch scope {
+        case .scenes: return .one
+        case .galleries, .images, .openedGallery: return .two
+        }
+    }
+
+    private func loadCatalogCardColumns() {
+        var loaded: [CatalogCardColumnScope: CatalogCardColumns] = [:]
+        if let data = UserDefaults.standard.data(forKey: catalogCardColumnsKey),
+           let raw = try? JSONDecoder().decode([String: Int].self, from: data) {
+            for scope in CatalogCardColumnScope.allCases {
+                if let value = raw[scope.rawValue], let columns = CatalogCardColumns(rawValue: value) {
+                    loaded[scope] = columns
+                }
+            }
+            // First launch after split: seed opened-gallery from the shared Images preference.
+            if loaded[.openedGallery] == nil, let images = loaded[.images] {
+                loaded[.openedGallery] = images
+            }
+        }
+        for scope in CatalogCardColumnScope.allCases where loaded[scope] == nil {
+            loaded[scope] = defaultCatalogCardColumns(for: scope)
+        }
+        catalogCardColumnsByScope = loaded
+    }
+
+    private func saveCatalogCardColumns() {
+        var raw: [String: Int] = [:]
+        for (scope, columns) in catalogCardColumnsByScope {
+            raw[scope.rawValue] = columns.rawValue
+        }
+        if let data = try? JSONEncoder().encode(raw) {
+            UserDefaults.standard.set(data, forKey: catalogCardColumnsKey)
+        }
+    }
+
+    func catalogCardColumns(for scope: CatalogCardColumnScope) -> CatalogCardColumns {
+        catalogCardColumnsByScope[scope] ?? defaultCatalogCardColumns(for: scope)
+    }
+
+    func catalogCardColumns(for tab: AppTab) -> CatalogCardColumns {
+        guard let scope = CatalogCardColumnScope.from(appTab: tab) else {
+            return .two
+        }
+        return catalogCardColumns(for: scope)
+    }
+
+    func setCatalogCardColumns(_ columns: CatalogCardColumns, for scope: CatalogCardColumnScope) {
+        var next = catalogCardColumnsByScope
+        next[scope] = columns
+        catalogCardColumnsByScope = next
+        saveCatalogCardColumns()
+    }
+
+    func setCatalogCardColumns(_ columns: CatalogCardColumns, for tab: AppTab) {
+        guard let scope = CatalogCardColumnScope.from(appTab: tab) else { return }
+        setCatalogCardColumns(columns, for: scope)
+    }
+
+    func toggleCatalogCardColumns(for scope: CatalogCardColumnScope) {
+        setCatalogCardColumns(catalogCardColumns(for: scope).next, for: scope)
+    }
+
+    func toggleCatalogCardColumns(for tab: AppTab) {
+        guard let scope = CatalogCardColumnScope.from(appTab: tab) else { return }
+        toggleCatalogCardColumns(for: scope)
     }
     
     private var currentServerSuffix: String {
@@ -386,8 +506,9 @@ class TabManager: ObservableObject {
     }
     
     var visibleTabs: [AppTab] {
-        // Fixed order: Home, Feeds (optional), StashLine (optional), Settings
+        // Fixed order: Home, Feeds (optional), Tools (optional), Settings
         // Dashboard, Studios, Tags, Performers, Scenes, Galleries are now sub-tabs of Home
+        // Server tasks live under Settings (not in the Tools tab)
         let reelsVisible = tabs.first(where: { $0.id == .reels })?.isVisible ?? true
         let toolsVisible = tabs.first(where: { $0.id == .tools })?.isVisible ?? true
         var result: [AppTab] = [.catalogue]
@@ -766,9 +887,13 @@ class TabManager: ObservableObject {
            let decoded = try? JSONDecoder().decode([ReelsModeConfig].self, from: data) {
             self.reelsModes = decoded.sorted { $0.sortOrder < $1.sortOrder }
             
-            // Ensure all modes exist (migration for new modes)
+            // Ensure remaining modes exist; strip legacy Pics from persisted config.
             var hasChanges = false
-            for modeType in ReelsModeType.allCases {
+            if reelsModes.contains(where: { $0.type == .pics }) {
+                reelsModes.removeAll { $0.type == .pics }
+                hasChanges = true
+            }
+            for modeType in ReelsModeType.allCases where modeType != .pics {
                 if !reelsModes.contains(where: { $0.type == modeType }) {
                     let newMode = ReelsModeConfig(
                         id: UUID(),
@@ -781,6 +906,7 @@ class TabManager: ObservableObject {
                 }
             }
             if hasChanges {
+                for i in 0..<reelsModes.count { reelsModes[i].sortOrder = i }
                 saveReelsModes()
             }
         } else {
@@ -852,12 +978,12 @@ class TabManager: ObservableObject {
     
     var enabledTools: [ToolsItem] {
         let sorted = tools.sorted { $0.sortOrder < $1.sortOrder }
-        // Downloads is enforced enabled; keep order fully user-controlled.
-        return sorted.filter { $0.isEnabled }.map(\.id)
+        // Downloads is enforced enabled; Server tasks live under Settings.
+        return sorted.filter { $0.isEnabled && $0.id != .server }.map(\.id)
     }
     
     func toggleTool(_ item: ToolsItem) {
-        guard item != .downloads else { return } // fixed
+        guard item != .downloads, item != .server else { return }
         if let index = tools.firstIndex(where: { $0.id == item }) {
             tools[index].isEnabled.toggle()
             saveTools()
@@ -893,8 +1019,9 @@ class TabManager: ObservableObject {
     }
     
     func toggleReelsMode(_ type: ReelsModeType) {
+        guard type != .pics else { return }
         // Don't allow disabling all modes
-        let enabledCount = reelsModes.filter { $0.isEnabled }.count
+        let enabledCount = reelsModes.filter { $0.isEnabled && $0.type != .pics }.count
         if let index = reelsModes.firstIndex(where: { $0.type == type }) {
             if reelsModes[index].isEnabled && enabledCount <= 1 {
                 return // Can't disable the last mode
@@ -905,18 +1032,25 @@ class TabManager: ObservableObject {
     }
     
     func moveReelsMode(from source: IndexSet, to destination: Int) {
-        reelsModes.move(fromOffsets: source, toOffset: destination)
-        for i in 0..<reelsModes.count {
-            reelsModes[i].sortOrder = i
-        }
+        var editable = reelsModes.filter { $0.type != .pics }.sorted { $0.sortOrder < $1.sortOrder }
+        editable.move(fromOffsets: source, toOffset: destination)
+        for i in 0..<editable.count { editable[i].sortOrder = i }
+        reelsModes = editable
         saveReelsModes()
     }
     
     var enabledReelsModes: [ReelsModeType] {
         reelsModes
-            .filter { $0.isEnabled }
+            .filter { $0.isEnabled && $0.type != .pics }
             .sorted { $0.sortOrder < $1.sortOrder }
             .map { $0.type }
+    }
+
+    /// Modes shown in Feeds settings (Pics removed from product).
+    var configurableReelsModes: [ReelsModeConfig] {
+        reelsModes
+            .filter { $0.type != .pics }
+            .sorted { $0.sortOrder < $1.sortOrder }
     }
     
     func getReelsDefaultSort(for type: ReelsModeType) -> String? {

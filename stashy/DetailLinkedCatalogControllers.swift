@@ -1813,7 +1813,7 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
     }
 
     func handlePresetSelection(_ newId: String, viewModel: StashDBViewModel) {
-        guard showFilterSortSheet else { return }
+        // Sheet picker and floating-bar filter Menu both drive this.
         if newId.isEmpty {
             selectedFilter = nil
             clearLiveChipsOnly()

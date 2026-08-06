@@ -80,7 +80,6 @@ private struct HomeViewContent: View {
                     }
                 }
             }
-            .padding(.bottom, 80)
         }
         .scrollContentBackground(.hidden)
         .navigationTitle("Dashboard")

@@ -23,7 +23,6 @@
 		372E2D6A2F6339EE00603361 /* LoginAuthHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2D692F6339EE00603361 /* LoginAuthHelper.swift */; };
 		372E2D6B2F633DB400603361 /* LoginAuthHelper.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2D692F6339EE00603361 /* LoginAuthHelper.swift */; };
 		372E2D992F64272300603361 /* VideoAnalysisManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2D982F64272300603361 /* VideoAnalysisManager.swift */; };
-		A1ICR0012345678901234AB /* IntelligentCropAnalyzer.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ICR0022345678901234AB /* IntelligentCropAnalyzer.swift */; };
 		372E2D9B2F64425000603361 /* StashSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2D9A2F64425000603361 /* StashSyncManager.swift */; };
 		37D092D62F8980B400DB7A08 /* MarkersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37D092D52F8980B400DB7A08 /* MarkersView.swift */; };
 		37D3E2E52F39384000AB8FAD /* ServerConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB779EFE84155DC02AAC07 /* ServerConfig.swift */; };
@@ -140,6 +139,10 @@
 		F6BC02EF04794FCAA2460E89 /* PerformerRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E682F2A6386004CA019 /* PerformerRepository.swift */; };
 		FC10AB0012345678901234AB /* FloatingCatalogBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC10AB0112345678901234AB /* FloatingCatalogBar.swift */; };
 		FC10AB0212345678901234AB /* FloatingCatalogBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC10AB0112345678901234AB /* FloatingCatalogBar.swift */; };
+		STNV000012345678901234AB /* StashyTopNavStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = STNV000022345678901234AB /* StashyTopNavStrip.swift */; };
+		STNV000032345678901234AB /* StashyTopNavStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = STNV000022345678901234AB /* StashyTopNavStrip.swift */; };
+		SCHR000012345678901234AB /* SharedChromeComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = SCHR000022345678901234AB /* SharedChromeComponents.swift */; };
+		SCHR000032345678901234AB /* SharedChromeComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = SCHR000022345678901234AB /* SharedChromeComponents.swift */; };
 		FDFEA639517B4DF2B8490448 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7794FE84155DC02AAC07 /* App.swift */; };
 /* End PBXBuildFile section */
 
@@ -165,7 +168,6 @@
 		08FB77A2FE84155DC02AAC07 /* StashDBViewModel.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = StashDBViewModel.swift; sourceTree = "<group>"; };
 		372E2D692F6339EE00603361 /* LoginAuthHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginAuthHelper.swift; sourceTree = "<group>"; };
 		372E2D982F64272300603361 /* VideoAnalysisManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoAnalysisManager.swift; sourceTree = "<group>"; };
-		A1ICR0022345678901234AB /* IntelligentCropAnalyzer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IntelligentCropAnalyzer.swift; sourceTree = "<group>"; };
 		372E2D9A2F64425000603361 /* StashSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashSyncManager.swift; sourceTree = "<group>"; };
 		37D092D52F8980B400DB7A08 /* MarkersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkersView.swift; sourceTree = "<group>"; };
 		37D3E24E2F3932C400AB8FAD /* stashyTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = stashyTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -240,6 +242,8 @@
 		DFUI000062F3AUDIT006 /* ToastManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ToastManager.swift; sourceTree = "<group>"; };
 		FA617C2A62174FFFB0912B44 /* SceneGroupsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneGroupsCard.swift; sourceTree = "<group>"; };
 		FC10AB0112345678901234AB /* FloatingCatalogBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingCatalogBar.swift; sourceTree = "<group>"; };
+		STNV000022345678901234AB /* StashyTopNavStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyTopNavStrip.swift; sourceTree = "<group>"; };
+		SCHR000022345678901234AB /* SharedChromeComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedChromeComponents.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -297,6 +301,8 @@
 				DFGQ000042F28A0000000004 /* GraphQLQueries.swift */,
 				DF22BB192F16743C007C2090 /* HomeView.swift */,
 				FC10AB0112345678901234AB /* FloatingCatalogBar.swift */,
+				STNV000022345678901234AB /* StashyTopNavStrip.swift */,
+				SCHR000022345678901234AB /* SharedChromeComponents.swift */,
 				971A00022F999002 /* HotOrNotToolsView.swift */,
 				372E2D692F6339EE00603361 /* LoginAuthHelper.swift */,
 				DF22BB262F167CDC007C2090 /* ImageCacheManager.swift */,
@@ -338,7 +344,6 @@
 			isa = PBXGroup;
 			children = (
 				372E2D982F64272300603361 /* VideoAnalysisManager.swift */,
-				A1ICR0022345678901234AB /* IntelligentCropAnalyzer.swift */,
 				372E2D9A2F64425000603361 /* StashSyncManager.swift */,
 				DFSEC0022F2A000100000002 /* SecurityManager.swift */,
 			);
@@ -565,7 +570,6 @@
 				DFST0000F2F30A000000000F /* ReelsModeSettingsView.swift in Sources */,
 				DFST000112F30A0000000011 /* DefaultSortView.swift in Sources */,
 				372E2D992F64272300603361 /* VideoAnalysisManager.swift in Sources */,
-				A1ICR0012345678901234AB /* IntelligentCropAnalyzer.swift in Sources */,
 				DFST000132F30A0000000013 /* DefaultFilterView.swift in Sources */,
 				DFST000152F30A0000000015 /* ServerStatisticsView.swift in Sources */,
 				DFE5045E2E8A8C2000323FF0 /* ScenesView.swift in Sources */,
@@ -609,6 +613,8 @@
 				DF06EF262F18EC1300299105 /* SceneCardView.swift in Sources */,
 				DF22BB242F16743C007C2090 /* HomeView.swift in Sources */,
 				FC10AB0012345678901234AB /* FloatingCatalogBar.swift in Sources */,
+				STNV000012345678901234AB /* StashyTopNavStrip.swift in Sources */,
+				SCHR000012345678901234AB /* SharedChromeComponents.swift in Sources */,
 				971A00012F999001 /* HotOrNotToolsView.swift in Sources */,
 				DFF7EE412F0D3D2800344A8B /* TabManager.swift in Sources */,
 				DFE504622E8A8C4000323FF0 /* StudiosView.swift in Sources */,
@@ -642,6 +648,8 @@
 				5BC6653D5C9D4675881F40BA /* GalleriesView.swift in Sources */,
 				2F2314B3093A480F864AFEEC /* HomeView.swift in Sources */,
 				FC10AB0212345678901234AB /* FloatingCatalogBar.swift in Sources */,
+				STNV000032345678901234AB /* StashyTopNavStrip.swift in Sources */,
+				SCHR000032345678901234AB /* SharedChromeComponents.swift in Sources */,
 				6B7F79949CEB4E2CB62F2650 /* ReelsView.swift in Sources */,
 				9AA0A05BF61443C2B087A163 /* SharedUtilities.swift in Sources */,
 				8D7ECC24161D4D9EBF4C3A57 /* TagsView.swift in Sources */,

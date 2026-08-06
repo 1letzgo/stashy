@@ -12,7 +12,6 @@ import WebKit
 private struct StudiosViewContent: View {
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var configManager = ServerConfigManager.shared
-    @ObservedObject private var appearance = AppearanceManager.shared
     @State private var selectedSortOption: StashDBViewModel.StudioSortOption
     @State private var isChangingSort = false
     @State private var searchText = ""
@@ -436,22 +435,9 @@ private struct StudiosViewContent: View {
         .floatingActionBar(isPresented: true, catalogChrome: CatalogFloatingChromeState(hasActiveServerConfig: configManager.activeConfig != nil, primaryListIsEmpty: viewModel.studios.isEmpty, errorMessage: viewModel.errorMessage)) {
             HStack(spacing: 0) {
                 Spacer(minLength: 0)
-                Button {
+                CatalogFilterFABButton(isActive: catalogFilterSortFABActive) {
                     showFilterSortSheet = true
-                } label: {
-                    Image(systemName: "slider.horizontal.3")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundColor(catalogFilterSortFABActive ? appearance.tintColor : .primary)
-                        .overlay(alignment: .topTrailing) {
-                            if catalogFilterSortFABActive {
-                                Circle()
-                                    .fill(appearance.tintColor)
-                                    .frame(width: 7, height: 7)
-                                    .offset(x: 3, y: -3)
-                            }
-                        }
                 }
-                .accessibilityLabel("Filter and sort")
                 Spacer(minLength: 0)
             }
         }
@@ -557,6 +543,14 @@ private struct StudiosViewContent: View {
     }
 
     private func onAppearAction() {
+        var forceRefresh = false
+        if let injectedSortStr = coordinator.activeSortOption,
+           let injectedSort = StashDBViewModel.StudioSortOption(rawValue: injectedSortStr) {
+            selectedSortOption = injectedSort
+            coordinator.activeSortOption = nil
+            forceRefresh = true
+        }
+
         // Check for search text from navigation
         if !coordinator.activeSearchText.isEmpty {
             searchText = coordinator.activeSearchText
@@ -568,7 +562,7 @@ private struct StudiosViewContent: View {
         }
         
         if TabManager.shared.getDefaultFilterId(for: .studios) == nil || !viewModel.savedFilters.isEmpty {
-            if viewModel.studios.isEmpty {
+            if forceRefresh || viewModel.studios.isEmpty {
                 performSearch()
             }
         }
@@ -637,7 +631,6 @@ private struct StudiosViewContent: View {
                     }
                 }
                 .padding(16)
-                .padding(.bottom, 70)
             }
             .refreshable { performSearch() }
             .onAppear {

@@ -43,7 +43,9 @@ struct ToolsSettingsView: View {
     }
     
     private var orderedTools: [ToolsItemConfig] {
-        tabManager.tools.sorted { $0.sortOrder < $1.sortOrder }
+        tabManager.tools
+            .filter { $0.id != .server }
+            .sorted { $0.sortOrder < $1.sortOrder }
     }
 
     var body: some View {
@@ -59,7 +61,7 @@ struct ToolsSettingsView: View {
             }
             .listRowBackground(Color.secondaryAppBackground)
 
-            Section("Tools Order") {
+            Section {
                 ForEach(orderedTools) { tool in
                     if tool.id == .downloads {
                         HStack {
@@ -80,8 +82,21 @@ struct ToolsSettingsView: View {
                     }
                 }
                 .onMove { indices, newOffset in
-                    tabManager.moveTools(from: indices, to: newOffset)
+                    var working = orderedTools
+                    working.move(fromOffsets: indices, toOffset: newOffset)
+                    var rebuilt = working.enumerated().map { idx, item in
+                        ToolsItemConfig(id: item.id, isEnabled: item.isEnabled, sortOrder: idx)
+                    }
+                    if tabManager.tools.contains(where: { $0.id == .server }) {
+                        rebuilt.append(ToolsItemConfig(id: .server, isEnabled: false, sortOrder: rebuilt.count))
+                    }
+                    tabManager.tools = rebuilt
+                    tabManager.saveTools()
                 }
+            } header: {
+                Text("Tools Order")
+            } footer: {
+                Text("Server tasks are available under Settings → Server.")
             }
             .listRowBackground(Color.secondaryAppBackground)
         }
