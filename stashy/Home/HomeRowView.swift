@@ -58,6 +58,49 @@ func homeCardHeight(for config: HomeRowConfig, isLarge: Bool, screenWidth: CGFlo
     }
 }
 
+// MARK: - Hero backdrop
+
+/// Blurred wash behind the first (large) dashboard row. Equatable so horizontal
+/// `scrollPosition` churn does not rebuild the safe-area-ignoring host unless the
+/// focused thumbnail actually changes — that remount was flickering the status bar.
+private struct HomeDashboardHeroBackdrop: View, Equatable {
+    let thumbnailURL: URL?
+
+    static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.thumbnailURL == rhs.thumbnailURL
+    }
+
+    var body: some View {
+        GeometryReader { geo in
+            Color.clear
+                .frame(height: geo.size.height + 500 + 12) // 500pt top + 12pt bottom extension
+                .overlay(alignment: .bottom) {
+                    ZStack {
+                        if let thumbnailURL {
+                            CustomAsyncImage(url: thumbnailURL) { loader in
+                                if let image = loader.image {
+                                    image.resizable().scaledToFill()
+                                }
+                            }
+                            .id(thumbnailURL.absoluteString)
+                            .transition(.opacity)
+                        }
+                    }
+                    .animation(.easeInOut(duration: 0.5), value: thumbnailURL?.absoluteString)
+                    .scaleEffect(1.3)
+                    .blur(radius: 40)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 1200)
+                }
+                .clipped()
+                .offset(y: -500)
+        }
+        .ignoresSafeArea(edges: .top)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+}
+
 // MARK: - HomeRowView
 
 struct HomeRowView: View {
@@ -110,26 +153,10 @@ struct HomeRowView: View {
         .background {
             if isLarge && isFirst && tabManager.showDashboardHeroBackground {
                 let focusedScene = scenes.first { $0.id == scrollID } ?? scenes.first
-                if let url = focusedScene?.thumbnailURL {
-                    GeometryReader { geo in
-                        Color.clear
-                            .frame(height: geo.size.height + 500 + 12) // 500pt top + 12pt bottom extension
-                            .overlay(alignment: .bottom) {
-                                CustomAsyncImage(url: url) { loader in
-                                    if let image = loader.image {
-                                        image.resizable().scaledToFill()
-                                    }
-                                }
-                                .scaleEffect(1.3)
-                                .blur(radius: 40)
-                                .frame(height: 1200)
-                            }
-                            .clipped()
-                            .offset(y: -500)
-                    }
-                    .ignoresSafeArea(edges: .top)
-                    .animation(.easeInOut(duration: 0.5), value: url)
-                }
+                // Keep the under-status-bar host mounted; only swap the image.
+                // Remounting `.ignoresSafeArea` on every scroll snap flickers the status bar.
+                HomeDashboardHeroBackdrop(thumbnailURL: focusedScene?.thumbnailURL)
+                    .equatable()
             }
         }
         .onAppear { checkAndLoad() }

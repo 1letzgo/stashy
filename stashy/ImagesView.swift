@@ -379,6 +379,9 @@ private struct ImagesViewBody: View {
 
             viewModel.fetchSavedFilters()
         }
+        .task(id: gallery?.id) {
+            await hydrateOpenedGalleryIfNeeded()
+        }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
             guard gallery == nil else { return }
             if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.images.rawValue {
@@ -619,6 +622,27 @@ private struct ImagesViewBody: View {
                     .font(.system(size: 24))
                     .foregroundColor(.appAccent.opacity(0.5))
             )
+    }
+
+    /// Image 1-row avatar navigation passes a stub Gallery (`cover: nil`). Load full metadata for the header.
+    private func hydrateOpenedGalleryIfNeeded() async {
+        guard let current = gallery, current.cover == nil else { return }
+        let query = GraphQLQueries.queryWithFragments("findGalleries")
+        let variables: [String: Any] = [
+            "ids": [current.id],
+            "filter": ["per_page": 1]
+        ]
+        do {
+            let response: GalleriesResponse = try await GraphQLClient.shared.execute(
+                query: query,
+                variables: variables
+            )
+            if let hydrated = response.data?.findGalleries.galleries.first {
+                gallery = hydrated
+            }
+        } catch {
+            // Keep stub + cover URL fallback; images list still works.
+        }
     }
 
     private func getGalleryHeaderDetails(_ gallery: Gallery) -> [(label: String, value: String)] {

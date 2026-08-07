@@ -1341,6 +1341,7 @@ struct StashSyncCard: View {
     @ObservedObject var handyManager = HandyManager.shared
     @ObservedObject var buttplugManager = ButtplugManager.shared
     @ObservedObject var loveSpouseManager = LoveSpouseManager.shared
+    @State private var isChannelsExpanded = false
 
     private var isSceneSyncActive: Bool {
         handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode || stashSync.isActive
@@ -1360,27 +1361,48 @@ struct StashSyncCard: View {
                         if showVideoAnalysis {
                             let combined = videoManager.currentIntensity
                             VStack(alignment: .leading, spacing: 8) {
-                                HStack {
-                                    Text("Combined Output")
-                                        .font(.subheadline.weight(.bold))
-                                    Spacer()
-                                    Text("\(Int(combined * 100))%")
-                                        .font(.subheadline.weight(.bold).monospacedDigit())
+                                Button {
+                                    withAnimation(.spring(duration: 0.25)) {
+                                        isChannelsExpanded.toggle()
+                                    }
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        HStack {
+                                            Text("Combined Output")
+                                                .font(.subheadline.weight(.bold))
+                                            Spacer()
+                                            Text("\(Int(combined * 100))%")
+                                                .font(.subheadline.weight(.bold).monospacedDigit())
+                                            Image(systemName: isChannelsExpanded ? "chevron.up" : "chevron.down")
+                                                .font(.system(size: 10, weight: .bold))
+                                                .foregroundColor(appearanceManager.tintColor)
+                                                .padding(6)
+                                                .background(appearanceManager.tintColor.opacity(0.12))
+                                                .clipShape(Circle())
+                                        }
+                                        GeometryReader { geo in
+                                            ZStack(alignment: .leading) {
+                                                Rectangle().fill(Color.gray.opacity(0.15))
+                                                Rectangle().fill(appearanceManager.tintColor)
+                                                    .frame(width: max(0, geo.size.width * CGFloat(combined)))
+                                                    .animation(.linear(duration: 0.1), value: combined)
+                                            }.clipShape(Capsule())
+                                        }.frame(height: 7)
+                                    }
+                                    .contentShape(Rectangle())
                                 }
-                                GeometryReader { geo in
-                                    ZStack(alignment: .leading) {
-                                        Rectangle().fill(Color.gray.opacity(0.15))
-                                        Rectangle().fill(appearanceManager.tintColor)
-                                            .frame(width: max(0, geo.size.width * CGFloat(combined)))
-                                            .animation(.linear(duration: 0.1), value: combined)
-                                    }.clipShape(Capsule())
-                                }.frame(height: 7)
+                                .buttonStyle(.plain)
 
-                                compactBar(label: "Hip / Body", value: videoManager.hipIntensity, color: appearanceManager.tintColor)
-                                compactBar(label: "Pelvis", value: videoManager.pelvisIntensity, color: .orange)
-                                compactBar(label: "Head / Neck", value: videoManager.headIntensity, color: .blue)
-                                compactBar(label: "Wrist / Arm", value: videoManager.wristIntensity, color: .purple)
-                                compactBar(label: "Horizontal", value: videoManager.horzIntensity, color: .green)
+                                if isChannelsExpanded {
+                                    VStack(alignment: .leading, spacing: 8) {
+                                        compactBar(label: "Hip / Body", value: videoManager.hipIntensity, color: appearanceManager.tintColor)
+                                        compactBar(label: "Pelvis", value: videoManager.pelvisIntensity, color: .orange)
+                                        compactBar(label: "Head / Neck", value: videoManager.headIntensity, color: .blue)
+                                        compactBar(label: "Wrist / Arm", value: videoManager.wristIntensity, color: .purple)
+                                        compactBar(label: "Horizontal", value: videoManager.horzIntensity, color: .green)
+                                    }
+                                    .transition(.opacity.combined(with: .move(edge: .top)))
+                                }
                             }
                             .padding(12)
                             .frame(maxWidth: .infinity, alignment: .leading)

@@ -125,7 +125,8 @@ class StashVideoSyncManager: ObservableObject {
     // Vision requests — reused across frames
     private let segmentationRequest: VNGeneratePersonSegmentationRequest = {
         let r = VNGeneratePersonSegmentationRequest()
-        if #available(iOS 15, *) { r.qualityLevel = .accurate }
+        // .balanced: ~same usable mask quality for ROI filtering, far cheaper than .accurate
+        if #available(iOS 15, *) { r.qualityLevel = .balanced }
         r.outputPixelFormat = kCVPixelFormatType_OneComponent32Float
         return r
     }()
@@ -135,6 +136,23 @@ class StashVideoSyncManager: ObservableObject {
     // Y-range (pixel coords, top-origin) of the dominant person from the last pose frame.
     // Used to restrict optical-flow sampling to the active person's region.
     private var dominantPersonPixelYRange: (min: Int, max: Int)? = nil
+
+    // Cached segmentation mask — refreshed every `segmentationInterval` frames
+    private var cachedPersonMask: CVPixelBuffer?
+    private let segmentationInterval = 4
+
+    // Optical flow runs every N frames (previous buffer still updated each frame for tight deltas)
+    private let opticalFlowInterval = 2
+
+    // Adaptive pose cadence state
+    private var framesSinceLastPose = 0
+    /// Background-safe snapshot of recent motion for pose interval selection
+    private var cachedMotionForPose: Float = 0
+
+    // Temporal dominant-person lock
+    private var previousDominantCentroid: CGPoint?
+    private var previousDominantScore: Float = 0
+    private var dominantSwitchCount = 0
 
     private init() {
         cachedSensitivity = Float(sensitivity)
@@ -259,26 +277,37 @@ class StashVideoSyncManager: ObservableObject {
         analysisQueue.async { [weak self] in
             guard let self = self else { return }
             defer { self.processingLock.unlock() }
-            let mask = self.runSegmentation(pixelBuffer)
-            self.runOpticalFlow(pixelBuffer, mask: mask)
+            let mask = self.runSegmentation(pixelBuffer, frameCounter: localCounter)
+            self.runOpticalFlow(pixelBuffer, mask: mask, frameCounter: localCounter)
             self.runPoseAnalysis(pixelBuffer, frameCounter: localCounter)
             DispatchQueue.main.async { self.frameCounter += 1 }
         }
     }
 
-    private func runSegmentation(_ pixelBuffer: CVPixelBuffer) -> CVPixelBuffer? {
+    private func runSegmentation(_ pixelBuffer: CVPixelBuffer, frameCounter: Int) -> CVPixelBuffer? {
+        // Reuse cached mask between refreshes to cut Vision cost
+        if frameCounter % segmentationInterval != 0, let cached = cachedPersonMask {
+            return cached
+        }
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
         do {
             try handler.perform([segmentationRequest])
-            return segmentationRequest.results?.first?.pixelBuffer
+            let mask = segmentationRequest.results?.first?.pixelBuffer
+            cachedPersonMask = mask
+            return mask
         } catch {
             DispatchQueue.main.async { self.lastError = "Seg: \(error.localizedDescription)" }
-            return nil
+            return cachedPersonMask
         }
     }
 
-    private func runOpticalFlow(_ pixelBuffer: CVPixelBuffer, mask: CVPixelBuffer?) {
+    private func runOpticalFlow(_ pixelBuffer: CVPixelBuffer, mask: CVPixelBuffer?, frameCounter: Int) {
         guard let previous = previousPixelBuffer else {
+            previousPixelBuffer = pixelBuffer
+            return
+        }
+        // Skip Vision optical-flow on odd intervals; keep previous buffer fresh for next delta
+        guard frameCounter % opticalFlowInterval == 0 else {
             previousPixelBuffer = pixelBuffer
             return
         }
@@ -296,8 +325,18 @@ class StashVideoSyncManager: ObservableObject {
         previousPixelBuffer = pixelBuffer
     }
 
+    /// Adaptive pose interval: denser when motion is high, sparse when idle.
+    private func poseInterval() -> Int {
+        let motion = cachedMotionForPose
+        if motion > 0.45 { return 3 }
+        if motion > 0.15 { return 6 }
+        return 9
+    }
+
     private func runPoseAnalysis(_ pixelBuffer: CVPixelBuffer, frameCounter: Int) {
-        guard frameCounter % 6 == 0 else {
+        framesSinceLastPose += 1
+        let interval = poseInterval()
+        guard framesSinceLastPose >= interval else {
             DispatchQueue.main.async {
                 self.headIntensity *= 0.90
                 self.pelvisIntensity *= 0.95
@@ -305,6 +344,7 @@ class StashVideoSyncManager: ObservableObject {
             }
             return
         }
+        framesSinceLastPose = 0
         let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, options: [:])
         do {
             try handler.perform([poseRequest])
@@ -312,6 +352,8 @@ class StashVideoSyncManager: ObservableObject {
             if observations.isEmpty {
                 decayPoseIntensities(strong: true)
                 dominantPersonPixelYRange = nil
+                previousDominantCentroid = nil
+                previousDominantScore = 0
             } else {
                 let dominant = selectDominantPerson(from: observations)
                 updateDominantPersonBounds(from: dominant, frameHeight: CVPixelBufferGetHeight(pixelBuffer))
@@ -319,6 +361,10 @@ class StashVideoSyncManager: ObservableObject {
                 analyzePelvisMovement(dominant)
                 analyzeWristMovement(dominant)
                 classifyPosition(observations)
+                if frameCounter % 30 == 0 {
+                    NSLog("🧍 Pose persons: %d | dominant switches: %d | interval: %d",
+                          observations.count, dominantSwitchCount, interval)
+                }
             }
         } catch {
             dominantPersonPixelYRange = nil
@@ -339,18 +385,90 @@ class StashVideoSyncManager: ObservableObject {
 
     // MARK: - Multi-Person Helpers
 
-    /// Returns the best-tracked person: the one with the most high-confidence joints visible.
-    private func selectDominantPerson(from observations: [VNHumanBodyPoseObservation]) -> VNHumanBodyPoseObservation {
+    private struct PersonScore {
+        let observation: VNHumanBodyPoseObservation
+        let score: Float
+        let centroid: CGPoint?
+    }
+
+    /// Joint-count × avg confidence × temporal proximity × slight center preference.
+    private func scorePerson(_ obs: VNHumanBodyPoseObservation) -> PersonScore {
         let keyJoints: [VNHumanBodyPoseObservation.JointName] = [
             .nose, .neck, .leftShoulder, .rightShoulder, .leftHip, .rightHip, .leftKnee, .rightKnee
         ]
-        var bestScore = -1
-        var best = observations[0]
-        for obs in observations {
-            let score = keyJoints.filter { (try? obs.recognizedPoint($0))?.confidence ?? 0 > 0.3 }.count
-            if score > bestScore { bestScore = score; best = obs }
+        var jointCount = 0
+        var confSum: Float = 0
+        var points: [CGPoint] = []
+        for joint in keyJoints {
+            if let p = try? obs.recognizedPoint(joint), p.confidence > 0.3 {
+                jointCount += 1
+                confSum += p.confidence
+                points.append(p.location)
+            }
         }
-        return best
+        guard jointCount > 0, !points.isEmpty else {
+            return PersonScore(observation: obs, score: 0, centroid: nil)
+        }
+        let avgConf = confSum / Float(jointCount)
+        let centroid = CGPoint(
+            x: points.map(\.x).reduce(0, +) / CGFloat(points.count),
+            y: points.map(\.y).reduce(0, +) / CGFloat(points.count)
+        )
+
+        var temporalBonus: Float = 1.0
+        if let prev = previousDominantCentroid {
+            let dx = Float(centroid.x - prev.x)
+            let dy = Float(centroid.y - prev.y)
+            let dist = sqrt(dx * dx + dy * dy)
+            // Full bonus within ~0.15; fades out by 0.4
+            temporalBonus = max(0.0, 1.0 - dist / 0.4)
+        }
+
+        let centerDist = hypot(Float(centroid.x) - 0.5, Float(centroid.y) - 0.5)
+        let centerBonus = max(0.5, 1.0 - centerDist)
+
+        let score = Float(jointCount) * avgConf * (0.6 + 0.4 * temporalBonus) * (0.85 + 0.15 * centerBonus)
+        return PersonScore(observation: obs, score: score, centroid: centroid)
+    }
+
+    /// Best-tracked person with temporal lock: prefer continuity unless a challenger
+    /// clearly outscores the person nearest the previous dominant centroid.
+    private func selectDominantPerson(from observations: [VNHumanBodyPoseObservation]) -> VNHumanBodyPoseObservation {
+        let scored = observations.map { scorePerson($0) }.sorted { $0.score > $1.score }
+        guard let best = scored.first else { return observations[0] }
+
+        guard let prev = previousDominantCentroid, observations.count > 1 else {
+            previousDominantCentroid = best.centroid
+            previousDominantScore = best.score
+            return best.observation
+        }
+
+        // Continuity candidate = observation whose centroid is closest to last dominant
+        var continuity = best
+        var minDist = Float.greatestFiniteMagnitude
+        for candidate in scored {
+            guard let c = candidate.centroid else { continue }
+            let dist = hypot(Float(c.x - prev.x), Float(c.y - prev.y))
+            if dist < minDist {
+                minDist = dist
+                continuity = candidate
+            }
+        }
+
+        // Keep continuity unless challenger beats it by hysteresis margin
+        let hysteresis: Float = 0.25
+        let keepContinuity = continuity.observation !== best.observation
+            && best.score < continuity.score * (1.0 + hysteresis)
+            && minDist < 0.25
+
+        let chosen = keepContinuity ? continuity : best
+        if !keepContinuity && continuity.observation !== best.observation {
+            dominantSwitchCount += 1
+        }
+
+        previousDominantCentroid = chosen.centroid
+        previousDominantScore = chosen.score
+        return chosen.observation
     }
 
     /// Computes the pixel Y-range (top-origin) for the dominant person by looking at their joint positions.
@@ -796,6 +914,9 @@ class StashVideoSyncManager: ObservableObject {
     private func computeCurrentIntensity() -> Float {
         let s = cachedSensitivity
 
+        // Snapshot for adaptive pose cadence (read from analysis queue)
+        cachedMotionForPose = max(rawMotionIntensity, hipIntensity, headIntensity, wristIntensity)
+
         // --- Update dominant channel EMA accumulators (slow adaptation) ---
         let emaAlpha: Float = 0.03
         hipAccum   = hipAccum   * (1 - emaAlpha) + hipIntensity   * emaAlpha
@@ -861,6 +982,12 @@ class StashVideoSyncManager: ObservableObject {
         audioTap = nil
         previousPixelBuffer = nil
         dominantPersonPixelYRange = nil
+        cachedPersonMask = nil
+        framesSinceLastPose = 0
+        cachedMotionForPose = 0
+        previousDominantCentroid = nil
+        previousDominantScore = 0
+        dominantSwitchCount = 0
         previousHeadCentroid = nil
         previousPelvisCentroid = nil
         previousPelvisY = 0.5

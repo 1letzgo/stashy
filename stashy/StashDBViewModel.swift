@@ -8408,10 +8408,11 @@ struct Gallery: Codable, Identifiable, Equatable {
             }
         }
         
-        // Fallback: use gallery asset endpoint
-        var fallbackPath = "\(config.baseURL)/gallery/\(id)/asset/thumbnail?width=640"
+        // Fallback when cover wasn't loaded (e.g. stub Gallery from image→gallery navigation).
+        var fallbackPath = "\(config.baseURL)/gallery/\(id)/cover"
         if let updated = updatedAt {
-            fallbackPath = "\(fallbackPath)&t=\(updated.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? updated)"
+            let separator = fallbackPath.contains("?") ? "&" : "?"
+            fallbackPath = "\(fallbackPath)\(separator)t=\(updated.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? updated)"
         }
         return signedURL(URL(string: fallbackPath))
     }

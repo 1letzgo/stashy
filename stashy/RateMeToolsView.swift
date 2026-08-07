@@ -31,11 +31,17 @@ private struct RateMeSceneDTO: Codable {
     let rating100: Int?
     let o_counter: Int?
     let paths: RateMeScenePaths?
+    let performers: [RateMePerformerDTO]?
 }
 
 private struct RateMeScenePaths: Codable {
     let screenshot: String?
     let preview: String?
+}
+
+private struct RateMePerformerDTO: Codable {
+    let id: String
+    let name: String?
 }
 
 private struct RateMeImageFindResponse: Codable {
@@ -58,12 +64,7 @@ private struct RateMeImageDTO: Codable {
     let o_counter: Int?
     let paths: RateMeImagePaths?
     let visual_files: [RateMeImageFile]?
-    let performers: [RateMeImagePerformerDTO]?
-}
-
-private struct RateMeImagePerformerDTO: Codable {
-    let id: String
-    let name: String?
+    let performers: [RateMePerformerDTO]?
 }
 
 private struct RateMeImagePaths: Codable {
@@ -140,7 +141,7 @@ private final class RateMeViewModel: ObservableObject {
         let isVideo: Bool
         /// width ÷ height when known (images); scenes always render 16:9.
         let aspectRatio: CGFloat?
-        /// Joined performer names (images); nil/empty for scenes.
+        /// Joined performer names.
         let performerNames: String?
         var oCounter: Int
         let mode: Mode
@@ -295,6 +296,9 @@ private final class RateMeViewModel: ObservableObject {
             guard let scene = res.data?.findScenes.scenes.first else { return nil }
             if skipIDs.contains(scene.id) { continue }
             let preview = signedMediaURL(scene.paths?.preview)
+            let performers = (scene.performers ?? [])
+                .compactMap { $0.name?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty }
+                .joined(separator: ", ")
             return Item(
                 id: scene.id,
                 title: scene.title?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty ?? "Untitled scene",
@@ -303,7 +307,7 @@ private final class RateMeViewModel: ObservableObject {
                 videoURL: nil,
                 isVideo: preview != nil,
                 aspectRatio: 16.0 / 9.0,
-                performerNames: nil,
+                performerNames: performers.nilIfEmpty,
                 oCounter: scene.o_counter ?? 0,
                 mode: .scenes
             )
@@ -691,7 +695,7 @@ struct RateMeToolsView: View {
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                if item.mode == .images, let performers = item.performerNames {
+                if let performers = item.performerNames {
                     Text(performers)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)

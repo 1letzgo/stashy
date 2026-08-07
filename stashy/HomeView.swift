@@ -36,7 +36,12 @@ private struct HomeViewContent: View {
         }
 
         return base
+            // Custom catalogue chrome owns the top; a live `navigationTitle` under a
+            // hidden system bar makes iOS toggle status-bar appearance while scrolling.
+            .navigationTitle("")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar(.hidden, for: .navigationBar)
+            .statusBarHidden(false)
             .onAppear {
                 guard configManager.activeConfig != nil else { return }
                 if viewModel.statistics == nil {
@@ -82,8 +87,6 @@ private struct HomeViewContent: View {
             }
         }
         .scrollContentBackground(.hidden)
-        .navigationTitle("Dashboard")
-        .navigationBarTitleDisplayMode(.inline)
         .refreshable {
             viewModel.homeRowScenes.removeAll()
             viewModel.initializeServerConnection()

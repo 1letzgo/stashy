@@ -235,20 +235,13 @@ struct SceneCardView: View {
     }
 }
 
-// Custom Video Player to force Aspect Fill
-struct AspectFillVideoPlayer: UIViewControllerRepresentable {
+/// Inline card preview via `AVPlayerLayer`.
+/// `AVPlayerViewController` steals status-bar visibility when it attaches — avoid it in grids/home.
+struct AspectFillVideoPlayer: View {
     let player: AVPlayer
-    
-    func makeUIViewController(context: Context) -> AVPlayerViewController {
-        let controller = AVPlayerViewController()
-        controller.player = player
-        controller.showsPlaybackControls = false
-        controller.videoGravity = .resizeAspectFill // Crucial for "filling" the card
-        return controller
-    }
-    
-    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
-        uiViewController.player = player
+
+    var body: some View {
+        FullScreenVideoPlayer(player: player, videoGravity: .resizeAspectFill)
     }
 }
 #endif
