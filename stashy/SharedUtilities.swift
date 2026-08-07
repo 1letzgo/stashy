@@ -808,42 +808,62 @@ struct SkeletonModifier: ViewModifier {
 // MARK: - Shared UI Components
 
 struct InfoPill: View {
+    enum Style {
+        /// Light fill + tint label (overlay on thumbnails).
+        case outline
+        /// Solid tint fill + white label (matches Scene Detail “Resume from …”).
+        case filled
+    }
+
     let icon: String?
     let text: String
     var color: Color? = nil
-    
+    var style: Style = .outline
+
     @ObservedObject private var appearanceManager = AppearanceManager.shared
-    
-    private var activeColor: Color {
+
+    private var fillColor: Color {
         color ?? appearanceManager.tintColor
     }
-    
+
     var body: some View {
         HStack(spacing: 4) {
             if let icon = icon, !icon.isEmpty {
                 Image(systemName: icon)
                     .font(.caption)
-                    .foregroundColor(activeColor)
             }
             Text(text)
                 .font(.caption)
                 .fontWeight(.bold)
-                .foregroundColor(activeColor)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 4)
-        .background(
+        .foregroundStyle(style == .filled ? Color.white : fillColor)
+        .padding(.horizontal, style == .filled ? 10 : 8)
+        .padding(.vertical, style == .filled ? 5 : 4)
+        .background(pillBackground)
+        .clipShape(Capsule())
+        .overlay {
+            if style == .outline {
+                Capsule().stroke(fillColor, lineWidth: 0.5)
+            }
+        }
+        .tint(fillColor)
+    }
+
+    @ViewBuilder
+    private var pillBackground: some View {
+        switch style {
+        case .filled:
+            fillColor
+        case .outline:
             ZStack {
                 #if os(tvOS)
                 Color.black
                 #else
                 Color(UIColor.systemBackground)
                 #endif
-                activeColor.opacity(0.1)
+                fillColor.opacity(0.1)
             }
-        )
-        .clipShape(Capsule())
-        .overlay(Capsule().stroke(activeColor, lineWidth: 0.5))
+        }
     }
 }
 

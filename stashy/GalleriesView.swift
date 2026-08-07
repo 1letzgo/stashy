@@ -554,38 +554,18 @@ private struct GalleriesViewContent: View {
 
     private var galleriesCoreChrome: some View {
         galleriesPrimaryContent
-            .navigationTitle(hideTitle ? "" : "Galleries")
-            .navigationBarTitleDisplayMode(.inline)
             .applyAppBackground()
-            .conditionalSearchable(isVisible: isSearchVisible, text: $searchText, prompt: "Search galleries...")
+            .modifier(GalleriesEmbeddedNavigationChrome(
+                hideTitle: hideTitle,
+                isSearchVisible: isSearchVisible,
+                searchText: $searchText,
+                onClearSearch: { performSearch() }
+            ))
             .onChange(of: searchText) { _, newValue in
                 NSObject.cancelPreviousPerformRequests(withTarget: self)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     if newValue == self.searchText {
                         performSearch()
-                    }
-                }
-            }
-            .toolbar {
-                if !searchText.isEmpty {
-                    ToolbarItem(placement: .principal) {
-                        Button {
-                            searchText = ""
-                            performSearch()
-                        } label: {
-                            HStack(spacing: 4) {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 10, weight: .bold))
-                                Text(searchText)
-                                    .font(.system(size: 12, weight: .bold))
-                                    .lineLimit(1)
-                            }
-                            .foregroundColor(.white.opacity(0.9))
-                            .padding(Edge.Set.horizontal, 10)
-                            .padding(.vertical, 8)
-                            .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                            .clipShape(Capsule())
-                        }
                     }
                 }
             }
@@ -769,6 +749,49 @@ private struct GalleriesViewContent: View {
             ListLivePresetTag.migrateLegacySelection(&catalogPresetRowSelection)
             refreshGalleryLocalPresets()
             applyCatalogPresetSelectionFromSheetIfNeeded()
+        }
+    }
+}
+
+/// When embedded under custom chrome (`hideTitle`), keep the system nav bar hidden.
+private struct GalleriesEmbeddedNavigationChrome: ViewModifier {
+    let hideTitle: Bool
+    let isSearchVisible: Bool
+    @Binding var searchText: String
+    var onClearSearch: () -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if hideTitle {
+            content.hideSystemNavigationBarForCustomChrome()
+        } else {
+            content
+                .navigationTitle("Galleries")
+                .navigationBarTitleDisplayMode(.inline)
+                .conditionalSearchable(isVisible: isSearchVisible, text: $searchText, prompt: "Search galleries...")
+                .toolbar {
+                    if !searchText.isEmpty {
+                        ToolbarItem(placement: .principal) {
+                            Button {
+                                searchText = ""
+                                onClearSearch()
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 10, weight: .bold))
+                                    Text(searchText)
+                                        .font(.system(size: 12, weight: .bold))
+                                        .lineLimit(1)
+                                }
+                                .foregroundColor(.white.opacity(0.9))
+                                .padding(Edge.Set.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(Color.black.opacity(DesignTokens.Opacity.badge))
+                                .clipShape(Capsule())
+                            }
+                        }
+                    }
+                }
         }
     }
 }

@@ -45,15 +45,13 @@ struct DefaultFilterView: View {
 
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Default Filters")
         .applyAppBackground()
         .scrollContentBackground(.hidden)
-        .toolbar {
+        .stashySettingsDetailChrome("Default Filters") {
             if viewModel.isLoadingSavedFilters {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Image(systemName: "line.3.horizontal.decrease.circle")
-                        .shimmer()
-                }
+                Image(systemName: "line.3.horizontal.decrease.circle")
+                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                    .shimmer()
             }
         }
         .onAppear {

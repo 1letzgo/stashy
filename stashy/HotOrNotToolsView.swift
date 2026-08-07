@@ -431,6 +431,7 @@ private struct HotOrNotPerformerData: Codable {
             country: country,
             imagePath: image_path,
             sceneCount: scene_count ?? 0,
+            imageCount: image_count,
             galleryCount: gallery_count,
             gender: gender,
             ethnicity: ethnicity,

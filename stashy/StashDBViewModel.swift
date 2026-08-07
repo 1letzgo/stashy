@@ -712,6 +712,10 @@ class StashDBViewModel: ObservableObject {
         case nameDesc
         case sceneCountDesc
         case sceneCountAsc
+        case imageCountDesc
+        case imageCountAsc
+        case galleryCountDesc
+        case galleryCountAsc
         case birthdateDesc
         case birthdateAsc
         case updatedAtDesc
@@ -729,6 +733,10 @@ class StashDBViewModel: ObservableObject {
             case .nameDesc: return "Name (Z-A)"
             case .sceneCountDesc: return "Scene Count (High-Low)"
             case .sceneCountAsc: return "Scene Count (Low-High)"
+            case .imageCountDesc: return "Image Count (High-Low)"
+            case .imageCountAsc: return "Image Count (Low-High)"
+            case .galleryCountDesc: return "Gallery Count (High-Low)"
+            case .galleryCountAsc: return "Gallery Count (Low-High)"
             case .birthdateDesc: return "Birthday (Youngest First)"
             case .birthdateAsc: return "Birthday (Oldest First)"
             case .updatedAtDesc: return "Updated (Newest First)"
@@ -745,8 +753,8 @@ class StashDBViewModel: ObservableObject {
 
         var direction: String {
             switch self {
-            case .nameAsc, .sceneCountAsc, .birthdateAsc, .updatedAtAsc, .createdAtAsc, .oCountAsc, .ratingAsc: return "ASC"
-            case .nameDesc, .sceneCountDesc, .birthdateDesc, .updatedAtDesc, .createdAtDesc, .oCountDesc, .ratingDesc, .random: return "DESC"
+            case .nameAsc, .sceneCountAsc, .imageCountAsc, .galleryCountAsc, .birthdateAsc, .updatedAtAsc, .createdAtAsc, .oCountAsc, .ratingAsc: return "ASC"
+            case .nameDesc, .sceneCountDesc, .imageCountDesc, .galleryCountDesc, .birthdateDesc, .updatedAtDesc, .createdAtDesc, .oCountDesc, .ratingDesc, .random: return "DESC"
             }
         }
 
@@ -754,6 +762,8 @@ class StashDBViewModel: ObservableObject {
             switch self {
             case .nameAsc, .nameDesc: return "name"
             case .sceneCountAsc, .sceneCountDesc: return "scenes_count"
+            case .imageCountAsc, .imageCountDesc: return "images_count"
+            case .galleryCountAsc, .galleryCountDesc: return "galleries_count"
             case .birthdateAsc, .birthdateDesc: return "birthdate"
             case .updatedAtAsc, .updatedAtDesc: return "updated_at"
             case .createdAtAsc, .createdAtDesc: return "created_at"
@@ -8046,6 +8056,7 @@ struct Performer: Codable, Identifiable, Equatable {
     var country: String?
     var imagePath: String?
     let sceneCount: Int
+    var imageCount: Int? = nil
     let galleryCount: Int?
     var gender: String?
     var ethnicity: String?
@@ -8069,6 +8080,7 @@ struct Performer: Codable, Identifiable, Equatable {
         case oCounter = "o_counter"
         case imagePath = "image_path"
         case sceneCount = "scene_count"
+        case imageCount = "image_count"
         case galleryCount = "gallery_count"
         case height = "height_cm"
         case fakeTits = "fake_tits"
@@ -8523,6 +8535,26 @@ struct StashImage: Codable, Identifiable, Equatable {
              return videoExtensions.contains(ext)
         }
         return false
+    }
+
+    /// Pixel size from the primary visual file, when known.
+    var pixelSize: CGSize? {
+        guard let w = visual_files?.first?.width, let h = visual_files?.first?.height,
+              w > 0, h > 0 else { return nil }
+        return CGSize(width: w, height: h)
+    }
+
+    /// 1/row Images feed card aspect (width ÷ height):
+    /// square → 1:1, portrait (incl. portrait video) → 9:12, landscape → native ratio.
+    var oneColumnFeedAspectRatio: CGFloat {
+        guard let size = pixelSize else { return 1 }
+        if size.width > size.height {
+            return size.width / size.height
+        }
+        if size.height > size.width {
+            return 9.0 / 12.0
+        }
+        return 1
     }
 
     var isAnimated: Bool {
@@ -9193,7 +9225,7 @@ extension StashDBViewModel {
     func searchTagsAsync(query: String, limit: Int = 5) async -> [Tag] {
         await withCheckedContinuation { continuation in
             let graphqlQuery = GraphQLQueries.queryWithFragments("findTags")
-            
+
             let body: [String: Any] = [
                 "query": graphqlQuery,
                 "variables": [
@@ -9201,8 +9233,9 @@ extension StashDBViewModel {
                         "q": query,
                         "per_page": limit,
                         "page": 1,
-                        "sort": "name",
-                        "direction": "ASC"
+                        // Most-used first (same field as Tags catalog scene-count sort).
+                        "sort": TagSortOption.sceneCountDesc.sortField,
+                        "direction": TagSortOption.sceneCountDesc.direction
                     ]
                 ]
             ]

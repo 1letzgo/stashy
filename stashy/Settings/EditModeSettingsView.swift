@@ -13,9 +13,9 @@ struct EditModeSettingsView: View {
             .listRowBackground(Color.secondaryAppBackground)
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Editing")
         .applyAppBackground()
         .scrollContentBackground(.hidden)
+        .stashySettingsDetailChrome("Editing")
     }
 }
 #endif

@@ -31,6 +31,8 @@ struct PerformerDetailView: View {
     @StateObject private var linkedTags: DetailLinkedTagsFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
+    /// Images 1/row autoplay: parent ScrollView drag/decelerate.
+    @State private var imagesFeedScrolling = false
 
     private var showsFeedsNavButton: Bool {
         tabManager.tabs.first(where: { $0.id == .reels })?.isVisible ?? true
@@ -185,6 +187,14 @@ struct PerformerDetailView: View {
                 }
             }
             .padding(16)
+        }
+        .onScrollPhaseChange { _, newPhase in
+            // Only track while Images is visible — avoids extra work on other tabs.
+            guard selectedDetailTab == .images else {
+                if imagesFeedScrolling { imagesFeedScrolling = false }
+                return
+            }
+            imagesFeedScrolling = newPhase != .idle
         }
     }
 
@@ -546,6 +556,17 @@ struct PerformerDetailView: View {
                     }
                     .frame(maxWidth: .infinity)
                 } else if selectedDetailTab == .images {
+                    let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.images)
+                    CatalogFABIconButton(
+                        systemImage: cardColumns.toggleIcon,
+                        accessibilityLabel: cardColumns.accessibilityLabel,
+                        accessibilityHint: "Switches between one and two cards per row"
+                    ) {
+                        withAnimation(DesignTokens.Animation.quick) {
+                            tabManager.toggleCatalogCardColumns(for: CatalogCardColumnScope.images)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
                     CatalogFilterFABButton(isActive: linkedImages.catalogFilterSortFABActive) {
                         HapticManager.light()
                         linkedImages.showFilterSortSheet = true
@@ -746,7 +767,8 @@ struct PerformerDetailView: View {
                 }
                 linkedImages.showRenameCatalogPresetAlert = true
             },
-            onRequestDelete: { linkedImages.showDeleteCatalogPresetAlert = true }
+            onRequestDelete: { linkedImages.showDeleteCatalogPresetAlert = true },
+            showsImagesFeedAutoplaySetting: true
         )
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
@@ -855,18 +877,15 @@ struct PerformerDetailView: View {
     }
     
     private var imageGrid: some View {
-        LazyVGrid(columns: galleryColumns, spacing: 12) {
-            ForEach(viewModel.detailImages) { image in
-                NavigationLink(destination: FullScreenImageView(images: .constant(viewModel.detailImages), selectedImageId: image.id)) {
-                    ImageThumbnailCard(image: image)
-                }
-                .buttonStyle(.plain)
-            }
-            if viewModel.isLoadingDetailImages { ProgressView().padding() }
-            else if viewModel.hasMoreDetailImages && !viewModel.detailImages.isEmpty {
-                Color.clear.onAppear { linkedImages.refetchImages(viewModel: viewModel, initial: false) }
-            }
-        }
+        LinkedImagesCatalogGrid(
+            images: $viewModel.detailImages,
+            sortOption: linkedImages.selectedSortOption,
+            isLoading: viewModel.isLoadingDetailImages,
+            hasMore: viewModel.hasMoreDetailImages,
+            onLoadMore: { linkedImages.refetchImages(viewModel: viewModel, initial: false) },
+            multiColumnGridItems: galleryColumns,
+            isFeedScrolling: imagesFeedScrolling
+        )
     }
     
     private func headerView(displayPerformer: Performer, battleLine: String?) -> some View {

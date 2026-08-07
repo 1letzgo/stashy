@@ -173,6 +173,72 @@ struct StashySectionChromeBar<Content: View>: View {
     }
 }
 
+/// Shared Back pill used by detail / settings chrome bars.
+struct StashyChromeBackButton: View {
+    var title: String = "Back"
+    var action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+            }
+            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+            .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(title)
+    }
+}
+
+/// Settings / simple pushed-detail chrome: Back · title · optional trailing.
+struct StashyDetailChromeBar<Trailing: View>: View {
+    let title: String
+    @ViewBuilder var trailing: () -> Trailing
+    @Environment(\.dismiss) private var dismiss
+
+    init(title: String, @ViewBuilder trailing: @escaping () -> Trailing = { EmptyView() }) {
+        self.title = title
+        self.trailing = trailing
+    }
+
+    var body: some View {
+        StashySectionChromeBar {
+            HStack(spacing: 8) {
+                StashyChromeBackButton { dismiss() }
+
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                trailing()
+            }
+            .frame(minHeight: StashyExpandingDock.activeHeight)
+            .padding(.horizontal, StashyExpandingDock.edgePadding)
+            .padding(.vertical, 8)
+        }
+    }
+}
+
+private struct StashySettingsDetailChromeModifier<Trailing: View>: ViewModifier {
+    let title: String
+    @ViewBuilder var trailing: () -> Trailing
+
+    func body(content: Content) -> some View {
+        content
+            .hideSystemNavigationBarForCustomChrome()
+            .enableSwipeBackWhenNavBarHidden()
+            .stashyCustomChromeInset(spacing: 0) {
+                StashyDetailChromeBar(title: title, trailing: trailing)
+            }
+    }
+}
+
 extension View {
     /// Hides the system navigation bar for custom chrome and restores edge swipe-to-pop.
     func enableSwipeBackWhenNavBarHidden() -> some View {
@@ -195,6 +261,21 @@ extension View {
         @ViewBuilder content: @escaping () -> V
     ) -> some View {
         safeAreaInset(edge: StashyChromePlacement.edge, spacing: spacing, content: content)
+    }
+
+    /// Pushed Settings detail: custom chrome (Back + title) instead of the system nav bar.
+    func stashySettingsDetailChrome(
+        _ title: String
+    ) -> some View {
+        modifier(StashySettingsDetailChromeModifier(title: title, trailing: { EmptyView() }))
+    }
+
+    /// Pushed Settings detail with trailing chrome accessory (status, loading, …).
+    func stashySettingsDetailChrome<Trailing: View>(
+        _ title: String,
+        @ViewBuilder trailing: @escaping () -> Trailing
+    ) -> some View {
+        modifier(StashySettingsDetailChromeModifier(title: title, trailing: trailing))
     }
 
     /// Clears pushed detail screens when a catalogue / tools menu section changes.

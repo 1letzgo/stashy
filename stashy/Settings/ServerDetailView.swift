@@ -68,9 +68,15 @@ struct ServerDetailView: View {
             }
             .listRowBackground(Color.secondaryAppBackground)
         }
-        .navigationTitle(server.name)
         .applyAppBackground()
         .scrollContentBackground(.hidden)
+        .stashySettingsDetailChrome(server.name) {
+            if isActive && viewModel.isServerConnected {
+                Image(systemName: "circle.fill")
+                    .foregroundColor(.green)
+                    .font(.caption)
+            }
+        }
         .alert(alertTitle, isPresented: $showAlert) {
             Button("OK", role: .cancel) { }
         } message: {
@@ -86,15 +92,6 @@ struct ServerDetailView: View {
                 }
             }
             .presentationDetents([.medium, .large])
-        }
-        .toolbar {
-            if isActive && viewModel.isServerConnected {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Image(systemName: "circle.fill")
-                        .foregroundColor(.green)
-                        .font(.caption)
-                }
-            }
         }
     }
 

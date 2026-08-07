@@ -12,6 +12,7 @@ struct UniversalSearchView: View {
     @ObservedObject var configManager = ServerConfigManager.shared
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
+    @Environment(\.dismissSearch) private var dismissSearch
     
     @State private var searchText = ""
     @State private var isSearching = false
@@ -193,7 +194,9 @@ struct UniversalSearchView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(performers) { performer in
-                        NavigationLink(destination: PerformerDetailView(performer: performer)) {
+                        NavigationLink(destination: searchPushDestination {
+                            PerformerDetailView(performer: performer)
+                        }) {
                             performerCard(performer)
                         }
                         .buttonStyle(.plain)
@@ -259,7 +262,9 @@ struct UniversalSearchView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(studios) { studio in
-                        NavigationLink(destination: StudioDetailView(studio: studio)) {
+                        NavigationLink(destination: searchPushDestination {
+                            StudioDetailView(studio: studio)
+                        }) {
                             studioCard(studio)
                         }
                         .buttonStyle(.plain)
@@ -298,8 +303,14 @@ struct UniversalSearchView: View {
             
             FlowLayout(spacing: 8) {
                 ForEach(tags) { tag in
-                    NavigationLink(destination: TagDetailView(selectedTag: tag)) {
-                        InfoPill(icon: "tag.fill", text: "\(tag.name) (\(tag.sceneCount ?? 0))")
+                    NavigationLink(destination: searchPushDestination {
+                        TagDetailView(selectedTag: tag)
+                    }) {
+                        InfoPill(
+                            icon: "tag.fill",
+                            text: "\(tag.name) (\(tag.sceneCount ?? 0))",
+                            style: .filled
+                        )
                     }
                     .buttonStyle(.plain)
                 }
@@ -317,7 +328,9 @@ struct UniversalSearchView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(alignment: .top, spacing: 12) {
                     ForEach(scenes) { scene in
-                        NavigationLink(destination: SceneDetailView(scene: scene)) {
+                        NavigationLink(destination: searchPushDestination {
+                            SceneDetailView(scene: scene)
+                        }) {
                             sceneCard(scene)
                         }
                         .buttonStyle(.plain)
@@ -352,7 +365,9 @@ struct UniversalSearchView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(galleries) { gallery in
-                        NavigationLink(destination: ImagesView(gallery: gallery)) {
+                        NavigationLink(destination: searchPushDestination {
+                            ImagesView(gallery: gallery)
+                        }) {
                             galleryCard(gallery)
                         }
                         .buttonStyle(.plain)
@@ -415,7 +430,9 @@ struct UniversalSearchView: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 12) {
                     ForEach(groups) { group in
-                        NavigationLink(destination: GroupDetailView(selectedGroup: group)) {
+                        NavigationLink(destination: searchPushDestination {
+                            GroupDetailView(selectedGroup: group)
+                        }) {
                             groupCard(group)
                         }
                         .buttonStyle(.plain)
@@ -479,7 +496,9 @@ struct UniversalSearchView: View {
                     ForEach(markers) { marker in
                         if let scene = marker.scene?.toScene() {
                             let mappedScene = scene.withResumeTime(marker.seconds)
-                            NavigationLink(destination: SceneDetailView(scene: mappedScene, autoPlay: true)) {
+                            NavigationLink(destination: searchPushDestination {
+                                SceneDetailView(scene: mappedScene, autoPlay: true)
+                            }) {
                                 searchMarkerCard(marker)
                             }
                             .buttonStyle(.plain)
@@ -491,6 +510,13 @@ struct UniversalSearchView: View {
         }
     }
     
+    /// Dismisses the Search field so pushed custom-chrome details are not covered by the native search bar.
+    @ViewBuilder
+    private func searchPushDestination<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        content()
+            .onAppear { dismissSearch() }
+    }
+
     private func searchMarkerCard(_ marker: SceneMarker) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             ZStack(alignment: .bottomTrailing) {

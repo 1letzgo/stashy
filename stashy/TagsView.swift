@@ -670,6 +670,8 @@ struct TagDetailView: View {
     @StateObject private var linkedStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
+    /// Images 1/row autoplay: parent ScrollView drag/decelerate.
+    @State private var imagesFeedScrolling = false
 
     private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
     private var navActionGroupSpacing: CGFloat { 7 }
@@ -965,6 +967,13 @@ struct TagDetailView: View {
             }
             .padding(16)
         }
+        .onScrollPhaseChange { _, newPhase in
+            guard selectedDetailTab == .images else {
+                if imagesFeedScrolling { imagesFeedScrolling = false }
+                return
+            }
+            imagesFeedScrolling = newPhase != .idle
+        }
     }
 
     var body: some View {
@@ -1117,6 +1126,17 @@ struct TagDetailView: View {
                     }
                     .frame(maxWidth: .infinity)
                 } else if selectedDetailTab == .images {
+                    let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.images)
+                    CatalogFABIconButton(
+                        systemImage: cardColumns.toggleIcon,
+                        accessibilityLabel: cardColumns.accessibilityLabel,
+                        accessibilityHint: "Switches between one and two cards per row"
+                    ) {
+                        withAnimation(DesignTokens.Animation.quick) {
+                            tabManager.toggleCatalogCardColumns(for: CatalogCardColumnScope.images)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
                     CatalogFilterFABButton(isActive: linkedImages.catalogFilterSortFABActive) {
                         HapticManager.light()
                         linkedImages.showFilterSortSheet = true
@@ -1272,7 +1292,8 @@ struct TagDetailView: View {
                 }
                 linkedImages.showRenameCatalogPresetAlert = true
             },
-            onRequestDelete: { linkedImages.showDeleteCatalogPresetAlert = true }
+            onRequestDelete: { linkedImages.showDeleteCatalogPresetAlert = true },
+            showsImagesFeedAutoplaySetting: true
         )
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
@@ -1504,18 +1525,15 @@ struct TagDetailView: View {
     }
     
     private var imageGrid: some View {
-        LazyVGrid(columns: galleryColumns, spacing: 12) {
-            ForEach(viewModel.detailImages) { image in
-                NavigationLink(destination: FullScreenImageView(images: .constant(viewModel.detailImages), selectedImageId: image.id)) {
-                    ImageThumbnailCard(image: image)
-                }
-                .buttonStyle(.plain)
-            }
-            if viewModel.isLoadingDetailImages { ProgressView().padding() }
-            else if viewModel.hasMoreDetailImages {
-                Color.clear.onAppear { linkedImages.refetchImages(viewModel: viewModel, initial: false) }
-            }
-        }
+        LinkedImagesCatalogGrid(
+            images: $viewModel.detailImages,
+            sortOption: linkedImages.selectedSortOption,
+            isLoading: viewModel.isLoadingDetailImages,
+            hasMore: viewModel.hasMoreDetailImages,
+            onLoadMore: { linkedImages.refetchImages(viewModel: viewModel, initial: false) },
+            multiColumnGridItems: galleryColumns,
+            isFeedScrolling: imagesFeedScrolling
+        )
     }
     
 }

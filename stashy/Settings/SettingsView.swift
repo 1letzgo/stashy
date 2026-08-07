@@ -65,6 +65,7 @@ struct SettingsView: View {
         }
         .applyAppBackground()
         .navigationBarHidden(true)
+        .popNavigationToRootOnChange(selectedSection.rawValue)
         .stashyCustomChromeInset(spacing: 0) {
             StashySectionChromeBar {
                 SettingsCategoryRow(selection: $selectedSection)
@@ -486,10 +487,9 @@ struct IntifaceSettingsView: View {
             }
             .listRowBackground(Color.secondaryAppBackground)
         }
-        .navigationTitle("Intiface")
-        .navigationBarTitleDisplayMode(.inline)
         .applyAppBackground()
         .scrollContentBackground(.hidden)
+        .stashySettingsDetailChrome("Intiface")
     }
 }
 
@@ -586,10 +586,9 @@ struct HandySettingsView: View {
             }
             .listRowBackground(Color.secondaryAppBackground)
         }
-        .navigationTitle("The Handy")
-        .navigationBarTitleDisplayMode(.inline)
         .applyAppBackground()
         .scrollContentBackground(.hidden)
+        .stashySettingsDetailChrome("The Handy")
     }
 }
 
@@ -619,10 +618,9 @@ struct LoveSpouseSettingsView: View {
             }
             .listRowBackground(Color.secondaryAppBackground)
         }
-        .navigationTitle("Love Spouse")
-        .navigationBarTitleDisplayMode(.inline)
         .applyAppBackground()
         .scrollContentBackground(.hidden)
+        .stashySettingsDetailChrome("Love Spouse")
     }
 }
 
@@ -681,10 +679,9 @@ struct StashSyncSettingsView: View {
             
 
         }
-        .navigationTitle("StashSync")
-        .navigationBarTitleDisplayMode(.inline)
         .applyAppBackground()
         .scrollContentBackground(.hidden)
+        .stashySettingsDetailChrome("StashSync")
         .alert("StashSync Disclaimer", isPresented: $showingDisclaimer) {
             Button("Cancel", role: .cancel) { }
             Button("Accept & Enable") {

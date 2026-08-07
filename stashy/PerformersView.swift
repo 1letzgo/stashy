@@ -789,40 +789,30 @@ struct PerformerCardView: View {
                     .allowsHitTesting(false)
 
                     VStack {
-                        HStack {
+                        HStack(alignment: .top, spacing: 4) {
                             if let age = ageText {
-                                HStack(spacing: 3) {
-                                    Image(systemName: "calendar")
-                                        .font(.system(size: 10, weight: .bold))
-                                    Text(age)
-                                        .font(.system(size: 11, weight: .bold))
-                                }
-                                .foregroundColor(.white)
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                                .clipShape(Capsule())
-                                .shadow(color: .black.opacity(0.2), radius: 2)
+                                cardPill(icon: "calendar", text: age)
                             }
 
-                            Spacer()
+                            Spacer(minLength: 4)
 
-                            HStack(spacing: 3) {
-                                Image(systemName: badgeType == .oCount ? appearanceManager.oCounterIcon : (badgeType == .rating ? "star.fill" : "film"))
-                                    .font(.system(size: 10, weight: .bold))
-                                Text(
-                                    badgeType == .oCount
-                                        ? "\(performer.oCounter ?? 0)"
-                                        : (badgeType == .rating ? "\(performer.rating100 ?? 0)" : "\(performer.sceneCount)")
-                                )
-                                    .font(.system(size: 11, weight: .bold))
+                            // Scene / image / gallery counts — only when > 0.
+                            if performer.sceneCount > 0 {
+                                cardPill(icon: "film", text: "\(performer.sceneCount)")
                             }
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                            .clipShape(Capsule())
-                            .shadow(color: .black.opacity(0.2), radius: 2)
+                            if let imageCount = performer.imageCount, imageCount > 0 {
+                                cardPill(icon: "photo", text: "\(imageCount)")
+                            }
+                            if let galleryCount = performer.galleryCount, galleryCount > 0 {
+                                cardPill(icon: "photo.stack", text: "\(galleryCount)")
+                            }
+
+                            // Sort-specific badge when not the default scene-count sort.
+                            if badgeType == .oCount {
+                                cardPill(icon: appearanceManager.oCounterIcon, text: "\(performer.oCounter ?? 0)")
+                            } else if badgeType == .rating {
+                                cardPill(icon: "star.fill", text: "\(performer.rating100 ?? 0)")
+                            }
                         }
                         .padding(8)
                         Spacer()
@@ -846,6 +836,21 @@ struct PerformerCardView: View {
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
+    }
+
+    private func cardPill(icon: String, text: String) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .bold))
+            Text(text)
+                .font(.system(size: 11, weight: .bold))
+        }
+        .foregroundColor(.white)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 4)
+        .background(Color.black.opacity(DesignTokens.Opacity.badge))
+        .clipShape(Capsule())
+        .shadow(color: .black.opacity(0.2), radius: 2)
     }
 }
 

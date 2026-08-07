@@ -18,9 +18,9 @@ struct AppearanceSettingsView: View {
             counterIconSection
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Appearance")
         .applyAppBackground()
         .scrollContentBackground(.hidden)
+        .stashySettingsDetailChrome("Appearance")
     }
 
     private var themeSection: some View {

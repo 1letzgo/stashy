@@ -102,9 +102,9 @@ struct ToolsSettingsView: View {
         }
         .listStyle(.insetGrouped)
         .environment(\.editMode, .constant(.active))
-        .navigationTitle("Tools")
         .applyAppBackground()
         .scrollContentBackground(.hidden)
+        .stashySettingsDetailChrome("Tools")
     }
 }
 
@@ -154,9 +154,9 @@ struct TabSettingsView: View {
         }
         .listStyle(.insetGrouped)
         .environment(\.editMode, .constant(.active))
-        .navigationTitle("Tabs")
         .applyAppBackground()
         .scrollContentBackground(.hidden)
+        .stashySettingsDetailChrome("Tabs")
     }
 }
 #endif

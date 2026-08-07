@@ -53,8 +53,8 @@ struct DashboardSettingsView: View {
         }
         .listStyle(.insetGrouped)
         .environment(\.editMode, .constant(.active))
-        .navigationTitle("Dashboard")
         .applyAppBackground()
+        .stashySettingsDetailChrome("Dashboard")
     }
 }
 #endif

@@ -95,8 +95,8 @@ struct ReelsModeSettingsView: View {
         .listStyle(.insetGrouped)
         .environment(\.editMode, .constant(.active))
         .deleteDisabled(true)
-        .navigationTitle("Feeds")
         .applyAppBackground()
+        .stashySettingsDetailChrome("Feeds")
         .onAppear {
             viewModel.fetchSavedFilters()
         }

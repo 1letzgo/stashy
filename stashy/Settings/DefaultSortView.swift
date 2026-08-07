@@ -35,9 +35,9 @@ struct DefaultSortView: View {
             .listRowBackground(Color.secondaryAppBackground)
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Default Sorting")
         .applyAppBackground()
         .scrollContentBackground(.hidden)
+        .stashySettingsDetailChrome("Default Sorting")
     }
 
     // MARK: - Tab Sort Rows
@@ -192,6 +192,26 @@ struct DefaultSortView: View {
                     }
                 } label: {
                     HStack { Text("Scene Count"); if binding.wrappedValue == .sceneCountAsc || binding.wrappedValue == .sceneCountDesc { Image(systemName: "checkmark") } }
+                }
+                Menu {
+                    Button(action: { binding.wrappedValue = .imageCountDesc }) {
+                        HStack { Text("Most Images"); if binding.wrappedValue == .imageCountDesc { Image(systemName: "checkmark") } }
+                    }
+                    Button(action: { binding.wrappedValue = .imageCountAsc }) {
+                        HStack { Text("Least Images"); if binding.wrappedValue == .imageCountAsc { Image(systemName: "checkmark") } }
+                    }
+                } label: {
+                    HStack { Text("Image Count"); if binding.wrappedValue == .imageCountAsc || binding.wrappedValue == .imageCountDesc { Image(systemName: "checkmark") } }
+                }
+                Menu {
+                    Button(action: { binding.wrappedValue = .galleryCountDesc }) {
+                        HStack { Text("Most Galleries"); if binding.wrappedValue == .galleryCountDesc { Image(systemName: "checkmark") } }
+                    }
+                    Button(action: { binding.wrappedValue = .galleryCountAsc }) {
+                        HStack { Text("Least Galleries"); if binding.wrappedValue == .galleryCountAsc { Image(systemName: "checkmark") } }
+                    }
+                } label: {
+                    HStack { Text("Gallery Count"); if binding.wrappedValue == .galleryCountAsc || binding.wrappedValue == .galleryCountDesc { Image(systemName: "checkmark") } }
                 }
                 Menu {
                     Button(action: { binding.wrappedValue = .oCountDesc }) {

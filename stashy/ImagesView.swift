@@ -7,6 +7,8 @@
 
 #if !os(tvOS)
 import SwiftUI
+import AVFoundation
+import AVKit
 
 struct ImagesView: View {
     let initialGallery: Gallery?
@@ -54,8 +56,21 @@ private struct ImagesViewBody: View {
     @State private var sessionKeyCache: [String: String] = [:]
     @State private var showingEditGallerySheet = false
     @State private var isHeaderExpanded = false
+    /// True while the Images feed ScrollView is dragging / decelerating.
+    @State private var isFeedScrolling = false
+    /// Global frames of visible video cards (for picking the most centered one).
+    @State private var videoCardFrames: [String: CGRect] = [:]
+    @State private var feedViewportFrame: CGRect = .zero
+    /// Only this image id may autoplay (most centered video in the viewport).
+    @State private var autoplayVideoImageId: String?
 
     private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
+    /// User preference from Filter & Sort (1/row muted autoplay).
+    @AppStorage("images_feed_video_autoplay") private var imagesFeedVideoAutoplay = true
+    /// 1/row + setting on + feed idle — individual cards still need matching `autoplayVideoImageId`.
+    private var feedAutoplayGateOpen: Bool {
+        imagesFeedVideoAutoplay && usesOneColumnFeedLayout && !isFeedScrolling
+    }
     private var isOpenedGallery: Bool { gallery != nil }
 
     init(
@@ -73,6 +88,23 @@ private struct ImagesViewBody: View {
     /// Same grouping prefs as Feeds → Pics.
     @AppStorage("stashline_group_sets") private var groupIntoSets = true
     @AppStorage("stashline_group_fallback") private var groupFallbackRaw = StashImageSetGroupingPolicy.sessionThenMeta.rawValue
+
+    private func recomputeAutoplayTarget() {
+        guard feedAutoplayGateOpen else {
+            if autoplayVideoImageId != nil { autoplayVideoImageId = nil }
+            return
+        }
+        let viewport = feedViewportFrame
+        guard viewport.width > 0, viewport.height > 0 else { return }
+        let targetY = viewport.midY
+        let best = videoCardFrames
+            .filter { $0.value.maxY > viewport.minY && $0.value.minY < viewport.maxY }
+            .min(by: { abs($0.value.midY - targetY) < abs($1.value.midY - targetY) })
+        let newId = best?.key
+        if autoplayVideoImageId != newId {
+            autoplayVideoImageId = newId
+        }
+    }
 
     // Multi-Select State
     @State private var isSelectionMode = false
@@ -227,24 +259,57 @@ private struct ImagesViewBody: View {
                     )
                 }
             } else {
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(spacing: 12) {
-                            if let gallery {
-                                openedGalleryHeader(gallery)
+                GeometryReader { viewport in
+                    ScrollViewReader { proxy in
+                        ScrollView {
+                            VStack(spacing: 12) {
+                                if let gallery {
+                                    openedGalleryHeader(gallery)
+                                }
+                                gridContent
                             }
-                            gridContent
+                            .padding(16)
+                            .padding(.bottom, isSelectionMode ? 80 : 0) // Add padding for floating bar
                         }
-                        .padding(16)
-                        .padding(.bottom, isSelectionMode ? 80 : 0) // Add padding for floating bar
-                    }
-                    .onAppear {
-                        if let id = lastOpenedImageId {
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
-                                proxy.scrollTo(id, anchor: .top)
+                        .onScrollPhaseChange { _, newPhase in
+                            let scrolling = newPhase != .idle
+                            isFeedScrolling = scrolling
+                            if scrolling {
+                                autoplayVideoImageId = nil
+                            } else {
+                                recomputeAutoplayTarget()
                             }
                         }
+                        .onAppear {
+                            feedViewportFrame = viewport.frame(in: .global)
+                            if let id = lastOpenedImageId {
+                                DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                                    proxy.scrollTo(id, anchor: .top)
+                                }
+                            }
+                            recomputeAutoplayTarget()
+                        }
+                        .onChange(of: viewport.size) { _, _ in
+                            feedViewportFrame = viewport.frame(in: .global)
+                            recomputeAutoplayTarget()
+                        }
+                        .onPreferenceChange(ImagesFeedVideoFrameKey.self) { frames in
+                            // Skip during scroll — geometry probes + @State writes cause jank.
+                            guard !isFeedScrolling else { return }
+                            videoCardFrames = frames
+                            recomputeAutoplayTarget()
+                        }
+                        .onChange(of: imagesFeedVideoAutoplay) { _, _ in
+                            recomputeAutoplayTarget()
+                        }
+                        .onChange(of: effectiveCardColumns) { _, _ in
+                            recomputeAutoplayTarget()
+                        }
+                        .onChange(of: isSelectionMode) { _, _ in
+                            recomputeAutoplayTarget()
+                        }
                     }
+                    .frame(width: viewport.size.width, height: viewport.size.height)
                 }
                 .refreshable {
                     sessionKeyCache.removeAll(keepingCapacity: true)
@@ -687,7 +752,8 @@ private struct ImagesViewBody: View {
                 }
                 imageListFilters.showRenameCatalogPresetAlert = true
             },
-            onRequestDelete: { imageListFilters.showDeleteCatalogPresetAlert = true }
+            onRequestDelete: { imageListFilters.showDeleteCatalogPresetAlert = true },
+            showsImagesFeedAutoplaySetting: true
         )
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
@@ -749,7 +815,7 @@ private struct ImagesViewBody: View {
         .id(effectiveCardColumns)
     }
     
-    /// Images stay square in both column modes (1/row Feeds matches Pics 1:1).
+    /// 2-column grid stays square; 1/row uses per-image orientation (see `StashImage.oneColumnFeedAspectRatio`).
     private var imageCardAspectRatio: CGFloat { 1.0 }
 
     private func loadMoreImagesIfNeeded() {
@@ -760,14 +826,29 @@ private struct ImagesViewBody: View {
         }
     }
 
+    /// Same order as the 1/row overview (grouped posts flattened); 2-col uses the raw list.
+    private var fullscreenSwipeImages: [StashImage] {
+        if usesOneColumnFeedLayout {
+            return oneColumnFeedPosts.flatMap(\.images)
+        }
+        return displayedImages
+    }
+
     private func fullScreenFeedBinding() -> Binding<[StashImage]> {
         Binding(
-            get: { displayedImages },
+            get: { fullscreenSwipeImages },
             set: { newImages in
+                // Persist deletes/edits onto the source list (API order), not the swipe projection.
+                let byId = Dictionary(uniqueKeysWithValues: newImages.map { ($0.id, $0) })
+                let remainingIds = Set(byId.keys)
+                let updated = displayedImages.compactMap { img -> StashImage? in
+                    guard remainingIds.contains(img.id) else { return nil }
+                    return byId[img.id] ?? img
+                }
                 if gallery != nil {
-                    viewModel.galleryImages = newImages
+                    viewModel.galleryImages = updated
                 } else {
-                    viewModel.allImages = newImages
+                    viewModel.allImages = updated
                 }
             }
         )
@@ -777,10 +858,11 @@ private struct ImagesViewBody: View {
     private func imageGroupCell(_ images: [StashImage]) -> some View {
         ImageGroupCatalogCell(
             images: images,
-            aspectRatio: imageCardAspectRatio,
             currentGalleryId: gallery?.id,
             // Fullscreen must page through the whole feed, not only this set/group.
             imagesBinding: fullScreenFeedBinding(),
+            autoplayVideoImageId: feedAutoplayGateOpen ? autoplayVideoImageId : nil,
+            reportsFeedVideoFrame: feedAutoplayGateOpen,
             onLoadMore: { loadMoreImagesIfNeeded() },
             onOpened: { lastOpenedImageId = $0 }
         )
@@ -900,14 +982,25 @@ private struct ImagesViewBody: View {
         .padding(.bottom, DesignTokens.Chrome.fabBottomPadding)
     }
 }
-/// 1/row Feeds-style post: header overlay on square image + optional set thumb strip.
-private struct ImageGroupCatalogCell: View {
+/// Reports visible video card frames (global) so the feed can pick a single centered autoplay target.
+struct ImagesFeedVideoFrameKey: PreferenceKey {
+    static var defaultValue: [String: CGRect] = [:]
+    static func reduce(value: inout [String: CGRect], nextValue: () -> [String: CGRect]) {
+        value.merge(nextValue(), uniquingKeysWith: { $1 })
+    }
+}
+
+/// 1/row Feeds-style post: header overlay on orientation-aware image + optional set thumb strip.
+struct ImageGroupCatalogCell: View {
     let images: [StashImage]
-    let aspectRatio: CGFloat
     /// When already inside a gallery detail, skip linking back to the same gallery.
     var currentGalleryId: String? = nil
     /// Full feed for fullscreen paging (not limited to this group).
     let imagesBinding: Binding<[StashImage]>
+    /// Only the image with this id may autoplay (most centered video).
+    var autoplayVideoImageId: String? = nil
+    /// Disable while scrolling — PreferenceKey geometry probes cause scroll jank.
+    var reportsFeedVideoFrame: Bool = false
     let onLoadMore: () -> Void
     let onOpened: (String) -> Void
 
@@ -915,16 +1008,18 @@ private struct ImageGroupCatalogCell: View {
 
     init(
         images: [StashImage],
-        aspectRatio: CGFloat,
         currentGalleryId: String? = nil,
         imagesBinding: Binding<[StashImage]>,
+        autoplayVideoImageId: String? = nil,
+        reportsFeedVideoFrame: Bool = false,
         onLoadMore: @escaping () -> Void,
         onOpened: @escaping (String) -> Void
     ) {
         self.images = images
-        self.aspectRatio = aspectRatio
         self.currentGalleryId = currentGalleryId
         self.imagesBinding = imagesBinding
+        self.autoplayVideoImageId = autoplayVideoImageId
+        self.reportsFeedVideoFrame = reportsFeedVideoFrame
         self.onLoadMore = onLoadMore
         self.onOpened = onOpened
         _visibleImageId = State(initialValue: images[0].id)
@@ -932,6 +1027,10 @@ private struct ImageGroupCatalogCell: View {
 
     private var visibleImage: StashImage {
         images.first(where: { $0.id == visibleImageId }) ?? images[0]
+    }
+
+    private var allowsVisibleVideoAutoplay: Bool {
+        visibleImage.isVideo && autoplayVideoImageId == visibleImage.id
     }
 
     var body: some View {
@@ -944,9 +1043,13 @@ private struct ImageGroupCatalogCell: View {
                 )) {
                     ImageThumbnailCard(
                         image: visibleImage,
-                        aspectRatio: aspectRatio,
-                        showsOverlayChrome: false
+                        aspectRatio: visibleImage.oneColumnFeedAspectRatio,
+                        showsOverlayChrome: false,
+                        allowsVideoAutoplay: allowsVisibleVideoAutoplay,
+                        reportsFeedVideoFrame: reportsFeedVideoFrame
                     )
+                    .animation(.easeInOut(duration: 0.2), value: visibleImage.oneColumnFeedAspectRatio)
+                    .id(visibleImage.id)
                 }
                 .buttonStyle(.plain)
                 .simultaneousGesture(TapGesture().onEnded {
@@ -1000,7 +1103,7 @@ private struct ImageGroupCatalogCell: View {
 }
 
 /// Semi-transparent header overlaid on the 1/row thumbnail.
-private struct ImageCatalogFeedHeader: View {
+struct ImageCatalogFeedHeader: View {
     let image: StashImage
     var currentGalleryId: String? = nil
     @ObservedObject private var appearanceManager = AppearanceManager.shared
@@ -1182,7 +1285,7 @@ private struct ImageCatalogFeedHeader: View {
 }
 
 /// Small square thumb under a grouped catalog image (1/row layout).
-private struct ImageGroupThumbView: View {
+struct ImageGroupThumbView: View {
     let image: StashImage
     var size: CGFloat = 56
     var isSelected: Bool = false
@@ -1239,7 +1342,21 @@ struct ImageThumbnailCard: View {
     var aspectRatio: CGFloat = 1
     /// When false (1/row Feeds layout), chrome lives in the header above the image.
     var showsOverlayChrome: Bool = true
+    /// When true and the card is a video, start muted playback after 0.5s of idle settle.
+    var allowsVideoAutoplay: Bool = false
+    /// Publish this card's global frame for feed-level "most centered video" selection.
+    var reportsFeedVideoFrame: Bool = false
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @State private var previewPlayer: AVPlayer?
+    @State private var isPreviewing = false
+    @State private var autoplayTask: Task<Void, Never>?
+    @State private var loopObserver: NSObjectProtocol?
+
+    /// Original media URL — Stash `paths.preview` is often a still/webp and blacks out in AVPlayer.
+    private var videoPlaybackURL: URL? {
+        guard image.isVideo else { return nil }
+        return image.imageURL
+    }
     
     var body: some View {
         ZStack(alignment: .bottomLeading) {
@@ -1264,7 +1381,15 @@ struct ImageThumbnailCard: View {
                         }
                     }
 
-                    if image.isVideo {
+                    if isPreviewing, let previewPlayer {
+                        AspectFillVideoPlayer(player: previewPlayer)
+                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .clipped()
+                            .allowsHitTesting(false)
+                            .transition(.opacity)
+                    }
+
+                    if image.isVideo && !isPreviewing {
                         Image(systemName: "play.fill")
                             .font(.title2)
                             .foregroundColor(.white)
@@ -1276,6 +1401,25 @@ struct ImageThumbnailCard: View {
             }
             .aspectRatio(aspectRatio, contentMode: .fit)
             .id(aspectRatio)
+            .background {
+                if reportsFeedVideoFrame, image.isVideo {
+                    GeometryReader { geo in
+                        Color.clear.preference(
+                            key: ImagesFeedVideoFrameKey.self,
+                            value: [image.id: geo.frame(in: .global)]
+                        )
+                    }
+                }
+            }
+            .onAppear { scheduleVideoAutoplayIfNeeded() }
+            .onDisappear { stopVideoPreview(releasePlayer: true) }
+            .onChange(of: allowsVideoAutoplay) { _, _ in
+                scheduleVideoAutoplayIfNeeded()
+            }
+            .onChange(of: image.id) { _, _ in
+                stopVideoPreview(releasePlayer: true)
+                scheduleVideoAutoplayIfNeeded()
+            }
 
             if showsOverlayChrome {
                 // Top Overlay (Studio and Date) — fixed fonts like SceneCardView
@@ -1342,6 +1486,61 @@ struct ImageThumbnailCard: View {
         }
         .background(Color.secondaryAppBackground)
         .modifier(ImageThumbnailCardChrome(enabled: showsOverlayChrome))
+    }
+
+    private func scheduleVideoAutoplayIfNeeded() {
+        autoplayTask?.cancel()
+        autoplayTask = nil
+
+        guard allowsVideoAutoplay, image.isVideo, videoPlaybackURL != nil else {
+            stopVideoPreview(releasePlayer: true)
+            return
+        }
+
+        autoplayTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            guard !Task.isCancelled, allowsVideoAutoplay else { return }
+            startVideoPreview()
+        }
+    }
+
+    private func startVideoPreview() {
+        guard let url = videoPlaybackURL else { return }
+        if previewPlayer == nil {
+            let player = createMutedPreviewPlayer(for: url)
+            previewPlayer = player
+            if let observer = loopObserver {
+                NotificationCenter.default.removeObserver(observer)
+            }
+            loopObserver = NotificationCenter.default.addObserver(
+                forName: .AVPlayerItemDidPlayToEndTime,
+                object: player.currentItem,
+                queue: .main
+            ) { [weak player] _ in
+                player?.seek(to: .zero)
+                player?.play()
+            }
+        }
+        withAnimation(.easeIn(duration: 0.2)) {
+            isPreviewing = true
+        }
+        previewPlayer?.play()
+    }
+
+    private func stopVideoPreview(releasePlayer: Bool) {
+        autoplayTask?.cancel()
+        autoplayTask = nil
+        // No animation — scroll-driven stops must not animate layout.
+        isPreviewing = false
+        previewPlayer?.pause()
+        previewPlayer?.seek(to: .zero)
+        if releasePlayer {
+            if let observer = loopObserver {
+                NotificationCenter.default.removeObserver(observer)
+                loopObserver = nil
+            }
+            previewPlayer = nil
+        }
     }
 }
 

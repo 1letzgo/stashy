@@ -27,35 +27,45 @@ extension View {
     }
 }
 
-/// Playback toggles for Feeds Filter & Sort sheets (moved out of Settings → Feeds).
-struct FeedsPlaybackSettingsCard: View {
-    @ObservedObject private var tabManager = TabManager.shared
+/// Label + trailing toggle — same typography/chrome as Filter / Sort rows.
+struct CatalogFilterSortToggleRow: View {
+    let label: String
+    @Binding var isOn: Bool
     @ObservedObject private var appearance = AppearanceManager.shared
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            VStack(spacing: 0) {
-                Toggle("Immersive Video Scaling", isOn: $tabManager.reelsFillHeight)
-                    .tint(appearance.tintColor)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-                Divider().padding(.leading, 16)
-                Toggle("Continuous Play", isOn: $tabManager.reelsContinuousPlay)
-                    .tint(appearance.tintColor)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 10)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(Color.secondaryAppBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 12))
-            .padding(.horizontal, 16)
-
-            Text("Immersive Scaling fills the area above the tab bar when orientation matches. Continuous Play advances instead of looping.")
-                .font(.caption)
+        HStack(alignment: .center, spacing: 12) {
+            Text(label)
+                .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
-                .padding(.horizontal, 32)
-                .padding(.bottom, 4)
+                .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+            Spacer(minLength: 0)
+            Toggle("", isOn: $isOn)
+                .labelsHidden()
+                .tint(appearance.tintColor)
         }
+        .catalogFilterSortControlCardChrome()
+    }
+}
+
+/// Playback toggles for Feeds Filter & Sort sheets (moved out of Settings → Feeds).
+struct FeedsPlaybackSettingsCard: View {
+    @ObservedObject private var tabManager = TabManager.shared
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            CatalogFilterSortToggleRow(label: "Immersive", isOn: $tabManager.reelsFillHeight)
+            CatalogFilterSortToggleRow(label: "Continuous", isOn: $tabManager.reelsContinuousPlay)
+        }
+    }
+}
+
+/// 1/row Images feed: muted autoplay of the centered video after scroll settles.
+struct ImagesFeedAutoplaySettingsCard: View {
+    @AppStorage("images_feed_video_autoplay") private var videoAutoplay = true
+
+    var body: some View {
+        CatalogFilterSortToggleRow(label: "Autoplay", isOn: $videoAutoplay)
     }
 }
 
@@ -329,6 +339,8 @@ struct CatalogServerManagedFilterNotice: View {
 private enum PerformerCatalogSortFieldKind: String, CaseIterable, Identifiable {
     case name
     case scenes_count
+    case images_count
+    case galleries_count
     case birthdate
     case updated_at
     case created_at
@@ -342,6 +354,8 @@ private enum PerformerCatalogSortFieldKind: String, CaseIterable, Identifiable {
         switch self {
         case .name: return "Name"
         case .scenes_count: return "Scene count"
+        case .images_count: return "Image count"
+        case .galleries_count: return "Gallery count"
         case .birthdate: return "Birthday"
         case .updated_at: return "Updated"
         case .created_at: return "Created"
@@ -360,6 +374,8 @@ private enum PerformerCatalogSortFieldKind: String, CaseIterable, Identifiable {
         switch self {
         case .name: return ascending ? .nameAsc : .nameDesc
         case .scenes_count: return ascending ? .sceneCountAsc : .sceneCountDesc
+        case .images_count: return ascending ? .imageCountAsc : .imageCountDesc
+        case .galleries_count: return ascending ? .galleryCountAsc : .galleryCountDesc
         case .birthdate: return ascending ? .birthdateAsc : .birthdateDesc
         case .updated_at: return ascending ? .updatedAtAsc : .updatedAtDesc
         case .created_at: return ascending ? .createdAtAsc : .createdAtDesc
@@ -1491,6 +1507,8 @@ struct ImagesCatalogFilterSortSheet: View {
     var onRequestDelete: () -> Void
     /// When `true`, shows Immersive Scaling / Continuous Play (Feeds clips sheet).
     var showsFeedsPlaybackSettings: Bool = false
+    /// When `true`, shows 1/row Images video autoplay toggle.
+    var showsImagesFeedAutoplaySetting: Bool = false
 
     @ObservedObject private var appearance = AppearanceManager.shared
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
@@ -1523,6 +1541,9 @@ struct ImagesCatalogFilterSortSheet: View {
                     }
                     if showsFeedsPlaybackSettings {
                         FeedsPlaybackSettingsCard()
+                    }
+                    if showsImagesFeedAutoplaySetting {
+                        ImagesFeedAutoplaySettingsCard()
                     }
                     if liveChipRowsVisible {
                         imageLiveChipsCard

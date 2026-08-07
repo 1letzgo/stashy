@@ -45,8 +45,8 @@ struct SecuritySettingsView: View {
                 .listRowBackground(Color.secondaryAppBackground)
             }
         }
-        .navigationTitle("Security")
         .applyAppBackground()
+        .stashySettingsDetailChrome("Security")
         .sheet(isPresented: $showingSetPasscode) {
             PasscodeSetupView(isPresented: $showingSetPasscode)
         }

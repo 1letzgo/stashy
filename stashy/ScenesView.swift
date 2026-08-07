@@ -1117,10 +1117,8 @@ private struct ScenesViewContent: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
 
-        .navigationTitle(hideTitle ? "" : "Scenes")
-        .navigationBarTitleDisplayMode(.inline)
         .applyAppBackground()
-
+        .modifier(ScenesEmbeddedNavigationChrome(hideTitle: hideTitle, searchText: $searchText, onClearSearch: performSearch))
         .onChange(of: searchText) { oldValue, newValue in
             // Debounce: Nur suchen wenn Nutzer aufhört zu tippen (0.5s Delay)
             NSObject.cancelPreviousPerformRequests(withTarget: self)
@@ -1129,31 +1127,6 @@ private struct ScenesViewContent: View {
                     self.performSearch()
                 }
             }
-        }
-        .toolbar {
-            // Search pill in title area when active
-            if !searchText.isEmpty {
-                ToolbarItem(placement: .principal) {
-                            Button(action: {
-                        searchText = ""
-                        performSearch()
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 10, weight: .bold))
-                            Text(searchText)
-                                .font(.system(size: 12, weight: .bold))
-                                .lineLimit(1)
-                        }
-                        .foregroundColor(.white.opacity(0.9))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                        .clipShape(Capsule())
-                    }
-                }
-            }
-            
         }
         .floatingActionBar(
             isPresented: showsFloatingFilterButton,
@@ -1567,6 +1540,49 @@ struct ScenesView: View {
             externalLiveFilterSheetBinding: nil,
             showsFloatingFilterButton: true
         )
+    }
+}
+
+/// When embedded in Performer/Studio/Tag/Group detail (`hideTitle`), do not re-enable the system
+/// nav bar — child `.toolbar` / `.navigationTitle` would otherwise override the parent's custom chrome
+/// (especially when pushed from Search).
+private struct ScenesEmbeddedNavigationChrome: ViewModifier {
+    let hideTitle: Bool
+    @Binding var searchText: String
+    var onClearSearch: () -> Void
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if hideTitle {
+            content.hideSystemNavigationBarForCustomChrome()
+        } else {
+            content
+                .navigationTitle("Scenes")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    if !searchText.isEmpty {
+                        ToolbarItem(placement: .principal) {
+                            Button {
+                                searchText = ""
+                                onClearSearch()
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 10, weight: .bold))
+                                    Text(searchText)
+                                        .font(.system(size: 12, weight: .bold))
+                                        .lineLimit(1)
+                                }
+                                .foregroundColor(.white.opacity(0.9))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(Color.black.opacity(DesignTokens.Opacity.badge))
+                                .clipShape(Capsule())
+                            }
+                        }
+                    }
+                }
+        }
     }
 }
 
