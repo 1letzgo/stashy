@@ -938,10 +938,18 @@ struct GalleryItemView: View {
     @Binding var isPlaying: Bool
     let scrubberState: ScrubberState
     var onInteraction: () -> Void
+    /// Continuous play: advance to next fullscreen item (own setting, not Feeds).
+    var onAdvanceToNext: () -> Void = {}
+
+    @AppStorage("images_fullscreen_immersive") private var immersiveScaling = true
+    @AppStorage("images_fullscreen_continuous") private var continuousPlay = false
+    @AppStorage("images_fullscreen_continuous_duration") private var continuousDurationSeconds = 3
 
     // Playback State
     @State private var player: AVPlayer?
     @State private var timeObserver: Any?
+    @State private var endObserver: NSObjectProtocol?
+    @State private var animationAdvanceTimer: Timer?
 
     private var isActiveItem: Bool {
         image.id == (currentVisibleId ?? fallbackActiveId)
@@ -959,8 +967,25 @@ struct GalleryItemView: View {
         return false
     }
 
+    /// Match Feeds: fill only when immersive is on and content orientation matches the device.
+    private var shouldFill: Bool {
+        guard immersiveScaling else { return false }
+        let isPortraitDevice = UIScreen.main.bounds.height > UIScreen.main.bounds.width
+        if isPortraitDevice {
+            return isPortrait
+        } else {
+            return !isPortrait
+        }
+    }
+
+    private var immersiveBottomInset: CGFloat {
+        guard shouldFill, showUI else { return 0 }
+        return ReelsImmersiveChromeLayout.videoBottomInset()
+    }
+
     @ViewBuilder
     private var mediaLayer: some View {
+        let bottomInset = immersiveBottomInset
         Group {
             if image.isAnimated {
                 ZoomableScrollView(isZoomed: $isZoomed, onTap: { _ in
@@ -970,11 +995,13 @@ struct GalleryItemView: View {
                     GeometryReader { _ in
                         CustomAsyncImage(url: image.imageURL) { loader in
                             if let data = loader.imageData, isAnimatedData(data) {
-                                AnimatedWebView(data: data, fillMode: false)
+                                AnimatedWebView(data: data, fillMode: shouldFill, bottomInset: bottomInset)
                             } else if let img = loader.image {
                                 img
                                     .resizable()
-                                    .aspectRatio(contentMode: .fit)
+                                    .aspectRatio(contentMode: shouldFill ? .fill : .fit)
+                                    .padding(.bottom, bottomInset)
+                                    .clipped()
                             } else if loader.isLoading {
                                 InlineSpinner(tint: .white)
                             } else {
@@ -989,14 +1016,20 @@ struct GalleryItemView: View {
                     if showUI { onInteraction() }
                 }) {
                     if let player = player {
-                        FullScreenVideoPlayer(player: player, videoGravity: .resizeAspect)
+                        FullScreenVideoPlayer(
+                            player: player,
+                            videoGravity: shouldFill ? .resizeAspectFill : .resizeAspect,
+                            bottomContentInset: bottomInset
+                        )
                     } else {
                         if let url = image.thumbnailURL {
                             CustomAsyncImage(url: url) { loader in
                                 if let img = loader.image {
                                     img
                                         .resizable()
-                                        .aspectRatio(contentMode: .fit)
+                                        .aspectRatio(contentMode: shouldFill ? .fill : .fit)
+                                        .padding(.bottom, bottomInset)
+                                        .clipped()
                                 } else {
                                     InlineSpinner(tint: .white)
                                 }
@@ -1015,8 +1048,10 @@ struct GalleryItemView: View {
                             if let img = loader.image {
                                 img
                                     .resizable()
-                                    .aspectRatio(contentMode: .fit)
+                                    .aspectRatio(contentMode: shouldFill ? .fill : .fit)
+                                    .padding(.bottom, bottomInset)
                                     .frame(maxWidth: .infinity, maxHeight: .infinity)
+                                    .clipped()
                             } else if loader.isLoading {
                                 ProgressView()
                                     .tint(.white)
@@ -1060,10 +1095,15 @@ struct GalleryItemView: View {
             applyActivePlaybackState()
         }
         .onDisappear {
+            cancelAnimationAdvanceTimer()
             player?.pause()
             if let timeObserver = timeObserver {
                 player?.removeTimeObserver(timeObserver)
                 self.timeObserver = nil
+            }
+            if let endObserver {
+                NotificationCenter.default.removeObserver(endObserver)
+                self.endObserver = nil
             }
         }
         .onChange(of: isMuted) { _, newValue in
@@ -1074,8 +1114,23 @@ struct GalleryItemView: View {
         }
         .onChange(of: isPlaying) { _, playing in
             guard isActiveItem else { return }
-            if playing { player?.play() }
-            else { player?.pause() }
+            if playing {
+                player?.play()
+            } else {
+                player?.pause()
+            }
+        }
+        .onChange(of: continuousPlay) { _, enabled in
+            guard isActiveItem, !image.isVideo else { return }
+            if enabled {
+                startStillAdvanceTimer()
+            } else {
+                cancelAnimationAdvanceTimer()
+            }
+        }
+        .onChange(of: continuousDurationSeconds) { _, _ in
+            guard isActiveItem, !image.isVideo, continuousPlay else { return }
+            startStillAdvanceTimer()
         }
         .onReceive(scrubberState.$seekTarget) { target in
             guard let t = target, isActiveItem, player != nil else { return }
@@ -1102,6 +1157,7 @@ struct GalleryItemView: View {
     private func applyActivePlaybackState() {
         guard isActiveItem else {
             player?.pause()
+            cancelAnimationAdvanceTimer()
             return
         }
         if image.isVideo {
@@ -1116,7 +1172,45 @@ struct GalleryItemView: View {
             scrubberState.duration = 1
             scrubberState.seeking = false
             scrubberState.seekTarget = nil
+            if continuousPlay {
+                startStillAdvanceTimer()
+            } else {
+                cancelAnimationAdvanceTimer()
+            }
         }
+    }
+
+    private func handlePlaybackEnded() {
+        guard image.id == (currentVisibleId ?? fallbackActiveId) else { return }
+        if continuousPlay {
+            onAdvanceToNext()
+            return
+        }
+        player?.seek(to: .zero)
+        player?.play()
+        isPlaying = true
+    }
+
+    /// Continuous: stills use the Dauer setting; animated GIFs/WebP use file duration (fallback: Dauer).
+    private func startStillAdvanceTimer() {
+        guard continuousPlay, !image.isVideo, isActiveItem else { return }
+        cancelAnimationAdvanceTimer()
+        let fallback = TimeInterval(max(1, continuousDurationSeconds))
+        let duration: TimeInterval
+        if isAnimatedImage {
+            let meta = image.visual_files?.first?.duration ?? 0
+            duration = meta > 0 ? meta : fallback
+        } else {
+            duration = fallback
+        }
+        animationAdvanceTimer = Timer.scheduledTimer(withTimeInterval: duration, repeats: false) { _ in
+            handlePlaybackEnded()
+        }
+    }
+
+    private func cancelAnimationAdvanceTimer() {
+        animationAdvanceTimer?.invalidate()
+        animationAdvanceTimer = nil
     }
 
     private func initPlayer(with streamURL: URL) {
@@ -1133,7 +1227,10 @@ struct GalleryItemView: View {
                 existingPlayer.removeTimeObserver(observer)
                 self.timeObserver = nil
             }
-            NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: existingPlayer.currentItem)
+            if let endObserver {
+                NotificationCenter.default.removeObserver(endObserver)
+                self.endObserver = nil
+            }
             existingPlayer.replaceCurrentItem(with: newItem)
         } else {
             self.player = createPlayer(for: streamURL)
@@ -1148,13 +1245,13 @@ struct GalleryItemView: View {
             scrubber.duration = metaDuration
         }
 
-        // Loop on end
-        NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { _ in
-            player.seek(to: .zero)
-            if itemId == (self.currentVisibleId ?? self.fallbackActiveId) {
-                player.play()
-                self.isPlaying = true
-            }
+        endObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: player.currentItem,
+            queue: .main
+        ) { _ in
+            guard itemId == (self.currentVisibleId ?? self.fallbackActiveId) else { return }
+            self.handlePlaybackEnded()
         }
 
         // Time observer — read visible id via Binding so paging updates stay live (Feeds pattern).
@@ -1221,6 +1318,18 @@ struct FullScreenImageView: View {
 
     private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
 
+    private func advanceFullscreenToNext(from id: String) {
+        guard let idx = images.firstIndex(where: { $0.id == id }),
+              idx + 1 < images.count else { return }
+        let nextId = images[idx + 1].id
+        withAnimation(.easeInOut(duration: 0.25)) {
+            currentVisibleId = nextId
+        }
+        if idx + 2 >= images.count {
+            onLoadMore?()
+        }
+    }
+
     var body: some View {
         ScrollViewReader { proxy in
             ZStack {
@@ -1240,7 +1349,10 @@ struct FullScreenImageView: View {
                                 fallbackActiveId: selectedImageId,
                                 isPlaying: $currentItemIsPlaying,
                                 scrubberState: scrubberState,
-                                onInteraction: { }
+                                onInteraction: { },
+                                onAdvanceToNext: {
+                                    advanceFullscreenToNext(from: image.id)
+                                }
                             )
                             .scrollDisabled(isMediaZoomed)
                             .containerRelativeFrame([.horizontal, .vertical])

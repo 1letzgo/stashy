@@ -60,12 +60,58 @@ struct FeedsPlaybackSettingsCard: View {
     }
 }
 
-/// 1/row Images feed: muted autoplay of the centered video after scroll settles.
+/// Images feed + fullscreen: autoplay (1/row) and fullscreen Immersive / Continuous (separate from Feeds).
 struct ImagesFeedAutoplaySettingsCard: View {
     @AppStorage("images_feed_video_autoplay") private var videoAutoplay = true
+    @AppStorage("images_fullscreen_immersive") private var fullscreenImmersive = true
+    @AppStorage("images_fullscreen_continuous") private var fullscreenContinuous = false
+    @AppStorage("images_fullscreen_continuous_duration") private var continuousDurationSeconds = 3
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    private let durationOptions = [2, 3, 5, 8, 10]
 
     var body: some View {
-        CatalogFilterSortToggleRow(label: "Autoplay", isOn: $videoAutoplay)
+        VStack(alignment: .leading, spacing: 16) {
+            CatalogFilterSortToggleRow(label: "Autoplay", isOn: $videoAutoplay)
+            CatalogFilterSortToggleRow(label: "Immersive", isOn: $fullscreenImmersive)
+            continuousCard
+        }
+    }
+
+    private var continuousCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
+                Text("Continuous")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.secondary)
+                    .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                Spacer(minLength: 0)
+                Toggle("", isOn: $fullscreenContinuous)
+                    .labelsHidden()
+                    .tint(appearance.tintColor)
+            }
+
+            if fullscreenContinuous {
+                HStack(alignment: .center, spacing: 12) {
+                    Text("Still Duration")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.secondary)
+                        .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                    Spacer(minLength: 0)
+                    HStack(spacing: 8) {
+                        ForEach(durationOptions, id: \.self) { seconds in
+                            CatalogFilterChip(
+                                title: "\(seconds)s",
+                                isActive: continuousDurationSeconds == seconds
+                            ) {
+                                continuousDurationSeconds = seconds
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        .catalogFilterSortControlCardChrome()
     }
 }
 
