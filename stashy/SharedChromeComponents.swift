@@ -194,6 +194,97 @@ struct StashyChromeBackButton: View {
     }
 }
 
+/// Modal catalog filter/sort sheet chrome (title default “Settings”) — not the system nav bar.
+struct CatalogSettingsSheetChromeBar: View {
+    var title: String = "Settings"
+    var hasSelectedPreset: Bool
+    var onReset: () -> Void
+    var onRequestSave: () -> Void
+    var onRequestSaveAs: () -> Void
+    var onRequestRename: () -> Void
+    var onRequestDelete: () -> Void
+
+    var body: some View {
+        StashySectionChromeBar {
+            HStack(spacing: 8) {
+                Button(action: onReset) {
+                    Text("Reset")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.red)
+                        .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Reset")
+
+                Text(title)
+                    .font(.title3.weight(.semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Menu {
+                    Button { onRequestSave() } label: {
+                        Label("Save", systemImage: "arrow.down.doc")
+                    }
+                    .disabled(!hasSelectedPreset)
+                    Button { onRequestSaveAs() } label: {
+                        Label("Save As", systemImage: "doc.badge.plus")
+                    }
+                } label: {
+                    Image(systemName: "arrow.down.doc")
+                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                        .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
+                        .background(StashyExpandingDock.inactiveBackground)
+                        .clipShape(Circle())
+                }
+                .accessibilityLabel("Save")
+
+                ChromeCircleButton(
+                    systemImage: "pencil",
+                    enabled: hasSelectedPreset,
+                    accessibilityLabel: "Rename",
+                    action: onRequestRename
+                )
+                ChromeCircleButton(
+                    systemImage: "trash",
+                    enabled: hasSelectedPreset,
+                    accessibilityLabel: "Delete",
+                    action: onRequestDelete
+                )
+            }
+            .frame(minHeight: StashyExpandingDock.activeHeight)
+            .padding(.horizontal, StashyExpandingDock.edgePadding)
+            .padding(.vertical, 10)
+        }
+    }
+}
+
+private struct CatalogSettingsSheetChromeModifier: ViewModifier {
+    var hasSelectedPreset: Bool
+    var onReset: () -> Void
+    var onRequestSave: () -> Void
+    var onRequestSaveAs: () -> Void
+    var onRequestRename: () -> Void
+    var onRequestDelete: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .hideSystemNavigationBarForCustomChrome()
+            // Modal sheets always pin chrome to the top (unlike tab-root chrome on iPad).
+            .safeAreaInset(edge: .top, spacing: 16) {
+                CatalogSettingsSheetChromeBar(
+                    hasSelectedPreset: hasSelectedPreset,
+                    onReset: onReset,
+                    onRequestSave: onRequestSave,
+                    onRequestSaveAs: onRequestSaveAs,
+                    onRequestRename: onRequestRename,
+                    onRequestDelete: onRequestDelete
+                )
+            }
+    }
+}
+
 /// Settings / simple pushed-detail chrome: Back · title · optional trailing.
 struct StashyDetailChromeBar<Trailing: View>: View {
     let title: String
@@ -263,6 +354,27 @@ extension View {
         safeAreaInset(edge: StashyChromePlacement.edge, spacing: spacing, content: content)
     }
 
+    /// Catalog filter/sort modal: custom “Settings” chrome instead of the system nav bar.
+    func catalogSettingsSheetChrome(
+        hasSelectedPreset: Bool,
+        onReset: @escaping () -> Void,
+        onRequestSave: @escaping () -> Void,
+        onRequestSaveAs: @escaping () -> Void,
+        onRequestRename: @escaping () -> Void,
+        onRequestDelete: @escaping () -> Void
+    ) -> some View {
+        modifier(
+            CatalogSettingsSheetChromeModifier(
+                hasSelectedPreset: hasSelectedPreset,
+                onReset: onReset,
+                onRequestSave: onRequestSave,
+                onRequestSaveAs: onRequestSaveAs,
+                onRequestRename: onRequestRename,
+                onRequestDelete: onRequestDelete
+            )
+        )
+    }
+
     /// Pushed Settings detail: custom chrome (Back + title) instead of the system nav bar.
     func stashySettingsDetailChrome(
         _ title: String
@@ -289,7 +401,7 @@ extension View {
 /// Shared filter/sort control for floating catalog bars (`slider.horizontal.3` + active tint dot).
 struct CatalogFilterFABButton: View {
     var isActive: Bool
-    var accessibilityLabel: String = "Filter and sort"
+    var accessibilityLabel: String = "Settings"
     let action: () -> Void
     @ObservedObject private var appearance = AppearanceManager.shared
 

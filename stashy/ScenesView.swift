@@ -1688,7 +1688,7 @@ enum SceneLiveFilterPresetStore {
     }
 }
 
-// MARK: - Filter & sort sheet
+// MARK: - Settings sheet (filter / sort)
 
 struct SceneLiveFilterSheet: View {
     /// Same width as `filterRow` labels so sort chips line up with filter chips.
@@ -1903,48 +1903,14 @@ struct SceneLiveFilterSheet: View {
                 }
             }
             .background(Color.appBackground)
-            .navigationTitle("Filter & Sort")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Reset", role: .destructive) { onReset() }
-                        .foregroundColor(.red)
-                }
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button {
-                            onRequestSave()
-                        } label: {
-                            Label("Save", systemImage: "arrow.down.doc")
-                        }
-                        .disabled(!hasSelectedPreset)
-
-                        Button {
-                            onRequestSaveAs()
-                        } label: {
-                            Label("Save As", systemImage: "doc.badge.plus")
-                        }
-                    } label: {
-                        Image(systemName: "arrow.down.doc")
-                        .fontWeight(.semibold)
-                }
-                    .accessibilityLabel("Save")
-
-                    Button(action: onRequestRename) {
-                        Image(systemName: "pencil")
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(!hasSelectedPreset)
-                    .accessibilityLabel("Rename")
-
-                    Button(role: .destructive, action: onRequestDelete) {
-                        Image(systemName: "trash")
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(!hasSelectedPreset)
-                    .accessibilityLabel("Delete")
-                }
-            }
+            .catalogSettingsSheetChrome(
+                hasSelectedPreset: hasSelectedPreset,
+                onReset: onReset,
+                onRequestSave: onRequestSave,
+                onRequestSaveAs: onRequestSaveAs,
+                onRequestRename: onRequestRename,
+                onRequestDelete: onRequestDelete
+            )
         }
         .presentationDetents([.medium, .large])
     }

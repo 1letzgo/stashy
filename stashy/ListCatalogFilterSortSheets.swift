@@ -2,7 +2,7 @@
 //  ListCatalogFilterSortSheets.swift
 //  stashy
 //
-//  Unified "Filter & Sort" sheets for Performers, Tags, and Studios catalog views.
+//  Unified catalog Settings sheets (filter / sort / playback) for list views.
 //
 
 #if !os(tvOS)
@@ -630,38 +630,14 @@ struct PerformersCatalogFilterSortSheet: View {
                 }
             }
             .background(Color.appBackground)
-            .navigationTitle("Filter & Sort")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Reset", role: .destructive) { onReset() }
-                        .foregroundColor(.red)
-                }
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button { onRequestSave() } label: {
-                            Label("Save", systemImage: "arrow.down.doc")
-                        }
-                        .disabled(!hasSelectedPreset)
-                        Button { onRequestSaveAs() } label: {
-                            Label("Save As", systemImage: "doc.badge.plus")
-                        }
-                    } label: {
-                        Image(systemName: "arrow.down.doc").fontWeight(.semibold)
-                    }
-                    .accessibilityLabel("Save")
-                    Button(action: onRequestRename) {
-                        Image(systemName: "pencil")
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(!hasSelectedPreset)
-                    Button(role: .destructive, action: onRequestDelete) {
-                        Image(systemName: "trash")
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(!hasSelectedPreset)
-                }
-            }
+            .catalogSettingsSheetChrome(
+                hasSelectedPreset: hasSelectedPreset,
+                onReset: onReset,
+                onRequestSave: onRequestSave,
+                onRequestSaveAs: onRequestSaveAs,
+                onRequestRename: onRequestRename,
+                onRequestDelete: onRequestDelete
+            )
         }
         .presentationDetents([.medium, .large])
     }
@@ -868,33 +844,14 @@ struct TagsCatalogFilterSortSheet: View {
                 }
             }
             .background(Color.appBackground)
-            .navigationTitle("Filter & Sort")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Reset", role: .destructive) { onReset() }
-                        .foregroundColor(.red)
-                }
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button { onRequestSave() } label: { Label("Save", systemImage: "arrow.down.doc") }
-                            .disabled(!hasSelectedPreset)
-                        Button { onRequestSaveAs() } label: { Label("Save As", systemImage: "doc.badge.plus") }
-                    } label: {
-                        Image(systemName: "arrow.down.doc").fontWeight(.semibold)
-                    }
-                    Button(action: onRequestRename) {
-                        Image(systemName: "pencil")
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(!hasSelectedPreset)
-                    Button(role: .destructive, action: onRequestDelete) {
-                        Image(systemName: "trash")
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(!hasSelectedPreset)
-                }
-            }
+            .catalogSettingsSheetChrome(
+                hasSelectedPreset: hasSelectedPreset,
+                onReset: onReset,
+                onRequestSave: onRequestSave,
+                onRequestSaveAs: onRequestSaveAs,
+                onRequestRename: onRequestRename,
+                onRequestDelete: onRequestDelete
+            )
         }
         .presentationDetents([.medium, .large])
     }
@@ -1041,33 +998,14 @@ struct StudiosCatalogFilterSortSheet: View {
                 }
             }
             .background(Color.appBackground)
-            .navigationTitle("Filter & Sort")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Reset", role: .destructive) { onReset() }
-                        .foregroundColor(.red)
-                }
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button { onRequestSave() } label: { Label("Save", systemImage: "arrow.down.doc") }
-                            .disabled(!hasSelectedPreset)
-                        Button { onRequestSaveAs() } label: { Label("Save As", systemImage: "doc.badge.plus") }
-                    } label: {
-                        Image(systemName: "arrow.down.doc").fontWeight(.semibold)
-                    }
-                    Button(action: onRequestRename) {
-                        Image(systemName: "pencil")
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(!hasSelectedPreset)
-                    Button(role: .destructive, action: onRequestDelete) {
-                        Image(systemName: "trash")
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(!hasSelectedPreset)
-                }
-            }
+            .catalogSettingsSheetChrome(
+                hasSelectedPreset: hasSelectedPreset,
+                onReset: onReset,
+                onRequestSave: onRequestSave,
+                onRequestSaveAs: onRequestSaveAs,
+                onRequestRename: onRequestRename,
+                onRequestDelete: onRequestDelete
+            )
         }
         .presentationDetents([.medium, .large])
     }
@@ -1299,33 +1237,14 @@ struct GalleriesCatalogFilterSortSheet: View {
                 }
             }
             .background(Color.appBackground)
-            .navigationTitle("Filter & Sort")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Reset", role: .destructive) { onReset() }
-                        .foregroundColor(.red)
-                }
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button { onRequestSave() } label: { Label("Save", systemImage: "arrow.down.doc") }
-                            .disabled(!hasSelectedPreset)
-                        Button { onRequestSaveAs() } label: { Label("Save As", systemImage: "doc.badge.plus") }
-                    } label: {
-                        Image(systemName: "arrow.down.doc").fontWeight(.semibold)
-                    }
-                    Button(action: onRequestRename) {
-                        Image(systemName: "pencil")
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(!hasSelectedPreset)
-                    Button(role: .destructive, action: onRequestDelete) {
-                        Image(systemName: "trash")
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(!hasSelectedPreset)
-                }
-            }
+            .catalogSettingsSheetChrome(
+                hasSelectedPreset: hasSelectedPreset,
+                onReset: onReset,
+                onRequestSave: onRequestSave,
+                onRequestSaveAs: onRequestSaveAs,
+                onRequestRename: onRequestRename,
+                onRequestDelete: onRequestDelete
+            )
         }
         .presentationDetents([.medium, .large])
     }
@@ -1601,33 +1520,14 @@ struct ImagesCatalogFilterSortSheet: View {
                 }
             }
             .background(Color.appBackground)
-            .navigationTitle("Filter & Sort")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Reset", role: .destructive) { onReset() }
-                        .foregroundColor(.red)
-                }
-                ToolbarItemGroup(placement: .navigationBarTrailing) {
-                    Menu {
-                        Button { onRequestSave() } label: { Label("Save", systemImage: "arrow.down.doc") }
-                            .disabled(!hasSelectedPreset)
-                        Button { onRequestSaveAs() } label: { Label("Save As", systemImage: "doc.badge.plus") }
-                    } label: {
-                        Image(systemName: "arrow.down.doc").fontWeight(.semibold)
-                    }
-                    Button(action: onRequestRename) {
-                        Image(systemName: "pencil")
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(!hasSelectedPreset)
-                    Button(role: .destructive, action: onRequestDelete) {
-                        Image(systemName: "trash")
-                    }
-                    .fontWeight(.semibold)
-                    .disabled(!hasSelectedPreset)
-                }
-            }
+            .catalogSettingsSheetChrome(
+                hasSelectedPreset: hasSelectedPreset,
+                onReset: onReset,
+                onRequestSave: onRequestSave,
+                onRequestSaveAs: onRequestSaveAs,
+                onRequestRename: onRequestRename,
+                onRequestDelete: onRequestDelete
+            )
         }
         .presentationDetents([.medium, .large])
     }
