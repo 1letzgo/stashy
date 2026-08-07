@@ -50,6 +50,7 @@
 		8D7ECC24161D4D9EBF4C3A57 /* TagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1D2F16743C007C2090 /* TagsView.swift */; };
 		91CF530080674BF98FF154C4 /* SceneCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF06EF252F18EC1100299105 /* SceneCardView.swift */; };
 		971A00012F999001 /* HotOrNotToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00022F999002 /* HotOrNotToolsView.swift */; };
+		971A00032F999003 /* RateMeToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00042F999004 /* RateMeToolsView.swift */; };
 		9AA0A05BF61443C2B087A163 /* SharedUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1C2F16743C007C2090 /* SharedUtilities.swift */; };
 		9BA6D13B444E433980610D36 /* SceneGroupsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA617C2A62174FFFB0912B44 /* SceneGroupsCard.swift */; };
 		A1ED4C0012345678901234AB /* EditModeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ED4C0112345678901234AB /* EditModeSettingsView.swift */; };
@@ -175,6 +176,7 @@
 		37D3E24E2F3932C400AB8FAD /* stashyTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = stashyTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		37D3E4912F3A305D00AB8FAD /* SceneHeatmapCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneHeatmapCard.swift; sourceTree = "<group>"; };
 		971A00022F999002 /* HotOrNotToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotOrNotToolsView.swift; sourceTree = "<group>"; };
+		971A00042F999004 /* RateMeToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RateMeToolsView.swift; sourceTree = "<group>"; };
 		A1ED4C0112345678901234AB /* EditModeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditModeSettingsView.swift; sourceTree = "<group>"; };
 		A1SP1C0112345678901234AB /* StashyPicView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyPicView.swift; sourceTree = "<group>"; };
 		A1IMGDS022345678901234AB /* StashImageDateSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashImageDateSort.swift; sourceTree = "<group>"; };
@@ -307,6 +309,7 @@
 				STNV000022345678901234AB /* StashyTopNavStrip.swift */,
 				SCHR000022345678901234AB /* SharedChromeComponents.swift */,
 				971A00022F999002 /* HotOrNotToolsView.swift */,
+				971A00042F999004 /* RateMeToolsView.swift */,
 				372E2D692F6339EE00603361 /* LoginAuthHelper.swift */,
 				DF22BB262F167CDC007C2090 /* ImageCacheManager.swift */,
 				37BE5B4D2F51718500107960 /* Managers */,
@@ -621,6 +624,7 @@
 				SCHR000012345678901234AB /* SharedChromeComponents.swift in Sources */,
 				LIMG000012345678901234AB /* LinkedImagesCatalogGrid.swift in Sources */,
 				971A00012F999001 /* HotOrNotToolsView.swift in Sources */,
+				971A00032F999003 /* RateMeToolsView.swift in Sources */,
 				DFF7EE412F0D3D2800344A8B /* TabManager.swift in Sources */,
 				DFE504622E8A8C4000323FF0 /* StudiosView.swift in Sources */,
 				DF22BB342F1831C7007C2090 /* AppearanceSettingsView.swift in Sources */,

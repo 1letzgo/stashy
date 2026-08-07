@@ -219,12 +219,14 @@ struct ToolsView: View {
         case downloads = "Downloads"
         case statistics = "Statistics"
         case hotOrNot = "Match"
+        case rateMe = "RateMe"
         
         var icon: String {
             switch self {
             case .downloads: return "square.and.arrow.down"
             case .statistics: return "chart.bar.fill"
             case .hotOrNot: return "flame.fill"
+            case .rateMe: return "star.fill"
             }
         }
     }
@@ -236,6 +238,7 @@ struct ToolsView: View {
             case .downloads: return .downloads
             case .statistics: return .statistics
             case .hotOrNot: return .hotOrNot
+            case .rateMe: return .rateMe
             case .server: return nil
             }
         }
@@ -264,6 +267,8 @@ struct ToolsView: View {
                 ToolsStatisticsView(viewModel: statisticsViewModel)
             case .hotOrNot:
                 HotOrNotToolsView()
+            case .rateMe:
+                RateMeToolsView()
             }
         }
         .onAppear {

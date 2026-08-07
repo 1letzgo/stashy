@@ -1341,110 +1341,133 @@ struct StashSyncCard: View {
     @ObservedObject var handyManager = HandyManager.shared
     @ObservedObject var buttplugManager = ButtplugManager.shared
     @ObservedObject var loveSpouseManager = LoveSpouseManager.shared
-    @State private var isChannelsExpanded = false
+
+    private var isSceneSyncActive: Bool {
+        handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode || stashSync.isActive
+    }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            // Header and Device Toggles
-            HStack(alignment: .center) {
-                Text("StashSync")
-                    .font(.title3)
-                    .fontWeight(.semibold)
-                
-                Spacer()
-                
-                // Device Toggle Pills in Header (Style matching Interactive Card)
-                let anyDeviceEnabled = handyManager.isEnabled || buttplugManager.isEnabled || loveSpouseManager.isEnabled
-                if anyDeviceEnabled {
-                    HStack(spacing: 8) {
-                        if handyManager.isEnabled {
-                            deviceTogglePill(
-                                label: "Handy",
-                                icon: handyManager.isStashSyncMode ? "hand.tap.fill" : "hand.tap",
-                                isOn: $handyManager.isStashSyncMode
-                            )
+        VStack(alignment: .leading, spacing: 8) {
+            Text("StashSync")
+                .font(.title3)
+                .fontWeight(.semibold)
+                .padding(.horizontal, 12)
+                .padding(.top, 8)
+
+            Group {
+                if isSceneSyncActive {
+                    VStack(alignment: .leading, spacing: 12) {
+                        if showVideoAnalysis {
+                            let combined = videoManager.currentIntensity
+                            VStack(alignment: .leading, spacing: 8) {
+                                HStack {
+                                    Text("Combined Output")
+                                        .font(.subheadline.weight(.bold))
+                                    Spacer()
+                                    Text("\(Int(combined * 100))%")
+                                        .font(.subheadline.weight(.bold).monospacedDigit())
+                                }
+                                GeometryReader { geo in
+                                    ZStack(alignment: .leading) {
+                                        Rectangle().fill(Color.gray.opacity(0.15))
+                                        Rectangle().fill(appearanceManager.tintColor)
+                                            .frame(width: max(0, geo.size.width * CGFloat(combined)))
+                                            .animation(.linear(duration: 0.1), value: combined)
+                                    }.clipShape(Capsule())
+                                }.frame(height: 7)
+
+                                compactBar(label: "Hip / Body", value: videoManager.hipIntensity, color: appearanceManager.tintColor)
+                                compactBar(label: "Pelvis", value: videoManager.pelvisIntensity, color: .orange)
+                                compactBar(label: "Head / Neck", value: videoManager.headIntensity, color: .blue)
+                                compactBar(label: "Wrist / Arm", value: videoManager.wristIntensity, color: .purple)
+                                compactBar(label: "Horizontal", value: videoManager.horzIntensity, color: .green)
+                            }
+                            .padding(12)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .background(Color.appBackground)
+                            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
                         }
-                        if buttplugManager.isEnabled {
-                            deviceTogglePill(
-                                label: "Intiface",
-                                icon: buttplugManager.isStashSyncMode ? "cable.connector.fill" : "cable.connector",
-                                isOn: $buttplugManager.isStashSyncMode
-                            )
+
+                        VStack(spacing: 4) {
+                            HStack {
+                                Text("Motion Sensitivity")
+                                    .font(.subheadline.weight(.bold))
+                                Spacer()
+                                Text("\(Int(videoManager.sensitivity * 50))%")
+                                    .font(.subheadline.weight(.bold).monospacedDigit())
+                            }
+                            Slider(value: $videoManager.sensitivity, in: 0.1...2.0)
+                                .tint(.orange)
                         }
-                        if loveSpouseManager.isEnabled {
-                            deviceTogglePill(
-                                label: "LoveSpouse",
-                                icon: loveSpouseManager.isStashSyncMode ? "antenna.radiowaves.left.and.right.circle.fill" : "antenna.radiowaves.left.and.right",
-                                isOn: $loveSpouseManager.isStashSyncMode
-                            )
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color.appBackground)
+                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
+
+                        let anyDeviceEnabled = handyManager.isEnabled || buttplugManager.isEnabled || loveSpouseManager.isEnabled
+                        if anyDeviceEnabled {
+                            HStack(spacing: 8) {
+                                if handyManager.isEnabled {
+                                    deviceTogglePill(
+                                        label: "Handy",
+                                        icon: handyManager.isStashSyncMode ? "hand.tap.fill" : "hand.tap",
+                                        isOn: $handyManager.isStashSyncMode
+                                    )
+                                }
+                                if buttplugManager.isEnabled {
+                                    deviceTogglePill(
+                                        label: "Intiface",
+                                        icon: buttplugManager.isStashSyncMode ? "cable.connector.fill" : "cable.connector",
+                                        isOn: $buttplugManager.isStashSyncMode
+                                    )
+                                }
+                                if loveSpouseManager.isEnabled {
+                                    deviceTogglePill(
+                                        label: "LoveSpouse",
+                                        icon: loveSpouseManager.isStashSyncMode ? "antenna.radiowaves.left.and.right.circle.fill" : "antenna.radiowaves.left.and.right",
+                                        isOn: $loveSpouseManager.isStashSyncMode
+                                    )
+                                }
+                            }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
+
+                        Button {
+                            HapticManager.medium()
+                            StashSyncManager.shared.toggle()
+                        } label: {
+                            Text("Deactivate on Scene")
+                                .font(.subheadline.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 10)
+                                .foregroundColor(.white)
+                                .background(Color.red.opacity(0.85))
+                                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.button, style: .continuous))
+                        }
+                        .buttonStyle(.plain)
                     }
+                } else {
+                    Button {
+                        HapticManager.medium()
+                        StashSyncManager.shared.toggle()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Image(systemName: "bolt.horizontal.fill")
+                            Text("Activate on Scene")
+                        }
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .foregroundColor(.white)
+                        .background(appearanceManager.tintColor)
+                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.button, style: .continuous))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
-            .padding(.top, 4)
-
-            // Video Analysis — combined banner + expandable channels
-            if showVideoAnalysis {
-            VStack(alignment: .leading, spacing: 6) {
-                // Combined output banner
-                let combined = videoManager.currentIntensity
-                Button(action: { withAnimation(.spring(duration: 0.25)) { isChannelsExpanded.toggle() } }) {
-                    VStack(alignment: .leading, spacing: 3) {
-                        HStack {
-                            Text("Combined Output")
-                                .font(.caption2).foregroundColor(.secondary)
-                            Spacer()
-                            Text("\(Int(combined * 100))%")
-                                .font(.caption2).monospacedDigit().foregroundColor(.secondary)
-                            Image(systemName: isChannelsExpanded ? "chevron.up" : "chevron.down")
-                                .font(.system(size: 9, weight: .bold))
-                                .foregroundColor(appearanceManager.tintColor)
-                                .padding(4)
-                                .background(appearanceManager.tintColor.opacity(0.12))
-                                .clipShape(Circle())
-                        }
-                        GeometryReader { geo in
-                            ZStack(alignment: .leading) {
-                                Rectangle().fill(Color.gray.opacity(0.15))
-                                Rectangle().fill(appearanceManager.tintColor)
-                                    .frame(width: max(0, geo.size.width * CGFloat(combined)))
-                                    .animation(.linear(duration: 0.1), value: combined)
-                            }.clipShape(Capsule())
-                        }.frame(height: 7)
-                    }
-                }.buttonStyle(.plain)
-
-                // Individual channels — collapsed by default
-                if isChannelsExpanded {
-                    VStack(alignment: .leading, spacing: 5) {
-                        compactBar(label: "Hip / Body", value: videoManager.hipIntensity,    color: appearanceManager.tintColor)
-                        compactBar(label: "Pelvis",     value: videoManager.pelvisIntensity, color: .orange)
-                        compactBar(label: "Head / Neck",value: videoManager.headIntensity,   color: .blue)
-                        compactBar(label: "Wrist / Arm",value: videoManager.wristIntensity,  color: .purple)
-                        compactBar(label: "Horizontal", value: videoManager.horzIntensity,   color: .green)
-                    }
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-            }
-            } // showVideoAnalysis
-
-            // Sensitivity Slider
-            VStack(spacing: 4) {
-                HStack {
-                    Text("Motion Sensitivity")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                    Spacer()
-                    Text("\(Int(videoManager.sensitivity * 50))%")
-                        .font(.caption2)
-                        .monospacedDigit()
-                        .foregroundColor(.secondary)
-                }
-                Slider(value: $videoManager.sensitivity, in: 0.1...2.0)
-                    .tint(.orange)
-            }
+            .padding(.horizontal, 12)
+            .padding(.bottom, 12)
         }
-        .padding(12)
         .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
@@ -1466,9 +1489,9 @@ struct StashSyncCard: View {
     private func compactBar(label: String, value: Float, color: Color) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             HStack {
-                Text(label).font(.caption2).foregroundColor(.secondary)
+                Text(label).font(.caption).foregroundColor(.secondary)
                 Spacer()
-                Text("\(Int(value * 100))%").font(.caption2).monospacedDigit().foregroundColor(.secondary)
+                Text("\(Int(value * 100))%").font(.caption.monospacedDigit()).foregroundColor(.secondary)
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {

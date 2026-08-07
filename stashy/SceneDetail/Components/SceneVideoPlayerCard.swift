@@ -317,7 +317,6 @@ struct SceneDetailMetadataCard: View {
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
 
-    @State private var showStashSyncSheet = false
     @State private var showingEditTitleSheet = false
 
     var onSeek: (Double) -> Void
@@ -402,11 +401,6 @@ struct SceneDetailMetadataCard: View {
                 StashVideoSyncManager.shared.setup(for: item)
             }
         }
-        .sheet(isPresented: $showStashSyncSheet) {
-            StashSyncSheet()
-                .presentationDetents([PresentationDetent.medium, PresentationDetent.large])
-                .presentationDragIndicator(Visibility.visible)
-        }
         .sheet(isPresented: $showingEditTitleSheet) {
             EditSceneTitleSheet(
                 sceneId: activeScene.id,
@@ -437,37 +431,9 @@ struct SceneDetailMetadataCard: View {
                 addMarkerButton
                 Spacer(minLength: 4)
                 qualityMenu
-                if StashVideoSyncManager.shared.isVideoSyncEnabled {
-                    Spacer(minLength: 4)
-                    stashSyncButton
-                }
             }
             .frame(maxWidth: .infinity)
         }
-    }
-
-    @ViewBuilder
-    private var stashSyncButton: some View {
-        #if !os(tvOS)
-        let isActive = HandyManager.shared.isStashSyncMode || ButtplugManager.shared.isStashSyncMode || LoveSpouseManager.shared.isStashSyncMode
-        Image(systemName: "bolt.horizontal.fill")
-            .font(.system(size: 10, weight: .bold))
-            .foregroundColor(isActive ? .orange : .secondary)
-            .padding(.horizontal, 8)
-            .frame(height: 24)
-            .background(isActive ? Color.orange.opacity(0.1) : Color.gray.opacity(0.1))
-            .clipShape(Capsule())
-            .onTapGesture {
-                HapticManager.medium()
-                StashSyncManager.shared.toggle()
-            }
-            .onLongPressGesture {
-                HapticManager.heavy()
-                showStashSyncSheet = true
-            }
-        #else
-        EmptyView()
-        #endif
     }
 
     @ViewBuilder

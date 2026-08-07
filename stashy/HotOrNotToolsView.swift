@@ -555,7 +555,7 @@ private struct HotOrNotPhotoTopClipShape: Shape {
     }
 }
 
-/// Row above each duel column; opens `PerformerDetailView` (label is only “Profile”).
+/// Row below each duel column; opens `PerformerDetailView` (label is only “Profile”).
 private struct HotOrNotProfileLinkCard: View {
     let performer: HotOrNotPerformerData
 
@@ -950,8 +950,9 @@ private struct HotOrNotDuelVoteFeedback: Equatable {
 @MainActor
 private final class HotOrNotViewModel: ObservableObject {
     enum Section: String {
-        case battle = "Duel"
+        case battle = "Game"
         case leaderboard = "Charts"
+        case settings = "Settings"
     }
 
     /// Persisted `rawValue`: `headToHead` | `placement` | `champion` (legacy `swiss` / `gauntlet` migrated on load).
@@ -1610,7 +1611,6 @@ struct HotOrNotToolsView: View {
 
     @StateObject private var model = HotOrNotViewModel()
     @ObservedObject private var appearance = AppearanceManager.shared
-    @State private var showPoolSettings = false
     /// Avoids re-running `loadDuelPair` when returning from `NavigationLink` (e.g. Profile): `.task` restarts after disappear/reappear.
     @State private var didRunInitialHotOrNotLoad = false
 
@@ -1624,11 +1624,18 @@ struct HotOrNotToolsView: View {
                     .padding(.horizontal, Self.contentHorizontalPadding)
             }
 
+            hotOrNotTopMenu
+                .padding(.horizontal, Self.contentHorizontalPadding)
+                .padding(.top, 8)
+                .padding(.bottom, 12)
+
             switch model.section {
             case .battle:
                 battleContent
             case .leaderboard:
                 leaderboardContent
+            case .settings:
+                HotOrNotPoolSettingsView(viewModel: model)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -1639,11 +1646,11 @@ struct HotOrNotToolsView: View {
                     hotOrNotDuelActionsRow
                         .padding(.horizontal, Self.contentHorizontalPadding)
                 }
-                hotOrNotBottomChrome
+                // Mode pills only while playing — not on Charts / Settings.
+                if model.section == .battle {
+                    hotOrNotBottomChrome
+                }
             }
-        }
-        .sheet(isPresented: $showPoolSettings) {
-            HotOrNotPoolSettingsSheet(viewModel: model)
         }
         .onAppear {
             guard !didRunInitialHotOrNotLoad else { return }
@@ -1664,7 +1671,6 @@ struct HotOrNotToolsView: View {
             Task { await model.loadDuelPair() }
         }
         .onChange(of: model.section) { _, newSection in
-            HapticManager.selection()
             if newSection == .leaderboard {
                 Task { await model.refreshLeaderboard() }
             }
@@ -1745,44 +1751,78 @@ struct HotOrNotToolsView: View {
         }
     }
 
-    /// Single bottom chrome: duel modes + Charts + pool (replaces separate mode picker + old segmented Duel/Charts bar).
+    /// Bottom chrome: duel mode pills only.
     private var hotOrNotBottomChrome: some View {
-        VStack(spacing: DesignTokens.Spacing.xs) {
-            HStack(spacing: DesignTokens.Spacing.xs) {
-                hotOrNotDuelModeChip(.headToHead)
-                hotOrNotDuelModeChip(.placement)
-                hotOrNotDuelModeChip(.champion)
+        HStack(spacing: StashyExpandingDock.itemSpacing) {
+            hotOrNotDuelModeChip(.headToHead)
+            hotOrNotDuelModeChip(.placement)
+            hotOrNotDuelModeChip(.champion)
+        }
+        .padding(.horizontal, StashyExpandingDock.edgePadding)
+        .padding(.bottom, DesignTokens.Chrome.fabBottomPadding)
+    }
+
+    /// Top menu: Game · Charts · Settings (pinned above content, not inside ScrollView).
+    private var hotOrNotTopMenu: some View {
+        HStack(spacing: StashyExpandingDock.itemSpacing) {
+            hotOrNotTopMenuChip(
+                title: "Game",
+                selected: model.section == .battle
+            ) {
+                guard model.section != .battle else { return }
+                HapticManager.selection()
+                model.section = .battle
             }
-            HStack(spacing: StashyExpandingDock.itemSpacing) {
-                hotOrNotChartsChip
-                    .frame(maxWidth: .infinity)
-                Button {
-                    HapticManager.light()
-                    showPoolSettings = true
-                } label: {
-                    Image(systemName: "gearshape.fill")
-                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        .foregroundStyle(.primary)
-                        .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
-                        .contentShape(Rectangle())
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Pool settings")
+            hotOrNotTopMenuChip(
+                title: "Charts",
+                selected: model.section == .leaderboard
+            ) {
+                guard model.section != .leaderboard else { return }
+                HapticManager.selection()
+                model.section = .leaderboard
+            }
+            hotOrNotTopMenuChip(
+                title: "Settings",
+                selected: model.section == .settings
+            ) {
+                guard model.section != .settings else { return }
+                HapticManager.selection()
+                model.section = .settings
             }
         }
-        .padding(.horizontal, DesignTokens.Chrome.fabInnerPadding)
-        .padding(.vertical, DesignTokens.Spacing.xs)
-        .background(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .floatingShadow()
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .stroke(Color.primary.opacity(DesignTokens.Chrome.strokeOpacity), lineWidth: 0.5)
-        )
-        .padding(.horizontal, DesignTokens.Chrome.fabOuterPadding)
-        .padding(.bottom, DesignTokens.Chrome.fabBottomPadding)
+    }
+
+    private func hotOrNotTopMenuChip(
+        title: String,
+        selected: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.85))
+                .lineLimit(1)
+                .minimumScaleFactor(0.78)
+                .frame(maxWidth: .infinity)
+                .frame(height: StashyExpandingDock.activeHeight)
+                .background(hotOrNotPillBackground(selected: selected))
+                .clipShape(Capsule(style: .continuous))
+                .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("\(title)\(selected ? ", selected" : "")")
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    private func hotOrNotPillBackground(selected: Bool) -> some View {
+        Capsule(style: .continuous)
+            .fill(selected ? appearance.tintColor : Color.secondary.opacity(0.15))
+            .shadow(
+                color: selected ? appearance.tintColor.opacity(0.35) : .clear,
+                radius: 6,
+                x: 0,
+                y: 3
+            )
     }
 
     private func hotOrNotDuelModeChip(_ mode: HotOrNotViewModel.DuelMode) -> some View {
@@ -1795,49 +1835,20 @@ struct HotOrNotToolsView: View {
             }
         } label: {
             Text(mode.label)
-                .font(.system(size: 12, weight: selected ? .semibold : .medium))
-                .foregroundStyle(selected ? Color.primary : Color.secondary)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.85))
                 .lineLimit(1)
                 .minimumScaleFactor(0.78)
                 .frame(maxWidth: .infinity)
                 .frame(height: StashyExpandingDock.activeHeight)
-                .padding(.horizontal, 4)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(selected ? appearance.tintColor.opacity(0.32) : Color.primary.opacity(0.06))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.primary.opacity(selected ? 0.0 : 0.1), lineWidth: 0.5)
-                )
+                .background(hotOrNotPillBackground(selected: selected))
+                .clipShape(Capsule(style: .continuous))
+                .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(model.isSubmitting)
         .accessibilityLabel("\(mode.label) mode\(selected ? ", selected" : "")")
-    }
-
-    private var hotOrNotChartsChip: some View {
-        let selected = model.section == .leaderboard
-        return Button {
-            HapticManager.selection()
-            model.section = .leaderboard
-        } label: {
-            Text("Charts")
-                .font(.system(size: 13, weight: selected ? .semibold : .medium))
-                .foregroundStyle(selected ? Color.primary : Color.secondary)
-                .frame(maxWidth: .infinity)
-                .frame(height: StashyExpandingDock.activeHeight)
-                .background(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .fill(selected ? appearance.tintColor.opacity(0.32) : Color.primary.opacity(0.06))
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                        .stroke(Color.primary.opacity(selected ? 0.0 : 0.1), lineWidth: 0.5)
-                )
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Charts\(selected ? ", selected" : "")")
+        .accessibilityAddTraits(selected ? .isSelected : [])
     }
 
     @ViewBuilder
@@ -1914,7 +1925,6 @@ struct HotOrNotToolsView: View {
                 } else if let l = model.left, let r = model.right {
                     HStack(alignment: .top, spacing: 10) {
                         VStack(spacing: 10) {
-                            HotOrNotProfileLinkCard(performer: l)
                             HotOrNotBattleColumn(
                                 model: model,
                                 performer: l,
@@ -1922,11 +1932,11 @@ struct HotOrNotToolsView: View {
                                 voteFeedback: model.duelFeedback?.left,
                                 choose: { Task { await model.choose(leftWins: true) } }
                             )
+                            HotOrNotProfileLinkCard(performer: l)
                         }
                         .frame(maxWidth: .infinity)
 
                         VStack(spacing: 10) {
-                            HotOrNotProfileLinkCard(performer: r)
                             HotOrNotBattleColumn(
                                 model: model,
                                 performer: r,
@@ -1934,13 +1944,13 @@ struct HotOrNotToolsView: View {
                                 voteFeedback: model.duelFeedback?.right,
                                 choose: { Task { await model.choose(leftWins: false) } }
                             )
+                            HotOrNotProfileLinkCard(performer: r)
                         }
                         .frame(maxWidth: .infinity)
                     }
                 }
             }
             .padding(.horizontal, Self.contentHorizontalPadding)
-            .padding(.top, 8)
             .padding(.bottom, 12)
         }
     }
@@ -1968,7 +1978,6 @@ struct HotOrNotToolsView: View {
                         }
                     }
                     .padding(.horizontal, Self.contentHorizontalPadding)
-                    .padding(.top, 8)
                     .padding(.bottom, 12)
                 }
             }
@@ -2135,11 +2144,10 @@ private struct HotOrNotLeaderboardCard: View {
     }
 }
 
-// MARK: - Pool settings (genders sheet)
+// MARK: - Pool settings (inline Settings section)
 
-private struct HotOrNotPoolSettingsSheet: View {
+private struct HotOrNotPoolSettingsView: View {
     @ObservedObject var viewModel: HotOrNotViewModel
-    @Environment(\.dismiss) private var dismiss
     @ObservedObject private var appearance = AppearanceManager.shared
 
     private static let genderRows: [(code: String, label: String)] = [
@@ -2152,31 +2160,43 @@ private struct HotOrNotPoolSettingsSheet: View {
     ]
 
     var body: some View {
-        NavigationStack {
-            List {
-                Section("Genders in pool") {
-                    ForEach(Self.genderRows, id: \.code) { row in
+        ScrollView {
+            VStack(alignment: .leading, spacing: 8) {
+                Text("Genders in pool")
+                    .font(.title3)
+                    .fontWeight(.semibold)
+                    .padding(.horizontal, 12)
+                    .padding(.top, 8)
+
+                VStack(spacing: 0) {
+                    ForEach(Array(Self.genderRows.enumerated()), id: \.element.code) { index, row in
                         Toggle(isOn: genderBinding(code: row.code)) {
                             Text(row.label)
+                                .font(.subheadline.weight(.semibold))
                         }
                         .tint(appearance.tintColor)
-                        .listRowBackground(Color.secondaryAppBackground)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 12)
+
+                        if index < Self.genderRows.count - 1 {
+                            Divider()
+                                .padding(.leading, 12)
+                        }
                     }
                 }
-            }
-            .scrollContentBackground(.hidden)
-            .navigationTitle("Pool settings")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
-                        dismiss()
-                    }
-                    .fontWeight(.semibold)
-                }
+                .background(Color.secondaryAppBackground)
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                .overlay(
+                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
+                        .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+                )
+                .cardShadow()
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
             }
         }
-        .applyAppBackground()
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(Color.appBackground)
     }
 
     private func genderBinding(code: String) -> Binding<Bool> {

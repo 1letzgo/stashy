@@ -30,7 +30,7 @@ struct SettingsView: View {
         case main = "Main"
         case actions = "Actions"
         case design = "Design"
-        case devices = "Devices"
+        case devices = "StashSync"
         
         var id: String { rawValue }
         
@@ -182,15 +182,14 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var devicesSettings: some View {
-        // 4. Devices: Device Syncronistation, StashyPremium
-        interactiveDevicesSection
-
-        Section(header: Text("StashyPremium")) {
+        Section(header: Text("StashySync")) {
             NavigationLink(destination: StashSyncSettingsView()) {
                 Label("StashSync", systemImage: "bolt.fill")
             }
         }
         .listRowBackground(Color.secondaryAppBackground)
+
+        interactiveDevicesSection
     }
 
     // MARK: - App Store Banner

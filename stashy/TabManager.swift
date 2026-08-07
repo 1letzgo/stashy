@@ -300,6 +300,7 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
     case downloads
     case statistics
     case hotOrNot
+    case rateMe
     
     var id: String { rawValue }
     
@@ -309,6 +310,7 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
         case .downloads: return "Downloads"
         case .statistics: return "Statistics"
         case .hotOrNot: return "Match"
+        case .rateMe: return "RateMe"
         }
     }
     
@@ -318,6 +320,7 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
         case .downloads: return "square.and.arrow.down"
         case .statistics: return "chart.bar.fill"
         case .hotOrNot: return "flame.fill"
+        case .rateMe: return "star.fill"
         }
     }
 }
@@ -961,7 +964,8 @@ class TabManager: ObservableObject {
                 ToolsItemConfig(id: .downloads, isEnabled: true, sortOrder: 0),
                 ToolsItemConfig(id: .server, isEnabled: true, sortOrder: 1),
                 ToolsItemConfig(id: .statistics, isEnabled: true, sortOrder: 2),
-                ToolsItemConfig(id: .hotOrNot, isEnabled: true, sortOrder: 3)
+                ToolsItemConfig(id: .hotOrNot, isEnabled: true, sortOrder: 3),
+                ToolsItemConfig(id: .rateMe, isEnabled: true, sortOrder: 4)
             ]
             enforceFixedTools()
             saveTools()

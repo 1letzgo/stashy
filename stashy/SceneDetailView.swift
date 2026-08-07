@@ -183,10 +183,6 @@ struct SceneDetailView: View {
                 let isStashSyncActive = handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode
                 let isStashSyncEnabled = StashVideoSyncManager.shared.isVideoSyncEnabled
                 
-                if isStashSyncEnabled && isStashSyncActive {
-                    StashSyncCard()
-                }
-                
                 if activeScene.interactive == true && activeScene.funscriptURL != nil && !isStashSyncActive {
                     SceneHeatmapCard(
                         heatmapURL: activeScene.heatmapURL,
@@ -197,6 +193,10 @@ struct SceneDetailView: View {
                         onSeekCommit: { seconds in commitScrub(to: seconds) },
                         onScrubStateChange: { active in isScrubbing = active }
                     )
+                }
+
+                if isStashSyncEnabled {
+                    StashSyncCard()
                 }
                 
                 if verticalSizeClass == .compact {
