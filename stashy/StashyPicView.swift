@@ -112,8 +112,6 @@ struct StashLineView: View {
                 isActive: stashLineListFilters.catalogFilterSortFABActive,
                 accessibilityLabel: "Filter und Sortierung"
             ) {
-                stashLineListFilters.refreshLocalPresets()
-                stashLineListFilters.applyCatalogPresetSelectionFromSheetIfNeeded(viewModel: viewModel)
                 stashLineListFilters.showFilterSortSheet = true
             }
             .frame(maxWidth: .infinity)
@@ -225,12 +223,7 @@ struct StashLineView: View {
             .presentationDragIndicator(.visible)
             .presentationBackground(Color.appBackground)
             .onAppear {
-                var sel = stashLineListFilters.catalogPresetRowSelection
-                ListLivePresetTag.migrateLegacySelection(&sel)
-                stashLineListFilters.catalogPresetRowSelection = sel
-                stashLineListFilters.refreshLocalPresets()
-                stashLineListFilters.applyCatalogPresetSelectionFromSheetIfNeeded(viewModel: viewModel)
-                stashLineListFilters.applyResolvedCatalogPresetPickerRowIfNeeded(viewModel: viewModel)
+                stashLineListFilters.prepareCatalogFilterSortSheetUI(viewModel: viewModel)
             }
         }
         .alert("Speichern unter", isPresented: $stashLineListFilters.showSaveAsCatalogPresetAlert) {

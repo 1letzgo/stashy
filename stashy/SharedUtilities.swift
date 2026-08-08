@@ -16,6 +16,7 @@ protocol DisplayNameProvider {
 }
 #if !os(tvOS)
 import WebKit
+import UIKit
 #endif
 import StoreKit
 
@@ -320,6 +321,56 @@ func createMutedPreviewPlayer(for url: URL) -> AVPlayer {
     player.isMuted = true
     return player
 }
+
+#if !os(tvOS)
+/// Captures a still from the current player (or `fallbackURL`) as a Stash-compatible
+/// `data:image/jpeg;base64,…` string for `tagUpdate` / `performerUpdate` image fields.
+@MainActor
+func captureVideoFrameDataURL(
+    from player: AVPlayer?,
+    fallbackURL: URL?,
+    at time: CMTime? = nil
+) async -> String? {
+    let asset: AVAsset?
+    let captureTime: CMTime
+
+    if let player, let itemAsset = player.currentItem?.asset {
+        asset = itemAsset
+        let playerTime = player.currentTime()
+        captureTime = time ?? (playerTime.isNumeric && playerTime.seconds.isFinite ? playerTime : .zero)
+    } else if let fallbackURL {
+        asset = makeAuthenticatedAsset(for: fallbackURL)
+        captureTime = time ?? .zero
+    } else {
+        return nil
+    }
+
+    guard let asset else { return nil }
+
+    let generator = AVAssetImageGenerator(asset: asset)
+    generator.appliesPreferredTrackTransform = true
+    generator.maximumSize = CGSize(width: 1920, height: 1920)
+    generator.requestedTimeToleranceBefore = CMTime(seconds: 0.05, preferredTimescale: 600)
+    generator.requestedTimeToleranceAfter = CMTime(seconds: 0.35, preferredTimescale: 600)
+
+    do {
+        let cgImage: CGImage
+        if #available(iOS 16.0, *) {
+            let (image, _) = try await generator.image(at: captureTime)
+            cgImage = image
+        } else {
+            var actual = CMTime.zero
+            cgImage = try generator.copyCGImage(at: captureTime, actualTime: &actual)
+        }
+        let uiImage = UIImage(cgImage: cgImage)
+        guard let jpeg = uiImage.jpegData(compressionQuality: 0.88) else { return nil }
+        return "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
+    } catch {
+        print("🖼 Frame capture failed: \(error)")
+        return nil
+    }
+}
+#endif
 
 // MARK: - Network Quality Monitor
 

@@ -3,6 +3,7 @@
 #if !os(tvOS)
 import SwiftUI
 import AVKit
+import UIKit
 
 struct SceneVideoPlayerCard: View {
     @Binding var activeScene: Scene
@@ -318,6 +319,11 @@ struct SceneDetailMetadataCard: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
 
     @State private var showingEditTitleSheet = false
+    @State private var showingSetTagImageSheet = false
+    @State private var showingSetSceneCoverConfirm = false
+    @State private var isCapturingTagFrame = false
+    @State private var isSettingSceneCover = false
+    @State private var capturedTagImageDataURL: String?
 
     var onSeek: (Double) -> Void
     var onTitleUpdated: ((String?, String?) -> Void)?
@@ -341,22 +347,6 @@ struct SceneDetailMetadataCard: View {
                                 .foregroundColor(appearanceManager.tintColor)
                         }
                     }
-                }
-
-                if activeScene.sceneDuration != nil || activeScene.date != nil {
-                    HStack {
-                        if let duration = activeScene.sceneDuration {
-                            Text("Duration: \(formatMetaTime(duration))")
-                        }
-
-                        Spacer()
-
-                        if let date = activeScene.date {
-                            Text("Released: \(date)")
-                        }
-                    }
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
                 }
             }
 
@@ -411,24 +401,51 @@ struct SceneDetailMetadataCard: View {
                 onTitleUpdated?(newTitle, newDetails)
             }
         }
+        .sheet(isPresented: $showingSetTagImageSheet) {
+            if let imageDataURL = capturedTagImageDataURL {
+                SetTagImageFromFrameSheet(
+                    imageDataURL: imageDataURL,
+                    sceneTags: activeScene.tags ?? [],
+                    viewModel: viewModel
+                )
+            }
+        }
+        .alert("Replace Scene Cover?", isPresented: $showingSetSceneCoverConfirm) {
+            Button("Cancel", role: .cancel) {}
+            Button("Replace", role: .destructive) {
+                captureAndSetSceneCover()
+            }
+        } message: {
+            Text("The current video frame will replace this scene’s cover image. This cannot be undone from the app.")
+        }
     }
 
     @ViewBuilder
     private var metadataSwipeBar: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 0) {
                 ratingMenu
-
                 Spacer(minLength: 4)
                 oCounterButton
-
-                if let playCount = activeScene.playCount, playCount > 0 {
-                    Spacer(minLength: 4)
-                    infoPill(icon: "play.circle", text: "\(playCount)")
-                }
-
                 Spacer(minLength: 4)
+                infoPill(icon: "play.circle", text: "\(activeScene.playCount ?? 0)")
+                if let duration = activeScene.sceneDuration {
+                    Spacer(minLength: 4)
+                    infoPill(icon: "clock", text: formatMetaTime(duration))
+                }
+                if let date = activeScene.date {
+                    Spacer(minLength: 4)
+                    infoPill(icon: "calendar", text: date)
+                }
+            }
+            .frame(maxWidth: .infinity)
+
+            HStack(spacing: 0) {
                 addMarkerButton
+                Spacer(minLength: 4)
+                setTagImageButton
+                Spacer(minLength: 4)
+                setSceneCoverButton
                 Spacer(minLength: 4)
                 qualityMenu
             }
@@ -460,6 +477,125 @@ struct SceneDetailMetadataCard: View {
             infoPill(icon: "plus.square.fill.on.square.fill", text: "Marker", color: .green)
         }
         .buttonStyle(.plain)
+    }
+
+    @ViewBuilder
+    private var setTagImageButton: some View {
+        Button(action: captureTagImageFrameAndPresentSheet) {
+            infoPill(
+                icon: isCapturingTagFrame ? "hourglass" : "tag.fill",
+                text: "Tag Image",
+                color: .orange
+            )
+        }
+        .buttonStyle(.plain)
+        // Only dim this pill while it is busy — do not couple to Scene Cover.
+        .disabled(isCapturingTagFrame)
+        .opacity(isCapturingTagFrame ? 0.7 : 1)
+        .accessibilityLabel("Set tag image from current frame")
+    }
+
+    @ViewBuilder
+    private var setSceneCoverButton: some View {
+        Button {
+            guard !isSettingSceneCover, !isCapturingTagFrame else { return }
+            HapticManager.light()
+            showingSetSceneCoverConfirm = true
+        } label: {
+            infoPill(
+                icon: isSettingSceneCover ? "hourglass" : "photo",
+                text: "Scene Cover",
+                color: .purple
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(isSettingSceneCover)
+        .opacity(isSettingSceneCover ? 0.7 : 1)
+        .accessibilityLabel("Set scene cover from current frame")
+    }
+
+    private func currentCaptureTime() -> CMTime {
+        let seconds: Double = {
+            let t = player?.currentTime().seconds ?? 0
+            return t.isFinite && t >= 0 ? t : 0
+        }()
+        return CMTime(seconds: seconds, preferredTimescale: 600)
+    }
+
+    private func captureTagImageFrameAndPresentSheet() {
+        guard !isCapturingTagFrame, !isSettingSceneCover else { return }
+        isCapturingTagFrame = true
+        HapticManager.light()
+
+        Task { @MainActor in
+            let dataURL = await captureVideoFrameDataURL(
+                from: player,
+                fallbackURL: activeScene.videoURL,
+                at: currentCaptureTime()
+            )
+            isCapturingTagFrame = false
+            guard let dataURL else {
+                ToastManager.shared.show(
+                    "Could not capture video frame",
+                    icon: "exclamationmark.triangle",
+                    style: .error
+                )
+                return
+            }
+            capturedTagImageDataURL = dataURL
+            showingSetTagImageSheet = true
+        }
+    }
+
+    private func captureAndSetSceneCover() {
+        guard !isSettingSceneCover, !isCapturingTagFrame else { return }
+        isSettingSceneCover = true
+
+        Task { @MainActor in
+            let dataURL = await captureVideoFrameDataURL(
+                from: player,
+                fallbackURL: activeScene.videoURL,
+                at: currentCaptureTime()
+            )
+            guard let dataURL else {
+                isSettingSceneCover = false
+                ToastManager.shared.show(
+                    "Could not capture video frame",
+                    icon: "exclamationmark.triangle",
+                    style: .error
+                )
+                return
+            }
+
+            viewModel.setSceneCoverImage(sceneId: activeScene.id, image: dataURL) { success in
+                DispatchQueue.main.async {
+                    isSettingSceneCover = false
+                    if success {
+                        let bust = ISO8601DateFormatter().string(from: Date())
+                        activeScene = activeScene.withUpdatedAt(bust)
+                        ToastManager.shared.show(
+                            "Scene cover updated",
+                            icon: "photo",
+                            style: .success
+                        )
+                        NotificationCenter.default.post(
+                            name: NSNotification.Name("SceneCoverUpdated"),
+                            object: nil,
+                            userInfo: [
+                                "sceneId": activeScene.id,
+                                "updatedAt": bust
+                            ]
+                        )
+                    } else {
+                        ToastManager.shared.show(
+                            "Failed to update scene cover",
+                            icon: "exclamationmark.triangle",
+                            style: .error
+                        )
+                    }
+                }
+            }
+        }
     }
 
     @ViewBuilder
@@ -649,6 +785,248 @@ struct SceneDetailMetadataCard: View {
             return String(format: "%d:%02d:%02d", hours, minutes, secs)
         } else {
             return String(format: "%d:%02d", minutes, secs)
+        }
+    }
+}
+
+/// Picks a tag and applies a previously captured video frame as its image.
+struct SetTagImageFromFrameSheet: View {
+    let imageDataURL: String
+    let sceneTags: [Tag]
+    @ObservedObject var viewModel: StashDBViewModel
+
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+
+    @State private var searchText = ""
+    @State private var allTags: [Tag] = []
+    @State private var isLoadingTags = false
+    @State private var isSaving = false
+    @State private var selectedTagId: String?
+
+    private var previewImage: UIImage? {
+        guard let comma = imageDataURL.firstIndex(of: ","),
+              let data = Data(base64Encoded: String(imageDataURL[imageDataURL.index(after: comma)...])) else {
+            return nil
+        }
+        return UIImage(data: data)
+    }
+
+    private var selectableTags: [Tag] {
+        let source: [Tag]
+        if !searchText.isEmpty {
+            source = allTags
+        } else if !sceneTags.isEmpty {
+            // Prefer full tag rows (with scene_count) when already loaded.
+            let byId = Dictionary(uniqueKeysWithValues: allTags.map { ($0.id, $0) })
+            source = sceneTags.map { byId[$0.id] ?? $0 }
+        } else {
+            source = allTags
+        }
+        let filtered: [Tag]
+        if searchText.isEmpty {
+            filtered = source
+        } else {
+            let q = searchText.lowercased()
+            filtered = source.filter { $0.name.lowercased().contains(q) }
+        }
+        return Self.sortedByFrequency(filtered)
+    }
+
+    /// Most-used tags first (`scene_count` desc), name as tiebreaker.
+    private static func sortedByFrequency(_ tags: [Tag]) -> [Tag] {
+        tags.sorted { lhs, rhs in
+            let l = lhs.sceneCount ?? 0
+            let r = rhs.sceneCount ?? 0
+            if l != r { return l > r }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    var body: some View {
+        NavigationView {
+            VStack(spacing: 0) {
+                if let previewImage {
+                    Image(uiImage: previewImage)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 160)
+                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .padding(.bottom, 8)
+                }
+
+                Form {
+                    Section {
+                        TextField("Search Tags...", text: $searchText)
+
+                        if isLoadingTags && allTags.isEmpty {
+                            HStack {
+                                Spacer()
+                                ProgressView("Loading tags...")
+                                Spacer()
+                            }
+                            .padding(.vertical, 8)
+                        } else if selectableTags.isEmpty {
+                            Text(searchText.isEmpty ? "No tags available" : "No tags match '\(searchText)'")
+                                .foregroundColor(.secondary)
+                        } else {
+                            ForEach(selectableTags.prefix(40), id: \.id) { tag in
+                                Button {
+                                    selectedTagId = tag.id
+                                } label: {
+                                    HStack(spacing: 10) {
+                                        tagThumbnail(tag)
+                                        VStack(alignment: .leading, spacing: 2) {
+                                            Text(tag.name)
+                                                .foregroundColor(.primary)
+                                            if sceneTags.contains(where: { $0.id == tag.id }) {
+                                                Text("On this scene")
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        }
+                                        Spacer()
+                                        if selectedTagId == tag.id {
+                                            Image(systemName: "checkmark")
+                                                .foregroundColor(appearanceManager.tintColor)
+                                        }
+                                    }
+                                    .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.plain)
+                            }
+
+                            if selectableTags.count > 40 {
+                                Text("Type more to refine search...")
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    } header: {
+                        Text(searchText.isEmpty && !sceneTags.isEmpty ? "Scene Tags" : "Tags")
+                    } footer: {
+                        Text("The selected tag’s image will be replaced with this video frame.")
+                    }
+                    .listRowBackground(Color.secondaryAppBackground)
+                }
+            }
+            .applyAppBackground()
+            .hideSystemNavigationBarForCustomChrome()
+            // Modal sheets pin chrome to the top (same as catalog filter sheets).
+            .safeAreaInset(edge: .top, spacing: 16) {
+                StashyDetailChromeBar(title: "Set Tag Image") {
+                    Button {
+                        applySelectedTagImage()
+                    } label: {
+                        Text(isSaving ? "…" : "Apply")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(
+                                (selectedTagId == nil || isSaving)
+                                    ? .white.opacity(0.35)
+                                    : appearanceManager.tintColor
+                            )
+                            .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(selectedTagId == nil || isSaving)
+                    .accessibilityLabel("Apply")
+                }
+            }
+            .onAppear {
+                if selectedTagId == nil {
+                    selectedTagId = Self.sortedByFrequency(sceneTags).first?.id
+                }
+                guard allTags.isEmpty else { return }
+                isLoadingTags = true
+                viewModel.fetchAllTags { fetched in
+                    DispatchQueue.main.async {
+                        let ranked = Self.sortedByFrequency(fetched)
+                        allTags = ranked
+                        isLoadingTags = false
+                        if selectedTagId == nil {
+                            let byId = Dictionary(uniqueKeysWithValues: ranked.map { ($0.id, $0) })
+                            let sceneRanked = Self.sortedByFrequency(sceneTags.map { byId[$0.id] ?? $0 })
+                            selectedTagId = (sceneRanked.first ?? ranked.first)?.id
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func tagThumbnail(_ tag: Tag) -> some View {
+        Group {
+            if let url = tag.thumbnailURL {
+                CustomAsyncImage(url: url) { loader in
+                    if let image = loader.image {
+                        image
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        tagPlaceholder
+                    }
+                }
+            } else {
+                tagPlaceholder
+            }
+        }
+        .frame(width: 36, height: 36)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+    }
+
+    private var tagPlaceholder: some View {
+        ZStack {
+            Color.gray.opacity(DesignTokens.Opacity.placeholder)
+            Image(systemName: "tag.fill")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(.secondary)
+        }
+    }
+
+    private func applySelectedTagImage() {
+        guard let tagId = selectedTagId else { return }
+        isSaving = true
+        viewModel.setTagImage(tagId: tagId, image: imageDataURL) { success in
+            DispatchQueue.main.async {
+                isSaving = false
+                if success {
+                    let tagName = (sceneTags + allTags).first(where: { $0.id == tagId })?.name ?? "Tag"
+                    let bust = UUID().uuidString
+                    let config = ServerConfigManager.shared.activeConfig ?? ServerConfigManager.shared.loadConfig()
+                    let newImagePath: String = {
+                        if let base = config?.baseURL {
+                            return "\(base)/tag/\(tagId)/image?bust=\(bust)"
+                        }
+                        return "/tag/\(tagId)/image?bust=\(bust)"
+                    }()
+                    let updatedAt = ISO8601DateFormatter().string(from: Date())
+                    ToastManager.shared.show(
+                        "Image updated for \(tagName)",
+                        icon: "tag.circle.fill",
+                        style: .success
+                    )
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("TagImageUpdated"),
+                        object: nil,
+                        userInfo: [
+                            "tagId": tagId,
+                            "newImagePath": newImagePath,
+                            "updatedAt": updatedAt
+                        ]
+                    )
+                    dismiss()
+                } else {
+                    ToastManager.shared.show(
+                        "Failed to update tag image",
+                        icon: "exclamationmark.triangle",
+                        style: .error
+                    )
+                }
+            }
         }
     }
 }

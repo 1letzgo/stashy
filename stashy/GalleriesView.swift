@@ -1815,6 +1815,12 @@ struct FullScreenImageView: View {
                 if success {
                     ToastManager.shared.show("Performer image updated", icon: "person.crop.circle.badge.checkmark", style: .success)
                     let bustedUrl = "\(imageURL)?bust=\(UUID().uuidString)"
+                    // Invalidate first, then notify loaders with a busted path so they
+                    // skip stale cache entries even if URL path stays the same.
+                    ImageCache.shared.invalidatePerformerProfileImage(
+                        performerId: performer.id,
+                        newImagePath: bustedUrl
+                    )
                     NotificationCenter.default.post(
                         name: NSNotification.Name("PerformerImageUpdated"),
                         object: nil,

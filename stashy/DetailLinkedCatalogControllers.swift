@@ -1469,6 +1469,9 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
     var hasCompletedInitialBootstrap = false
     /// Scroll restore target after popping fullscreen (survives ImagesView remounts when model is hoisted).
     var sessionLastOpenedImageId: String?
+    /// When true, `handlePresetSelection` ignores the next `catalogPresetRowSelection` change
+    /// (sheet-open picker sync must not refetch the list).
+    private var ignoreNextPresetSelectionChange = false
 
     init(scope: DetailLinkedImagesScope, initialSort: StashDBViewModel.ImageSortOption = .dateDesc) {
         self.scope = scope
@@ -1580,6 +1583,26 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
         let next = resolvedCatalogPresetPickerRowId(viewModel: viewModel)
         if catalogPresetRowSelection != next {
             catalogPresetRowSelection = next
+        }
+    }
+
+    /// Sheet open: migrate legacy IDs + sync Menu title row. Does **not** re-apply filters / refetch.
+    func prepareCatalogFilterSortSheetUI(viewModel: StashDBViewModel) {
+        var sel = catalogPresetRowSelection
+        ListLivePresetTag.migrateLegacySelection(&sel)
+        ignoreNextPresetSelectionChange = true
+        if catalogPresetRowSelection != sel {
+            catalogPresetRowSelection = sel
+        }
+        refreshLocalPresets()
+        rehydrateSelectedFilter(from: viewModel)
+        let next = resolvedCatalogPresetPickerRowId(viewModel: viewModel)
+        if catalogPresetRowSelection != next {
+            ignoreNextPresetSelectionChange = true
+            catalogPresetRowSelection = next
+        }
+        DispatchQueue.main.async { [weak self] in
+            self?.ignoreNextPresetSelectionChange = false
         }
     }
 
@@ -1844,6 +1867,8 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
 
     func handlePresetSelection(_ newId: String, viewModel: StashDBViewModel) {
         // Sheet picker and floating-bar filter Menu both drive this.
+        // Cleared asynchronously after `prepareCatalogFilterSortSheetUI` so multi-step sync is covered.
+        guard !ignoreNextPresetSelectionChange else { return }
         if newId.isEmpty {
             selectedFilter = nil
             clearLiveChipsOnly()

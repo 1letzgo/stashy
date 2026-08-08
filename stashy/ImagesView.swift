@@ -827,12 +827,8 @@ private struct ImagesViewBody: View {
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
         .onAppear {
-            var sel = imageListFilters.catalogPresetRowSelection
-            ListLivePresetTag.migrateLegacySelection(&sel)
-            imageListFilters.catalogPresetRowSelection = sel
-            imageListFilters.refreshLocalPresets()
-            imageListFilters.applyCatalogPresetSelectionFromSheetIfNeeded(viewModel: viewModel)
-            imageListFilters.applyResolvedCatalogPresetPickerRowIfNeeded(viewModel: viewModel)
+            // Sync picker chrome only — re-applying the active filter here cleared/refetched the grid.
+            imageListFilters.prepareCatalogFilterSortSheetUI(viewModel: viewModel)
         }
     }
     

@@ -22,6 +22,8 @@ class ImageCache {
     private var _cachedServerCacheDirectory: URL?
     private var lastCleanupDate: Date?
     private var performerImageObserver: NSObjectProtocol?
+    private var tagImageObserver: NSObjectProtocol?
+    private var sceneCoverObserver: NSObjectProtocol?
     
     private init() {
         // Memory Cache Config
@@ -46,6 +48,27 @@ class ImageCache {
                   let performerId = notification.userInfo?["performerId"] as? String else { return }
             let newPath = notification.userInfo?["newImagePath"] as? String
             self.invalidatePerformerProfileImage(performerId: performerId, newImagePath: newPath)
+        }
+
+        tagImageObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("TagImageUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self,
+                  let tagId = notification.userInfo?["tagId"] as? String else { return }
+            let newPath = notification.userInfo?["newImagePath"] as? String
+            self.invalidateTagImage(tagId: tagId, newImagePath: newPath)
+        }
+
+        sceneCoverObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SceneCoverUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let self,
+                  let sceneId = notification.userInfo?["sceneId"] as? String else { return }
+            self.invalidateSceneCoverImage(sceneId: sceneId)
         }
     }
     
@@ -312,6 +335,26 @@ class ImageCache {
         invalidateURLStrings(toInvalidate)
     }
 
+    /// After a tag image mutation, drop cached `/tag/{id}/image` variants.
+    func invalidateTagImage(tagId: String, newImagePath: String? = nil) {
+        let config = ServerConfigManager.shared.activeConfig ?? ServerConfigManager.shared.loadConfig()
+        guard let config, config.hasValidConfig else { return }
+        let defaultURLString = "\(config.baseURL)/tag/\(tagId)/image"
+        var toInvalidate = performerImageCacheURLVariants(for: defaultURLString)
+        if let newImagePath {
+            toInvalidate.append(contentsOf: performerImageCacheURLVariants(for: newImagePath))
+        }
+        invalidateURLStrings(toInvalidate)
+    }
+
+    /// After a scene cover mutation, drop cached `/scene/{id}/screenshot` variants.
+    func invalidateSceneCoverImage(sceneId: String) {
+        let config = ServerConfigManager.shared.activeConfig ?? ServerConfigManager.shared.loadConfig()
+        guard let config, config.hasValidConfig else { return }
+        let defaultURLString = "\(config.baseURL)/scene/\(sceneId)/screenshot"
+        invalidateURLStrings(performerImageCacheURLVariants(for: defaultURLString))
+    }
+
     private func imageCost(_ image: UIImage) -> Int {
         if let cg = image.cgImage {
             return cg.bytesPerRow * cg.height
@@ -333,11 +376,11 @@ class ImageLoader: ObservableObject {
     private var url: URL?
     private var fetchTask: Task<Void, Never>?
     private let session: URLSession
-    private var performerImageRefreshObserver: NSObjectProtocol?
+    private var imageRefreshObservers: [NSObjectProtocol] = []
 
     deinit {
-        if let performerImageRefreshObserver {
-            NotificationCenter.default.removeObserver(performerImageRefreshObserver)
+        for observer in imageRefreshObservers {
+            NotificationCenter.default.removeObserver(observer)
         }
         fetchTask?.cancel()
     }
@@ -351,24 +394,67 @@ class ImageLoader: ObservableObject {
         config.timeoutIntervalForResource = 30
         self.session = URLSession(configuration: config)
 
-        performerImageRefreshObserver = NotificationCenter.default.addObserver(
-            forName: NSNotification.Name("PerformerImageUpdated"),
-            object: nil,
-            queue: .main
-        ) { [weak self] note in
-            guard let self,
-                  let performerId = note.userInfo?["performerId"] as? String else { return }
-            let newImagePath = note.userInfo?["newImagePath"] as? String
-            Task { @MainActor in
-                guard let u = self.url,
-                      Self.shouldRefreshForPerformerImageUpdate(
-                        currentURL: u,
-                        performerId: performerId,
-                        newImagePath: newImagePath
-                      ) else { return }
-                self.updateURL(u, force: true)
+        imageRefreshObservers = [
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("PerformerImageUpdated"),
+                object: nil,
+                queue: .main
+            ) { [weak self] note in
+                guard let self,
+                      let performerId = note.userInfo?["performerId"] as? String else { return }
+                let newImagePath = note.userInfo?["newImagePath"] as? String
+                Task { @MainActor in
+                    guard let u = self.url,
+                          Self.shouldRefreshForPerformerImageUpdate(
+                            currentURL: u,
+                            performerId: performerId,
+                            newImagePath: newImagePath
+                          ) else { return }
+                    // Prefer the busted path when provided so SwiftUI URL identity also changes.
+                    if let newImagePath, let newURL = URL(string: newImagePath),
+                       u.path.contains("/performer/\(performerId)/") || u.path == newURL.path {
+                        self.updateURL(newURL, force: true, bypassCache: true)
+                    } else {
+                        self.updateURL(u, force: true, bypassCache: true)
+                    }
+                }
+            },
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("TagImageUpdated"),
+                object: nil,
+                queue: .main
+            ) { [weak self] note in
+                guard let self,
+                      let tagId = note.userInfo?["tagId"] as? String else { return }
+                let newImagePath = note.userInfo?["newImagePath"] as? String
+                Task { @MainActor in
+                    guard let u = self.url,
+                          Self.shouldRefreshForTagImageUpdate(
+                            currentURL: u,
+                            tagId: tagId,
+                            newImagePath: newImagePath
+                          ) else { return }
+                    if let newImagePath, let newURL = URL(string: newImagePath) {
+                        self.updateURL(newURL, force: true, bypassCache: true)
+                    } else {
+                        self.updateURL(u, force: true, bypassCache: true)
+                    }
+                }
+            },
+            NotificationCenter.default.addObserver(
+                forName: NSNotification.Name("SceneCoverUpdated"),
+                object: nil,
+                queue: .main
+            ) { [weak self] note in
+                guard let self,
+                      let sceneId = note.userInfo?["sceneId"] as? String else { return }
+                Task { @MainActor in
+                    guard let u = self.url,
+                          Self.shouldRefreshForSceneCoverUpdate(currentURL: u, sceneId: sceneId) else { return }
+                    self.updateURL(u, force: true, bypassCache: true)
+                }
             }
-        }
+        ]
 
         // Synchronous memory cache check — avoids any loading flash for warm-cache hits
         if let url, let cachedUIImage = ImageCache.shared.memoryObject(forKey: url as NSURL) {
@@ -376,7 +462,7 @@ class ImageLoader: ObservableObject {
             self.imageData = ImageCache.shared.data(forKey: url as NSURL)
             self.isLoading = false
         } else {
-            loadImage()
+            loadImage(bypassCache: false)
         }
     }
 
@@ -394,7 +480,26 @@ class ImageLoader: ObservableObject {
         return currentURL.path == newURL.path
     }
 
-    func updateURL(_ newURL: URL?, force: Bool = false) {
+    nonisolated private static func shouldRefreshForTagImageUpdate(
+        currentURL: URL,
+        tagId: String,
+        newImagePath: String?
+    ) -> Bool {
+        if currentURL.path.contains("/tag/\(tagId)/") {
+            return true
+        }
+        guard let newImagePath, let newURL = URL(string: newImagePath) else { return false }
+        return currentURL.path == newURL.path
+    }
+
+    nonisolated private static func shouldRefreshForSceneCoverUpdate(
+        currentURL: URL,
+        sceneId: String
+    ) -> Bool {
+        currentURL.path.contains("/scene/\(sceneId)/screenshot")
+    }
+
+    func updateURL(_ newURL: URL?, force: Bool = false, bypassCache: Bool = false) {
         if !force {
             guard newURL != self.url else { return }
         }
@@ -404,10 +509,10 @@ class ImageLoader: ObservableObject {
         self.image = nil
         self.error = nil
         self.isLoading = true
-        loadImage()
+        loadImage(bypassCache: bypassCache || force)
     }
 
-    private func loadImage() {
+    private func loadImage(bypassCache: Bool = false) {
         guard let url = url else {
             self.error = CustomAsyncImageError.noURL
             self.isLoading = false
@@ -418,9 +523,11 @@ class ImageLoader: ObservableObject {
         fetchTask = Task {
             // Check cancellation
             if Task.isCancelled { return }
-            
-            // 1. Memory/Disk cache — disk I/O off main actor
-            if let cachedUIImage = await ImageCache.shared.loadObject(forKey: url as NSURL) {
+
+            // After profile/tag/cover mutations, skip stale memory/disk entries even if
+            // invalidation raced or missed a signed-URL variant.
+            if !bypassCache,
+               let cachedUIImage = await ImageCache.shared.loadObject(forKey: url as NSURL) {
                 if Task.isCancelled { return }
                 self.imageData = await ImageCache.shared.loadData(forKey: url as NSURL)
                 self.image = Image(uiImage: cachedUIImage)

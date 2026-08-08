@@ -773,12 +773,7 @@ struct PerformerDetailView: View {
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
         .onAppear {
-            var sel = linkedImages.catalogPresetRowSelection
-            ListLivePresetTag.migrateLegacySelection(&sel)
-            linkedImages.catalogPresetRowSelection = sel
-            linkedImages.refreshLocalPresets()
-            linkedImages.applyCatalogPresetSelectionFromSheetIfNeeded(viewModel: viewModel)
-            linkedImages.applyResolvedCatalogPresetPickerRowIfNeeded(viewModel: viewModel)
+            linkedImages.prepareCatalogFilterSortSheetUI(viewModel: viewModel)
         }
     }
     

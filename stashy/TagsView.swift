@@ -1092,6 +1092,16 @@ struct TagDetailView: View {
             }
         }
         .sceneLiveUpdates(using: viewModel)
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("TagImageUpdated"))) { notification in
+            guard let tagId = notification.userInfo?["tagId"] as? String,
+                  tagId == selectedTag.id else { return }
+            if let newPath = notification.userInfo?["newImagePath"] as? String {
+                selectedTag.imagePath = newPath
+            }
+            if let updatedAt = notification.userInfo?["updatedAt"] as? String {
+                selectedTag.updatedAt = updatedAt
+            }
+        }
         .hideSystemNavigationBarForCustomChrome()
         .enableSwipeBackWhenNavBarHidden()
         .stashyCustomChromeInset(spacing: 0) {
@@ -1298,12 +1308,7 @@ struct TagDetailView: View {
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
         .onAppear {
-            var sel = linkedImages.catalogPresetRowSelection
-            ListLivePresetTag.migrateLegacySelection(&sel)
-            linkedImages.catalogPresetRowSelection = sel
-            linkedImages.refreshLocalPresets()
-            linkedImages.applyCatalogPresetSelectionFromSheetIfNeeded(viewModel: viewModel)
-            linkedImages.applyResolvedCatalogPresetPickerRowIfNeeded(viewModel: viewModel)
+            linkedImages.prepareCatalogFilterSortSheetUI(viewModel: viewModel)
         }
     }
     

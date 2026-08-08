@@ -271,6 +271,31 @@ class StashDBViewModel: ObservableObject {
             }
         }
 
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("TagImageUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let tagId = notification.userInfo?["tagId"] as? String,
+                  let newImagePath = notification.userInfo?["newImagePath"] as? String else { return }
+            let updatedAt = notification.userInfo?["updatedAt"] as? String
+            Task { @MainActor in
+                self?.patchTagImageInLists(tagId: tagId, newImagePath: newImagePath, updatedAt: updatedAt)
+            }
+        }
+
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SceneCoverUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let sceneId = notification.userInfo?["sceneId"] as? String,
+                  let updatedAt = notification.userInfo?["updatedAt"] as? String else { return }
+            Task { @MainActor in
+                self?.patchSceneCoverInLists(sceneId: sceneId, updatedAt: updatedAt)
+            }
+        }
+
         imageRatingUpdatedObserver = NotificationCenter.default.addObserver(
             forName: NSNotification.Name("ImageRatingUpdated"),
             object: nil,
@@ -1328,6 +1353,27 @@ class StashDBViewModel: ObservableObject {
         // Remove from home row caches
         for rowType in homeRowScenes.keys {
             homeRowScenes[rowType]?.removeAll { $0.id == id }
+        }
+    }
+
+    /// Updates tag image path / updatedAt in the catalog tag list after a tag image mutation.
+    func patchTagImageInLists(tagId: String, newImagePath: String, updatedAt: String?) {
+        guard let idx = tags.firstIndex(where: { $0.id == tagId }) else { return }
+        tags[idx].imagePath = newImagePath
+        if let updatedAt { tags[idx].updatedAt = updatedAt }
+    }
+
+    /// Busts scene cover URLs in catalog lists after a cover mutation.
+    func patchSceneCoverInLists(sceneId: String, updatedAt: String) {
+        if let idx = scenes.firstIndex(where: { $0.id == sceneId }) {
+            let s = scenes[idx]
+            scenes[idx] = s.withUpdatedAt(updatedAt)
+        }
+        for key in homeRowScenes.keys {
+            guard var row = homeRowScenes[key],
+                  let idx = row.firstIndex(where: { $0.id == sceneId }) else { continue }
+            row[idx] = row[idx].withUpdatedAt(updatedAt)
+            homeRowScenes[key] = row
         }
     }
 
@@ -6491,6 +6537,52 @@ struct GenerateData: Codable {
         }
     }
 
+    /// Sets a tag's image from a URL or `data:image/...;base64,…` payload (same as Stash web / performer image).
+    func setTagImage(tagId: String, image: String, completion: @escaping (Bool) -> Void) {
+        let mutation = """
+        mutation TagUpdate($input: TagUpdateInput!) {
+            tagUpdate(input: $input) { id }
+        }
+        """
+        let variables: [String: Any] = [
+            "input": [
+                "id": tagId,
+                "image": image
+            ]
+        ]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false)
+            return
+        }
+        performGraphQLQuery(query: bodyString) { (response: TagUpdateResponse?) in
+            completion(response?.data?.tagUpdate != nil)
+        }
+    }
+
+    /// Sets a scene cover / thumbnail from a URL or `data:image/...;base64,…` payload.
+    func setSceneCoverImage(sceneId: String, image: String, completion: @escaping (Bool) -> Void) {
+        let mutation = """
+        mutation SceneUpdate($input: SceneUpdateInput!) {
+            sceneUpdate(input: $input) { id }
+        }
+        """
+        let variables: [String: Any] = [
+            "input": [
+                "id": sceneId,
+                "cover_image": image
+            ]
+        ]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false)
+            return
+        }
+        performGraphQLQuery(query: bodyString) { (response: SceneUpdateResponse?) in
+            completion(response?.data?.sceneUpdate != nil)
+        }
+    }
+
     /// Updates performer metadata shown on the detail screen (edit mode).
     func updatePerformerDetails(
         performerId: String,
@@ -7492,6 +7584,18 @@ struct Scene: Codable, Identifiable, Equatable {
             paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams
         )
     }
+
+    /// Creates a copy with updated `updatedAt` (cache-busts screenshot / cover URLs).
+    func withUpdatedAt(_ newUpdatedAt: String?) -> Scene {
+        return Scene(
+            id: id, title: title, details: details, date: date, duration: duration,
+            studio: studio, performers: performers, files: files, tags: tags,
+            galleries: galleries, groups: groups, organized: organized,
+            resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
+            rating100: rating100, createdAt: createdAt, updatedAt: newUpdatedAt,
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams
+        )
+    }
     
 }
 
@@ -8232,7 +8336,7 @@ struct Tag: Codable, Identifiable, Equatable {
     let id: String
     var name: String
     var description: String?
-    let imagePath: String?
+    var imagePath: String?
     let sceneCount: Int?
     let imageCount: Int?
     let galleryCount: Int?
@@ -8240,7 +8344,7 @@ struct Tag: Codable, Identifiable, Equatable {
     let performerCount: Int?
     var favorite: Bool?
     let createdAt: String?
-    let updatedAt: String?
+    var updatedAt: String?
     
     enum CodingKeys: String, CodingKey {
         case id, name, favorite, description
