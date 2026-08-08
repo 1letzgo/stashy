@@ -24,8 +24,21 @@ import StoreKit
 
 enum PerformerBadgeType {
     case sceneCount
+    case imageCount
+    case galleryCount
     case oCount
     case rating
+
+    /// Count badge driven by the active Performers list sort.
+    static func forSort(_ sort: StashDBViewModel.PerformerSortOption) -> PerformerBadgeType {
+        switch sort {
+        case .sceneCountAsc, .sceneCountDesc: return .sceneCount
+        case .imageCountAsc, .imageCountDesc: return .imageCount
+        case .galleryCountAsc, .galleryCountDesc: return .galleryCount
+        case .oCountAsc, .oCountDesc: return .oCount
+        default: return .sceneCount
+        }
+    }
 }
 
 // MARK: - Global Helper Functions

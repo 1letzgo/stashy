@@ -100,7 +100,7 @@ class NavigationCoordinator: ObservableObject {
         // Switch to Catalogue tab
         selectedTab = .catalogue
     }
-    
+
     // MARK: - Deep Links
     
     func navigateToScenes(sort: StashDBViewModel.SceneSortOption? = nil, filter: StashDBViewModel.SavedFilter? = nil, search: String = "", noDefaultFilter: Bool = false) {

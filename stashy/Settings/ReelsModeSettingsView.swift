@@ -154,7 +154,16 @@ struct ReelsModeSettingsView: View {
             }
 
         case .pics:
-            EmptyView()
+            let current = StashDBViewModel.ImageSortOption(rawValue: tabManager.getReelsDefaultSort(for: .pics) ?? "") ?? .dateDesc
+            Menu {
+                ForEach(StashDBViewModel.ImageSortOption.allCases, id: \.self) { option in
+                    Button(action: { tabManager.setReelsDefaultSort(for: .pics, option: option.rawValue) }) {
+                        HStack { Text(option.displayName); if option == current { Image(systemName: "checkmark") } }
+                    }
+                }
+            } label: {
+                pickerLabelText(current.displayName)
+            }
         }
     }
 
@@ -282,7 +291,32 @@ struct ReelsModeSettingsView: View {
             }
 
         case .pics:
-            EmptyView()
+            let filters = viewModel.savedFilters.values
+                .filter { $0.mode == .images }
+                .sorted { $0.name < $1.name }
+            if filters.isEmpty && !viewModel.isLoadingSavedFilters {
+                Text("No filters found")
+                    .foregroundColor(.secondary)
+                    .font(.subheadline)
+            } else {
+                Picker("", selection: Binding(
+                    get: { tabManager.getDefaultFilterId(for: .images) ?? "" },
+                    set: { newId in
+                        if newId.isEmpty {
+                            tabManager.setDefaultFilter(for: .images, filterId: nil, filterName: nil)
+                        } else if let filter = filters.first(where: { $0.id == newId }) {
+                            tabManager.setDefaultFilter(for: .images, filterId: filter.id, filterName: filter.name)
+                        }
+                    }
+                )) {
+                    Text("None").tag("")
+                    ForEach(filters) { filter in
+                        Text(filter.name).tag(filter.id)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
         }
     }
 }

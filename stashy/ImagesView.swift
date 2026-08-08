@@ -15,6 +15,8 @@ struct ImagesView: View {
     /// Keeps the Instagram/Feeds 1/row card when opening a gallery from that layout
     /// (does not change GalleriesView or the persisted `openedGallery` column pref).
     var forceOneColumnFeed: Bool = false
+    /// Feeds → Pics: same 1/row catalog UI, but sort/filter owned by Reels session (not Images-tab defaults).
+    var feedsEmbedded: Bool = false
     @StateObject private var ownedViewModel = StashDBViewModel()
     let catalogBrowserViewModel: StashDBViewModel?
     /// Catalog tab: owned by `CatalogsView` so filter/sort survive ImagesView remounts
@@ -26,11 +28,13 @@ struct ImagesView: View {
         gallery: Gallery? = nil,
         catalogBrowserViewModel: StashDBViewModel? = nil,
         forceOneColumnFeed: Bool = false,
+        feedsEmbedded: Bool = false,
         sharedImageListFilters: DetailLinkedImagesFilterModel? = nil
     ) {
         self.initialGallery = gallery
         self.catalogBrowserViewModel = catalogBrowserViewModel
         self.forceOneColumnFeed = forceOneColumnFeed
+        self.feedsEmbedded = feedsEmbedded
         self.sharedImageListFilters = sharedImageListFilters
         let scope: DetailLinkedImagesScope = gallery.map { .gallery($0.id) } ?? .catalogRoot
         _ownedImageListFilters = StateObject(wrappedValue: DetailLinkedImagesFilterModel(scope: scope))
@@ -40,6 +44,7 @@ struct ImagesView: View {
         ImagesViewBody(
             initialGallery: initialGallery,
             forceOneColumnFeed: forceOneColumnFeed,
+            feedsEmbedded: feedsEmbedded,
             viewModel: initialGallery != nil ? ownedViewModel : (catalogBrowserViewModel ?? ownedViewModel),
             imageListFilters: sharedImageListFilters ?? ownedImageListFilters
         )
@@ -49,6 +54,7 @@ struct ImagesView: View {
 private struct ImagesViewBody: View {
     @State private var gallery: Gallery?
     var forceOneColumnFeed: Bool = false
+    var feedsEmbedded: Bool = false
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var imageListFilters: DetailLinkedImagesFilterModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
@@ -61,6 +67,8 @@ private struct ImagesViewBody: View {
     @State private var sessionKeyCache: [String: String] = [:]
     @State private var showingEditGallerySheet = false
     @State private var isHeaderExpanded = false
+    /// After the user hits the 1/2-column toggle, stop locking `forceOneColumnFeed`.
+    @State private var ignoreForcedOneColumnFeed = false
     /// True while the Images feed ScrollView is dragging / decelerating.
     @State private var isFeedScrolling = false
     /// Global frames of visible video cards (for picking the most centered one).
@@ -81,11 +89,13 @@ private struct ImagesViewBody: View {
     init(
         initialGallery: Gallery?,
         forceOneColumnFeed: Bool,
+        feedsEmbedded: Bool = false,
         viewModel: StashDBViewModel,
         imageListFilters: DetailLinkedImagesFilterModel
     ) {
         _gallery = State(initialValue: initialGallery)
         self.forceOneColumnFeed = forceOneColumnFeed
+        self.feedsEmbedded = feedsEmbedded
         self.viewModel = viewModel
         self.imageListFilters = imageListFilters
     }
@@ -123,7 +133,10 @@ private struct ImagesViewBody: View {
     }
 
     private var effectiveCardColumns: CatalogCardColumns {
-        forceOneColumnFeed ? .one : tabManager.catalogCardColumns(for: cardColumnScope)
+        if forceOneColumnFeed && !ignoreForcedOneColumnFeed {
+            return .one
+        }
+        return tabManager.catalogCardColumns(for: cardColumnScope)
     }
 
     private var columns: [GridItem] {
@@ -149,7 +162,9 @@ private struct ImagesViewBody: View {
     private func changeSortOption(to newOption: StashDBViewModel.ImageSortOption) {
         sessionKeyCache.removeAll(keepingCapacity: true)
         if gallery == nil {
-            TabManager.shared.setSortOption(for: .images, option: newOption.rawValue)
+            if !feedsEmbedded {
+                TabManager.shared.setSortOption(for: .images, option: newOption.rawValue)
+            }
         } else {
             TabManager.shared.setDetailSortOption(for: DetailViewContext.gallery.rawValue, option: newOption.rawValue)
         }
@@ -164,6 +179,8 @@ private struct ImagesViewBody: View {
     @discardableResult
     private func applyImagesDefaultFilterFromSettingsIfNeeded(force: Bool) -> Bool {
         guard gallery == nil else { return false }
+        // Feeds performer/tag handoff: stay on Filter = None until the user picks a filter.
+        if imageListFilters.suppressSettingsDefaultFilter { return false }
         if !force, imageListFilters.selectedFilter != nil { return false }
 
         if let defaultId = TabManager.shared.getDefaultFilterId(for: .images),
@@ -351,6 +368,21 @@ private struct ImagesViewBody: View {
             }
         }
         .onAppear {
+            // Feeds → Pics: parent already restored session sort/filter — do not clobber with Images-tab defaults.
+            if feedsEmbedded, gallery == nil {
+                if lastOpenedImageId == nil {
+                    lastOpenedImageId = imageListFilters.sessionLastOpenedImageId
+                }
+                if viewModel.savedFilters.isEmpty {
+                    viewModel.fetchSavedFilters()
+                }
+                if viewModel.allImages.isEmpty && !viewModel.isLoadingImages {
+                    imageListFilters.refetchImages(viewModel: viewModel, initial: true)
+                }
+                imageListFilters.hasCompletedInitialBootstrap = true
+                return
+            }
+
             // Catalog: after the first bootstrap, returning from FullScreenImageView (or a view remount)
             // must keep filter/sort/session — do not re-apply Settings defaults.
             if gallery == nil, imageListFilters.hasCompletedInitialBootstrap {
@@ -407,14 +439,14 @@ private struct ImagesViewBody: View {
             await hydrateOpenedGalleryIfNeeded()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
-            guard gallery == nil else { return }
+            guard gallery == nil, !feedsEmbedded else { return }
             if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.images.rawValue {
                 _ = applyImagesDefaultFilterFromSettingsIfNeeded(force: true)
                 imageListFilters.refetchImages(viewModel: viewModel, initial: true)
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultSortChanged"))) { notification in
-            guard gallery == nil else { return }
+            guard gallery == nil, !feedsEmbedded else { return }
             if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.images.rawValue {
                 let raw = TabManager.shared.getPersistentSortOption(for: .images) ?? "dateDesc"
                 let newSort = StashDBViewModel.ImageSortOption(rawValue: raw) ?? .dateDesc
@@ -435,10 +467,12 @@ private struct ImagesViewBody: View {
             guard gallery == nil else { return }
             // After bootstrap, a later `fetchSavedFilters` (e.g. onAppear while returning from
             // fullscreen) must not replace the user's active filter with Settings defaults.
+            // `suppressSettingsDefaultFilter` blocks Settings default during Feeds deep-links.
             if imageListFilters.hasCompletedInitialBootstrap,
                imageListFilters.selectedFilter != nil
                 || !imageListFilters.catalogPresetRowSelection.isEmpty
-                || imageListFilters.catalogFilterSortFABActive {
+                || imageListFilters.catalogFilterSortFABActive
+                || imageListFilters.suppressSettingsDefaultFilter {
                 imageListFilters.applyResolvedCatalogPresetPickerRowIfNeeded(viewModel: viewModel)
                 return
             }
@@ -458,7 +492,8 @@ private struct ImagesViewBody: View {
                 if imageListFilters.hasCompletedInitialBootstrap,
                    imageListFilters.selectedFilter != nil
                     || !imageListFilters.catalogPresetRowSelection.isEmpty
-                    || imageListFilters.catalogFilterSortFABActive {
+                    || imageListFilters.catalogFilterSortFABActive
+                    || imageListFilters.suppressSettingsDefaultFilter {
                     return
                 }
                 if applyImagesDefaultFilterFromSettingsIfNeeded(force: false) {
@@ -479,26 +514,28 @@ private struct ImagesViewBody: View {
                     }
                     .frame(maxWidth: .infinity)
                 } else {
-                    if !forceOneColumnFeed {
-                        let cardColumns = tabManager.catalogCardColumns(for: cardColumnScope)
-                        CatalogFABIconButton(
-                            systemImage: cardColumns.toggleIcon,
-                            accessibilityLabel: cardColumns.accessibilityLabel,
-                            accessibilityHint: "Switches between one and two cards per row"
-                        ) {
-                            withAnimation(DesignTokens.Animation.quick) {
-                                tabManager.toggleCatalogCardColumns(for: cardColumnScope)
-                            }
+                    let cardColumns = effectiveCardColumns
+                    CatalogFABIconButton(
+                        systemImage: cardColumns.toggleIcon,
+                        accessibilityLabel: cardColumns.accessibilityLabel,
+                        accessibilityHint: "Switches between one and two cards per row"
+                    ) {
+                        withAnimation(DesignTokens.Animation.quick) {
+                            ignoreForcedOneColumnFeed = true
+                            tabManager.toggleCatalogCardColumns(for: cardColumnScope)
                         }
-                        .frame(maxWidth: .infinity)
                     }
+                    .frame(maxWidth: .infinity)
 
                     CatalogFABIconButton(systemImage: "checkmark.circle") {
                         withAnimation(DesignTokens.Animation.quick) { isSelectionMode = true }
                     }
                     .frame(maxWidth: .infinity)
 
-                    imagesFilterMenuButton
+                    // Feeds → Pics: quick filter lives in the Reels navbar.
+                    if !feedsEmbedded {
+                        imagesFilterMenuButton
+                    }
 
                     CatalogFilterFABButton(isActive: catalogFilterSortFABActive) {
                         imageListFilters.showFilterSortSheet = true
@@ -1101,6 +1138,10 @@ struct ImageGroupCatalogCell: View {
         images.first(where: { $0.id == visibleImageId }) ?? images[0]
     }
 
+    private var visibleIndex: Int {
+        images.firstIndex(where: { $0.id == visibleImageId }) ?? 0
+    }
+
     private var allowsVisibleVideoAutoplay: Bool {
         visibleImage.isVideo && autoplayVideoImageId == visibleImage.id
     }
@@ -1129,6 +1170,20 @@ struct ImageGroupCatalogCell: View {
                 })
 
                 ImageCatalogFeedHeader(image: visibleImage, currentGalleryId: currentGalleryId)
+
+                if images.count > 1 {
+                    Text("\(visibleIndex + 1)/\(images.count)")
+                        .font(.caption2).fontWeight(.semibold)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 4)
+                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
+                        .clipShape(Capsule())
+                        .padding(8)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                        .allowsHitTesting(false)
+                        .accessibilityLabel("Image \(visibleIndex + 1) of \(images.count)")
+                }
             }
 
             if images.count > 1 {
@@ -1223,7 +1278,7 @@ struct ImageCatalogFeedHeader: View {
                         }
                         .buttonStyle(.plain)
                     } else {
-                        NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer())) {
+                        NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer(), initialTab: .images)) {
                             performerAvatar(performer, offset: idx)
                         }
                         .buttonStyle(.plain)
@@ -1254,7 +1309,7 @@ struct ImageCatalogFeedHeader: View {
                         .lineLimit(1)
                         .shadow(color: .black.opacity(0.35), radius: 1, y: 1)
                 } else if performers.count == 1 {
-                    NavigationLink(destination: PerformerDetailView(performer: performers[0].toPerformer())) {
+                    NavigationLink(destination: PerformerDetailView(performer: performers[0].toPerformer(), initialTab: .images)) {
                         Text(performers[0].name)
                             .font(.subheadline).fontWeight(.semibold)
                             .foregroundColor(.white)
@@ -1265,7 +1320,7 @@ struct ImageCatalogFeedHeader: View {
                 } else {
                     HStack(spacing: 4) {
                         ForEach(Array(performers.enumerated()), id: \.element.id) { idx, performer in
-                            NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer())) {
+                            NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer(), initialTab: .images)) {
                                 Text(performer.name)
                                     .font(.subheadline).fontWeight(.semibold)
                                     .foregroundColor(.white)
@@ -1424,6 +1479,11 @@ struct ImageThumbnailCard: View {
     @State private var autoplayTask: Task<Void, Never>?
     @State private var loopObserver: NSObjectProtocol?
 
+    /// 1/row Feeds/Images crops from the top; multi-column grids stay centered.
+    private var mediaFillAlignment: Alignment {
+        showsOverlayChrome ? .center : .top
+    }
+
     /// Original media URL — Stash `paths.preview` is often a still/webp and blacks out in AVPlayer.
     private var videoPlaybackURL: URL? {
         guard image.isVideo else { return nil }
@@ -1444,7 +1504,11 @@ struct ImageThumbnailCard: View {
                                 uiImage
                                     .resizable()
                                     .scaledToFill()
-                                    .frame(width: geometry.size.width, height: geometry.size.height)
+                                    .frame(
+                                        width: geometry.size.width,
+                                        height: geometry.size.height,
+                                        alignment: mediaFillAlignment
+                                    )
                                     .clipped()
                             } else {
                                 Image(systemName: "photo")
@@ -1455,7 +1519,11 @@ struct ImageThumbnailCard: View {
 
                     if isPreviewing, let previewPlayer {
                         AspectFillVideoPlayer(player: previewPlayer)
-                            .frame(width: geometry.size.width, height: geometry.size.height)
+                            .frame(
+                                width: geometry.size.width,
+                                height: geometry.size.height,
+                                alignment: mediaFillAlignment
+                            )
                             .clipped()
                             .allowsHitTesting(false)
                             .transition(.opacity)

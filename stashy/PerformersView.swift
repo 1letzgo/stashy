@@ -669,11 +669,7 @@ private struct PerformersViewContent: View {
                         NavigationLink(destination: PerformerDetailView(performer: performer)) {
                             PerformerCardView(
                                 performer: performer,
-                                badgeType: (selectedSortOption == .oCountDesc || selectedSortOption == .oCountAsc)
-                                    ? .oCount
-                                    : (selectedSortOption == .ratingDesc || selectedSortOption == .ratingAsc)
-                                        ? .rating
-                                        : .sceneCount
+                                badgeType: .forSort(selectedSortOption)
                             )
                         }
                         .buttonStyle(.plain)
@@ -745,6 +741,26 @@ struct PerformerCardView: View {
         return "\(y)"
     }
 
+    private var countBadgeIcon: String {
+        switch badgeType {
+        case .sceneCount: return "film"
+        case .imageCount: return "photo"
+        case .galleryCount: return "photo.stack"
+        case .oCount: return appearanceManager.oCounterIcon
+        case .rating: return "star.fill"
+        }
+    }
+
+    private var countBadgeText: String {
+        switch badgeType {
+        case .sceneCount: return "\(performer.sceneCount)"
+        case .imageCount: return "\(performer.imageCount ?? 0)"
+        case .galleryCount: return "\(performer.galleryCount ?? 0)"
+        case .oCount: return "\(performer.oCounter ?? 0)"
+        case .rating: return "\(performer.rating100 ?? 0)"
+        }
+    }
+
     var body: some View {
         // Wie `ImageThumbnailCard`: Bild in Zelle mit fester `geometry`-Fläche + `clipped()`,
         // damit `scaledToFill` den Hit-Test / Layout nicht sprengt; Root `contentShape`
@@ -790,29 +806,13 @@ struct PerformerCardView: View {
 
                     VStack {
                         HStack(alignment: .top, spacing: 4) {
-                            if let age = ageText {
-                                cardPill(icon: "calendar", text: age)
+                            if let ageText {
+                                cardPill(icon: "calendar", text: ageText)
                             }
 
                             Spacer(minLength: 4)
 
-                            // Scene / image / gallery counts — only when > 0.
-                            if performer.sceneCount > 0 {
-                                cardPill(icon: "film", text: "\(performer.sceneCount)")
-                            }
-                            if let imageCount = performer.imageCount, imageCount > 0 {
-                                cardPill(icon: "photo", text: "\(imageCount)")
-                            }
-                            if let galleryCount = performer.galleryCount, galleryCount > 0 {
-                                cardPill(icon: "photo.stack", text: "\(galleryCount)")
-                            }
-
-                            // Sort-specific badge when not the default scene-count sort.
-                            if badgeType == .oCount {
-                                cardPill(icon: appearanceManager.oCounterIcon, text: "\(performer.oCounter ?? 0)")
-                            } else if badgeType == .rating {
-                                cardPill(icon: "star.fill", text: "\(performer.rating100 ?? 0)")
-                            }
+                            cardPill(icon: countBadgeIcon, text: countBadgeText)
                         }
                         .padding(8)
                         Spacer()

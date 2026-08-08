@@ -37,6 +37,7 @@ struct ContentSettingsSection: View {
 struct ToolsSettingsView: View {
     @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @AppStorage(RateMeSettings.showDeleteButtonKey) private var rateMeShowDeleteButton = false
 
     private var toolsTabIsVisible: Bool {
         tabManager.tabs.first(where: { $0.id == .tools })?.isVisible ?? true
@@ -99,6 +100,12 @@ struct ToolsSettingsView: View {
                 Text("Server tasks are available under Settings → Server.")
             }
             .listRowBackground(Color.secondaryAppBackground)
+
+            Section("RateMe") {
+                Toggle("Show Delete Button", isOn: $rateMeShowDeleteButton)
+                    .tint(appearanceManager.tintColor)
+            }
+            .listRowBackground(Color.secondaryAppBackground)
         }
         .listStyle(.insetGrouped)
         .environment(\.editMode, .constant(.active))
@@ -106,6 +113,11 @@ struct ToolsSettingsView: View {
         .scrollContentBackground(.hidden)
         .stashySettingsDetailChrome("Tools")
     }
+}
+
+/// Shared UserDefaults keys for RateMe options.
+enum RateMeSettings {
+    static let showDeleteButtonKey = "stashy.rateMe.showDeleteButton"
 }
 
 struct TabSettingsView: View {

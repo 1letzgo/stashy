@@ -13,6 +13,7 @@ struct StudioDetailView: View {
     @State private var studio: Studio
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
+    @ObservedObject private var tabManager = TabManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -547,6 +548,17 @@ struct StudioDetailView: View {
                     }
                     .frame(maxWidth: .infinity)
                 } else if selectedDetailTab == .images {
+                    let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.images)
+                    CatalogFABIconButton(
+                        systemImage: cardColumns.toggleIcon,
+                        accessibilityLabel: cardColumns.accessibilityLabel,
+                        accessibilityHint: "Switches between one and two cards per row"
+                    ) {
+                        withAnimation(DesignTokens.Animation.quick) {
+                            tabManager.toggleCatalogCardColumns(for: CatalogCardColumnScope.images)
+                        }
+                    }
+                    .frame(maxWidth: .infinity)
                     CatalogFilterFABButton(isActive: linkedImages.catalogFilterSortFABActive) {
                         HapticManager.light()
                         linkedImages.showFilterSortSheet = true

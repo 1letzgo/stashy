@@ -209,6 +209,11 @@ struct ReelsViewBody: View {
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @ObservedObject private var tabManager = TabManager.shared
     @ObservedObject private var configManager = ServerConfigManager.shared
+    @ObservedObject private var stashSyncManager = StashSyncManager.shared
+    @ObservedObject private var videoSyncManager = StashVideoSyncManager.shared
+    @ObservedObject private var handyManager = HandyManager.shared
+    @ObservedObject private var buttplugManager = ButtplugManager.shared
+    @ObservedObject private var loveSpouseManager = LoveSpouseManager.shared
     @ObservedObject var viewModel: StashDBViewModel
     @EnvironmentObject var coordinator: NavigationCoordinator
     @State private var selectedSortOption: StashDBViewModel.SceneSortOption = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .scenes) ?? "") ?? .random
@@ -226,6 +231,12 @@ struct ReelsViewBody: View {
         scope: .reelsClips,
         initialSort: StashDBViewModel.ImageSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .clips) ?? "") ?? .random
     )
+    /// Same catalog scope as Images 1/row — shared with embedded `ImagesView`.
+    @StateObject private var reelsPicsFilters = DetailLinkedImagesFilterModel(
+        scope: .catalogRoot,
+        initialSort: StashDBViewModel.ImageSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .pics) ?? "") ?? .dateDesc
+    )
+    @StateObject private var reelsPicsViewModel = StashDBViewModel()
     @State private var selectedPreviewFilter: StashDBViewModel.SavedFilter?
     @State private var showReelsSceneFilterSheet = false
     /// While the scene-style filter sheet hydrates UI (migration / saved-filter list), ignore preset `onChange` so we do not refetch the Reels timeline.
@@ -292,6 +303,7 @@ struct ReelsViewBody: View {
             case .markers: return selectedMarkerSortOption.rawValue
             case .clips: return reelsClipImageFilters.selectedSortOption.rawValue
             case .previews: return selectedSortOption.rawValue
+            case .pics: return reelsPicsFilters.selectedSortOption.rawValue
             }
         }()
         if let raw = sortRaw {
@@ -309,6 +321,7 @@ struct ReelsViewBody: View {
                 return reelsClipImageFilters.selectedFilter?.id
             case .previews:
                 return selectedPreviewFilter?.id
+            case .pics: return reelsPicsFilters.selectedFilter?.id
             }
         }()
         if let id = filterId, !id.isEmpty {
@@ -455,6 +468,7 @@ struct ReelsViewBody: View {
             }
         case .clips:
             reelsSyncClipCatalogPresetPickerSelection()
+        case .pics: break
         }
     }
 
@@ -482,6 +496,7 @@ struct ReelsViewBody: View {
             reelsPreviewLiveChips = previewChips
         case .clips:
             break
+        case .pics: break
         }
     }
 
@@ -822,6 +837,7 @@ struct ReelsViewBody: View {
         case .markers: return .markers
         case .clips: return .images   // clips are served via findImages
         case .previews: return .previews
+        case .pics: return .images
         }
     }
 
@@ -858,6 +874,7 @@ struct ReelsViewBody: View {
         case .markers: return "marker"
         case .clips: return "clip"
         case .previews: return "preview"
+        case .pics: return nil
         }
     }
 
@@ -960,6 +977,7 @@ struct ReelsViewBody: View {
         case .previews:
             guard viewModel.hasMorePreviews, !viewModel.isLoadingMorePreviews else { return }
             viewModel.loadMorePreviews()
+        case .pics: break
         }
     }
 
@@ -992,6 +1010,7 @@ struct ReelsViewBody: View {
         case markers = "Markers"
         case clips = "Clips"
         case previews = "Previews"
+        case pics = "Pics"
         
         var icon: String {
             switch self {
@@ -999,6 +1018,7 @@ struct ReelsViewBody: View {
             case .markers: return "bookmark.fill"
             case .clips: return "photo.on.rectangle.angled"
             case .previews: return "play.rectangle.on.rectangle.fill"
+            case .pics: return "camera.fill"
             }
         }
         
@@ -1008,6 +1028,7 @@ struct ReelsViewBody: View {
             case .markers: return .markers
             case .clips: return .clips
             case .previews: return .previews
+            case .pics: return .pics
             }
         }
         
@@ -1017,7 +1038,7 @@ struct ReelsViewBody: View {
             case .markers: self = .markers
             case .clips: self = .clips
             case .previews: self = .previews
-            case .pics: self = .scenes // Codable migration: legacy Pics → Scenes
+            case .pics: self = .pics
             }
         }
     }
@@ -1246,6 +1267,7 @@ struct ReelsViewBody: View {
         case .markers: return viewModel.sceneMarkers.filter { $0.stream != nil && !$0.stream!.isEmpty }.map { ReelItemData.marker($0) }
         case .clips: return viewModel.clips.map { ReelItemData.clip($0) }
         case .previews: return viewModel.previews.map { ReelItemData.preview($0) }
+        case .pics: return []
         }
     }
 
@@ -1261,6 +1283,16 @@ struct ReelsViewBody: View {
             applySettings(clipSortBy: reelsClipImageFilters.selectedSortOption, clipFilter: reelsClipImageFilters.selectedFilter, performer: performer, tags: selectedTags)
         case .previews:
             applySettings(previewSortBy: selectedSortOption, previewFilter: selectedPreviewFilter, performer: performer, tags: selectedTags)
+        case .pics:
+            selectedPerformer = performer
+            selectedTags = []
+            reelsPicsFilters.liveFilterTagIds = []
+            reelsPicsViewModel.imagePerformerIdFilter = performer.id
+            reelsPicsFilters.suppressSettingsDefaultFilter = true
+            reelsPicsFilters.selectedFilter = nil
+            reelsPicsFilters.catalogPresetRowSelection = ""
+            reelsPicsViewModel.currentImageFilter = nil
+            reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
         }
     }
 
@@ -1274,6 +1306,18 @@ struct ReelsViewBody: View {
             applySettings(clipSortBy: reelsClipImageFilters.selectedSortOption, clipFilter: reelsClipImageFilters.selectedFilter, performer: selectedPerformer, tags: newTags)
         case .previews:
             applySettings(previewSortBy: selectedSortOption, previewFilter: selectedPreviewFilter, performer: selectedPerformer, tags: newTags)
+        case .pics:
+            selectedTags = newTags
+            reelsPicsFilters.liveFilterTagIds = newTags.map(\.id)
+            if newTags.isEmpty && selectedPerformer == nil {
+                reelsPicsRestoreDefaultFilterAfterDeepLinkIfNeeded()
+            } else {
+                reelsPicsFilters.suppressSettingsDefaultFilter = true
+                reelsPicsFilters.selectedFilter = nil
+                reelsPicsFilters.catalogPresetRowSelection = ""
+                reelsPicsViewModel.currentImageFilter = nil
+            }
+            reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
         }
     }
 
@@ -1287,7 +1331,29 @@ struct ReelsViewBody: View {
             applySettings(clipSortBy: reelsClipImageFilters.selectedSortOption, clipFilter: reelsClipImageFilters.selectedFilter, performer: nil, tags: selectedTags)
         case .previews:
             applySettings(previewSortBy: selectedSortOption, previewFilter: selectedPreviewFilter, performer: nil, tags: selectedTags)
+        case .pics:
+            selectedPerformer = nil
+            reelsPicsViewModel.imagePerformerIdFilter = nil
+            if selectedTags.isEmpty {
+                reelsPicsRestoreDefaultFilterAfterDeepLinkIfNeeded()
+            }
+            reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
         }
+    }
+
+    /// After clearing a Feeds deep-link, allow Settings default filter again.
+    private func reelsPicsRestoreDefaultFilterAfterDeepLinkIfNeeded() {
+        guard reelsPicsFilters.suppressSettingsDefaultFilter else { return }
+        reelsPicsFilters.suppressSettingsDefaultFilter = false
+        if reelsPicsFilters.selectedFilter == nil,
+           let defId = TabManager.shared.getDefaultFilterId(for: .images) {
+            let filter = viewModel.savedFilters[defId] ?? reelsPicsViewModel.savedFilters[defId]
+            reelsPicsFilters.selectedFilter = filter
+            if let filter {
+                reelsPicsFilters.catalogPresetRowSelection = ListLivePresetTag.serverRow(filter.id)
+            }
+        }
+        saveSessionState(for: .pics)
     }
 
     private func applySettings(sortBy: StashDBViewModel.SceneSortOption? = nil, markerSortBy: StashDBViewModel.SceneMarkerSortOption? = nil, clipSortBy: StashDBViewModel.ImageSortOption? = nil, previewSortBy: StashDBViewModel.SceneSortOption? = nil, sceneFilter: StashDBViewModel.SavedFilter? = nil, markerFilter: StashDBViewModel.SavedFilter? = nil, clipFilter: StashDBViewModel.SavedFilter? = nil, previewFilter: StashDBViewModel.SavedFilter? = nil, performer: ScenePerformer? = nil, tags: [Tag] = [], mode: ReelsMode? = nil, clearClipFilter: Bool = false, clearSceneFilter: Bool = false, clearMarkerFilter: Bool = false, clearPreviewFilter: Bool = false, rerollRandom: Bool = false, sceneLiveRefresh: Bool = false, clipImageLiveRefresh: Bool = false) {
@@ -1378,6 +1444,7 @@ struct ReelsViewBody: View {
                     usedFrozenRestore = true
                     currentVisibleSceneId = vid
                 }
+            case .pics: break
             }
         }
 
@@ -1391,6 +1458,7 @@ struct ReelsViewBody: View {
                 viewModel.takeReelsFrozenMarkersSnapshot(visibleItemId: currentVisibleSceneId)
             case .previews:
                 viewModel.takeReelsFrozenPreviewsSnapshot(visibleItemId: currentVisibleSceneId)
+            case .pics: break
             }
             // Entering a criterion overlay (performer/tags) should start at the top of the
             // newly filtered timeline. Keep the old position only in the frozen snapshot.
@@ -1478,6 +1546,7 @@ struct ReelsViewBody: View {
                 )
             case .previews:
                 viewModel.fetchPreviews(sortBy: selectedSortOption, isInitialLoad: true, filter: mergedPreviewFilter, liveFilter: sceneLiveForPreviews)
+            case .pics: break
             }
         }
 
@@ -1530,6 +1599,7 @@ struct ReelsViewBody: View {
                 if let firstId = viewModel.clips.first?.id { newId = "clip-\(firstId)" }
             case .previews:
                 if let firstId = viewModel.previews.first?.id { newId = "preview-\(firstId)" }
+            case .pics: break
             }
             if let id = newId {
                 // Show first item while paging walks toward pendingRestoreId in
@@ -1798,6 +1868,7 @@ struct ReelsViewBody: View {
         case .markers: return viewModel.sceneMarkers.isEmpty
         case .clips: return viewModel.clips.isEmpty
         case .previews: return viewModel.previews.isEmpty
+        case .pics: return false
         }
     }
 
@@ -1808,6 +1879,7 @@ struct ReelsViewBody: View {
         case .markers: return viewModel.isLoadingMarkers
         case .clips: return viewModel.isLoadingClips
         case .previews: return viewModel.isLoadingPreviews || viewModel.isLoading
+        case .pics: return false
         }
     }
 
@@ -1827,18 +1899,22 @@ struct ReelsViewBody: View {
         case .previews:
             let raw = id.hasPrefix("preview-") ? String(id.dropFirst("preview-".count)) : id
             return viewModel.previews.first(where: { $0.id == raw }).map { .preview($0) }
+        case .pics:
+            return nil
         }
     }
 
     /// Kein Server / Verbindungsfehler: untere Capsule- & Scrubber-Leiste ausblenden (wie „offline“).
     private var reelsBottomChromeSuppressed: Bool {
-        configManager.activeConfig == nil || (isListEmpty && viewModel.errorMessage != nil)
+        if reelsMode == .pics { return true }
+        return configManager.activeConfig == nil || (isListEmpty && viewModel.errorMessage != nil)
     }
 
     /// Voller Rand-zu-Rand-Modus nur für den eigentlichen Reels-Player. Bei leerer Liste + Laden/Fehler
     /// bleibt die System-Safe-Area aktiv, damit zentrierte States (`ConnectionErrorView`, Loading)
     /// mit der oberen `safeAreaInset`-Nav-Leiste fluchten und nicht „nach oben rutschen“.
     private var reelsPremiumContentSafeAreaRegions: SafeAreaRegions {
+        if reelsMode == .pics { return [] }
         let awaitingFeed = isListEmpty && (isFeedLoading || viewModel.errorMessage != nil)
         if awaitingFeed { return [] }
         return .all
@@ -2071,6 +2147,18 @@ struct ReelsViewBody: View {
             .onChange(of: reelsMode) { oldValue, newValue in
                 handleModeChange(from: oldValue, to: newValue)
             }
+            .onChange(of: reelsPicsFilters.selectedSortOption) { _, _ in
+                guard reelsMode == .pics else { return }
+                saveSessionState(for: .pics)
+            }
+            .onChange(of: reelsPicsFilters.selectedFilter?.id) { _, newId in
+                guard reelsMode == .pics else { return }
+                // User picked a saved filter — allow Settings defaults again later.
+                if newId != nil {
+                    reelsPicsFilters.suppressSettingsDefaultFilter = false
+                }
+                saveSessionState(for: .pics)
+            }
             .onChange(of: currentVisibleSceneId) { _, _ in
                 handleCurrentVisibleSceneIdChanged()
             }
@@ -2214,21 +2302,36 @@ struct ReelsViewBody: View {
         let reelsFeedConnectionError = isListEmpty && viewModel.errorMessage != nil
         ZStack {
             Group {
-                if reelsFeedConnectionError {
+                if reelsMode == .pics {
+                    Color.appBackground.ignoresSafeArea()
+                } else if reelsFeedConnectionError {
                     Color.appBackground.ignoresSafeArea()
                 } else {
                     Color.black.ignoresSafeArea()
                 }
             }
 
-            let isLoading = isFeedLoading && isListEmpty
-
-            if isLoading {
-                loadingStateView
-            } else if isListEmpty && viewModel.errorMessage != nil {
-                errorStateView
+            if reelsMode == .pics {
+                if isInitialized {
+                    ImagesView(
+                        catalogBrowserViewModel: reelsPicsViewModel,
+                        forceOneColumnFeed: true,
+                        feedsEmbedded: true,
+                        sharedImageListFilters: reelsPicsFilters
+                    )
+                } else {
+                    StandardLoadingView(message: "Loading feeds...")
+                }
             } else {
-                reelsListView()
+                let isLoading = isFeedLoading && isListEmpty
+
+                if isLoading {
+                    loadingStateView
+                } else if isListEmpty && viewModel.errorMessage != nil {
+                    errorStateView
+                } else {
+                    reelsListView()
+                }
             }
         }
         .ignoresSafeArea(reelsPremiumContentSafeAreaRegions)
@@ -2260,7 +2363,15 @@ struct ReelsViewBody: View {
     }
 
     private func handleDefaultFilterChanged(_ notification: Notification) {
-        if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.reels.rawValue {
+        guard let tabId = notification.userInfo?["tab"] as? String else { return }
+        if tabId == AppTab.images.rawValue, reelsMode == .pics {
+            let defaultId = TabManager.shared.getDefaultFilterId(for: .images)
+            reelsPicsFilters.selectedFilter = defaultId.flatMap { viewModel.savedFilters[$0] }
+            saveSessionState(for: .pics)
+            reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
+            return
+        }
+        if tabId == AppTab.reels.rawValue {
             switch reelsMode {
             case .scenes:
                 let defaultId = TabManager.shared.getDefaultFilterId(for: .reels)
@@ -2280,6 +2391,8 @@ struct ReelsViewBody: View {
                 let newFilter = defaultId != nil ? viewModel.savedFilters[defaultId!] : nil
                 selectedPreviewFilter = newFilter
                 applySettings(previewSortBy: StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .previews) ?? "") ?? selectedSortOption, previewFilter: newFilter, performer: selectedPerformer, tags: selectedTags)
+            case .pics:
+                break
             }
             reelsSyncFilterSheetPresetAndLiveChips(savedFilters: viewModel.savedFilters)
         }
@@ -2292,6 +2405,7 @@ struct ReelsViewBody: View {
             case .markers: return viewModel.sceneMarkers.isEmpty
             case .clips: return viewModel.clips.isEmpty
             case .previews: return viewModel.previews.isEmpty
+            case .pics: return false
             }
         }()
 
@@ -2301,6 +2415,7 @@ struct ReelsViewBody: View {
             case .scenes: return selectedFilter == nil
             case .markers: return selectedMarkerFilter == nil
             case .previews: return selectedPreviewFilter == nil
+            case .pics: return reelsPicsFilters.selectedFilter == nil
             }
         }()
         let noLiveChipCriteria: Bool = {
@@ -2313,6 +2428,8 @@ struct ReelsViewBody: View {
                 return !reelsMarkerLiveChips.isLiveFilterActive
             case .previews:
                 return !reelsPreviewLiveChips.isLiveFilterActive
+            case .pics:
+                return !reelsPicsFilters.catalogFilterSortFABActive
             }
         }()
         let noCriteriaSet = noSavedSceneStyleFilter && noLiveChipCriteria && selectedPerformer == nil && selectedTags.isEmpty
@@ -2324,6 +2441,7 @@ struct ReelsViewBody: View {
                 case .markers: return TabManager.shared.getDefaultMarkerFilterId(for: .reels)
                 case .clips: return TabManager.shared.getDefaultClipFilterId(for: .reels)
                 case .previews: return TabManager.shared.getDefaultPreviewFilterId(for: .reels)
+                case .pics: return TabManager.shared.getDefaultFilterId(for: .images)
                 }
             }()
 
@@ -2343,6 +2461,10 @@ struct ReelsViewBody: View {
                     case .previews:
                         selectedPreviewFilter = filter
                         applySettings(previewSortBy: StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .previews) ?? "") ?? selectedSortOption, previewFilter: filter, performer: selectedPerformer, tags: selectedTags)
+                    case .pics:
+                        reelsPicsFilters.selectedFilter = filter
+                        saveSessionState(for: .pics)
+                        reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
                     }
                 } else {
                     let currentModeType = reelsMode.toModeType
@@ -2361,6 +2483,12 @@ struct ReelsViewBody: View {
                     case .previews:
                         let savedSort = StashDBViewModel.SceneSortOption(rawValue: savedSortStr ?? "") ?? .random
                         applySettings(previewSortBy: savedSort, previewFilter: nil, performer: selectedPerformer, tags: selectedTags, clearPreviewFilter: true)
+                    case .pics:
+                        if let savedSort = StashDBViewModel.ImageSortOption(rawValue: savedSortStr ?? "") {
+                            reelsPicsFilters.selectedSortOption = savedSort
+                        }
+                        reelsPicsFilters.selectedFilter = nil
+                        saveSessionState(for: .pics)
                     }
                 }
                 reelsSyncFilterSheetPresetAndLiveChips(savedFilters: newValue)
@@ -2441,20 +2569,38 @@ struct ReelsViewBody: View {
         let initialPerformer = coordinator.reelsPerformer
         let initialTags = coordinator.reelsTags
         let targetModeStr = coordinator.reelsTargetMode
+        let picsPerformer = coordinator.picsPerformerFilter
 
         guard targetModeStr != nil
             || initialPerformer != nil
-            || !initialTags.isEmpty else {
+            || !initialTags.isEmpty
+            || picsPerformer != nil else {
             return false
         }
 
         if let modeStr = targetModeStr {
             coordinator.reelsTargetMode = nil
             if modeStr == "Pics" {
-                reelsMode = firstEnabledReelsMode
+                reelsMode = .pics
             } else if let mode = ReelsMode(rawValue: modeStr) {
                 reelsMode = mode
             }
+        }
+
+        // Legacy: Performer detail → Pics (Images 1/row)
+        if let performer = picsPerformer {
+            coordinator.picsPerformerFilter = nil
+            applyReelsPicsNavigation(performer: performer.toScenePerformer(), tags: [])
+            return true
+        }
+
+        // After applying target mode: if we land on Pics (first enabled mode or explicit),
+        // apply performer/tags there — do not drop them (old path skipped refetch / cleared tags).
+        if reelsMode == .pics, initialPerformer != nil || !initialTags.isEmpty {
+            coordinator.reelsPerformer = nil
+            coordinator.reelsTags = []
+            applyReelsPicsNavigation(performer: initialPerformer, tags: initialTags)
+            return true
         }
 
         if initialPerformer != nil || !initialTags.isEmpty {
@@ -2498,13 +2644,84 @@ struct ReelsViewBody: View {
                 }
                 reelsClipImageFilters.selectedFilter = clipF
                 applySettings(clipSortBy: savedSort, clipFilter: clipF, performer: initialPerformer, tags: initialTags, mode: .clips)
+            case .pics:
+                applyReelsPicsNavigation(performer: initialPerformer, tags: initialTags)
+                return true
             }
             reelsSyncFilterSheetPresetAndLiveChips(savedFilters: viewModel.savedFilters)
             isInitialized = true
             return true
         }
 
+        if targetModeStr != nil {
+            if reelsMode == .pics {
+                // Mode-only handoff: normal Pics bootstrap (with default filter). Criterion
+                // deep-links are handled above via `applyReelsPicsNavigation`.
+                if selectedPerformer != nil || !selectedTags.isEmpty {
+                    applyReelsPicsNavigation(performer: selectedPerformer, tags: selectedTags)
+                } else {
+                    bootstrapReelsPicsFiltersIfNeeded()
+                    reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
+                    isInitialized = true
+                }
+            } else {
+                isInitialized = true
+            }
+            return true
+        }
+
         return false
+    }
+
+    /// Apply performer/tag criteria to Feeds → Pics and fetch immediately.
+    /// Deep-links use Filter = None (no session/Settings default) — only sort + handed criteria.
+    private func applyReelsPicsNavigation(performer: ScenePerformer?, tags: [Tag]) {
+        reelsMode = .pics
+        selectedPerformer = performer
+        selectedTags = tags
+
+        if let raw = sessionSortRaw(for: .pics),
+           let opt = StashDBViewModel.ImageSortOption(rawValue: raw) {
+            reelsPicsFilters.selectedSortOption = opt
+        } else if let def = TabManager.shared.getReelsDefaultSort(for: .pics),
+                  let opt = StashDBViewModel.ImageSortOption(rawValue: def) {
+            reelsPicsFilters.selectedSortOption = opt
+        }
+
+        // Explicit None — wipe any prior session default before fetch.
+        reelsPicsFilters.suppressSettingsDefaultFilter = true
+        reelsPicsFilters.selectedFilter = nil
+        reelsPicsFilters.catalogPresetRowSelection = ""
+        reelsPicsFilters.clearLiveChipsOnly()
+        reelsPicsViewModel.currentImageFilter = nil
+        reelsPicsViewModel.imagePerformerIdFilter = performer?.id
+        reelsPicsFilters.liveFilterTagIds = tags.map(\.id)
+        saveSessionState(for: .pics)
+
+        reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
+        reelsSyncFilterSheetPresetAndLiveChips(savedFilters: viewModel.savedFilters)
+        isInitialized = true
+    }
+
+    /// Session / Settings defaults for embedded Images 1/row (Pics).
+    private func bootstrapReelsPicsFiltersIfNeeded() {
+        // Normal Pics entry may apply Settings default again.
+        reelsPicsFilters.suppressSettingsDefaultFilter = false
+        if let raw = sessionSortRaw(for: .pics),
+           let opt = StashDBViewModel.ImageSortOption(rawValue: raw) {
+            reelsPicsFilters.selectedSortOption = opt
+        } else if let def = TabManager.shared.getReelsDefaultSort(for: .pics),
+                  let opt = StashDBViewModel.ImageSortOption(rawValue: def) {
+            reelsPicsFilters.selectedSortOption = opt
+        }
+        if let fid = sessionFilterId(for: .pics) {
+            reelsPicsFilters.selectedFilter = viewModel.savedFilters[fid] ?? reelsPicsViewModel.savedFilters[fid]
+        } else if let defId = TabManager.shared.getDefaultFilterId(for: .images) {
+            reelsPicsFilters.selectedFilter = viewModel.savedFilters[defId] ?? reelsPicsViewModel.savedFilters[defId]
+        }
+        reelsPicsViewModel.imagePerformerIdFilter = selectedPerformer?.id
+        reelsPicsFilters.liveFilterTagIds = selectedTags.map(\.id)
+        saveSessionState(for: .pics)
     }
 
     private func handleOnAppear() {
@@ -2576,6 +2793,8 @@ struct ReelsViewBody: View {
             if let fid = sessionFilterId(for: .previews) {
                 selectedPreviewFilter = viewModel.savedFilters[fid]
             }
+        case .pics:
+            bootstrapReelsPicsFiltersIfNeeded()
         }
 
         // IMPORTANT: Restore the session sort/filter BEFORE restoring scroll position.
@@ -2601,6 +2820,7 @@ struct ReelsViewBody: View {
                 case .markers: return viewModel.sceneMarkers.isEmpty
                 case .clips: return viewModel.clips.isEmpty
                 case .previews: return viewModel.previews.isEmpty
+                case .pics: return false
                 }
             }()
 
@@ -2612,6 +2832,7 @@ struct ReelsViewBody: View {
                     case .markers: return TabManager.shared.getDefaultMarkerFilterId(for: .reels)
                     case .clips: return TabManager.shared.getDefaultClipFilterId(for: .reels)
                     case .previews: return TabManager.shared.getDefaultPreviewFilterId(for: .reels)
+                    case .pics: return TabManager.shared.getDefaultFilterId(for: .images)
                     }
                 }()
                     
@@ -2670,9 +2891,13 @@ struct ReelsViewBody: View {
                         }
                         selectedPreviewFilter = prevFilter
                         applySettings(previewSortBy: savedSort, previewFilter: prevFilter)
+                    case .pics:
+                        bootstrapReelsPicsFiltersIfNeeded()
                     }
                     reelsSyncFilterSheetPresetAndLiveChips(savedFilters: viewModel.savedFilters)
                 }
+            } else if reelsMode == .pics {
+                bootstrapReelsPicsFiltersIfNeeded()
             }
         isInitialized = true
     }
@@ -2722,6 +2947,8 @@ struct ReelsViewBody: View {
             selectedSortOption = StashDBViewModel.SceneSortOption(rawValue: sortRaw) ?? selectedSortOption
             let fid = sessionFilterId(for: .previews) ?? TabManager.shared.getDefaultPreviewFilterId(for: .reels)
             selectedPreviewFilter = (fid != nil ? viewModel.savedFilters[fid!] : nil)
+        case .pics:
+            bootstrapReelsPicsFiltersIfNeeded()
         }
 
         reelsSyncFilterSheetPresetAndLiveChips(for: newValue, savedFilters: viewModel.savedFilters)
@@ -2735,6 +2962,9 @@ struct ReelsViewBody: View {
             applySettings(clipSortBy: reelsClipImageFilters.selectedSortOption, clipFilter: reelsClipImageFilters.selectedFilter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
         case .previews:
             applySettings(previewSortBy: selectedSortOption, previewFilter: selectedPreviewFilter, performer: selectedPerformer, tags: selectedTags, mode: newValue)
+        case .pics:
+            bootstrapReelsPicsFiltersIfNeeded()
+            reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
         }
     }
 
@@ -2755,6 +2985,7 @@ struct ReelsViewBody: View {
                 applySettings(clipSortBy: reelsClipImageFilters.selectedSortOption, clipFilter: reelsClipImageFilters.selectedFilter, performer: selectedPerformer, tags: selectedTags)
             case .previews:
                 applySettings(previewSortBy: selectedSortOption, previewFilter: selectedPreviewFilter, performer: selectedPerformer, tags: selectedTags)
+            case .pics: break
             }
         })
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -2824,6 +3055,7 @@ struct ReelsViewBody: View {
                 case .markers: viewModel.loadMoreMarkers()
                 case .clips: viewModel.loadMoreClips()
                 case .previews: viewModel.loadMorePreviews()
+                case .pics: break
                 }
             }
         }
@@ -2935,127 +3167,111 @@ struct ReelsViewBody: View {
     /// Match expanding-dock menu chrome.
     private var reelsTopChromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
 
-    /// Top chrome: filter + mode · active filters/hashtags · O + rating
+    /// Top chrome: filter + mode · O + full stars (hidden in Pics); active performer/tag filters on a second row.
     @ViewBuilder
     private func reelsNavBar(currentItem: ReelItemData?) -> some View {
         let oCounter = currentItem?.oCounter ?? 0
-        let rating100 = currentItem?.rating100 ?? 0
-        let stars = max(0, min(5, Int(round(Double(rating100) / 20.0))))
+        let rating100 = currentItem?.rating100
+        let showsRateChrome = reelsMode != .pics
+        let hasActiveCriterionChips = selectedPerformer != nil || !selectedTags.isEmpty
 
-        HStack(spacing: 8) {
-            HStack(spacing: 6) {
-                reelsModePill
-                reelsFilterSortPill
-            }
-            .fixedSize()
-
-            ScrollView(.horizontal, showsIndicators: false) {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
                 HStack(spacing: 6) {
-                    if let performer = selectedPerformer {
-                        Button(action: { applyClearPerformerOnly() }) {
-                            HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 11, weight: .bold))
-                                Text(performer.name)
-                                    .font(.subheadline.weight(.semibold))
-                                    .lineLimit(1)
-                            }
-                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                            .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
-                        }
-                        .buttonStyle(.plain)
+                    reelsModePill
+                    if reelsMode == .pics || reelsMode == .clips {
+                        reelsQuickFilterPill
                     }
-
-                    ForEach(selectedTags) { tag in
-                        Button(action: {
-                            var newTags = selectedTags
-                            newTags.removeAll { $0.id == tag.id }
-                            applyTagsChange(newTags)
-                        }) {
-                            HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 11, weight: .bold))
-                                Text("#\(tag.name)")
-                                    .font(.subheadline.weight(.semibold))
-                                    .lineLimit(1)
-                            }
-                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                            .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
-                        }
-                        .buttonStyle(.plain)
+                    reelsFilterSortPill
+                    if showsReelsStashSyncButton {
+                        reelsStashSyncPill
                     }
                 }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .frame(height: reelsTopChromePillHeight)
+                .fixedSize()
 
-            HStack(spacing: 6) {
-                Button {
-                    if let item = currentItem {
-                        handleOCounterChange(item: item, newCount: oCounter + 1)
-                    }
-                } label: {
-                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                        Image(systemName: oCounter > 0 ? AppearanceManager.shared.oCounterIconFilled : AppearanceManager.shared.oCounterIcon)
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                            .foregroundColor(oCounter > 0 ? appearanceManager.tintColor : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                        Text("\(oCounter)")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                    }
-                    .opacity(currentItem == nil ? 0.35 : 1.0)
-                    .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
-                }
-                .buttonStyle(.plain)
-                .disabled(currentItem == nil)
-                .accessibilityLabel("O-Counter")
+                Spacer(minLength: 8)
 
-                Group {
-                    if let item = currentItem {
-                        Menu {
-                            Button(action: { handleRatingChange(item: item, newRating: 0) }) {
-                                HStack {
-                                    Text("Clear Rating")
-                                    if stars == 0 { Image(systemName: "checkmark") }
-                                }
-                            }
-                            Divider()
-                            ForEach(1...5, id: \.self) { s in
-                                Button(action: { handleRatingChange(item: item, newRating: s * 20) }) {
-                                    HStack {
-                                        Text(String(repeating: "★", count: s))
-                                        if stars == s { Image(systemName: "checkmark") }
-                                    }
-                                }
+                if showsRateChrome {
+                    HStack(spacing: 6) {
+                        Button {
+                            if let item = currentItem {
+                                handleOCounterChange(item: item, newCount: oCounter + 1)
                             }
                         } label: {
                             HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                                Image(systemName: "star.fill")
+                                Image(systemName: oCounter > 0 ? AppearanceManager.shared.oCounterIconFilled : AppearanceManager.shared.oCounterIcon)
                                     .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                                    .foregroundColor(.white.opacity(stars > 0 ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
-                                Text("\(stars)")
+                                    .foregroundColor(oCounter > 0 ? appearanceManager.tintColor : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                                Text("\(oCounter)")
                                     .font(.subheadline.weight(.semibold))
                                     .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
                             }
+                            .opacity(currentItem == nil ? 0.35 : 1.0)
                             .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
                         }
                         .buttonStyle(.plain)
-                    } else {
-                        HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                            Image(systemName: "star.fill")
-                                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                            Text("0")
-                                .font(.subheadline.weight(.semibold))
+                        .disabled(currentItem == nil)
+                        .accessibilityLabel("O-Counter")
+
+                        StarRatingView(
+                            rating100: rating100,
+                            isInteractive: currentItem != nil,
+                            size: 15,
+                            spacing: 3
+                        ) { newRating in
+                            guard let item = currentItem else { return }
+                            handleRatingChange(item: item, newRating: newRating)
                         }
-                        .foregroundColor(.white.opacity(0.35))
+                        .opacity(currentItem == nil ? 0.35 : 1.0)
                         .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
+                        .accessibilityLabel("Rating")
+                    }
+                    .fixedSize()
+                }
+            }
+            .frame(height: reelsTopChromePillHeight)
+
+            if hasActiveCriterionChips {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        if let performer = selectedPerformer {
+                            Button(action: { applyClearPerformerOnly() }) {
+                                HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 11, weight: .bold))
+                                    Text(performer.name)
+                                        .font(.subheadline.weight(.semibold))
+                                        .lineLimit(1)
+                                }
+                                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                                .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        ForEach(selectedTags) { tag in
+                            Button(action: {
+                                var newTags = selectedTags
+                                newTags.removeAll { $0.id == tag.id }
+                                applyTagsChange(newTags)
+                            }) {
+                                HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 11, weight: .bold))
+                                    Text("#\(tag.name)")
+                                        .font(.subheadline.weight(.semibold))
+                                        .lineLimit(1)
+                                }
+                                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                                .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                 }
-                .accessibilityLabel("Rating")
+                .frame(height: reelsTopChromePillHeight)
             }
-            .fixedSize()
         }
-        .frame(height: reelsTopChromePillHeight)
         .padding(.horizontal, StashyExpandingDock.edgePadding)
         .padding(.vertical, 6)
         .colorScheme(.dark)
@@ -3084,7 +3300,13 @@ struct ReelsViewBody: View {
             if let item = currentItem {
                 HStack(alignment: .center, spacing: 10) {
                     if let performer = item.performers.first {
-                        NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer())) {
+                        NavigationLink(
+                            destination: PerformerDetailView(
+                                performer: performer.toPerformer(),
+                                // Clips (and Pics) are image feeds — open the Images tab, not Galleries/Scenes.
+                                initialTab: (reelsMode == .clips || reelsMode == .pics) ? .images : nil
+                            )
+                        ) {
                             performerThumbnail(performer)
                         }
                         .buttonStyle(.plain)
@@ -3281,6 +3503,9 @@ struct ReelsViewBody: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: 12) {
                     modeMenu
+                    if reelsMode == .pics || reelsMode == .clips {
+                        reelsQuickFilterPill
+                    }
                     reelsFilterSortFAB
                 }
             }
@@ -3289,6 +3514,118 @@ struct ReelsViewBody: View {
     @ViewBuilder
     private var reelsFilterSortFAB: some View {
         reelsFilterSortPill
+    }
+
+    private var reelsQuickFilterMenuActive: Bool {
+        switch reelsMode {
+        case .pics:
+            return reelsPicsFilters.selectedFilter != nil || !reelsPicsFilters.catalogPresetRowSelection.isEmpty
+        case .clips:
+            return reelsClipImageFilters.selectedFilter != nil || !reelsClipImageFilters.catalogPresetRowSelection.isEmpty
+        default:
+            return false
+        }
+    }
+
+    @ViewBuilder
+    private var reelsQuickFilterPill: some View {
+        let filtersModel: DetailLinkedImagesFilterModel = {
+            switch reelsMode {
+            case .pics: return reelsPicsFilters
+            default: return reelsClipImageFilters
+            }
+        }()
+        let filterSourceVM: StashDBViewModel = {
+            if reelsMode == .pics {
+                return reelsPicsViewModel.savedFilters.isEmpty ? viewModel : reelsPicsViewModel
+            }
+            return viewModel
+        }()
+        let serverFilters = filtersModel.sortedServerImageFilters(viewModel: filterSourceVM)
+        let selection = filtersModel.catalogPresetRowSelection
+        Menu {
+            Button {
+                applyReelsQuickFilterSelection("")
+            } label: {
+                HStack {
+                    Text("No Filter")
+                    if selection.isEmpty && filtersModel.selectedFilter == nil {
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+
+            if !serverFilters.isEmpty {
+                Section("Saved Filters") {
+                    ForEach(serverFilters) { filter in
+                        Button {
+                            applyReelsQuickFilterSelection(ListLivePresetTag.serverRow(filter.id))
+                        } label: {
+                            HStack {
+                                Text(filter.name)
+                                if selection == ListLivePresetTag.serverRow(filter.id)
+                                    || (selection.isEmpty && filtersModel.selectedFilter?.id == filter.id) {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !filtersModel.localCatalogPresets.isEmpty {
+                Section("Presets") {
+                    ForEach(filtersModel.localCatalogPresets) { preset in
+                        Button {
+                            applyReelsQuickFilterSelection(ListLivePresetTag.localRow(preset.id))
+                        } label: {
+                            HStack {
+                                Text(preset.name)
+                                if selection == ListLivePresetTag.localRow(preset.id) {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "line.3.horizontal.decrease")
+                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                .foregroundColor(
+                    reelsQuickFilterMenuActive
+                        ? appearanceManager.tintColor
+                        : .white.opacity(StashyExpandingDock.inactiveIconOpacity)
+                )
+                .frame(width: StashyExpandingDock.iconSize, height: StashyExpandingDock.iconSize)
+                .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight, iconOnly: true))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Filter")
+        .accessibilityHint("Chooses a saved filter or preset")
+    }
+
+    private func applyReelsQuickFilterSelection(_ rowId: String) {
+        switch reelsMode {
+        case .pics:
+            reelsPicsFilters.refreshLocalPresets()
+            // Prefer Pics VM; fall back to Reels VM for saved-filter lookup if Pics hasn't loaded yet.
+            let filterSource = reelsPicsViewModel.savedFilters.isEmpty ? viewModel : reelsPicsViewModel
+            reelsPicsFilters.catalogPresetRowSelection = rowId
+            reelsPicsFilters.handlePresetSelection(rowId, viewModel: filterSource)
+            // Ensure fetch hits the embedded Images list VM.
+            if filterSource !== reelsPicsViewModel {
+                reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
+            }
+            saveSessionState(for: .pics)
+        case .clips:
+            reelsClipImageFilters.refreshLocalPresets()
+            reelsClipImageFilters.catalogPresetRowSelection = rowId
+            reelsClipImageFilters.handlePresetSelection(rowId, viewModel: viewModel)
+            refetchReelsClipsFromModel(viewModel)
+        default:
+            break
+        }
     }
 
     @ViewBuilder
@@ -3306,6 +3643,10 @@ struct ReelsViewBody: View {
                 reelsClipImageFilters.refreshLocalPresets()
                 reelsSyncClipCatalogPresetPickerSelection()
                 reelsClipImageFilters.showFilterSortSheet = true
+            case .pics:
+                reelsPicsFilters.refreshLocalPresets()
+                reelsPicsFilters.prepareCatalogFilterSortSheetUI(viewModel: reelsPicsViewModel)
+                reelsPicsFilters.showFilterSortSheet = true
             }
         } label: {
             Image(systemName: "slider.horizontal.3")
@@ -3316,6 +3657,38 @@ struct ReelsViewBody: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Filter und Sortierung")
+    }
+
+    /// Visible only when Settings → StashSync is enabled (not on Pics).
+    private var showsReelsStashSyncButton: Bool {
+        videoSyncManager.isVideoSyncEnabled && reelsMode != .pics
+    }
+
+    private var isReelsStashSyncActive: Bool {
+        stashSyncManager.isSyncing
+            || handyManager.isStashSyncMode
+            || buttplugManager.isStashSyncMode
+            || loveSpouseManager.isStashSyncMode
+    }
+
+    @ViewBuilder
+    private var reelsStashSyncPill: some View {
+        Button {
+            #if !os(tvOS)
+            HapticManager.selection()
+            #endif
+            stashSyncManager.setSyncing(!isReelsStashSyncActive)
+        } label: {
+            Image(systemName: isReelsStashSyncActive ? "bolt.horizontal.fill" : "bolt.horizontal")
+                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                .foregroundColor(isReelsStashSyncActive ? .orange : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                .frame(width: StashyExpandingDock.iconSize, height: StashyExpandingDock.iconSize)
+                .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight, iconOnly: true))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("StashSync")
+        .accessibilityValue(isReelsStashSyncActive ? "On" : "Off")
+        .accessibilityHint("Toggles device sync for the current feed")
     }
 
     @ViewBuilder

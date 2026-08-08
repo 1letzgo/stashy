@@ -865,6 +865,10 @@ struct AddMarkerSheet: View {
         }
     }
     
+    private var canAddMarker: Bool {
+        !title.isEmpty && !primaryTagId.isEmpty && !isCreating
+    }
+
     var body: some View {
         NavigationView {
             Form {
@@ -876,7 +880,7 @@ struct AddMarkerSheet: View {
                         Text(formatTime(seconds))
                             .foregroundColor(.secondary)
                     }
-                    
+
                     HStack {
                         Text("End Time (optional):")
                         Spacer()
@@ -886,10 +890,10 @@ struct AddMarkerSheet: View {
                     }
                 }
                 .listRowBackground(Color.secondaryAppBackground)
-                
+
                 Section(header: Text("Primary Tag")) {
                     TextField("Search Tags...", text: $searchText)
-                    
+
                     if isLoadingTags {
                         HStack {
                             Spacer()
@@ -911,7 +915,7 @@ struct AddMarkerSheet: View {
                                         .font(.caption)
                                         .foregroundColor(.secondary)
                                 }
-                                
+
                                 if primaryTagId == tag.id {
                                     Image(systemName: "checkmark")
                                         .foregroundColor(appearanceManager.tintColor)
@@ -925,7 +929,7 @@ struct AddMarkerSheet: View {
                                 }
                             }
                         }
-                        
+
                         if filteredTags.count > 20 {
                             Text("Type more to refine search...")
                                 .font(.caption)
@@ -938,20 +942,23 @@ struct AddMarkerSheet: View {
                 }
                 .listRowBackground(Color.secondaryAppBackground)
             }
-            .navigationTitle("Add Marker")
-            .navigationBarTitleDisplayMode(.inline)
             .applyAppBackground()
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Add") {
+            .scrollContentBackground(.hidden)
+            .hideSystemNavigationBarForCustomChrome()
+            // Modal sheets pin chrome to the top (same as Set Tag Image).
+            .safeAreaInset(edge: .top, spacing: 16) {
+                StashyDetailChromeBar(title: "Add Marker", onBack: { dismiss() }) {
+                    Button {
                         createMarker()
+                    } label: {
+                        Text(isCreating ? "…" : "Add")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(canAddMarker ? appearanceManager.tintColor : .white.opacity(0.35))
+                            .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
                     }
-                    .disabled(title.isEmpty || primaryTagId.isEmpty || isCreating)
+                    .buttonStyle(.plain)
+                    .disabled(!canAddMarker)
+                    .accessibilityLabel("Add")
                 }
             }
             .onAppear {

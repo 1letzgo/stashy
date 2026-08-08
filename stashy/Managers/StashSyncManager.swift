@@ -117,20 +117,36 @@ class StashSyncManager: ObservableObject {
         headIntensity = 0.0
     }
 
-    func toggle() {
-        let isCurrentlySyncing = HandyManager.shared.isStashSyncMode || ButtplugManager.shared.isStashSyncMode || LoveSpouseManager.shared.isStashSyncMode
-        let newValue = !isCurrentlySyncing
-        print("⚡ StashSyncManager.toggle() — newValue:\(newValue) handy.enabled:\(HandyManager.shared.isEnabled) handy.connected:\(HandyManager.shared.isConnected)")
+    /// True when any device channel is in StashSync mode or the pulse engine is running.
+    var isSyncing: Bool {
+        isActive
+            || HandyManager.shared.isStashSyncMode
+            || ButtplugManager.shared.isStashSyncMode
+            || LoveSpouseManager.shared.isStashSyncMode
+    }
 
-        HandyManager.shared.isStashSyncMode = newValue
-        ButtplugManager.shared.isStashSyncMode = newValue
-        LoveSpouseManager.shared.isStashSyncMode = newValue
+    /// Simple on/off used by Feeds settings (and `toggle()`).
+    func setSyncing(_ enabled: Bool) {
+        print("⚡ StashSyncManager.setSyncing(\(enabled)) handy.enabled:\(HandyManager.shared.isEnabled) handy.connected:\(HandyManager.shared.isConnected)")
 
-        if newValue {
+        if enabled {
+            StashVideoSyncManager.shared.isVideoSyncEnabled = true
+        }
+
+        HandyManager.shared.isStashSyncMode = enabled
+        ButtplugManager.shared.isStashSyncMode = enabled
+        LoveSpouseManager.shared.isStashSyncMode = enabled
+
+        if enabled {
             start()
         } else {
             stop()
+            StashVideoSyncManager.shared.stop()
         }
+    }
+
+    func toggle() {
+        setSyncing(!isSyncing)
     }
 }
 #else

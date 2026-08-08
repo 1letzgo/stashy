@@ -917,7 +917,7 @@ struct SetTagImageFromFrameSheet: View {
             .hideSystemNavigationBarForCustomChrome()
             // Modal sheets pin chrome to the top (same as catalog filter sheets).
             .safeAreaInset(edge: .top, spacing: 16) {
-                StashyDetailChromeBar(title: "Set Tag Image") {
+                StashyDetailChromeBar(title: "Set Tag Image", onBack: { dismiss() }) {
                     Button {
                         applySelectedTagImage()
                     } label: {
@@ -974,7 +974,7 @@ struct SetTagImageFromFrameSheet: View {
                 tagPlaceholder
             }
         }
-        .frame(width: 36, height: 36)
+        .frame(width: 64, height: 36) // 16:9
         .clipShape(RoundedRectangle(cornerRadius: 8))
     }
 

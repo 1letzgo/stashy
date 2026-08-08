@@ -280,7 +280,7 @@ enum ReelsModeType: String, Codable, CaseIterable {
         case .markers: return "bookmark.fill"
         case .clips: return "photo.on.rectangle.angled"
         case .previews: return "play.rectangle.on.rectangle.fill"
-        case .pics: return "photo.fill"
+        case .pics: return "camera.fill"
         }
     }
 }
@@ -890,19 +890,16 @@ class TabManager: ObservableObject {
            let decoded = try? JSONDecoder().decode([ReelsModeConfig].self, from: data) {
             self.reelsModes = decoded.sorted { $0.sortOrder < $1.sortOrder }
             
-            // Ensure remaining modes exist; strip legacy Pics from persisted config.
+            // Ensure all modes exist (incl. Pics / StashLine 1-per-row).
             var hasChanges = false
-            if reelsModes.contains(where: { $0.type == .pics }) {
-                reelsModes.removeAll { $0.type == .pics }
-                hasChanges = true
-            }
-            for modeType in ReelsModeType.allCases where modeType != .pics {
+            for modeType in ReelsModeType.allCases {
                 if !reelsModes.contains(where: { $0.type == modeType }) {
                     let newMode = ReelsModeConfig(
                         id: UUID(),
                         type: modeType,
                         isEnabled: true,
-                        sortOrder: reelsModes.count
+                        sortOrder: reelsModes.count,
+                        defaultSortOption: modeType == .pics ? "dateDesc" : nil
                     )
                     reelsModes.append(newMode)
                     hasChanges = true
@@ -918,7 +915,8 @@ class TabManager: ObservableObject {
                 ReelsModeConfig(id: UUID(), type: .scenes, isEnabled: true, sortOrder: 0),
                 ReelsModeConfig(id: UUID(), type: .markers, isEnabled: true, sortOrder: 1),
                 ReelsModeConfig(id: UUID(), type: .clips, isEnabled: true, sortOrder: 2),
-                ReelsModeConfig(id: UUID(), type: .previews, isEnabled: true, sortOrder: 3)
+                ReelsModeConfig(id: UUID(), type: .previews, isEnabled: true, sortOrder: 3),
+                ReelsModeConfig(id: UUID(), type: .pics, isEnabled: true, sortOrder: 4, defaultSortOption: "dateDesc")
             ]
             saveReelsModes()
         }
@@ -1023,9 +1021,8 @@ class TabManager: ObservableObject {
     }
     
     func toggleReelsMode(_ type: ReelsModeType) {
-        guard type != .pics else { return }
         // Don't allow disabling all modes
-        let enabledCount = reelsModes.filter { $0.isEnabled && $0.type != .pics }.count
+        let enabledCount = reelsModes.filter { $0.isEnabled }.count
         if let index = reelsModes.firstIndex(where: { $0.type == type }) {
             if reelsModes[index].isEnabled && enabledCount <= 1 {
                 return // Can't disable the last mode
@@ -1036,7 +1033,7 @@ class TabManager: ObservableObject {
     }
     
     func moveReelsMode(from source: IndexSet, to destination: Int) {
-        var editable = reelsModes.filter { $0.type != .pics }.sorted { $0.sortOrder < $1.sortOrder }
+        var editable = reelsModes.sorted { $0.sortOrder < $1.sortOrder }
         editable.move(fromOffsets: source, toOffset: destination)
         for i in 0..<editable.count { editable[i].sortOrder = i }
         reelsModes = editable
@@ -1045,16 +1042,14 @@ class TabManager: ObservableObject {
     
     var enabledReelsModes: [ReelsModeType] {
         reelsModes
-            .filter { $0.isEnabled && $0.type != .pics }
+            .filter { $0.isEnabled }
             .sorted { $0.sortOrder < $1.sortOrder }
             .map { $0.type }
     }
 
-    /// Modes shown in Feeds settings (Pics removed from product).
+    /// Modes shown in Feeds settings.
     var configurableReelsModes: [ReelsModeConfig] {
-        reelsModes
-            .filter { $0.type != .pics }
-            .sorted { $0.sortOrder < $1.sortOrder }
+        reelsModes.sorted { $0.sortOrder < $1.sortOrder }
     }
     
     func getReelsDefaultSort(for type: ReelsModeType) -> String? {

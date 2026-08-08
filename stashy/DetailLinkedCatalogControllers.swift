@@ -1467,6 +1467,8 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
     /// Catalog root: skip re-applying Settings defaults / initial fetch after the first bootstrap
     /// (e.g. returning from FullScreenImageView must not wipe an active filter).
     var hasCompletedInitialBootstrap = false
+    /// Feeds deep-link (performer/tag → Pics): keep Filter = None; do not inject Settings default.
+    var suppressSettingsDefaultFilter = false
     /// Scroll restore target after popping fullscreen (survives ImagesView remounts when model is hoisted).
     var sessionLastOpenedImageId: String?
     /// When true, `handlePresetSelection` ignores the next `catalogPresetRowSelection` change

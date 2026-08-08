@@ -165,7 +165,7 @@ struct StashLineView: View {
                 }
             }
         }
-        .floatingActionBar(isPresented: true, catalogChrome: CatalogFloatingChromeState(hasActiveServerConfig: configManager.activeConfig != nil, primaryListIsEmpty: viewModel.allImages.isEmpty, errorMessage: viewModel.errorMessage, imageFindListError: viewModel.imageFindListError)) {
+        .floatingActionBar(isPresented: !isEmbedded, catalogChrome: CatalogFloatingChromeState(hasActiveServerConfig: configManager.activeConfig != nil, primaryListIsEmpty: viewModel.allImages.isEmpty, errorMessage: viewModel.errorMessage, imageFindListError: viewModel.imageFindListError)) {
             floatingBarContent
         }
         .sheet(isPresented: $stashLineListFilters.showFilterSortSheet) {
@@ -259,25 +259,31 @@ struct StashLineView: View {
         }
         .onAppear {
             // Im embedded Reels-Pics-Mode hat der Parent bereits aus der Session restored;
-            // hier nicht mehr mit TabManager-Defaults überschreiben.
-            if !usesExternalListFilters {
+            // hier nicht mehr mit TabManager-Defaults überschreiben — und sofort laden
+            // (sonst: Default-Filter-ID gesetzt + selectedFilter schon vom Parent → nie performSearch).
+            if usesExternalListFilters {
+                if viewModel.allImages.isEmpty {
+                    performSearch()
+                }
+            } else {
                 let sortStr = TabManager.shared.getSortOption(for: .stashline) ?? "dateDesc"
                 if let sort = StashDBViewModel.ImageSortOption(rawValue: sortStr) {
                     stashLineListFilters.selectedSortOption = sort
                 }
-            }
-            if TabManager.shared.getDefaultFilterId(for: .stashline) == nil || !viewModel.savedFilters.isEmpty {
-                if viewModel.allImages.isEmpty {
-                    performSearch()
+                if TabManager.shared.getDefaultFilterId(for: .stashline) == nil || !viewModel.savedFilters.isEmpty {
+                    if viewModel.allImages.isEmpty {
+                        performSearch()
+                    }
                 }
+                viewModel.fetchSavedFilters()
             }
-            viewModel.fetchSavedFilters()
             rebuildGroupedPosts()
         }
         .onChange(of: stashLineGroupingFingerprint) { _, _ in
             rebuildGroupedPosts()
         }
         .onChange(of: viewModel.savedFilters) { _, newValue in
+            guard !usesExternalListFilters else { return }
             if stashLineListFilters.selectedFilter == nil {
                 if let defaultId = TabManager.shared.getDefaultFilterId(for: .stashline),
                    let filter = newValue[defaultId] {
@@ -288,9 +294,12 @@ struct StashLineView: View {
                         performSearch()
                     }
                 }
+            } else if viewModel.allImages.isEmpty && !viewModel.isLoadingImages {
+                performSearch()
             }
         }
         .onChange(of: viewModel.isLoadingSavedFilters) { oldValue, isLoading in
+            guard !usesExternalListFilters else { return }
             if oldValue == true && isLoading == false {
                 if viewModel.allImages.isEmpty && !viewModel.isLoadingImages && stashLineListFilters.selectedFilter == nil {
                     performSearch()

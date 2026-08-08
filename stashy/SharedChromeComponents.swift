@@ -288,18 +288,31 @@ private struct CatalogSettingsSheetChromeModifier: ViewModifier {
 /// Settings / simple pushed-detail chrome: Back · title · optional trailing.
 struct StashyDetailChromeBar<Trailing: View>: View {
     let title: String
+    /// Prefer for modal sheets: `safeAreaInset` + `NavigationView` can make env `dismiss` a no-op.
+    var onBack: (() -> Void)? = nil
     @ViewBuilder var trailing: () -> Trailing
     @Environment(\.dismiss) private var dismiss
 
-    init(title: String, @ViewBuilder trailing: @escaping () -> Trailing = { EmptyView() }) {
+    init(
+        title: String,
+        onBack: (() -> Void)? = nil,
+        @ViewBuilder trailing: @escaping () -> Trailing = { EmptyView() }
+    ) {
         self.title = title
+        self.onBack = onBack
         self.trailing = trailing
     }
 
     var body: some View {
         StashySectionChromeBar {
             HStack(spacing: 8) {
-                StashyChromeBackButton { dismiss() }
+                StashyChromeBackButton {
+                    if let onBack {
+                        onBack()
+                    } else {
+                        dismiss()
+                    }
+                }
 
                 Text(title)
                     .font(.subheadline.weight(.semibold))

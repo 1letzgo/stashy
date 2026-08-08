@@ -58,15 +58,18 @@ struct PerformerDetailView: View {
         }
     }
     @State private var selectedDetailTab: DetailTab = .scenes
+    /// When set (e.g. Feeds Pics/Clips → `.images`), keep that tab and skip scenes/galleries auto-switch.
+    private let preferredInitialTab: DetailTab?
 
     private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
 
-    init(performer: Performer) {
+    init(performer: Performer, initialTab: DetailTab? = nil) {
         _performer = State(initialValue: performer)
+        self.preferredInitialTab = initialTab
         let sc = performer.sceneCount
         // Do not open the Scenes stack when we have no scene signal; galleries (or other tabs after load) avoid an empty default.
-        let initialTab: DetailTab = sc > 0 ? .scenes : .galleries
-        _selectedDetailTab = State(initialValue: initialTab)
+        let resolvedTab: DetailTab = initialTab ?? (sc > 0 ? .scenes : .galleries)
+        _selectedDetailTab = State(initialValue: resolvedTab)
         _linkedStudios = StateObject(wrappedValue: DetailLinkedStudiosFilterModel(scope: .performer(performer.id)))
         _linkedTags = StateObject(wrappedValue: DetailLinkedTagsFilterModel(scope: .performer(performer.id)))
         _linkedGalleries = StateObject(wrappedValue: DetailLinkedGalleriesFilterModel(scope: .performer(performer.id)))
@@ -485,11 +488,13 @@ struct PerformerDetailView: View {
             isFavorite = performer.favorite ?? false
         }
         .onChange(of: viewModel.totalPerformerGalleries) { oldValue, newValue in
+            guard preferredInitialTab == nil else { return }
             if newValue > 0 && shouldAutoSwitchToPerformerGalleriesForEmptyScenes {
                 withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = .galleries }
             }
         }
         .onChange(of: viewModel.totalPerformerScenes) { oldValue, newValue in
+            guard preferredInitialTab == nil else { return }
             if newValue > 0 {
                 withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = .scenes }
             } else if shouldAutoSwitchToPerformerGalleriesForEmptyScenes {
@@ -501,6 +506,7 @@ struct PerformerDetailView: View {
             }
         }
         .onChange(of: viewModel.isLoadingPerformerScenes) { _, loading in
+            guard preferredInitialTab == nil else { return }
             if !loading, selectedDetailTab == .scenes, effectiveScenes == 0, let first = availableTabs.first {
                 withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = first }
             }
