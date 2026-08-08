@@ -34,15 +34,21 @@ struct MainTabView: View {
             TabView(selection: Binding(
                 get: { coordinator.selectedTab },
                 set: { newValue in
-                    if newValue == coordinator.selectedTab && newValue == .catalogue {
-                        let now = Date()
-                        if let lastTap = coordinator.lastHomeTapTime, now.timeIntervalSince(lastTap) < 0.5 {
-                            // Double tap detected -> Go to Dashboard
-                            coordinator.catalogueSubTab = CatalogsView.CatalogsTab.dashboard.rawValue
-                            coordinator.lastHomeTapTime = nil
-                        } else {
-                            // Single tap -> Just record time and let system pop/scroll
-                            coordinator.lastHomeTapTime = now
+                    if newValue == coordinator.selectedTab {
+                        if newValue == .catalogue {
+                            let now = Date()
+                            if let lastTap = coordinator.lastHomeTapTime, now.timeIntervalSince(lastTap) < 0.5 {
+                                // Double tap detected -> Go to Dashboard
+                                coordinator.catalogueSubTab = CatalogsView.CatalogsTab.dashboard.rawValue
+                                coordinator.lastHomeTapTime = nil
+                            } else {
+                                // Single tap -> Just record time and let system pop/scroll
+                                coordinator.lastHomeTapTime = now
+                            }
+                        } else if newValue == .reels {
+                            // Re-tap Feeds only: pop detail + rebuild UI. Do not remount when
+                            // merely entering the tab — that aborted in-flight Clips fetches.
+                            remountFeedsTab()
                         }
                     } else {
                         coordinator.selectedTab = newValue
@@ -145,6 +151,16 @@ struct MainTabView: View {
             hasValidConfig = false
             coordinator.selectedTab = .settings
         }
+    }
+
+    /// Clean Feeds rebuild: session save → player teardown → new `NavigationStack` identity.
+    /// Keeps `reelsFeedViewModel` warm; sub-mode / position come from `ReelsSessionRAM`.
+    private func remountFeedsTab() {
+        NotificationCenter.default.post(name: Notification.Name("ReelsWillRemount"), object: nil)
+        ReelsPlayerRegistry.pauseAll()
+        // Clear any prior tab-leave suspend so the remounted Feeds instance can autoplay.
+        ReelsPlayerRegistry.resumePlayback()
+        coordinator.reelsTabID = UUID()
     }
 }
 

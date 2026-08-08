@@ -13,6 +13,10 @@ import Combine
 
 private extension Notification.Name {
     static let reelsPauseAllPlayers = Notification.Name("ReelsPauseAllPlayers")
+    /// Hard teardown (pause + release item) — used when leaving video modes for Pics.
+    static let reelsTeardownAllPlayers = Notification.Name("ReelsTeardownAllPlayers")
+    /// Tab-bar (re)select: persist session then remount Feeds via `reelsTabID`.
+    static let reelsWillRemount = Notification.Name("ReelsWillRemount")
 }
 
 /// Reads the on-screen tab bar overlap without changing SwiftUI safe-area / paging layout.
@@ -169,6 +173,7 @@ enum ReelsSessionRAM {
                 || key.hasPrefix("reels_session_sort_")
                 || key.hasPrefix("reels_session_filter_")
                 || key.hasPrefix("reels_session_random_seed_")
+                || key.hasPrefix("reels_session_mode_")
                 || key.hasPrefix("reels_playback_checkpoint_") {
                 ud.removeObject(forKey: key)
             }
@@ -225,7 +230,7 @@ struct ReelsViewBody: View {
     @State private var currentVisibleSceneId: String?
     @State private var showDeleteConfirmation = false
     @State private var sceneToDelete: Scene?
-    @State private var reelsMode: ReelsMode = ReelsMode(from: TabManager.shared.enabledReelsModes.first ?? .scenes)
+    @State private var reelsMode: ReelsMode = Self.sessionRestoredReelsMode()
     @State private var selectedMarkerSortOption: StashDBViewModel.SceneMarkerSortOption = StashDBViewModel.SceneMarkerSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .markers) ?? "") ?? .random
     @StateObject private var reelsClipImageFilters = DetailLinkedImagesFilterModel(
         scope: .reelsClips,
@@ -277,14 +282,35 @@ struct ReelsViewBody: View {
     @State private var shouldScrollToTopAfterCriterionChange: Bool = false
 
     // MARK: - Session-persisted sort/filter (per server + mode)
+    private static func reelsSessionServerID() -> String {
+        ServerConfigManager.shared.activeConfig?.id.uuidString ?? "default"
+    }
+
+    private static func reelsSessionModeKey() -> String {
+        "reels_session_mode_\(reelsSessionServerID())"
+    }
+
+    /// Last Feeds sub-mode for this app launch (survives tab remounts).
+    private static func sessionRestoredReelsMode() -> ReelsMode {
+        let enabled = TabManager.shared.enabledReelsModes
+        if let raw = ReelsSessionRAM.string(forKey: reelsSessionModeKey()),
+           let mode = ReelsMode(rawValue: raw),
+           enabled.contains(mode.toModeType) {
+            return mode
+        }
+        return ReelsMode(from: enabled.first ?? .scenes)
+    }
+
+    private func persistSessionReelsMode(_ mode: ReelsMode? = nil) {
+        ReelsSessionRAM.setString((mode ?? reelsMode).rawValue, forKey: Self.reelsSessionModeKey())
+    }
+
     private func reelsSessionSortKey(for mode: ReelsMode) -> String {
-        let serverID = ServerConfigManager.shared.activeConfig?.id.uuidString ?? "default"
-        return "reels_session_sort_\(serverID)_\(mode.rawValue)"
+        "reels_session_sort_\(Self.reelsSessionServerID())_\(mode.rawValue)"
     }
 
     private func reelsSessionFilterKey(for mode: ReelsMode) -> String {
-        let serverID = ServerConfigManager.shared.activeConfig?.id.uuidString ?? "default"
-        return "reels_session_filter_\(serverID)_\(mode.rawValue)"
+        "reels_session_filter_\(Self.reelsSessionServerID())_\(mode.rawValue)"
     }
 
     private func sessionSortRaw(for mode: ReelsMode) -> String? {
@@ -296,6 +322,8 @@ struct ReelsViewBody: View {
     }
 
     private func saveSessionState(for mode: ReelsMode) {
+        persistSessionReelsMode(mode)
+
         // Sort
         let sortRaw: String? = {
             switch mode {
@@ -886,7 +914,30 @@ struct ReelsViewBody: View {
         ReelsSessionRAM.setString(id, forKey: reelsPositionKey(for: mode))
     }
 
+    private func clearSavedPosition(for mode: ReelsMode) {
+        ReelsSessionRAM.setString(nil, forKey: reelsPositionKey(for: mode))
+    }
+
+    /// Tab-bar reselect: rebuild Feeds from the first item (not mid-timeline restore).
+    private static func reelsRestartFromTopKey() -> String {
+        "reels_restart_from_top_\(reelsSessionServerID())"
+    }
+
+    private var shouldRestartFeedFromTop: Bool {
+        ReelsSessionRAM.string(forKey: Self.reelsRestartFromTopKey()) != nil
+    }
+
+    private func markRestartFeedFromTop() {
+        ReelsSessionRAM.setString("1", forKey: Self.reelsRestartFromTopKey())
+    }
+
+    private func clearRestartFeedFromTopFlag() {
+        ReelsSessionRAM.setString(nil, forKey: Self.reelsRestartFromTopKey())
+    }
+
     private func saveCurrentPositionIfPossible(for mode: ReelsMode) {
+        // Tab-bar remount asks for a fresh start — don't re-persist the old index.
+        guard !shouldRestartFeedFromTop else { return }
         guard let prefix = expectedPrefix(for: mode) else { return }
         guard let id = currentVisibleSceneId, id.hasPrefix("\(prefix)-") else { return }
         savePosition(id, for: mode)
@@ -899,6 +950,10 @@ struct ReelsViewBody: View {
 
     /// Persists `itemId|seconds` so resume can seek only when the same item is still active.
     private func savePlaybackCheckpoint(for mode: ReelsMode) {
+        guard !shouldRestartFeedFromTop else {
+            ReelsSessionRAM.setString(nil, forKey: reelsPlaybackCheckpointKey(for: mode))
+            return
+        }
         guard let id = currentVisibleSceneId else {
             ReelsSessionRAM.setString(nil, forKey: reelsPlaybackCheckpointKey(for: mode))
             return
@@ -945,9 +1000,11 @@ struct ReelsViewBody: View {
             pendingRestoreId = nil
             return
         }
-        // If it's already present, we're done.
+        // If it's already present, bind selection — clearing `pendingRestoreId` alone
+        // left `currentVisibleSceneId` nil after tab remounts (blank Clips feed).
         if currentReelItems.contains(where: { $0.id == targetId }) {
             pendingRestoreId = nil
+            currentVisibleSceneId = targetId
             return
         }
         pendingRestoreId = targetId
@@ -1962,10 +2019,23 @@ struct ReelsViewBody: View {
                 }
             }
             .onDisappear {
-                // Tab switches often skip `onDisappear`; still needed for push/pop within Feeds.
+                // Still on Feeds (push/pop or tab remount): pause only — never `suspendPlayback()`.
+                // Remount destroys this view *after* the new instance's `onAppear`; suspending here
+                // would leave `playIfAllowed` as a permanent no-op for Clips.
                 if coordinator.selectedTab == .reels {
-                    reelsStopPlaybackAndAccessories()
+                    reelsPausePlaybackForLocalTeardown()
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .reelsWillRemount)) { _ in
+                // Tab-bar icon: restart feed from the top (mode/filter stay; position does not).
+                markRestartFeedFromTop()
+                persistSessionReelsMode()
+                saveSessionState(for: reelsMode)
+                clearSavedPosition(for: reelsMode)
+                ReelsSessionRAM.setString(nil, forKey: reelsPlaybackCheckpointKey(for: reelsMode))
+                currentItemIsPlaying = false
+                ReelsPlayerRegistry.pauseAll()
+                NotificationCenter.default.post(name: .reelsTeardownAllPlayers, object: nil)
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
                 handleDefaultFilterChanged(notification)
@@ -2498,18 +2568,25 @@ struct ReelsViewBody: View {
         }
     }
 
-    /// Pausiert alle registrierten Reels-`AVPlayer`, beendet Zubehör-Sync und gibt die Audio-Session frei.
-    /// Wichtig beim **Haupttab-Wechsel weg von Feeds**: SwiftUI-`TabView` ruft hier oft kein `onDisappear` auf.
-    private func reelsStopPlaybackAndAccessories() {
+    /// Pause players while staying on Feeds (nav push or `reelsTabID` remount). Does **not** suspend
+    /// the registry — that would race a remounted instance's autoplay.
+    private func reelsPausePlaybackForLocalTeardown() {
         saveCurrentPositionIfPossible(for: reelsMode)
         savePlaybackCheckpoint(for: reelsMode)
         currentItemIsPlaying = false
-        ReelsPlayerRegistry.suspendPlayback()
+        ReelsPlayerRegistry.pauseAll()
         NotificationCenter.default.post(name: .reelsPauseAllPlayers, object: nil)
-        UIApplication.shared.isIdleTimerDisabled = false
         HandyManager.shared.stop()
         ButtplugManager.shared.stopAllDevices()
         LoveSpouseManager.shared.stop()
+    }
+
+    /// Pausiert alle registrierten Reels-`AVPlayer`, beendet Zubehör-Sync und gibt die Audio-Session frei.
+    /// Wichtig beim **Haupttab-Wechsel weg von Feeds**: SwiftUI-`TabView` ruft hier oft kein `onDisappear` auf.
+    private func reelsStopPlaybackAndAccessories() {
+        reelsPausePlaybackForLocalTeardown()
+        ReelsPlayerRegistry.suspendPlayback()
+        UIApplication.shared.isIdleTimerDisabled = false
         do {
             try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
@@ -2761,7 +2838,11 @@ struct ReelsViewBody: View {
             return
         }
 
-        restoreSessionRandomSeedIfAvailable()
+        let restartFromTop = shouldRestartFeedFromTop
+
+        if !restartFromTop {
+            restoreSessionRandomSeedIfAvailable()
+        }
 
         // Restore session sort/filter for the current mode (prevents resetting to defaults on tab return)
         switch reelsMode {
@@ -2797,12 +2878,22 @@ struct ReelsViewBody: View {
             bootstrapReelsPicsFiltersIfNeeded()
         }
 
-        // IMPORTANT: Restore the session sort/filter BEFORE restoring scroll position.
-        // Otherwise we may auto-select (and persist) the first item from the wrong sort,
-        // which breaks position restore (notably for Clips when using Created sorting).
-        restorePositionIfAvailable(for: reelsMode, forceIfPrefixMismatch: false)
-        beginPagedRestoreIfNeeded()
-        autoSelectFirstItem()
+        // Tab-bar icon → start of feed. Normal appear → restore last scroll position.
+        if restartFromTop {
+            pendingRestoreId = nil
+            currentVisibleSceneId = nil
+            clearSavedPosition(for: reelsMode)
+            ReelsSessionRAM.setString(nil, forKey: reelsPlaybackCheckpointKey(for: reelsMode))
+            if let kind = seedKind(for: reelsMode) {
+                viewModel.refreshRandomSeed(for: kind)
+                persistSessionRandomSeed(for: reelsMode)
+            }
+        } else {
+            // IMPORTANT: Restore sort/filter BEFORE scroll position (Clips Created sorting).
+            restorePositionIfAvailable(for: reelsMode, forceIfPrefixMismatch: false)
+            beginPagedRestoreIfNeeded()
+            autoSelectFirstItem()
+        }
         
         // 1. Initialize reelsMode ONLY if current mode is disabled in settings
         let enabledTypes = tabManager.enabledReelsModes
@@ -2824,7 +2915,7 @@ struct ReelsViewBody: View {
                 }
             }()
 
-            if isCurrentlyEmpty {
+            if isCurrentlyEmpty && !restartFromTop {
                 // Priority 2: Try to apply default filter
                 let defaultId: String? = {
                     switch reelsMode {
@@ -2874,14 +2965,8 @@ struct ReelsViewBody: View {
                         selectedMarkerSortOption = savedSort
                         applySettings(markerSortBy: savedSort, markerFilter: initialMarkerFilter, performer: selectedPerformer, tags: selectedTags)
                     case .clips:
-                        let savedSort = StashDBViewModel.ImageSortOption(rawValue: savedSortStr ?? "") ?? .random
-                        reelsClipImageFilters.selectedSortOption = savedSort
-                        var clipFilter = reelsClipImageFilters.selectedFilter
-                        if clipFilter == nil, let defId = defaultId {
-                            clipFilter = viewModel.savedFilters[defId]
-                        }
-                        reelsClipImageFilters.selectedFilter = clipFilter
-                        applySettings(clipSortBy: savedSort, clipFilter: clipFilter)
+                        // Fetched via `ensureReelsClipsLoaded()` below (also covers warm remounts).
+                        break
                     case .previews:
                         let savedSort = StashDBViewModel.SceneSortOption(rawValue: savedSortStr ?? "") ?? .random
                         selectedSortOption = savedSort
@@ -2896,30 +2981,140 @@ struct ReelsViewBody: View {
                     }
                     reelsSyncFilterSheetPresetAndLiveChips(savedFilters: viewModel.savedFilters)
                 }
-            } else if reelsMode == .pics {
+            } else if reelsMode == .pics, !restartFromTop {
                 bootstrapReelsPicsFiltersIfNeeded()
+                // Remount recreates the Pics VM — refetch when the warm scene VM has no pics list.
+                if reelsPicsViewModel.allImages.isEmpty {
+                    reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
+                }
             }
+
+        if restartFromTop {
+            refetchCurrentReelsModeFromTop()
+        } else if reelsMode == .clips {
+            // Fresh view identity with warm VM — rebind ScrollView via fetch.
+            ensureReelsClipsLoaded(rerollRandom: false)
+        }
+
+        persistSessionReelsMode()
         isInitialized = true
+        clearRestartFeedFromTopFlag()
+        if reelsMode != .pics {
+            ReelsPlayerRegistry.resumePlayback()
+            currentItemIsPlaying = true
+            // Remount: old view's `onDisappear` can run after this appear — re-assert play next ticks.
+            DispatchQueue.main.async {
+                guard self.coordinator.selectedTab == .reels else { return }
+                ReelsPlayerRegistry.resumePlayback()
+                self.isUserScrollingReels = false
+                self.currentItemIsPlaying = true
+                self.playTrigger += 1
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                guard self.coordinator.selectedTab == .reels else { return }
+                ReelsPlayerRegistry.resumePlayback()
+                self.currentItemIsPlaying = true
+                if self.currentVisibleSceneId == nil {
+                    self.autoSelectFirstItem()
+                }
+                self.playTrigger += 1
+            }
+        }
+    }
+
+    /// Tab-bar reselect: page-1 refetch for the active mode, first item selected when data arrives.
+    private func refetchCurrentReelsModeFromTop() {
+        shouldScrollToTopAfterCriterionChange = true
+        pendingRestoreId = nil
+        currentVisibleSceneId = nil
+        switch reelsMode {
+        case .scenes:
+            applySettings(
+                sortBy: selectedSortOption,
+                sceneFilter: selectedFilter,
+                performer: selectedPerformer,
+                tags: selectedTags,
+                mode: .scenes,
+                rerollRandom: true
+            )
+        case .markers:
+            applySettings(
+                markerSortBy: selectedMarkerSortOption,
+                markerFilter: selectedMarkerFilter,
+                performer: selectedPerformer,
+                tags: selectedTags,
+                mode: .markers,
+                rerollRandom: true
+            )
+        case .clips:
+            ensureReelsClipsLoaded(rerollRandom: true)
+        case .previews:
+            applySettings(
+                previewSortBy: selectedSortOption,
+                previewFilter: selectedPreviewFilter,
+                performer: selectedPerformer,
+                tags: selectedTags,
+                mode: .previews,
+                rerollRandom: true
+            )
+        case .pics:
+            bootstrapReelsPicsFiltersIfNeeded()
+            reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
+        }
+    }
+
+    /// Cold / remount Clips: apply session-or-default sort/filter and fetch.
+    private func ensureReelsClipsLoaded(rerollRandom: Bool = false) {
+        let sortRaw = sessionSortRaw(for: .clips) ?? TabManager.shared.getReelsDefaultSort(for: .clips) ?? ""
+        let sort = StashDBViewModel.ImageSortOption(rawValue: sortRaw) ?? reelsClipImageFilters.selectedSortOption
+        reelsClipImageFilters.selectedSortOption = sort
+        let fid = sessionFilterId(for: .clips) ?? TabManager.shared.getDefaultClipFilterId(for: .reels)
+        if let fid {
+            reelsClipImageFilters.selectedFilter = viewModel.savedFilters[fid]
+        }
+        // Avoid stacking duplicate initial fetches when filters are still loading.
+        if fid != nil, viewModel.savedFilters.isEmpty {
+            return
+        }
+        applySettings(
+            clipSortBy: sort,
+            clipFilter: reelsClipImageFilters.selectedFilter,
+            performer: selectedPerformer,
+            tags: selectedTags,
+            mode: .clips,
+            rerollRandom: rerollRandom
+        )
     }
 
     private func handleModeChange(from oldValue: ReelsMode, to newValue: ReelsMode) {
-        // When switching sub-tabs (Scenes/Markers/Clips/Previews) always pause the
-        // currently playing item immediately. Autoplay for the new mode is handled by
-        // autoSelectFirstItem -> currentVisibleSceneId change (which resets isPlaying).
+        // When switching sub-tabs always pause immediately. Autoplay for the new *video*
+        // mode is restored below; Pics embeds ImagesView and must not keep clip audio.
+        persistSessionReelsMode(newValue)
         currentItemIsPlaying = false
+        ReelsPlayerRegistry.pauseAll()
+        NotificationCenter.default.post(name: .reelsPauseAllPlayers, object: nil)
         // Zoom locks outer paging via `.scrollDisabled(isMediaZoomed)` — clear on mode switch
         // so Clips/etc. are swipeable again after a pinch on Scenes.
         isMediaZoomed = false
         isUserScrollingReels = false
-        // Some mode switches may not trigger a scrollPosition/currentVisibleSceneId change
-        // (e.g. when the list is already populated). Ensure we resume playback intent
-        // shortly after the mode switch so the active item can start playing again.
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-            self.currentItemIsPlaying = true
+
+        // Persist old mode position before clearing the active id (Pics teardown).
+        saveCurrentPositionIfPossible(for: oldValue)
+
+        if newValue == .pics {
+            // Active row's `onDisappear` skips `cleanupPlayer` while still "active", so force
+            // teardown and clear identity — otherwise Clips keep playing under Pics.
+            NotificationCenter.default.post(name: .reelsTeardownAllPlayers, object: nil)
+            currentVisibleSceneId = nil
+        } else {
+            // Some mode switches may not trigger a scrollPosition/currentVisibleSceneId change
+            // (e.g. when the list is already populated). Resume playback intent shortly after.
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
+                guard self.reelsMode != .pics else { return }
+                self.currentItemIsPlaying = true
+            }
         }
 
-        // Persist old mode position, then restore the last known position for the new mode.
-        saveCurrentPositionIfPossible(for: oldValue)
         restorePositionIfAvailable(for: newValue, forceIfPrefixMismatch: true)
         beginPagedRestoreIfNeeded()
 
@@ -3990,6 +4185,10 @@ extension ReelItemView {
                 player?.rate = 0
                 syncPlaybackActivityPosition()
                 playbackActivityTracker.stop()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .reelsTeardownAllPlayers)) { _ in
+                cleanupPlayer()
+                cancelAnimationAdvanceTimer()
             }
             .onChange(of: isMuted) { _, newValue in
                 player?.isMuted = newValue

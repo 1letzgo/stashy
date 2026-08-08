@@ -5326,9 +5326,9 @@ class StashDBViewModel: ObservableObject {
         print("🔍 fetchClips: Raw Body = \(bodyString)")
         
         performGraphQLQuery(query: bodyString) { (response: GalleryImagesResponse?) in
-            if let result = response?.data?.findImages {
-                DispatchQueue.main.async {
-                    guard requestGeneration == self.clipsFetchGeneration else { return }
+            DispatchQueue.main.async {
+                guard requestGeneration == self.clipsFetchGeneration else { return }
+                if let result = response?.data?.findImages {
                     if isInitialLoad {
                         self.clips = result.images
                         self.totalClips = result.count
@@ -5338,16 +5338,12 @@ class StashDBViewModel: ObservableObject {
                         let newClips = result.images.filter { !existingIds.contains($0.id) }
                         self.clips.append(contentsOf: newClips)
                     }
-                    
+
                     self.hasMoreClips = result.images.count == perPage
                     self.currentClipsPage = page
-                    self.isLoadingClips = false
                 }
-            } else {
-                DispatchQueue.main.async {
-                    guard requestGeneration == self.clipsFetchGeneration else { return }
-                    self.isLoadingClips = false
-                }
+                self.isLoadingClips = false
+                if isInitialLoad { self.isLoading = false }
             }
         }
     }
