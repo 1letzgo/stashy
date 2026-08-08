@@ -13,6 +13,9 @@ struct CatalogsView: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     /// Ein ViewModel für alle Katalog-Listen-Tabs (Scenes, Images, …): Daten bleiben beim Unter-Tab-Wechsel warm, ein Verbindungstest.
     @StateObject private var catalogBrowserViewModel = StashDBViewModel()
+    /// Images filter/sort session — lives on CatalogsView so it survives ImagesView remounts
+    /// when pushing FullScreenImageView (especially 1/row video).
+    @StateObject private var catalogImagesFilters = DetailLinkedImagesFilterModel(scope: .catalogRoot)
     
     enum CatalogsTab: String, CaseIterable {
         case dashboard = "Dashboard"
@@ -107,7 +110,10 @@ struct CatalogsView: View {
                 case .scenes:
                     ScenesView.catalogTab(viewModel: catalogBrowserViewModel)
                 case .images:
-                    ImagesView(catalogBrowserViewModel: catalogBrowserViewModel)
+                    ImagesView(
+                        catalogBrowserViewModel: catalogBrowserViewModel,
+                        sharedImageListFilters: catalogImagesFilters
+                    )
                 case .galleries:
                     GalleriesView(catalogBrowserViewModel: catalogBrowserViewModel)
                 case .performers:

@@ -1464,10 +1464,40 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
     @Published var tagPickerLoading = false
     @Published var liveFilterMediaKind: ImageListMediaKind = .all
 
+    /// Catalog root: skip re-applying Settings defaults / initial fetch after the first bootstrap
+    /// (e.g. returning from FullScreenImageView must not wipe an active filter).
+    var hasCompletedInitialBootstrap = false
+    /// Scroll restore target after popping fullscreen (survives ImagesView remounts when model is hoisted).
+    var sessionLastOpenedImageId: String?
+
     init(scope: DetailLinkedImagesScope, initialSort: StashDBViewModel.ImageSortOption = .dateDesc) {
         self.scope = scope
         self.selectedSortOption = initialSort
         self.selectedFilter = nil
+    }
+
+    /// After an ImagesView remount, restore chip/filter UI from the shared catalog VM session.
+    func rehydrateFromViewModelSessionIfNeeded(_ viewModel: StashDBViewModel) {
+        guard case .catalogRoot = scope else { return }
+        let hasLocalFilter =
+            selectedFilter != nil
+            || !catalogPresetRowSelection.isEmpty
+            || isLiveFilterActive
+        guard !hasLocalFilter else { return }
+
+        if let f = viewModel.currentImageFilter {
+            selectedFilter = f
+            catalogPresetRowSelection = ListLivePresetTag.serverRow(f.id)
+            if viewModel.currentImageLiveFilter.isEmpty {
+                syncLiveChipsFromSelectedFilter(viewModel: viewModel)
+            } else {
+                mapLiveFragmentToChips(viewModel.currentImageLiveFilter)
+            }
+        } else if !viewModel.currentImageLiveFilter.isEmpty {
+            mapLiveFragmentToChips(viewModel.currentImageLiveFilter)
+        }
+
+        selectedSortOption = viewModel.currentImageSortOption
     }
 
     private var isLiveFilterActive: Bool {

@@ -17,18 +17,23 @@ struct ImagesView: View {
     var forceOneColumnFeed: Bool = false
     @StateObject private var ownedViewModel = StashDBViewModel()
     let catalogBrowserViewModel: StashDBViewModel?
-    @StateObject private var imageListFilters: DetailLinkedImagesFilterModel
+    /// Catalog tab: owned by `CatalogsView` so filter/sort survive ImagesView remounts
+    /// (e.g. after FullScreenImageView / heavy video memory pressure).
+    private let sharedImageListFilters: DetailLinkedImagesFilterModel?
+    @StateObject private var ownedImageListFilters: DetailLinkedImagesFilterModel
 
     init(
         gallery: Gallery? = nil,
         catalogBrowserViewModel: StashDBViewModel? = nil,
-        forceOneColumnFeed: Bool = false
+        forceOneColumnFeed: Bool = false,
+        sharedImageListFilters: DetailLinkedImagesFilterModel? = nil
     ) {
         self.initialGallery = gallery
         self.catalogBrowserViewModel = catalogBrowserViewModel
         self.forceOneColumnFeed = forceOneColumnFeed
+        self.sharedImageListFilters = sharedImageListFilters
         let scope: DetailLinkedImagesScope = gallery.map { .gallery($0.id) } ?? .catalogRoot
-        _imageListFilters = StateObject(wrappedValue: DetailLinkedImagesFilterModel(scope: scope))
+        _ownedImageListFilters = StateObject(wrappedValue: DetailLinkedImagesFilterModel(scope: scope))
     }
 
     var body: some View {
@@ -36,7 +41,7 @@ struct ImagesView: View {
             initialGallery: initialGallery,
             forceOneColumnFeed: forceOneColumnFeed,
             viewModel: initialGallery != nil ? ownedViewModel : (catalogBrowserViewModel ?? ownedViewModel),
-            imageListFilters: imageListFilters
+            imageListFilters: sharedImageListFilters ?? ownedImageListFilters
         )
     }
 }
@@ -346,6 +351,19 @@ private struct ImagesViewBody: View {
             }
         }
         .onAppear {
+            // Catalog: after the first bootstrap, returning from FullScreenImageView (or a view remount)
+            // must keep filter/sort/session — do not re-apply Settings defaults.
+            if gallery == nil, imageListFilters.hasCompletedInitialBootstrap {
+                imageListFilters.rehydrateFromViewModelSessionIfNeeded(viewModel)
+                if lastOpenedImageId == nil {
+                    lastOpenedImageId = imageListFilters.sessionLastOpenedImageId
+                }
+                if viewModel.savedFilters.isEmpty {
+                    viewModel.fetchSavedFilters()
+                }
+                return
+            }
+
             // Apply default sort option
             let defaultSortStr: String
             if gallery != nil {
@@ -366,14 +384,20 @@ private struct ImagesViewBody: View {
                 viewModel.currentImageSearchQuery = coordinator.activeSearchText
                 coordinator.activeSearchText = ""
                 imageListFilters.refetchImages(viewModel: viewModel, initial: true)
+                imageListFilters.hasCompletedInitialBootstrap = true
             } else if gallery != nil, viewModel.galleryImages.isEmpty {
                 imageListFilters.refetchImages(viewModel: viewModel, initial: true)
             } else if gallery == nil {
+                imageListFilters.rehydrateFromViewModelSessionIfNeeded(viewModel)
                 // Settings → Default Filters: apply before first fetch when filters are already loaded.
                 let appliedDefault = applyImagesDefaultFilterFromSettingsIfNeeded(force: false)
                 let defaultPending = TabManager.shared.getDefaultFilterId(for: .images) != nil && viewModel.savedFilters.isEmpty
                 if !defaultPending, (appliedDefault || viewModel.allImages.isEmpty) {
                     imageListFilters.refetchImages(viewModel: viewModel, initial: true)
+                }
+                // Wait for `savedFilters` when a Settings default is configured but not loaded yet.
+                if !defaultPending {
+                    imageListFilters.hasCompletedInitialBootstrap = true
                 }
             }
 
@@ -403,25 +427,46 @@ private struct ImagesViewBody: View {
             imageListFilters.selectedFilter = nil
             imageListFilters.clearLiveChipsOnly()
             imageListFilters.refreshLocalPresets()
+            imageListFilters.hasCompletedInitialBootstrap = false
+            imageListFilters.sessionLastOpenedImageId = nil
             imageListFilters.refetchImages(viewModel: viewModel, initial: true)
         }
         .onChange(of: viewModel.savedFilters) { _, _ in
             guard gallery == nil else { return }
+            // After bootstrap, a later `fetchSavedFilters` (e.g. onAppear while returning from
+            // fullscreen) must not replace the user's active filter with Settings defaults.
+            if imageListFilters.hasCompletedInitialBootstrap,
+               imageListFilters.selectedFilter != nil
+                || !imageListFilters.catalogPresetRowSelection.isEmpty
+                || imageListFilters.catalogFilterSortFABActive {
+                imageListFilters.applyResolvedCatalogPresetPickerRowIfNeeded(viewModel: viewModel)
+                return
+            }
             if applyImagesDefaultFilterFromSettingsIfNeeded(force: false) {
                 // Always refetch after applying Settings default — shared VM may already hold unfiltered rows.
                 imageListFilters.refetchImages(viewModel: viewModel, initial: true)
+                imageListFilters.hasCompletedInitialBootstrap = true
             } else if !viewModel.isLoadingSavedFilters, viewModel.allImages.isEmpty,
                       imageListFilters.selectedFilter == nil {
                 imageListFilters.refetchImages(viewModel: viewModel, initial: true)
+                imageListFilters.hasCompletedInitialBootstrap = true
             }
         }
         .onChange(of: viewModel.isLoadingSavedFilters) { oldValue, isLoading in
             if oldValue == true && isLoading == false, gallery == nil,
                !viewModel.isLoadingImages {
+                if imageListFilters.hasCompletedInitialBootstrap,
+                   imageListFilters.selectedFilter != nil
+                    || !imageListFilters.catalogPresetRowSelection.isEmpty
+                    || imageListFilters.catalogFilterSortFABActive {
+                    return
+                }
                 if applyImagesDefaultFilterFromSettingsIfNeeded(force: false) {
                     imageListFilters.refetchImages(viewModel: viewModel, initial: true)
+                    imageListFilters.hasCompletedInitialBootstrap = true
                 } else if viewModel.allImages.isEmpty, imageListFilters.selectedFilter == nil {
                     imageListFilters.refetchImages(viewModel: viewModel, initial: true)
+                    imageListFilters.hasCompletedInitialBootstrap = true
                 }
             }
         }
@@ -888,7 +933,7 @@ private struct ImagesViewBody: View {
             autoplayVideoImageId: feedAutoplayGateOpen ? autoplayVideoImageId : nil,
             reportsFeedVideoFrame: feedAutoplayGateOpen,
             onLoadMore: { loadMoreImagesIfNeeded() },
-            onOpened: { lastOpenedImageId = $0 }
+            onOpened: { rememberOpenedImage(id: $0) }
         )
         .id(images[0].id)
     }
@@ -932,9 +977,16 @@ private struct ImagesViewBody: View {
                 .buttonStyle(.plain)
                 .id(image.id)
                 .simultaneousGesture(TapGesture().onEnded {
-                    lastOpenedImageId = image.id
+                    rememberOpenedImage(id: image.id)
                 })
             }
+        }
+    }
+
+    private func rememberOpenedImage(id: String) {
+        lastOpenedImageId = id
+        if gallery == nil {
+            imageListFilters.sessionLastOpenedImageId = id
         }
     }
     
