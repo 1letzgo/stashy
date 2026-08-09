@@ -200,17 +200,10 @@ struct AddPerformerToSceneSheet: View {
                 }
                 .listRowBackground(Color.secondaryAppBackground)
             }
-            .navigationTitle("Edit Performers")
-            .navigationBarTitleDisplayMode(.inline)
             .applyAppBackground()
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") { save() }
-                        .disabled(isSaving)
-                }
+            .scrollContentBackground(.hidden)
+            .stashyModalSheetChrome("Edit Performers", onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(title: "Save", enabled: !isSaving, isBusy: isSaving) { save() }
             }
             .onAppear {
                 selectedIds = Set(currentPerformers.map { $0.id })

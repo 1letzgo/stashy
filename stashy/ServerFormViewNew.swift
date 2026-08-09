@@ -257,28 +257,21 @@ struct ServerFormViewNew: View {
                 .listRowBackground(Color.secondaryAppBackground)
             }
         }
-        .navigationTitle(configToEdit == nil ? "Add Server" : "Edit Server")
-        .navigationBarTitleDisplayMode(.inline)
         .applyAppBackground()
-        .toolbar {
-            ToolbarItem(placement: .cancellationAction) {
-                Button("Cancel") {
-                    presentationMode.wrappedValue.dismiss()
+        .scrollContentBackground(.hidden)
+        .stashyModalSheetChrome(configToEdit == nil ? "Add Server" : "Edit Server", onBack: {
+            presentationMode.wrappedValue.dismiss()
+        }) {
+            StashyChromeTrailingTextButton(title: "Save", enabled: isConfigValid) {
+                // Clean address before saving
+                let detection = ServerConfig.detectProtocol(from: serverAddress)
+                if let proto = detection.protocol {
+                    serverProtocol = proto
                 }
-            }
-            ToolbarItem(placement: .confirmationAction) {
-                Button("Save") {
-                    // Clean address before saving
-                    let detection = ServerConfig.detectProtocol(from: serverAddress)
-                    if let proto = detection.protocol {
-                        serverProtocol = proto
-                    }
-                    serverAddress = detection.address
-                    
-                    saveServer()
-                    presentationMode.wrappedValue.dismiss()
-                }
-                .disabled(!isConfigValid)
+                serverAddress = detection.address
+
+                saveServer()
+                presentationMode.wrappedValue.dismiss()
             }
         }
         .onAppear {

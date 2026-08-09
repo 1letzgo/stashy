@@ -1302,6 +1302,8 @@ struct FullScreenImageView: View {
     @State private var performerImageTargetPerformers: [GalleryPerformer] = []
     @State private var currentItemIsPlaying = true
     @State private var scrubberState = ScrubberState()
+    /// Triggers UIKit pop when `dismiss()` is a no-op under `safeAreaInset` chrome.
+    @State private var navigationBackTrigger: UUID?
 
     init(images: Binding<[StashImage]>, selectedImageId: String, onLoadMore: (() -> Void)? = nil) {
         self._images = images
@@ -1317,6 +1319,10 @@ struct FullScreenImageView: View {
     }
 
     private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
+
+    private func goBack() {
+        navigationBackTrigger = UUID()
+    }
 
     private func advanceFullscreenToNext(from id: String) {
         guard let idx = images.firstIndex(where: { $0.id == id }),
@@ -1380,11 +1386,18 @@ struct FullScreenImageView: View {
             .navigationBarBackButtonHidden(true)
             .toolbar(.hidden, for: .navigationBar)
             .enableSwipeBackWhenNavBarHidden()
+            .background {
+                StashyNavigationBackTrigger(trigger: $navigationBackTrigger) {
+                    dismiss()
+                }
+            }
             .toolbar(showUI ? .automatic : .hidden, for: .tabBar)
             .safeAreaInset(edge: .top, spacing: 0) {
                 if showUI, !StashyChromePlacement.prefersBottom {
                     fullScreenImageNavBar
                         .transition(.opacity)
+                        // Keep chrome above full-bleed media hit-testing.
+                        .zIndex(10)
                 }
             }
             .safeAreaInset(edge: .bottom, spacing: 0) {
@@ -1397,6 +1410,7 @@ struct FullScreenImageView: View {
                     feedsStyleScrubberBar(currentImage: currentImage)
                 }
                 .allowsHitTesting(showUI)
+                .zIndex(10)
             }
             .animation(.easeInOut(duration: 0.2), value: showUI)
             .onChange(of: activeImageId) { _, _ in
@@ -1590,7 +1604,7 @@ struct FullScreenImageView: View {
         StashySectionChromeBar {
             HStack(spacing: 8) {
                 Button {
-                    dismiss()
+                    goBack()
                 } label: {
                     HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
                         Image(systemName: "chevron.left")
@@ -1789,7 +1803,7 @@ struct FullScreenImageView: View {
                     // Update the bound array so parent views (e.g. StashLine / Images grid)
                     // can immediately remove the deleted item without a full reload.
                     self.images.removeAll(where: { $0.id == imageToDelete.id })
-                    dismiss()
+                    self.goBack()
                 } else {
                     ToastManager.shared.show("Failed to delete image", icon: "exclamationmark.triangle", style: .error)
                 }

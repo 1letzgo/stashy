@@ -914,25 +914,14 @@ struct SetTagImageFromFrameSheet: View {
                 }
             }
             .applyAppBackground()
-            .hideSystemNavigationBarForCustomChrome()
-            // Modal sheets pin chrome to the top (same as catalog filter sheets).
-            .safeAreaInset(edge: .top, spacing: 16) {
-                StashyDetailChromeBar(title: "Set Tag Image", onBack: { dismiss() }) {
-                    Button {
-                        applySelectedTagImage()
-                    } label: {
-                        Text(isSaving ? "…" : "Apply")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(
-                                (selectedTagId == nil || isSaving)
-                                    ? .white.opacity(0.35)
-                                    : appearanceManager.tintColor
-                            )
-                            .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(selectedTagId == nil || isSaving)
-                    .accessibilityLabel("Apply")
+            .scrollContentBackground(.hidden)
+            .stashyModalSheetChrome("Set Tag Image", onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(
+                    title: "Apply",
+                    enabled: selectedTagId != nil,
+                    isBusy: isSaving
+                ) {
+                    applySelectedTagImage()
                 }
             }
             .onAppear {
@@ -1058,17 +1047,10 @@ struct EditSceneTitleSheet: View {
                 }
                 .listRowBackground(Color.secondaryAppBackground)
             }
-            .navigationTitle("Edit Scene")
-            .navigationBarTitleDisplayMode(.inline)
             .applyAppBackground()
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") { save() }
-                        .disabled(isSaving)
-                }
+            .scrollContentBackground(.hidden)
+            .stashyModalSheetChrome("Edit Scene", onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(title: "Save", enabled: !isSaving, isBusy: isSaving) { save() }
             }
             .onAppear {
                 title = currentTitle ?? ""

@@ -1148,19 +1148,14 @@ struct EditStudioSheet: View {
                 }
                 .listRowBackground(Color.secondaryAppBackground)
             }
-            .navigationTitle("Edit Studio")
-            .navigationBarTitleDisplayMode(.inline)
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") { save() }
-                        .disabled(isSaving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .tint(appearanceManager.tintColor)
-                }
+            .stashyModalSheetChrome("Edit Studio", onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(
+                    title: "Save",
+                    enabled: !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                    isBusy: isSaving
+                ) { save() }
             }
             .onAppear {
                 name = studio.name

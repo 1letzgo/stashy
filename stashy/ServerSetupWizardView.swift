@@ -63,16 +63,8 @@ struct ServerSetupWizardView: View {
                     .padding(.horizontal, 24)
                     .padding(.bottom, 32)
             }
-            .navigationTitle("Server Setup")
-            .navigationBarTitleDisplayMode(.inline)
             .applyAppBackground()
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
-                        dismiss()
-                    }
-                }
-            }
+            .stashyModalSheetChrome("Server Setup", onBack: { dismiss() })
         }
     }
     

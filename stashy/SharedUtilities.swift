@@ -1751,19 +1751,22 @@ struct StashSyncSheet: View {
                 }
                 .listRowBackground(Color.secondaryAppBackground)
             }
-            .navigationTitle("StashSync")
-            .navigationBarTitleDisplayMode(.inline)
             .scrollContentBackground(.hidden)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Done") { 
-                        if handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode {
-                            stashSync.isActive = true
-                        } else {
-                            stashSync.isActive = false
-                        }
-                        dismiss() 
+            .stashyModalSheetChrome("StashSync", onBack: {
+                if handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode {
+                    stashSync.isActive = true
+                } else {
+                    stashSync.isActive = false
+                }
+                dismiss()
+            }) {
+                StashyChromeTrailingTextButton(title: "Done") {
+                    if handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode {
+                        stashSync.isActive = true
+                    } else {
+                        stashSync.isActive = false
                     }
+                    dismiss()
                 }
             }
         }

@@ -1571,19 +1571,14 @@ struct EditTagSheet: View {
                 }
                 .listRowBackground(Color.secondaryAppBackground)
             }
-            .navigationTitle("Edit Tag")
-            .navigationBarTitleDisplayMode(.inline)
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") { save() }
-                        .disabled(isSaving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .tint(appearanceManager.tintColor)
-                }
+            .stashyModalSheetChrome("Edit Tag", onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(
+                    title: "Save",
+                    enabled: !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                    isBusy: isSaving
+                ) { save() }
             }
             .onAppear {
                 name = tag.name

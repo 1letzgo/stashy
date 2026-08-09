@@ -176,17 +176,10 @@ struct AddTagToSceneSheet: View {
                 }
                 .listRowBackground(Color.secondaryAppBackground)
             }
-            .navigationTitle("Edit Tags")
-            .navigationBarTitleDisplayMode(.inline)
             .applyAppBackground()
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") { save() }
-                        .disabled(isSaving)
-                }
+            .scrollContentBackground(.hidden)
+            .stashyModalSheetChrome("Edit Tags", onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(title: "Save", enabled: !isSaving, isBusy: isSaving) { save() }
             }
             .onAppear {
                 selectedIds = Set(currentTags.map { $0.id })

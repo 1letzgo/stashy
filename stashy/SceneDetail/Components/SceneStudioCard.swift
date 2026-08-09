@@ -160,17 +160,10 @@ struct AddStudioToSceneSheet: View {
                 }
                 .listRowBackground(Color.secondaryAppBackground)
             }
-            .navigationTitle("Set Studio")
-            .navigationBarTitleDisplayMode(.inline)
             .applyAppBackground()
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") { save() }
-                        .disabled(isSaving)
-                }
+            .scrollContentBackground(.hidden)
+            .stashyModalSheetChrome("Set Studio", onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(title: "Save", enabled: !isSaving, isBusy: isSaving) { save() }
             }
             .onAppear {
                 selectedId = currentStudio?.id ?? ""

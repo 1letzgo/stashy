@@ -944,21 +944,13 @@ struct AddMarkerSheet: View {
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .hideSystemNavigationBarForCustomChrome()
-            // Modal sheets pin chrome to the top (same as Set Tag Image).
-            .safeAreaInset(edge: .top, spacing: 16) {
-                StashyDetailChromeBar(title: "Add Marker", onBack: { dismiss() }) {
-                    Button {
-                        createMarker()
-                    } label: {
-                        Text(isCreating ? "…" : "Add")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(canAddMarker ? appearanceManager.tintColor : .white.opacity(0.35))
-                            .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(!canAddMarker)
-                    .accessibilityLabel("Add")
+            .stashyModalSheetChrome("Add Marker", onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(
+                    title: "Add",
+                    enabled: canAddMarker,
+                    isBusy: isCreating
+                ) {
+                    createMarker()
                 }
             }
             .onAppear {

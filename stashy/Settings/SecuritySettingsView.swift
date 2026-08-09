@@ -126,15 +126,7 @@ struct PasscodeSetupView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding()
             .background(Color.appBackground.ignoresSafeArea())
-            .navigationTitle("Passcode")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Button("Cancel") {
-                        isPresented = false
-                    }
-                }
-            }
+            .stashyModalSheetChrome("Passcode", onBack: { isPresented = false })
             .onChange(of: passcode) { _, newValue in
                 if step == 1 && newValue.count == 4 {
                     step = 2

@@ -290,8 +290,10 @@ private struct ImagesViewBody: View {
                                 }
                                 gridContent
                             }
-                            .padding(16)
-                            .padding(.bottom, isSelectionMode ? 80 : 0) // Add padding for floating bar
+                            .padding(.horizontal, 16)
+                            // Same top inset as SceneDetail under custom chrome (no phantom nav gap).
+                            .padding(.top, 16)
+                            .padding(.bottom, 16 + (isSelectionMode ? 80 : 0))
                         }
                         .onScrollPhaseChange { _, newPhase in
                             let scrolling = newPhase != .idle
@@ -340,7 +342,7 @@ private struct ImagesViewBody: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .modifier(OpenedGalleryNavigationChrome(isOpenedGallery: isOpenedGallery))
+        .modifier(OpenedGalleryNavigationChrome(isOpenedGallery: isOpenedGallery, feedsEmbedded: feedsEmbedded))
         .applyAppBackground()
         .overlay(alignment: .bottom) {
             if isSelectionMode {
@@ -355,11 +357,9 @@ private struct ImagesViewBody: View {
         } message: {
             Text("These images will be permanently deleted. This action cannot be undone.")
         }
-        .stashyCustomChromeInset(spacing: 0) {
-            if isOpenedGallery {
-                openedGalleryNavBar
-            }
-        }
+        .modifier(ImagesTopChromeInset(isOpenedGallery: isOpenedGallery) {
+            openedGalleryNavBar
+        })
         .sheet(isPresented: $showingEditGallerySheet) {
             if let gallery {
                 EditGallerySheet(gallery: gallery, viewModel: viewModel) { updated in
@@ -1700,8 +1700,11 @@ private struct ImageThumbnailCardChrome: ViewModifier {
 }
 
 /// System title for Images catalog; custom chrome + swipe-back for opened galleries.
+/// Feeds → Pics: only suppress the system title (no swipe-enabler on the embedded root —
+/// that raced with pushed FullScreenImageView and killed back/swipe).
 private struct OpenedGalleryNavigationChrome: ViewModifier {
     let isOpenedGallery: Bool
+    var feedsEmbedded: Bool = false
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -1709,10 +1712,31 @@ private struct OpenedGalleryNavigationChrome: ViewModifier {
             content
                 .hideSystemNavigationBarForCustomChrome()
                 .enableSwipeBackWhenNavBarHidden()
+        } else if feedsEmbedded {
+            content
+                .navigationTitle("")
+                .navigationBarTitleDisplayMode(.inline)
+                .navigationBarBackButtonHidden(true)
+                .toolbar(.hidden, for: .navigationBar)
         } else {
             content
                 .navigationTitle("Images")
                 .navigationBarTitleDisplayMode(.inline)
+        }
+    }
+}
+
+/// Only attach top chrome inset when an opened gallery actually has a nav bar.
+private struct ImagesTopChromeInset<Chrome: View>: ViewModifier {
+    let isOpenedGallery: Bool
+    @ViewBuilder var chrome: () -> Chrome
+
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if isOpenedGallery {
+            content.stashyCustomChromeInset(spacing: 0, content: chrome)
+        } else {
+            content
         }
     }
 }
@@ -1749,19 +1773,14 @@ struct EditGallerySheet: View {
                 }
                 .listRowBackground(Color.secondaryAppBackground)
             }
-            .navigationTitle("Edit Gallery")
-            .navigationBarTitleDisplayMode(.inline)
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") { save() }
-                        .disabled(isSaving || title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .tint(appearanceManager.tintColor)
-                }
+            .stashyModalSheetChrome("Edit Gallery", onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(
+                    title: "Save",
+                    enabled: !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                    isBusy: isSaving
+                ) { save() }
             }
             .onAppear {
                 title = gallery.title

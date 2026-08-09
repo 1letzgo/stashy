@@ -366,40 +366,14 @@ struct StashLineView: View {
             performerFilter = newValue
         }
         .fullScreenCover(item: $fullScreenPresentation) { presentation in
-            NavigationStack {
-                FullScreenImageView(
-                    images: $fullScreenImages,
-                    selectedImageId: presentation.selectedImageId,
-                    onLoadMore: nil
-                )
-                .toolbar {
-                    ToolbarItem(placement: .navigationBarLeading) {
-                        Button {
-                            fullScreenPresentation = nil
-                        } label: {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 14, weight: .bold))
-                                .foregroundColor(appearanceManager.tintColor)
-                        }
-                    }
-                }
-            }
+            FullScreenImageView(
+                images: $fullScreenImages,
+                selectedImageId: presentation.selectedImageId,
+                onLoadMore: nil
+            )
         }
         .fullScreenCover(item: $performerDetailPresented) { performer in
-            NavigationStack {
-                PerformerDetailView(performer: performer.toPerformer())
-                    .toolbar {
-                        ToolbarItem(placement: .navigationBarLeading) {
-                            Button {
-                                performerDetailPresented = nil
-                            } label: {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(appearanceManager.tintColor)
-                            }
-                        }
-                    }
-            }
+            PerformerDetailView(performer: performer.toPerformer())
         }
         .onChange(of: fullScreenImages.count) { _, _ in
             let newIds = Set(fullScreenImages.map(\.id))

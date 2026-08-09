@@ -3362,11 +3362,12 @@ struct ReelsViewBody: View {
     /// Match expanding-dock menu chrome.
     private var reelsTopChromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
 
-    /// Top chrome: filter + mode · O + full stars (hidden in Pics); active performer/tag filters on a second row.
+    /// Top chrome: filter + mode · O + rating dropdown (hidden in Pics); criterion chips on a second row.
     @ViewBuilder
     private func reelsNavBar(currentItem: ReelItemData?) -> some View {
         let oCounter = currentItem?.oCounter ?? 0
-        let rating100 = currentItem?.rating100
+        let rating100 = currentItem?.rating100 ?? 0
+        let stars = max(0, min(5, Int(round(Double(rating100) / 20.0))))
         let showsRateChrome = reelsMode != .pics
         let hasActiveCriterionChips = selectedPerformer != nil || !selectedTags.isEmpty
 
@@ -3408,17 +3409,51 @@ struct ReelsViewBody: View {
                         .disabled(currentItem == nil)
                         .accessibilityLabel("O-Counter")
 
-                        StarRatingView(
-                            rating100: rating100,
-                            isInteractive: currentItem != nil,
-                            size: 15,
-                            spacing: 3
-                        ) { newRating in
-                            guard let item = currentItem else { return }
-                            handleRatingChange(item: item, newRating: newRating)
+                        Group {
+                            if let item = currentItem {
+                                Menu {
+                                    Button {
+                                        handleRatingChange(item: item, newRating: 0)
+                                    } label: {
+                                        HStack {
+                                            Text("Clear Rating")
+                                            if stars == 0 { Image(systemName: "checkmark") }
+                                        }
+                                    }
+                                    Divider()
+                                    ForEach(1...5, id: \.self) { s in
+                                        Button {
+                                            handleRatingChange(item: item, newRating: s * 20)
+                                        } label: {
+                                            HStack {
+                                                Text(String(repeating: "★", count: s))
+                                                if stars == s { Image(systemName: "checkmark") }
+                                            }
+                                        }
+                                    }
+                                } label: {
+                                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                                        Image(systemName: "star.fill")
+                                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                                            .foregroundColor(.white.opacity(stars > 0 ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
+                                        Text("\(stars)")
+                                            .font(.subheadline.weight(.semibold))
+                                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                                    }
+                                    .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                                    Image(systemName: "star.fill")
+                                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                                    Text("0")
+                                        .font(.subheadline.weight(.semibold))
+                                }
+                                .foregroundColor(.white.opacity(0.35))
+                                .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
+                            }
                         }
-                        .opacity(currentItem == nil ? 0.35 : 1.0)
-                        .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
                         .accessibilityLabel("Rating")
                     }
                     .fixedSize()
@@ -3467,8 +3502,9 @@ struct ReelsViewBody: View {
                 .frame(height: reelsTopChromePillHeight)
             }
         }
+        // Same horizontal inset as `StashyDetailChromeBar` / expanding-dock chrome.
         .padding(.horizontal, StashyExpandingDock.edgePadding)
-        .padding(.vertical, 6)
+        .padding(.vertical, 8)
         .colorScheme(.dark)
         .opacity(isUIVisible ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: isUIVisible)
@@ -3876,7 +3912,7 @@ struct ReelsViewBody: View {
         } label: {
             Image(systemName: isReelsStashSyncActive ? "bolt.horizontal.fill" : "bolt.horizontal")
                 .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                .foregroundColor(isReelsStashSyncActive ? .orange : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                .foregroundColor(.white.opacity(isReelsStashSyncActive ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
                 .frame(width: StashyExpandingDock.iconSize, height: StashyExpandingDock.iconSize)
                 .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight, iconOnly: true))
         }

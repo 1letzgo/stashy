@@ -20,17 +20,30 @@ private enum StashyNavPopGestureStorage {
     private static var key: UInt8 = 0
 
     static func install(on nav: UINavigationController) {
+        // Always leave the recognizer enabled — gating belongs in shouldBegin.
+        // Toggling `isEnabled` from embedded root hosts (Feeds/Pics) races with
+        // pushed details and can permanently disable swipe-back.
         if let existing = objc_getAssociatedObject(nav, &key) as? StashyNavPopGestureDelegate {
             existing.navigationController = nav
             nav.interactivePopGestureRecognizer?.delegate = existing
-            nav.interactivePopGestureRecognizer?.isEnabled = nav.viewControllers.count > 1
+            nav.interactivePopGestureRecognizer?.isEnabled = true
             return
         }
         let delegate = StashyNavPopGestureDelegate()
         delegate.navigationController = nav
         objc_setAssociatedObject(nav, &key, delegate, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
         nav.interactivePopGestureRecognizer?.delegate = delegate
-        nav.interactivePopGestureRecognizer?.isEnabled = nav.viewControllers.count > 1
+        nav.interactivePopGestureRecognizer?.isEnabled = true
+    }
+
+    static func nearestNavigationController(from start: UIViewController?) -> UINavigationController? {
+        var current = start
+        while let vc = current {
+            if let nav = vc as? UINavigationController { return nav }
+            if let nav = vc.navigationController { return nav }
+            current = vc.parent
+        }
+        return nil
     }
 }
 
@@ -44,6 +57,54 @@ private struct SwipeBackGestureEnabler: UIViewControllerRepresentable {
 
     func updateUIViewController(_ uiViewController: SwipeBackEnablerViewController, context: Context) {
         uiViewController.applyCustomChromeNavBar()
+    }
+}
+
+/// Reliable back for pushed details: `Environment.dismiss` is often a no-op when the
+/// screen uses `safeAreaInset` chrome. Falls back to UIKit `popViewController`.
+struct StashyNavigationBackTrigger: UIViewControllerRepresentable {
+    @Binding var trigger: UUID?
+    var dismissFallback: () -> Void
+
+    final class Host: UIViewController {}
+
+    final class Coordinator {
+        var lastHandled: UUID?
+        var dismissFallback: () -> Void
+
+        init(dismissFallback: @escaping () -> Void) {
+            self.dismissFallback = dismissFallback
+        }
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(dismissFallback: dismissFallback)
+    }
+
+    func makeUIViewController(context: Context) -> Host {
+        let host = Host()
+        host.view.isHidden = true
+        host.view.isUserInteractionEnabled = false
+        return host
+    }
+
+    func updateUIViewController(_ uiViewController: Host, context: Context) {
+        context.coordinator.dismissFallback = dismissFallback
+        if let nav = StashyNavPopGestureStorage.nearestNavigationController(from: uiViewController) {
+            StashyNavPopGestureStorage.install(on: nav)
+        }
+        guard let token = trigger, context.coordinator.lastHandled != token else { return }
+        context.coordinator.lastHandled = token
+        // Consume once; defer so we run after the current SwiftUI update cycle.
+        DispatchQueue.main.async {
+            self.trigger = nil
+            if let nav = StashyNavPopGestureStorage.nearestNavigationController(from: uiViewController),
+               nav.viewControllers.count > 1 {
+                nav.popViewController(animated: true)
+            } else {
+                context.coordinator.dismissFallback()
+            }
+        }
     }
 }
 
@@ -285,6 +346,27 @@ private struct CatalogSettingsSheetChromeModifier: ViewModifier {
     }
 }
 
+/// Trailing text action in modal/detail chrome (Save / Done / Apply / …).
+struct StashyChromeTrailingTextButton: View {
+    let title: String
+    var enabled: Bool = true
+    var isBusy: Bool = false
+    let action: () -> Void
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        Button(action: action) {
+            Text(isBusy ? "…" : title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(enabled && !isBusy ? appearance.tintColor : .white.opacity(0.35))
+                .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled || isBusy)
+        .accessibilityLabel(title)
+    }
+}
+
 /// Settings / simple pushed-detail chrome: Back · title · optional trailing.
 struct StashyDetailChromeBar<Trailing: View>: View {
     let title: String
@@ -386,6 +468,27 @@ extension View {
                 onRequestDelete: onRequestDelete
             )
         )
+    }
+
+    /// Modal sheet chrome pinned to the top (Back · title · trailing). Prefer over system nav bars.
+    func stashyModalSheetChrome(
+        _ title: String,
+        onBack: (() -> Void)? = nil
+    ) -> some View {
+        stashyModalSheetChrome(title, onBack: onBack) { EmptyView() }
+    }
+
+    /// Modal sheet chrome with trailing action (Save / Done / Apply / …).
+    func stashyModalSheetChrome<Trailing: View>(
+        _ title: String,
+        onBack: (() -> Void)? = nil,
+        @ViewBuilder trailing: @escaping () -> Trailing
+    ) -> some View {
+        self
+            .hideSystemNavigationBarForCustomChrome()
+            .safeAreaInset(edge: .top, spacing: 16) {
+                StashyDetailChromeBar(title: title, onBack: onBack, trailing: trailing)
+            }
     }
 
     /// Pushed Settings detail: custom chrome (Back + title) instead of the system nav bar.

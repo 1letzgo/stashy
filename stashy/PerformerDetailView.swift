@@ -27,6 +27,8 @@ struct PerformerDetailView: View {
     @State private var hasRunPerformerDetailInitialLoad = false
     @State private var hotOrNotBattleLine: String?
     @State private var showingEditPerformerSheet = false
+    /// UIKit pop when `dismiss()` is a no-op under custom chrome (Feeds → Clips/Pics).
+    @State private var navigationBackTrigger: UUID?
     @StateObject private var linkedStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedTags: DetailLinkedTagsFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
@@ -329,13 +331,17 @@ struct PerformerDetailView: View {
     /// Extra gap between section icons ↔ favorite/edit actions.
     private var navActionGroupSpacing: CGFloat { 7 }
 
+    private func goBack() {
+        navigationBackTrigger = UUID()
+    }
+
     /// Custom top chrome: Back · section icons · Favorite · Edit (edit mode). Feeds lives in the header.
     @ViewBuilder
     private var performerDetailNavBar: some View {
         StashySectionChromeBar {
             HStack(spacing: 8) {
                 Button {
-                    dismiss()
+                    goBack()
                 } label: {
                     HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
                         Image(systemName: "chevron.left")
@@ -527,6 +533,11 @@ struct PerformerDetailView: View {
         }
         .hideSystemNavigationBarForCustomChrome()
         .enableSwipeBackWhenNavBarHidden()
+        .background {
+            StashyNavigationBackTrigger(trigger: $navigationBackTrigger) {
+                dismiss()
+            }
+        }
         .stashyCustomChromeInset(spacing: 0) {
             performerDetailNavBar
         }
@@ -1175,19 +1186,14 @@ struct EditPerformerSheet: View {
                 }
                 .listRowBackground(Color.secondaryAppBackground)
             }
-            .navigationTitle("Edit Performer")
-            .navigationBarTitleDisplayMode(.inline)
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .toolbar {
-                ToolbarItem(placement: .navigationBarLeading) {
-                    Button("Cancel") { dismiss() }
-                }
-                ToolbarItem(placement: .navigationBarTrailing) {
-                    Button("Save") { save() }
-                        .disabled(isSaving || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        .tint(appearanceManager.tintColor)
-                }
+            .stashyModalSheetChrome("Edit Performer", onBack: { dismiss() }) {
+                StashyChromeTrailingTextButton(
+                    title: "Save",
+                    enabled: !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                    isBusy: isSaving
+                ) { save() }
             }
             .onAppear { hydrate() }
         }
