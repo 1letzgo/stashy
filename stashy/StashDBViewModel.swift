@@ -7289,6 +7289,7 @@ struct Scene: Codable, Identifiable, Equatable {
     let interactive: Bool?
     var streams: [SceneStream]?
     let stashIds: [StashID]?
+    let captions: [VideoCaption]?
 
     /// True when the scene already has at least one Stash-Box ID.
     var hasStashID: Bool {
@@ -7297,10 +7298,14 @@ struct Scene: Codable, Identifiable, Equatable {
             !(id.stashId?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
         }
     }
+
+    var hasCaptions: Bool {
+        !(captions ?? []).isEmpty && paths?.caption != nil
+    }
     
     
     enum CodingKeys: String, CodingKey {
-        case id, title, details, date, duration, studio, performers, files, tags, galleries, groups, organized, rating100, paths, interactive, streams
+        case id, title, details, date, duration, studio, performers, files, tags, galleries, groups, organized, rating100, paths, interactive, streams, captions
         case resumeTime = "resume_time"
         case playCount = "play_count"
         case oCounter = "o_counter"
@@ -7311,7 +7316,7 @@ struct Scene: Codable, Identifiable, Equatable {
     }
 
     // Explicit initializer to handle manual updates like 'withStreams'
-    init(id: String, title: String?, details: String?, date: String?, duration: Double?, studio: SceneStudio?, performers: [ScenePerformer], files: [SceneFile]?, tags: [Tag]?, galleries: [Gallery]?, groups: [SceneGroupEntry]? = nil, organized: Bool?, resumeTime: Double?, playCount: Int?, oCounter: Int?, rating100: Int?, createdAt: String?, updatedAt: String?, paths: ScenePaths?, sceneMarkers: [SceneMarker]?, interactive: Bool?, streams: [SceneStream]? = nil, stashIds: [StashID]? = nil) {
+    init(id: String, title: String?, details: String?, date: String?, duration: Double?, studio: SceneStudio?, performers: [ScenePerformer], files: [SceneFile]?, tags: [Tag]?, galleries: [Gallery]?, groups: [SceneGroupEntry]? = nil, organized: Bool?, resumeTime: Double?, playCount: Int?, oCounter: Int?, rating100: Int?, createdAt: String?, updatedAt: String?, paths: ScenePaths?, sceneMarkers: [SceneMarker]?, interactive: Bool?, streams: [SceneStream]? = nil, stashIds: [StashID]? = nil, captions: [VideoCaption]? = nil) {
         self.id = id
         self.title = title
         self.details = details
@@ -7335,6 +7340,7 @@ struct Scene: Codable, Identifiable, Equatable {
         self.interactive = interactive
         self.streams = streams
         self.stashIds = stashIds
+        self.captions = captions
     }
 
     // Decodable init
@@ -7363,6 +7369,7 @@ struct Scene: Codable, Identifiable, Equatable {
         interactive = try container.decodeIfPresent(Bool.self, forKey: .interactive)
         streams = try container.decodeIfPresent([SceneStream].self, forKey: .streams)
         stashIds = try container.decodeIfPresent([StashID].self, forKey: .stashIds)
+        captions = try container.decodeIfPresent([VideoCaption].self, forKey: .captions)
     }
     
     
@@ -7658,7 +7665,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: newResumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions
         )
     }
 
@@ -7670,7 +7677,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: newRating, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions
         )
     }
 
@@ -7682,7 +7689,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: newStreams, stashIds: stashIds
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: newStreams, stashIds: stashIds, captions: captions
         )
     }
 
@@ -7694,7 +7701,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: newPlayCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions
         )
     }
 
@@ -7706,7 +7713,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: newOCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions
         )
     }
 
@@ -7718,10 +7725,22 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: newUpdatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions
         )
     }
     
+}
+
+struct VideoCaption: Codable, Equatable, Hashable, Identifiable {
+    let languageCode: String
+    let captionType: String
+
+    var id: String { "\(languageCode).\(captionType)" }
+
+    enum CodingKeys: String, CodingKey {
+        case languageCode = "language_code"
+        case captionType = "caption_type"
+    }
 }
 
 struct SceneStream: Codable, Equatable {
@@ -9287,6 +9306,8 @@ struct VideoPlayerView: UIViewControllerRepresentable {
     /// surface (e.g. a `fullScreenCover`) can attach the same `AVPlayer`.
     var attachPlayer: Bool = true
     var showsPlaybackControls: Bool = true
+    /// External WebVTT captions rendered via `contentOverlayView` (works inline + fullscreen).
+    var subtitleText: String = ""
     /// Reserved for future native-menu integration. iOS' `AVPlayerViewController`
     /// has no public API for transport-bar custom menus (those are tvOS-only),
     /// so the value is ignored on this platform — quality selection happens via
@@ -9309,6 +9330,8 @@ struct VideoPlayerView: UIViewControllerRepresentable {
             // Verhindert das Analyse-/„Text erkennen“-Steuerelement bei pausierten Frames (Visual Look Up).
             playerViewController.allowsVideoFrameAnalysis = false
         }
+        context.coordinator.installSubtitleOverlay(on: playerViewController)
+        context.coordinator.updateSubtitleText(subtitleText)
         return playerViewController
     }
 
@@ -9330,15 +9353,64 @@ struct VideoPlayerView: UIViewControllerRepresentable {
                 uiViewController.allowsVideoFrameAnalysis = false
             }
         }
+        context.coordinator.installSubtitleOverlay(on: uiViewController)
+        context.coordinator.updateSubtitleText(subtitleText)
     }
 
     class Coordinator: NSObject, AVPlayerViewControllerDelegate {
         var player: AVPlayer
         @Binding var isFullscreen: Bool
+        private weak var subtitleLabel: UILabel?
+        private weak var subtitleContainer: UIView?
 
         init(player: AVPlayer, isFullscreen: Binding<Bool>) {
             self.player = player
             _isFullscreen = isFullscreen
+        }
+
+        func installSubtitleOverlay(on controller: AVPlayerViewController) {
+            guard let overlay = controller.contentOverlayView else { return }
+            if subtitleContainer?.superview === overlay { return }
+
+            subtitleContainer?.removeFromSuperview()
+
+            let container = UIView()
+            container.isUserInteractionEnabled = false
+            container.translatesAutoresizingMaskIntoConstraints = false
+            overlay.addSubview(container)
+
+            let label = UILabel()
+            label.translatesAutoresizingMaskIntoConstraints = false
+            label.textAlignment = .center
+            label.numberOfLines = 0
+            label.textColor = .white
+            label.font = .systemFont(ofSize: 18, weight: .semibold)
+            label.layer.shadowColor = UIColor.black.cgColor
+            label.layer.shadowOpacity = 0.9
+            label.layer.shadowRadius = 3
+            label.layer.shadowOffset = CGSize(width: 0, height: 1)
+            label.isHidden = true
+            container.addSubview(label)
+
+            NSLayoutConstraint.activate([
+                container.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 24),
+                container.trailingAnchor.constraint(equalTo: overlay.trailingAnchor, constant: -24),
+                container.bottomAnchor.constraint(equalTo: overlay.safeAreaLayoutGuide.bottomAnchor, constant: -56),
+
+                label.leadingAnchor.constraint(equalTo: container.leadingAnchor),
+                label.trailingAnchor.constraint(equalTo: container.trailingAnchor),
+                label.topAnchor.constraint(equalTo: container.topAnchor),
+                label.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+            ])
+
+            subtitleContainer = container
+            subtitleLabel = label
+        }
+
+        func updateSubtitleText(_ text: String) {
+            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            subtitleLabel?.text = trimmed
+            subtitleLabel?.isHidden = trimmed.isEmpty
         }
 
         func playerViewController(_ playerViewController: AVPlayerViewController, willBeginFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {

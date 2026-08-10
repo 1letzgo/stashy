@@ -7,6 +7,7 @@ fragment SceneFields on Scene {
   galleries { id title date image_count }
   groups { group { id name updated_at front_image_path } scene_index }
   paths { screenshot preview stream webp vtt sprite funscript interactive_heatmap caption }
+  captions { language_code caption_type }
   stash_ids { endpoint stash_id }
   scene_markers {
     id

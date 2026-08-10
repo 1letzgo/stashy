@@ -22,6 +22,7 @@ struct SceneDetailView: View {
     @ObservedObject var loveSpouseManager = LoveSpouseManager.shared
     
     @ObservedObject private var downloadManager = DownloadManager.shared
+    @StateObject private var subtitleController = SubtitleController()
     
     let autoPlay: Bool
     
@@ -259,6 +260,7 @@ struct SceneDetailView: View {
                     isPlaybackStarted: $isPlaybackStarted,
                     isFullscreen: $isFullscreen,
                     isPreviewing: $isPreviewing,
+                    subtitleController: subtitleController,
                     onSeek: { seconds in seekTo(seconds) },
                     onStartPlayback: { resume in startPlayback(resume: resume) }
                 )
@@ -271,9 +273,10 @@ struct SceneDetailView: View {
                     capturedMarkerTime: $capturedMarkerTime,
                     playbackSpeed: $playbackSpeed,
                     viewModel: viewModel,
+                    subtitleController: subtitleController,
                     onSeek: { seconds in seekTo(seconds) },
                     onTitleUpdated: { newTitle, newDetails in
-                        activeScene = Scene(id: activeScene.id, title: newTitle, details: newDetails, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds)
+                        activeScene = Scene(id: activeScene.id, title: newTitle, details: newDetails, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions)
                     }
                 )
                 
@@ -306,7 +309,7 @@ struct SceneDetailView: View {
                             sceneDate: activeScene.date,
                             performers: activeScene.performers,
                             onPerformersUpdated: { updated in
-                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds)
+                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions)
                             },
                             viewModel: viewModel
                         )
@@ -317,7 +320,7 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             studio: activeScene.studio,
                             onStudioUpdated: { updated in
-                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds)
+                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions)
                             },
                             viewModel: viewModel
                         )
@@ -327,7 +330,7 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             groups: activeScene.groups ?? [],
                             onGroupsUpdated: { updated in
-                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds)
+                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions)
                             },
                             viewModel: viewModel
                         )
@@ -342,7 +345,7 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             tags: activeScene.tags,
                             onTagsUpdated: { updated in
-                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds)
+                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions)
                             },
                             viewModel: viewModel,
                             isTagsExpanded: $isTagsExpanded,
@@ -372,7 +375,7 @@ struct SceneDetailView: View {
                         sceneDate: activeScene.date,
                         performers: activeScene.performers,
                         onPerformersUpdated: { updated in
-                            activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds)
+                            activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions)
                         },
                         viewModel: viewModel
                     )
@@ -383,7 +386,7 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             studio: activeScene.studio,
                             onStudioUpdated: { updated in
-                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds)
+                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions)
                             },
                             viewModel: viewModel
                         )
@@ -391,7 +394,7 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             groups: activeScene.groups ?? [],
                             onGroupsUpdated: { updated in
-                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds)
+                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions)
                             },
                             viewModel: viewModel
                         )
@@ -406,7 +409,7 @@ struct SceneDetailView: View {
                         sceneId: activeScene.id,
                         tags: activeScene.tags,
                         onTagsUpdated: { updated in
-                            activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds)
+                            activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions)
                         },
                         viewModel: viewModel,
                         isTagsExpanded: $isTagsExpanded,
@@ -514,6 +517,7 @@ struct SceneDetailView: View {
                         newScene = newScene.withStreams(streams)
                     }
                     self.activeScene = newScene
+                    self.configureSubtitles()
                 }
             }
         }
@@ -545,7 +549,7 @@ struct SceneDetailView: View {
             }
         }
         
-        if activeScene.performers.isEmpty || (activeScene.tags?.isEmpty ?? true) || activeScene.groups == nil || activeScene.sceneMarkers == nil {
+        if activeScene.performers.isEmpty || (activeScene.tags?.isEmpty ?? true) || activeScene.groups == nil || activeScene.sceneMarkers == nil || activeScene.captions == nil {
             viewModel.fetchSceneDetails(sceneId: activeScene.id) { updatedScene in
                 if let updated = updatedScene {
                     DispatchQueue.main.async {
@@ -555,9 +559,12 @@ struct SceneDetailView: View {
                             newScene = newScene.withResumeTime(resTime)
                         }
                         self.activeScene = newScene
+                        self.configureSubtitles()
                     }
                 }
             }
+        } else {
+            configureSubtitles()
         }
         
         // Removed automatic setupScene to enforce manual activation unless explicitly requested via autoPlay
@@ -568,6 +575,10 @@ struct SceneDetailView: View {
                 }
             }
         }
+    }
+
+    private func configureSubtitles() {
+        subtitleController.configure(scene: activeScene, player: player)
     }
 
     private func handleOnDisappear() {
@@ -597,6 +608,7 @@ struct SceneDetailView: View {
         // Flush watched seconds + resume (clears resume at ≥98% like Stash web).
         ensurePlaybackActivityConfigured()
         playbackActivityTracker.stop()
+        subtitleController.detach()
     }
 
     private func handlePeriodicSync() {
@@ -670,6 +682,7 @@ struct SceneDetailView: View {
             player = createPlayer(for: videoURL)
             player?.isMuted = isMuted
             addTimeObserverIfNeeded()
+            configureSubtitles()
 
             if resume, let resumeTime = activeScene.resumeTime, resumeTime > 0 {
                 let targetTime = CMTime(seconds: resumeTime, preferredTimescale: 600)
@@ -684,6 +697,7 @@ struct SceneDetailView: View {
             isPlaybackStarted = true
         }
         player?.play()
+        subtitleController.attach(player: player)
         if handyManager.isSyncing {
             handyManager.play(at: player?.currentTime().seconds ?? 0)
         }

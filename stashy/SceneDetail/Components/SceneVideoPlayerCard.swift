@@ -13,6 +13,7 @@ struct SceneVideoPlayerCard: View {
     @Binding var isPreviewing: Bool
 
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject var subtitleController: SubtitleController
 
     @State private var previewPlayer: AVPlayer?
 
@@ -34,7 +35,11 @@ struct SceneVideoPlayerCard: View {
         VStack(spacing: 0) {
             if activeScene.videoURL != nil {
                 if isPlaybackStarted, let player = player {
-                    VideoPlayerView(player: player, isFullscreen: $isFullscreen)
+                    VideoPlayerView(
+                        player: player,
+                        isFullscreen: $isFullscreen,
+                        subtitleText: subtitleController.currentText
+                    )
                         .aspectRatio(16/9, contentMode: .fit)
                         .frame(maxWidth: .infinity)
                         .clipShape(
@@ -317,6 +322,7 @@ struct SceneDetailMetadataCard: View {
 
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject var subtitleController: SubtitleController
 
     @State private var showingEditTitleSheet = false
     @State private var showingSetTagImageSheet = false
@@ -448,6 +454,10 @@ struct SceneDetailMetadataCard: View {
                 setSceneCoverButton
                 Spacer(minLength: 4)
                 qualityMenu
+                if activeScene.hasCaptions {
+                    Spacer(minLength: 4)
+                    captionsMenu
+                }
             }
             .frame(maxWidth: .infinity)
         }
@@ -779,6 +789,46 @@ struct SceneDetailMetadataCard: View {
             }
         } else if let res = sourceResolutionLabel {
             infoPill(icon: "video.fill", text: res, color: .blue)
+        }
+    }
+
+    @ViewBuilder
+    private var captionsMenu: some View {
+        let captions = activeScene.captions ?? []
+        Menu {
+            Button {
+                subtitleController.select(nil)
+            } label: {
+                Label {
+                    Text("Off")
+                } icon: {
+                    if subtitleController.selectedCaption == nil {
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+            Section("Subtitles") {
+                ForEach(captions) { caption in
+                    Button {
+                        subtitleController.select(caption)
+                    } label: {
+                        Label {
+                            Text(caption.displayName)
+                        } icon: {
+                            if subtitleController.selectedCaption == caption {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
+        } label: {
+            let label = subtitleController.selectedCaption?.shortLabel ?? "CC"
+            infoPill(
+                icon: "captions.bubble.fill",
+                text: label,
+                color: subtitleController.selectedCaption == nil ? .secondary : .purple
+            )
         }
     }
 
