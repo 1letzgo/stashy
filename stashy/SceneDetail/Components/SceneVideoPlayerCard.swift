@@ -474,7 +474,7 @@ struct SceneDetailMetadataCard: View {
             capturedMarkerTime = player?.currentTime().seconds ?? 0
             showingAddMarkerSheet = true
         }) {
-            infoPill(icon: "plus.square.fill.on.square.fill", text: "Marker", color: .green)
+            infoPill(icon: "plus.square.fill.on.square.fill", text: "Add marker", color: .green)
         }
         .buttonStyle(.plain)
     }
