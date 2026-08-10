@@ -1,0 +1,9 @@
+query FindJob($input: FindJobInput!) {
+  findJob(input: $input) {
+    id
+    status
+    description
+    progress
+    error
+  }
+}

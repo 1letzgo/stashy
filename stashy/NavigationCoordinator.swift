@@ -24,6 +24,9 @@ class NavigationCoordinator: ObservableObject {
     @Published var reelsTags: [Tag] = []
     @Published var reelsTargetMode: String? = nil
     @Published var reelsNavigationToken = UUID()
+    /// Snapshot captured by the remounted Feeds instance (avoids race where a dying
+    /// ReelsView clears performer/tags before the new instance can read them).
+    @Published private(set) var reelsDeepLink = ReelsDeepLink.empty
 
     // StashLine Navigation
     @Published var stashlinePath = NavigationPath()
@@ -167,21 +170,38 @@ class NavigationCoordinator: ObservableObject {
     }
     
     func navigateToReels(performer: ScenePerformer? = nil, tags: [Tag] = [], mode: String? = nil) {
+        let link = ReelsDeepLink(performer: performer, tags: tags, mode: mode, picsPerformer: nil)
+        self.reelsDeepLink = link
         self.reelsPerformer = performer
         self.reelsTags = tags
         self.reelsTargetMode = mode
-        // Remount before selecting the tab so a previous Feeds instance cannot
-        // consume (and clear) `reelsPerformer`, then get destroyed empty.
+        self.picsPerformerFilter = nil
+        // Tear down players, then remount so performer/tag handoff cannot reuse a stale session.
+        NotificationCenter.default.post(name: Notification.Name("ReelsWillRemount"), object: nil)
         self.reelsTabID = UUID()
         self.selectedTab = .reels
         self.reelsNavigationToken = UUID()
     }
 
     func navigateToStashLine(performer: GalleryPerformer) {
+        let link = ReelsDeepLink(performer: nil, tags: [], mode: "Pics", picsPerformer: performer)
+        self.reelsDeepLink = link
         self.picsPerformerFilter = performer
+        self.reelsPerformer = nil
+        self.reelsTags = []
         self.reelsTargetMode = "Pics"
+        NotificationCenter.default.post(name: Notification.Name("ReelsWillRemount"), object: nil)
         self.reelsTabID = UUID()
         self.selectedTab = .reels
+        self.reelsNavigationToken = UUID()
+    }
+
+    func clearReelsDeepLink() {
+        reelsDeepLink = .empty
+        reelsPerformer = nil
+        reelsTags = []
+        reelsTargetMode = nil
+        picsPerformerFilter = nil
     }
     
     func resetAllStacks() {
@@ -203,14 +223,25 @@ class NavigationCoordinator: ObservableObject {
         noDefaultFilter = false
         performerToOpen = nil
         studioToOpen = nil
-        reelsPerformer = nil
-        reelsTags = []
-        reelsTargetMode = nil
-        picsPerformerFilter = nil
+        clearReelsDeepLink()
         
         // Force navigation to Home (Dashboard) sub-tab
         self.catalogueSubTab = "Dashboard"
         self.selectedTab = .catalogue
+    }
+}
+
+/// Atomic Feeds deep-link payload (Performer / Tags / Mode) for a single remount.
+struct ReelsDeepLink: Equatable {
+    var performer: ScenePerformer?
+    var tags: [Tag]
+    var mode: String?
+    var picsPerformer: GalleryPerformer?
+
+    static let empty = ReelsDeepLink(performer: nil, tags: [], mode: nil, picsPerformer: nil)
+
+    var isEmpty: Bool {
+        performer == nil && tags.isEmpty && mode == nil && picsPerformer == nil
     }
 }
 

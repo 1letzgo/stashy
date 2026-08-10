@@ -220,7 +220,16 @@ struct ReelsViewBody: View {
     @ObservedObject private var buttplugManager = ButtplugManager.shared
     @ObservedObject private var loveSpouseManager = LoveSpouseManager.shared
     @ObservedObject var viewModel: StashDBViewModel
+    /// Captured at remount time from ``NavigationCoordinator/reelsDeepLink``.
+    private let deepLink: ReelsDeepLink
     @EnvironmentObject var coordinator: NavigationCoordinator
+
+    init(viewModel: StashDBViewModel, deepLink: ReelsDeepLink = .empty) {
+        self.viewModel = viewModel
+        self.deepLink = deepLink
+    }
+
+    @State private var didConsumeDeepLink = false
     @State private var selectedSortOption: StashDBViewModel.SceneSortOption = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .scenes) ?? "") ?? .random
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
     @State private var selectedMarkerFilter: StashDBViewModel.SavedFilter?
@@ -2639,24 +2648,39 @@ struct ReelsViewBody: View {
         ReelsMode(from: tabManager.enabledReelsModes.first ?? .scenes)
     }
 
-    /// Consumes ``NavigationCoordinator`` reels navigation (performer/tag/mode) even when
-    /// ``isInitialized`` is already true — e.g. Feeds button from Tag/Performer detail.
+    /// Clears warm lists / restore targets so a deep-link always rebuilds the timeline.
+    private func prepareFreshFeedForDeepLink() {
+        markRestartFeedFromTop()
+        pendingRestoreId = nil
+        currentVisibleSceneId = nil
+        shouldScrollToTopAfterCriterionChange = true
+        viewModel.clearReelsCriterionFrozenSnapshots()
+        viewModel.scenes = []
+        viewModel.sceneMarkers = []
+        viewModel.clips = []
+        viewModel.previews = []
+        reelsPicsViewModel.allImages = []
+        for mode in [ReelsMode.scenes, .markers, .clips, .previews, .pics] {
+            clearSavedPosition(for: mode)
+        }
+    }
+
+    /// Applies the remount-captured ``deepLink`` only. Dying Feeds instances were created
+    /// with `.empty` and must not touch coordinator state (that raced away performer/tags).
     @discardableResult
     private func applyPendingReelsNavigationFromCoordinator() -> Bool {
-        let initialPerformer = coordinator.reelsPerformer
-        let initialTags = coordinator.reelsTags
-        let targetModeStr = coordinator.reelsTargetMode
-        let picsPerformer = coordinator.picsPerformerFilter
+        guard !didConsumeDeepLink, !deepLink.isEmpty else { return false }
+        didConsumeDeepLink = true
+        // Drop coordinator copy so icon remounts / later appears cannot re-apply stale criteria.
+        coordinator.clearReelsDeepLink()
+        prepareFreshFeedForDeepLink()
 
-        guard targetModeStr != nil
-            || initialPerformer != nil
-            || !initialTags.isEmpty
-            || picsPerformer != nil else {
-            return false
-        }
+        let initialPerformer = deepLink.performer
+        let initialTags = deepLink.tags
+        let targetModeStr = deepLink.mode
+        let picsPerformer = deepLink.picsPerformer
 
         if let modeStr = targetModeStr {
-            coordinator.reelsTargetMode = nil
             if modeStr == "Pics" {
                 reelsMode = .pics
             } else if let mode = ReelsMode(rawValue: modeStr) {
@@ -2666,7 +2690,6 @@ struct ReelsViewBody: View {
 
         // Legacy: Performer detail → Pics (Images 1/row)
         if let performer = picsPerformer {
-            coordinator.picsPerformerFilter = nil
             applyReelsPicsNavigation(performer: performer.toScenePerformer(), tags: [])
             return true
         }
@@ -2674,17 +2697,18 @@ struct ReelsViewBody: View {
         // After applying target mode: if we land on Pics (first enabled mode or explicit),
         // apply performer/tags there — do not drop them (old path skipped refetch / cleared tags).
         if reelsMode == .pics, initialPerformer != nil || !initialTags.isEmpty {
-            coordinator.reelsPerformer = nil
-            coordinator.reelsTags = []
             applyReelsPicsNavigation(performer: initialPerformer, tags: initialTags)
             return true
         }
 
         if initialPerformer != nil || !initialTags.isEmpty {
-            coordinator.reelsPerformer = nil
-            coordinator.reelsTags = []
-
-            let targetMode = firstEnabledReelsMode
+            let targetMode: ReelsMode = {
+                if let modeStr = targetModeStr {
+                    if modeStr == "Pics" { return .pics }
+                    if let mode = ReelsMode(rawValue: modeStr) { return mode }
+                }
+                return firstEnabledReelsMode
+            }()
             reelsMode = targetMode
 
             switch targetMode {
@@ -3362,152 +3386,210 @@ struct ReelsViewBody: View {
     /// Match expanding-dock menu chrome.
     private var reelsTopChromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
 
-    /// Top chrome: filter + mode · O + rating dropdown (hidden in Pics); criterion chips on a second row.
+    /// Section chrome: mode pills · Settings/StashSync trailing.
+    /// Criterion chips + O/Rating sit outside the bar (over the feed).
     @ViewBuilder
     private func reelsNavBar(currentItem: ReelItemData?) -> some View {
-        let oCounter = currentItem?.oCounter ?? 0
-        let rating100 = currentItem?.rating100 ?? 0
-        let stars = max(0, min(5, Int(round(Double(rating100) / 20.0))))
         let showsRateChrome = reelsMode != .pics
         let hasActiveCriterionChips = selectedPerformer != nil || !selectedTags.isEmpty
+        let showsCriterionRow = hasActiveCriterionChips || showsRateChrome
+        let prefersBottom = StashyChromePlacement.prefersBottom
 
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                HStack(spacing: 6) {
-                    reelsModePill
-                    if reelsMode == .pics || reelsMode == .clips {
-                        reelsQuickFilterPill
-                    }
-                    reelsFilterSortPill
-                    if showsReelsStashSyncButton {
-                        reelsStashSyncPill
-                    }
-                }
-                .fixedSize()
+        VStack(spacing: 0) {
+            if prefersBottom, showsCriterionRow {
+                reelsCriterionAndRateRow(
+                    currentItem: currentItem,
+                    hasActiveCriterionChips: hasActiveCriterionChips,
+                    showsRateChrome: showsRateChrome
+                )
+            }
 
-                Spacer(minLength: 8)
+            StashySectionChromeBar {
+                HStack(spacing: 8) {
+                    reelsModeDock
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                if showsRateChrome {
                     HStack(spacing: 6) {
-                        Button {
-                            if let item = currentItem {
-                                handleOCounterChange(item: item, newCount: oCounter + 1)
-                            }
-                        } label: {
-                            HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                                Image(systemName: oCounter > 0 ? AppearanceManager.shared.oCounterIconFilled : AppearanceManager.shared.oCounterIcon)
-                                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                                    .foregroundColor(oCounter > 0 ? appearanceManager.tintColor : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                                Text("\(oCounter)")
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                            }
-                            .opacity(currentItem == nil ? 0.35 : 1.0)
-                            .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
+                        reelsFilterSortPill
+                        if showsReelsStashSyncButton {
+                            reelsStashSyncPill
                         }
-                        .buttonStyle(.plain)
-                        .disabled(currentItem == nil)
-                        .accessibilityLabel("O-Counter")
-
-                        Group {
-                            if let item = currentItem {
-                                Menu {
-                                    Button {
-                                        handleRatingChange(item: item, newRating: 0)
-                                    } label: {
-                                        HStack {
-                                            Text("Clear Rating")
-                                            if stars == 0 { Image(systemName: "checkmark") }
-                                        }
-                                    }
-                                    Divider()
-                                    ForEach(1...5, id: \.self) { s in
-                                        Button {
-                                            handleRatingChange(item: item, newRating: s * 20)
-                                        } label: {
-                                            HStack {
-                                                Text(String(repeating: "★", count: s))
-                                                if stars == s { Image(systemName: "checkmark") }
-                                            }
-                                        }
-                                    }
-                                } label: {
-                                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                                        Image(systemName: "star.fill")
-                                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                                            .foregroundColor(.white.opacity(stars > 0 ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
-                                        Text("\(stars)")
-                                            .font(.subheadline.weight(.semibold))
-                                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                                    }
-                                    .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
-                                }
-                                .buttonStyle(.plain)
-                            } else {
-                                HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                                    Image(systemName: "star.fill")
-                                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                                    Text("0")
-                                        .font(.subheadline.weight(.semibold))
-                                }
-                                .foregroundColor(.white.opacity(0.35))
-                                .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
-                            }
-                        }
-                        .accessibilityLabel("Rating")
                     }
                     .fixedSize()
                 }
+                .frame(minHeight: reelsTopChromePillHeight)
+                .padding(.horizontal, StashyExpandingDock.edgePadding)
+                .padding(.vertical, 6)
             }
-            .frame(height: reelsTopChromePillHeight)
 
-            if hasActiveCriterionChips {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 6) {
-                        if let performer = selectedPerformer {
-                            Button(action: { applyClearPerformerOnly() }) {
-                                HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                                    Image(systemName: "xmark")
-                                        .font(.system(size: 11, weight: .bold))
-                                    Text(performer.name)
-                                        .font(.subheadline.weight(.semibold))
-                                        .lineLimit(1)
-                                }
-                                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                                .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        ForEach(selectedTags) { tag in
-                            Button(action: {
-                                var newTags = selectedTags
-                                newTags.removeAll { $0.id == tag.id }
-                                applyTagsChange(newTags)
-                            }) {
-                                HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                                    Image(systemName: "xmark")
-                                        .font(.system(size: 11, weight: .bold))
-                                    Text("#\(tag.name)")
-                                        .font(.subheadline.weight(.semibold))
-                                        .lineLimit(1)
-                                }
-                                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                                .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-                .frame(height: reelsTopChromePillHeight)
+            if !prefersBottom, showsCriterionRow {
+                reelsCriterionAndRateRow(
+                    currentItem: currentItem,
+                    hasActiveCriterionChips: hasActiveCriterionChips,
+                    showsRateChrome: showsRateChrome
+                )
             }
         }
-        // Same horizontal inset as `StashyDetailChromeBar` / expanding-dock chrome.
-        .padding(.horizontal, StashyExpandingDock.edgePadding)
-        .padding(.vertical, 8)
-        .colorScheme(.dark)
         .opacity(isUIVisible ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: isUIVisible)
+    }
+
+    @ViewBuilder
+    private func reelsCriterionAndRateRow(
+        currentItem: ReelItemData?,
+        hasActiveCriterionChips: Bool,
+        showsRateChrome: Bool
+    ) -> some View {
+        HStack(spacing: 8) {
+            if hasActiveCriterionChips {
+                reelsCriterionChipsRow
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                Spacer(minLength: 0)
+            }
+
+            if showsRateChrome {
+                reelsRateChrome(currentItem: currentItem)
+            }
+        }
+        .frame(minHeight: reelsTopChromePillHeight)
+        .padding(.horizontal, StashyExpandingDock.edgePadding)
+        .padding(.vertical, 6)
+        .colorScheme(.dark)
+    }
+
+    @ViewBuilder
+    private var reelsModeDock: some View {
+        let enabledModes = tabManager.enabledReelsModes.map { ReelsMode(from: $0) }
+        StashyExpandingDockBrowseStrip(
+            items: enabledModes.map {
+                StashyNavMenuItem(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon)
+            },
+            selectionID: reelsMode.rawValue,
+            accessibilityLabel: "Feed",
+            accessibilityHint: "Chooses which feed mode to show"
+        ) { id in
+            guard let mode = ReelsMode(rawValue: id), mode != reelsMode else { return }
+            reelsMode = mode
+        }
+    }
+
+    @ViewBuilder
+    private var reelsCriterionChipsRow: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
+                if let performer = selectedPerformer {
+                    Button(action: { applyClearPerformerOnly() }) {
+                        HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 11, weight: .bold))
+                            Text(performer.name)
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                        }
+                        .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                        .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                ForEach(selectedTags) { tag in
+                    Button(action: {
+                        var newTags = selectedTags
+                        newTags.removeAll { $0.id == tag.id }
+                        applyTagsChange(newTags)
+                    }) {
+                        HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                            Image(systemName: "xmark")
+                                .font(.system(size: 11, weight: .bold))
+                            Text("#\(tag.name)")
+                                .font(.subheadline.weight(.semibold))
+                                .lineLimit(1)
+                        }
+                        .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                        .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func reelsRateChrome(currentItem: ReelItemData?) -> some View {
+        let oCounter = currentItem?.oCounter ?? 0
+        let rating100 = currentItem?.rating100 ?? 0
+        let stars = max(0, min(5, Int(round(Double(rating100) / 20.0))))
+
+        HStack(spacing: 6) {
+            Button {
+                if let item = currentItem {
+                    handleOCounterChange(item: item, newCount: oCounter + 1)
+                }
+            } label: {
+                HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                    Image(systemName: oCounter > 0 ? AppearanceManager.shared.oCounterIconFilled : AppearanceManager.shared.oCounterIcon)
+                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        .foregroundColor(oCounter > 0 ? appearanceManager.tintColor : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                    Text("\(oCounter)")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                }
+                .opacity(currentItem == nil ? 0.35 : 1.0)
+                .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
+            }
+            .buttonStyle(.plain)
+            .disabled(currentItem == nil)
+            .accessibilityLabel("O-Counter")
+
+            Group {
+                if let item = currentItem {
+                    Menu {
+                        Button {
+                            handleRatingChange(item: item, newRating: 0)
+                        } label: {
+                            HStack {
+                                Text("Clear Rating")
+                                if stars == 0 { Image(systemName: "checkmark") }
+                            }
+                        }
+                        Divider()
+                        ForEach(1...5, id: \.self) { s in
+                            Button {
+                                handleRatingChange(item: item, newRating: s * 20)
+                            } label: {
+                                HStack {
+                                    Text(String(repeating: "★", count: s))
+                                    if stars == s { Image(systemName: "checkmark") }
+                                }
+                            }
+                        }
+                    } label: {
+                        HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                            Image(systemName: "star.fill")
+                                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                                .foregroundColor(.white.opacity(stars > 0 ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
+                            Text("\(stars)")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                        }
+                        .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                        Image(systemName: "star.fill")
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        Text("0")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundColor(.white.opacity(0.35))
+                    .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
+                }
+            }
+            .accessibilityLabel("Rating")
+        }
+        .fixedSize()
     }
 
     // MARK: - Scrubber bar
@@ -3734,9 +3816,6 @@ struct ReelsViewBody: View {
             ToolbarItem(placement: .navigationBarTrailing) {
                 HStack(spacing: 12) {
                     modeMenu
-                    if reelsMode == .pics || reelsMode == .clips {
-                        reelsQuickFilterPill
-                    }
                     reelsFilterSortFAB
                 }
             }
@@ -3924,40 +4003,7 @@ struct ReelsViewBody: View {
 
     @ViewBuilder
     private var modeMenu: some View {
-        reelsModePill
-    }
-
-    @ViewBuilder
-    private var reelsModePill: some View {
-        let enabledModes = tabManager.enabledReelsModes.map { ReelsMode(from: $0) }
-        Menu {
-            ForEach(enabledModes, id: \.self) { mode in
-                Button {
-                    guard mode != reelsMode else { return }
-                    #if !os(tvOS)
-                    HapticManager.selection()
-                    #endif
-                    withAnimation(.spring(response: 0.32, dampingFraction: 0.72)) {
-                        reelsMode = mode
-                    }
-                } label: {
-                    Label(mode.rawValue, systemImage: mode.icon)
-                }
-            }
-        } label: {
-            HStack(spacing: 8) {
-                Image(systemName: reelsMode.icon)
-                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                    .frame(width: StashyExpandingDock.iconSize, height: StashyExpandingDock.iconSize)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 10, weight: .bold))
-            }
-            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-            .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Feed")
-        .accessibilityValue(reelsMode.rawValue)
+        reelsModeDock
     }
 
 }
@@ -5050,13 +5096,15 @@ struct StashSyncManagerModifier: ViewModifier {
 struct ReelsView: View {
     @StateObject private var ownedViewModel = StashDBViewModel()
     private let externalViewModel: StashDBViewModel?
+    private let deepLink: ReelsDeepLink
 
-    init(viewModel: StashDBViewModel? = nil) {
+    init(viewModel: StashDBViewModel? = nil, deepLink: ReelsDeepLink = .empty) {
         self.externalViewModel = viewModel
+        self.deepLink = deepLink
     }
 
     var body: some View {
-        ReelsViewBody(viewModel: externalViewModel ?? ownedViewModel)
+        ReelsViewBody(viewModel: externalViewModel ?? ownedViewModel, deepLink: deepLink)
     }
 }
 

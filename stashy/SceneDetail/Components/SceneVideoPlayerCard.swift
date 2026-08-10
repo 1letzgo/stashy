@@ -655,6 +655,27 @@ struct SceneDetailMetadataCard: View {
         (resolutionFromLabel(a.label) ?? 0) > (resolutionFromLabel(b.label) ?? 0)
     }
 
+    /// File height → short quality chip text (`4K`, `1080p`, …).
+    private var sourceResolutionLabel: String? {
+        guard let height = activeScene.files?.first?.height, height > 0 else { return nil }
+        if height >= 2160 { return "4K" }
+        if height >= 1080 { return "1080p" }
+        if height >= 720 { return "720p" }
+        return "\(height)p"
+    }
+
+    private func isDirectStreamLabel(_ label: String) -> Bool {
+        label.lowercased().contains("direct stream")
+    }
+
+    /// Prefer resolution over Stash's "Direct stream" label on the quality chip.
+    private func displayLabel(for stream: SceneStream) -> String {
+        if isDirectStreamLabel(stream.label), let res = sourceResolutionLabel {
+            return res
+        }
+        return stream.label
+    }
+
     private var currentStreamURLString: String? {
         (player?.currentItem?.asset as? AVURLAsset)?.url.absoluteString
     }
@@ -666,6 +687,15 @@ struct SceneDetailMetadataCard: View {
             return current == stream.url
         }
         return lhs.host == rhs.host && lhs.path == rhs.path
+    }
+
+    private func isPlayingDirectStream(_ directURL: URL) -> Bool {
+        guard let current = currentStreamURLString,
+              let currentPath = URLComponents(string: current)?.path,
+              let directPath = URLComponents(url: directURL, resolvingAgainstBaseURL: false)?.path else {
+            return false
+        }
+        return currentPath == directPath
     }
 
     @ViewBuilder
@@ -720,20 +750,14 @@ struct SceneDetailMetadataCard: View {
                 if let directURL = directStreamURL {
                     Section("Original") {
                         Button(action: { switchPlayerStream(to: directURL) }) {
-                            let res = activeScene.files?.first?.height
                             let label: String = {
-                                guard let h = res else { return "Direct Stream" }
-                                if h >= 2160 { return "Original · 4K" }
-                                if h >= 1080 { return "Original · 1080p" }
-                                if h >= 720 { return "Original · 720p" }
-                                return "Original · \(h)p"
+                                if let res = sourceResolutionLabel { return "Original · \(res)" }
+                                return "Original"
                             }()
                             Label {
                                 Text(label)
                             } icon: {
-                                if let current = currentStreamURLString,
-                                   let direct = URL(string: directURL.absoluteString),
-                                   URLComponents(string: current)?.path == URLComponents(url: direct, resolvingAgainstBaseURL: false)?.path {
+                                if isPlayingDirectStream(directURL) {
                                     Image(systemName: "checkmark")
                                 }
                             }
@@ -742,19 +766,18 @@ struct SceneDetailMetadataCard: View {
                 }
             } label: {
                 let currentLabel: String = {
+                    if let directURL = directStreamURL, isPlayingDirectStream(directURL) {
+                        return sourceResolutionLabel ?? "Original"
+                    }
                     if let current = currentStreamURLString,
                        let active = streams.first(where: { isCurrentlyPlaying($0) || $0.url == current }) {
-                        return active.label
+                        return displayLabel(for: active)
                     }
-                    if let firstFile = activeScene.files?.first, let height = firstFile.height {
-                        return height >= 2160 ? "4K" : (height >= 1080 ? "1080p" : (height >= 720 ? "720p" : "\(height)p"))
-                    }
-                    return "Quality"
+                    return sourceResolutionLabel ?? "Quality"
                 }()
                 infoPill(icon: "video.fill", text: currentLabel, color: .blue)
             }
-        } else if let firstFile = activeScene.files?.first, let height = firstFile.height {
-            let res = height >= 2160 ? "4K" : (height >= 1080 ? "1080p" : (height >= 720 ? "720p" : "\(height)p"))
+        } else if let res = sourceResolutionLabel {
             infoPill(icon: "video.fill", text: res, color: .blue)
         }
     }

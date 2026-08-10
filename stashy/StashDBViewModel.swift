@@ -5735,13 +5735,15 @@ class StashDBViewModel: ObservableObject {
         return dict
     }
 
-    func triggerIdentify(completion: @escaping (Bool, String) -> Void) {
+    /// Starts Identify with server defaults. Pass `sceneIDs` to scope to those scenes; omit for library-wide.
+    /// Completion: `(success, message, jobId)` — `jobId` can be polled via ``waitForJob``.
+    func triggerIdentify(sceneIDs: [String]? = nil, completion: @escaping (Bool, String, String?) -> Void) {
         // Step 1: fetch configured stash-box endpoints from server
         let configQuery = GraphQLQueries.loadQuery(named: "configuration")
         let configBody: [String: Any] = ["query": configQuery]
         guard let configData = try? JSONSerialization.data(withJSONObject: configBody),
               let configString = String(data: configData, encoding: .utf8) else {
-            completion(false, "Failed to build configuration request.")
+            completion(false, "Failed to build configuration request.", nil)
             return
         }
 
@@ -5749,7 +5751,7 @@ class StashDBViewModel: ObservableObject {
             let config = response?.data?.configuration
             let boxes = config?.general?.stashBoxes ?? []
             if boxes.isEmpty {
-                completion(false, "No Stash-Box endpoints configured on this server.")
+                completion(false, "No Stash-Box endpoints configured on this server.", nil)
                 return
             }
 
@@ -5789,22 +5791,111 @@ class StashDBViewModel: ObservableObject {
                 ]
             }
 
-            let input: [String: Any] = ["sources": sources, "options": options, "paths": []]
+            var input: [String: Any] = ["sources": sources, "options": options]
+            if let sceneIDs, !sceneIDs.isEmpty {
+                input["sceneIDs"] = sceneIDs
+            } else {
+                input["paths"] = []
+            }
 
             let identifyQuery = GraphQLQueries.loadQuery(named: "metadataIdentify")
             let body: [String: Any] = ["query": identifyQuery, "variables": ["input": input]]
             guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
                   let bodyString = String(data: bodyData, encoding: .utf8) else {
-                completion(false, "Failed to build identify request.")
+                completion(false, "Failed to build identify request.", nil)
                 return
             }
 
             self.performGraphQLQuery(query: bodyString) { (response: GenericMutationResponse?) in
-                if response != nil {
+                if let jobId = response?.data?["metadataIdentify"], !jobId.isEmpty {
                     let names = boxes.map { $0.name ?? $0.endpoint }.joined(separator: ", ")
-                    completion(true, "Identify started using: \(names)")
+                    if let sceneIDs, sceneIDs.count == 1 {
+                        completion(true, "Identify started for this scene using: \(names)", jobId)
+                    } else if let sceneIDs, !sceneIDs.isEmpty {
+                        completion(true, "Identify started for \(sceneIDs.count) scenes using: \(names)", jobId)
+                    } else {
+                        completion(true, "Identify started using: \(names)", jobId)
+                    }
+                } else if response != nil {
+                    // Older servers may omit / null the job id; treat as started without tracking.
+                    let names = boxes.map { $0.name ?? $0.endpoint }.joined(separator: ", ")
+                    completion(true, "Identify started using: \(names)", nil)
                 } else {
-                    completion(false, "Failed to start identify. Please check your server configuration.")
+                    completion(false, "Failed to start identify. Please check your server configuration.", nil)
+                }
+            }
+        }
+    }
+
+    /// Polls `findJob` until the job finishes, fails, or `timeout` elapses.
+    func waitForJob(
+        id jobId: String,
+        pollInterval: TimeInterval = 1.0,
+        timeout: TimeInterval = 180,
+        completion: @escaping (Bool, String) -> Void
+    ) {
+        let deadline = Date().addingTimeInterval(timeout)
+        var sawJob = false
+
+        func poll() {
+            self.fetchJob(id: jobId) { job in
+                if let job {
+                    sawJob = true
+                    switch job.status.uppercased() {
+                    case "FINISHED":
+                        completion(true, job.description ?? "Identify finished")
+                    case "FAILED":
+                        completion(false, job.error ?? "Identify failed")
+                    case "CANCELLED":
+                        completion(false, "Identify was cancelled")
+                    default:
+                        // READY / RUNNING / STOPPING
+                        guard Date() < deadline else {
+                            completion(false, "Identify timed out")
+                            return
+                        }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + pollInterval) {
+                            poll()
+                        }
+                    }
+                    return
+                }
+
+                // Job missing from queue: finished jobs are often purged quickly.
+                if sawJob {
+                    completion(true, "Identify finished")
+                    return
+                }
+                guard Date() < deadline else {
+                    completion(false, "Identify job not found")
+                    return
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + pollInterval) {
+                    poll()
+                }
+            }
+        }
+
+        poll()
+    }
+
+    private func fetchJob(id jobId: String, completion: @escaping (StashJob?) -> Void) {
+        let query = GraphQLQueries.loadQuery(named: "findJob")
+        let body: [String: Any] = ["query": query, "variables": ["input": ["id": jobId]]]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(nil)
+            return
+        }
+
+        // Avoid toggling global `isLoading` while polling.
+        GraphQLClient.shared.execute(query: bodyString) { (result: Result<FindJobResponse, GraphQLNetworkError>) in
+            DispatchQueue.main.async {
+                switch result {
+                case .success(let response):
+                    completion(response.data?.findJob)
+                case .failure:
+                    completion(nil)
                 }
             }
         }
@@ -6892,6 +6983,22 @@ struct GenericMutationResponse: Codable {
     let data: [String: String]?
 }
 
+struct FindJobResponse: Codable {
+    let data: FindJobData?
+}
+
+struct FindJobData: Codable {
+    let findJob: StashJob?
+}
+
+struct StashJob: Codable {
+    let id: String
+    let status: String
+    let description: String?
+    let progress: Double?
+    let error: String?
+}
+
 struct StashConfigurationResponse: Codable {
     let data: StashConfigurationData?
 }
@@ -7148,6 +7255,16 @@ struct SingleSceneData: Codable {
     let findScene: Scene?
 }
 
+struct StashID: Codable, Equatable {
+    let endpoint: String?
+    let stashId: String?
+
+    enum CodingKeys: String, CodingKey {
+        case endpoint
+        case stashId = "stash_id"
+    }
+}
+
 struct Scene: Codable, Identifiable, Equatable {
     let id: String
     let title: String?
@@ -7171,6 +7288,15 @@ struct Scene: Codable, Identifiable, Equatable {
     let sceneMarkers: [SceneMarker]?
     let interactive: Bool?
     var streams: [SceneStream]?
+    let stashIds: [StashID]?
+
+    /// True when the scene already has at least one Stash-Box ID.
+    var hasStashID: Bool {
+        guard let stashIds else { return false }
+        return stashIds.contains { id in
+            !(id.stashId?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+        }
+    }
     
     
     enum CodingKeys: String, CodingKey {
@@ -7181,10 +7307,11 @@ struct Scene: Codable, Identifiable, Equatable {
         case createdAt = "created_at"
         case updatedAt = "updated_at"
         case sceneMarkers = "scene_markers"
+        case stashIds = "stash_ids"
     }
 
     // Explicit initializer to handle manual updates like 'withStreams'
-    init(id: String, title: String?, details: String?, date: String?, duration: Double?, studio: SceneStudio?, performers: [ScenePerformer], files: [SceneFile]?, tags: [Tag]?, galleries: [Gallery]?, groups: [SceneGroupEntry]? = nil, organized: Bool?, resumeTime: Double?, playCount: Int?, oCounter: Int?, rating100: Int?, createdAt: String?, updatedAt: String?, paths: ScenePaths?, sceneMarkers: [SceneMarker]?, interactive: Bool?, streams: [SceneStream]? = nil) {
+    init(id: String, title: String?, details: String?, date: String?, duration: Double?, studio: SceneStudio?, performers: [ScenePerformer], files: [SceneFile]?, tags: [Tag]?, galleries: [Gallery]?, groups: [SceneGroupEntry]? = nil, organized: Bool?, resumeTime: Double?, playCount: Int?, oCounter: Int?, rating100: Int?, createdAt: String?, updatedAt: String?, paths: ScenePaths?, sceneMarkers: [SceneMarker]?, interactive: Bool?, streams: [SceneStream]? = nil, stashIds: [StashID]? = nil) {
         self.id = id
         self.title = title
         self.details = details
@@ -7207,6 +7334,7 @@ struct Scene: Codable, Identifiable, Equatable {
         self.sceneMarkers = sceneMarkers
         self.interactive = interactive
         self.streams = streams
+        self.stashIds = stashIds
     }
 
     // Decodable init
@@ -7234,6 +7362,7 @@ struct Scene: Codable, Identifiable, Equatable {
         sceneMarkers = try container.decodeIfPresent([SceneMarker].self, forKey: .sceneMarkers)
         interactive = try container.decodeIfPresent(Bool.self, forKey: .interactive)
         streams = try container.decodeIfPresent([SceneStream].self, forKey: .streams)
+        stashIds = try container.decodeIfPresent([StashID].self, forKey: .stashIds)
     }
     
     
@@ -7529,7 +7658,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: newResumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds
         )
     }
 
@@ -7541,7 +7670,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: newRating, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds
         )
     }
 
@@ -7553,7 +7682,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: newStreams
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: newStreams, stashIds: stashIds
         )
     }
 
@@ -7565,7 +7694,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: newPlayCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds
         )
     }
 
@@ -7577,7 +7706,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: newOCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds
         )
     }
 
@@ -7589,7 +7718,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: newUpdatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds
         )
     }
     

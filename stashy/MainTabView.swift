@@ -160,6 +160,8 @@ struct MainTabView: View {
         ReelsPlayerRegistry.pauseAll()
         // Clear any prior tab-leave suspend so the remounted Feeds instance can autoplay.
         ReelsPlayerRegistry.resumePlayback()
+        // Icon re-tap must not re-apply a previous Performer/Tag deep-link.
+        coordinator.clearReelsDeepLink()
         coordinator.reelsTabID = UUID()
     }
 }
@@ -205,7 +207,7 @@ extension MainTabView {
             
         case .reels:
             NavigationStack {
-                ReelsView(viewModel: reelsFeedViewModel)
+                ReelsView(viewModel: reelsFeedViewModel, deepLink: coordinator.reelsDeepLink)
             }
             .id(coordinator.reelsTabID)
 
@@ -349,7 +351,7 @@ struct ToolsServerView: View {
                             }
                         }
                         taskRow(label: "Identify", icon: "person.crop.square.filled.and.at.rectangle", taskId: "identify") {
-                            viewModel.triggerIdentify { _, message in
+                            viewModel.triggerIdentify { _, message, _ in
                                 showResult(title: "Identify", message: message)
                             }
                         }
