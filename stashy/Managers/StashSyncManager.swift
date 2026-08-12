@@ -11,8 +11,16 @@ class StashSyncManager: ObservableObject {
     @Published var isActive: Bool = false
 
     var isStashSyncEnabled: Bool {
-        get { StashVideoSyncManager.shared.isVideoSyncEnabled }
-        set { StashVideoSyncManager.shared.isVideoSyncEnabled = newValue }
+        get {
+            StashyPlusManager.isUnlockedNow && StashVideoSyncManager.shared.isVideoSyncEnabled
+        }
+        set {
+            guard StashyPlusManager.isUnlockedNow else {
+                StashVideoSyncManager.shared.isVideoSyncEnabled = false
+                return
+            }
+            StashVideoSyncManager.shared.isVideoSyncEnabled = newValue
+        }
     }
 
     // Internal state
@@ -128,6 +136,17 @@ class StashSyncManager: ObservableObject {
     /// Simple on/off used by Feeds settings (and `toggle()`).
     func setSyncing(_ enabled: Bool) {
         print("⚡ StashSyncManager.setSyncing(\(enabled)) handy.enabled:\(HandyManager.shared.isEnabled) handy.connected:\(HandyManager.shared.isConnected)")
+
+        if enabled, !StashyPlusManager.isUnlockedNow {
+            DispatchQueue.main.async {
+                ToastManager.shared.show(
+                    "StashSync is part of Stashy+ — unlock in Settings",
+                    icon: "sparkles",
+                    style: .error
+                )
+            }
+            return
+        }
 
         if enabled {
             StashVideoSyncManager.shared.isVideoSyncEnabled = true

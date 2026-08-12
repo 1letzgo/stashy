@@ -355,6 +355,24 @@ class ImageCache {
         invalidateURLStrings(performerImageCacheURLVariants(for: defaultURLString))
     }
 
+    /// After marker screenshot generation, drop cached placeholder / stale stills.
+    func invalidateMarkerScreenshot(markerId: String, sceneId: String? = nil, screenshotPath: String? = nil) {
+        let config = ServerConfigManager.shared.activeConfig ?? ServerConfigManager.shared.loadConfig()
+        guard let config, config.hasValidConfig else { return }
+        var toInvalidate = performerImageCacheURLVariants(
+            for: "\(config.baseURL)/scenemarker/\(markerId)/screenshot"
+        )
+        if let sceneId, !sceneId.isEmpty {
+            toInvalidate.append(contentsOf: performerImageCacheURLVariants(
+                for: "\(config.baseURL)/scene/\(sceneId)/scene_marker/\(markerId)/screenshot"
+            ))
+        }
+        if let screenshotPath, !screenshotPath.isEmpty {
+            toInvalidate.append(contentsOf: performerImageCacheURLVariants(for: screenshotPath))
+        }
+        invalidateURLStrings(toInvalidate)
+    }
+
     private func imageCost(_ image: UIImage) -> Int {
         if let cg = image.cgImage {
             return cg.bytesPerRow * cg.height

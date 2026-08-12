@@ -8,6 +8,7 @@ fragment SceneFields on Scene {
   groups { group { id name updated_at front_image_path } scene_index }
   paths { screenshot preview stream webp vtt sprite funscript interactive_heatmap caption }
   captions { language_code caption_type }
+  custom_fields
   stash_ids { endpoint stash_id }
   scene_markers {
     id

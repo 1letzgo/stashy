@@ -14,6 +14,7 @@ struct SceneVideoPlayerCard: View {
 
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var subtitleController: SubtitleController
+    @ObservedObject var transcriptionController: SceneLiveTranscriptionController
 
     @State private var previewPlayer: AVPlayer?
 
@@ -38,18 +39,36 @@ struct SceneVideoPlayerCard: View {
                     VideoPlayerView(
                         player: player,
                         isFullscreen: $isFullscreen,
-                        subtitleText: subtitleController.currentText
+                        // Inline: only the bottom SwiftUI overlay. contentOverlayView is for fullscreen.
+                        subtitleText: isFullscreen ? subtitleController.currentText : ""
                     )
-                        .aspectRatio(16/9, contentMode: .fit)
-                        .frame(maxWidth: .infinity)
-                        .clipShape(
-                            UnevenRoundedRectangle(
-                                topLeadingRadius: 12,
-                                bottomLeadingRadius: 0,
-                                bottomTrailingRadius: 0,
-                                topTrailingRadius: 12
-                            )
+                    .aspectRatio(16/9, contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+                    .overlay(alignment: .bottom) {
+                        // Same caption channel for server VTT and live ASR.
+                        if !subtitleController.currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                            Text(subtitleController.currentText)
+                                .font(.system(size: 16, weight: .semibold))
+                                .foregroundStyle(.white)
+                                .multilineTextAlignment(.center)
+                                .lineLimit(3)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(Color.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                                .padding(.horizontal, 16)
+                                .padding(.bottom, 14)
+                                .allowsHitTesting(false)
+                                .transition(.opacity)
+                        }
+                    }
+                    .clipShape(
+                        UnevenRoundedRectangle(
+                            topLeadingRadius: 12,
+                            bottomLeadingRadius: 0,
+                            bottomTrailingRadius: 0,
+                            topTrailingRadius: 12
                         )
+                    )
                 } else {
                     thumbnailWithOverlay
                 }
@@ -323,6 +342,8 @@ struct SceneDetailMetadataCard: View {
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var subtitleController: SubtitleController
+    @ObservedObject var transcriptionController: SceneLiveTranscriptionController
+    @ObservedObject var captionTranslator: SceneCaptionTranslator
 
     @State private var showingEditTitleSheet = false
     @State private var showingSetTagImageSheet = false
@@ -330,6 +351,9 @@ struct SceneDetailMetadataCard: View {
     @State private var isCapturingTagFrame = false
     @State private var isSettingSceneCover = false
     @State private var capturedTagImageDataURL: String?
+    @State private var showSpeechModelDownloadOffer = false
+    /// Filled from `SpeechTranscriber.supportedLocales` — excludes unsupported codes like `cs`.
+    @State private var speechSupportedLanguageOptions: [(id: String, label: String)] = []
 
     var onSeek: (Double) -> Void
     var onTitleUpdated: ((String?, String?) -> Void)?
@@ -396,6 +420,30 @@ struct SceneDetailMetadataCard: View {
             if let item = player?.currentItem {
                 StashVideoSyncManager.shared.setup(for: item)
             }
+            Task { await loadSpeechSupportedLanguagesIfNeeded() }
+        }
+        .onChange(of: transcriptionController.errorMessage) { _, message in
+            guard let message, !message.isEmpty else { return }
+            ToastManager.shared.show(message, icon: "captions.bubble", style: .error)
+        }
+        .onChange(of: captionTranslator.statusMessage) { _, message in
+            guard let message, !message.isEmpty else { return }
+            ToastManager.shared.show(message, icon: "translate", style: .error)
+        }
+        .onChange(of: transcriptionController.needsSpeechModelDownload) { _, needs in
+            if needs { showSpeechModelDownloadOffer = true }
+        }
+        .alert("Download speech model?", isPresented: $showSpeechModelDownloadOffer) {
+            Button("Download") {
+                transcriptionController.approveSpeechModelDownload()
+            }
+            Button("Not now", role: .cancel) {}
+        } message: {
+            let name = transcriptionController.downloadingModelLanguage ?? "this language"
+            Text(
+                "Live captions need the on-device \(name) speech model. "
+                + "The download is managed by iOS and can be several hundred megabytes."
+            )
         }
         .sheet(isPresented: $showingEditTitleSheet) {
             EditSceneTitleSheet(
@@ -460,6 +508,13 @@ struct SceneDetailMetadataCard: View {
                 }
             }
             .frame(maxWidth: .infinity)
+
+            HStack(spacing: 4) {
+                setLanguageMenu
+                teleprompterControls
+                Spacer(minLength: 0)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -652,6 +707,11 @@ struct SceneDetailMetadataCard: View {
         if wasPlaying { player.play() }
 
         StashVideoSyncManager.shared.setup(for: newItem)
+
+        if transcriptionController.isTeleprompterModeActive {
+            // Prefer dedicated transcription URL (MP4/direct); fall back to the new player URL.
+            transcriptionController.rebindStreamURL(activeScene.transcriptionStreamURL ?? url)
+        }
     }
 
     private func resolutionFromLabel(_ label: String) -> Int? {
@@ -797,12 +857,13 @@ struct SceneDetailMetadataCard: View {
         let captions = activeScene.captions ?? []
         Menu {
             Button {
-                subtitleController.select(nil)
+                stopLiveCaptionsIfNeeded()
+                subtitleController.select(nil, userInitiated: true)
             } label: {
                 Label {
                     Text("Off")
                 } icon: {
-                    if subtitleController.selectedCaption == nil {
+                    if subtitleController.selectedCaption == nil && !subtitleController.isLiveCaptionsActive {
                         Image(systemName: "checkmark")
                     }
                 }
@@ -810,7 +871,8 @@ struct SceneDetailMetadataCard: View {
             Section("Subtitles") {
                 ForEach(captions) { caption in
                     Button {
-                        subtitleController.select(caption)
+                        stopLiveCaptionsIfNeeded()
+                        subtitleController.select(caption, userInitiated: true)
                     } label: {
                         Label {
                             Text(caption.displayName)
@@ -823,24 +885,330 @@ struct SceneDetailMetadataCard: View {
                 }
             }
         } label: {
-            let label = subtitleController.selectedCaption?.shortLabel ?? "CC"
+            let live = subtitleController.isLiveCaptionsActive
+            let label = live ? "Live" : (subtitleController.selectedCaption?.shortLabel ?? "CC")
             infoPill(
                 icon: "captions.bubble.fill",
                 text: label,
-                color: subtitleController.selectedCaption == nil ? .secondary : .purple
+                color: live ? .orange : (subtitleController.selectedCaption == nil ? .secondary : .purple)
             )
+        }
+    }
+
+    private func stopLiveCaptionsIfNeeded() {
+        guard transcriptionController.isTeleprompterModeActive || subtitleController.isLiveCaptionsActive else { return }
+        transcriptionController.liveCaptionHandler = nil
+        transcriptionController.onLookaheadModeChanged = nil
+        transcriptionController.translationRequestHandler = nil
+        subtitleController.endLiveCaptions()
+        captionTranslator.deactivate()
+        Task { await transcriptionController.disable() }
+    }
+
+    @ViewBuilder
+    private var setLanguageMenu: some View {
+        // Stable label + frozen options: rebuilding Menu content/label while open makes it flicker.
+        let code = activeScene.spokenLanguageCode?.uppercased() ?? "Lang"
+        let selected = activeScene.spokenLanguageCode
+        SceneLanguageMenu(
+            options: speechSupportedLanguageOptions,
+            selectedCode: selected,
+            labelCode: code,
+            onSelect: applySceneLanguage
+        )
+        .equatable()
+    }
+
+    @ViewBuilder
+    private var teleprompterControls: some View {
+        let userLang = SubtitleTargetLanguage.load()
+        let active = transcriptionController.isTeleprompterModeActive
+        let mode = transcriptionController.mode
+        // Menu label must stay identity-stable. Progress ticks (prep/model %) live beside it.
+        HStack(spacing: 4) {
+            TeleprompterModeMenu(
+                mode: mode,
+                userLanguage: userLang,
+                isActive: active,
+                translationEnabled: captionTranslator.isEnabled,
+                needsSpeechModelDownload: transcriptionController.needsSpeechModelDownload,
+                speechModelName: transcriptionController.downloadingModelLanguage,
+                needsTranslationPack: captionTranslator.needsLanguageDownload,
+                onSelect: setTeleprompterMode,
+                onDownloadSpeechModel: { transcriptionController.approveSpeechModelDownload() },
+                onDownloadTranslationPack: { captionTranslator.approveDownload() }
+            )
+            .equatable()
+            if active {
+                liveCaptionStatusChip(targetLanguage: userLang)
+            }
+        }
+    }
+
+    /// Progress / busy chip outside the Menu so label identity does not thrash.
+    @ViewBuilder
+    private func liveCaptionStatusChip(targetLanguage: String) -> some View {
+        let modelDownload = transcriptionController.modelDownloadProgress
+        let isModelFetch = modelDownload != nil
+        let packDownload = captionTranslator.isDownloadingLanguagePack
+        let preparing = transcriptionController.isPreparing && !isModelFetch && !packDownload
+        let prep = transcriptionController.prepProgress
+        let building = !preparing && !isModelFetch && !packDownload && (prep ?? 1) >= 0.05 && (prep ?? 1) < 1
+        let color = Color.orange
+        let modelFraction = modelDownload ?? 0
+
+        if isModelFetch || packDownload || preparing || building {
+            pillContainer(color: color) {
+                Group {
+                    if isModelFetch {
+                        ZStack {
+                            Circle().stroke(color.opacity(0.3), lineWidth: 2)
+                            Circle()
+                                .trim(from: 0, to: modelFraction > 0 ? max(0.03, modelFraction) : 0.08)
+                                .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                        }
+                        .padding(1)
+                    } else if building, let prep {
+                        ZStack {
+                            Circle().stroke(color.opacity(0.3), lineWidth: 2)
+                            Circle()
+                                .trim(from: 0, to: max(0.03, prep))
+                                .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                        }
+                        .padding(1)
+                    } else {
+                        ProgressView()
+                            .scaleEffect(0.5)
+                            .tint(color)
+                    }
+                }
+                .frame(width: 12, height: 12)
+
+                Text(statusChipLabel(
+                    isModelFetch: isModelFetch,
+                    modelFraction: modelFraction,
+                    packDownload: packDownload,
+                    preparing: preparing,
+                    building: building,
+                    prep: prep,
+                    targetLanguage: targetLanguage
+                ))
+                .font(.system(size: 10, weight: .bold))
+                .monospacedDigit()
+                .lineLimit(1)
+            }
+        }
+    }
+
+    private func statusChipLabel(
+        isModelFetch: Bool,
+        modelFraction: Double,
+        packDownload: Bool,
+        preparing: Bool,
+        building: Bool,
+        prep: Double?,
+        targetLanguage: String
+    ) -> String {
+        if isModelFetch {
+            if modelFraction > 0 { return "\(Int((modelFraction * 100).rounded()))%" }
+            if let status = transcriptionController.speechAssetStatusText, !status.isEmpty {
+                return String(status.prefix(8))
+            }
+            return transcriptionController.downloadingModelLanguage ?? "Model"
+        }
+        if packDownload { return targetLanguage.uppercased() }
+        if preparing { return "…" }
+        if building, let prep { return "\(Int(prep * 100))%" }
+        return "AI CC"
+    }
+
+    private func applySceneLanguage(_ code: String) {
+        let previous = activeScene
+        activeScene = activeScene.withSpokenLanguage(code)
+        viewModel.updateSceneLanguage(sceneId: activeScene.id, languageCode: code) { success in
+            if !success {
+                DispatchQueue.main.async {
+                    activeScene = previous
+                    ToastManager.shared.show("Failed to save language", icon: "exclamationmark.triangle", style: .error)
+                }
+            } else {
+                DispatchQueue.main.async {
+                    ToastManager.shared.show("Language set to \(code.uppercased())", icon: "globe", style: .success)
+                }
+            }
+        }
+    }
+
+    private func setTeleprompterMode(_ mode: SceneTeleprompterMode) {
+        guard mode != .off else {
+            stopLiveCaptionsIfNeeded()
+            return
+        }
+        guard StashyPlusManager.shared.isUnlocked else {
+            ToastManager.shared.show("AI captions are part of Stashy+ — unlock in Settings", icon: "sparkles", style: .error)
+            return
+        }
+        guard transcriptionController.isReadAlongAvailable else {
+            ToastManager.shared.show("Teleprompter requires iOS 26+ and supported hardware", icon: "text.viewfinder", style: .error)
+            return
+        }
+        guard let player else {
+            ToastManager.shared.show("Start playback first", icon: "play.circle", style: .error)
+            return
+        }
+        if activeScene.spokenLanguageCode == nil {
+            ToastManager.shared.show("Set scene language first", icon: "globe", style: .error)
+            return
+        }
+        let url = activeScene.transcriptionStreamURL
+            ?? (player.currentItem?.asset as? AVURLAsset).map { $0.url }
+        var extras: [URL] = []
+        if let streams = activeScene.streams {
+            for stream in streams where stream.mime_type == "video/mp4" {
+                if let u = URL(string: stream.url) { extras.append(signedURL(u) ?? u) }
+            }
+            if let path = activeScene.paths?.stream, let u = URL(string: path) {
+                extras.append(signedURL(u) ?? u)
+            }
+        }
+
+        let sceneLanguage = activeScene.spokenLanguageCode
+        let targetLanguage = SubtitleTargetLanguage.load()
+        let wantsTranslation = mode == .userLanguage
+            && !SubtitleTargetLanguage.sameLanguage(sceneLanguage, targetLanguage)
+
+        // Every CC enable gets a clean caption channel + brand-new speech session.
+        Task {
+            await transcriptionController.disable(resetError: true)
+            guard !Task.isCancelled else { return }
+
+            // Preflight the speech model *before* starting — and present the download offer
+            // after the Menu has finished dismissing (SwiftUI drops alerts during that window).
+            switch await transcriptionController.probeSpeechModel(for: sceneLanguage) {
+            case .ready:
+                break
+            case .unsupported(let name):
+                // e.g. Czech (`cs`) — not in SpeechTranscriber.supportedLocales at all.
+                ToastManager.shared.show(
+                    "Live CC has no SpeechTranscriber language for \(name)",
+                    icon: "captions.bubble",
+                    style: .error
+                )
+                return
+            case .needsDownload(let name, _), .downloading(let name, _):
+                ToastManager.shared.show(
+                    "\(name) speech model required",
+                    icon: "arrow.down.circle",
+                    style: .info
+                )
+            }
+
+            var translates = false
+            if wantsTranslation {
+                switch await SceneCaptionTranslator.availability(from: sceneLanguage, to: targetLanguage) {
+                case .ready:
+                    translates = true
+                case .needsDownload:
+                    // Don't toast here — LanguageAvailability often reports `.supported` for an
+                    // already-installed DE pack. prepareTranslation will settle it quietly, or
+                    // the CC menu will offer a download if the pack is truly missing.
+                    translates = true
+                case .sourceUnsupported(let code):
+                    ToastManager.shared.show(
+                        "No translation from \(code) — showing captions in the scene language",
+                        icon: "character.bubble",
+                        style: .info
+                    )
+                case .targetUnsupported(let code):
+                    ToastManager.shared.show(
+                        "No translation to \(code) on this device — showing captions in the scene language",
+                        icon: "character.bubble",
+                        style: .info
+                    )
+                case .pairUnsupported(let source, let target):
+                    ToastManager.shared.show(
+                        "No translation \(source) → \(target) — showing captions in the scene language",
+                        icon: "character.bubble",
+                        style: .info
+                    )
+                }
+            }
+
+            if translates {
+                captionTranslator.activate(
+                    source: sceneLanguage,
+                    target: targetLanguage,
+                    downloadApproved: false
+                )
+                transcriptionController.translationRequestHandler = { [weak captionTranslator] cueID, text in
+                    captionTranslator?.requestTranslation(id: cueID, text: text)
+                }
+            } else {
+                captionTranslator.deactivate()
+                transcriptionController.translationRequestHandler = nil
+            }
+
+            subtitleController.beginLiveCaptions(timelineSynced: true)
+            transcriptionController.onLookaheadModeChanged = { [weak subtitleController] lookahead in
+                subtitleController?.setLiveCaptionsTimelineSynced(true)
+                _ = lookahead
+            }
+            transcriptionController.liveCaptionHandler = { [weak subtitleController] text in
+                subtitleController?.pushLiveCaption(text)
+            }
+            transcriptionController.start(
+                mode: mode,
+                player: player,
+                sceneID: activeScene.id,
+                sceneDuration: activeScene.sceneDuration,
+                sceneLanguage: sceneLanguage,
+                streamURL: url,
+                extraCandidateURLs: extras
+            )
+
+            // Wait for ensureSpeechModel to park on the offer, then present after Menu teardown.
+            for _ in 0..<20 {
+                if transcriptionController.needsSpeechModelDownload { break }
+                if transcriptionController.errorMessage != nil { break }
+                if transcriptionController.isTeleprompterReady { break }
+                try? await Task.sleep(nanoseconds: 100_000_000)
+            }
+            if transcriptionController.needsSpeechModelDownload {
+                try? await Task.sleep(nanoseconds: 450_000_000)
+                showSpeechModelDownloadOffer = true
+            }
+            if let err = transcriptionController.errorMessage, !err.isEmpty {
+                subtitleController.endLiveCaptions()
+                captionTranslator.deactivate()
+                transcriptionController.liveCaptionHandler = nil
+                transcriptionController.onLookaheadModeChanged = nil
+                transcriptionController.translationRequestHandler = nil
+                ToastManager.shared.show(err, icon: "captions.bubble", style: .error)
+            }
         }
     }
 
     @ViewBuilder
     private func infoPill(icon: String, text: String, color: Color = Color.pillAccent) -> some View {
-        HStack(spacing: 4) {
+        pillContainer(color: color) {
             Image(systemName: icon)
                 .font(.system(size: 10, weight: .bold))
             Text(text)
                 .font(.system(size: 10, weight: .bold))
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
+        }
+    }
+
+    @ViewBuilder
+    private func pillContainer<Content: View>(
+        color: Color,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        HStack(spacing: 4) {
+            content()
         }
         .padding(.horizontal, 8)
         .frame(height: 24)
@@ -858,6 +1226,160 @@ struct SceneDetailMetadataCard: View {
             return String(format: "%d:%02d:%02d", hours, minutes, secs)
         } else {
             return String(format: "%d:%02d", minutes, secs)
+        }
+    }
+
+    private func loadSpeechSupportedLanguagesIfNeeded() async {
+        if let cached = Self.cachedSpeechLanguageOptions, !cached.isEmpty {
+            if speechSupportedLanguageOptions.isEmpty {
+                speechSupportedLanguageOptions = cached
+            }
+            return
+        }
+        let options = await SpeechTranscriberAvailability.sceneLanguagePickerOptions()
+        Self.cachedSpeechLanguageOptions = options
+        speechSupportedLanguageOptions = options
+    }
+
+    private static var cachedSpeechLanguageOptions: [(id: String, label: String)]?
+}
+
+/// Scene-language Menu isolated from player/transcription churn so the popup does not rebuild.
+private struct SceneLanguageMenu: View, Equatable {
+    let options: [(id: String, label: String)]
+    let selectedCode: String?
+    let labelCode: String
+    let onSelect: (String) -> Void
+
+    static func == (lhs: SceneLanguageMenu, rhs: SceneLanguageMenu) -> Bool {
+        lhs.selectedCode == rhs.selectedCode
+            && lhs.labelCode == rhs.labelCode
+            && lhs.options.map(\.id) == rhs.options.map(\.id)
+    }
+
+    var body: some View {
+        Menu {
+            if options.isEmpty {
+                Text("Loading languages…")
+            } else {
+                ForEach(options, id: \.id) { option in
+                    Button {
+                        onSelect(option.id)
+                    } label: {
+                        Label {
+                            Text(option.label)
+                        } icon: {
+                            if selectedCode == option.id {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "globe")
+                    .font(.system(size: 10, weight: .bold))
+                Text(labelCode)
+                    .font(.system(size: 10, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 24)
+            .background(Color.teal.opacity(0.1))
+            .foregroundColor(.teal)
+            .clipShape(Capsule())
+        }
+    }
+}
+
+/// CC mode Menu with a stable label — progress UI must not live in the label.
+private struct TeleprompterModeMenu: View, Equatable {
+    let mode: SceneTeleprompterMode
+    let userLanguage: String
+    let isActive: Bool
+    let translationEnabled: Bool
+    let needsSpeechModelDownload: Bool
+    let speechModelName: String?
+    let needsTranslationPack: Bool
+    let onSelect: (SceneTeleprompterMode) -> Void
+    let onDownloadSpeechModel: () -> Void
+    let onDownloadTranslationPack: () -> Void
+
+    static func == (lhs: TeleprompterModeMenu, rhs: TeleprompterModeMenu) -> Bool {
+        lhs.mode == rhs.mode
+            && lhs.userLanguage == rhs.userLanguage
+            && lhs.isActive == rhs.isActive
+            && lhs.translationEnabled == rhs.translationEnabled
+            && lhs.needsSpeechModelDownload == rhs.needsSpeechModelDownload
+            && lhs.speechModelName == rhs.speechModelName
+            && lhs.needsTranslationPack == rhs.needsTranslationPack
+    }
+
+    var body: some View {
+        let color: Color = isActive ? .orange : .secondary
+        let label: String = {
+            if needsSpeechModelDownload { return speechModelName ?? "AI CC↓" }
+            if needsTranslationPack { return "AI CC↓" }
+            if isActive && translationEnabled { return "AI CC·\(userLanguage.uppercased())" }
+            return "AI CC"
+        }()
+
+        Menu {
+            Button { onSelect(.off) } label: {
+                Label {
+                    Text(SceneTeleprompterMode.off.title)
+                } icon: {
+                    if mode == .off { Image(systemName: "checkmark") }
+                }
+            }
+            Button { onSelect(.sceneLanguage) } label: {
+                Label {
+                    Text(SceneTeleprompterMode.sceneLanguage.title)
+                } icon: {
+                    if mode == .sceneLanguage { Image(systemName: "checkmark") }
+                }
+            }
+            Button { onSelect(.userLanguage) } label: {
+                Label {
+                    Text("\(SceneTeleprompterMode.userLanguage.title) (\(userLanguage.uppercased()))")
+                } icon: {
+                    if mode == .userLanguage { Image(systemName: "checkmark") }
+                }
+            }
+            if needsSpeechModelDownload {
+                Divider()
+                Button(action: onDownloadSpeechModel) {
+                    Label(
+                        "Download \(speechModelName ?? "speech") speech model",
+                        systemImage: "arrow.down.circle"
+                    )
+                }
+            }
+            if needsTranslationPack {
+                Divider()
+                Button(action: onDownloadTranslationPack) {
+                    Label(
+                        "Download \(userLanguage.uppercased()) language pack",
+                        systemImage: "arrow.down.circle"
+                    )
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: isActive ? "captions.bubble.fill" : "captions.bubble")
+                    .font(.system(size: 10, weight: .bold))
+                Text(label)
+                    .font(.system(size: 10, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .padding(.horizontal, 8)
+            .frame(height: 24)
+            .background(color.opacity(0.1))
+            .foregroundColor(color)
+            .clipShape(Capsule())
         }
     }
 }

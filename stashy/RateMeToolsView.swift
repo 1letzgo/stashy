@@ -696,7 +696,6 @@ struct RateMeToolsView: View {
 
     @StateObject private var model = RateMeViewModel()
     @ObservedObject private var appearance = AppearanceManager.shared
-    @AppStorage(RateMeSettings.showDeleteButtonKey) private var showDeleteButton = false
     /// Avoids reloading when returning from `NavigationLink` (Watch Scene): `.task` restarts after disappear/reappear.
     @State private var didRunInitialRateMeLoad = false
     @State private var showDeleteConfirmation = false
@@ -900,7 +899,7 @@ struct RateMeToolsView: View {
                 }
             }
 
-            // Full-width row: Rate (flex) + compact O (+ optional Delete).
+            // Full-width row: Rate (flex) + compact O + Delete.
             // Keep Rate wide enough for 5 stars — proportional side slots were clipping the 5th.
             HStack(alignment: .center, spacing: 10) {
                 VStack(spacing: 14) {
@@ -911,14 +910,14 @@ struct RateMeToolsView: View {
                     StarRatingView(
                         rating100: model.draftRating100,
                         isInteractive: !model.isSubmitting && !model.isDeleting,
-                        size: showDeleteButton ? 24 : 28,
-                        spacing: showDeleteButton ? 4 : 6
+                        size: 24,
+                        spacing: 4
                     ) { newRating in
                         Task { await model.submitRating(newRating) }
                     }
                     .frame(maxWidth: .infinity)
                 }
-                .padding(.horizontal, showDeleteButton ? 10 : 12)
+                .padding(.horizontal, 10)
                 .padding(.vertical, 12)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
                 .layoutPriority(1)
@@ -951,33 +950,31 @@ struct RateMeToolsView: View {
                 .disabled(model.isSubmitting || model.isIncrementingO || model.isDeleting)
                 .accessibilityLabel("O-Counter \(item.oCounter), tap to increment")
 
-                if showDeleteButton {
-                    Button {
-                        HapticManager.light()
-                        showDeleteConfirmation = true
-                    } label: {
-                        VStack(spacing: 8) {
-                            Image(systemName: "trash.fill")
-                                .font(.title2.weight(.semibold))
-                                .foregroundStyle(.red)
-                            Text("Delete")
-                                .font(.caption.weight(.semibold))
-                                .foregroundStyle(.red)
-                                .lineLimit(1)
-                                .minimumScaleFactor(0.7)
-                        }
-                        .frame(width: 56)
-                        .frame(maxHeight: .infinity)
-                        .padding(.vertical, 12)
-                        .background(Color.appBackground)
-                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
-                        .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
+                Button {
+                    HapticManager.light()
+                    showDeleteConfirmation = true
+                } label: {
+                    VStack(spacing: 8) {
+                        Image(systemName: "trash.fill")
+                            .font(.title2.weight(.semibold))
+                            .foregroundStyle(.red)
+                        Text("Delete")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.red)
+                            .lineLimit(1)
+                            .minimumScaleFactor(0.7)
                     }
-                    .buttonStyle(.plain)
-                    .disabled(model.isSubmitting || model.isDeleting || model.isLoading)
-                    .accessibilityLabel("Delete")
-                    .accessibilityHint("Deletes this item and its files after confirmation")
+                    .frame(width: 56)
+                    .frame(maxHeight: .infinity)
+                    .padding(.vertical, 12)
+                    .background(Color.appBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
                 }
+                .buttonStyle(.plain)
+                .disabled(model.isSubmitting || model.isDeleting || model.isLoading)
+                .accessibilityLabel("Delete")
+                .accessibilityHint("Deletes this item and its files after confirmation")
             }
             .frame(maxWidth: .infinity)
             .frame(height: 96)

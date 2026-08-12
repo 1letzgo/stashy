@@ -25,6 +25,12 @@
 		372E2D992F64272300603361 /* VideoAnalysisManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2D982F64272300603361 /* VideoAnalysisManager.swift */; };
 		372E2D9B2F64425000603361 /* StashSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2D9A2F64425000603361 /* StashSyncManager.swift */; };
 		372E2D9D2F645A0100603361 /* SubtitleController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2D9C2F645A0100603361 /* SubtitleController.swift */; };
+		A1PLUS012F30B00000000001 /* StashyPlusManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1PLUS022F30B00000000002 /* StashyPlusManager.swift */; };
+		372E2DA32F646B0100603361 /* SceneTranscriptionSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DA22F646B0100603361 /* SceneTranscriptionSupport.swift */; };
+		372E2DA52F646B0100603361 /* SceneLiveTranscriptionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DA42F646B0100603361 /* SceneLiveTranscriptionController.swift */; };
+		372E2DA72F646B0100603361 /* SceneTeleprompterPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DA62F646B0100603361 /* SceneTeleprompterPanel.swift */; };
+		372E2DA92F646B0100603361 /* SceneTranscodeAudioPrefetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DA82F646B0100603361 /* SceneTranscodeAudioPrefetcher.swift */; };
+		372E2DAB2F646B0100603361 /* SceneCaptionTranslator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DAA2F646B0100603361 /* SceneCaptionTranslator.swift */; };
 		37D092D62F8980B400DB7A08 /* MarkersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 37D092D52F8980B400DB7A08 /* MarkersView.swift */; };
 		37D3E2E52F39384000AB8FAD /* ServerConfig.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB779EFE84155DC02AAC07 /* ServerConfig.swift */; };
 		37D3E3262F39444C00AB8FAD /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0000022E8A9C0000000001 /* Assets.xcassets */; };
@@ -174,6 +180,13 @@
 		372E2D982F64272300603361 /* VideoAnalysisManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoAnalysisManager.swift; sourceTree = "<group>"; };
 		372E2D9A2F64425000603361 /* StashSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashSyncManager.swift; sourceTree = "<group>"; };
 		372E2D9C2F645A0100603361 /* SubtitleController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleController.swift; sourceTree = "<group>"; };
+		A1PLUS022F30B00000000002 /* StashyPlusManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyPlusManager.swift; sourceTree = "<group>"; };
+		A1PLUS032F30B00000000003 /* Configuration.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Configuration.storekit; sourceTree = "<group>"; };
+		372E2DA22F646B0100603361 /* SceneTranscriptionSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneTranscriptionSupport.swift; sourceTree = "<group>"; };
+		372E2DA42F646B0100603361 /* SceneLiveTranscriptionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneLiveTranscriptionController.swift; sourceTree = "<group>"; };
+		372E2DA62F646B0100603361 /* SceneTeleprompterPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneTeleprompterPanel.swift; sourceTree = "<group>"; };
+		372E2DA82F646B0100603361 /* SceneTranscodeAudioPrefetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneTranscodeAudioPrefetcher.swift; sourceTree = "<group>"; };
+		372E2DAA2F646B0100603361 /* SceneCaptionTranslator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCaptionTranslator.swift; sourceTree = "<group>"; };
 		37D092D52F8980B400DB7A08 /* MarkersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkersView.swift; sourceTree = "<group>"; };
 		37D3E24E2F3932C400AB8FAD /* stashyTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = stashyTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		37D3E4912F3A305D00AB8FAD /* SceneHeatmapCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneHeatmapCard.swift; sourceTree = "<group>"; };
@@ -292,6 +305,7 @@
 			isa = PBXGroup;
 			children = (
 				08FB7794FE84155DC02AAC07 /* App.swift */,
+				A1PLUS032F30B00000000003 /* Configuration.storekit */,
 				DF22BB312F1831C7007C2090 /* AppearanceManager.swift */,
 				AA0000022E8A9C0000000001 /* Assets.xcassets */,
 				DF675E612F2A46A1004CA019 /* Home */,
@@ -315,6 +329,7 @@
 				372E2D692F6339EE00603361 /* LoginAuthHelper.swift */,
 				DF22BB262F167CDC007C2090 /* ImageCacheManager.swift */,
 				37BE5B4D2F51718500107960 /* Managers */,
+				372E2D9F2F646B0100603361 /* Subtitles */,
 				DFSM000022F2NEWFILE002 /* KeychainManager.swift */,
 				08FB7798FE84155DC02AAC07 /* MainTabView.swift */,
 				DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */,
@@ -354,10 +369,23 @@
 			children = (
 				372E2D982F64272300603361 /* VideoAnalysisManager.swift */,
 				372E2D9A2F64425000603361 /* StashSyncManager.swift */,
+				A1PLUS022F30B00000000002 /* StashyPlusManager.swift */,
 				372E2D9C2F645A0100603361 /* SubtitleController.swift */,
 				DFSEC0022F2A000100000002 /* SecurityManager.swift */,
 			);
 			path = Managers;
+			sourceTree = "<group>";
+		};
+		372E2D9F2F646B0100603361 /* Subtitles */ = {
+			isa = PBXGroup;
+			children = (
+				372E2DA22F646B0100603361 /* SceneTranscriptionSupport.swift */,
+				372E2DA42F646B0100603361 /* SceneLiveTranscriptionController.swift */,
+				372E2DA62F646B0100603361 /* SceneTeleprompterPanel.swift */,
+				372E2DA82F646B0100603361 /* SceneTranscodeAudioPrefetcher.swift */,
+				372E2DAA2F646B0100603361 /* SceneCaptionTranslator.swift */,
+			);
+			path = Subtitles;
 			sourceTree = "<group>";
 		};
 		DF675E612F2A46A1004CA019 /* Home */ = {
@@ -580,7 +608,13 @@
 				DFST0000F2F30A000000000F /* ReelsModeSettingsView.swift in Sources */,
 				DFST000112F30A0000000011 /* DefaultSortView.swift in Sources */,
 				372E2D992F64272300603361 /* VideoAnalysisManager.swift in Sources */,
+				A1PLUS012F30B00000000001 /* StashyPlusManager.swift in Sources */,
 				372E2D9D2F645A0100603361 /* SubtitleController.swift in Sources */,
+				372E2DA32F646B0100603361 /* SceneTranscriptionSupport.swift in Sources */,
+				372E2DA52F646B0100603361 /* SceneLiveTranscriptionController.swift in Sources */,
+				372E2DA72F646B0100603361 /* SceneTeleprompterPanel.swift in Sources */,
+				372E2DA92F646B0100603361 /* SceneTranscodeAudioPrefetcher.swift in Sources */,
+				372E2DAB2F646B0100603361 /* SceneCaptionTranslator.swift in Sources */,
 				DFST000132F30A0000000013 /* DefaultFilterView.swift in Sources */,
 				DFST000152F30A0000000015 /* ServerStatisticsView.swift in Sources */,
 				DFE5045E2E8A8C2000323FF0 /* ScenesView.swift in Sources */,
@@ -841,7 +875,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 100;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -852,7 +886,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.1;
+				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -871,7 +905,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 100;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -882,7 +916,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.1;
+				MARKETING_VERSION = 3.0;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PROVISIONING_PROFILE_SPECIFIER = "";

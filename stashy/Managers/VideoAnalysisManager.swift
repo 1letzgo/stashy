@@ -82,7 +82,9 @@ class StashVideoSyncManager: ObservableObject {
     @Published var isRecording: Bool = false
 
     private var currentPlayerTime: Double = 0
-    private var currentItem: AVPlayerItem?
+    private var currentPlayerItem: AVPlayerItem?
+    /// Item currently wired for video/audio taps (used by live captions).
+    var currentItem: AVPlayerItem? { currentPlayerItem }
     private var videoOutput: AVPlayerItemVideoOutput?
     private var displayLink: CADisplayLink?
     private var previousPixelBuffer: CVPixelBuffer?
@@ -117,6 +119,23 @@ class StashVideoSyncManager: ObservableObject {
     // Audio tap
     private var audioTap: MTAudioProcessingTap?
     private var audioAGCMax: Float = 0.01  // adaptive ceiling for AGC normalization
+    private var tapASBD: AudioStreamBasicDescription?
+    private let transcriptionHandlerLock = NSLock()
+    private var _transcriptionPCMHandler: ((AVAudioPCMBuffer) -> Void)?
+    /// Live PCM from the same decode path as playback (HLS-safe). Called on the audio thread; buffer is a copy.
+    var transcriptionPCMHandler: ((AVAudioPCMBuffer) -> Void)? {
+        get {
+            transcriptionHandlerLock.lock()
+            defer { transcriptionHandlerLock.unlock() }
+            return _transcriptionPCMHandler
+        }
+        set {
+            transcriptionHandlerLock.lock()
+            _transcriptionPCMHandler = newValue
+            transcriptionHandlerLock.unlock()
+        }
+    }
+    var hasAudioTapInstalled: Bool { audioTap != nil }
 
     private var cancellables = Set<AnyCancellable>()
     private let analysisQueue = DispatchQueue(label: "com.stashko.videoanalysis", qos: .userInteractive)
@@ -161,7 +180,7 @@ class StashVideoSyncManager: ObservableObject {
 
     func setup(for playerItem: AVPlayerItem) {
         cleanup()
-        self.currentItem = playerItem
+        self.currentPlayerItem = playerItem
 
         let settings: [String: Any] = [
             kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
@@ -210,8 +229,16 @@ class StashVideoSyncManager: ObservableObject {
                 let storage = MTAudioProcessingTapGetStorage(tap)
                 Unmanaged<StashVideoSyncManager>.fromOpaque(storage).release()
             },
-            prepare: { _, _, _ in },
-            unprepare: { _ in },
+            prepare: { tap, _, processingFormat in
+                let storage = MTAudioProcessingTapGetStorage(tap)
+                let manager = Unmanaged<StashVideoSyncManager>.fromOpaque(storage).takeUnretainedValue()
+                manager.tapASBD = processingFormat.pointee
+            },
+            unprepare: { tap in
+                let storage = MTAudioProcessingTapGetStorage(tap)
+                let manager = Unmanaged<StashVideoSyncManager>.fromOpaque(storage).takeUnretainedValue()
+                manager.tapASBD = nil
+            },
             process: { tap, numberFrames, flags, bufferListInOut, numberFramesOut, flagsOut in
                 let storage = MTAudioProcessingTapGetStorage(tap)
                 let manager = Unmanaged<StashVideoSyncManager>.fromOpaque(storage).takeUnretainedValue()
@@ -233,6 +260,15 @@ class StashVideoSyncManager: ObservableObject {
                 for i in 0..<sampleCount { let s = samples[i]; sumSquares += s * s }
                 let rms = sqrt(sumSquares / Float(sampleCount))
                 manager.updateAudioIntensity(rms)
+
+                manager.transcriptionHandlerLock.lock()
+                let handler = manager._transcriptionPCMHandler
+                let asbd = manager.tapASBD
+                manager.transcriptionHandlerLock.unlock()
+                if let handler, let asbd,
+                   let pcm = manager.copyTapBuffer(bufferList: bufferListInOut, frames: outFrames, asbd: asbd) {
+                    handler(pcm)
+                }
             }
         )
 
@@ -256,6 +292,43 @@ class StashVideoSyncManager: ObservableObject {
         DispatchQueue.main.async {
             self.audioIntensity = self.audioIntensity * sm + normalized * (1.0 - sm)
         }
+    }
+
+    /// Copy tap audio into an owned `AVAudioPCMBuffer` (safe to hand off the realtime thread).
+    private func copyTapBuffer(
+        bufferList: UnsafeMutablePointer<AudioBufferList>,
+        frames: CMItemCount,
+        asbd: AudioStreamBasicDescription
+    ) -> AVAudioPCMBuffer? {
+        guard frames > 0 else { return nil }
+        var asbdCopy = asbd
+        guard var format = AVAudioFormat(streamDescription: &asbdCopy) else { return nil }
+        // Some taps report an incomplete ASBD; fall back to common float stereo @ 48k.
+        if format.channelCount == 0 || format.sampleRate <= 0 {
+            let rate = asbd.mSampleRate > 0 ? asbd.mSampleRate : 48_000
+            let channels = AVAudioChannelCount(max(1, asbd.mChannelsPerFrame == 0 ? 2 : asbd.mChannelsPerFrame))
+            let interleaved = asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved == 0
+            guard let fallback = AVAudioFormat(
+                commonFormat: .pcmFormatFloat32,
+                sampleRate: rate,
+                channels: channels,
+                interleaved: interleaved
+            ) else { return nil }
+            format = fallback
+        }
+        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames))
+        else { return nil }
+        buffer.frameLength = AVAudioFrameCount(frames)
+
+        let abl = UnsafeMutableAudioBufferListPointer(bufferList)
+        let destABL = UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList)
+        let count = min(abl.count, destABL.count)
+        for i in 0..<count {
+            guard let src = abl[i].mData, let dst = destABL[i].mData else { continue }
+            let byteCount = min(Int(abl[i].mDataByteSize), Int(destABL[i].mDataByteSize))
+            memcpy(dst, src, byteCount)
+        }
+        return buffer
     }
 
     // MARK: - Display Link
@@ -976,10 +1049,11 @@ class StashVideoSyncManager: ObservableObject {
     private func cleanup() {
         displayLink?.invalidate()
         displayLink = nil
-        if let output = videoOutput, let item = currentItem { item.remove(output) }
+        if let output = videoOutput, let item = currentPlayerItem { item.remove(output) }
         videoOutput = nil
-        currentItem = nil
+        currentPlayerItem = nil
         audioTap = nil
+        tapASBD = nil
         previousPixelBuffer = nil
         dominantPersonPixelYRange = nil
         cachedPersonMask = nil

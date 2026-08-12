@@ -41,6 +41,112 @@ enum PerformerBadgeType {
     }
 }
 
+/// User-preferred subtitle / teleprompter target language (Playback settings).
+enum SubtitleTargetLanguage {
+    static let storageKey = "stashy_subtitle_target_language"
+
+    static let selectableLanguageCodes: [String] = [
+        "de", "en", "fr", "es", "it", "nl", "pt", "pl", "ru", "ja", "zh", "ko",
+        "ar", "hi", "tr", "sv", "da", "nb", "fi", "cs", "hu", "uk", "el", "he", "vi", "th", "id", "ro",
+    ]
+
+    static var defaultLanguageCode: String {
+        languageCode(from: Locale.preferredLanguages.first ?? Locale.current.identifier(.bcp47)) ?? "en"
+    }
+
+    static func load(from defaults: UserDefaults = .standard) -> String {
+        let raw = defaults.string(forKey: storageKey)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !raw.isEmpty { return normalized(raw) }
+        return defaultLanguageCode
+    }
+
+    static func normalized(_ code: String) -> String {
+        let trimmed = code.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !trimmed.isEmpty else { return defaultLanguageCode }
+        let base = languageCode(from: trimmed) ?? trimmed
+        let allowed = Set(selectableLanguageCodes + [defaultLanguageCode])
+        return allowed.contains(base) ? base : defaultLanguageCode
+    }
+
+    static func persist(_ code: String, to defaults: UserDefaults = .standard) {
+        defaults.set(normalized(code), forKey: storageKey)
+    }
+
+    static func displayName(for code: String, locale: Locale = .current) -> String {
+        locale.localizedString(forLanguageCode: code) ?? code.uppercased()
+    }
+
+    static func pickerOptions(locale: Locale = .current) -> [(id: String, label: String)] {
+        var codes = Set(selectableLanguageCodes)
+        codes.insert(defaultLanguageCode)
+        codes.insert(load())
+        return codes.sorted { displayName(for: $0, locale: locale) < displayName(for: $1, locale: locale) }
+            .map { (id: $0, label: displayName(for: $0, locale: locale)) }
+    }
+
+    static func languageCode(from identifier: String) -> String? {
+        let id = identifier.lowercased()
+        if let dash = id.firstIndex(of: "-") { return String(id[..<dash]) }
+        if let underscore = id.firstIndex(of: "_") { return String(id[..<underscore]) }
+        return id.count >= 2 ? String(id.prefix(2)) : (id.isEmpty ? nil : id)
+    }
+
+    /// Language names and 3-letter codes that a plain `prefix(2)` would mangle
+    /// ("German" would become "ge", "Spanish" "sp", "Czech" "cz" — none of them real codes).
+    private static let languageAliases: [String: String] = [
+        "german": "de", "deutsch": "de", "ger": "de", "deu": "de",
+        "english": "en", "englisch": "en", "eng": "en",
+        "french": "fr", "français": "fr", "francais": "fr", "französisch": "fr", "fra": "fr", "fre": "fr",
+        "spanish": "es", "español": "es", "espanol": "es", "spanisch": "es", "spa": "es",
+        "italian": "it", "italiano": "it", "italienisch": "it", "ita": "it",
+        "dutch": "nl", "nederlands": "nl", "niederländisch": "nl", "nld": "nl", "dut": "nl",
+        "portuguese": "pt", "português": "pt", "portugues": "pt", "portugiesisch": "pt", "por": "pt",
+        "polish": "pl", "polski": "pl", "polnisch": "pl", "pol": "pl",
+        "russian": "ru", "russisch": "ru", "rus": "ru",
+        "japanese": "ja", "japanisch": "ja", "jpn": "ja",
+        "chinese": "zh", "mandarin": "zh", "chinesisch": "zh", "zho": "zh", "chi": "zh",
+        "korean": "ko", "koreanisch": "ko", "kor": "ko",
+        "arabic": "ar", "arabisch": "ar", "ara": "ar",
+        "hindi": "hi", "hin": "hi",
+        "turkish": "tr", "türkisch": "tr", "türkçe": "tr", "tur": "tr",
+        "swedish": "sv", "svenska": "sv", "schwedisch": "sv", "swe": "sv",
+        "danish": "da", "dansk": "da", "dänisch": "da", "dan": "da",
+        "norwegian": "nb", "norsk": "nb", "norwegisch": "nb", "nor": "nb",
+        "finnish": "fi", "suomi": "fi", "finnisch": "fi", "fin": "fi",
+        "czech": "cs", "čeština": "cs", "cestina": "cs", "tschechisch": "cs", "ces": "cs", "cze": "cs",
+        "hungarian": "hu", "magyar": "hu", "ungarisch": "hu", "hun": "hu",
+        "ukrainian": "uk", "ukrainisch": "uk", "ukr": "uk",
+        "greek": "el", "griechisch": "el", "ell": "el", "gre": "el",
+        "hebrew": "he", "hebräisch": "he", "heb": "he", "iw": "he",
+        "vietnamese": "vi", "vietnamesisch": "vi", "vie": "vi",
+        "thai": "th", "thailändisch": "th", "tha": "th",
+        "indonesian": "id", "bahasa indonesia": "id", "indonesisch": "id", "ind": "id",
+        "romanian": "ro", "rumänisch": "ro", "romana": "ro", "ron": "ro", "rum": "ro",
+    ]
+
+    /// Turns whatever is stored in Stash (`de`, `de-DE`, `German`, `deu`, …) into an ISO-639-1
+    /// code, or `nil` when the value cannot be resolved to a real language.
+    static func canonicalCode(from raw: String?) -> String? {
+        guard let value = raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+              !value.isEmpty else { return nil }
+        if let alias = languageAliases[value] { return alias }
+        guard let base = languageCode(from: value) else { return nil }
+        if let alias = languageAliases[base] { return alias }
+        guard base.count == 2, isKnownISOCode(base) else { return nil }
+        return base
+    }
+
+    private static func isKnownISOCode(_ code: String) -> Bool {
+        Locale.LanguageCode.isoLanguageCodes.contains { $0.identifier == code }
+    }
+
+    static func sameLanguage(_ a: String?, _ b: String?) -> Bool {
+        guard let a = a.flatMap({ languageCode(from: $0) }),
+              let b = b.flatMap({ languageCode(from: $0) }) else { return false }
+        return a == b
+    }
+}
+
 // MARK: - Global Helper Functions
 
 /// Adds the API key as a query parameter to the URL for authentication
@@ -234,7 +340,18 @@ func createPlayer(for url: URL) -> AVPlayer {
     player.automaticallyWaitsToMinimizeStalling = false
     player.allowsExternalPlayback = true
     player.preventsDisplaySleepDuringVideoPlayback = true
+    applyBackgroundPlaybackPolicy(to: player)
     return player
+}
+
+/// When PiP is disabled in settings, pause A/V on lock/background instead of
+/// keeping a Now Playing / lock-screen session alive.
+func applyBackgroundPlaybackPolicy(to player: AVPlayer) {
+    if #available(iOS 15.0, *) {
+        player.audiovisualBackgroundPlaybackPolicy = TabManager.shared.isPiPEnabled
+            ? .automatic
+            : .pauses
+    }
 }
 
 // MARK: - Scene playback activity (play_duration / resume_time)
@@ -437,7 +554,7 @@ final class NetworkQualityMonitor: @unchecked Sendable {
 
 // MARK: - Generic JSON Handling
 
-enum StashJSONValue: Codable {
+enum StashJSONValue: Codable, Equatable {
     case string(String)
     case int(Int)
     case double(Double)
@@ -480,6 +597,15 @@ enum StashJSONValue: Codable {
         case .object(let o): return o.mapValues { $0.value }
         case .array(let a): return a.map { $0.value }
         case .null: return NSNull()
+        }
+    }
+
+    var stringValue: String? {
+        switch self {
+        case .string(let s): return s
+        case .int(let i): return String(i)
+        case .double(let d): return String(d)
+        default: return nil
         }
     }
 }

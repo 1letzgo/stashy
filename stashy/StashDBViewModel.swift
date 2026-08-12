@@ -5915,36 +5915,106 @@ class StashDBViewModel: ObservableObject {
         clipPreviews: Bool = false,
         imageThumbnails: Bool = false,
         imagePhashes: Bool = false,
+        sceneIDs: [String]? = nil,
+        markerIDs: [String]? = nil,
         completion: @escaping (Bool, String) -> Void
     ) {
-        let input: [String: Any] = [
-            "covers": covers,
-            "previews": previews,
-            "imagePreviews": imagePreviews,
-            "sprites": sprites,
-            "markers": markers,
-            "markerImagePreviews": markerImagePreviews,
-            "markerScreenshots": markerScreenshots,
-            "transcodes": transcodes,
-            "phashes": phashes,
-            "interactiveHeatmapsSpeeds": interactiveHeatmapsSpeeds,
-            "clipPreviews": clipPreviews,
-            "imageThumbnails": imageThumbnails,
-            "imagePhashes": imagePhashes
-        ]
+        triggerGenerateReturningJobId(
+            covers: covers,
+            previews: previews,
+            imagePreviews: imagePreviews,
+            sprites: sprites,
+            markers: markers,
+            markerImagePreviews: markerImagePreviews,
+            markerScreenshots: markerScreenshots,
+            transcodes: transcodes,
+            phashes: phashes,
+            interactiveHeatmapsSpeeds: interactiveHeatmapsSpeeds,
+            clipPreviews: clipPreviews,
+            imageThumbnails: imageThumbnails,
+            imagePhashes: imagePhashes,
+            sceneIDs: sceneIDs,
+            markerIDs: markerIDs
+        ) { success, message, _ in
+            completion(success, message)
+        }
+    }
+
+    /// Starts a scoped generate job. Completion: `(success, message, jobId)`.
+    func triggerGenerateReturningJobId(
+        covers: Bool = false,
+        previews: Bool = false,
+        imagePreviews: Bool = false,
+        sprites: Bool = false,
+        markers: Bool = false,
+        markerImagePreviews: Bool = false,
+        markerScreenshots: Bool = false,
+        transcodes: Bool = false,
+        phashes: Bool = false,
+        interactiveHeatmapsSpeeds: Bool = false,
+        clipPreviews: Bool = false,
+        imageThumbnails: Bool = false,
+        imagePhashes: Bool = false,
+        overwrite: Bool = false,
+        sceneIDs: [String]? = nil,
+        markerIDs: [String]? = nil,
+        completion: @escaping (Bool, String, String?) -> Void
+    ) {
+        // Only send enabled flags + scope — matches Stash web and avoids odd no-op jobs.
+        var input: [String: Any] = [:]
+        if covers { input["covers"] = true }
+        if previews { input["previews"] = true }
+        if imagePreviews { input["imagePreviews"] = true }
+        if sprites { input["sprites"] = true }
+        if markers { input["markers"] = true }
+        if markerImagePreviews { input["markerImagePreviews"] = true }
+        if markerScreenshots { input["markerScreenshots"] = true }
+        if transcodes { input["transcodes"] = true }
+        if phashes { input["phashes"] = true }
+        if interactiveHeatmapsSpeeds { input["interactiveHeatmapsSpeeds"] = true }
+        if clipPreviews { input["clipPreviews"] = true }
+        if imageThumbnails { input["imageThumbnails"] = true }
+        if imagePhashes { input["imagePhashes"] = true }
+        if overwrite { input["overwrite"] = true }
+        if let sceneIDs, !sceneIDs.isEmpty {
+            input["sceneIDs"] = sceneIDs
+        }
+        if let markerIDs, !markerIDs.isEmpty {
+            input["markerIDs"] = markerIDs
+        }
         let query = GraphQLQueries.loadQuery(named: "metadataGenerate")
         let body: [String: Any] = ["query": query, "variables": ["input": input]]
         guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
               let bodyString = String(data: bodyData, encoding: .utf8) else {
-            completion(false, "Failed to build generate request.")
+            completion(false, "Failed to build generate request.", nil)
             return
         }
         performGraphQLQuery(query: bodyString) { (response: GenericMutationResponse?) in
-            if response != nil {
-                completion(true, "Generate started successfully!")
+            if let jobId = response?.data?["metadataGenerate"], !jobId.isEmpty {
+                completion(true, "Generate started successfully!", jobId)
+            } else if response != nil {
+                completion(true, "Generate started successfully!", nil)
             } else {
-                completion(false, "Failed to start generate. Please check your server configuration.")
+                completion(false, "Failed to start generate. Please check your server configuration.", nil)
             }
+        }
+    }
+
+    /// Generates still thumbnails for markers on a scene (frame at each marker's start time).
+    ///
+    /// Important: scope via `sceneIDs`, not only `markerIDs`. Stash's per-marker generate path
+    /// does not create `generated/markers/<hash>/`, so screenshot writes fail for new scenes.
+    func generateMarkerScreenshots(sceneId: String, completion: @escaping (Bool, String?) -> Void) {
+        guard !sceneId.isEmpty else {
+            completion(false, nil)
+            return
+        }
+        triggerGenerateReturningJobId(
+            markerScreenshots: true,
+            overwrite: true,
+            sceneIDs: [sceneId]
+        ) { success, _, jobId in
+            completion(success, jobId)
         }
     }
 
@@ -6196,13 +6266,15 @@ struct GenerateData: Codable {
         }
     }
     
-    func createSceneMarker(sceneId: String, title: String, seconds: Double, endSeconds: Double? = nil, primaryTagId: String, completion: @escaping (Bool) -> Void) {
+    /// Creates a scene marker. Completion receives `(success, createdMarker)`.
+    func createSceneMarker(sceneId: String, title: String, seconds: Double, endSeconds: Double? = nil, primaryTagId: String, completion: @escaping (Bool, SceneMarker?) -> Void) {
         let mutation = """
         mutation SceneMarkerCreate($input: SceneMarkerCreateInput!) {
             sceneMarkerCreate(input: $input) {
                 id
                 title
                 seconds
+                screenshot
             }
         }
         """
@@ -6224,15 +6296,15 @@ struct GenerateData: Codable {
         
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
               let bodyString = String(data: bodyData, encoding: .utf8) else {
-            completion(false)
+            completion(false, nil)
             return
         }
         
         performGraphQLQuery(query: bodyString) { (response: SceneMarkerCreateResponse?) in
-            if response?.data?.sceneMarkerCreate != nil {
-                completion(true)
+            if let marker = response?.data?.sceneMarkerCreate {
+                completion(true, marker)
             } else {
-                completion(false)
+                completion(false, nil)
             }
         }
     }
@@ -6484,6 +6556,33 @@ struct GenerateData: Codable {
         var input: [String: Any] = ["id": sceneId]
         if let t = title { input["title"] = t } else { input["title"] = NSNull() }
         if let d = details { input["details"] = d } else { input["details"] = NSNull() }
+        let variables: [String: Any] = ["input": input]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false); return
+        }
+        performGraphQLQuery(query: bodyString) { (response: SceneUpdateResponse?) in
+            completion(response?.data?.sceneUpdate != nil)
+        }
+    }
+
+    /// Writes spoken language into Stash scene `custom_fields.language`.
+    func updateSceneLanguage(sceneId: String, languageCode: String?, completion: @escaping (Bool) -> Void) {
+        let mutation = """
+        mutation SceneUpdate($input: SceneUpdateInput!) {
+            sceneUpdate(input: $input) { id }
+        }
+        """
+        var partial: [String: Any] = [:]
+        if let languageCode, !languageCode.isEmpty {
+            partial["language"] = languageCode
+        } else {
+            partial["language"] = NSNull()
+        }
+        let input: [String: Any] = [
+            "id": sceneId,
+            "custom_fields": ["partial": partial]
+        ]
         let variables: [String: Any] = ["input": input]
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
               let bodyString = String(data: bodyData, encoding: .utf8) else {
@@ -7290,6 +7389,7 @@ struct Scene: Codable, Identifiable, Equatable {
     var streams: [SceneStream]?
     let stashIds: [StashID]?
     let captions: [VideoCaption]?
+    let customFields: [String: StashJSONValue]?
 
     /// True when the scene already has at least one Stash-Box ID.
     var hasStashID: Bool {
@@ -7300,7 +7400,33 @@ struct Scene: Codable, Identifiable, Equatable {
     }
 
     var hasCaptions: Bool {
-        !(captions ?? []).isEmpty && paths?.caption != nil
+        !(captions ?? []).isEmpty
+    }
+
+    /// Spoken language from Stash custom field `language`, accepting codes as well as names
+    /// ("de", "de-DE", "German", "deu"). `nil` when the field holds something unresolvable.
+    var spokenLanguageCode: String? {
+        SubtitleTargetLanguage.canonicalCode(from: customFields?["language"]?.stringValue)
+    }
+
+    /// Prefer Direct/MP4 for speech reader; fall back to paths.stream.
+    var transcriptionStreamURL: URL? {
+        if let streams {
+            let mp4 = streams.filter {
+                $0.mime_type == "video/mp4" && !$0.label.lowercased().contains("mkv")
+            }
+            if let best = mp4.first, let url = URL(string: best.url) {
+                return signedURL(url)
+            }
+            if let direct = streams.first(where: { $0.label.lowercased().contains("direct") }),
+               let url = URL(string: direct.url) {
+                return signedURL(url)
+            }
+        }
+        if let path = paths?.stream, let url = URL(string: path) {
+            return signedURL(url)
+        }
+        return videoURL
     }
     
     
@@ -7313,10 +7439,11 @@ struct Scene: Codable, Identifiable, Equatable {
         case updatedAt = "updated_at"
         case sceneMarkers = "scene_markers"
         case stashIds = "stash_ids"
+        case customFields = "custom_fields"
     }
 
     // Explicit initializer to handle manual updates like 'withStreams'
-    init(id: String, title: String?, details: String?, date: String?, duration: Double?, studio: SceneStudio?, performers: [ScenePerformer], files: [SceneFile]?, tags: [Tag]?, galleries: [Gallery]?, groups: [SceneGroupEntry]? = nil, organized: Bool?, resumeTime: Double?, playCount: Int?, oCounter: Int?, rating100: Int?, createdAt: String?, updatedAt: String?, paths: ScenePaths?, sceneMarkers: [SceneMarker]?, interactive: Bool?, streams: [SceneStream]? = nil, stashIds: [StashID]? = nil, captions: [VideoCaption]? = nil) {
+    init(id: String, title: String?, details: String?, date: String?, duration: Double?, studio: SceneStudio?, performers: [ScenePerformer], files: [SceneFile]?, tags: [Tag]?, galleries: [Gallery]?, groups: [SceneGroupEntry]? = nil, organized: Bool?, resumeTime: Double?, playCount: Int?, oCounter: Int?, rating100: Int?, createdAt: String?, updatedAt: String?, paths: ScenePaths?, sceneMarkers: [SceneMarker]?, interactive: Bool?, streams: [SceneStream]? = nil, stashIds: [StashID]? = nil, captions: [VideoCaption]? = nil, customFields: [String: StashJSONValue]? = nil) {
         self.id = id
         self.title = title
         self.details = details
@@ -7341,6 +7468,7 @@ struct Scene: Codable, Identifiable, Equatable {
         self.streams = streams
         self.stashIds = stashIds
         self.captions = captions
+        self.customFields = customFields
     }
 
     // Decodable init
@@ -7370,6 +7498,7 @@ struct Scene: Codable, Identifiable, Equatable {
         streams = try container.decodeIfPresent([SceneStream].self, forKey: .streams)
         stashIds = try container.decodeIfPresent([StashID].self, forKey: .stashIds)
         captions = try container.decodeIfPresent([VideoCaption].self, forKey: .captions)
+        customFields = try container.decodeIfPresent([String: StashJSONValue].self, forKey: .customFields)
     }
     
     
@@ -7665,7 +7794,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: newResumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields
         )
     }
 
@@ -7677,7 +7806,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: newRating, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields
         )
     }
 
@@ -7689,7 +7818,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: newStreams, stashIds: stashIds, captions: captions
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: newStreams, stashIds: stashIds, captions: captions, customFields: customFields
         )
     }
 
@@ -7701,7 +7830,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: newPlayCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields
         )
     }
 
@@ -7713,7 +7842,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: newOCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields
         )
     }
 
@@ -7725,8 +7854,30 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: newUpdatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields
         )
+    }
+
+    /// Creates a copy with updated custom fields (e.g. spoken `language`).
+    func withCustomFields(_ newFields: [String: StashJSONValue]?) -> Scene {
+        return Scene(
+            id: id, title: title, details: details, date: date, duration: duration,
+            studio: studio, performers: performers, files: files, tags: tags,
+            galleries: galleries, groups: groups, organized: organized,
+            resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
+            rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: newFields
+        )
+    }
+
+    func withSpokenLanguage(_ code: String?) -> Scene {
+        var fields = customFields ?? [:]
+        if let code, !code.isEmpty {
+            fields["language"] = .string(code)
+        } else {
+            fields.removeValue(forKey: "language")
+        }
+        return withCustomFields(fields.isEmpty ? nil : fields)
     }
     
 }
@@ -9105,7 +9256,17 @@ class DownloadManager: NSObject, ObservableObject {
     func downloadScene(_ scene: Scene) {
         let sceneId = scene.id
         guard !isDownloaded(id: sceneId), activeDownloads[sceneId] == nil else { return }
-        
+        #if !os(tvOS)
+        guard StashyPlusManager.isUnlockedNow else {
+            ToastManager.shared.show(
+                "Downloads are part of Stashy+ — unlock in Settings",
+                icon: "sparkles",
+                style: .error
+            )
+            return
+        }
+        #endif
+
         // 1. Fetch streams first to ensure we get a compatible MP4 if original is not
         StashDBViewModel().fetchSceneStreams(sceneId: sceneId) { streams in
             let sceneWithStreams = scene.withStreams(streams)
@@ -9326,6 +9487,7 @@ struct VideoPlayerView: UIViewControllerRepresentable {
         playerViewController.videoGravity = .resizeAspect
         playerViewController.allowsPictureInPicturePlayback = TabManager.shared.isPiPEnabled
         playerViewController.canStartPictureInPictureAutomaticallyFromInline = TabManager.shared.isPiPEnabled
+        applyBackgroundPlaybackPolicy(to: player)
         if #available(iOS 16.0, *) {
             // Verhindert das Analyse-/„Text erkennen“-Steuerelement bei pausierten Frames (Visual Look Up).
             playerViewController.allowsVideoFrameAnalysis = false
@@ -9348,6 +9510,7 @@ struct VideoPlayerView: UIViewControllerRepresentable {
         if uiViewController.canStartPictureInPictureAutomaticallyFromInline != tabManager.isPiPEnabled {
             uiViewController.canStartPictureInPictureAutomaticallyFromInline = tabManager.isPiPEnabled
         }
+        applyBackgroundPlaybackPolicy(to: player)
         if #available(iOS 16.0, *) {
             if uiViewController.allowsVideoFrameAnalysis {
                 uiViewController.allowsVideoFrameAnalysis = false
@@ -9370,47 +9533,62 @@ struct VideoPlayerView: UIViewControllerRepresentable {
 
         func installSubtitleOverlay(on controller: AVPlayerViewController) {
             guard let overlay = controller.contentOverlayView else { return }
-            if subtitleContainer?.superview === overlay { return }
+            if subtitleContainer?.superview === overlay {
+                overlay.bringSubviewToFront(subtitleContainer!)
+                return
+            }
 
             subtitleContainer?.removeFromSuperview()
 
             let container = UIView()
             container.isUserInteractionEnabled = false
             container.translatesAutoresizingMaskIntoConstraints = false
+            container.isHidden = true
             overlay.addSubview(container)
 
             let label = UILabel()
             label.translatesAutoresizingMaskIntoConstraints = false
             label.textAlignment = .center
-            label.numberOfLines = 0
+            label.numberOfLines = 3
             label.textColor = .white
-            label.font = .systemFont(ofSize: 18, weight: .semibold)
+            label.font = .systemFont(ofSize: 17, weight: .semibold)
             label.layer.shadowColor = UIColor.black.cgColor
-            label.layer.shadowOpacity = 0.9
-            label.layer.shadowRadius = 3
+            label.layer.shadowOpacity = 0.95
+            label.layer.shadowRadius = 2
             label.layer.shadowOffset = CGSize(width: 0, height: 1)
             label.isHidden = true
             container.addSubview(label)
 
+            // Near the bottom in fullscreen (inline uses SwiftUI overlay instead).
             NSLayoutConstraint.activate([
-                container.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 24),
-                container.trailingAnchor.constraint(equalTo: overlay.trailingAnchor, constant: -24),
-                container.bottomAnchor.constraint(equalTo: overlay.safeAreaLayoutGuide.bottomAnchor, constant: -56),
+                container.leadingAnchor.constraint(equalTo: overlay.leadingAnchor, constant: 16),
+                container.trailingAnchor.constraint(equalTo: overlay.trailingAnchor, constant: -16),
+                container.bottomAnchor.constraint(equalTo: overlay.bottomAnchor, constant: -28),
 
-                label.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-                label.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-                label.topAnchor.constraint(equalTo: container.topAnchor),
-                label.bottomAnchor.constraint(equalTo: container.bottomAnchor),
+                label.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 10),
+                label.trailingAnchor.constraint(equalTo: container.trailingAnchor, constant: -10),
+                label.topAnchor.constraint(equalTo: container.topAnchor, constant: 6),
+                label.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -6),
             ])
 
+            overlay.bringSubviewToFront(container)
             subtitleContainer = container
             subtitleLabel = label
         }
 
         func updateSubtitleText(_ text: String) {
             let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            subtitleLabel?.text = trimmed
-            subtitleLabel?.isHidden = trimmed.isEmpty
+            guard let label = subtitleLabel, let container = subtitleContainer else { return }
+            label.text = trimmed
+            let visible = !trimmed.isEmpty
+            label.isHidden = !visible
+            container.isHidden = !visible
+            container.backgroundColor = visible ? UIColor.black.withAlphaComponent(0.55) : .clear
+            container.layer.cornerRadius = 8
+            container.clipsToBounds = true
+            if visible, let overlay = container.superview {
+                overlay.bringSubviewToFront(container)
+            }
         }
 
         func playerViewController(_ playerViewController: AVPlayerViewController, willBeginFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {

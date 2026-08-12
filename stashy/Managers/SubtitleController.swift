@@ -6,10 +6,31 @@ import UIKit
 
 // MARK: - Cue model
 
-struct SubtitleCue: Equatable {
+struct SubtitleCue: Equatable, Identifiable {
+    let id: UUID
     let start: TimeInterval
     let end: TimeInterval
     let text: String
+    /// Filled in asynchronously by on-device translation for live captions.
+    var translated: String?
+
+    init(id: UUID = UUID(), start: TimeInterval, end: TimeInterval, text: String, translated: String? = nil) {
+        self.id = id
+        self.start = start
+        self.end = end
+        self.text = text
+        self.translated = translated
+    }
+
+    /// Identity is the timed content — a re-parsed cue is the same cue.
+    static func == (lhs: SubtitleCue, rhs: SubtitleCue) -> Bool {
+        lhs.start == rhs.start
+            && lhs.end == rhs.end
+            && lhs.text == rhs.text
+            && lhs.translated == rhs.translated
+    }
+
+    var displayText: String { translated ?? text }
 }
 
 // MARK: - WebVTT parser
@@ -137,6 +158,8 @@ final class SubtitleController: ObservableObject {
     @Published private(set) var currentText: String = ""
     @Published private(set) var availableCaptions: [VideoCaption] = []
     @Published private(set) var selectedCaption: VideoCaption?
+    /// Device live ASR is feeding the same display channel as server VTT.
+    @Published private(set) var isLiveCaptionsActive = false
 
     private var cues: [SubtitleCue] = []
     private var cueIndex: Int = 0
@@ -144,28 +167,51 @@ final class SubtitleController: ObservableObject {
     private var timeObserver: Any?
     private var loadTask: Task<Void, Never>?
     private var captionBaseURL: URL?
+    private var liveHoldUntil = Date.distantPast
+    private static let liveHoldSeconds: TimeInterval = 2.2
+    /// When true, live text is driven by playhead timing (empty string clears).
+    private var liveCaptionsTimelineSynced = false
+    /// User chose "Off" in the CC menu — don't auto-enable again for this scene.
+    private var captionsExplicitlyOff = false
+    private var configuredSceneID: String?
 
     var hasCaptions: Bool { !availableCaptions.isEmpty }
 
     func configure(scene: Scene, player: AVPlayer?) {
+        let sceneChanged = configuredSceneID != scene.id
+        if sceneChanged {
+            configuredSceneID = scene.id
+            captionsExplicitlyOff = false
+        }
+
         let previousCaptions = availableCaptions
         let previousBase = captionBaseURL
         availableCaptions = scene.captions ?? []
-        captionBaseURL = {
-            guard let path = scene.paths?.caption else { return nil }
-            return URL(string: path)
-        }()
+        captionBaseURL = Self.resolveCaptionBaseURL(scene.paths?.caption)
+            ?? Self.fallbackCaptionBaseURL(sceneID: scene.id)
         attach(player: player)
 
         guard hasCaptions else {
-            select(nil)
+            if !isLiveCaptionsActive {
+                selectedCaption = nil
+                currentText = ""
+                cues = []
+                cueIndex = 0
+                loadTask?.cancel()
+            }
             return
         }
 
-        // Keep current choice across detail refreshes.
-        if previousCaptions == availableCaptions,
+        if isLiveCaptionsActive { return }
+        if captionsExplicitlyOff { return }
+
+        // Keep a working selection across detail refreshes / player attach.
+        if !sceneChanged,
+           previousCaptions == availableCaptions,
            previousBase == captionBaseURL,
-           selectedCaption == nil || availableCaptions.contains(where: { $0 == selectedCaption }) {
+           let selected = selectedCaption,
+           availableCaptions.contains(where: { $0 == selected }),
+           !cues.isEmpty || loadTask != nil {
             return
         }
 
@@ -175,19 +221,19 @@ final class SubtitleController: ObservableObject {
             return
         }
 
-        // Restore preference, else match device language (Stash web behavior).
-        if let preferred = UserDefaults.standard.string(forKey: Self.preferredLanguageKey),
-           let match = availableCaptions.first(where: { $0.languageCode == preferred }) {
+        if let match = preferredCaption(from: availableCaptions) {
             select(match)
-        } else if let deviceLang = Locale.current.language.languageCode?.identifier,
-                  let match = availableCaptions.first(where: { $0.languageCode == deviceLang }) {
-            select(match)
-        } else {
-            select(nil)
+        } else if let first = availableCaptions.first {
+            // Always show something when the scene has captions (Stash web also defaults on).
+            select(first)
         }
     }
 
-    func select(_ caption: VideoCaption?) {
+    func select(_ caption: VideoCaption?, userInitiated: Bool = false) {
+        if userInitiated {
+            captionsExplicitlyOff = caption == nil
+        }
+        endLiveCaptions()
         selectedCaption = caption
         currentText = ""
         cues = []
@@ -198,18 +244,123 @@ final class SubtitleController: ObservableObject {
             UserDefaults.standard.set(caption.languageCode, forKey: Self.preferredLanguageKey)
         }
 
-        guard let caption, let url = url(for: caption) else { return }
+        guard let caption, let url = url(for: caption) else {
+            if caption != nil {
+                print("💬 Caption URL missing for \(caption?.id ?? "?") (base=\(captionBaseURL?.absoluteString ?? "nil"))")
+            }
+            return
+        }
 
         loadTask = Task { [weak self] in
-            let text = await Self.fetchVTT(from: url)
+            let text = await Self.fetchCaptionText(from: url)
             guard !Task.isCancelled, let self else { return }
             guard self.selectedCaption == caption else { return }
-            self.cues = WebVTTParser.parse(text ?? "")
+            let parsed = Self.parseCaptionFile(text ?? "")
+            if parsed.isEmpty {
+                print("💬 Caption parse produced 0 cues from \(redactedURLString(url))")
+            }
+            self.cues = parsed
             self.cueIndex = 0
+            self.loadTask = nil
             if let seconds = self.player?.currentTime().seconds, seconds.isFinite {
                 self.updateText(at: seconds)
             }
         }
+    }
+
+    private func preferredCaption(from captions: [VideoCaption]) -> VideoCaption? {
+        let candidates: [String?] = [
+            UserDefaults.standard.string(forKey: Self.preferredLanguageKey),
+            SubtitleTargetLanguage.load(),
+            Locale.current.language.languageCode?.identifier,
+            "00",
+        ]
+        for raw in candidates {
+            guard let code = raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+                  !code.isEmpty else { continue }
+            if let match = captions.first(where: { $0.languageCode.lowercased() == code }) {
+                return match
+            }
+        }
+        return nil
+    }
+
+    private static func resolveCaptionBaseURL(_ path: String?) -> URL? {
+        guard let path = path?.trimmingCharacters(in: .whitespacesAndNewlines), !path.isEmpty else {
+            return nil
+        }
+        if path.hasPrefix("http://") || path.hasPrefix("https://"), let url = URL(string: path) {
+            return url
+        }
+        guard let config = ServerConfigManager.shared.activeConfig ?? ServerConfigManager.shared.loadConfig() else {
+            return URL(string: path)
+        }
+        let trimmed = path.hasPrefix("/") ? String(path.dropFirst()) : path
+        return URL(string: "\(config.baseURL)/\(trimmed)")
+    }
+
+    private static func fallbackCaptionBaseURL(sceneID: String) -> URL? {
+        guard let config = ServerConfigManager.shared.activeConfig ?? ServerConfigManager.shared.loadConfig() else {
+            return nil
+        }
+        return URL(string: "\(config.baseURL)/scene/\(sceneID)/caption")
+    }
+
+    private static func parseCaptionFile(_ raw: String) -> [SubtitleCue] {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+        // Stash normally converts SRT→WebVTT server-side; keep a tolerant parse either way.
+        return WebVTTParser.parse(raw)
+    }
+
+    /// Take over the normal caption channel for on-device live speech (same overlay as server VTT).
+    func beginLiveCaptions(timelineSynced: Bool = false) {
+        loadTask?.cancel()
+        loadTask = nil
+        selectedCaption = nil
+        cues = []
+        cueIndex = 0
+        currentText = ""
+        liveHoldUntil = Date.distantPast
+        liveCaptionsTimelineSynced = timelineSynced
+        isLiveCaptionsActive = true
+    }
+
+    func setLiveCaptionsTimelineSynced(_ synced: Bool) {
+        liveCaptionsTimelineSynced = synced
+        if synced {
+            liveHoldUntil = Date.distantFuture
+        }
+    }
+
+    func pushLiveCaption(_ text: String) {
+        guard isLiveCaptionsActive else { return }
+        let trimmed = text
+            .replacingOccurrences(of: "\n", with: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmed.isEmpty {
+            if !currentText.isEmpty { currentText = "" }
+            liveHoldUntil = Date.distantPast
+            return
+        }
+        if currentText != trimmed {
+            currentText = trimmed
+        }
+        if liveCaptionsTimelineSynced {
+            liveHoldUntil = Date.distantFuture
+        } else {
+            liveHoldUntil = Date().addingTimeInterval(Self.liveHoldSeconds)
+        }
+    }
+
+    func endLiveCaptions() {
+        guard isLiveCaptionsActive else { return }
+        isLiveCaptionsActive = false
+        liveCaptionsTimelineSynced = false
+        liveHoldUntil = Date.distantPast
+        if !currentText.isEmpty { currentText = "" }
+        cues = []
+        cueIndex = 0
     }
 
     func attach(player: AVPlayer?) {
@@ -230,6 +381,7 @@ final class SubtitleController: ObservableObject {
     func detach() {
         loadTask?.cancel()
         loadTask = nil
+        endLiveCaptions()
         detachTimeObserver()
         player = nil
         currentText = ""
@@ -238,11 +390,11 @@ final class SubtitleController: ObservableObject {
     }
 
     func url(for caption: VideoCaption) -> URL? {
-        guard var components = URLComponents(url: captionBaseURL ?? URL(fileURLWithPath: "/"), resolvingAgainstBaseURL: false),
-              captionBaseURL != nil else { return nil }
+        guard let base = captionBaseURL,
+              var components = URLComponents(url: base, resolvingAgainstBaseURL: false) else { return nil }
         var items = (components.queryItems ?? []).filter {
             let name = $0.name.lowercased()
-            return name != "lang" && name != "type"
+            return name != "lang" && name != "type" && name != "apikey"
         }
         items.append(URLQueryItem(name: "lang", value: caption.languageCode))
         items.append(URLQueryItem(name: "type", value: caption.captionType))
@@ -258,6 +410,13 @@ final class SubtitleController: ObservableObject {
     }
 
     private func updateText(at seconds: TimeInterval) {
+        if isLiveCaptionsActive {
+            if !liveCaptionsTimelineSynced, Date() >= liveHoldUntil, !currentText.isEmpty {
+                currentText = ""
+            }
+            return
+        }
+
         guard selectedCaption != nil, !cues.isEmpty else {
             if !currentText.isEmpty { currentText = "" }
             return
@@ -286,19 +445,23 @@ final class SubtitleController: ObservableObject {
         }
     }
 
-    private static func fetchVTT(from url: URL) async -> String? {
-        var request = URLRequest(url: url)
+    private static func fetchCaptionText(from url: URL) async -> String? {
+        var request = authenticatedStashRequest(for: url)
         request.timeoutInterval = 30
-        if let apiKey = ServerConfigManager.shared.activeConfig?.secureApiKey, !apiKey.isEmpty {
-            request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
-        }
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-                print("💬 Caption fetch failed: HTTP \(http.statusCode)")
+                print("💬 Caption fetch failed: HTTP \(http.statusCode) for \(redactedURLString(url))")
                 return nil
             }
-            return String(data: data, encoding: .utf8)
+            guard !data.isEmpty else {
+                print("💬 Caption fetch returned empty body for \(redactedURLString(url))")
+                return nil
+            }
+            if let utf8 = String(data: data, encoding: .utf8) { return utf8 }
+            if let utf16 = String(data: data, encoding: .utf16) { return utf16 }
+            print("💬 Caption fetch: unsupported encoding (\(data.count) bytes)")
+            return nil
         } catch {
             print("💬 Caption fetch error: \(error.localizedDescription)")
             return nil

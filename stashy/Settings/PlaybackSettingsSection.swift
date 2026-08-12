@@ -63,3 +63,64 @@ struct PlaybackSettingsSection: View {
 
     }
 }
+
+#if !os(tvOS)
+/// AI subtitle controls shown under Settings → Stashy+.
+struct StashyPlusAISubtitlesSettings: View {
+    @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject var tabManager = TabManager.shared
+    /// Local selection so the picker label refreshes after a pick (UserDefaults alone does not).
+    @State private var subtitleLanguageCode: String = SubtitleTargetLanguage.load()
+
+    var body: some View {
+        Picker(selection: Binding(
+            get: { subtitleLanguageCode },
+            set: { newValue in
+                subtitleLanguageCode = newValue
+                SubtitleTargetLanguage.persist(newValue)
+            }
+        )) {
+            ForEach(SubtitleTargetLanguage.pickerOptions(), id: \.id) { option in
+                Text(option.label).tag(option.id)
+            }
+        } label: {
+            Label("Subtitle Language", systemImage: "captions.bubble")
+        }
+
+        Toggle(isOn: $tabManager.isLiveCaptionLookaheadEnabled) {
+            Label("Live CC Lookahead", systemImage: "hare")
+        }
+        .tint(appearanceManager.tintColor)
+    }
+}
+
+/// Downloads / Match / RateMe enablement for Settings → Stashy+.
+struct StashyPlusToolsSettings: View {
+    @ObservedObject var tabManager = TabManager.shared
+    @ObservedObject var appearanceManager = AppearanceManager.shared
+
+    var body: some View {
+        Toggle(isOn: toolBinding(for: .downloads)) {
+            Label(ToolsItem.downloads.title, systemImage: ToolsItem.downloads.icon)
+        }
+        .tint(appearanceManager.tintColor)
+
+        Toggle(isOn: toolBinding(for: .hotOrNot)) {
+            Label(ToolsItem.hotOrNot.title, systemImage: ToolsItem.hotOrNot.icon)
+        }
+        .tint(appearanceManager.tintColor)
+
+        Toggle(isOn: toolBinding(for: .rateMe)) {
+            Label(ToolsItem.rateMe.title, systemImage: ToolsItem.rateMe.icon)
+        }
+        .tint(appearanceManager.tintColor)
+    }
+
+    private func toolBinding(for item: ToolsItem) -> Binding<Bool> {
+        Binding(
+            get: { tabManager.tools.first(where: { $0.id == item })?.isEnabled ?? false },
+            set: { _ in tabManager.toggleTool(item) }
+        )
+    }
+}
+#endif

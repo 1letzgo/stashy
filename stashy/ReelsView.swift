@@ -3386,7 +3386,7 @@ struct ReelsViewBody: View {
     /// Match expanding-dock menu chrome.
     private var reelsTopChromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
 
-    /// Section chrome: mode pills · Settings/StashSync trailing.
+    /// Section chrome: mode pills · StashSync/Settings trailing.
     /// Criterion chips + O/Rating sit outside the bar (over the feed).
     @ViewBuilder
     private func reelsNavBar(currentItem: ReelItemData?) -> some View {
@@ -3410,10 +3410,10 @@ struct ReelsViewBody: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     HStack(spacing: 6) {
-                        reelsFilterSortPill
                         if showsReelsStashSyncButton {
                             reelsStashSyncPill
                         }
+                        reelsFilterSortPill
                     }
                     .fixedSize()
                 }
@@ -3530,7 +3530,7 @@ struct ReelsViewBody: View {
                 HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
                     Image(systemName: oCounter > 0 ? AppearanceManager.shared.oCounterIconFilled : AppearanceManager.shared.oCounterIcon)
                         .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        .foregroundColor(oCounter > 0 ? appearanceManager.tintColor : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                        .foregroundColor(.white.opacity(oCounter > 0 ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
                     Text("\(oCounter)")
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
@@ -3969,9 +3969,9 @@ struct ReelsViewBody: View {
         .accessibilityLabel("Filter und Sortierung")
     }
 
-    /// Visible only when Settings → StashSync is enabled (not on Pics).
+    /// Visible only when Stashy+ StashSync is unlocked + enabled (not on Pics).
     private var showsReelsStashSyncButton: Bool {
-        videoSyncManager.isVideoSyncEnabled && reelsMode != .pics
+        stashSyncManager.isStashSyncEnabled && reelsMode != .pics
     }
 
     private var isReelsStashSyncActive: Bool {

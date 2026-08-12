@@ -11,6 +11,7 @@ import AVFoundation
 import AVKit
 import WebKit
 import Combine
+import Translation
 
 struct SceneDetailView: View {
     let scene: Scene
@@ -23,6 +24,8 @@ struct SceneDetailView: View {
     
     @ObservedObject private var downloadManager = DownloadManager.shared
     @StateObject private var subtitleController = SubtitleController()
+    @StateObject private var transcriptionController = SceneLiveTranscriptionController()
+    @StateObject private var captionTranslator = SceneCaptionTranslator()
     
     let autoPlay: Bool
     
@@ -261,6 +264,7 @@ struct SceneDetailView: View {
                     isFullscreen: $isFullscreen,
                     isPreviewing: $isPreviewing,
                     subtitleController: subtitleController,
+                    transcriptionController: transcriptionController,
                     onSeek: { seconds in seekTo(seconds) },
                     onStartPlayback: { resume in startPlayback(resume: resume) }
                 )
@@ -274,14 +278,18 @@ struct SceneDetailView: View {
                     playbackSpeed: $playbackSpeed,
                     viewModel: viewModel,
                     subtitleController: subtitleController,
+                    transcriptionController: transcriptionController,
+                    captionTranslator: captionTranslator,
                     onSeek: { seconds in seekTo(seconds) },
                     onTitleUpdated: { newTitle, newDetails in
-                        activeScene = Scene(id: activeScene.id, title: newTitle, details: newDetails, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions)
+                        activeScene = Scene(id: activeScene.id, title: newTitle, details: newDetails, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields)
                     }
                 )
+
+                // Live captions render inside AVPlayer overlay — no separate teleprompter panel.
                 
                 let isStashSyncActive = handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode
-                let isStashSyncEnabled = StashVideoSyncManager.shared.isVideoSyncEnabled
+                let isStashSyncEnabled = StashSyncManager.shared.isStashSyncEnabled
                 
                 if activeScene.interactive == true && activeScene.funscriptURL != nil && !isStashSyncActive {
                     SceneHeatmapCard(
@@ -309,7 +317,7 @@ struct SceneDetailView: View {
                             sceneDate: activeScene.date,
                             performers: activeScene.performers,
                             onPerformersUpdated: { updated in
-                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions)
+                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields)
                             },
                             viewModel: viewModel
                         )
@@ -320,7 +328,7 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             studio: activeScene.studio,
                             onStudioUpdated: { updated in
-                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions)
+                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields)
                             },
                             viewModel: viewModel
                         )
@@ -330,7 +338,7 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             groups: activeScene.groups ?? [],
                             onGroupsUpdated: { updated in
-                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions)
+                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields)
                             },
                             viewModel: viewModel
                         )
@@ -345,7 +353,7 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             tags: activeScene.tags,
                             onTagsUpdated: { updated in
-                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions)
+                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields)
                             },
                             viewModel: viewModel,
                             isTagsExpanded: $isTagsExpanded,
@@ -375,7 +383,7 @@ struct SceneDetailView: View {
                         sceneDate: activeScene.date,
                         performers: activeScene.performers,
                         onPerformersUpdated: { updated in
-                            activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions)
+                            activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields)
                         },
                         viewModel: viewModel
                     )
@@ -386,7 +394,7 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             studio: activeScene.studio,
                             onStudioUpdated: { updated in
-                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions)
+                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields)
                             },
                             viewModel: viewModel
                         )
@@ -394,7 +402,7 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             groups: activeScene.groups ?? [],
                             onGroupsUpdated: { updated in
-                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions)
+                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields)
                             },
                             viewModel: viewModel
                         )
@@ -409,7 +417,7 @@ struct SceneDetailView: View {
                         sceneId: activeScene.id,
                         tags: activeScene.tags,
                         onTagsUpdated: { updated in
-                            activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions)
+                            activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields)
                         },
                         viewModel: viewModel,
                         isTagsExpanded: $isTagsExpanded,
@@ -454,11 +462,25 @@ struct SceneDetailView: View {
                 title: activeScene.title ?? "Unknown Title",
                 capturedMarkerTime: capturedMarkerTime,
                 sceneId: activeScene.id,
+                player: player,
+                videoURL: activeScene.videoURL,
                 viewModel: viewModel,
                 onRefresh: refreshSceneDetails,
                 onDelete: deleteSceneWithFiles
             ))
             .modifier(lifecycleModifier)
+            // `TranslationSession` lives as long as the view carrying `translationTask`, and the
+            // system download sheet is presented from it — so it sits on the detail root rather
+            // than the player card, which is rebuilt around fullscreen transitions. A zero-sized
+            // background host cannot present that sheet.
+            .translationTask(captionTranslator.configuration) { session in
+                await captionTranslator.run(session: session)
+            }
+            .onAppear {
+                captionTranslator.onTranslated = { [weak transcriptionController] cueID, text in
+                    transcriptionController?.applyTranslation(cueID: cueID, text: text)
+                }
+            }
     }
 
     private var lifecycleModifier: SceneDetailLifecycleModifier {
@@ -588,14 +610,24 @@ struct SceneDetailView: View {
             return
         }
 
-        if !isFullscreen {
-            player?.pause()
-            StashSyncManager.shared.stop()
-            if handyManager.isSyncing || handyManager.isStashSyncMode { handyManager.pause() }
-            if buttplugManager.isConnected { buttplugManager.stop() }
-            if loveSpouseManager.isConnected { loveSpouseManager.stop() }
-        }
         stopPreview()
+
+        // Fullscreen presentation can fire onDisappear before `isFullscreen` flips.
+        // Defer teardown so we don't kill live CC / pause while entering fullscreen.
+        DispatchQueue.main.async {
+            self.finishDisappearTeardown()
+        }
+    }
+
+    private func finishDisappearTeardown() {
+        if isDeleting { return }
+        if isFullscreen { return }
+
+        player?.pause()
+        StashSyncManager.shared.stop()
+        if handyManager.isSyncing || handyManager.isStashSyncMode { handyManager.pause() }
+        if buttplugManager.isConnected { buttplugManager.stop() }
+        if loveSpouseManager.isConnected { loveSpouseManager.stop() }
         removeTimeObserver()
 
         if let player {
@@ -605,10 +637,11 @@ struct SceneDetailView: View {
                 playbackActivityTracker.setPosition(currentTime: currentTime, duration: duration)
             }
         }
-        // Flush watched seconds + resume (clears resume at ≥98% like Stash web).
         ensurePlaybackActivityConfigured()
         playbackActivityTracker.stop()
         subtitleController.detach()
+        captionTranslator.deactivate()
+        Task { await transcriptionController.disable() }
     }
 
     private func handlePeriodicSync() {
@@ -719,13 +752,15 @@ struct SceneDetailView: View {
         let interval = CMTime(seconds: 0.25, preferredTimescale: 600)
         timeObserverToken = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
             let seconds = time.seconds
-            if seconds >= 0 {
-                currentPlaybackTime = seconds
-                let duration = player.currentItem?.duration.seconds ?? activeScene.sceneDuration ?? 0
-                playbackActivityTracker.setPosition(currentTime: seconds, duration: duration)
-            }
-            if !hasAddedPlay, seconds > 1 {
-                registerScenePlay()
+            Task { @MainActor in
+                if seconds >= 0 {
+                    currentPlaybackTime = seconds
+                    let duration = player.currentItem?.duration.seconds ?? activeScene.sceneDuration ?? 0
+                    playbackActivityTracker.setPosition(currentTime: seconds, duration: duration)
+                }
+                if !hasAddedPlay, seconds > 1 {
+                    registerScenePlay()
+                }
             }
         }
     }
@@ -955,6 +990,9 @@ extension SceneStudio {
 struct AddMarkerSheet: View {
     let sceneId: String
     let seconds: Double
+    /// Used to capture a still at the marker start (same path as Scene Cover).
+    let player: AVPlayer?
+    let videoURL: URL?
     @ObservedObject var viewModel: StashDBViewModel
     var onComplete: () -> Void
     @Environment(\.dismiss) var dismiss
@@ -1078,23 +1116,90 @@ struct AddMarkerSheet: View {
     
     private func createMarker() {
         isCreating = true
-        
         let endSeconds = parseTime(endTimeString)
-        
-        viewModel.createSceneMarker(
-            sceneId: sceneId,
-            title: title,
-            seconds: seconds,
-            endSeconds: endSeconds,
-            primaryTagId: primaryTagId
-        ) { success in
-            DispatchQueue.main.async {
-                isCreating = false
-                if success {
-                    onComplete()
-                    dismiss()
+        let captureTime = CMTime(seconds: max(0, seconds), preferredTimescale: 600)
+
+        Task { @MainActor in
+            // Capture start-frame still like Scene Cover (instant local thumb).
+            let frameDataURL = await captureVideoFrameDataURL(
+                from: player,
+                fallbackURL: videoURL,
+                at: captureTime
+            )
+
+            viewModel.createSceneMarker(
+                sceneId: sceneId,
+                title: title,
+                seconds: seconds,
+                endSeconds: endSeconds,
+                primaryTagId: primaryTagId
+            ) { success, createdMarker in
+                DispatchQueue.main.async {
+                    self.isCreating = false
+                    guard success, let createdMarker else { return }
+
+                    if let frameDataURL {
+                        self.seedMarkerThumbnailCache(marker: createdMarker, dataURL: frameDataURL)
+                    }
+
+                    self.onComplete()
+                    self.dismiss()
+
+                    // Persist on the server: Stash has no marker image upload field
+                    // (unlike scene `cover_image`), so generate the still at start time.
+                    // Must scope by sceneIDs so Stash creates `generated/markers/<hash>/`.
+                    self.viewModel.generateMarkerScreenshots(sceneId: self.sceneId) { genStarted, jobId in
+                        guard genStarted else {
+                            print("⚠️ Marker screenshot generate failed to start for scene \(self.sceneId)")
+                            return
+                        }
+                        let finish: (Bool) -> Void = { success in
+                            DispatchQueue.main.async {
+                                guard success else { return }
+                                ImageCache.shared.invalidateMarkerScreenshot(
+                                    markerId: createdMarker.id,
+                                    sceneId: self.sceneId,
+                                    screenshotPath: createdMarker.screenshot
+                                )
+                                self.onComplete()
+                            }
+                        }
+                        guard let jobId, !jobId.isEmpty else {
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+                                finish(true)
+                            }
+                            return
+                        }
+                        self.viewModel.waitForJob(id: jobId, timeout: 120) { jobSuccess, message in
+                            if !jobSuccess {
+                                print("⚠️ Marker screenshot generate job failed: \(message)")
+                            }
+                            finish(jobSuccess)
+                        }
+                    }
                 }
             }
+        }
+    }
+
+    /// Seeds memory/disk cache so the marker strip shows the captured frame immediately.
+    private func seedMarkerThumbnailCache(marker: SceneMarker, dataURL: String) {
+        guard let comma = dataURL.firstIndex(of: ","),
+              let jpeg = Data(base64Encoded: String(dataURL[dataURL.index(after: comma)...])),
+              let config = ServerConfigManager.shared.activeConfig ?? ServerConfigManager.shared.loadConfig(),
+              config.hasValidConfig
+        else { return }
+
+        var urls = [
+            "\(config.baseURL)/scenemarker/\(marker.id)/screenshot",
+            "\(config.baseURL)/scene/\(sceneId)/scene_marker/\(marker.id)/screenshot"
+        ]
+        if let screenshot = marker.screenshot, !screenshot.isEmpty {
+            urls.append(screenshot)
+        }
+        for urlString in urls {
+            guard let url = URL(string: urlString) else { continue }
+            ImageCache.shared.setData(jpeg, forKey: url as NSURL)
         }
     }
     
@@ -1135,6 +1240,8 @@ private struct SceneDetailAlertModifier: ViewModifier {
     let title:              String
     let capturedMarkerTime: Double
     let sceneId:            String
+    let player:             AVPlayer?
+    let videoURL:           URL?
     let viewModel:          StashDBViewModel
     let onRefresh:          () -> Void
     let onDelete:           () -> Void
@@ -1148,7 +1255,13 @@ private struct SceneDetailAlertModifier: ViewModifier {
                 Text("The scene '\(title)' and all associated files will be permanently deleted. This action cannot be undone.")
             }
             .sheet(isPresented: $showingAddMarkerSheet) {
-                AddMarkerSheet(sceneId: sceneId, seconds: capturedMarkerTime, viewModel: viewModel) {
+                AddMarkerSheet(
+                    sceneId: sceneId,
+                    seconds: capturedMarkerTime,
+                    player: player,
+                    videoURL: videoURL,
+                    viewModel: viewModel
+                ) {
                     onRefresh()
                 }
             }

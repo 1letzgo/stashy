@@ -37,15 +37,15 @@ struct ContentSettingsSection: View {
 struct ToolsSettingsView: View {
     @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var appearanceManager = AppearanceManager.shared
-    @AppStorage(RateMeSettings.showDeleteButtonKey) private var rateMeShowDeleteButton = false
 
     private var toolsTabIsVisible: Bool {
         tabManager.tabs.first(where: { $0.id == .tools })?.isVisible ?? true
     }
-    
-    private var orderedTools: [ToolsItemConfig] {
+
+    /// Core tools only — Downloads / Match / RateMe are managed under Settings → Stashy+.
+    private var orderedCoreTools: [ToolsItemConfig] {
         tabManager.tools
-            .filter { $0.id != .server }
+            .filter { $0.id != .server && !TabManager.isStashyPlusTool($0.id) }
             .sorted { $0.sortOrder < $1.sortOrder }
     }
 
@@ -63,30 +63,31 @@ struct ToolsSettingsView: View {
             .listRowBackground(Color.secondaryAppBackground)
 
             Section {
-                ForEach(orderedTools) { tool in
-                    if tool.id == .downloads {
-                        HStack {
-                            Label(tool.id.title, systemImage: tool.id.icon)
-                            Spacer()
-                            Text("Always Included")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    } else {
-                        Toggle(isOn: Binding(
-                            get: { tool.isEnabled },
-                            set: { _ in tabManager.toggleTool(tool.id) }
-                        )) {
-                            Label(tool.id.title, systemImage: tool.id.icon)
-                        }
-                        .tint(appearanceManager.tintColor)
+                ForEach(orderedCoreTools) { tool in
+                    Toggle(isOn: Binding(
+                        get: { tool.isEnabled },
+                        set: { _ in tabManager.toggleTool(tool.id) }
+                    )) {
+                        Label(tool.id.title, systemImage: tool.id.icon)
                     }
+                    .tint(appearanceManager.tintColor)
                 }
                 .onMove { indices, newOffset in
-                    var working = orderedTools
+                    var working = orderedCoreTools
                     working.move(fromOffsets: indices, toOffset: newOffset)
+                    // Preserve Stashy+ tools and Server at the end.
+                    let plusTools = tabManager.tools
+                        .filter { TabManager.isStashyPlusTool($0.id) }
+                        .sorted { $0.sortOrder < $1.sortOrder }
                     var rebuilt = working.enumerated().map { idx, item in
                         ToolsItemConfig(id: item.id, isEnabled: item.isEnabled, sortOrder: idx)
+                    }
+                    for tool in plusTools {
+                        rebuilt.append(ToolsItemConfig(
+                            id: tool.id,
+                            isEnabled: tool.isEnabled,
+                            sortOrder: rebuilt.count
+                        ))
                     }
                     if tabManager.tools.contains(where: { $0.id == .server }) {
                         rebuilt.append(ToolsItemConfig(id: .server, isEnabled: false, sortOrder: rebuilt.count))
@@ -97,13 +98,7 @@ struct ToolsSettingsView: View {
             } header: {
                 Text("Tools Order")
             } footer: {
-                Text("Server tasks are available under Settings → Server.")
-            }
-            .listRowBackground(Color.secondaryAppBackground)
-
-            Section("RateMe") {
-                Toggle("Show Delete Button", isOn: $rateMeShowDeleteButton)
-                    .tint(appearanceManager.tintColor)
+                Text("Downloads, Match, and RateMe live under Settings → Stashy+. Server tasks are under Settings → Server.")
             }
             .listRowBackground(Color.secondaryAppBackground)
         }
@@ -113,11 +108,6 @@ struct ToolsSettingsView: View {
         .scrollContentBackground(.hidden)
         .stashySettingsDetailChrome("Tools")
     }
-}
-
-/// Shared UserDefaults keys for RateMe options.
-enum RateMeSettings {
-    static let showDeleteButtonKey = "stashy.rateMe.showDeleteButton"
 }
 
 struct TabSettingsView: View {

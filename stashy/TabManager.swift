@@ -355,6 +355,13 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(isPiPEnabled, forKey: isPiPEnabledKey)
         }
     }
+    /// Allows live captions to pull a second low-res transcode ahead of the playhead.
+    /// Costs extra server CPU, but is the only way to avoid recognition lag on transcoded scenes.
+    @Published var isLiveCaptionLookaheadEnabled: Bool = true {
+        didSet {
+            UserDefaults.standard.set(isLiveCaptionLookaheadEnabled, forKey: isLiveCaptionLookaheadKey)
+        }
+    }
     @Published var dashboardHeroSize: DashboardHeroSize = .big {
         didSet {
             UserDefaults.standard.set(dashboardHeroSize.rawValue, forKey: dashboardHeroSizeKey)
@@ -390,6 +397,7 @@ class TabManager: ObservableObject {
     private let reelsFillHeightKey = "ReelsFillHeight"
     private let reelsContinuousPlayKey = "ReelsContinuousPlay"
     private let isPiPEnabledKey = "isPiPEnabled"
+    private let isLiveCaptionLookaheadKey = "isLiveCaptionLookaheadEnabled"
     private let dashboardHeroSizeKey = "DashboardHeroSize"
     private let useCompactStatisticsKey = "useCompactStatistics"
     private let showDashboardHeroBackgroundKey = "showDashboardHeroBackground"
@@ -418,6 +426,7 @@ class TabManager: ObservableObject {
         self.reelsFillHeight = UserDefaults.standard.object(forKey: reelsFillHeightKey) as? Bool ?? true
         self.reelsContinuousPlay = UserDefaults.standard.bool(forKey: reelsContinuousPlayKey)
         self.isPiPEnabled = UserDefaults.standard.object(forKey: isPiPEnabledKey) as? Bool ?? true
+        self.isLiveCaptionLookaheadEnabled = UserDefaults.standard.object(forKey: isLiveCaptionLookaheadKey) as? Bool ?? true
         if let heroSizeRaw = UserDefaults.standard.string(forKey: dashboardHeroSizeKey),
            let heroSize = DashboardHeroSize(rawValue: heroSizeRaw) {
             self.dashboardHeroSize = heroSize
@@ -953,7 +962,6 @@ class TabManager: ObservableObject {
             
             self.tools = result.sorted { $0.sortOrder < $1.sortOrder }
             
-            // Enforce: Downloads is always enabled and anchored first
             enforceFixedTools()
             if hasChanges { saveTools() }
         } else {
@@ -980,12 +988,26 @@ class TabManager: ObservableObject {
     
     var enabledTools: [ToolsItem] {
         let sorted = tools.sorted { $0.sortOrder < $1.sortOrder }
-        // Downloads is enforced enabled; Server tasks live under Settings.
-        return sorted.filter { $0.isEnabled && $0.id != .server }.map(\.id)
+        // Server tasks live under Settings.
+        // Downloads / Match / RateMe require Stashy+ on iOS.
+        return sorted.compactMap { item -> ToolsItem? in
+            guard item.isEnabled, item.id != .server else { return nil }
+            #if !os(tvOS)
+            if Self.isStashyPlusTool(item.id), !StashyPlusManager.isUnlockedNow {
+                return nil
+            }
+            #endif
+            return item.id
+        }
+    }
+
+    /// Tools managed / gated under Settings → Stashy+.
+    static func isStashyPlusTool(_ item: ToolsItem) -> Bool {
+        item == .downloads || item == .hotOrNot || item == .rateMe
     }
     
     func toggleTool(_ item: ToolsItem) {
-        guard item != .downloads, item != .server else { return }
+        guard item != .server else { return }
         if let index = tools.firstIndex(where: { $0.id == item }) {
             tools[index].isEnabled.toggle()
             saveTools()
@@ -993,7 +1015,7 @@ class TabManager: ObservableObject {
         }
     }
     
-    /// Reorder tools (Downloads is movable but always enabled).
+    /// Reorder tools.
     func moveTools(from source: IndexSet, to destination: Int) {
         var reordered = tools.sorted { $0.sortOrder < $1.sortOrder }
         reordered.move(fromOffsets: source, toOffset: destination)
@@ -1005,10 +1027,8 @@ class TabManager: ObservableObject {
     }
     
     private func enforceFixedTools() {
-        // Ensure downloads exists and is always enabled (but not anchored).
-        if let idx = tools.firstIndex(where: { $0.id == .downloads }) {
-            tools[idx].isEnabled = true
-        } else {
+        // Ensure downloads exists (Stashy+ tool — visibility gated separately).
+        if !tools.contains(where: { $0.id == .downloads }) {
             tools.append(ToolsItemConfig(id: .downloads, isEnabled: true, sortOrder: (tools.map(\.sortOrder).max() ?? 0) + 1))
         }
     }
