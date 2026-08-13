@@ -56,7 +56,11 @@ class AppearanceManager: ObservableObject {
 
     var currentTheme: AppTheme {
         if preferredTheme == .system {
-            return .dark // Default to dark for system if needed, or implement full resolution
+            #if os(iOS) || os(tvOS)
+            return UITraitCollection.current.userInterfaceStyle == .light ? .light : .dark
+            #else
+            return .dark
+            #endif
         }
         return preferredTheme
     }
@@ -75,12 +79,12 @@ class AppearanceManager: ObservableObject {
 
 
     private init() {
-        // Load from UserDefaults or use default
-        self.tintColor = .appAccent
+        // Load from UserDefaults or use fresh-install defaults (Dark Blue + Gray).
+        self.tintColor = .appDefaultTint
         self.oCounterIcon = UserDefaults.standard.string(forKey: "kOCounterIcon") ?? "heart"
-        
-        let savedTheme = UserDefaults.standard.string(forKey: kPreferredTheme) ?? AppTheme.system.rawValue
-        self.preferredTheme = AppTheme(rawValue: savedTheme) ?? .system
+
+        let savedTheme = UserDefaults.standard.string(forKey: kPreferredTheme) ?? AppTheme.darkBlue.rawValue
+        self.preferredTheme = AppTheme(rawValue: savedTheme) ?? .darkBlue
         let editKeyExists = UserDefaults.standard.object(forKey: "kEditModeEnabled") != nil
         self.isEditModeEnabled = editKeyExists ? UserDefaults.standard.bool(forKey: "kEditModeEnabled") : true
 
@@ -117,8 +121,7 @@ class AppearanceManager: ObservableObject {
             let a = Double(defaults.float(forKey: kTintColorAlpha))
             self.tintColor = Color(red: r, green: g, blue: b, opacity: a)
         } else {
-            // Default color
-            self.tintColor = .appAccent
+            self.tintColor = .appDefaultTint
         }
     }
     

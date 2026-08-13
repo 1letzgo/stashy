@@ -32,6 +32,8 @@ struct MainTabView: View {
 
     var body: some View {
         ZStack {
+            Color.appBackground(for: appearanceManager.currentTheme)
+                .ignoresSafeArea()
             TabView(selection: Binding(
                 get: {
                     let selected = coordinator.selectedTab
@@ -382,99 +384,99 @@ struct ToolsServerView: View {
     var body: some View {
         Group {
             if activeServer != nil {
-                Form {
-                    Section("Scan & Identify") {
-                        taskRow(label: "Scan Library", icon: "arrow.triangle.2.circlepath", taskId: "scan") {
+                List {
+                    Section {
+                        stashyScrollingSectionHeader("Scan & Identify")
+                        taskRow(label: "Scan Library", icon: "arrow.triangle.2.circlepath", taskId: "scan", index: 0, count: 2) {
                             viewModel.triggerLibraryScan { _, message in
                                 showResult(title: "Scan Library", message: message)
                             }
                         }
-                        taskRow(label: "Identify", icon: "person.crop.square.filled.and.at.rectangle", taskId: "identify") {
+                        taskRow(label: "Identify", icon: "person.crop.square.filled.and.at.rectangle", taskId: "identify", index: 1, count: 2) {
                             viewModel.triggerIdentify { _, message, _ in
                                 showResult(title: "Identify", message: message)
                             }
                         }
                     }
-                    .listRowBackground(Color.secondaryAppBackground)
-                    
-                    Section("Generate") {
-                        taskRow(label: "Scene covers", icon: "photo.fill", taskId: "gen_covers") {
+
+                    Section {
+                        stashyScrollingSectionHeader("Generate")
+                        taskRow(label: "Scene covers", icon: "photo.fill", taskId: "gen_covers", index: 0, count: 13) {
                             viewModel.triggerGenerate(covers: true) { _, message in
                                 showResult(title: "Scene covers", message: message)
                             }
                         }
-                        taskRow(label: "Previews", icon: "play.rectangle.fill", taskId: "gen_previews") {
+                        taskRow(label: "Previews", icon: "play.rectangle.fill", taskId: "gen_previews", index: 1, count: 13) {
                             viewModel.triggerGenerate(previews: true) { _, message in
                                 showResult(title: "Previews", message: message)
                             }
                         }
-                        taskRow(label: "Animated image previews", icon: "photo.on.rectangle.angled", taskId: "gen_imagePreviews") {
+                        taskRow(label: "Animated image previews", icon: "photo.on.rectangle.angled", taskId: "gen_imagePreviews", index: 2, count: 13) {
                             viewModel.triggerGenerate(imagePreviews: true) { _, message in
                                 showResult(title: "Animated image previews", message: message)
                             }
                         }
-                        taskRow(label: "Scene scrubber sprites", icon: "square.grid.3x3.fill", taskId: "gen_sprites") {
+                        taskRow(label: "Scene scrubber sprites", icon: "square.grid.3x3.fill", taskId: "gen_sprites", index: 3, count: 13) {
                             viewModel.triggerGenerate(sprites: true) { _, message in
                                 showResult(title: "Scene scrubber sprites", message: message)
                             }
                         }
-                        taskRow(label: "Marker previews", icon: "mappin.and.ellipse", taskId: "gen_markers") {
+                        taskRow(label: "Marker previews", icon: "mappin.and.ellipse", taskId: "gen_markers", index: 4, count: 13) {
                             viewModel.triggerGenerate(markers: true) { _, message in
                                 showResult(title: "Marker previews", message: message)
                             }
                         }
-                        taskRow(label: "Marker animated image previews", icon: "mappin.and.ellipse.circle.fill", taskId: "gen_markerImagePreviews") {
+                        taskRow(label: "Marker animated image previews", icon: "mappin.and.ellipse.circle.fill", taskId: "gen_markerImagePreviews", index: 5, count: 13) {
                             viewModel.triggerGenerate(markerImagePreviews: true) { _, message in
                                 showResult(title: "Marker animated image previews", message: message)
                             }
                         }
-                        taskRow(label: "Marker screenshots", icon: "camera.fill", taskId: "gen_markerScreenshots") {
+                        taskRow(label: "Marker screenshots", icon: "camera.fill", taskId: "gen_markerScreenshots", index: 6, count: 13) {
                             viewModel.triggerGenerate(markerScreenshots: true) { _, message in
                                 showResult(title: "Marker screenshots", message: message)
                             }
                         }
-                        taskRow(label: "Transcodes", icon: "film.stack", taskId: "gen_transcodes") {
+                        taskRow(label: "Transcodes", icon: "film.stack", taskId: "gen_transcodes", index: 7, count: 13) {
                             viewModel.triggerGenerate(transcodes: true) { _, message in
                                 showResult(title: "Transcodes", message: message)
                             }
                         }
-                        taskRow(label: "Video perceptual hashes", icon: "number.square.fill", taskId: "gen_phashes") {
+                        taskRow(label: "Video perceptual hashes", icon: "number.square.fill", taskId: "gen_phashes", index: 8, count: 13) {
                             viewModel.triggerGenerate(phashes: true) { _, message in
                                 showResult(title: "Video perceptual hashes", message: message)
                             }
                         }
-                        taskRow(label: "Generate heatmaps and speeds for interactive scenes", icon: "waveform.path.ecg", taskId: "gen_heatmaps") {
+                        taskRow(label: "Generate heatmaps and speeds for interactive scenes", icon: "waveform.path.ecg", taskId: "gen_heatmaps", index: 9, count: 13) {
                             viewModel.triggerGenerate(interactiveHeatmapsSpeeds: true) { _, message in
                                 showResult(title: "Generate heatmaps and speeds", message: message)
                             }
                         }
-                        taskRow(label: "Image clip previews", icon: "play.rectangle.on.rectangle.fill", taskId: "gen_clipPreviews") {
+                        taskRow(label: "Image clip previews", icon: "play.rectangle.on.rectangle.fill", taskId: "gen_clipPreviews", index: 10, count: 13) {
                             viewModel.triggerGenerate(clipPreviews: true) { _, message in
                                 showResult(title: "Image clip previews", message: message)
                             }
                         }
-                        taskRow(label: "Image thumbnails", icon: "photo.on.rectangle", taskId: "gen_imageThumbnails") {
+                        taskRow(label: "Image thumbnails", icon: "photo.on.rectangle", taskId: "gen_imageThumbnails", index: 11, count: 13) {
                             viewModel.triggerGenerate(imageThumbnails: true) { _, message in
                                 showResult(title: "Image thumbnails", message: message)
                             }
                         }
-                        taskRow(label: "Image perceptual hashes", icon: "number.circle.fill", taskId: "gen_imagePhashes") {
+                        taskRow(label: "Image perceptual hashes", icon: "number.circle.fill", taskId: "gen_imagePhashes", index: 12, count: 13) {
                             viewModel.triggerGenerate(imagePhashes: true) { _, message in
                                 showResult(title: "Image perceptual hashes", message: message)
                             }
                         }
                     }
-                    .listRowBackground(Color.secondaryAppBackground)
-                    
-                    Section("Cache") {
-                        taskRow(label: "Clear Image Cache", icon: "internaldrive", taskId: "cache_clear") {
+
+                    Section {
+                        stashyScrollingSectionHeader("Cache")
+                        taskRow(label: "Clear Image Cache", icon: "internaldrive", taskId: "cache_clear", index: 0, count: 1) {
                             ImageCache.shared.clearCurrentServerCache()
                             showResult(title: "Cache Cleared", message: "Images will be reloaded from the server.")
                         }
                     }
-                    .listRowBackground(Color.secondaryAppBackground)
                 }
-                .scrollContentBackground(.hidden)
+                .stashySettingsList()
                 .tint(appearanceManager.tintColor)
             } else {
                 VStack(spacing: 16) {
@@ -510,7 +512,7 @@ struct ToolsServerView: View {
     }
     
     @ViewBuilder
-    private func taskRow(label: String, icon: String, taskId: String, action: @escaping () -> Void) -> some View {
+    private func taskRow(label: String, icon: String, taskId: String, index: Int, count: Int, action: @escaping () -> Void) -> some View {
         HStack {
             Label {
                 Text(label)
@@ -539,6 +541,7 @@ struct ToolsServerView: View {
                 .disabled(runningTask != nil)
             }
         }
+        .stashyGroupedBlockRow(index: index, count: count)
     }
     
     private func showResult(title: String, message: String) {

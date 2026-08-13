@@ -13,7 +13,11 @@ struct PlaybackSettingsSection: View {
     @ObservedObject var tabManager = TabManager.shared
 
     var body: some View {
-        Section(header: Text("Playback")) {
+        let qualityRows = configManager.activeConfig != nil ? 2 : 1
+        let rowCount = qualityRows + 1
+
+        Section {
+            stashyScrollingSectionHeader("Playback")
             if let config = configManager.activeConfig {
                 Picker(selection: Binding(
                     get: { config.defaultQuality },
@@ -30,6 +34,7 @@ struct PlaybackSettingsSection: View {
                 } label: {
                     Label("Library Quality", systemImage: "film")
                 }
+                .stashyGroupedBlockRow(index: 0, count: rowCount)
 
                 Picker(selection: Binding(
                     get: { config.reelsQuality },
@@ -46,21 +51,22 @@ struct PlaybackSettingsSection: View {
                 } label: {
                     Label("Feeds Quality", systemImage: "play.rectangle.on.rectangle")
                 }
+                .stashyGroupedBlockRow(index: 1, count: rowCount)
             } else {
                 Text("Connect to a server to configure quality settings.")
                     .foregroundColor(.secondary)
                     .font(.caption)
+                    .stashyGroupedBlockRow(index: 0, count: rowCount)
             }
-            
+
             #if !os(tvOS)
             Toggle(isOn: $tabManager.isPiPEnabled) {
                 Label("Picture-in-Picture", systemImage: "pip")
             }
             .tint(appearanceManager.tintColor)
+            .stashyGroupedBlockRow(index: qualityRows, count: rowCount)
             #endif
         }
-        .listRowBackground(Color.secondaryAppBackground)
-
     }
 }
 
@@ -86,11 +92,13 @@ struct StashyPlusAISubtitlesSettings: View {
         } label: {
             Label("Subtitle Language", systemImage: "captions.bubble")
         }
+        .stashyGroupedBlockRow(index: 0, count: 2)
 
         Toggle(isOn: $tabManager.isLiveCaptionLookaheadEnabled) {
             Label("Live CC Lookahead", systemImage: "hare")
         }
         .tint(appearanceManager.tintColor)
+        .stashyGroupedBlockRow(index: 1, count: 2)
     }
 }
 

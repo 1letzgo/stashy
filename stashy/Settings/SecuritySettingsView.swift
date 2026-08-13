@@ -13,38 +13,45 @@ struct SecuritySettingsView: View {
     }
     
     var body: some View {
-        Form {
-            Section(header: Text("App Lock")) {
+        List {
+            Section {
+                stashyScrollingSectionHeader("App Lock")
                 if securityManager.isPasscodeSet {
                     Button("Change Passcode") {
                         resetSetPasscode()
                         showingSetPasscode = true
                     }
-                    
+                    .stashyGroupedBlockRow(index: 0, count: 3)
+
                     Button("Remove Passcode", role: .destructive) {
                         securityManager.removePasscode()
                     }
-                    
+                    .stashyGroupedBlockRow(index: 1, count: 3)
+
                     Toggle("Use \(securityManager.biometryType == .faceID ? "FaceID" : "Biometrics")", isOn: $securityManager.isBiometricsEnabled)
                         .tint(appearanceManager.tintColor)
                         .disabled(!securityManager.isPasscodeSet)
+                        .stashyGroupedBlockRow(index: 2, count: 3)
                 } else {
                     Button("Enable Passcode Lock") {
                         resetSetPasscode()
                         showingSetPasscode = true
                     }
+                    .stashyGroupedSettingsRow()
                 }
             }
-            .listRowBackground(Color.secondaryAppBackground)
-            
+
             if securityManager.isPasscodeSet {
-                Section(header: Text("Options"), footer: Text("The app will automatically lock whenever it is moved to the background.")) {
+                Section {
+                    stashyScrollingSectionHeader("Options")
                     Toggle("Auto-lock on Background", isOn: $securityManager.autoLockOnBackground)
                         .tint(appearanceManager.tintColor)
+                        .stashyGroupedSettingsRow()
+                    stashyScrollingSectionFooter("The app will automatically lock whenever it is moved to the background.")
                 }
-                .listRowBackground(Color.secondaryAppBackground)
             }
         }
+        .stashySettingsList()
         .applyAppBackground()
         .stashySettingsDetailChrome("Security")
         .sheet(isPresented: $showingSetPasscode) {

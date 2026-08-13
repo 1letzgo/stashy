@@ -614,6 +614,85 @@ enum StashJSONValue: Codable, Equatable {
 
 import SwiftUI
 
+#if !os(tvOS)
+private struct StashyGroupedBlockBackground: View {
+    let index: Int
+    let count: Int
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        let radius = DesignTokens.CornerRadius.small
+        let fill = Color.secondaryAppBackground(for: appearance.currentTheme)
+        if count <= 1 {
+            RoundedRectangle(cornerRadius: radius).fill(fill)
+        } else if index == 0 {
+            UnevenRoundedRectangle(
+                topLeadingRadius: radius,
+                bottomLeadingRadius: 0,
+                bottomTrailingRadius: 0,
+                topTrailingRadius: radius
+            )
+            .fill(fill)
+        } else if index == count - 1 {
+            UnevenRoundedRectangle(
+                topLeadingRadius: 0,
+                bottomLeadingRadius: radius,
+                bottomTrailingRadius: radius,
+                topTrailingRadius: 0
+            )
+            .fill(fill)
+        } else {
+            Rectangle().fill(fill)
+        }
+    }
+}
+
+/// Re-reads theme/tint so backgrounds follow AppearanceManager without a full remount.
+struct StashyThemeFill: View {
+    enum Role { case app, secondary }
+    var role: Role = .app
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        switch role {
+        case .app:
+            Color.appBackground(for: appearance.currentTheme)
+        case .secondary:
+            Color.secondaryAppBackground(for: appearance.currentTheme)
+        }
+    }
+}
+
+private struct StashySettingsCardRowBackground: View {
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
+            .fill(Color.secondaryAppBackground(for: appearance.currentTheme))
+            .padding(.vertical, 4)
+    }
+}
+
+private struct StashyGroupedSettingsRowBackground: View {
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
+            .fill(Color.secondaryAppBackground(for: appearance.currentTheme))
+    }
+}
+
+private struct StashyAppBackgroundModifier: ViewModifier {
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    func body(content: Content) -> some View {
+        content
+            .scrollContentBackground(.hidden)
+            .background(Color.appBackground(for: appearance.currentTheme))
+    }
+}
+#endif
+
 extension View {
     /// Applies a transformation to the view if a condition is met.
     @ViewBuilder
@@ -638,15 +717,103 @@ extension View {
     }
     #endif
     
+    /// Shared Settings list chrome: plain (so custom row cards keep a stable
+    /// corner radius), Form-matching insets, compact section headers.
+    #if !os(tvOS)
+    func stashySettingsList() -> some View {
+        self
+            .listStyle(.plain)
+            .listRowSpacing(0)
+            .listSectionSpacing(24)
+            .contentMargins(.horizontal, 20, for: .scrollContent)
+            .contentMargins(.top, 20, for: .scrollContent)
+            .environment(\.defaultMinListRowHeight, 0)
+            .scrollContentBackground(.hidden)
+    }
+
+    /// Same list chrome as `stashySettingsList()`; name kept for reorderable card screens.
+    func stashyMovableCardsList() -> some View {
+        stashySettingsList()
+    }
+
+    func stashySettingsCardRow() -> some View {
+        self
+            .listRowSeparator(.hidden)
+            .listRowBackground(StashySettingsCardRowBackground())
+    }
+
+    func stashyGroupedSettingsRow() -> some View {
+        self
+            .listRowBackground(StashyGroupedSettingsRowBackground())
+    }
+
+    func stashyGroupedBlockRow(index: Int, count: Int) -> some View {
+        self.listRowBackground(StashyGroupedBlockBackground(index: index, count: count))
+    }
+
+    /// Form/insetGrouped section header look, as a scrolling row (plain lists otherwise pin headers).
+    func stashyScrollingSectionHeader(_ title: String, isBeta: Bool = false) -> some View {
+        HStack(alignment: .center, spacing: 8) {
+            Text(title)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .textCase(.uppercase)
+            if isBeta {
+                StashyBetaBadge()
+            }
+            Spacer(minLength: 0)
+        }
+        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 8, trailing: 0))
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
+        .moveDisabled(true)
+        .deleteDisabled(true)
+    }
+
+    /// Form-style section footer, as a scrolling row under grouped settings cards.
+    func stashyScrollingSectionFooter(_ text: String) -> some View {
+        Text(text)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 0, trailing: 0))
+            .listRowBackground(Color.clear)
+            .listRowSeparator(.hidden)
+            .moveDisabled(true)
+            .deleteDisabled(true)
+    }
+    #endif
+}
+
+#if !os(tvOS)
+/// Compact “Beta” capsule for settings features that are still experimental.
+struct StashyBetaBadge: View {
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        Text("Beta")
+            .font(.system(size: 10, weight: .bold))
+            .foregroundStyle(appearance.tintColor)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(
+                Capsule(style: .continuous)
+                    .fill(appearance.tintColor.opacity(0.16))
+            )
+            .textCase(nil)
+            .accessibilityLabel("Beta")
+    }
+}
+#endif
+
+extension View {
     /// Applies the standard app background color.
     @ViewBuilder
     func applyAppBackground() -> some View {
         #if os(tvOS)
         self.background(Color.appBackground)
         #else
-        self
-            .scrollContentBackground(.hidden)
-            .background(Color.appBackground)
+        modifier(StashyAppBackgroundModifier())
         #endif
     }
     
@@ -690,7 +857,7 @@ struct StandardLoadingView: View {
                 .frame(maxWidth: .infinity)
             }
         }
-        .background(Color.appBackground)
+        .background(StashyThemeFill(role: .app))
     }
 }
 
@@ -1779,8 +1946,9 @@ struct StashSyncSheet: View {
     
     var body: some View {
         NavigationView {
-            Form {
-                Section(header: Text("Connected Devices")) {
+            List {
+                Section {
+                    stashyScrollingSectionHeader("Connected Devices")
                     if handyManager.isEnabled {
                         Toggle(isOn: $handyManager.isStashSyncMode) {
                             HStack(spacing: 12) {
@@ -1789,6 +1957,7 @@ struct StashSyncSheet: View {
                                 Text("The Handy")
                             }
                         }
+                        .stashyGroupedSettingsRow()
                     }
                     if buttplugManager.isEnabled {
                         Toggle(isOn: $buttplugManager.isStashSyncMode) {
@@ -1798,6 +1967,7 @@ struct StashSyncSheet: View {
                                 Text("Intiface")
                             }
                         }
+                        .stashyGroupedSettingsRow()
                     }
                     if loveSpouseManager.isEnabled {
                         Toggle(isOn: $loveSpouseManager.isStashSyncMode) {
@@ -1807,11 +1977,12 @@ struct StashSyncSheet: View {
                                 Text("LoveSpouse")
                             }
                         }
+                        .stashyGroupedSettingsRow()
                     }
                 }
-                .listRowBackground(Color.secondaryAppBackground)
                 if showVideoAnalysis {
-                Section(header: Text("Live Signal Analysis")) {
+                Section {
+                    stashyScrollingSectionHeader("Live Signal Analysis")
                     VStack(spacing: 10) {
                         // Combined banner
                         let combined = videoManager.currentIntensity
@@ -1850,11 +2021,13 @@ struct StashSyncSheet: View {
                             }
                             .transition(.opacity.combined(with: .move(edge: .top)))
                         }
-                    }.padding(.vertical, 8)
+                    }
+                    .padding(.vertical, 8)
+                    .stashyGroupedSettingsRow()
                 }
-                .listRowBackground(Color.secondaryAppBackground)
                 } // showVideoAnalysis
-                Section(header: Text("Analysis Sensitivity")) {
+                Section {
+                    stashyScrollingSectionHeader("Analysis Sensitivity")
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Motion Analysis")
@@ -1862,10 +2035,12 @@ struct StashSyncSheet: View {
                             Text("\(Int(videoManager.sensitivity * 50))%").foregroundColor(.secondary)
                         }
                         Slider(value: $videoManager.sensitivity, in: 0.1...2.0).tint(.orange)
-                    }.padding(.vertical, 4)
+                    }
+                    .padding(.vertical, 4)
+                    .stashyGroupedSettingsRow()
                 }
-                .listRowBackground(Color.secondaryAppBackground)
-                Section(header: Text("Optical Flow Smoothing")) {
+                Section {
+                    stashyScrollingSectionHeader("Optical Flow Smoothing")
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Smoothing")
@@ -1874,10 +2049,10 @@ struct StashSyncSheet: View {
                         }
                         Slider(value: $videoManager.smoothing, in: 0.0...0.9).tint(.orange)
                     }
+                    .stashyGroupedSettingsRow()
                 }
-                .listRowBackground(Color.secondaryAppBackground)
             }
-            .scrollContentBackground(.hidden)
+            .stashySettingsList()
             .stashyModalSheetChrome(AIMotionCopy.name, onBack: {
                 if handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode {
                     stashSync.isActive = true

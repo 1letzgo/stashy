@@ -294,6 +294,7 @@
 		08FB778CFE84155DC02AAC07 = {
 			isa = PBXGroup;
 			children = (
+				A1PLUS032F30B00000000003 /* Configuration.storekit */,
 				08FB77A8FE84155DC02AAC07 /* stashy */,
 				08FB77A0FE84155DC02AAC07 /* stashy/Info.plist */,
 				DFE504602E8A8E6F00323FF0 /* stashy.app */,
@@ -307,7 +308,6 @@
 			isa = PBXGroup;
 			children = (
 				08FB7794FE84155DC02AAC07 /* App.swift */,
-				A1PLUS032F30B00000000003 /* Configuration.storekit */,
 				DF22BB312F1831C7007C2090 /* AppearanceManager.swift */,
 				AA0000022E8A9C0000000001 /* Assets.xcassets */,
 				DF675E612F2A46A1004CA019 /* Home */,

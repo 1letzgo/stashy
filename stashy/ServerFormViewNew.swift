@@ -54,6 +54,17 @@ struct ServerFormViewNew: View {
     var isConfigValid: Bool {
         return !name.isEmpty && !serverAddress.isEmpty
     }
+
+    private var authFooterText: String {
+        switch authMethod {
+        case .none:
+            return "No authentication will be used."
+        case .login:
+            return "Login with your Stash credentials to retrieve the API key."
+        case .apiKey:
+            return "Enter your Stash API key directly."
+        }
+    }
     
     var currentBaseURL: String {
         let parsed = ServerConfig.parseAddress(serverAddress)
@@ -79,11 +90,22 @@ struct ServerFormViewNew: View {
     }
     
     var body: some View {
-        Form {
+        let authCount: Int = {
+            switch authMethod {
+            case .none: return 1
+            case .login: return loginErrorMessage == nil ? 4 : 5
+            case .apiKey: return 2
+            }
+        }()
+        let connectionCount = (testResult == .failure && !testMessage.isEmpty) ? 2 : 1
+
+        List {
             Section {
+                stashyScrollingSectionHeader("Server Details")
                 TextField("Server Name", text: $name)
                     .textContentType(.organizationName)
-                
+                    .stashyGroupedBlockRow(index: 0, count: 3)
+
                 Picker("Protocol", selection: $serverProtocol) {
                     ForEach(ServerProtocol.allCases, id: \.self) { proto in
                         Text(proto.displayName).tag(proto)
@@ -91,7 +113,8 @@ struct ServerFormViewNew: View {
                 }
                 .pickerStyle(.segmented)
                 .onChange(of: serverProtocol) { _, _ in resetTestState() }
-                
+                .stashyGroupedBlockRow(index: 1, count: 3)
+
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Server Address")
                         .font(.caption)
@@ -116,13 +139,11 @@ struct ServerFormViewNew: View {
                         }
                 }
                 .padding(.vertical, 4)
-            } header: {
-                Text("Server Details")
+                .stashyGroupedBlockRow(index: 2, count: 3)
             }
-            .listRowBackground(Color.secondaryAppBackground)
-            
-            // Authentication Section
+
             Section {
+                stashyScrollingSectionHeader("Authentication")
                 Picker("Auth Method", selection: $authMethod) {
                     ForEach(AuthMethod.allCases, id: \.self) { method in
                         Text(method.rawValue).tag(method)
@@ -130,16 +151,19 @@ struct ServerFormViewNew: View {
                 }
                 .pickerStyle(.segmented)
                 .padding(.vertical, 4)
-                
+                .stashyGroupedBlockRow(index: 0, count: authCount)
+
                 if authMethod == .login {
                     TextField("Username", text: $username)
                         .textContentType(.username)
                         .autocapitalization(.none)
                         .disableAutocorrection(true)
-                    
+                        .stashyGroupedBlockRow(index: 1, count: authCount)
+
                     SecureField("Password", text: $password)
                         .textContentType(.password)
-                    
+                        .stashyGroupedBlockRow(index: 2, count: authCount)
+
                     Button(action: fetchKeyViaLogin) {
                         HStack {
                             if isFetchingKey {
@@ -158,11 +182,13 @@ struct ServerFormViewNew: View {
                     }
                     .disabled(username.isEmpty || password.isEmpty || isFetchingKey)
                     .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
-                    
+                    .stashyGroupedBlockRow(index: 3, count: authCount)
+
                     if let error = loginErrorMessage {
                         Text(error)
                             .font(.caption)
                             .foregroundColor(.red)
+                            .stashyGroupedBlockRow(index: 4, count: authCount)
                     }
                 } else if authMethod == .apiKey {
                     HStack {
@@ -173,25 +199,15 @@ struct ServerFormViewNew: View {
                             .autocorrectionDisabled()
                     }
                     .padding(.vertical, 4)
+                    .stashyGroupedBlockRow(index: 1, count: authCount)
                 }
-            } header: {
-                Text("Authentication")
-            } footer: {
-                switch authMethod {
-                case .none:
-                    Text("No authentication will be used.")
-                case .login:
-                    Text("Login with your Stash credentials to retrieve the API key.")
-                case .apiKey:
-                    Text("Enter your Stash API key directly.")
-                }
+
+                stashyScrollingSectionFooter(authFooterText)
             }
-            .listRowBackground(Color.secondaryAppBackground)
-            
-            // Connection Test Section
+
             Section {
+                stashyScrollingSectionHeader("Connection")
                 Button(action: {
-                    // Clean address before testing
                     let detection = ServerConfig.detectProtocol(from: serverAddress)
                     if let proto = detection.protocol {
                         serverProtocol = proto
@@ -207,12 +223,12 @@ struct ServerFormViewNew: View {
                             Image(systemName: testResultIcon)
                                 .foregroundColor(testResultColor)
                         }
-                        
+
                         Text(isTesting ? "Testing..." : "Test Connection")
                             .foregroundColor(.primary)
-                        
+
                         Spacer()
-                        
+
                         if testResult == .success {
                             Text(testMessage)
                                 .font(.caption)
@@ -221,7 +237,8 @@ struct ServerFormViewNew: View {
                     }
                 }
                 .disabled(!isConfigValid || isTesting)
-                
+                .stashyGroupedBlockRow(index: 0, count: connectionCount)
+
                 if testResult == .failure && !testMessage.isEmpty {
                     HStack {
                         Image(systemName: "exclamationmark.triangle.fill")
@@ -230,19 +247,14 @@ struct ServerFormViewNew: View {
                             .font(.caption)
                             .foregroundColor(.secondary)
                     }
+                    .stashyGroupedBlockRow(index: 1, count: connectionCount)
                 }
-            } header: {
-                Text("Connection")
-            } footer: {
-                Group {
-                    if isConfigValid {
-                        Text("URL: \(currentBaseURL)")
-                    }
+
+                if isConfigValid {
+                    stashyScrollingSectionFooter("URL: \(currentBaseURL)")
                 }
             }
-            .listRowBackground(Color.secondaryAppBackground)
-            
-            // Delete Button (only if editing)
+
             if configToEdit != nil {
                 Section {
                     Button(role: .destructive, action: { showingDeleteAlert = true }) {
@@ -253,12 +265,12 @@ struct ServerFormViewNew: View {
                             Spacer()
                         }
                     }
+                    .stashyGroupedSettingsRow()
                 }
-                .listRowBackground(Color.secondaryAppBackground)
             }
         }
+        .stashySettingsList()
         .applyAppBackground()
-        .scrollContentBackground(.hidden)
         .stashyModalSheetChrome(configToEdit == nil ? "Add Server" : "Edit Server", onBack: {
             presentationMode.wrappedValue.dismiss()
         }) {

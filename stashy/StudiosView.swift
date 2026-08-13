@@ -771,12 +771,13 @@ struct StudioImageView: View {
 // Row-based view for list layout
 struct StudioRowView: View {
     let studio: Studio
+    @ObservedObject private var appearance = AppearanceManager.shared
 
     var body: some View {
         HStack(spacing: 16) {
             // Logo on the left (square with gray background)
             ZStack {
-                Color(red: 44/255.0, green: 44/255.0, blue: 46/255.0)
+                Color.studioHeaderGray(for: appearance.currentTheme)
                 
                 StudioImageView(studio: studio)
                     .frame(width: 50, height: 50)
@@ -807,18 +808,19 @@ struct StudioRowView: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 12)
-        .background(Color.secondaryAppBackground)
+        .background(Color.secondaryAppBackground(for: appearance.currentTheme))
         .contentShape(Rectangle())
     }
 }
 
 struct StudioCardView: View {
     let studio: Studio
+    @ObservedObject private var appearance = AppearanceManager.shared
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             // Logo Block (Top)
-            Color.studioHeaderGray
+            Color.studioHeaderGray(for: appearance.currentTheme)
                 .aspectRatio(2.2, contentMode: .fit)
                 .overlay(
                     StudioImageView(studio: studio)
@@ -860,7 +862,7 @@ struct StudioCardView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
         }
-        .background(Color.secondaryAppBackground)
+        .background(Color.secondaryAppBackground(for: appearance.currentTheme))
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
     }

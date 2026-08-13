@@ -96,10 +96,15 @@ final class StashyPlusManager: ObservableObject {
     /// TestFlight-only: keep UI locked even if StoreKit would re-grant access.
     nonisolated static let debugForceLockedKey = "stashy_plus_debug_force_locked"
 
-    /// First freemium **build** (`CFBundleVersion` / `CURRENT_PROJECT_VERSION`).
-    /// On iOS, `AppTransaction.originalAppVersion` is the original build number —
-    /// not the marketing version. Buyers with a lower original build get Lifetime.
+    /// First freemium release is **3.0**. Every App Store purchase before that was paid
+    /// and gets stashy+ Lifetime.
+    ///
+    /// On iOS, `AppTransaction.originalAppVersion` is `CFBundleVersion` (build), not
+    /// the marketing version. Pre-3.0 binaries used build `1`; 3.0 starts at `100`.
+    /// Marketing strings (`2.1`, `2.0.1`) are compared against `3.0` so a reported
+    /// `"3.0"` is not treated as paid (which a naive `< 100` check would do).
     /// Sandbox / TestFlight always report `"1.0"` and must be ignored.
+    nonisolated static let firstFreemiumMarketingVersion = "3.0"
     nonisolated static let firstFreemiumBuild = "100"
 
     @Published private(set) var isUnlocked: Bool
@@ -267,8 +272,14 @@ final class StashyPlusManager: ObservableObject {
         unlockLifetime(source: .lifetime)
     }
 
+    /// `true` when the customer's original App Store version was a paid build (before 3.0).
     nonisolated static func isLegacyPaidAppVersion(_ originalAppVersion: String) -> Bool {
-        version(originalAppVersion, isLessThan: firstFreemiumBuild)
+        let raw = originalAppVersion.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !raw.isEmpty else { return false }
+        if raw.contains(".") {
+            return version(raw, isLessThan: firstFreemiumMarketingVersion)
+        }
+        return version(raw, isLessThan: firstFreemiumBuild)
     }
 
     nonisolated static func version(_ lhs: String, isLessThan rhs: String) -> Bool {

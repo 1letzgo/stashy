@@ -1970,10 +1970,11 @@ struct ReelsViewBody: View {
         }
     }
 
-    /// Kein Server / Verbindungsfehler: untere Capsule- & Scrubber-Leiste ausblenden (wie „offline“).
+    /// Kein Server / Verbindungsfehler / Laden: untere Capsule- & Scrubber-Leiste ausblenden (wie Pics).
     private var reelsBottomChromeSuppressed: Bool {
         if reelsMode == .pics { return true }
-        return configManager.activeConfig == nil || (isListEmpty && viewModel.errorMessage != nil)
+        if isListEmpty { return true }
+        return configManager.activeConfig == nil
     }
 
     /// Voller Rand-zu-Rand-Modus nur für den eigentlichen Reels-Player. Bei leerer Liste + Laden/Fehler
@@ -1981,8 +1982,7 @@ struct ReelsViewBody: View {
     /// mit der oberen `safeAreaInset`-Nav-Leiste fluchten und nicht „nach oben rutschen“.
     private var reelsPremiumContentSafeAreaRegions: SafeAreaRegions {
         if reelsMode == .pics { return [] }
-        let awaitingFeed = isListEmpty && (isFeedLoading || viewModel.errorMessage != nil)
-        if awaitingFeed { return [] }
+        if isListEmpty { return [] }
         return .all
     }
 
@@ -2380,15 +2380,8 @@ struct ReelsViewBody: View {
     private var premiumContentLayout: some View {
         let reelsFeedConnectionError = isListEmpty && viewModel.errorMessage != nil
         ZStack {
-            Group {
-                if reelsMode == .pics {
-                    Color.appBackground.ignoresSafeArea()
-                } else if reelsFeedConnectionError {
-                    Color.appBackground.ignoresSafeArea()
-                } else {
-                    Color.black.ignoresSafeArea()
-                }
-            }
+            StashyThemeFill(role: .app)
+                .ignoresSafeArea()
 
             if reelsMode == .pics {
                 if isInitialized {
@@ -2401,19 +2394,15 @@ struct ReelsViewBody: View {
                 } else {
                     StandardLoadingView(message: "Loading feeds...")
                 }
+            } else if reelsFeedConnectionError {
+                errorStateView
+            } else if isListEmpty {
+                loadingStateView
             } else {
-                let isLoading = isFeedLoading && isListEmpty
-
-                if isLoading {
-                    loadingStateView
-                } else if isListEmpty && viewModel.errorMessage != nil {
-                    errorStateView
-                } else {
-                    reelsListView()
-                }
+                reelsListView()
+                    .ignoresSafeArea(reelsPremiumContentSafeAreaRegions)
             }
         }
-        .ignoresSafeArea(reelsPremiumContentSafeAreaRegions)
         .navigationBarHidden(true)
         .safeAreaInset(edge: .top, spacing: 0) {
             if !StashyChromePlacement.prefersBottom {
@@ -3390,7 +3379,7 @@ struct ReelsViewBody: View {
     /// Criterion chips + O/Rating sit outside the bar (over the feed).
     @ViewBuilder
     private func reelsNavBar(currentItem: ReelItemData?) -> some View {
-        let showsRateChrome = reelsMode != .pics
+        let showsRateChrome = reelsMode != .pics && !isListEmpty
         let hasActiveCriterionChips = selectedPerformer != nil || !selectedTags.isEmpty
         let showsCriterionRow = hasActiveCriterionChips || showsRateChrome
         let prefersBottom = StashyChromePlacement.prefersBottom

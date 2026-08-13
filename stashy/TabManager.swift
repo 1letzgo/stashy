@@ -6,7 +6,7 @@ import SwiftUI
 import Combine
 
 /// Catalog grid density for Scenes / Galleries / Images (1 or 2 cards per row).
-enum CatalogCardColumns: Int, CaseIterable, Codable {
+enum CatalogCardColumns: Int, CaseIterable, Codable, Hashable {
     case one = 1
     case two = 2
 
@@ -24,6 +24,13 @@ enum CatalogCardColumns: Int, CaseIterable, Codable {
         switch self {
         case .one: return "One card per row"
         case .two: return "Two cards per row"
+        }
+    }
+
+    var settingsLabel: String {
+        switch self {
+        case .one: return "1 per Row"
+        case .two: return "2 per Row"
         }
     }
 
@@ -155,6 +162,14 @@ enum DetailViewContext: String, CaseIterable, Codable, Identifiable {
         case .tag: return "tag.fill"
         case .gallery: return "photo.on.rectangle.angled"
         case .group: return "rectangle.stack.fill"
+        }
+    }
+
+    /// Label used inside a catalog-tab settings card (e.g. Performers → Scenes Sort).
+    var settingsRowTitle: String {
+        switch self {
+        case .gallery: return "Images Sort"
+        default: return "Scenes Sort"
         }
     }
 }

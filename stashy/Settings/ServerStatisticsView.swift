@@ -10,6 +10,7 @@ import SwiftUI
 struct ServerStatisticsView: View {
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject private var configManager = ServerConfigManager.shared
+    @ObservedObject private var appearance = AppearanceManager.shared
     @State private var hasAttemptedLoad = false
     @State private var didFailLoad = false
 
@@ -100,7 +101,7 @@ struct ServerStatisticsView: View {
                 .padding(.bottom, 4)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondaryAppBackground)
+        .background(Color.secondaryAppBackground(for: appearance.currentTheme))
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .overlay(
             RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)

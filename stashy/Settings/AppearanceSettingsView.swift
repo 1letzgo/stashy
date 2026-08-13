@@ -17,30 +17,31 @@ struct AppearanceSettingsView: View {
             accentColorSection
             counterIconSection
         }
-        .listStyle(.insetGrouped)
+        .stashySettingsList()
         .applyAppBackground()
-        .scrollContentBackground(.hidden)
         .stashySettingsDetailChrome("Appearance")
     }
 
     private var themeSection: some View {
-        Section(header: Text("App Theme"), footer: Text("Choose the appearance of the app.")) {
+        Section {
+            stashyScrollingSectionHeader("App Theme")
             Picker("Theme", selection: $appearanceManager.preferredTheme) {
                 ForEach(AppTheme.allCases) { theme in
                     Text(theme.rawValue).tag(theme)
                 }
             }
             .pickerStyle(.segmented)
+            .stashyGroupedSettingsRow()
+            stashyScrollingSectionFooter("Choose the appearance of the app.")
         }
-        .listRowBackground(Color.secondaryAppBackground)
     }
 
     private var accentColorSection: some View {
-        Section(header: Text("App Accent Color"), footer: Text("This color will be applied to the tab bar, navigation bar buttons, and other interactive elements throughout the app.")) {
-            // Color Picker
+        Section {
+            stashyScrollingSectionHeader("App Accent Color")
             ColorPicker("Custom Color", selection: $appearanceManager.tintColor, supportsOpacity: false)
-            
-            // Presets Grid
+                .stashyGroupedBlockRow(index: 0, count: 2)
+
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 44))], spacing: 10) {
                 ForEach(appearanceManager.presets) { option in
                     Circle()
@@ -63,20 +64,23 @@ struct AppearanceSettingsView: View {
                 }
             }
             .padding(.vertical, 8)
+            .stashyGroupedBlockRow(index: 1, count: 2)
+            stashyScrollingSectionFooter("This color will be applied to the tab bar, navigation bar buttons, and other interactive elements throughout the app.")
         }
-        .listRowBackground(Color.secondaryAppBackground)
     }
 
     private var counterIconSection: some View {
-        Section(header: Text("O Counter"), footer: Text("Choose which icon to display for the O Counter throughout the app.")) {
+        Section {
+            stashyScrollingSectionHeader("O Counter")
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 56))], spacing: 12) {
                 ForEach(appearanceManager.oCounterIconPresets) { option in
                     counterIconItem(for: option)
                 }
             }
             .padding(.vertical, 8)
+            .stashyGroupedSettingsRow()
+            stashyScrollingSectionFooter("Choose which icon to display for the O Counter throughout the app.")
         }
-        .listRowBackground(Color.secondaryAppBackground)
     }
 
     private func counterIconItem(for option: IconOption) -> some View {

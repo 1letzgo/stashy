@@ -28,23 +28,23 @@ struct SettingsView: View {
     @State private var selectedSection: SettingsSection = .main
     
     // IAP / stashy+
-    @StateObject private var storeManager = StoreManager()
+    @ObservedObject private var storeManager = StoreManager.shared
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
 
     enum SettingsSection: String, CaseIterable, Identifiable {
         case main = "Main"
+        case stashyPlus = "stashy+"
         case actions = "Actions"
         case design = "Design"
-        case stashyPlus = "stashy+"
         
         var id: String { rawValue }
         
         var icon: String {
             switch self {
             case .main: return "gearshape.fill"
+            case .stashyPlus: return "sparkles"
             case .actions: return "server.rack"
             case .design: return "paintbrush.fill"
-            case .stashyPlus: return "sparkles"
             }
         }
     }
@@ -66,7 +66,7 @@ struct SettingsView: View {
             if activeSection == .actions {
                 ToolsServerView(embedded: true)
             } else {
-                Form {
+                List {
                     switch activeSection {
                     case .main:
                         mainSettings
@@ -78,6 +78,7 @@ struct SettingsView: View {
                         EmptyView()
                     }
                 }
+                .stashySettingsList()
             }
         }
         .applyAppBackground()
@@ -168,43 +169,34 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var designSettings: some View {
-        // Design: Appearance, Security, Content & Tabs, Default Settings
-        Section(header: Text("Appearance")) {
+        Section {
+            stashyScrollingSectionHeader("Appearance")
             NavigationLink(destination: AppearanceSettingsView()) {
                 Label("Appearance", systemImage: "paintbrush")
             }
+            .stashyGroupedBlockRow(index: 0, count: 2)
             NavigationLink(destination: EditModeSettingsView()) {
                 Label("Editing", systemImage: "pencil.circle")
             }
+            .stashyGroupedBlockRow(index: 1, count: 2)
         }
-        .listRowBackground(Color.secondaryAppBackground)
 
-        Section(header: Text("Security")) {
+        Section {
+            stashyScrollingSectionHeader("Security")
             NavigationLink(destination: SecuritySettingsView()) {
                 Label("Security", systemImage: "lock.shield")
             }
+            .stashyGroupedSettingsRow()
         }
-        .listRowBackground(Color.secondaryAppBackground)
 
         if configManager.activeConfig != nil {
             ContentSettingsSection()
-
-            Section("Default Settings") {
-                NavigationLink(destination: DefaultSortView()) {
-                    Label("Sorting", systemImage: "arrow.up.arrow.down")
-                }
-
-                NavigationLink(destination: DefaultFilterView()) {
-                    Label("Filters", systemImage: "line.3.horizontal.decrease.circle")
-                }
-            }
-            .listRowBackground(Color.secondaryAppBackground)
         } else {
             Section {
-                Text("Content & default settings require an active server.")
+                Text("Content settings require an active server.")
                     .foregroundColor(.secondary)
+                    .stashyGroupedSettingsRow()
             }
-            .listRowBackground(Color.secondaryAppBackground)
         }
     }
 
@@ -217,45 +209,73 @@ struct SettingsView: View {
         }
 
         if stashyPlus.isUnlocked {
-            Section(header: Text("Custom App Icons")) {
+            Section {
+                stashyScrollingSectionHeader("Custom App Icons")
                 StashyPlusAppIconSettings()
+                    .stashyGroupedSettingsRow()
             }
-            .listRowBackground(Color.secondaryAppBackground)
 
-            Section(header: Text("AI Subtitles and translation")) {
+            Section {
+                stashyScrollingSectionHeader("AI Subtitles and translation", isBeta: true)
                 StashyPlusAISubtitlesSettings()
             }
-            .listRowBackground(Color.secondaryAppBackground)
 
-            Section(header: Text(AIMotionCopy.name)) {
+            Section {
+                stashyScrollingSectionHeader(AIMotionCopy.name, isBeta: true)
                 NavigationLink(destination: StashSyncSettingsView()) {
                     Label(AIMotionCopy.name, systemImage: "bolt.fill")
                 }
+                .stashyGroupedSettingsRow()
             }
-            .listRowBackground(Color.secondaryAppBackground)
 
-            Section(header: Text("Tools")) {
+            Section {
+                stashyScrollingSectionHeader("Tools")
                 StashyPlusToolToggle(item: .downloads)
+                    .stashyGroupedBlockRow(index: 0, count: 4)
                 StashyPlusToolToggle(item: .statistics)
+                    .stashyGroupedBlockRow(index: 1, count: 4)
                 StashyPlusToolToggle(item: .hotOrNot)
+                    .stashyGroupedBlockRow(index: 2, count: 4)
                 StashyPlusToolToggle(item: .rateMe)
+                    .stashyGroupedBlockRow(index: 3, count: 4)
             }
-            .listRowBackground(Color.secondaryAppBackground)
         } else {
-            Section(header: Text("Included with stashy+")) {
+            Section {
+                stashyScrollingSectionHeader("Included with stashy+")
                 Label("Custom App Icons", systemImage: "lock.fill")
+                    .foregroundColor(.secondary)
+                    .stashyGroupedBlockRow(index: 0, count: 7)
                 Label("Download Scenes", systemImage: "lock.fill")
-                Label("AI Subtitles and translation", systemImage: "lock.fill")
-                Label(AIMotionCopy.name, systemImage: "lock.fill")
+                    .foregroundColor(.secondary)
+                    .stashyGroupedBlockRow(index: 1, count: 7)
+                lockedPlusFeature("AI Subtitles and translation", systemImage: "lock.fill", isBeta: true)
+                    .stashyGroupedBlockRow(index: 2, count: 7)
+                lockedPlusFeature(AIMotionCopy.name, systemImage: "lock.fill", isBeta: true)
+                    .stashyGroupedBlockRow(index: 3, count: 7)
                 Label(ToolsItem.statistics.plusFeatureTitle, systemImage: "lock.fill")
+                    .foregroundColor(.secondary)
+                    .stashyGroupedBlockRow(index: 4, count: 7)
                 Label(ToolsItem.hotOrNot.plusFeatureTitle, systemImage: "lock.fill")
+                    .foregroundColor(.secondary)
+                    .stashyGroupedBlockRow(index: 5, count: 7)
                 Label(ToolsItem.rateMe.title, systemImage: "lock.fill")
+                    .foregroundColor(.secondary)
+                    .stashyGroupedBlockRow(index: 6, count: 7)
             }
-            .foregroundColor(.secondary)
-            .listRowBackground(Color.secondaryAppBackground)
         }
 
         stashyPlusPurchaseSection
+    }
+
+    private func lockedPlusFeature(_ title: String, systemImage: String, isBeta: Bool = false) -> some View {
+        HStack {
+            Label(title, systemImage: systemImage)
+                .foregroundColor(.secondary)
+            if isBeta {
+                Spacer()
+                StashyBetaBadge()
+            }
+        }
     }
 
     // MARK: - TestFlight Banner
@@ -310,11 +330,14 @@ struct SettingsView: View {
         }
         .buttonStyle(.plain)
         .listRowBackground(
-            LinearGradient(
-                colors: [Color(red: 0.18, green: 0.38, blue: 0.95), Color(red: 0.55, green: 0.2, blue: 0.85)],
-                startPoint: .topLeading,
-                endPoint: .bottomTrailing
-            )
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
+                .fill(
+                    LinearGradient(
+                        colors: [Color(red: 0.18, green: 0.38, blue: 0.95), Color(red: 0.55, green: 0.2, blue: 0.85)],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
         )
     }
 
@@ -347,17 +370,20 @@ struct SettingsView: View {
         Group {
             if showsLegacyAppLifetimeButton {
                 Section {
+                    stashyScrollingSectionHeader("stashy+")
                     legacyAppLifetimeButton
-                } header: {
-                    Text("stashy+")
-                } footer: {
-                    Text(stashyPlus.source.statusDetail)
+                        .listRowBackground(
+                            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
+                                .fill(Color.green)
+                        )
+                    stashyScrollingSectionFooter(stashyPlus.source.statusDetail)
                 }
-                .listRowBackground(Color.green)
             }
 
             if showsPurchaseMenu {
                 Section {
+                    stashyScrollingSectionHeader(stashyPlus.isUnlocked ? "stashy+" : "Unlock stashy+")
+
                     if stashyPlus.isUnlocked && !showsLegacyAppLifetimeButton {
                         HStack(spacing: 10) {
                             Image(systemName: "checkmark.seal.fill")
@@ -370,6 +396,7 @@ struct SettingsView: View {
                                     .foregroundColor(.secondary)
                             }
                         }
+                        .stashyGroupedSettingsRow()
                     }
 
                     if stashyPlus.shouldOfferPurchases {
@@ -380,6 +407,7 @@ struct SettingsView: View {
                                     Text("Loading stashy+ options…")
                                         .foregroundColor(.secondary)
                                 }
+                                .stashyGroupedSettingsRow()
                             } else {
                                 VStack(alignment: .leading, spacing: 8) {
                                     Text(storeManager.lastProductError ?? "stashy+ products unavailable.")
@@ -394,6 +422,7 @@ struct SettingsView: View {
                                         Task { await storeManager.fetchProducts() }
                                     }
                                 }
+                                .stashyGroupedSettingsRow()
                             }
                         } else {
                             ForEach(sortedProducts) { product in
@@ -416,11 +445,13 @@ struct SettingsView: View {
                                 }
                                 .buttonStyle(.plain)
                                 .disabled(storeManager.isPurchasing)
+                                .stashySettingsCardRow()
                             }
                             if let missing = storeManager.lastProductError, missing.hasPrefix("Missing from StoreKit") {
                                 Text(missing)
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
+                                    .stashyGroupedSettingsRow()
                             }
                         }
                     }
@@ -439,6 +470,7 @@ struct SettingsView: View {
                         }
                         .buttonStyle(.plain)
                         .disabled(storeManager.isPurchasing || storeManager.isRestoringPurchases)
+                        .stashyGroupedSettingsRow()
                     }
 
                     if stashyPlus.source == .subscription {
@@ -448,15 +480,13 @@ struct SettingsView: View {
                             stashyPlusRowLabel("Manage Subscription", systemImage: "creditcard")
                         }
                         .buttonStyle(.plain)
+                        .stashyGroupedSettingsRow()
                     }
-                } header: {
-                    Text(stashyPlus.isUnlocked ? "stashy+" : "Unlock stashy+")
-                } footer: {
+
                     if !stashyPlus.isUnlocked {
-                        Text("Monthly, Yearly, or Lifetime. If you bought the app at full price, tap Restore Purchases.")
+                        stashyScrollingSectionFooter("Monthly, Yearly, or Lifetime. If you bought the app at full price, tap Restore Purchases.")
                     }
                 }
-                .listRowBackground(Color.secondaryAppBackground)
             }
         }
         .task {
@@ -563,17 +593,19 @@ struct SettingsView: View {
         Group {
             tipSection
 
-            Section("Links") {
+            Section {
+                stashyScrollingSectionHeader("Links")
                 Link(destination: URL(string: "https://github.com/1letzgo/stashy")!) {
                     Label("GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
                         .foregroundColor(appearanceManager.tintColor)
                 }
+                .stashyGroupedBlockRow(index: 0, count: 2)
                 Link(destination: URL(string: "https://discord.gg/D8wXv6Pm")!) {
                     Label("Discord", systemImage: "bubble.left.and.bubble.right.fill")
                         .foregroundColor(appearanceManager.tintColor)
                 }
+                .stashyGroupedBlockRow(index: 1, count: 2)
             }
-            .listRowBackground(Color.secondaryAppBackground)
             
         }
     }
@@ -587,6 +619,7 @@ struct SettingsView: View {
     @ViewBuilder
     private var tipSection: some View {
         Section {
+            stashyScrollingSectionHeader("Tips")
             if sortedTipProducts.isEmpty {
                 if storeManager.isLoadingProducts {
                     HStack {
@@ -594,6 +627,7 @@ struct SettingsView: View {
                         Text("Loading tips…")
                             .foregroundColor(.secondary)
                     }
+                    .stashyGroupedSettingsRow()
                 } else {
                     VStack(alignment: .leading, spacing: 8) {
                         Text("Tips unavailable.")
@@ -603,6 +637,7 @@ struct SettingsView: View {
                             Task { await storeManager.fetchProducts() }
                         }
                     }
+                    .stashyGroupedSettingsRow()
                 }
             } else {
                 ForEach(sortedTipProducts) { product in
@@ -625,14 +660,11 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(storeManager.isPurchasing)
+                    .stashySettingsCardRow()
                 }
             }
-        } header: {
-            Text("Tips")
-        } footer: {
-            Text("Support stashy. Tips do not unlock stashy+.")
+            stashyScrollingSectionFooter("Support stashy. Tips do not unlock stashy+.")
         }
-        .listRowBackground(Color.secondaryAppBackground)
         .task {
             if storeManager.tipProducts.isEmpty {
                 await storeManager.fetchProducts()
@@ -649,18 +681,21 @@ struct SettingsView: View {
     }
     // MARK: - Interactive Devices
     private var interactiveDevicesSection: some View {
-        Section(header: Text("Device Synchronization")) {
+        Section {
+            stashyScrollingSectionHeader("Device Synchronization")
             NavigationLink(destination: HandySettingsView()) {
                 Label("The Handy", systemImage: "hand.tap")
             }
+            .stashyGroupedBlockRow(index: 0, count: 3)
             NavigationLink(destination: IntifaceSettingsView()) {
                 Label("Intiface", systemImage: "cable.connector")
             }
+            .stashyGroupedBlockRow(index: 1, count: 3)
             NavigationLink(destination: LoveSpouseSettingsView()) {
                 Label("Love Spouse", systemImage: "antenna.radiowaves.left.and.right")
             }
+            .stashyGroupedBlockRow(index: 2, count: 3)
         }
-        .listRowBackground(Color.secondaryAppBackground)
     }
 
     // MARK: - Actions
@@ -685,6 +720,8 @@ public enum StoreError: Error {
 
 @MainActor
 class StoreManager: ObservableObject {
+    static let shared = StoreManager()
+
     @Published var products: [Product] = []
     @Published var tipProducts: [Product] = []
     @Published var isLoadingProducts = false
@@ -693,9 +730,19 @@ class StoreManager: ObservableObject {
     @Published var isRestoringPurchases = false
 
     private var transactionListener: Task<Void, Never>?
+    private var legacyPaidRetryCount = 0
 
-    init() {
+    private init() {
         transactionListener = listenForTransactions()
+        NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in
+                await self?.syncUnlockFromStore()
+            }
+        }
         Task {
             await syncUnlockFromStore()
             await fetchProducts()
@@ -800,7 +847,29 @@ class StoreManager: ObservableObject {
             }
         }
 
-        let legacyPaidApp = await Self.isLegacyPaidAppPurchaser()
+        let legacyPaidApp: Bool
+        switch await Self.isLegacyPaidAppPurchaser() {
+        case .yes:
+            legacyPaidApp = true
+            legacyPaidRetryCount = 0
+        case .no:
+            legacyPaidApp = false
+            legacyPaidRetryCount = 0
+        case .unknown:
+            // Don't treat a StoreKit outage as "not a paid buyer". Keep any
+            // previously persisted grandfathering and retry a few times.
+            legacyPaidApp = UserDefaults.standard.string(forKey: StashyPlusManager.sourceKey)
+                == StashyPlusSource.legacyPaidApp.rawValue
+                || UserDefaults.standard.bool(forKey: StashyPlusManager.lifetimeKey)
+            if legacyPaidRetryCount < 3 {
+                legacyPaidRetryCount += 1
+                let attempt = legacyPaidRetryCount
+                Task {
+                    try? await Task.sleep(nanoseconds: UInt64(attempt) * 5_000_000_000)
+                    await self.syncUnlockFromStore()
+                }
+            }
+        }
 
         StashyPlusManager.shared.applyStoreEntitlements(
             hasLifetimePurchase: hasLifetimePurchase,
@@ -847,24 +916,28 @@ class StoreManager: ObservableObject {
         }
     }
 
-    /// Paid-app buyers (original build before freemium) get Lifetime.
+    /// Paid-app buyers (original version before 3.0) get Lifetime.
     /// TestFlight / Sandbox cannot prove a real App Store paid purchase — Apple always
     /// reports `originalAppVersion == "1.0"` there, so we skip grandfathering.
-    private static func isLegacyPaidAppPurchaser() async -> Bool {
+    private enum LegacyPaidAppResult {
+        case yes, no, unknown
+    }
+
+    private static func isLegacyPaidAppPurchaser() async -> LegacyPaidAppResult {
         do {
             let result = try await AppTransaction.shared
             let appTransaction = try Self.checkVerifiedStatic(result)
             if appTransaction.environment == .sandbox || appTransaction.environment == .xcode {
                 print("ℹ️ Skipping paid-app grandfathering in \(appTransaction.environment) (originalAppVersion=\(appTransaction.originalAppVersion))")
-                return false
+                return .no
             }
             let original = appTransaction.originalAppVersion
             let isLegacy = StashyPlusManager.isLegacyPaidAppVersion(original)
-            print("ℹ️ AppTransaction originalAppVersion=\(original) legacyPaid=\(isLegacy)")
-            return isLegacy
+            print("ℹ️ AppTransaction originalAppVersion=\(original) pre-3.0 paid=\(isLegacy)")
+            return isLegacy ? .yes : .no
         } catch {
             print("AppTransaction check failed: \(error)")
-            return false
+            return .unknown
         }
     }
 
@@ -909,7 +982,15 @@ class StoreManager: ObservableObject {
             }
         }
 
-        let legacyPaidApp = await isLegacyPaidAppPurchaser()
+        let legacyPaidApp: Bool
+        switch await isLegacyPaidAppPurchaser() {
+        case .yes: legacyPaidApp = true
+        case .no: legacyPaidApp = false
+        case .unknown:
+            legacyPaidApp = UserDefaults.standard.string(forKey: StashyPlusManager.sourceKey)
+                == StashyPlusSource.legacyPaidApp.rawValue
+                || UserDefaults.standard.bool(forKey: StashyPlusManager.lifetimeKey)
+        }
         await MainActor.run {
             StashyPlusManager.shared.applyStoreEntitlements(
                 hasLifetimePurchase: hasLifetimePurchase,
@@ -941,42 +1022,48 @@ struct IntifaceSettingsView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     
     var body: some View {
-        Form {
+        let serverRowCount = 3
+        List {
             Section {
                 Toggle("Enable Intiface", isOn: $buttplugManager.isEnabled)
                     .tint(appearanceManager.tintColor)
+                    .stashyGroupedSettingsRow()
             }
-            .listRowBackground(Color.secondaryAppBackground)
-            
-            Section(header: Text("Intiface Server")) {
+
+            Section {
+                stashyScrollingSectionHeader("Intiface Server")
                 TextField("Server Address", text: $buttplugManager.serverAddress)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
                     .disabled(!buttplugManager.isEnabled)
-                
+                    .stashyGroupedBlockRow(index: 0, count: serverRowCount)
+
                 HStack {
                     Text("Status")
                     Spacer()
                     Text(buttplugManager.statusMessage)
                         .foregroundColor(buttplugManager.isConnected ? .green : .secondary)
                 }
-                
+                .stashyGroupedBlockRow(index: 1, count: serverRowCount)
+
                 if buttplugManager.isConnected {
                     Button("Disconnect", role: .destructive) {
                         buttplugManager.disconnect()
                     }
+                    .stashyGroupedBlockRow(index: 2, count: serverRowCount)
                 } else {
                     Button("Connect") {
                         buttplugManager.connect()
                     }
                     .disabled(!buttplugManager.isEnabled)
+                    .stashyGroupedBlockRow(index: 2, count: serverRowCount)
                 }
             }
-            .listRowBackground(Color.secondaryAppBackground)
-            
+
             if !buttplugManager.devices.isEmpty {
-                Section(header: Text("Discovered Devices")) {
-                    ForEach(buttplugManager.devices) { device in
+                Section {
+                    stashyScrollingSectionHeader("Discovered Devices")
+                    ForEach(Array(buttplugManager.devices.enumerated()), id: \.element.id) { index, device in
                         HStack {
                             Image(systemName: "cable.connector")
                             Text(device.name)
@@ -984,17 +1071,17 @@ struct IntifaceSettingsView: View {
                             Image(systemName: "checkmark.circle.fill")
                                 .foregroundColor(.green)
                         }
+                        .stashyGroupedBlockRow(index: index, count: buttplugManager.devices.count)
                     }
                 }
-                .listRowBackground(Color.secondaryAppBackground)
             }
-            
-            Section(footer: Text("Stashy connects to Intiface Desktop or Intiface Central via WebSockets. Ensure 'Enable Remote Network Access' is turned on in Intiface settings.")) {
+
+            Section {
+                stashyScrollingSectionFooter("Stashy connects to Intiface Desktop or Intiface Central via WebSockets. Ensure 'Enable Remote Network Access' is turned on in Intiface settings.")
             }
-            .listRowBackground(Color.secondaryAppBackground)
         }
+        .stashySettingsList()
         .applyAppBackground()
-        .scrollContentBackground(.hidden)
         .stashySettingsDetailChrome("Intiface")
     }
 }
@@ -1004,25 +1091,28 @@ struct HandySettingsView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
 
     var body: some View {
-        Form {
+        List {
             Section {
                 Toggle("Enable The Handy", isOn: $handyManager.isEnabled)
                     .tint(appearanceManager.tintColor)
+                    .stashyGroupedSettingsRow()
             }
-            .listRowBackground(Color.secondaryAppBackground)
 
-            Section(header: Text("Device Type"), footer: Text("The Handy uses HAMP protocol. The Oh. uses HVP protocol.")) {
+            Section {
+                stashyScrollingSectionHeader("Device Type")
                 Picker("Device", selection: $handyManager.deviceType) {
                     Text("The Handy").tag("The Handy")
                     Text("The Oh.").tag("Oh.")
                 }
                 .pickerStyle(.segmented)
                 .disabled(!handyManager.isEnabled)
+                .stashyGroupedSettingsRow()
+                stashyScrollingSectionFooter("The Handy uses HAMP protocol. The Oh. uses HVP protocol.")
             }
-            .listRowBackground(Color.secondaryAppBackground)
 
             if handyManager.deviceType == "The Handy" {
-                Section(header: Text("AI Motion Controls")) {
+                Section {
+                    stashyScrollingSectionHeader("AI Motion Controls")
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Stroke Length")
@@ -1034,6 +1124,7 @@ struct HandySettingsView: View {
                         Slider(value: $handyManager.strokeLength, in: 10...100, step: 5)
                             .tint(appearanceManager.tintColor)
                     }
+                    .stashyGroupedBlockRow(index: 0, count: 2)
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Max Velocity")
@@ -1045,11 +1136,12 @@ struct HandySettingsView: View {
                         Slider(value: $handyManager.maxVelocity, in: 10...100, step: 5)
                             .tint(appearanceManager.tintColor)
                     }
+                    .stashyGroupedBlockRow(index: 1, count: 2)
                 }
-                .listRowBackground(Color.secondaryAppBackground)
                 .disabled(!handyManager.isEnabled)
             } else {
-                Section(header: Text("AI Motion Controls")) {
+                Section {
+                    stashyScrollingSectionHeader("AI Motion Controls")
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Max Intensity")
@@ -1061,22 +1153,25 @@ struct HandySettingsView: View {
                         Slider(value: $handyManager.maxAmplitude, in: 0.1...1.0, step: 0.05)
                             .tint(appearanceManager.tintColor)
                     }
+                    .stashyGroupedSettingsRow()
                 }
-                .listRowBackground(Color.secondaryAppBackground)
                 .disabled(!handyManager.isEnabled)
             }
 
-            Section(header: Text("Handy Connection"), footer: Text("Stashy now automatically uploads local funscripts to Handy Cloud. The Public URL is only needed for advanced setups.")) {
+            Section {
+                stashyScrollingSectionHeader("Handy Connection")
                 TextField("Connection Key", text: HandyManager.shared.$connectionKey)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
                     .disabled(!handyManager.isEnabled)
+                    .stashyGroupedBlockRow(index: 0, count: 4)
 
                 TextField("Public URL Override (Optional)", text: HandyManager.shared.$publicUrl)
                     .autocapitalization(.none)
                     .disableAutocorrection(true)
                     .keyboardType(.URL)
                     .disabled(!handyManager.isEnabled)
+                    .stashyGroupedBlockRow(index: 1, count: 4)
 
                 HStack {
                     Text("Status")
@@ -1084,16 +1179,19 @@ struct HandySettingsView: View {
                     Text(handyManager.statusMessage)
                         .foregroundColor(handyManager.isConnected ? .green : .secondary)
                 }
+                .stashyGroupedBlockRow(index: 2, count: 4)
 
                 Button("Check Connection") {
                     handyManager.checkConnection()
                 }
                 .disabled(!handyManager.isEnabled)
+                .stashyGroupedBlockRow(index: 3, count: 4)
+
+                stashyScrollingSectionFooter("Stashy now automatically uploads local funscripts to Handy Cloud. The Public URL is only needed for advanced setups.")
             }
-            .listRowBackground(Color.secondaryAppBackground)
         }
+        .stashySettingsList()
         .applyAppBackground()
-        .scrollContentBackground(.hidden)
         .stashySettingsDetailChrome("The Handy")
     }
 }
@@ -1103,29 +1201,30 @@ struct LoveSpouseSettingsView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     
     var body: some View {
-        Form {
+        List {
             Section {
                 Toggle("Enable Love Spouse", isOn: $loveSpouseManager.isEnabled)
                     .tint(appearanceManager.tintColor)
+                    .stashyGroupedSettingsRow()
             }
-            .listRowBackground(Color.secondaryAppBackground)
-            
-            Section(header: Text("Connection Status")) {
+
+            Section {
+                stashyScrollingSectionHeader("Connection Status")
                 HStack {
                     Text("Bluetooth")
                     Spacer()
                     Text(loveSpouseManager.statusMessage)
                         .foregroundColor(loveSpouseManager.isConnected ? .green : .secondary)
                 }
+                .stashyGroupedSettingsRow()
             }
-            .listRowBackground(Color.secondaryAppBackground)
-            
-            Section(footer: Text("Love Spouse 2.4g toys use BLE advertising. Ensure Bluetooth is enabled and the toy is in pairing/scan mode. Both toys in range will react simultaneously.")) {
+
+            Section {
+                stashyScrollingSectionFooter("Love Spouse 2.4g toys use BLE advertising. Ensure Bluetooth is enabled and the toy is in pairing/scan mode. Both toys in range will react simultaneously.")
             }
-            .listRowBackground(Color.secondaryAppBackground)
         }
+        .stashySettingsList()
         .applyAppBackground()
-        .scrollContentBackground(.hidden)
         .stashySettingsDetailChrome("Love Spouse")
     }
 }
@@ -1150,27 +1249,29 @@ struct StashSyncSettingsView: View {
             }
         )
         
-        Form {
+        List {
             if !stashyPlus.isUnlocked {
                 Section {
                     Label(AIMotionCopy.requiresPlus, systemImage: "lock.fill")
                         .foregroundColor(.secondary)
-                } footer: {
-                    Text("Unlock stashy+ to use this feature.")
+                        .stashyGroupedSettingsRow()
+                    stashyScrollingSectionFooter("Unlock stashy+ to use this feature.")
                 }
-                .listRowBackground(Color.secondaryAppBackground)
             }
 
-            Section(header: Text("AI Motion Features"), footer: Text(AIMotionCopy.disclaimer)) {
+            Section {
+                stashyScrollingSectionHeader("AI Motion Features")
                 Toggle(isOn: syncEnabledBinding) {
                     Label(AIMotionCopy.name, systemImage: "bolt.fill")
                 }
                 .tint(appearanceManager.tintColor)
                 .disabled(!stashyPlus.isUnlocked)
+                .stashyGroupedSettingsRow()
+                stashyScrollingSectionFooter(AIMotionCopy.disclaimer)
             }
-            .listRowBackground(Color.secondaryAppBackground)
-            
-            Section(header: Text("Sensitivity")) {
+
+            Section {
+                stashyScrollingSectionHeader("Sensitivity")
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text("AI Motion Sensitivity")
@@ -1178,12 +1279,14 @@ struct StashSyncSettingsView: View {
                         Text("\(Int(videoManager.sensitivity * 50))%").foregroundColor(.secondary)
                     }
                     Slider(value: $videoManager.sensitivity, in: 0.1...2.0).tint(.orange)
-                }.padding(.vertical, 4)
+                }
+                .padding(.vertical, 4)
+                .stashyGroupedSettingsRow()
             }
             .disabled(!videoManager.isVideoSyncEnabled)
-            .listRowBackground(Color.secondaryAppBackground)
 
-            Section(header: Text("Optical Flow Smoothing")) {
+            Section {
+                stashyScrollingSectionHeader("Optical Flow Smoothing")
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
                         Text("Smoothing")
@@ -1192,14 +1295,12 @@ struct StashSyncSettingsView: View {
                     }
                     Slider(value: $videoManager.smoothing, in: 0.0...0.9).tint(.orange)
                 }
+                .stashyGroupedSettingsRow()
             }
             .disabled(!videoManager.isVideoSyncEnabled)
-            .listRowBackground(Color.secondaryAppBackground)
-            
-
         }
+        .stashySettingsList()
         .applyAppBackground()
-        .scrollContentBackground(.hidden)
         .stashySettingsDetailChrome(AIMotionCopy.name)
         .alert("AI Motion Disclaimer", isPresented: $showingDisclaimer) {
             Button("Cancel", role: .cancel) { }

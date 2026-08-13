@@ -28,11 +28,16 @@ struct ServerDetailView: View {
     }
 
     var body: some View {
-        Form {
-            Section("Server Information") {
+        let infoCount = isActive ? 4 : 3
+        List {
+            Section {
+                stashyScrollingSectionHeader("Server Information")
                 LabeledContent("Name", value: server.name)
+                    .stashyGroupedBlockRow(index: 0, count: infoCount)
                 LabeledContent("URL", value: server.baseURL)
+                    .stashyGroupedBlockRow(index: 1, count: infoCount)
                 LabeledContent("Protocol", value: server.serverProtocol.displayName)
+                    .stashyGroupedBlockRow(index: 2, count: infoCount)
                 if isActive {
                     HStack {
                         Text("Status")
@@ -40,24 +45,26 @@ struct ServerDetailView: View {
                         Text(viewModel.serverStatus)
                             .foregroundColor(viewModel.isServerConnected ? .green : .red)
                     }
+                    .stashyGroupedBlockRow(index: 3, count: infoCount)
                 }
             }
-            .listRowBackground(Color.secondaryAppBackground)
 
             if !isActive {
                 Section {
                     taskRow(label: "Connect to Server", icon: "power", taskId: "connect") {
                         connectServer()
                     }
+                    .stashyGroupedSettingsRow()
                 }
-                .listRowBackground(Color.secondaryAppBackground)
             }
 
-            Section("Server Configuration") {
+            Section {
+                stashyScrollingSectionHeader("Server Configuration")
                 Button(action: { showingEditSheet = true }) {
                     Label("Edit Configuration", systemImage: "pencil")
                         .foregroundColor(.primary)
                 }
+                .stashyGroupedBlockRow(index: 0, count: 2)
                 Button(role: .destructive, action: {
                     configManager.deleteServer(id: server.id)
                     presentationMode.wrappedValue.dismiss()
@@ -65,11 +72,11 @@ struct ServerDetailView: View {
                     Label("Delete Server", systemImage: "trash")
                         .foregroundColor(appearanceManager.tintColor)
                 }
+                .stashyGroupedBlockRow(index: 1, count: 2)
             }
-            .listRowBackground(Color.secondaryAppBackground)
         }
+        .stashySettingsList()
         .applyAppBackground()
-        .scrollContentBackground(.hidden)
         .stashySettingsDetailChrome(server.name) {
             if isActive && viewModel.isServerConnected {
                 Image(systemName: "circle.fill")

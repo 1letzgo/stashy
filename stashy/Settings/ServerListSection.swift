@@ -19,8 +19,9 @@ struct ServerListSection: View {
     var onScan: () -> Void
 
     var body: some View {
-        Section("Servers") {
-            ForEach(configManager.savedServers) { server in
+        Section {
+            stashyScrollingSectionHeader("Servers")
+            ForEach(Array(configManager.savedServers.enumerated()), id: \.element.id) { index, server in
                 ServerListRow(
                     server: server,
                     viewModel: viewModel,
@@ -39,18 +40,18 @@ struct ServerListSection: View {
                     },
                     onScan: onScan
                 )
+                .stashyGroupedBlockRow(index: index, count: configManager.savedServers.count + 1)
             }
             .onDelete { indexSet in
                 configManager.deleteServer(at: indexSet)
             }
-            .listRowBackground(Color.secondaryAppBackground)
 
             Button(action: {
                 showingAddServerSheet = true
             }) {
                 Label("Add New Server", systemImage: "plus")
             }
-            .listRowBackground(Color.secondaryAppBackground)
+            .stashyGroupedBlockRow(index: configManager.savedServers.count, count: configManager.savedServers.count + 1)
         }
     }
 }

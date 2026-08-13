@@ -16,12 +16,14 @@ import CoreBluetooth
 
 extension Color {
     static let appAccent = Color(red: 0x64/255.0, green: 0x4C/255.0, blue: 0x3D/255.0)
-    
-    static var appBackground: Color {
+    /// Default accent on a fresh install (matches the Gray preset).
+    static let appDefaultTint = Color.gray
+
+    static func appBackground(for theme: AppTheme) -> Color {
         #if os(tvOS)
         return Color(hex: "#161E2B")
         #else
-        switch AppearanceManager.shared.currentTheme {
+        switch theme {
         case .darkBlue:
             return Color(hex: "#1E293B")
         default:
@@ -29,12 +31,16 @@ extension Color {
         }
         #endif
     }
-    
-    static var secondaryAppBackground: Color {
+
+    static var appBackground: Color {
+        appBackground(for: AppearanceManager.shared.currentTheme)
+    }
+
+    static func secondaryAppBackground(for theme: AppTheme) -> Color {
         #if os(tvOS)
         return Color(UIColor.separator).opacity(0.15)
         #else
-        switch AppearanceManager.shared.currentTheme {
+        switch theme {
         case .darkBlue:
             return Color(hex: "#334155")
         default:
@@ -42,12 +48,16 @@ extension Color {
         }
         #endif
     }
-    
-    static var pillAccent: Color {
+
+    static var secondaryAppBackground: Color {
+        secondaryAppBackground(for: AppearanceManager.shared.currentTheme)
+    }
+
+    static func pillAccent(for theme: AppTheme) -> Color {
         #if os(tvOS)
         return .primary
         #else
-        switch AppearanceManager.shared.currentTheme {
+        switch theme {
         case .darkBlue:
             return .white.opacity(0.9)
         default:
@@ -55,9 +65,17 @@ extension Color {
         }
         #endif
     }
-    
+
+    static var pillAccent: Color {
+        pillAccent(for: AppearanceManager.shared.currentTheme)
+    }
+
+    static func studioHeaderGray(for theme: AppTheme) -> Color {
+        theme == .darkBlue ? Color(hex: "#1E293B") : Color(red: 44/255.0, green: 44/255.0, blue: 46/255.0)
+    }
+
     static var studioHeaderGray: Color {
-        AppearanceManager.shared.currentTheme == .darkBlue ? Color(hex: "#1E293B") : Color(red: 44/255.0, green: 44/255.0, blue: 46/255.0)
+        studioHeaderGray(for: AppearanceManager.shared.currentTheme)
     }
 
     init(hex: String) {
@@ -6967,9 +6985,10 @@ extension StashDBViewModel {
         }
 
         let fileIds = scene.files?.compactMap { $0.id } ?? []
+        let sceneId = scene.id
         let sceneMutation = """
         mutation {
-            sceneDestroy(input: { id: "\(scene.id)" })
+            sceneDestroy(input: { id: "\(sceneId)" })
         }
         """
 
@@ -7010,7 +7029,7 @@ extension StashDBViewModel {
                                         self?.deleteSceneFiles(fileIds: fileIds, config: config) { success in
                                             DispatchQueue.main.async {
                                                 if success {
-                                                    NotificationCenter.default.post(name: NSNotification.Name("SceneDeleted"), object: nil, userInfo: ["sceneId": scene.id])
+                                                    NotificationCenter.default.post(name: NSNotification.Name("SceneDeleted"), object: nil, userInfo: ["sceneId": sceneId])
                                                 }
                                                 completion(success)
                                             }
@@ -7018,7 +7037,7 @@ extension StashDBViewModel {
                                     }
                                 } else {
                                     DispatchQueue.main.async {
-                                        NotificationCenter.default.post(name: NSNotification.Name("SceneDeleted"), object: nil, userInfo: ["sceneId": scene.id])
+                                        NotificationCenter.default.post(name: NSNotification.Name("SceneDeleted"), object: nil, userInfo: ["sceneId": sceneId])
                                         completion(true)
                                     }
                                 }
