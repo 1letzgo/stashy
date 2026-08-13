@@ -2,8 +2,9 @@
 //  StashyPlusManager.swift
 //  stashy
 //
-//  Entitlement gate for Stashy+ (AI subtitles, Downloads, Match, RateMe, StashSync).
-//  Unlocked via subscription, lifetime IAP, legacy paid-app purchase, or prior tip jar.
+//  Entitlement gate for stashy+ (AI subtitles, Downloads, Advanced Statistics, Match, RateMe, AI Motion, App Icon).
+//  Unlocked via subscription, lifetime IAP, or legacy paid-app purchase.
+//  Old tip-jar UserDefaults still grant lifetime; new tips never do.
 //
 
 #if !os(tvOS)
@@ -19,23 +20,30 @@ enum StashyPlusProduct {
     static let allIDs: Set<String> = [monthly, yearly, lifetime]
     static let subscriptionIDs: Set<String> = [monthly, yearly]
 
-    /// Retired tip-jar consumables — still grant lifetime if found in purchase history.
-    static let legacyTipIDs: Set<String> = [
-        "de.stashy.tip1",
-        "de.stashy.tip2",
-        "de.stashy.tip3",
-    ]
+    static let tipSmall = "de.stashy.tip1"
+    static let tipMedium = "de.stashy.tip2"
+    static let tipLarge = "de.stashy.tip3"
+
+    /// Consumable tips — thank-you only, never grant stashy+.
+    static let tipIDs: Set<String> = [tipSmall, tipMedium, tipLarge]
+    static let legacyTipIDs: Set<String> = tipIDs
 
     static let displayNames: [String: String] = [
         monthly: "Monthly",
         yearly: "Yearly",
         lifetime: "Lifetime",
+        tipSmall: "Small",
+        tipMedium: "Medium",
+        tipLarge: "Large",
     ]
 
     static let sortOrder: [String: Int] = [
         monthly: 0,
         yearly: 1,
         lifetime: 2,
+        tipSmall: 0,
+        tipMedium: 1,
+        tipLarge: 2,
     ]
 }
 
@@ -49,10 +57,10 @@ enum StashyPlusSource: String, Equatable {
     var statusTitle: String {
         switch self {
         case .none: return "Not unlocked"
-        case .subscription: return "Stashy+ active"
-        case .lifetime: return "Stashy+ Lifetime"
-        case .legacyPaidApp: return "Stashy+ Lifetime"
-        case .legacyTip: return "Stashy+ Lifetime"
+        case .subscription: return "stashy+ active"
+        case .lifetime: return "stashy+ Lifetime"
+        case .legacyPaidApp: return "stashy+ Lifetime"
+        case .legacyTip: return "stashy+ Lifetime"
         }
     }
 
@@ -72,7 +80,7 @@ enum StashyPlusSource: String, Equatable {
     }
 }
 
-/// Central gate for Stashy+ features.
+/// Central gate for stashy+ features.
 @MainActor
 final class StashyPlusManager: ObservableObject {
     static let shared = StashyPlusManager()

@@ -94,11 +94,12 @@ struct CatalogCategoryRow: View {
 
 struct SettingsCategoryRow: View {
     @Binding var selection: SettingsView.SettingsSection
+    var sections: [SettingsView.SettingsSection] = Array(SettingsView.SettingsSection.allCases)
 
     var body: some View {
         StashyTopNavNameDropdownRow(
-            title: "Settings",
-            items: SettingsView.SettingsSection.allCases.map {
+            title: sections.count == 1 ? (sections.first?.rawValue ?? "Settings") : "Settings",
+            items: sections.map {
                 StashyNavMenuItem(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon)
             },
             selectionID: selection.rawValue,

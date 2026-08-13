@@ -11,6 +11,7 @@ import SwiftUI
 struct ContentSettingsSection: View {
     @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject private var stashyPlus = StashyPlusManager.shared
 
     var body: some View {
         Section("Content & Tabs") {
@@ -22,8 +23,10 @@ struct ContentSettingsSection: View {
                 Label("Feeds", systemImage: "play.rectangle.on.rectangle")
             }
 
-            NavigationLink(destination: ToolsSettingsView()) {
-                Label("Tools", systemImage: "cube.box")
+            if stashyPlus.isUnlocked {
+                NavigationLink(destination: ToolsSettingsView()) {
+                    Label("Tools", systemImage: "cube.box")
+                }
             }
 
             NavigationLink(destination: TabSettingsView()) {
@@ -37,12 +40,13 @@ struct ContentSettingsSection: View {
 struct ToolsSettingsView: View {
     @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject private var stashyPlus = StashyPlusManager.shared
 
     private var toolsTabIsVisible: Bool {
         tabManager.tabs.first(where: { $0.id == .tools })?.isVisible ?? true
     }
 
-    /// Core tools only — Downloads / Match / RateMe are managed under Settings → Stashy+.
+    /// Core tools only — plus tools are managed under stashy+.
     private var orderedCoreTools: [ToolsItemConfig] {
         tabManager.tools
             .filter { $0.id != .server && !TabManager.isStashyPlusTool($0.id) }
@@ -51,7 +55,7 @@ struct ToolsSettingsView: View {
 
     var body: some View {
         List {
-            Section("Tools Tab") {
+            Section {
                 Toggle(isOn: Binding(
                     get: { toolsTabIsVisible },
                     set: { _ in tabManager.toggle(.tools) }
@@ -59,48 +63,58 @@ struct ToolsSettingsView: View {
                     Text("Show Tools Tab")
                 }
                 .tint(appearanceManager.tintColor)
+            } header: {
+                Text("Tools Tab")
+            } footer: {
+                if stashyPlus.isUnlocked {
+                    Text("Advanced Statistics, Downloads, Match, and RateMe are managed under Settings → stashy+.")
+                } else {
+                    Text("The Tools tab appears after stashy+ is unlocked.")
+                }
             }
             .listRowBackground(Color.secondaryAppBackground)
 
-            Section {
-                ForEach(orderedCoreTools) { tool in
-                    Toggle(isOn: Binding(
-                        get: { tool.isEnabled },
-                        set: { _ in tabManager.toggleTool(tool.id) }
-                    )) {
-                        Label(tool.id.title, systemImage: tool.id.icon)
+            if !orderedCoreTools.isEmpty {
+                Section {
+                    ForEach(orderedCoreTools) { tool in
+                        Toggle(isOn: Binding(
+                            get: { tool.isEnabled },
+                            set: { _ in tabManager.toggleTool(tool.id) }
+                        )) {
+                            Label(tool.id.title, systemImage: tool.id.icon)
+                        }
+                        .tint(appearanceManager.tintColor)
                     }
-                    .tint(appearanceManager.tintColor)
+                    .onMove { indices, newOffset in
+                        var working = orderedCoreTools
+                        working.move(fromOffsets: indices, toOffset: newOffset)
+                        // Preserve stashy+ tools and Server at the end.
+                        let plusTools = tabManager.tools
+                            .filter { TabManager.isStashyPlusTool($0.id) }
+                            .sorted { $0.sortOrder < $1.sortOrder }
+                        var rebuilt = working.enumerated().map { idx, item in
+                            ToolsItemConfig(id: item.id, isEnabled: item.isEnabled, sortOrder: idx)
+                        }
+                        for tool in plusTools {
+                            rebuilt.append(ToolsItemConfig(
+                                id: tool.id,
+                                isEnabled: tool.isEnabled,
+                                sortOrder: rebuilt.count
+                            ))
+                        }
+                        if tabManager.tools.contains(where: { $0.id == .server }) {
+                            rebuilt.append(ToolsItemConfig(id: .server, isEnabled: false, sortOrder: rebuilt.count))
+                        }
+                        tabManager.tools = rebuilt
+                        tabManager.saveTools()
+                    }
+                } header: {
+                    Text("Tools Order")
+                } footer: {
+                    Text("Server tasks are under Settings → Actions.")
                 }
-                .onMove { indices, newOffset in
-                    var working = orderedCoreTools
-                    working.move(fromOffsets: indices, toOffset: newOffset)
-                    // Preserve Stashy+ tools and Server at the end.
-                    let plusTools = tabManager.tools
-                        .filter { TabManager.isStashyPlusTool($0.id) }
-                        .sorted { $0.sortOrder < $1.sortOrder }
-                    var rebuilt = working.enumerated().map { idx, item in
-                        ToolsItemConfig(id: item.id, isEnabled: item.isEnabled, sortOrder: idx)
-                    }
-                    for tool in plusTools {
-                        rebuilt.append(ToolsItemConfig(
-                            id: tool.id,
-                            isEnabled: tool.isEnabled,
-                            sortOrder: rebuilt.count
-                        ))
-                    }
-                    if tabManager.tools.contains(where: { $0.id == .server }) {
-                        rebuilt.append(ToolsItemConfig(id: .server, isEnabled: false, sortOrder: rebuilt.count))
-                    }
-                    tabManager.tools = rebuilt
-                    tabManager.saveTools()
-                }
-            } header: {
-                Text("Tools Order")
-            } footer: {
-                Text("Downloads, Match, and RateMe live under Settings → Stashy+. Server tasks are under Settings → Server.")
+                .listRowBackground(Color.secondaryAppBackground)
             }
-            .listRowBackground(Color.secondaryAppBackground)
         }
         .listStyle(.insetGrouped)
         .environment(\.editMode, .constant(.active))

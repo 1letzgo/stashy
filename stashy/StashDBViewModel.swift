@@ -9259,7 +9259,7 @@ class DownloadManager: NSObject, ObservableObject {
         #if !os(tvOS)
         guard StashyPlusManager.isUnlockedNow else {
             ToastManager.shared.show(
-                "Downloads are part of Stashy+ — unlock in Settings",
+                "Downloads are part of stashy+ — unlock in Settings",
                 icon: "sparkles",
                 style: .error
             )
@@ -9460,6 +9460,74 @@ extension DownloadManager: URLSessionDownloadDelegate {
 
 #if !os(tvOS)
 // MARK: - Shared Video Components
+
+/// AVPlayerViewController drops hardware-keyboard skip on Mac / iPad fullscreen.
+/// We re-apply ±15s arrow seeks only while fullscreen so inline Apple shortcuts stay single-fire.
+final class StashyPlayerViewController: AVPlayerViewController {
+    var handlesFullscreenKeyboardSkip = false
+    private let skipInterval: TimeInterval = 15
+
+    override var canBecomeFirstResponder: Bool { true }
+
+    override var keyCommands: [UIKeyCommand]? {
+        guard handlesFullscreenKeyboardSkip else { return super.keyCommands }
+        let commands = [
+            UIKeyCommand(input: UIKeyCommand.inputLeftArrow, modifierFlags: [], action: #selector(skipBackward)),
+            UIKeyCommand(input: UIKeyCommand.inputRightArrow, modifierFlags: [], action: #selector(skipForward)),
+        ]
+        commands.forEach { $0.wantsPriorityOverSystemBehavior = true }
+        return commands
+    }
+
+    override func viewDidAppear(_ animated: Bool) {
+        super.viewDidAppear(animated)
+        if handlesFullscreenKeyboardSkip {
+            becomeFirstResponder()
+        }
+    }
+
+    override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
+        guard handlesFullscreenKeyboardSkip else {
+            super.pressesBegan(presses, with: event)
+            return
+        }
+        for press in presses {
+            switch press.key?.keyCode {
+            case .keyboardLeftArrow:
+                skip(by: -skipInterval)
+                return
+            case .keyboardRightArrow:
+                skip(by: skipInterval)
+                return
+            default:
+                break
+            }
+        }
+        super.pressesBegan(presses, with: event)
+    }
+
+    @objc private func skipBackward() { skip(by: -skipInterval) }
+    @objc private func skipForward() { skip(by: skipInterval) }
+
+    private func skip(by seconds: TimeInterval) {
+        guard let player, let item = player.currentItem else { return }
+        let current = player.currentTime().seconds
+        guard current.isFinite else { return }
+        var target = current + seconds
+        let duration = item.duration.seconds
+        if duration.isFinite {
+            target = min(max(0, target), max(0, duration))
+        } else {
+            target = max(0, target)
+        }
+        player.seek(
+            to: CMTime(seconds: target, preferredTimescale: 600),
+            toleranceBefore: .positiveInfinity,
+            toleranceAfter: .positiveInfinity
+        )
+    }
+}
+
 struct VideoPlayerView: UIViewControllerRepresentable {
     let player: AVPlayer
     @Binding var isFullscreen: Bool
@@ -9480,7 +9548,7 @@ struct VideoPlayerView: UIViewControllerRepresentable {
         Coordinator(player: player, isFullscreen: $isFullscreen)
     }
     func makeUIViewController(context: Context) -> AVPlayerViewController {
-        let playerViewController = AVPlayerViewController()
+        let playerViewController = StashyPlayerViewController()
         playerViewController.player = attachPlayer ? player : nil
         playerViewController.delegate = context.coordinator
         playerViewController.showsPlaybackControls = showsPlaybackControls
@@ -9593,9 +9661,16 @@ struct VideoPlayerView: UIViewControllerRepresentable {
 
         func playerViewController(_ playerViewController: AVPlayerViewController, willBeginFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
             isFullscreen = true
+            if let stashyPlayer = playerViewController as? StashyPlayerViewController {
+                stashyPlayer.handlesFullscreenKeyboardSkip = true
+                coordinator.animate(alongsideTransition: nil) { _ in
+                    stashyPlayer.becomeFirstResponder()
+                }
+            }
         }
 
         func playerViewController(_ playerViewController: AVPlayerViewController, willEndFullScreenPresentationWithAnimationCoordinator coordinator: UIViewControllerTransitionCoordinator) {
+            (playerViewController as? StashyPlayerViewController)?.handlesFullscreenKeyboardSkip = false
             coordinator.animate(alongsideTransition: nil) { _ in
                 // Standard behavior might pause, so we force play if we intend to keep playing
                 self.player.play()

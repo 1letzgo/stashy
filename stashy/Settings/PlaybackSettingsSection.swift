@@ -65,7 +65,7 @@ struct PlaybackSettingsSection: View {
 }
 
 #if !os(tvOS)
-/// AI subtitle controls shown under Settings → Stashy+.
+/// AI subtitle and translation controls shown under Settings → stashy+.
 struct StashyPlusAISubtitlesSettings: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var tabManager = TabManager.shared
@@ -94,33 +94,20 @@ struct StashyPlusAISubtitlesSettings: View {
     }
 }
 
-/// Downloads / Match / RateMe enablement for Settings → Stashy+.
-struct StashyPlusToolsSettings: View {
+/// Single stashy+ tool enablement row.
+struct StashyPlusToolToggle: View {
+    let item: ToolsItem
     @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var appearanceManager = AppearanceManager.shared
 
     var body: some View {
-        Toggle(isOn: toolBinding(for: .downloads)) {
-            Label(ToolsItem.downloads.title, systemImage: ToolsItem.downloads.icon)
-        }
-        .tint(appearanceManager.tintColor)
-
-        Toggle(isOn: toolBinding(for: .hotOrNot)) {
-            Label(ToolsItem.hotOrNot.title, systemImage: ToolsItem.hotOrNot.icon)
-        }
-        .tint(appearanceManager.tintColor)
-
-        Toggle(isOn: toolBinding(for: .rateMe)) {
-            Label(ToolsItem.rateMe.title, systemImage: ToolsItem.rateMe.icon)
-        }
-        .tint(appearanceManager.tintColor)
-    }
-
-    private func toolBinding(for item: ToolsItem) -> Binding<Bool> {
-        Binding(
+        Toggle(isOn: Binding(
             get: { tabManager.tools.first(where: { $0.id == item })?.isEnabled ?? false },
             set: { _ in tabManager.toggleTool(item) }
-        )
+        )) {
+            Label(item.plusFeatureTitle, systemImage: item.icon)
+        }
+        .tint(appearanceManager.tintColor)
     }
 }
 #endif

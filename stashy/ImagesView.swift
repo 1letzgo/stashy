@@ -505,7 +505,7 @@ private struct ImagesViewBody: View {
                 }
             }
         }
-        .floatingActionBar(isPresented: true, catalogChrome: CatalogFloatingChromeState(hasActiveServerConfig: configManager.activeConfig != nil, primaryListIsEmpty: displayedImages.isEmpty, errorMessage: viewModel.errorMessage, imageFindListError: viewModel.imageFindListError)) {
+        .floatingActionBar(isPresented: !feedsEmbedded, catalogChrome: CatalogFloatingChromeState(hasActiveServerConfig: configManager.activeConfig != nil, primaryListIsEmpty: displayedImages.isEmpty, errorMessage: viewModel.errorMessage, imageFindListError: viewModel.imageFindListError)) {
             HStack(spacing: 0) {
                 if isSelectionMode {
                     CatalogFABIconButton(systemImage: "checkmark.circle.fill") {

@@ -26,6 +26,7 @@
 		372E2D9B2F64425000603361 /* StashSyncManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2D9A2F64425000603361 /* StashSyncManager.swift */; };
 		372E2D9D2F645A0100603361 /* SubtitleController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2D9C2F645A0100603361 /* SubtitleController.swift */; };
 		A1PLUS012F30B00000000001 /* StashyPlusManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1PLUS022F30B00000000002 /* StashyPlusManager.swift */; };
+		A1ICON012F30B00000000001 /* AppIconManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ICON022F30B00000000002 /* AppIconManager.swift */; };
 		372E2DA32F646B0100603361 /* SceneTranscriptionSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DA22F646B0100603361 /* SceneTranscriptionSupport.swift */; };
 		372E2DA52F646B0100603361 /* SceneLiveTranscriptionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DA42F646B0100603361 /* SceneLiveTranscriptionController.swift */; };
 		372E2DA72F646B0100603361 /* SceneTeleprompterPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DA62F646B0100603361 /* SceneTeleprompterPanel.swift */; };
@@ -181,6 +182,7 @@
 		372E2D9A2F64425000603361 /* StashSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashSyncManager.swift; sourceTree = "<group>"; };
 		372E2D9C2F645A0100603361 /* SubtitleController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleController.swift; sourceTree = "<group>"; };
 		A1PLUS022F30B00000000002 /* StashyPlusManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyPlusManager.swift; sourceTree = "<group>"; };
+		A1ICON022F30B00000000002 /* AppIconManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconManager.swift; sourceTree = "<group>"; };
 		A1PLUS032F30B00000000003 /* Configuration.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Configuration.storekit; sourceTree = "<group>"; };
 		372E2DA22F646B0100603361 /* SceneTranscriptionSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneTranscriptionSupport.swift; sourceTree = "<group>"; };
 		372E2DA42F646B0100603361 /* SceneLiveTranscriptionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneLiveTranscriptionController.swift; sourceTree = "<group>"; };
@@ -370,6 +372,7 @@
 				372E2D982F64272300603361 /* VideoAnalysisManager.swift */,
 				372E2D9A2F64425000603361 /* StashSyncManager.swift */,
 				A1PLUS022F30B00000000002 /* StashyPlusManager.swift */,
+				A1ICON022F30B00000000002 /* AppIconManager.swift */,
 				372E2D9C2F645A0100603361 /* SubtitleController.swift */,
 				DFSEC0022F2A000100000002 /* SecurityManager.swift */,
 			);
@@ -609,6 +612,7 @@
 				DFST000112F30A0000000011 /* DefaultSortView.swift in Sources */,
 				372E2D992F64272300603361 /* VideoAnalysisManager.swift in Sources */,
 				A1PLUS012F30B00000000001 /* StashyPlusManager.swift in Sources */,
+				A1ICON012F30B00000000001 /* AppIconManager.swift in Sources */,
 				372E2D9D2F645A0100603361 /* SubtitleController.swift in Sources */,
 				372E2DA32F646B0100603361 /* SceneTranscriptionSupport.swift in Sources */,
 				372E2DA52F646B0100603361 /* SceneLiveTranscriptionController.swift in Sources */,
@@ -872,7 +876,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 100;
@@ -902,7 +906,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
-				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = NO;
+				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 100;

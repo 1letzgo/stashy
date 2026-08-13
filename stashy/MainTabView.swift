@@ -15,6 +15,7 @@ struct MainTabView: View {
     @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var securityManager = SecurityManager.shared
+    @ObservedObject private var stashyPlus = StashyPlusManager.shared
     /// Feeds (`ReelsView`): bleibt über Tab-Wechsel erhalten; Szenen-/Marker-Scroll-Position in `ReelsSessionRAM`.
     @StateObject private var reelsFeedViewModel = StashDBViewModel()
     @State private var hasValidConfig = false
@@ -32,7 +33,13 @@ struct MainTabView: View {
     var body: some View {
         ZStack {
             TabView(selection: Binding(
-                get: { coordinator.selectedTab },
+                get: {
+                    let selected = coordinator.selectedTab
+                    if selected == .search || tabManager.visibleTabs.contains(selected) {
+                        return selected
+                    }
+                    return tabManager.visibleTabs.first ?? .catalogue
+                },
                 set: { newValue in
                     if newValue == coordinator.selectedTab {
                         if newValue == .catalogue {
@@ -86,6 +93,12 @@ struct MainTabView: View {
                 ReelsPlayerRegistry.suspendPlayback()
                 NotificationCenter.default.post(name: Notification.Name("ReelsPauseAllPlayers"), object: nil)
                 try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+            }
+            .onChange(of: stashyPlus.isUnlocked) { _, _ in
+                ensureSelectedTabIsVisible()
+            }
+            .onChange(of: tabManager.visibleTabs) { _, _ in
+                ensureSelectedTabIsVisible()
             }
 
             if securityManager.isAppLocked {
@@ -164,6 +177,20 @@ struct MainTabView: View {
         coordinator.clearReelsDeepLink()
         coordinator.reelsTabID = UUID()
     }
+
+    /// Tools ↔ stashy+ swap must not leave TabView on a hidden tab.
+    private func ensureSelectedTabIsVisible() {
+        let selected = coordinator.selectedTab
+        guard selected != .search else { return }
+        guard !tabManager.visibleTabs.contains(selected) else { return }
+        if stashyPlus.isUnlocked {
+            coordinator.selectedTab = tabManager.visibleTabs.contains(.tools) ? .tools : .settings
+        } else if tabManager.visibleTabs.contains(.stashyPlus) {
+            coordinator.selectedTab = .stashyPlus
+        } else {
+            coordinator.selectedTab = tabManager.visibleTabs.first ?? .catalogue
+        }
+    }
 }
 
 extension MainTabView {
@@ -204,7 +231,14 @@ extension MainTabView {
                     .applyAppBackground()
             }
             .id(coordinator.toolsTabID)
-            
+
+        case .stashyPlus:
+            NavigationStack {
+                SettingsView(stashyPlusOnly: true)
+                    .applyAppBackground()
+            }
+            .id("stashyPlusTab")
+
         case .reels:
             NavigationStack {
                 ReelsView(viewModel: reelsFeedViewModel, deepLink: coordinator.reelsDeepLink)
@@ -441,6 +475,7 @@ struct ToolsServerView: View {
                     .listRowBackground(Color.secondaryAppBackground)
                 }
                 .scrollContentBackground(.hidden)
+                .tint(appearanceManager.tintColor)
             } else {
                 VStack(spacing: 16) {
                     Spacer()
@@ -479,11 +514,12 @@ struct ToolsServerView: View {
         HStack {
             Label {
                 Text(label)
+                    .foregroundColor(.primary)
             } icon: {
                 Image(systemName: icon)
+                    .foregroundColor(appearanceManager.tintColor)
                     .frame(width: 24, alignment: .center)
             }
-            .foregroundColor(.primary)
             Spacer()
             if runningTask == taskId {
                 ProgressView()

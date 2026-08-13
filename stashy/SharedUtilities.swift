@@ -1539,7 +1539,7 @@ struct StashSyncCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text("StashSync")
+            Text(AIMotionCopy.name)
                 .font(.title3)
                 .fontWeight(.semibold)
                 .padding(.horizontal, 12)
@@ -1878,7 +1878,7 @@ struct StashSyncSheet: View {
                 .listRowBackground(Color.secondaryAppBackground)
             }
             .scrollContentBackground(.hidden)
-            .stashyModalSheetChrome("StashSync", onBack: {
+            .stashyModalSheetChrome(AIMotionCopy.name, onBack: {
                 if handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode {
                     stashSync.isActive = true
                 } else {

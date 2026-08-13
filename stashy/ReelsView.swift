@@ -3969,7 +3969,7 @@ struct ReelsViewBody: View {
         .accessibilityLabel("Filter und Sortierung")
     }
 
-    /// Visible only when Stashy+ StashSync is unlocked + enabled (not on Pics).
+    /// Visible only when stashy+ AI Motion is unlocked + enabled (not on Pics).
     private var showsReelsStashSyncButton: Bool {
         stashSyncManager.isStashSyncEnabled && reelsMode != .pics
     }
@@ -3996,7 +3996,7 @@ struct ReelsViewBody: View {
                 .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight, iconOnly: true))
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("StashSync")
+        .accessibilityLabel(AIMotionCopy.name)
         .accessibilityValue(isReelsStashSyncActive ? "On" : "Off")
         .accessibilityHint("Toggles device sync for the current feed")
     }

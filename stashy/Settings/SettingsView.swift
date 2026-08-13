@@ -11,6 +11,9 @@ import StoreKit
 import UIKit
 
 struct SettingsView: View {
+    /// When true, this instance is the locked stashy+ tab (paywall only — no Settings chrome).
+    var stashyPlusOnly: Bool = false
+
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @ObservedObject private var configManager = ServerConfigManager.shared
@@ -24,7 +27,7 @@ struct SettingsView: View {
     @State private var editingServer: ServerConfig?
     @State private var selectedSection: SettingsSection = .main
     
-    // IAP / Stashy+
+    // IAP / stashy+
     @StateObject private var storeManager = StoreManager()
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
 
@@ -32,7 +35,7 @@ struct SettingsView: View {
         case main = "Main"
         case actions = "Actions"
         case design = "Design"
-        case stashyPlus = "Stashy+"
+        case stashyPlus = "stashy+"
         
         var id: String { rawValue }
         
@@ -46,13 +49,25 @@ struct SettingsView: View {
         }
     }
 
+    private var chromeSections: [SettingsSection] {
+        if stashyPlusOnly { return [.stashyPlus] }
+        if stashyPlus.isUnlocked { return Array(SettingsSection.allCases) }
+        return SettingsSection.allCases.filter { $0 != .stashyPlus }
+    }
+
+    private var activeSection: SettingsSection {
+        if stashyPlusOnly { return .stashyPlus }
+        if selectedSection == .stashyPlus && !stashyPlus.isUnlocked { return .main }
+        return selectedSection
+    }
+
     var body: some View {
         Group {
-            if selectedSection == .actions {
+            if activeSection == .actions {
                 ToolsServerView(embedded: true)
             } else {
                 Form {
-                    switch selectedSection {
+                    switch activeSection {
                     case .main:
                         mainSettings
                     case .design:
@@ -66,11 +81,21 @@ struct SettingsView: View {
             }
         }
         .applyAppBackground()
+        .tint(appearanceManager.tintColor)
         .navigationBarHidden(true)
-        .popNavigationToRootOnChange(selectedSection.rawValue)
+        .popNavigationToRootOnChange(activeSection.rawValue)
         .stashyCustomChromeInset(spacing: 0) {
             StashySectionChromeBar {
-                SettingsCategoryRow(selection: $selectedSection)
+                SettingsCategoryRow(
+                    selection: Binding(
+                        get: { activeSection },
+                        set: { newValue in
+                            guard !stashyPlusOnly else { return }
+                            selectedSection = newValue
+                        }
+                    ),
+                    sections: chromeSections
+                )
                     .padding(.horizontal, StashyExpandingDock.edgePadding)
                     .padding(.vertical, 6)
             }
@@ -104,6 +129,14 @@ struct SettingsView: View {
         .onAppear {
             if configManager.activeConfig != nil {
                 viewModel.testConnection()
+            }
+            if !stashyPlusOnly && selectedSection == .stashyPlus && !stashyPlus.isUnlocked {
+                selectedSection = .main
+            }
+        }
+        .onChange(of: stashyPlus.isUnlocked) { _, unlocked in
+            if !stashyPlusOnly && !unlocked && selectedSection == .stashyPlus {
+                selectedSection = .main
             }
         }
         .alert("Library Scan", isPresented: $showScanAlert) {
@@ -183,50 +216,61 @@ struct SettingsView: View {
             }
         }
 
-        stashyPlusPurchaseSection
-
         if stashyPlus.isUnlocked {
-            Section(header: Text("AI Subtitles")) {
+            Section(header: Text("Custom App Icons")) {
+                StashyPlusAppIconSettings()
+            }
+            .listRowBackground(Color.secondaryAppBackground)
+
+            Section(header: Text("AI Subtitles and translation")) {
                 StashyPlusAISubtitlesSettings()
             }
             .listRowBackground(Color.secondaryAppBackground)
 
-            Section(header: Text("Plus Tools")) {
-                StashyPlusToolsSettings()
-            }
-            .listRowBackground(Color.secondaryAppBackground)
-
-            Section(header: Text("StashSync")) {
+            Section(header: Text(AIMotionCopy.name)) {
                 NavigationLink(destination: StashSyncSettingsView()) {
-                    Label("StashSync", systemImage: "bolt.fill")
+                    Label(AIMotionCopy.name, systemImage: "bolt.fill")
                 }
             }
             .listRowBackground(Color.secondaryAppBackground)
+
+            Section(header: Text("Tools")) {
+                StashyPlusToolToggle(item: .downloads)
+                StashyPlusToolToggle(item: .statistics)
+                StashyPlusToolToggle(item: .hotOrNot)
+                StashyPlusToolToggle(item: .rateMe)
+            }
+            .listRowBackground(Color.secondaryAppBackground)
         } else {
-            Section(header: Text("Included with Stashy+")) {
-                Label("AI Subtitles", systemImage: "lock.fill")
-                Label("Downloads", systemImage: "lock.fill")
-                Label("Match & RateMe", systemImage: "lock.fill")
-                Label("StashSync", systemImage: "lock.fill")
+            Section(header: Text("Included with stashy+")) {
+                Label("Custom App Icons", systemImage: "lock.fill")
+                Label("Download Scenes", systemImage: "lock.fill")
+                Label("AI Subtitles and translation", systemImage: "lock.fill")
+                Label(AIMotionCopy.name, systemImage: "lock.fill")
+                Label(ToolsItem.statistics.plusFeatureTitle, systemImage: "lock.fill")
+                Label(ToolsItem.hotOrNot.plusFeatureTitle, systemImage: "lock.fill")
+                Label(ToolsItem.rateMe.title, systemImage: "lock.fill")
             }
             .foregroundColor(.secondary)
             .listRowBackground(Color.secondaryAppBackground)
         }
+
+        stashyPlusPurchaseSection
     }
 
-    // MARK: - App Store Banner
+    // MARK: - TestFlight Banner
 
     @Environment(\.openURL) private var openURL
 
     private var appStoreBanner: some View {
         Button {
-            if let url = URL(string: "https://apps.apple.com/us/app/stashy/id6754876029") {
+            if let url = URL(string: "https://discord.gg/cGpVgRbHQ") {
                 openURL(url)
             }
         } label: {
             VStack(alignment: .leading, spacing: 14) {
                 HStack(spacing: 10) {
-                    Image(systemName: "apple.logo")
+                    Image(systemName: "calendar.badge.exclamationmark")
                         .font(.system(size: 22, weight: .semibold))
                         .foregroundColor(.white)
                         .frame(width: 44, height: 44)
@@ -234,10 +278,10 @@ struct SettingsView: View {
                         .clipShape(RoundedRectangle(cornerRadius: 10))
 
                     VStack(alignment: .leading, spacing: 2) {
-                        Text("You're using a TestFlight build")
+                        Text("TestFlight ends 15 September")
                             .font(.subheadline.weight(.bold))
                             .foregroundColor(.white)
-                        Text("Help support stashy on the App Store")
+                        Text("From then on, stashy is free on the App Store.")
                             .font(.caption)
                             .foregroundColor(.white.opacity(0.8))
                     }
@@ -246,14 +290,13 @@ struct SettingsView: View {
                 }
 
                 VStack(alignment: .leading, spacing: 6) {
-                    featureRow(icon: "arrow.triangle.2.circlepath", text: "Free updates, forever")
-                    featureRow(icon: "star.fill", text: "Ratings help others discover stashy")
-                    featureRow(icon: "bolt.heart.fill", text: "Directly supports solo development")
+                    featureRow(icon: "infinity", text: "Grab a Lifetime license at the current price before then")
+                    featureRow(icon: "checkmark.seal.fill", text: "Lifetime keeps stashy+ unlocked forever on this Apple ID")
                 }
 
                 HStack {
                     Spacer()
-                    Text("Get stashy on the App Store")
+                    Text("Join Discord")
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 16)
@@ -265,6 +308,7 @@ struct SettingsView: View {
             }
             .padding(.vertical, 6)
         }
+        .buttonStyle(.plain)
         .listRowBackground(
             LinearGradient(
                 colors: [Color(red: 0.18, green: 0.38, blue: 0.95), Color(red: 0.55, green: 0.2, blue: 0.85)],
@@ -286,131 +330,183 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - Stashy+ In-App Purchases
+    // MARK: - stashy+ In-App Purchases
 
+    private var sortedProducts: [Product] {
+        storeManager.products.sorted {
+            (StashyPlusProduct.sortOrder[$0.id] ?? 99) < (StashyPlusProduct.sortOrder[$1.id] ?? 99)
+        }
+    }
+
+    private var showsLegacyAppLifetimeButton: Bool {
+        stashyPlus.source == .legacyPaidApp
+    }
+
+    @ViewBuilder
     private var stashyPlusPurchaseSection: some View {
-        Section {
-            if stashyPlus.isUnlocked {
-                HStack(spacing: 10) {
-                    Image(systemName: "checkmark.seal.fill")
-                        .foregroundColor(.green)
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(stashyPlus.source.statusTitle)
-                            .font(.subheadline.weight(.semibold))
-                        Text(statusDetailText)
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+        Group {
+            if showsLegacyAppLifetimeButton {
+                Section {
+                    legacyAppLifetimeButton
+                } header: {
+                    Text("stashy+")
+                } footer: {
+                    Text(stashyPlus.source.statusDetail)
                 }
+                .listRowBackground(Color.green)
             }
 
-            if stashyPlus.shouldOfferPurchases {
-                if storeManager.products.isEmpty {
-                    if storeManager.isLoadingProducts {
-                        HStack {
-                            ProgressView()
-                            Text("Loading Stashy+ options…")
-                                .foregroundColor(.secondary)
+            if showsPurchaseMenu {
+                Section {
+                    if stashyPlus.isUnlocked && !showsLegacyAppLifetimeButton {
+                        HStack(spacing: 10) {
+                            Image(systemName: "checkmark.seal.fill")
+                                .foregroundColor(.green)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(stashyPlus.source.statusTitle)
+                                    .font(.subheadline.weight(.semibold))
+                                Text(statusDetailText)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
                         }
-                    } else {
-                        VStack(alignment: .leading, spacing: 8) {
-                            Text(storeManager.lastProductError ?? "Stashy+ products unavailable.")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                            if isTestFlightBuild() {
-                                Text("TestFlight loads products from App Store Connect. Create de.stashy.plus.m / .y / .l there (and wait until Ready to Submit), or run from Xcode with the StoreKit config.")
+                    }
+
+                    if stashyPlus.shouldOfferPurchases {
+                        if storeManager.products.isEmpty {
+                            if storeManager.isLoadingProducts {
+                                HStack {
+                                    ProgressView()
+                                    Text("Loading stashy+ options…")
+                                        .foregroundColor(.secondary)
+                                }
+                            } else {
+                                VStack(alignment: .leading, spacing: 8) {
+                                    Text(storeManager.lastProductError ?? "stashy+ products unavailable.")
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                    if isTestFlightBuild() {
+                                        Text("TestFlight loads products from App Store Connect. Create de.stashy.plus.m / .y / .l there (and wait until Ready to Submit), or run from Xcode with the StoreKit config.")
+                                            .font(.caption2)
+                                            .foregroundColor(.secondary)
+                                    }
+                                    Button("Retry") {
+                                        Task { await storeManager.fetchProducts() }
+                                    }
+                                }
+                            }
+                        } else {
+                            ForEach(sortedProducts) { product in
+                                Button {
+                                    Task { await purchaseStashyPlus(product) }
+                                } label: {
+                                    HStack {
+                                        stashyPlusRowLabel(
+                                            StashyPlusProduct.displayNames[product.id] ?? product.displayName,
+                                            systemImage: iconFor(productID: product.id)
+                                        )
+                                        Spacer()
+                                        if storeManager.isPurchasing {
+                                            ProgressView()
+                                        } else {
+                                            Text(priceLabel(for: product))
+                                                .foregroundColor(.secondary)
+                                        }
+                                    }
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(storeManager.isPurchasing)
+                            }
+                            if let missing = storeManager.lastProductError, missing.hasPrefix("Missing from StoreKit") {
+                                Text(missing)
                                     .font(.caption2)
                                     .foregroundColor(.secondary)
                             }
-                            Button("Retry") {
-                                Task { await storeManager.fetchProducts() }
-                            }
                         }
                     }
-                } else {
-                    ForEach(storeManager.products) { product in
+
+                    if !stashyPlus.isUnlocked {
                         Button {
-                            Task {
-                                if let error = await storeManager.purchase(product) {
-                                    ToastManager.shared.show(error, icon: "exclamationmark.triangle", style: .error)
-                                } else if stashyPlus.isUnlocked {
-                                    ToastManager.shared.show("Stashy+ unlocked — thank you!", icon: "sparkles", style: .success)
-                                }
-                            }
+                            Task { await restorePurchases() }
                         } label: {
                             HStack {
-                                Label(
-                                    StashyPlusProduct.displayNames[product.id] ?? product.displayName,
-                                    systemImage: iconFor(productID: product.id)
-                                )
-                                .foregroundColor(appearanceManager.tintColor)
+                                stashyPlusRowLabel("Restore Purchases", systemImage: "arrow.clockwise")
                                 Spacer()
-                                if storeManager.isPurchasing {
+                                if storeManager.isRestoringPurchases {
                                     ProgressView()
-                                } else {
-                                    Text(priceLabel(for: product))
-                                        .foregroundColor(.secondary)
                                 }
                             }
                         }
-                        .disabled(storeManager.isPurchasing)
+                        .buttonStyle(.plain)
+                        .disabled(storeManager.isPurchasing || storeManager.isRestoringPurchases)
                     }
-                    if let missing = storeManager.lastProductError, missing.hasPrefix("Missing from StoreKit") {
-                        Text(missing)
-                            .font(.caption2)
-                            .foregroundColor(.secondary)
-                    }
-                }
-            }
 
-            if !stashyPlus.isUnlocked {
-                Button {
-                    Task { await restorePurchases() }
-                } label: {
-                    HStack {
-                        Label("Restore Purchases", systemImage: "arrow.clockwise")
-                            .foregroundColor(appearanceManager.tintColor)
-                        Spacer()
-                        if storeManager.isRestoringPurchases {
-                            ProgressView()
+                    if stashyPlus.source == .subscription {
+                        Button {
+                            Task { await storeManager.manageSubscriptions() }
+                        } label: {
+                            stashyPlusRowLabel("Manage Subscription", systemImage: "creditcard")
                         }
+                        .buttonStyle(.plain)
+                    }
+                } header: {
+                    Text(stashyPlus.isUnlocked ? "stashy+" : "Unlock stashy+")
+                } footer: {
+                    if !stashyPlus.isUnlocked {
+                        Text("Monthly, Yearly, or Lifetime. If you bought the app at full price, tap Restore Purchases.")
                     }
                 }
-                .disabled(storeManager.isPurchasing || storeManager.isRestoringPurchases)
-            }
-
-            if stashyPlus.source == .subscription {
-                Button {
-                    Task { await storeManager.manageSubscriptions() }
-                } label: {
-                    Label("Manage Subscription", systemImage: "creditcard")
-                        .foregroundColor(appearanceManager.tintColor)
-                }
-            }
-
-            if isTestFlightBuild() {
-                Button(role: .destructive) {
-                    stashyPlus.resetUnlockForTesting()
-                    ToastManager.shared.show("Stashy+ reset (TestFlight)", icon: "lock.fill", style: .info)
-                } label: {
-                    Label("Reset Stashy+ Unlock", systemImage: "lock.rotation")
-                }
-            }
-        } header: {
-            Text(stashyPlus.isUnlocked ? "Stashy+" : "Unlock Stashy+")
-        } footer: {
-            if !stashyPlus.isUnlocked {
-                Text("Monthly, Yearly, or Lifetime. Full-price app buyers keep Lifetime automatically — use Restore Purchases if needed.")
-            } else if isTestFlightBuild() {
-                Text("TestFlight only: Reset clears the unlock so you can retest the paywall. A new purchase clears the reset.")
+                .listRowBackground(Color.secondaryAppBackground)
             }
         }
-        .listRowBackground(Color.secondaryAppBackground)
         .task {
             await storeManager.syncUnlockFromStore()
             if storeManager.products.isEmpty {
                 await storeManager.fetchProducts()
             }
+        }
+    }
+
+    private var showsPurchaseMenu: Bool {
+        !showsLegacyAppLifetimeButton
+            || stashyPlus.shouldOfferPurchases
+            || !stashyPlus.isUnlocked
+    }
+
+    private var legacyAppLifetimeButton: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "checkmark.seal.fill")
+                .font(.title3)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Grab Lifetime")
+                    .font(.subheadline.weight(.bold))
+                Text("Included with your app purchase")
+                    .font(.caption)
+                    .opacity(0.9)
+            }
+            Spacer()
+            Text("Purchased")
+                .font(.caption.weight(.semibold))
+        }
+        .foregroundColor(.white)
+        .padding(.vertical, 6)
+    }
+
+    private func stashyPlusRowLabel(_ title: String, systemImage: String) -> some View {
+        Label {
+            Text(title)
+                .foregroundColor(.primary)
+        } icon: {
+            Image(systemName: systemImage)
+                .foregroundColor(appearanceManager.tintColor)
+        }
+    }
+
+    private func purchaseStashyPlus(_ product: Product) async {
+        if let error = await storeManager.purchase(product) {
+            ToastManager.shared.show(error, icon: "exclamationmark.triangle", style: .error)
+        } else if stashyPlus.isUnlocked {
+            ToastManager.shared.show("stashy+ unlocked — thank you!", icon: "sparkles", style: .success)
         }
     }
 
@@ -428,14 +524,7 @@ struct SettingsView: View {
     }
 
     private func priceLabel(for product: Product) -> String {
-        switch product.id {
-        case StashyPlusProduct.monthly:
-            return "\(product.displayPrice)/mo"
-        case StashyPlusProduct.yearly:
-            return "\(product.displayPrice)/yr"
-        default:
-            return product.displayPrice
-        }
+        product.displayPrice
     }
 
     private func restorePurchases() async {
@@ -443,13 +532,13 @@ struct SettingsView: View {
         await storeManager.restorePurchases()
         if stashyPlus.isUnlocked {
             ToastManager.shared.show(
-                wasUnlocked ? "Purchases restored" : "Stashy+ unlocked",
+                wasUnlocked ? "Purchases restored" : "stashy+ unlocked",
                 icon: "sparkles",
                 style: .success
             )
         } else {
             ToastManager.shared.show(
-                "No Stashy+ purchase found on this Apple ID",
+                "No stashy+ purchase found on this Apple ID",
                 icon: "info.circle",
                 style: .error
             )
@@ -461,6 +550,9 @@ struct SettingsView: View {
         case StashyPlusProduct.monthly: return "calendar"
         case StashyPlusProduct.yearly: return "calendar.badge.clock"
         case StashyPlusProduct.lifetime: return "infinity"
+        case StashyPlusProduct.tipSmall: return "heart"
+        case StashyPlusProduct.tipMedium: return "heart.fill"
+        case StashyPlusProduct.tipLarge: return "bolt.heart.fill"
         default: return "sparkles"
         }
     }
@@ -469,6 +561,8 @@ struct SettingsView: View {
 
     private var aboutSection: some View {
         Group {
+            tipSection
+
             Section("Links") {
                 Link(destination: URL(string: "https://github.com/1letzgo/stashy")!) {
                     Label("GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
@@ -481,6 +575,76 @@ struct SettingsView: View {
             }
             .listRowBackground(Color.secondaryAppBackground)
             
+        }
+    }
+
+    private var sortedTipProducts: [Product] {
+        storeManager.tipProducts.sorted {
+            (StashyPlusProduct.sortOrder[$0.id] ?? 99) < (StashyPlusProduct.sortOrder[$1.id] ?? 99)
+        }
+    }
+
+    @ViewBuilder
+    private var tipSection: some View {
+        Section {
+            if sortedTipProducts.isEmpty {
+                if storeManager.isLoadingProducts {
+                    HStack {
+                        ProgressView()
+                        Text("Loading tips…")
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("Tips unavailable.")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                        Button("Retry") {
+                            Task { await storeManager.fetchProducts() }
+                        }
+                    }
+                }
+            } else {
+                ForEach(sortedTipProducts) { product in
+                    Button {
+                        Task { await purchaseTip(product) }
+                    } label: {
+                        HStack {
+                            stashyPlusRowLabel(
+                                StashyPlusProduct.displayNames[product.id] ?? product.displayName,
+                                systemImage: iconFor(productID: product.id)
+                            )
+                            Spacer()
+                            if storeManager.isPurchasing {
+                                ProgressView()
+                            } else {
+                                Text(product.displayPrice)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(storeManager.isPurchasing)
+                }
+            }
+        } header: {
+            Text("Tips")
+        } footer: {
+            Text("Support stashy. Tips do not unlock stashy+.")
+        }
+        .listRowBackground(Color.secondaryAppBackground)
+        .task {
+            if storeManager.tipProducts.isEmpty {
+                await storeManager.fetchProducts()
+            }
+        }
+    }
+
+    private func purchaseTip(_ product: Product) async {
+        if let error = await storeManager.purchase(product) {
+            ToastManager.shared.show(error, icon: "exclamationmark.triangle", style: .error)
+        } else {
+            ToastManager.shared.show("Thank you for the tip!", icon: "heart.fill", style: .success)
         }
     }
     // MARK: - Interactive Devices
@@ -522,6 +686,7 @@ public enum StoreError: Error {
 @MainActor
 class StoreManager: ObservableObject {
     @Published var products: [Product] = []
+    @Published var tipProducts: [Product] = []
     @Published var isLoadingProducts = false
     @Published var lastProductError: String?
     @Published var isPurchasing = false
@@ -546,22 +711,26 @@ class StoreManager: ObservableObject {
         lastProductError = nil
         defer { isLoadingProducts = false }
         do {
-            let requested = StashyPlusProduct.allIDs
-            let products = try await Product.products(for: Array(requested))
-            self.products = products.sorted {
+            let plusIDs = StashyPlusProduct.allIDs
+            let tipIDs = StashyPlusProduct.tipIDs
+            let loaded = try await Product.products(for: Array(plusIDs.union(tipIDs)))
+            self.products = loaded.filter { plusIDs.contains($0.id) }.sorted {
                 (StashyPlusProduct.sortOrder[$0.id] ?? 99) < (StashyPlusProduct.sortOrder[$1.id] ?? 99)
             }
-            let loaded = Set(products.map(\.id))
-            let missing = requested.subtracting(loaded).sorted()
-            if products.isEmpty {
-                lastProductError = "No Stashy+ products returned. For Xcode runs, enable Configuration.storekit on the stashy scheme. For TestFlight, the products must exist in App Store Connect."
-                print("💬 StoreKit returned 0 products for \(requested.sorted())")
+            self.tipProducts = loaded.filter { tipIDs.contains($0.id) }.sorted {
+                (StashyPlusProduct.sortOrder[$0.id] ?? 99) < (StashyPlusProduct.sortOrder[$1.id] ?? 99)
+            }
+            let loadedPlus = Set(self.products.map(\.id))
+            let missing = plusIDs.subtracting(loadedPlus).sorted()
+            if self.products.isEmpty {
+                lastProductError = "No stashy+ products returned. For Xcode runs, enable Configuration.storekit on the stashy scheme. For TestFlight, the products must exist in App Store Connect."
+                print("💬 StoreKit returned 0 stashy+ products for \(plusIDs.sorted())")
             } else if !missing.isEmpty {
                 lastProductError = "Missing from StoreKit/App Store Connect: \(missing.joined(separator: ", "))"
-                print("💬 StoreKit loaded \(loaded.sorted()), missing \(missing)")
+                print("💬 StoreKit loaded \(loadedPlus.sorted()), missing \(missing)")
             } else {
                 lastProductError = nil
-                print("💬 StoreKit loaded products: \(products.map(\.id))")
+                print("💬 StoreKit loaded products: \(loaded.map(\.id))")
             }
         } catch {
             lastProductError = error.localizedDescription
@@ -579,6 +748,10 @@ class StoreManager: ObservableObject {
             switch result {
             case .success(let verification):
                 let transaction = try checkVerified(verification)
+                if StashyPlusProduct.tipIDs.contains(transaction.productID) {
+                    await transaction.finish()
+                    return nil
+                }
                 StashyPlusManager.shared.clearDebugForceLock()
                 await apply(transaction)
                 await transaction.finish()
@@ -596,12 +769,12 @@ class StoreManager: ObservableObject {
         }
     }
 
-    /// Refresh entitlements from StoreKit (subscriptions, lifetime, legacy paid app, old tips).
-    func syncUnlockFromStore(scanTipHistory: Bool = false) async {
+    /// Refresh entitlements from StoreKit (subscriptions, lifetime, legacy paid app).
+    /// Existing UserDefaults from the old tip-unlock era still count; new tips do not.
+    func syncUnlockFromStore() async {
         for await result in Transaction.unfinished {
             guard case .verified(let transaction) = result else { continue }
-            if StashyPlusProduct.allIDs.contains(transaction.productID)
-                || StashyPlusProduct.legacyTipIDs.contains(transaction.productID) {
+            if StashyPlusProduct.allIDs.contains(transaction.productID) {
                 await apply(transaction)
             }
             await transaction.finish()
@@ -610,7 +783,7 @@ class StoreManager: ObservableObject {
         var hasLifetimePurchase = false
         var subscriptionProductID: String?
         var subscriptionExpiration: Date?
-        var legacyTip = UserDefaults.standard.integer(forKey: StashyPlusManager.tipsCountKey) > 0
+        let legacyTip = UserDefaults.standard.integer(forKey: StashyPlusManager.tipsCountKey) > 0
             || UserDefaults.standard.bool(forKey: StashyPlusManager.unlockedKey)
 
         for await result in Transaction.currentEntitlements {
@@ -627,17 +800,6 @@ class StoreManager: ObservableObject {
             }
         }
 
-        // Tip history scan only on Restore (Transaction.all can be large).
-        if scanTipHistory, !hasLifetimePurchase, !legacyTip {
-            for await result in Transaction.all {
-                guard case .verified(let transaction) = result else { continue }
-                if StashyPlusProduct.legacyTipIDs.contains(transaction.productID) {
-                    legacyTip = true
-                    break
-                }
-            }
-        }
-
         let legacyPaidApp = await Self.isLegacyPaidAppPurchaser()
 
         StashyPlusManager.shared.applyStoreEntitlements(
@@ -649,7 +811,7 @@ class StoreManager: ObservableObject {
         )
 
         if StashyPlusManager.shared.isUnlocked {
-            print("✅ Stashy+ entitlement synced (\(StashyPlusManager.shared.source.rawValue))")
+            print("✅ stashy+ entitlement synced (\(StashyPlusManager.shared.source.rawValue))")
         }
     }
 
@@ -662,7 +824,7 @@ class StoreManager: ObservableObject {
         } catch {
             print("AppStore.sync failed: \(error)")
         }
-        await syncUnlockFromStore(scanTipHistory: true)
+        await syncUnlockFromStore()
     }
 
     func manageSubscriptions() async {
@@ -679,14 +841,9 @@ class StoreManager: ObservableObject {
     }
 
     private func apply(_ transaction: StoreKit.Transaction) async {
-        if transaction.productID == StashyPlusProduct.lifetime
-            || StashyPlusProduct.legacyTipIDs.contains(transaction.productID) {
-            let source: StashyPlusSource = StashyPlusProduct.legacyTipIDs.contains(transaction.productID)
-                ? .legacyTip
-                : .lifetime
-            await MainActor.run {
-                StashyPlusManager.shared.unlockLifetime(source: source)
-            }
+        guard transaction.productID == StashyPlusProduct.lifetime else { return }
+        await MainActor.run {
+            StashyPlusManager.shared.unlockLifetime(source: .lifetime)
         }
     }
 
@@ -716,15 +873,10 @@ class StoreManager: ObservableObject {
             for await result in Transaction.updates {
                 guard case .verified(let transaction) = result else { continue }
                 let relevant = StashyPlusProduct.allIDs.contains(transaction.productID)
-                    || StashyPlusProduct.legacyTipIDs.contains(transaction.productID)
                 if relevant {
-                    if transaction.productID == StashyPlusProduct.lifetime
-                        || StashyPlusProduct.legacyTipIDs.contains(transaction.productID) {
-                        let source: StashyPlusSource = StashyPlusProduct.legacyTipIDs.contains(transaction.productID)
-                            ? .legacyTip
-                            : .lifetime
+                    if transaction.productID == StashyPlusProduct.lifetime {
                         await MainActor.run {
-                            StashyPlusManager.shared.unlockLifetime(source: source)
+                            StashyPlusManager.shared.unlockLifetime(source: .lifetime)
                         }
                     }
                     await transaction.finish()
@@ -741,7 +893,8 @@ class StoreManager: ObservableObject {
         var hasLifetimePurchase = false
         var subscriptionProductID: String?
         var subscriptionExpiration: Date?
-        var legacyTip = false
+        let legacyTip = UserDefaults.standard.integer(forKey: StashyPlusManager.tipsCountKey) > 0
+            || UserDefaults.standard.bool(forKey: StashyPlusManager.unlockedKey)
 
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else { continue }
@@ -753,8 +906,6 @@ class StoreManager: ObservableObject {
                     subscriptionExpiration = exp
                     subscriptionProductID = transaction.productID
                 }
-            } else if StashyPlusProduct.legacyTipIDs.contains(transaction.productID) {
-                legacyTip = true
             }
         }
 
@@ -871,7 +1022,7 @@ struct HandySettingsView: View {
             .listRowBackground(Color.secondaryAppBackground)
 
             if handyManager.deviceType == "The Handy" {
-                Section(header: Text("StashSync Controls")) {
+                Section(header: Text("AI Motion Controls")) {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Stroke Length")
@@ -898,7 +1049,7 @@ struct HandySettingsView: View {
                 .listRowBackground(Color.secondaryAppBackground)
                 .disabled(!handyManager.isEnabled)
             } else {
-                Section(header: Text("StashSync Controls")) {
+                Section(header: Text("AI Motion Controls")) {
                     VStack(alignment: .leading, spacing: 4) {
                         HStack {
                             Text("Max Intensity")
@@ -1002,17 +1153,17 @@ struct StashSyncSettingsView: View {
         Form {
             if !stashyPlus.isUnlocked {
                 Section {
-                    Label("StashSync requires Stashy+", systemImage: "lock.fill")
+                    Label(AIMotionCopy.requiresPlus, systemImage: "lock.fill")
                         .foregroundColor(.secondary)
                 } footer: {
-                    Text("Unlock Stashy+ under Settings → Stashy+.")
+                    Text("Unlock stashy+ to use this feature.")
                 }
                 .listRowBackground(Color.secondaryAppBackground)
             }
 
-            Section(header: Text("StashSync Features"), footer: Text("StashSync uses real-time on-device video analysis to synchronize your devices. This process is CPU-intensive and can lead to increased battery drain and device heating. By enabling this feature, you acknowledge that you use StashSync and any controlled hardware devices at your own risk. Any potential damage or injury resulting from the use of connected hardware is your sole responsibility.")) {
+            Section(header: Text("AI Motion Features"), footer: Text(AIMotionCopy.disclaimer)) {
                 Toggle(isOn: syncEnabledBinding) {
-                    Label("StashSync", systemImage: "bolt.fill")
+                    Label(AIMotionCopy.name, systemImage: "bolt.fill")
                 }
                 .tint(appearanceManager.tintColor)
                 .disabled(!stashyPlus.isUnlocked)
@@ -1022,7 +1173,7 @@ struct StashSyncSettingsView: View {
             Section(header: Text("Sensitivity")) {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack {
-                        Text("StashSync Sensitivity")
+                        Text("AI Motion Sensitivity")
                         Spacer()
                         Text("\(Int(videoManager.sensitivity * 50))%").foregroundColor(.secondary)
                     }
@@ -1049,15 +1200,15 @@ struct StashSyncSettingsView: View {
         }
         .applyAppBackground()
         .scrollContentBackground(.hidden)
-        .stashySettingsDetailChrome("StashSync")
-        .alert("StashSync Disclaimer", isPresented: $showingDisclaimer) {
+        .stashySettingsDetailChrome(AIMotionCopy.name)
+        .alert("AI Motion Disclaimer", isPresented: $showingDisclaimer) {
             Button("Cancel", role: .cancel) { }
             Button("Accept & Enable") {
                 videoManager.isDisclaimerAccepted = true
                 videoManager.isVideoSyncEnabled = true
             }
         } message: {
-            Text("StashSync uses real-time on-device video analysis to synchronize your devices. This process is CPU-intensive and can lead to increased battery drain and device heating. By enabling this feature, you acknowledge that you use StashSync and any controlled hardware devices at your own risk. Any potential damage or injury resulting from the use of connected hardware is your sole responsibility.")
+            Text(AIMotionCopy.disclaimer)
         }
     }
 }

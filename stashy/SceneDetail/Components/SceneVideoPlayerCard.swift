@@ -1047,7 +1047,7 @@ struct SceneDetailMetadataCard: View {
             return
         }
         guard StashyPlusManager.shared.isUnlocked else {
-            ToastManager.shared.show("AI captions are part of Stashy+ — unlock in Settings", icon: "sparkles", style: .error)
+            ToastManager.shared.show("AI captions are part of stashy+ — unlock in Settings", icon: "sparkles", style: .error)
             return
         }
         guard transcriptionController.isReadAlongAvailable else {

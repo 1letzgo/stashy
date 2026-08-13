@@ -69,6 +69,8 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
     case catalogue
     case downloads
     case tools
+    /// Paywall tab shown in place of Tools while stashy+ is locked (iOS).
+    case stashyPlus
     case reels
     case search
     case settings
@@ -92,6 +94,7 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
         case .catalogue: return "Home"
         case .downloads: return "Downloads"
         case .tools: return "Tools"
+        case .stashyPlus: return "stashy+"
         case .reels: return "Feeds"
         case .search: return "Search"
         case .settings: return "Settings"
@@ -114,6 +117,7 @@ enum AppTab: String, CaseIterable, Codable, Identifiable {
         case .catalogue: return "square.grid.2x2.fill"
         case .downloads: return "square.and.arrow.down"
         case .tools: return "cube.box"
+        case .stashyPlus: return "sparkles"
         case .reels: return "play.rectangle.on.rectangle"
         case .search: return "magnifyingglass"
         case .settings: return "gear"
@@ -313,6 +317,15 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
         case .rateMe: return "RateMe"
         }
     }
+
+    /// Name used in stashy+ settings / paywall lists.
+    var plusFeatureTitle: String {
+        switch self {
+        case .statistics: return "Advanced Statistics"
+        case .hotOrNot: return "Performer Match"
+        default: return title
+        }
+    }
     
     var icon: String {
         switch self {
@@ -410,12 +423,21 @@ class TabManager: ObservableObject {
         
         // Listen for server changes to reload server-specific configuration
         NotificationCenter.default.addObserver(self, selector: #selector(handleServerChange), name: NSNotification.Name("ServerConfigChanged"), object: nil)
+        #if !os(tvOS)
+        NotificationCenter.default.addObserver(self, selector: #selector(handleStashyPlusChange), name: .stashyPlusUnlocked, object: nil)
+        #endif
     }
     
     @objc private func handleServerChange() {
         print("🔄 TabManager: Server changed, reloading configurations")
         loadAllConfigs()
     }
+
+    #if !os(tvOS)
+    @objc private func handleStashyPlusChange() {
+        objectWillChange.send()
+    }
+    #endif
     
     private func loadAllConfigs() {
         loadConfig()
@@ -518,14 +540,22 @@ class TabManager: ObservableObject {
     }
     
     var visibleTabs: [AppTab] {
-        // Fixed order: Home, Feeds (optional), Tools (optional), Settings
+        // Fixed order: Home, Feeds (optional), Tools or stashy+ (iOS), Settings
         // Dashboard, Studios, Tags, Performers, Scenes, Galleries are now sub-tabs of Home
         // Server tasks live under Settings (not in the Tools tab)
         let reelsVisible = tabs.first(where: { $0.id == .reels })?.isVisible ?? true
         let toolsVisible = tabs.first(where: { $0.id == .tools })?.isVisible ?? true
         var result: [AppTab] = [.catalogue]
         if reelsVisible { result.append(.reels) }
+        #if !os(tvOS)
+        if StashyPlusManager.isUnlockedNow {
+            if toolsVisible { result.append(.tools) }
+        } else {
+            result.append(.stashyPlus)
+        }
+        #else
         if toolsVisible { result.append(.tools) }
+        #endif
         result.append(.settings)
         return result
     }
@@ -571,6 +601,7 @@ class TabManager: ObservableObject {
             
             // Ensure the decoded tabs are sorted
             var decodedTabs = decoded.sorted { $0.sortOrder < $1.sortOrder }
+            decodedTabs.removeAll { $0.id == .stashyPlus }
             
             var needsSave = false
             
@@ -989,7 +1020,7 @@ class TabManager: ObservableObject {
     var enabledTools: [ToolsItem] {
         let sorted = tools.sorted { $0.sortOrder < $1.sortOrder }
         // Server tasks live under Settings.
-        // Downloads / Match / RateMe require Stashy+ on iOS.
+        // Downloads / Advanced Statistics / Match / RateMe require stashy+ on iOS.
         return sorted.compactMap { item -> ToolsItem? in
             guard item.isEnabled, item.id != .server else { return nil }
             #if !os(tvOS)
@@ -1001,9 +1032,9 @@ class TabManager: ObservableObject {
         }
     }
 
-    /// Tools managed / gated under Settings → Stashy+.
+    /// Tools managed / gated under stashy+.
     static func isStashyPlusTool(_ item: ToolsItem) -> Bool {
-        item == .downloads || item == .hotOrNot || item == .rateMe
+        item == .downloads || item == .statistics || item == .hotOrNot || item == .rateMe
     }
     
     func toggleTool(_ item: ToolsItem) {
@@ -1027,7 +1058,7 @@ class TabManager: ObservableObject {
     }
     
     private func enforceFixedTools() {
-        // Ensure downloads exists (Stashy+ tool — visibility gated separately).
+        // Ensure downloads exists (stashy+ tool — visibility gated separately).
         if !tools.contains(where: { $0.id == .downloads }) {
             tools.append(ToolsItemConfig(id: .downloads, isEnabled: true, sortOrder: (tools.map(\.sortOrder).max() ?? 0) + 1))
         }
