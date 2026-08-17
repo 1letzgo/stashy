@@ -8,7 +8,7 @@
 import Combine
 import Foundation
 
-struct OCountHeatmapItem: Identifiable {
+struct OCountHeatmapItem: Identifiable, Equatable {
     enum Kind: Equatable {
         case scene
         case image
@@ -74,6 +74,58 @@ struct OCountHeatmapItem: Identifiable {
             studio: scene.studio ?? studio,
             rating100: scene.rating100 ?? rating100,
             countOnDay: countOnDay
+        )
+    }
+
+    var isPlaceholder: Bool {
+        title == "Untitled" && thumbnailPath == nil && previewPath == nil && imagePath == nil
+    }
+
+    func withRating(_ rating100: Int?) -> OCountHeatmapItem {
+        OCountHeatmapItem(
+            kind: kind,
+            stashID: stashID,
+            title: title,
+            thumbnailPath: thumbnailPath,
+            previewPath: previewPath,
+            imagePath: imagePath,
+            visualFiles: visualFiles,
+            performers: performers,
+            studio: studio,
+            rating100: rating100,
+            countOnDay: countOnDay
+        )
+    }
+
+    func withCountOnDay(_ count: Int) -> OCountHeatmapItem {
+        OCountHeatmapItem(
+            kind: kind,
+            stashID: stashID,
+            title: title,
+            thumbnailPath: thumbnailPath,
+            previewPath: previewPath,
+            imagePath: imagePath,
+            visualFiles: visualFiles,
+            performers: performers,
+            studio: studio,
+            rating100: rating100,
+            countOnDay: count
+        )
+    }
+
+    static func stub(kind: Kind, stashID: String) -> OCountHeatmapItem {
+        OCountHeatmapItem(
+            kind: kind,
+            stashID: stashID,
+            title: "Untitled",
+            thumbnailPath: nil,
+            previewPath: nil,
+            imagePath: nil,
+            visualFiles: nil,
+            performers: [],
+            studio: nil,
+            rating100: nil,
+            countOnDay: 1
         )
     }
 
@@ -150,6 +202,115 @@ struct OCountHeatmapItem: Identifiable {
     }
 }
 
+struct OCountTimelineEvent: Equatable {
+    let item: OCountHeatmapItem
+    let date: Date
+    let count: Int
+    /// True when `date` is the O-Count action, not file created/updated.
+    var isActionTime: Bool = false
+}
+
+/// Local action times for image O-counts. Stash images have no `o_history`.
+enum ImageOCountActionStore {
+    struct Entry: Codable {
+        let imageId: String
+        let at: TimeInterval
+        var title: String?
+        var thumbnailPath: String?
+        var previewPath: String?
+        var imagePath: String?
+        var rating100: Int?
+
+        func asItem() -> OCountHeatmapItem? {
+            let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let resolved = trimmed.isEmpty ? "Untitled" : trimmed
+            guard resolved != "Untitled" || thumbnailPath != nil || previewPath != nil || imagePath != nil else {
+                return nil
+            }
+            return OCountHeatmapItem(
+                kind: .image,
+                stashID: imageId,
+                title: resolved,
+                thumbnailPath: thumbnailPath,
+                previewPath: previewPath,
+                imagePath: imagePath,
+                visualFiles: nil,
+                performers: [],
+                studio: nil,
+                rating100: rating100,
+                countOnDay: 1
+            )
+        }
+
+        func withMetadata(_ item: OCountHeatmapItem) -> Entry {
+            Entry(
+                imageId: imageId,
+                at: at,
+                title: item.isPlaceholder ? title : item.title,
+                thumbnailPath: item.thumbnailPath ?? thumbnailPath,
+                previewPath: item.previewPath ?? previewPath,
+                imagePath: item.imagePath ?? imagePath,
+                rating100: item.rating100 ?? rating100
+            )
+        }
+    }
+
+    private static let lookbackSeconds: TimeInterval = 90 * 24 * 60 * 60
+
+    static func record(imageId: String, at date: Date = Date(), item: OCountHeatmapItem? = nil) {
+        guard !imageId.isEmpty else { return }
+        var entries = load()
+        entries.append(
+            Entry(
+                imageId: imageId,
+                at: date.timeIntervalSince1970,
+                title: item?.isPlaceholder == false ? item?.title : nil,
+                thumbnailPath: item?.thumbnailPath,
+                previewPath: item?.previewPath,
+                imagePath: item?.imagePath,
+                rating100: item?.rating100
+            )
+        )
+        let cutoff = Date().addingTimeInterval(-lookbackSeconds).timeIntervalSince1970
+        entries.removeAll { $0.at < cutoff }
+        save(entries)
+    }
+
+    static func updateMetadata(imageId: String, item: OCountHeatmapItem) {
+        guard !imageId.isEmpty, !item.isPlaceholder else { return }
+        var entries = load()
+        var changed = false
+        for index in entries.indices where entries[index].imageId == imageId {
+            let next = entries[index].withMetadata(item)
+            if next.title != entries[index].title || next.thumbnailPath != entries[index].thumbnailPath {
+                entries[index] = next
+                changed = true
+            }
+        }
+        if changed { save(entries) }
+    }
+
+    static func all() -> [Entry] {
+        let cutoff = Date().addingTimeInterval(-lookbackSeconds).timeIntervalSince1970
+        return load().filter { $0.at >= cutoff }
+    }
+
+    private static func defaultsKey() -> String {
+        let id = ServerConfigManager.shared.activeConfig?.id.uuidString ?? "default"
+        return "stashy_timeline_image_o_actions_\(id)"
+    }
+
+    private static func load() -> [Entry] {
+        guard let data = UserDefaults.standard.data(forKey: defaultsKey()) else { return [] }
+        return (try? JSONDecoder().decode([Entry].self, from: data)) ?? []
+    }
+
+    private static func save(_ entries: [Entry]) {
+        guard let data = try? JSONEncoder().encode(entries) else { return }
+        UserDefaults.standard.set(data, forKey: defaultsKey())
+    }
+}
+
 @MainActor
 final class OCountHeatmapLoader: ObservableObject {
     static let shared = OCountHeatmapLoader()
@@ -159,6 +320,9 @@ final class OCountHeatmapLoader: ObservableObject {
     @Published private(set) var isLoading = false
     @Published private(set) var didFail = false
 
+    private var timedEvents: [OCountTimelineEvent] = []
+    private var liveEvents: [OCountTimelineEvent] = []
+    private var hydratingImageIDs = Set<String>()
     private var loadedServerID: UUID?
     private var hasLoaded = false
 
@@ -210,6 +374,28 @@ final class OCountHeatmapLoader: ObservableObject {
                 self?.applyLiveSceneMetadata(scene)
             }
         }
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SceneRatingUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let sceneId = notification.userInfo?["sceneId"] as? String else { return }
+            let rating = notification.userInfo?["rating100"] as? Int
+            Task { @MainActor in
+                self?.applyLiveRating(kind: .scene, stashID: sceneId, rating100: rating)
+            }
+        }
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("ImageRatingUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let imageId = notification.userInfo?["imageId"] as? String else { return }
+            let rating = notification.userInfo?["rating100"] as? Int
+            Task { @MainActor in
+                self?.applyLiveRating(kind: .image, stashID: imageId, rating100: rating)
+            }
+        }
     }
 
     func loadIfNeeded() async {
@@ -228,6 +414,9 @@ final class OCountHeatmapLoader: ObservableObject {
             let buckets = try await fetchCountsByDay()
             countsByDay = buckets.counts
             itemsByDay = buckets.items
+            timedEvents = buckets.events
+            pruneLiveEvents(against: buckets.events)
+            restorePersistedImageActions()
             loadedServerID = serverID
             hasLoaded = true
             didFail = false
@@ -236,8 +425,10 @@ final class OCountHeatmapLoader: ObservableObject {
             didFail = true
             countsByDay = [:]
             itemsByDay = [:]
+            timedEvents = []
             loadedServerID = nil
             hasLoaded = false
+            restorePersistedImageActions()
         }
     }
 
@@ -259,6 +450,31 @@ final class OCountHeatmapLoader: ObservableObject {
             if lhs.kind != rhs.kind { return lhs.kind == .scene }
             if lhs.countOnDay != rhs.countOnDay { return lhs.countOnDay > rhs.countOnDay }
             return lhs.title.localizedCaseInsensitiveCompare(rhs.title) == .orderedAscending
+        }
+    }
+
+    func events(in range: Range<Date>, actionsOnly: Bool = false) -> [OCountTimelineEvent] {
+        restorePersistedImageActions()
+        return (timedEvents + liveEvents).filter { event in
+            guard range.contains(event.date) else { return false }
+            // Images have no `o_history`: keep only real action times.
+            // Scenes stay on Stash `o_history` / created_at fallback.
+            if actionsOnly, event.item.kind == .image {
+                return event.isActionTime
+            }
+            return true
+        }
+    }
+
+    var isReady: Bool { hasLoaded }
+
+    /// File-date image rows. Timeline ignores these.
+    func recentImageEvents(since start: Date) async -> [OCountTimelineEvent] {
+        do {
+            return try await fetchImageEvents(updatedSince: start)
+        } catch {
+            print("❌ O-Count recent images: \(error)")
+            return []
         }
     }
 
@@ -285,35 +501,146 @@ final class OCountHeatmapLoader: ObservableObject {
     private func reset() {
         countsByDay = [:]
         itemsByDay = [:]
+        timedEvents = []
+        liveEvents = []
+        hydratingImageIDs = []
         hasLoaded = false
         loadedServerID = nil
         didFail = false
     }
 
     private func applyLiveOIncrement(kind: OCountHeatmapItem.Kind, stashID: String) {
-        let today = Self.dayKey(Date(), calendar: calendar)
+        let now = Date()
+        let today = Self.dayKey(now, calendar: calendar)
         countsByDay[today, default: 0] += 1
         var list = itemsByDay[today] ?? []
+        let source = list.first(where: { $0.kind == kind && $0.stashID == stashID })
+            ?? itemsByDay.values.flatMap({ $0 }).first(where: { $0.kind == kind && $0.stashID == stashID })
+            ?? liveEvents.last(where: { $0.item.kind == kind && $0.item.stashID == stashID })?.item
         if let idx = list.firstIndex(where: { $0.kind == kind && $0.stashID == stashID }) {
             list[idx].countOnDay += 1
-        } else if let source = itemsByDay.values.flatMap({ $0 }).first(where: { $0.kind == kind && $0.stashID == stashID }) {
-            list.append(
-                OCountHeatmapItem(
-                    kind: source.kind,
-                    stashID: source.stashID,
-                    title: source.title,
-                    thumbnailPath: source.thumbnailPath,
-                    previewPath: source.previewPath,
-                    imagePath: source.imagePath,
-                    visualFiles: source.visualFiles,
-                    performers: source.performers,
-                    studio: source.studio,
-                    rating100: source.rating100,
-                    countOnDay: 1
-                )
-            )
+        } else if let source {
+            list.append(source.withCountOnDay(1))
+        } else {
+            list.append(OCountHeatmapItem.stub(kind: kind, stashID: stashID))
         }
         itemsByDay[today] = list
+
+        let item = source ?? OCountHeatmapItem.stub(kind: kind, stashID: stashID)
+        liveEvents.append(OCountTimelineEvent(item: item.withCountOnDay(1), date: now, count: 1, isActionTime: true))
+        objectWillChange.send()
+
+        if kind == .image {
+            ImageOCountActionStore.record(imageId: stashID, at: now, item: item.isPlaceholder ? nil : item)
+        }
+
+        if kind == .image, item.isPlaceholder {
+            Task { await self.hydrateLiveImage(stashID) }
+        }
+    }
+
+    func imageItem(stashID: String) -> OCountHeatmapItem? {
+        let items = liveEvents.map(\.item) + itemsByDay.values.flatMap { $0 }
+        return items.first {
+            $0.kind == .image && $0.stashID == stashID && !$0.isPlaceholder
+        }
+    }
+
+    func hydrateImageIfNeeded(_ stashID: String) async {
+        await hydrateLiveImage(stashID)
+    }
+
+    private func hydrateLiveImage(_ stashID: String) async {
+        guard hydratingImageIDs.insert(stashID).inserted else { return }
+        defer { hydratingImageIDs.remove(stashID) }
+        guard let item = await fetchImageItem(id: stashID) else { return }
+        for index in liveEvents.indices where liveEvents[index].item.kind == .image && liveEvents[index].item.stashID == stashID {
+            liveEvents[index] = OCountTimelineEvent(
+                item: item.withCountOnDay(liveEvents[index].count),
+                date: liveEvents[index].date,
+                count: liveEvents[index].count,
+                isActionTime: true
+            )
+        }
+        var next = itemsByDay
+        for (day, items) in next {
+            var copy = items
+            var changed = false
+            for index in copy.indices where copy[index].kind == .image && copy[index].stashID == stashID {
+                copy[index] = item.withCountOnDay(copy[index].countOnDay)
+                changed = true
+            }
+            if changed { next[day] = copy }
+        }
+        itemsByDay = next
+        ImageOCountActionStore.updateMetadata(imageId: stashID, item: item)
+        objectWillChange.send()
+        NotificationCenter.default.post(
+            name: NSNotification.Name("ImageOCountHydrated"),
+            object: nil,
+            userInfo: ["imageId": stashID]
+        )
+    }
+
+    private func pruneLiveEvents(against fetched: [OCountTimelineEvent]) {
+        let imageCutoff = Date().addingTimeInterval(-90 * 24 * 60 * 60)
+        let sceneCutoff = Date().addingTimeInterval(-24 * 60 * 60)
+        liveEvents.removeAll { live in
+            if live.item.kind == .scene {
+                if live.date < sceneCutoff { return true }
+                return fetched.contains {
+                    $0.item.kind == .scene
+                        && $0.item.stashID == live.item.stashID
+                        && abs($0.date.timeIntervalSince(live.date)) < 180
+                }
+            }
+            if !live.isActionTime { return true }
+            if live.date < imageCutoff { return true }
+            return fetched.contains {
+                $0.isActionTime
+                    && $0.item.kind == .image
+                    && $0.item.stashID == live.item.stashID
+                    && abs($0.date.timeIntervalSince(live.date)) < 180
+            }
+        }
+    }
+
+    private func restorePersistedImageActions() {
+        var hydrateIDs = Set<String>()
+        for entry in ImageOCountActionStore.all() {
+            let date = Date(timeIntervalSince1970: entry.at)
+            let source = resolvedImageItem(for: entry)
+            let event = OCountTimelineEvent(
+                item: source.withCountOnDay(1),
+                date: date,
+                count: 1,
+                isActionTime: true
+            )
+            if let index = liveEvents.firstIndex(where: {
+                $0.isActionTime
+                    && $0.item.kind == .image
+                    && $0.item.stashID == entry.imageId
+                    && abs($0.date.timeIntervalSince1970 - entry.at) < 0.05
+            }) {
+                if liveEvents[index].item.isPlaceholder, !source.isPlaceholder {
+                    liveEvents[index] = event
+                }
+            } else {
+                liveEvents.append(event)
+            }
+            if source.isPlaceholder {
+                hydrateIDs.insert(entry.imageId)
+            }
+        }
+        for imageId in hydrateIDs {
+            Task { await self.hydrateLiveImage(imageId) }
+        }
+    }
+
+    private func resolvedImageItem(for entry: ImageOCountActionStore.Entry) -> OCountHeatmapItem {
+        if let cached = imageItem(stashID: entry.imageId) { return cached }
+        if let stored = entry.asItem() { return stored }
+        return OCountHeatmapItem.stub(kind: .image, stashID: entry.imageId)
     }
 
     private func applyLiveSceneMetadata(_ scene: Scene) {
@@ -335,6 +662,30 @@ final class OCountHeatmapLoader: ObservableObject {
         if didChange {
             itemsByDay = next
         }
+    }
+
+    private func applyLiveRating(kind: OCountHeatmapItem.Kind, stashID: String, rating100: Int?) {
+        func patch(_ item: OCountHeatmapItem) -> OCountHeatmapItem {
+            guard item.kind == kind, item.stashID == stashID else { return item }
+            return item.withRating(rating100)
+        }
+        timedEvents = timedEvents.map {
+            OCountTimelineEvent(item: patch($0.item), date: $0.date, count: $0.count, isActionTime: $0.isActionTime)
+        }
+        liveEvents = liveEvents.map {
+            OCountTimelineEvent(item: patch($0.item), date: $0.date, count: $0.count, isActionTime: $0.isActionTime)
+        }
+        var next = itemsByDay
+        var didChange = false
+        for (day, items) in next {
+            let updated = items.map(patch)
+            if updated != items {
+                next[day] = updated
+                didChange = true
+            }
+        }
+        if didChange { itemsByDay = next }
+        objectWillChange.send()
     }
 
     private func fetchCountsByDay() async throws -> OCountDayBuckets {
@@ -371,6 +722,7 @@ final class OCountHeatmapLoader: ObservableObject {
               o_counter
               o_history
               created_at
+              rating100
               paths { screenshot }
               studio { id name }
             }
@@ -420,24 +772,35 @@ final class OCountHeatmapLoader: ObservableObject {
             total = response.data?.findScenes?.count ?? scenes.count
             for scene in scenes {
                 guard let id = scene.id else { continue }
-                var perDay: [String: Int] = [:]
+                var addedHistory = false
                 for stamp in scene.o_history ?? [] {
                     guard let date = stamp.date else { continue }
-                    perDay[Self.dayKey(date, calendar: calendar), default: 0] += 1
-                }
-                if perDay.isEmpty, (scene.o_counter ?? 0) > 0,
-                   let created = scene.created_at.flatMap(Self.parseTimestamp) {
-                    perDay[Self.dayKey(created, calendar: calendar), default: 0] += scene.o_counter ?? 0
-                }
-                for (key, amount) in perDay {
+                    addedHistory = true
                     buckets.add(
                         kind: .scene,
                         stashID: id,
                         title: scene.title,
                         thumbnailPath: scene.paths?.screenshot,
                         studio: scene.studio?.asSceneStudio,
-                        dayKey: key,
-                        amount: amount
+                        rating100: scene.rating100,
+                        dayKey: Self.dayKey(date, calendar: calendar),
+                        amount: 1,
+                        occurredAt: date,
+                        isActionTime: true
+                    )
+                }
+                if !addedHistory, (scene.o_counter ?? 0) > 0,
+                   let created = scene.created_at.flatMap(Self.parseTimestamp) {
+                    buckets.add(
+                        kind: .scene,
+                        stashID: id,
+                        title: scene.title,
+                        thumbnailPath: scene.paths?.screenshot,
+                        studio: scene.studio?.asSceneStudio,
+                        rating100: scene.rating100,
+                        dayKey: Self.dayKey(created, calendar: calendar),
+                        amount: scene.o_counter ?? 0,
+                        occurredAt: created
                     )
                 }
             }
@@ -459,6 +822,7 @@ final class OCountHeatmapLoader: ObservableObject {
               o_counter
               created_at
               updated_at
+              rating100
               paths { screenshot }
               studio { id name }
             }
@@ -501,8 +865,10 @@ final class OCountHeatmapLoader: ObservableObject {
                     title: scene.title,
                     thumbnailPath: scene.paths?.screenshot,
                     studio: scene.studio?.asSceneStudio,
+                    rating100: scene.rating100,
                     dayKey: Self.dayKey(date, calendar: calendar),
-                    amount: scene.o_counter ?? 0
+                    amount: scene.o_counter ?? 0,
+                    occurredAt: date
                 )
             }
             if scenes.isEmpty { break }
@@ -567,7 +933,7 @@ final class OCountHeatmapLoader: ObservableObject {
             total = response.data?.findImages?.count ?? images.count
             for image in images {
                 guard let id = image.id else { continue }
-                let stamp = image.created_at ?? image.updated_at
+                let stamp = image.updated_at ?? image.created_at
                 guard let date = stamp.flatMap(Self.parseTimestamp) else { continue }
                 buckets.add(
                     kind: .image,
@@ -580,7 +946,8 @@ final class OCountHeatmapLoader: ObservableObject {
                     performers: image.performers?.compactMap(\.asGalleryPerformer) ?? [],
                     rating100: image.rating100,
                     dayKey: Self.dayKey(date, calendar: calendar),
-                    amount: image.o_counter ?? 0
+                    amount: image.o_counter ?? 0,
+                    occurredAt: date
                 )
             }
             if images.isEmpty { break }
@@ -588,6 +955,140 @@ final class OCountHeatmapLoader: ObservableObject {
             if page > 200 { break }
         }
         return buckets
+    }
+
+    private func fetchImageEvents(updatedSince start: Date) async throws -> [OCountTimelineEvent] {
+        let query = """
+        query FindRecentImageOCounters($filter: FindFilterType, $image_filter: ImageFilterType) {
+          findImages(filter: $filter, image_filter: $image_filter) {
+            count
+            images {
+              id
+              title
+              o_counter
+              rating100
+              created_at
+              updated_at
+              paths { thumbnail preview image }
+              visual_files {
+                ... on BaseFile { __typename path basename }
+                ... on ImageFile { __typename path height width basename }
+                ... on VideoFile { __typename path height width duration basename }
+              }
+              performers { id name image_path }
+            }
+          }
+        }
+        """
+        var page = 1
+        let perPage = 100
+        var events: [OCountTimelineEvent] = []
+        var total = Int.max
+
+        while (page - 1) * perPage < total {
+            let response: ImageOCounterResponse = try await GraphQLClient.shared.execute(
+                query: query,
+                variables: [
+                    "filter": [
+                        "page": page,
+                        "per_page": perPage,
+                        "sort": "updated_at",
+                        "direction": "DESC"
+                    ],
+                    "image_filter": [
+                        "o_counter": [
+                            "value": 0,
+                            "modifier": "GREATER_THAN"
+                        ]
+                    ]
+                ]
+            )
+            let images = response.data?.findImages?.images ?? []
+            total = response.data?.findImages?.count ?? images.count
+            var reachedEnd = images.isEmpty
+            for image in images {
+                guard let id = image.id else { continue }
+                let stamp = image.updated_at ?? image.created_at
+                guard let date = stamp.flatMap(Self.parseTimestamp) else { continue }
+                if date < start {
+                    reachedEnd = true
+                    break
+                }
+                let amount = max(1, image.o_counter ?? 1)
+                events.append(
+                    OCountTimelineEvent(
+                        item: OCountHeatmapItem(
+                            kind: .image,
+                            stashID: id,
+                            title: {
+                                let trimmed = image.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                                return trimmed.isEmpty ? "Untitled" : trimmed
+                            }(),
+                            thumbnailPath: image.paths?.thumbnail ?? image.paths?.preview ?? image.paths?.image,
+                            previewPath: image.paths?.preview,
+                            imagePath: image.paths?.image,
+                            visualFiles: image.visual_files?.compactMap(\.asImageFile),
+                            performers: image.performers?.compactMap(\.asGalleryPerformer) ?? [],
+                            studio: nil,
+                            rating100: image.rating100,
+                            countOnDay: amount
+                        ),
+                        date: date,
+                        count: amount
+                    )
+                )
+            }
+            if reachedEnd || images.count < perPage { break }
+            page += 1
+            if page > 20 { break }
+        }
+        return events
+    }
+
+    private func fetchImageItem(id: String) async -> OCountHeatmapItem? {
+        let query = """
+        query FindImageOCountItem($id: ID!) {
+          findImage(id: $id) {
+            id
+            title
+            o_counter
+            rating100
+            paths { thumbnail preview image }
+            visual_files {
+              ... on BaseFile { __typename path basename }
+              ... on ImageFile { __typename path height width basename }
+              ... on VideoFile { __typename path height width duration basename }
+            }
+            performers { id name image_path }
+          }
+        }
+        """
+        do {
+            let response: OCountFindImageItemResponse = try await GraphQLClient.shared.execute(
+                query: query,
+                variables: ["id": id]
+            )
+            guard let image = response.data?.findImage, let imageID = image.id else { return nil }
+            return OCountHeatmapItem(
+                kind: .image,
+                stashID: imageID,
+                title: {
+                    let trimmed = image.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                    return trimmed.isEmpty ? "Untitled" : trimmed
+                }(),
+                thumbnailPath: image.paths?.thumbnail ?? image.paths?.preview ?? image.paths?.image,
+                previewPath: image.paths?.preview,
+                imagePath: image.paths?.image,
+                visualFiles: image.visual_files?.compactMap(\.asImageFile),
+                performers: image.performers?.compactMap(\.asGalleryPerformer) ?? [],
+                studio: nil,
+                rating100: image.rating100,
+                countOnDay: max(1, image.o_counter ?? 1)
+            )
+        } catch {
+            print("❌ O-Count hydrate image: \(error)")
+            return nil
+        }
     }
 
     nonisolated static func dayKey(_ date: Date, calendar: Calendar) -> String {
@@ -636,6 +1137,7 @@ final class OCountHeatmapLoader: ObservableObject {
 private struct OCountDayBuckets {
     var counts: [String: Int] = [:]
     var items: [String: [OCountHeatmapItem]] = [:]
+    var events: [OCountTimelineEvent] = []
 
     mutating func add(
         kind: OCountHeatmapItem.Kind,
@@ -649,20 +1151,23 @@ private struct OCountDayBuckets {
         studio: SceneStudio? = nil,
         rating100: Int? = nil,
         dayKey: String,
-        amount: Int
+        amount: Int,
+        occurredAt: Date? = nil,
+        isActionTime: Bool = false
     ) {
         guard amount > 0, !stashID.isEmpty else { return }
         counts[dayKey, default: 0] += amount
         var list = items[dayKey] ?? []
+        let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let resolvedTitle = trimmed.isEmpty ? "Untitled" : trimmed
         if let idx = list.firstIndex(where: { $0.kind == kind && $0.stashID == stashID }) {
             list[idx].countOnDay += amount
         } else {
-            let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             list.append(
                 OCountHeatmapItem(
                     kind: kind,
                     stashID: stashID,
-                    title: trimmed.isEmpty ? "Untitled" : trimmed,
+                    title: resolvedTitle,
                     thumbnailPath: thumbnailPath,
                     previewPath: previewPath,
                     imagePath: imagePath,
@@ -675,6 +1180,28 @@ private struct OCountDayBuckets {
             )
         }
         items[dayKey] = list
+        if let occurredAt {
+            events.append(
+                OCountTimelineEvent(
+                    item: OCountHeatmapItem(
+                        kind: kind,
+                        stashID: stashID,
+                        title: resolvedTitle,
+                        thumbnailPath: thumbnailPath,
+                        previewPath: previewPath,
+                        imagePath: imagePath,
+                        visualFiles: visualFiles,
+                        performers: performers,
+                        studio: studio,
+                        rating100: rating100,
+                        countOnDay: amount
+                    ),
+                    date: occurredAt,
+                    count: amount,
+                    isActionTime: isActionTime
+                )
+            )
+        }
     }
 
     mutating func merge(_ other: OCountDayBuckets) {
@@ -696,6 +1223,7 @@ private struct OCountDayBuckets {
                 )
             }
         }
+        events.append(contentsOf: other.events)
     }
 }
 
@@ -898,6 +1426,7 @@ private struct OHistoryResponse: Decodable {
         let o_counter: Int?
         let created_at: String?
         let o_history: [FlexibleJSONTime]?
+        let rating100: Int?
         let paths: OCountPathsPayload?
         let studio: OCountStudioPayload?
     }
@@ -925,6 +1454,7 @@ private struct OCounterFallbackResponse: Decodable {
         let o_counter: Int?
         let created_at: String?
         let updated_at: String?
+        let rating100: Int?
         let paths: OCountPathsPayload?
         let studio: OCountStudioPayload?
     }
@@ -953,6 +1483,13 @@ private struct ImageOCounterResponse: Decodable {
         let paths: OCountPathsPayload?
         let visual_files: [OCountVisualFile]?
         let performers: [OCountPerformerPayload]?
+    }
+}
+
+private struct OCountFindImageItemResponse: Decodable {
+    let data: Payload?
+    struct Payload: Decodable {
+        let findImage: ImageOCounterResponse.ImageOCounter?
     }
 }
 

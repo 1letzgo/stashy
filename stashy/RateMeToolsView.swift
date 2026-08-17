@@ -243,6 +243,28 @@ private final class RateMeViewModel: ObservableObject {
                 return
             }
             HapticManager.success()
+            switch current.mode {
+            case .scenes:
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("SceneRatingUpdated"),
+                    object: nil,
+                    userInfo: [
+                        "sceneId": current.id,
+                        "rating100": rating100 as Any,
+                        "title": current.title
+                    ]
+                )
+            case .images:
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("ImageRatingUpdated"),
+                    object: nil,
+                    userInfo: [
+                        "imageId": current.id,
+                        "rating100": rating100 as Any,
+                        "title": current.title
+                    ]
+                )
+            }
             // Keep the selected stars visible briefly before advancing.
             try? await Task.sleep(nanoseconds: Self.ratingHoldNanoseconds)
             skipIDs.remove(current.id)

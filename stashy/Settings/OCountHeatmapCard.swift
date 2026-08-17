@@ -228,23 +228,13 @@ struct OCountHeatmapCard: View {
             LazyVGrid(columns: DesignTokens.Tools.rankedColumns(for: horizontalSizeClass), spacing: 8) {
                 ForEach(items) { item in
                     NavigationLink {
-                        dayItemDestination(item)
+                        OCountMediaDestination(item: item)
                     } label: {
                         OCountDayItemRow(item: item)
                     }
                     .buttonStyle(.plain)
                 }
             }
-        }
-    }
-
-    @ViewBuilder
-    private func dayItemDestination(_ item: OCountHeatmapItem) -> some View {
-        switch item.kind {
-        case .scene:
-            SceneDetailView(scene: item.asScene)
-        case .image:
-            OCountImageDestination(item: item)
         }
     }
 
@@ -678,21 +668,49 @@ private struct OCountDayItemRow: View {
     }
 }
 
-private struct OCountImageDestination: View {
+struct OCountMediaDestination: View {
+    let item: OCountHeatmapItem
+
+    var body: some View {
+        switch item.kind {
+        case .scene:
+            SceneDetailView(scene: item.asScene)
+        case .image:
+            OCountImageDestination(item: item)
+        }
+    }
+}
+
+struct OCountImageDestination: View {
     let imageId: String
     private let stub: StashImage
     @State private var images: [StashImage]
+    @State private var isReady: Bool
 
     init(item: OCountHeatmapItem) {
         let stub = item.asImage
         self.imageId = stub.id
         self.stub = stub
         _images = State(initialValue: [stub])
+        _isReady = State(initialValue: Self.isPlayable(stub))
     }
 
     var body: some View {
-        FullScreenImageView(images: $images, selectedImageId: imageId)
-            .task { await hydrate() }
+        Group {
+            if isReady {
+                FullScreenImageView(images: $images, selectedImageId: imageId)
+            } else {
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    StandardLoadingView(message: "Loading...")
+                }
+            }
+        }
+        .task { await hydrate() }
+    }
+
+    private static func isPlayable(_ image: StashImage) -> Bool {
+        image.visual_files != nil || image.paths?.image != nil || image.isVideo
     }
 
     @MainActor
@@ -709,9 +727,13 @@ private struct OCountImageDestination: View {
                 query: query,
                 variables: ["id": imageId]
             )
-            guard var full = response.data?.findImage else { return }
+            guard var full = response.data?.findImage else {
+                isReady = true
+                return
+            }
             guard let idx = images.firstIndex(where: { $0.id == full.id }) else {
                 images = [full]
+                isReady = true
                 return
             }
             let current = images[idx]
@@ -722,8 +744,10 @@ private struct OCountImageDestination: View {
                 full = full.withOCounter(current.o_counter)
             }
             images[idx] = full
+            isReady = true
         } catch {
             print("❌ O-Count image hydrate: \(error)")
+            isReady = true
         }
     }
 }

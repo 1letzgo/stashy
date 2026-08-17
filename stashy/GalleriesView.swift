@@ -1094,6 +1094,10 @@ struct GalleryItemView: View {
             }
             applyActivePlaybackState()
         }
+        .onChange(of: image.isVideo) { _, isVideo in
+            if isVideo { setupPlayer() }
+            applyActivePlaybackState()
+        }
         .onDisappear {
             cancelAnimationAdvanceTimer()
             player?.pause()
