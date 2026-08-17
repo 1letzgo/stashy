@@ -14,31 +14,110 @@ enum SpeechTranscriberAvailability {
         return false
     }
 
-    /// Language picker entries for scene language — only codes Apple’s SpeechTranscriber
-    /// can actually recognize on this device (e.g. no Czech).
+    /// Language picker entries for scene language — one row per language
+    /// (`en-US`/`en-GB` → English, `zh-CN`/`zh-HK`/`zh-TW` → Chinese).
+    /// Cantonese (`yue`) stays its own row; its `forLanguageCode` name often equals "Chinese".
     static func sceneLanguagePickerOptions(
         locale: Locale = .current
     ) async -> [(id: String, label: String)] {
         guard #available(iOS 26.0, *) else { return [] }
         guard SpeechTranscriber.isAvailable else { return [] }
-        var codes = Set<String>()
+        var grouped: [String: [Locale]] = [:]
         for supported in await SpeechTranscriber.supportedLocales {
-            if let code = supported.language.languageCode?.identifier.lowercased() {
-                codes.insert(code)
-            } else if let code = SubtitleTargetLanguage.languageCode(
-                from: supported.identifier(.bcp47)
-            ) {
-                codes.insert(code)
-            }
+            let subtag = supported.identifier(.bcp47)
+                .lowercased()
+                .replacingOccurrences(of: "_", with: "-")
+                .split(separator: "-")
+                .first
+                .map(String.init) ?? supported.identifier(.bcp47).lowercased()
+            grouped[subtag, default: []].append(supported)
         }
-        return codes
-            .sorted {
-                SubtitleTargetLanguage.displayName(for: $0, locale: locale)
-                    < SubtitleTargetLanguage.displayName(for: $1, locale: locale)
+        return grouped.keys.sorted {
+            pickerLabel(forSubtag: $0, locale: locale)
+                .localizedStandardCompare(pickerLabel(forSubtag: $1, locale: locale)) == .orderedAscending
+        }
+        .map { (id: $0, label: pickerLabel(forSubtag: $0, locale: locale)) }
+    }
+
+    static func speechLocaleDisplayName(for locale: Locale, locale display: Locale = .current) -> String {
+        pickerLabel(forSubtag: SpeechTranscriptionLocaleResolver.speechLanguageSubtag(locale), locale: display)
+    }
+
+    private static func pickerLabel(forSubtag subtag: String, locale display: Locale) -> String {
+        if subtag == "yue" {
+            let yue = display.localizedString(forLanguageCode: "yue")
+            let zh = display.localizedString(forLanguageCode: "zh")
+            if let yue, !yue.isEmpty, yue != zh { return yue }
+            if let name = display.localizedString(forIdentifier: "yue-CN"), !name.isEmpty {
+                if let paren = name.firstIndex(of: "(") {
+                    return String(name[..<paren]).trimmingCharacters(in: .whitespaces)
+                }
+                return name
             }
-            .map {
-                (id: $0, label: SubtitleTargetLanguage.displayName(for: $0, locale: locale))
-            }
+            return "Cantonese"
+        }
+        return SubtitleTargetLanguage.displayName(for: subtag, locale: display)
+    }
+
+    /// Maps a stored scene tag (`zh`, `yue`, `zh-CN`) onto the picker row that should stay selected.
+    static func matchingPickerId(stored: String?, optionIds: [String]) -> String? {
+        guard let stored else { return nil }
+        let needle = stored.replacingOccurrences(of: "_", with: "-").lowercased()
+        if let exact = optionIds.first(where: { $0.lowercased() == needle }) {
+            return exact
+        }
+        let wanted = languageAndRegion(needle)
+        if let wantedRegion = wanted.region,
+           let match = optionIds.first(where: {
+               let parts = languageAndRegion($0)
+               return parts.lang == wanted.lang && parts.region == wantedRegion
+           }) {
+            return match
+        }
+        let lang = wanted.lang
+        let preferredDefaults: [String: String] = [
+            "yue": "yue-CN",
+            "zh": "zh-CN",
+            "cmn": "zh-CN",
+            "de": "de-DE",
+            "en": "en-US",
+            "fr": "fr-FR",
+            "es": "es-ES",
+            "pt": "pt-BR",
+            "nl": "nl-NL",
+        ]
+        if let preferred = preferredDefaults[lang],
+           let match = optionIds.first(where: {
+               let parts = languageAndRegion($0)
+               let pref = languageAndRegion(preferred)
+               return parts.lang == pref.lang && parts.region == pref.region
+           }) {
+            return match
+        }
+        let langMatches = optionIds.filter { languageAndRegion($0).lang == lang }
+        if langMatches.count == 1 { return langMatches[0] }
+        return nil
+    }
+
+    private static func languageAndRegion(_ id: String) -> (lang: String, region: String?) {
+        let parts = id.lowercased()
+            .replacingOccurrences(of: "_", with: "-")
+            .split(separator: "-")
+            .map(String.init)
+        let lang = parts.first ?? ""
+        let region = parts.reversed().first { $0.count == 2 && $0 != lang }
+        return (lang, region)
+    }
+
+    static func shortPickerLabel(stored: String?, selectedId: String?) -> String {
+        let tag = (selectedId ?? stored)?
+            .replacingOccurrences(of: "_", with: "-")
+            .uppercased()
+        guard let tag, !tag.isEmpty else { return "Lang" }
+        let parts = tag.split(separator: "-").map(String.init)
+        guard let lang = parts.first else { return "Lang" }
+        if lang == "YUE" { return "YUE" }
+        return lang
     }
 }
 
@@ -69,9 +148,16 @@ enum SpeechTranscriptionLocaleResolver {
         guard !supported.isEmpty else { throw ResolveError.localeNotSupported }
 
         let preferred = locale(fromMetadataLanguage: preferredLanguageTag)
-        // Prefer Apple's exact asset locale (`cs-CZ`) over a short tag that only looks supported.
-        if let preferred, let exact = await SpeechTranscriber.supportedLocale(equivalentTo: preferred) {
-            return Resolution(locale: exact, usedFallback: false)
+        if let preferred {
+            if let exact = matchLocale(preferred, in: supported) {
+                return Resolution(locale: exact, usedFallback: false)
+            }
+            // `equivalentTo` can map generic `zh` onto Cantonese (`yue-CN`). Only accept
+            // Apple's suggestion when the BCP-47 language subtag still matches.
+            if let apple = await SpeechTranscriber.supportedLocale(equivalentTo: preferred),
+               sameSpeechLanguage(apple, preferred) {
+                return Resolution(locale: apple, usedFallback: false)
+            }
         }
 
         var candidates: [Locale] = []
@@ -92,11 +178,12 @@ enum SpeechTranscriptionLocaleResolver {
             let key = candidate.identifier(.bcp47).lowercased()
             guard seen.insert(key).inserted else { continue }
             let match = await SpeechTranscriber.supportedLocale(equivalentTo: candidate)
+                .flatMap { sameSpeechLanguage($0, candidate) ? $0 : nil }
                 ?? matchLocale(candidate, in: supported)
             guard let match else { continue }
             let usedFallback =
                 preferred != nil
-                && !sameLanguage(match, preferred!)
+                && !sameSpeechLanguage(match, preferred!)
             return Resolution(locale: match, usedFallback: usedFallback)
         }
         if let first = supported.first {
@@ -113,8 +200,11 @@ enum SpeechTranscriptionLocaleResolver {
         let lower = value.lowercased()
         let nameMap: [String: String] = [
             "german": "de", "english": "en", "french": "fr", "spanish": "es",
-            "italian": "it", "japanese": "ja", "chinese": "zh", "korean": "ko",
+            "italian": "it", "japanese": "ja", "korean": "ko",
             "portuguese": "pt", "russian": "ru", "dutch": "nl",
+            "chinese": "zh-CN", "chinesisch": "zh-CN", "mandarin": "zh-CN",
+            "cantonese": "yue-CN", "kantonesisch": "yue-CN",
+            "zh": "zh-CN", "yue": "yue-CN",
         ]
         if let mapped = nameMap[lower] {
             return Locale(identifier: mapped)
@@ -123,28 +213,77 @@ enum SpeechTranscriptionLocaleResolver {
     }
 
     static func matchLocale(_ requested: Locale, in supported: [Locale]) -> Locale? {
-        let reqId = requested.identifier(.bcp47).lowercased()
+        let reqId = requested.identifier(.bcp47).lowercased().replacingOccurrences(of: "_", with: "-")
         if reqId.isEmpty { return nil }
-        if let exact = supported.first(where: { $0.identifier(.bcp47).lowercased() == reqId }) {
+        if let exact = supported.first(where: {
+            $0.identifier(.bcp47).lowercased().replacingOccurrences(of: "_", with: "-") == reqId
+        }) {
             return exact
         }
-        let reqLang = languageCode(from: requested) ?? (reqId.count >= 2 ? String(reqId.prefix(2)) : nil)
-        guard let reqLang else { return nil }
-        let langMatches = supported.filter { locale in
-            let id = locale.identifier(.bcp47).lowercased()
-            if id == reqLang || id.hasPrefix(reqLang + "-") { return true }
-            return languageCode(from: locale) == reqLang
+        let reqLang = speechLanguageSubtag(requested)
+        guard !reqLang.isEmpty else { return nil }
+        let langMatches = supported.filter { speechLanguageSubtag($0) == reqLang }
+        if reqId.contains("-") {
+            let reqRegion = reqId.split(separator: "-").dropFirst().first.map(String.init)
+            if let reqRegion,
+               let regional = langMatches.first(where: {
+                   $0.identifier(.bcp47).lowercased().replacingOccurrences(of: "_", with: "-")
+                       .split(separator: "-")
+                       .map(String.init)
+                       .contains(reqRegion)
+               }) {
+                return regional
+            }
+        }
+        let preferredDefaults: [String: String] = [
+            "yue": "yue-CN", "zh": "zh-CN", "de": "de-DE", "en": "en-US",
+        ]
+        if let preferred = preferredDefaults[reqLang] {
+            let prefRegion = preferred.split(separator: "-").last.map(String.init)?.lowercased()
+            if let prefRegion,
+               let match = langMatches.first(where: {
+                   $0.identifier(.bcp47)
+                       .lowercased()
+                       .replacingOccurrences(of: "_", with: "-")
+                       .split(separator: "-")
+                       .map(String.init)
+                       .contains(prefRegion)
+               }) {
+                return match
+            }
         }
         return langMatches.first { $0.identifier(.bcp47).contains("-") } ?? langMatches.first
     }
 
-    private static func languageCode(from locale: Locale) -> String? {
-        locale.language.languageCode?.identifier.lowercased()
+    /// BCP-47 language subtag (`yue`, `zh`). Do not use Foundation's `languageCode`,
+    /// which can report Cantonese as `zh`.
+    static func speechLanguageSubtag(_ locale: Locale) -> String {
+        locale.identifier(.bcp47)
+            .lowercased()
+            .replacingOccurrences(of: "_", with: "-")
+            .split(separator: "-")
+            .first
+            .map(String.init) ?? ""
     }
 
-    private static func sameLanguage(_ a: Locale, _ b: Locale) -> Bool {
-        guard let ca = languageCode(from: a), let cb = languageCode(from: b) else { return false }
+    private static func sameSpeechLanguage(_ a: Locale, _ b: Locale) -> Bool {
+        let ca = speechLanguageSubtag(a)
+        let cb = speechLanguageSubtag(b)
+        guard !ca.isEmpty, !cb.isEmpty else { return false }
         return ca == cb
+    }
+
+    /// Exact / same-subtag match first. Apple's `equivalentTo` is not trusted across
+    /// `yue` (Cantonese) vs `zh` (Mandarin).
+    static func supportedLocaleMatching(_ requested: Locale) async -> Locale? {
+        guard #available(iOS 26.0, *) else { return nil }
+        let supported = await SpeechTranscriber.supportedLocales
+        if let exact = matchLocale(requested, in: supported) { return exact }
+        if let apple = await SpeechTranscriber.supportedLocale(equivalentTo: requested),
+           sameSpeechLanguage(apple, requested) {
+            return apple
+        }
+        return nil
     }
 }
 
@@ -223,6 +362,8 @@ struct SceneTranscriptionAudioContext: Equatable {
 
 enum SceneTeleprompterMode: String, CaseIterable, Identifiable {
     case off
+    case english
+    /// Legacy: treated as English captions. Kept so old UserDefaults values still decode.
     case sceneLanguage
     case userLanguage
 
@@ -231,9 +372,32 @@ enum SceneTeleprompterMode: String, CaseIterable, Identifiable {
     var title: String {
         switch self {
         case .off: return "Off"
-        case .sceneLanguage: return "Scene language"
+        case .english, .sceneLanguage: return "English"
         case .userLanguage: return "My language"
         }
+    }
+
+    /// Language the user wants captions in. Scene speech is detected separately.
+    var captionTargetCode: String? {
+        switch self {
+        case .off: return nil
+        case .english, .sceneLanguage: return "en"
+        case .userLanguage: return SubtitleTargetLanguage.load()
+        }
+    }
+
+    /// Last AI CC choice — restored when playback starts again after pause / leaving the scene.
+    private static let preferredModeKey = "stashy_ai_cc_preferred_mode"
+
+    static var preferred: SceneTeleprompterMode {
+        let raw = UserDefaults.standard.string(forKey: preferredModeKey) ?? ""
+        if raw == "sceneLanguage" { return .english }
+        return SceneTeleprompterMode(rawValue: raw) ?? .off
+    }
+
+    static func persist(_ mode: SceneTeleprompterMode) {
+        let stored = mode == .sceneLanguage ? SceneTeleprompterMode.english : mode
+        UserDefaults.standard.set(stored.rawValue, forKey: preferredModeKey)
     }
 }
 

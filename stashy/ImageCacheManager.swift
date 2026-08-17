@@ -68,7 +68,8 @@ class ImageCache {
         ) { [weak self] notification in
             guard let self,
                   let sceneId = notification.userInfo?["sceneId"] as? String else { return }
-            self.invalidateSceneCoverImage(sceneId: sceneId)
+            let screenshotPath = notification.userInfo?["screenshotPath"] as? String
+            self.invalidateSceneCoverImage(sceneId: sceneId, screenshotPath: screenshotPath)
         }
     }
     
@@ -348,11 +349,16 @@ class ImageCache {
     }
 
     /// After a scene cover mutation, drop cached `/scene/{id}/screenshot` variants.
-    func invalidateSceneCoverImage(sceneId: String) {
+    func invalidateSceneCoverImage(sceneId: String, screenshotPath: String? = nil) {
         let config = ServerConfigManager.shared.activeConfig ?? ServerConfigManager.shared.loadConfig()
         guard let config, config.hasValidConfig else { return }
-        let defaultURLString = "\(config.baseURL)/scene/\(sceneId)/screenshot"
-        invalidateURLStrings(performerImageCacheURLVariants(for: defaultURLString))
+        var toInvalidate = performerImageCacheURLVariants(
+            for: "\(config.baseURL)/scene/\(sceneId)/screenshot"
+        )
+        if let screenshotPath, !screenshotPath.isEmpty {
+            toInvalidate.append(contentsOf: performerImageCacheURLVariants(for: screenshotPath))
+        }
+        invalidateURLStrings(toInvalidate)
     }
 
     /// After marker screenshot generation, drop cached placeholder / stale stills.
@@ -514,7 +520,10 @@ class ImageLoader: ObservableObject {
         currentURL: URL,
         sceneId: String
     ) -> Bool {
-        currentURL.path.contains("/scene/\(sceneId)/screenshot")
+        let path = currentURL.path
+        if path.contains("/scene/\(sceneId)/screenshot") { return true }
+        if path.contains("/scene/\(sceneId)/") && path.lowercased().contains("screenshot") { return true }
+        return currentURL.absoluteString.contains(sceneId) && path.lowercased().contains("screenshot")
     }
 
     func updateURL(_ newURL: URL?, force: Bool = false, bypassCache: Bool = false) {
@@ -640,11 +649,10 @@ struct CustomAsyncImage<Content: View>: View {
 
     var body: some View {
         content(loader)
-            .onChange(of: url) { oldValue, newValue in
+            .onChange(of: url) { _, newValue in
                 loader.updateURL(newValue)
             }
             .onChange(of: configManager.activeConfig?.id) { _, _ in
-                // Force reload even if URL is same string, as headers (API Key) changed
                 loader.updateURL(url, force: true)
             }
     }

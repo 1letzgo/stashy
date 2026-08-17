@@ -90,7 +90,7 @@ struct StashyPlusAISubtitlesSettings: View {
                 Text(option.label).tag(option.id)
             }
         } label: {
-            Label("Subtitle Language", systemImage: "captions.bubble")
+            Label("My subtitle language", systemImage: "captions.bubble")
         }
         .stashyGroupedBlockRow(index: 0, count: 2)
 

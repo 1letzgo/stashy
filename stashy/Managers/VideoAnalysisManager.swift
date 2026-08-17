@@ -198,27 +198,22 @@ class StashVideoSyncManager: ObservableObject {
 
     private func setupAudioTap(for playerItem: AVPlayerItem) {
         let asset = playerItem.asset
-        if #available(iOS 16.0, *) {
-            Task { [weak self] in
-                guard let self else { return }
-                do {
-                    let tracks = try await asset.loadTracks(withMediaType: .audio)
-                    guard let audioTrack = tracks.first else { return }
-                    await MainActor.run {
-                        self.installAudioTap(on: playerItem, audioTrack: audioTrack)
-                    }
-                } catch {
-                    // If track loading fails, skip audio tap gracefully
+        Task { [weak self] in
+            guard let self else { return }
+            do {
+                let tracks = try await asset.loadTracks(withMediaType: .audio)
+                let selected = tracks.first(where: { $0.trackID == SceneExclusiveAudio.selectedTrackID }) ?? tracks.first
+                guard let audioTrack = selected else { return }
+                await MainActor.run {
+                    self.installAudioTap(on: playerItem, audioTrack: audioTrack, allAudioTracks: tracks)
                 }
+            } catch {
+                // If track loading fails, skip audio tap gracefully
             }
-        } else {
-            let tracks = asset.tracks(withMediaType: .audio)
-            guard let audioTrack = tracks.first else { return }
-            installAudioTap(on: playerItem, audioTrack: audioTrack)
         }
     }
 
-    private func installAudioTap(on playerItem: AVPlayerItem, audioTrack: AVAssetTrack) {
+    private func installAudioTap(on playerItem: AVPlayerItem, audioTrack: AVAssetTrack, allAudioTracks: [AVAssetTrack]) {
         var callbacks = MTAudioProcessingTapCallbacks(
             version: kMTAudioProcessingTapCallbacksVersion_0,
             clientInfo: UnsafeMutableRawPointer(Unmanaged.passRetained(self).toOpaque()),
@@ -277,11 +272,14 @@ class StashVideoSyncManager: ObservableObject {
         guard status == noErr, let tap = tap else { return }
         self.audioTap = tap
 
-        let audioParams = AVMutableAudioMixInputParameters(track: audioTrack)
-        audioParams.audioTapProcessor = tap
-        let audioMix = AVMutableAudioMix()
-        audioMix.inputParameters = [audioParams]
-        playerItem.audioMix = audioMix
+        let tracks = allAudioTracks.isEmpty ? [audioTrack] : allAudioTracks
+        let selectedID = SceneExclusiveAudio.selectedTrackID ?? audioTrack.trackID
+        SceneExclusiveAudio.selectedTrackID = selectedID
+        playerItem.audioMix = SceneExclusiveAudio.makeMix(
+            tracks: tracks,
+            selectedTrackID: selectedID,
+            tap: tap
+        )
     }
 
     // Called from audio real-time thread — only touches audioAGCMax (audio-thread-only) + dispatches to main

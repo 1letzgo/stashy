@@ -21,6 +21,7 @@ private enum SceneLiveSortFieldKind: String, CaseIterable, Identifiable {
     case duration
     case last_played_at
     case play_count
+    case play_duration
     case o_counter
     case rating
     case random
@@ -35,6 +36,7 @@ private enum SceneLiveSortFieldKind: String, CaseIterable, Identifiable {
         case .duration: return "Duration"
         case .last_played_at: return "Last played"
         case .play_count: return "Play count"
+        case .play_duration: return "Watch time"
         case .o_counter: return "O Count"
         case .rating: return "Rating"
         case .random: return "Random"
@@ -53,6 +55,7 @@ private enum SceneLiveSortFieldKind: String, CaseIterable, Identifiable {
         case .duration: return ascending ? .durationAsc : .durationDesc
         case .last_played_at: return ascending ? .lastPlayedAtAsc : .lastPlayedAtDesc
         case .play_count: return ascending ? .playCountAsc : .playCountDesc
+        case .play_duration: return ascending ? .playDurationAsc : .playDurationDesc
         case .o_counter: return ascending ? .oCounterAsc : .oCounterDesc
         case .rating: return ascending ? .ratingAsc : .ratingDesc
         case .random: return .random
@@ -1913,6 +1916,7 @@ struct SceneLiveFilterSheet: View {
             )
         }
         .presentationDetents([.medium, .large])
+        .presentationBackgroundInteraction(.disabled)
     }
 
     /// Shown inside the live-filter card when chip rows are hidden (same copy as standalone notice, without extra chrome).

@@ -214,11 +214,6 @@ struct ReelsViewBody: View {
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @ObservedObject private var tabManager = TabManager.shared
     @ObservedObject private var configManager = ServerConfigManager.shared
-    @ObservedObject private var stashSyncManager = StashSyncManager.shared
-    @ObservedObject private var videoSyncManager = StashVideoSyncManager.shared
-    @ObservedObject private var handyManager = HandyManager.shared
-    @ObservedObject private var buttplugManager = ButtplugManager.shared
-    @ObservedObject private var loveSpouseManager = LoveSpouseManager.shared
     @ObservedObject var viewModel: StashDBViewModel
     /// Captured at remount time from ``NavigationCoordinator/reelsDeepLink``.
     private let deepLink: ReelsDeepLink
@@ -1949,6 +1944,15 @@ struct ReelsViewBody: View {
         }
     }
 
+    /// Same gate as Pics (`isLoadingImages && allImages.isEmpty`): spinner only while a fetch is in flight.
+    private var showsBlockingFeedLoad: Bool {
+        isFeedLoading && isListEmpty
+    }
+
+    private var showsFeedConnectionError: Bool {
+        isListEmpty && !isFeedLoading && viewModel.errorMessage != nil
+    }
+
     /// Lookup without remapping the entire feed list (chrome reads this every body pass).
     private var currentVisibleReelItem: ReelItemData? {
         guard let id = currentVisibleSceneId else { return nil }
@@ -2127,6 +2131,7 @@ struct ReelsViewBody: View {
         )
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
+        .presentationBackgroundInteraction(.disabled)
         .onAppear {
             reelsSceneFilterSheetHydrating = true
             SceneLivePresetTag.migrateLegacySelection(&reelsSceneLiveSheetPresetSelection)
@@ -2363,6 +2368,7 @@ struct ReelsViewBody: View {
         )
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
+        .presentationBackgroundInteraction(.disabled)
         .onAppear {
             reelsClipFilterSheetHydrating = true
             var sel = reelsClipImageFilters.catalogPresetRowSelection
@@ -2378,7 +2384,6 @@ struct ReelsViewBody: View {
 
     @ViewBuilder
     private var premiumContentLayout: some View {
-        let reelsFeedConnectionError = isListEmpty && viewModel.errorMessage != nil
         ZStack {
             StashyThemeFill(role: .app)
                 .ignoresSafeArea()
@@ -2394,10 +2399,12 @@ struct ReelsViewBody: View {
                 } else {
                     StandardLoadingView(message: "Loading feeds...")
                 }
-            } else if reelsFeedConnectionError {
+            } else if showsBlockingFeedLoad {
+                loadingStateView
+            } else if showsFeedConnectionError {
                 errorStateView
             } else if isListEmpty {
-                loadingStateView
+                emptyStateView
             } else {
                 reelsListView()
                     .ignoresSafeArea(reelsPremiumContentSafeAreaRegions)
@@ -2592,6 +2599,16 @@ struct ReelsViewBody: View {
         }
     }
 
+    /// Scenes / Markers / Clips / Previews take the playback session. Pics must not —
+    /// muted 1-row autoplay mixes with other audio instead of ducking it.
+    private func applyReelsAudioSession(for mode: ReelsMode) {
+        if mode == .pics {
+            applyAmbientMixingAudioSession()
+        } else {
+            applyPlaybackAudioSession()
+        }
+    }
+
     /// Resume scroll item + mid-clip time and continue autoplay after returning to Feeds.
     private func reelsResumePlaybackAfterReturn() {
         guard coordinator.selectedTab == .reels else { return }
@@ -2606,12 +2623,10 @@ struct ReelsViewBody: View {
         currentItemShowRatingOverlay = false
 
         UIApplication.shared.isIdleTimerDisabled = true
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
-            try AVAudioSession.sharedInstance().setActive(true)
-        } catch {
-            print("🎬 Reels: Audio resume error: \(error)")
-        }
+        applyReelsAudioSession(for: reelsMode)
+
+        // Pics uses ImagesView muted autoplay and must not resume reel players / steal audio.
+        if reelsMode == .pics { return }
 
         // Ensure the last visible item is still selected (TabView usually keeps @State).
         if currentVisibleSceneId == nil {
@@ -2823,12 +2838,7 @@ struct ReelsViewBody: View {
 
         ReelsSessionRAM.clearLegacyUserDefaultsIfNeeded()
         
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
-            try AVAudioSession.sharedInstance().setActive(true)
-        } catch {
-            print("🎬 Reels: Audio setup error: \(error)")
-        }
+        applyReelsAudioSession(for: reelsMode)
 
         // 0. Guard against rotation-triggered onAppear
         if isRotating {
@@ -3082,12 +3092,8 @@ struct ReelsViewBody: View {
         let sort = StashDBViewModel.ImageSortOption(rawValue: sortRaw) ?? reelsClipImageFilters.selectedSortOption
         reelsClipImageFilters.selectedSortOption = sort
         let fid = sessionFilterId(for: .clips) ?? TabManager.shared.getDefaultClipFilterId(for: .reels)
-        if let fid {
-            reelsClipImageFilters.selectedFilter = viewModel.savedFilters[fid]
-        }
-        // Avoid stacking duplicate initial fetches when filters are still loading.
-        if fid != nil, viewModel.savedFilters.isEmpty {
-            return
+        if let fid, let filter = viewModel.savedFilters[fid] {
+            reelsClipImageFilters.selectedFilter = filter
         }
         applySettings(
             clipSortBy: sort,
@@ -3113,6 +3119,8 @@ struct ReelsViewBody: View {
 
         // Persist old mode position before clearing the active id (Pics teardown).
         saveCurrentPositionIfPossible(for: oldValue)
+
+        applyReelsAudioSession(for: newValue)
 
         if newValue == .pics {
             // Active row's `onDisappear` skips `cleanupPlayer` while still "active", so force
@@ -3182,20 +3190,53 @@ struct ReelsViewBody: View {
     }
 
     @ViewBuilder
+    private var emptyStateView: some View {
+        SharedEmptyStateView(
+            icon: emptyStateIcon,
+            title: emptyStateTitle,
+            buttonText: "Reload",
+            onRetry: retryCurrentFeedFetch
+        )
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var emptyStateIcon: String {
+        switch reelsMode {
+        case .scenes: return "film"
+        case .markers: return "bookmark.fill"
+        case .clips: return "photo.on.rectangle.angled"
+        case .previews: return "play.rectangle"
+        case .pics: return "camera.fill"
+        }
+    }
+
+    private var emptyStateTitle: String {
+        switch reelsMode {
+        case .scenes: return "No scenes found"
+        case .markers: return "No markers found"
+        case .clips: return "No clips found"
+        case .previews: return "No previews found"
+        case .pics: return "No images found"
+        }
+    }
+
+    private func retryCurrentFeedFetch() {
+        switch reelsMode {
+        case .scenes:
+            applySettings(sortBy: selectedSortOption, sceneFilter: selectedFilter, performer: selectedPerformer, tags: selectedTags)
+        case .markers:
+            applySettings(markerSortBy: selectedMarkerSortOption, markerFilter: selectedMarkerFilter, performer: selectedPerformer, tags: selectedTags)
+        case .clips:
+            applySettings(clipSortBy: reelsClipImageFilters.selectedSortOption, clipFilter: reelsClipImageFilters.selectedFilter, performer: selectedPerformer, tags: selectedTags)
+        case .previews:
+            applySettings(previewSortBy: selectedSortOption, previewFilter: selectedPreviewFilter, performer: selectedPerformer, tags: selectedTags)
+        case .pics: break
+        }
+    }
+
+    @ViewBuilder
     private var errorStateView: some View {
-        ConnectionErrorView(onRetry: {
-            switch reelsMode {
-            case .scenes:
-                applySettings(sortBy: selectedSortOption, sceneFilter: selectedFilter, performer: selectedPerformer, tags: selectedTags)
-            case .markers:
-                applySettings(markerSortBy: selectedMarkerSortOption, markerFilter: selectedMarkerFilter, performer: selectedPerformer, tags: selectedTags)
-            case .clips:
-                applySettings(clipSortBy: reelsClipImageFilters.selectedSortOption, clipFilter: reelsClipImageFilters.selectedFilter, performer: selectedPerformer, tags: selectedTags)
-            case .previews:
-                applySettings(previewSortBy: selectedSortOption, previewFilter: selectedPreviewFilter, performer: selectedPerformer, tags: selectedTags)
-            case .pics: break
-            }
-        })
+        ConnectionErrorView(onRetry: retryCurrentFeedFetch)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -3399,9 +3440,9 @@ struct ReelsViewBody: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                     HStack(spacing: 6) {
-                        if showsReelsStashSyncButton {
-                            reelsStashSyncPill
-                        }
+                        #if !os(tvOS)
+                        ReelsAIMotionPill(pillHeight: reelsTopChromePillHeight, isPicsMode: reelsMode == .pics)
+                        #endif
                         reelsFilterSortPill
                     }
                     .fixedSize()
@@ -3957,39 +3998,55 @@ struct ReelsViewBody: View {
         .buttonStyle(.plain)
         .accessibilityLabel("Filter und Sortierung")
     }
+}
 
-    /// Visible only when stashy+ AI Motion is unlocked + enabled (not on Pics).
-    private var showsReelsStashSyncButton: Bool {
-        stashSyncManager.isStashSyncEnabled && reelsMode != .pics
+#if !os(tvOS)
+/// Isolated from ``ReelsViewBody`` so AI Motion intensity ticks cannot rebuild Feeds
+/// (and restack `AVPlayerLayer` over the filter-sheet menu).
+private struct ReelsAIMotionPill: View {
+    let pillHeight: CGFloat
+    let isPicsMode: Bool
+
+    @ObservedObject private var stashSyncManager = StashSyncManager.shared
+    @ObservedObject private var handyManager = HandyManager.shared
+    @ObservedObject private var buttplugManager = ButtplugManager.shared
+    @ObservedObject private var loveSpouseManager = LoveSpouseManager.shared
+    @ObservedObject private var plusManager = StashyPlusManager.shared
+    @AppStorage("video_sync_enabled") private var isVideoSyncEnabled = false
+
+    private var showsButton: Bool {
+        plusManager.isUnlocked && isVideoSyncEnabled && !isPicsMode
     }
 
-    private var isReelsStashSyncActive: Bool {
+    private var isActive: Bool {
         stashSyncManager.isSyncing
             || handyManager.isStashSyncMode
             || buttplugManager.isStashSyncMode
             || loveSpouseManager.isStashSyncMode
     }
 
-    @ViewBuilder
-    private var reelsStashSyncPill: some View {
-        Button {
-            #if !os(tvOS)
-            HapticManager.selection()
-            #endif
-            stashSyncManager.setSyncing(!isReelsStashSyncActive)
-        } label: {
-            Image(systemName: isReelsStashSyncActive ? "bolt.horizontal.fill" : "bolt.horizontal")
-                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                .foregroundColor(.white.opacity(isReelsStashSyncActive ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
-                .frame(width: StashyExpandingDock.iconSize, height: StashyExpandingDock.iconSize)
-                .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight, iconOnly: true))
+    var body: some View {
+        if showsButton {
+            Button {
+                HapticManager.selection()
+                stashSyncManager.setSyncing(!isActive)
+            } label: {
+                Image(systemName: isActive ? "bolt.horizontal.fill" : "bolt.horizontal")
+                    .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                    .foregroundColor(.white.opacity(isActive ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
+                    .frame(width: StashyExpandingDock.iconSize, height: StashyExpandingDock.iconSize)
+                    .modifier(StashyChromePillStyle(height: pillHeight, iconOnly: true))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel(AIMotionCopy.name)
+            .accessibilityValue(isActive ? "On" : "Off")
+            .accessibilityHint("Toggles device sync for the current feed")
         }
-        .buttonStyle(.plain)
-        .accessibilityLabel(AIMotionCopy.name)
-        .accessibilityValue(isReelsStashSyncActive ? "On" : "Off")
-        .accessibilityHint("Toggles device sync for the current feed")
     }
+}
+#endif
 
+extension ReelsViewBody {
     @ViewBuilder
     private var modeMenu: some View {
         reelsModeDock

@@ -73,7 +73,17 @@ enum SubtitleTargetLanguage {
     }
 
     static func displayName(for code: String, locale: Locale = .current) -> String {
-        locale.localizedString(forLanguageCode: code) ?? code.uppercased()
+        let id = code.replacingOccurrences(of: "_", with: "-")
+        if id.contains("-"), let name = locale.localizedString(forIdentifier: id), !name.isEmpty {
+            return name
+        }
+        if let name = locale.localizedString(forLanguageCode: id), !name.isEmpty {
+            return name
+        }
+        if let name = locale.localizedString(forIdentifier: id), !name.isEmpty {
+            return name
+        }
+        return id.uppercased()
     }
 
     static func pickerOptions(locale: Locale = .current) -> [(id: String, label: String)] {
@@ -85,9 +95,14 @@ enum SubtitleTargetLanguage {
     }
 
     static func languageCode(from identifier: String) -> String? {
-        let id = identifier.lowercased()
-        if let dash = id.firstIndex(of: "-") { return String(id[..<dash]) }
-        if let underscore = id.firstIndex(of: "_") { return String(id[..<underscore]) }
+        let id = identifier.lowercased().replacingOccurrences(of: "_", with: "-")
+        if let dash = id.firstIndex(of: "-") {
+            let base = String(id[..<dash])
+            return base.isEmpty ? nil : base
+        }
+        // ISO 639-1 (`zh`) and ISO 639-3 (`yue` Cantonese) must stay intact.
+        // `prefix(2)` turned Cantonese into `yu`, which then failed the picker match.
+        if id.count == 2 || id.count == 3 { return id }
         return id.count >= 2 ? String(id.prefix(2)) : (id.isEmpty ? nil : id)
     }
 
@@ -105,6 +120,7 @@ enum SubtitleTargetLanguage {
         "russian": "ru", "russisch": "ru", "rus": "ru",
         "japanese": "ja", "japanisch": "ja", "jpn": "ja",
         "chinese": "zh", "mandarin": "zh", "chinesisch": "zh", "zho": "zh", "chi": "zh",
+        "cantonese": "yue", "kantonesisch": "yue", "yue": "yue", "cmn": "zh",
         "korean": "ko", "koreanisch": "ko", "kor": "ko",
         "arabic": "ar", "arabisch": "ar", "ara": "ar",
         "hindi": "hi", "hin": "hi",
@@ -124,20 +140,38 @@ enum SubtitleTargetLanguage {
         "romanian": "ro", "rumänisch": "ro", "romana": "ro", "ron": "ro", "rum": "ro",
     ]
 
-    /// Turns whatever is stored in Stash (`de`, `de-DE`, `German`, `deu`, …) into an ISO-639-1
-    /// code, or `nil` when the value cannot be resolved to a real language.
+    /// Turns whatever is stored in Stash (`de`, `de-DE`, `German`, `deu`, …) into an ISO
+    /// language code (639-1 or 639-3), or `nil` when the value cannot be resolved.
     static func canonicalCode(from raw: String?) -> String? {
         guard let value = raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
               !value.isEmpty else { return nil }
         if let alias = languageAliases[value] { return alias }
         guard let base = languageCode(from: value) else { return nil }
         if let alias = languageAliases[base] { return alias }
-        guard base.count == 2, isKnownISOCode(base) else { return nil }
+        guard (base.count == 2 || base.count == 3), isKnownISOCode(base) else { return nil }
         return base
     }
 
+    /// Scene-language tag for SpeechTranscriber: keeps BCP-47 regions so `zh-CN`,
+    /// `zh-HK`, `zh-TW`, and `yue-CN` stay distinct instead of collapsing to `zh`.
+    static func normalizedSceneLanguageTag(from raw: String?) -> String? {
+        guard var value = raw?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else { return nil }
+        value = value.replacingOccurrences(of: "_", with: "-").lowercased()
+        let sceneNames: [String: String] = [
+            "cantonese": "yue-CN", "kantonesisch": "yue-CN", "yue": "yue-CN",
+            "chinese": "zh-CN", "chinesisch": "zh-CN", "mandarin": "zh-CN", "zh": "zh-CN",
+        ]
+        if let mapped = sceneNames[value] { return mapped }
+        if let alias = languageAliases[value] { return alias }
+        let lang = languageCode(from: value) ?? value
+        guard (lang.count == 2 || lang.count == 3), isKnownISOCode(lang) else { return nil }
+        return value
+    }
+
     private static func isKnownISOCode(_ code: String) -> Bool {
-        Locale.LanguageCode.isoLanguageCodes.contains { $0.identifier == code }
+        if code == "yue" || code == "cmn" { return true }
+        return Locale.LanguageCode.isoLanguageCodes.contains { $0.identifier == code }
     }
 
     static func sameLanguage(_ a: String?, _ b: String?) -> Bool {
@@ -238,16 +272,34 @@ func isHeadphonesConnected() -> Bool {
     })
 }
 
+/// Last scene-player mute choice. Missing key → mute unless headphones are connected.
+enum ScenePlayerMute {
+    private static let key = "stashy_scene_player_muted"
+
+    static func initialValue() -> Bool {
+        if UserDefaults.standard.object(forKey: key) == nil {
+            return !isHeadphonesConnected()
+        }
+        return UserDefaults.standard.bool(forKey: key)
+    }
+
+    static func persist(_ muted: Bool) {
+        UserDefaults.standard.set(muted, forKey: key)
+    }
+}
+
 // MARK: - Scene live updates (from SceneDetailView)
 
 /// Keeps scene lists in sync with live updates coming from `SceneDetailView`.
 ///
-/// `SceneDetailView` publishes changes (resume time, play count, deletions) through
-/// `NotificationCenter`. Views that display scenes should apply `sceneLiveUpdates(using:)`
-/// so they update in-place when navigating back.
+/// `SceneDetailView` publishes changes (resume time, play count, deletions, metadata)
+/// through `NotificationCenter`. Views that display scenes should apply
+/// `sceneLiveUpdates(using:)` so they update in-place when navigating back.
 ///
 /// Image FullScreen rating / o_counter use the parallel notifications
-/// `ImageRatingUpdated` / `ImageOCounterUpdated`, observed in `StashDBViewModel`.
+/// `ImageRatingUpdated` / `ImageOCounterUpdated`. Scene o_counter uses
+/// `SceneOCounterUpdated`. Title / studio / performers / tags / rating use `SceneUpdated`
+/// (also observed globally on `StashDBViewModel`). Scene covers use `SceneCoverUpdated`.
 struct SceneLiveUpdatesModifier: ViewModifier {
     @ObservedObject var viewModel: StashDBViewModel
 
@@ -267,6 +319,17 @@ struct SceneLiveUpdatesModifier: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneDeleted"))) { notification in
                 if let sceneId = notification.userInfo?["sceneId"] as? String {
                     viewModel.removeScene(id: sceneId)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneUpdated"))) { notification in
+                if let scene = Scene.fromListMetadataNotification(notification) {
+                    viewModel.mergeSceneListMetadata(scene)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneCoverUpdated"))) { notification in
+                if let sceneId = notification.userInfo?["sceneId"] as? String,
+                   let updatedAt = notification.userInfo?["updatedAt"] as? String {
+                    viewModel.patchSceneCoverInLists(sceneId: sceneId, updatedAt: updatedAt)
                 }
             }
     }
@@ -300,7 +363,14 @@ func makeAuthenticatedAsset(for url: URL) -> AVURLAsset {
 /// Creates a VOD-tuned `AVPlayerItem` for Stash content with the playing-state buffer.
 func makeVODPlayerItem(for url: URL) -> AVPlayerItem {
     let asset = makeAuthenticatedAsset(for: url)
-    let item = AVPlayerItem(asset: asset)
+    let item = AVPlayerItem(
+        asset: asset,
+        automaticallyLoadedAssetKeys: [
+            "tracks",
+            "availableMediaCharacteristicsWithMediaSelectionOptions",
+            "duration"
+        ]
+    )
     configureForVOD(item, isScrubbing: false)
     // Seed a sensible peak bit rate based on the current network class.
     if let cap = NetworkQualityMonitor.shared.recommendedPeakBitRate() {
@@ -317,15 +387,30 @@ func configureForVOD(_ item: AVPlayerItem, isScrubbing: Bool) {
     item.canUseNetworkResourcesForLiveStreamingWhilePaused = true
 }
 
-func createPlayer(for url: URL) -> AVPlayer {
+func applyPlaybackAudioSession() {
     let session = AVAudioSession.sharedInstance()
-    if session.category != .playback {
-        do {
-            try session.setCategory(.playback, mode: .moviePlayback, options: [])
-            try session.setActive(true)
-        } catch {
-            print("🎬 VIDEO PLAYER: Error setting up AVAudioSession: \(error)")
-        }
+    guard session.category != .playback else { return }
+    do {
+        try session.setCategory(.playback, mode: .moviePlayback, options: [])
+        try session.setActive(true)
+    } catch {
+        print("🎬 VIDEO PLAYER: Error setting up AVAudioSession: \(error)")
+    }
+}
+
+/// Mixes with other audio (Music, podcasts). Used for muted previews and Feeds → Pics.
+func applyAmbientMixingAudioSession() {
+    do {
+        try AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: .mixWithOthers)
+        try AVAudioSession.sharedInstance().setActive(true)
+    } catch {
+        print("🎬 PREVIEW PLAYER: Error setting up AVAudioSession: \(error)")
+    }
+}
+
+func createPlayer(for url: URL, takesAudioSession: Bool = true) -> AVPlayer {
+    if takesAudioSession {
+        applyPlaybackAudioSession()
     }
 
     let playerItem = makeVODPlayerItem(for: url)
@@ -357,6 +442,7 @@ func applyBackgroundPlaybackPolicy(to player: AVPlayer) {
 // MARK: - Scene playback activity (play_duration / resume_time)
 
 /// Accumulates watched seconds and syncs deltas via `sceneSaveActivity`, matching Stash web `trackActivity`.
+/// Only continuous playhead movement counts — seeks/skips do not add the jumped gap as watch time.
 @MainActor
 final class ScenePlaybackActivityTracker {
     /// Called with `(resumeTime?, playDurationDelta)`. `resumeTime` is `nil` when resume should not be updated.
@@ -368,14 +454,25 @@ final class ScenePlaybackActivityTracker {
     private var totalPlayDuration: Double = 0
     private var pendingPlayDuration: Double = 0
     private var currentTime: Double = 0
+    private var lastMediaTime: Double?
     private var duration: Double = 0
     private let tickInterval: TimeInterval = 1
-    private let sendIntervalSeconds: Int = 10
+    private let sendIntervalSeconds: Double = 10
     /// Stash clears resume when playback is ≥ 98% complete.
     private let completedResumePercent: Double = 98
+    /// Larger playhead jumps are seeks (covers 2–3× speed plus timer jitter).
+    private let maxContinuousDelta: TimeInterval = 4
 
     func setPosition(currentTime: Double, duration: Double) {
         if currentTime.isFinite, currentTime >= 0 {
+            if let last = lastMediaTime {
+                let jump = currentTime - last
+                if jump < -0.25 || jump > maxContinuousDelta {
+                    lastMediaTime = currentTime
+                }
+            } else {
+                lastMediaTime = currentTime
+            }
             self.currentTime = currentTime
         }
         if duration.isFinite, duration > 0 {
@@ -383,8 +480,16 @@ final class ScenePlaybackActivityTracker {
         }
     }
 
+    /// Realign after an explicit seek so the skipped range is not counted as watched.
+    func noteSeek(to time: Double) {
+        guard time.isFinite, time >= 0 else { return }
+        currentTime = time
+        lastMediaTime = time
+    }
+
     func start() {
         guard timer == nil else { return }
+        lastMediaTime = currentTime
         let timer = Timer(timeInterval: tickInterval, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.tick()
@@ -395,7 +500,6 @@ final class ScenePlaybackActivityTracker {
     }
 
     func stop() {
-        guard timer != nil else { return }
         timer?.invalidate()
         timer = nil
         flush()
@@ -406,6 +510,7 @@ final class ScenePlaybackActivityTracker {
         totalPlayDuration = 0
         pendingPlayDuration = 0
         currentTime = 0
+        lastMediaTime = nil
         duration = 0
     }
 
@@ -429,9 +534,16 @@ final class ScenePlaybackActivityTracker {
     }
 
     private func tick() {
-        totalPlayDuration += tickInterval
-        pendingPlayDuration += tickInterval
-        if Int(totalPlayDuration.rounded(.down)) % sendIntervalSeconds == 0 {
+        let mediaTime = currentTime
+        let last = lastMediaTime ?? mediaTime
+        lastMediaTime = mediaTime
+        let delta = mediaTime - last
+        // Seeks, pauses, and stalls produce a jump or zero — don't treat those as watched.
+        guard delta > 0, delta <= maxContinuousDelta else { return }
+
+        totalPlayDuration += delta
+        pendingPlayDuration += delta
+        if pendingPlayDuration >= sendIntervalSeconds {
             flush()
         }
     }
@@ -439,11 +551,7 @@ final class ScenePlaybackActivityTracker {
 
 /// Creates a muted preview player that doesn't interrupt other audio
 func createMutedPreviewPlayer(for url: URL) -> AVPlayer {
-    do {
-        try AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: .mixWithOthers)
-    } catch {
-        print("🎬 PREVIEW PLAYER: Error setting up AVAudioSession: \(error)")
-    }
+    applyAmbientMixingAudioSession()
 
     let asset = makeAuthenticatedAsset(for: url)
     let playerItem = AVPlayerItem(asset: asset)

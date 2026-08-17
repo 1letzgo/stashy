@@ -273,6 +273,8 @@ class StashDBViewModel: ObservableObject {
     private var performerImageUpdatedObserver: NSObjectProtocol?
     private var imageRatingUpdatedObserver: NSObjectProtocol?
     private var imageOCounterUpdatedObserver: NSObjectProtocol?
+    private var sceneOCounterUpdatedObserver: NSObjectProtocol?
+    private var sceneUpdatedObserver: NSObjectProtocol?
 
     init() {
         NotificationCenter.default.addObserver(self, selector: #selector(handleServerChange), name: NSNotification.Name("ServerConfigChanged"), object: nil)
@@ -337,6 +339,29 @@ class StashDBViewModel: ObservableObject {
                 self?.patchImageOCounterInLists(imageId: imageId, oCounter: oCounter)
             }
         }
+
+        sceneOCounterUpdatedObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SceneOCounterUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let sceneId = notification.userInfo?["sceneId"] as? String,
+                  let oCounter = notification.userInfo?["oCounter"] as? Int else { return }
+            Task { @MainActor in
+                self?.patchSceneOCounterInLists(sceneId: sceneId, oCounter: oCounter)
+            }
+        }
+
+        sceneUpdatedObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SceneUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let scene = Scene.fromListMetadataNotification(notification) else { return }
+            Task { @MainActor in
+                self?.mergeSceneListMetadata(scene)
+            }
+        }
         
         // Initial connection test if config exists
         if let config = ServerConfigManager.shared.loadConfig(), config.hasValidConfig {
@@ -353,6 +378,12 @@ class StashDBViewModel: ObservableObject {
         }
         if let imageOCounterUpdatedObserver {
             NotificationCenter.default.removeObserver(imageOCounterUpdatedObserver)
+        }
+        if let sceneOCounterUpdatedObserver {
+            NotificationCenter.default.removeObserver(sceneOCounterUpdatedObserver)
+        }
+        if let sceneUpdatedObserver {
+            NotificationCenter.default.removeObserver(sceneUpdatedObserver)
         }
         NotificationCenter.default.removeObserver(self)
     }
@@ -828,6 +859,14 @@ class StashDBViewModel: ObservableObject {
         case updatedAtAsc
         case createdAtDesc
         case createdAtAsc
+        case ratingDesc
+        case ratingAsc
+        case performerCountDesc
+        case performerCountAsc
+        case galleryCountDesc
+        case galleryCountAsc
+        case imageCountDesc
+        case imageCountAsc
 
         var displayName: String {
             switch self {
@@ -839,14 +878,22 @@ class StashDBViewModel: ObservableObject {
             case .updatedAtAsc: return "Updated (Oldest First)"
             case .createdAtDesc: return "Created (Newest First)"
             case .createdAtAsc: return "Created (Oldest First)"
+            case .ratingDesc: return "Rating (High-Low)"
+            case .ratingAsc: return "Rating (Low-High)"
+            case .performerCountDesc: return "Performer Count (High-Low)"
+            case .performerCountAsc: return "Performer Count (Low-High)"
+            case .galleryCountDesc: return "Gallery Count (High-Low)"
+            case .galleryCountAsc: return "Gallery Count (Low-High)"
+            case .imageCountDesc: return "Image Count (High-Low)"
+            case .imageCountAsc: return "Image Count (Low-High)"
             case .random: return "Random"
             }
         }
 
         var direction: String {
             switch self {
-            case .nameAsc, .sceneCountAsc, .updatedAtAsc, .createdAtAsc: return "ASC"
-            case .nameDesc, .sceneCountDesc, .updatedAtDesc, .createdAtDesc, .random: return "DESC"
+            case .nameAsc, .sceneCountAsc, .updatedAtAsc, .createdAtAsc, .ratingAsc, .performerCountAsc, .galleryCountAsc, .imageCountAsc: return "ASC"
+            case .nameDesc, .sceneCountDesc, .updatedAtDesc, .createdAtDesc, .ratingDesc, .performerCountDesc, .galleryCountDesc, .imageCountDesc, .random: return "DESC"
             }
         }
 
@@ -856,6 +903,10 @@ class StashDBViewModel: ObservableObject {
             case .sceneCountAsc, .sceneCountDesc: return "scenes_count"
             case .updatedAtAsc, .updatedAtDesc: return "updated_at"
             case .createdAtAsc, .createdAtDesc: return "created_at"
+            case .ratingAsc, .ratingDesc: return "rating"
+            case .performerCountAsc, .performerCountDesc: return "performer_count"
+            case .galleryCountAsc, .galleryCountDesc: return "galleries_count"
+            case .imageCountAsc, .imageCountDesc: return "images_count"
             case .random: return "random"
             }
         }
@@ -877,6 +928,8 @@ class StashDBViewModel: ObservableObject {
         case lastPlayedAtAsc
         case playCountDesc
         case playCountAsc
+        case playDurationDesc
+        case playDurationAsc
         case oCounterDesc
         case oCounterAsc
         case ratingDesc
@@ -896,6 +949,8 @@ class StashDBViewModel: ObservableObject {
             case .lastPlayedAtAsc: return "Last Played (Oldest First)"
             case .playCountDesc: return "Most Viewed"
             case .playCountAsc: return "Least Viewed"
+            case .playDurationDesc: return "Watch Time (High-Low)"
+            case .playDurationAsc: return "Watch Time (Low-High)"
             case .oCounterDesc: return "Counter (High-Low)"
             case .oCounterAsc: return "Counter (Low-High)"
             case .ratingDesc: return "Rating (High-Low)"
@@ -906,8 +961,8 @@ class StashDBViewModel: ObservableObject {
 
         var direction: String {
             switch self {
-            case .dateDesc, .createdAtDesc, .durationDesc, .lastPlayedAtDesc, .playCountDesc, .oCounterDesc, .ratingDesc, .random: return "DESC"
-            case .dateAsc, .createdAtAsc, .titleAsc, .durationAsc, .lastPlayedAtAsc, .playCountAsc, .oCounterAsc, .ratingAsc: return "ASC"
+            case .dateDesc, .createdAtDesc, .durationDesc, .lastPlayedAtDesc, .playCountDesc, .playDurationDesc, .oCounterDesc, .ratingDesc, .random: return "DESC"
+            case .dateAsc, .createdAtAsc, .titleAsc, .durationAsc, .lastPlayedAtAsc, .playCountAsc, .playDurationAsc, .oCounterAsc, .ratingAsc: return "ASC"
             case .titleDesc: return "DESC"
             }
         }
@@ -920,6 +975,7 @@ class StashDBViewModel: ObservableObject {
             case .durationDesc, .durationAsc: return "duration"
             case .lastPlayedAtDesc, .lastPlayedAtAsc: return "last_played_at"
             case .playCountDesc, .playCountAsc: return "play_count"
+            case .playDurationDesc, .playDurationAsc: return "play_duration"
             case .oCounterDesc, .oCounterAsc: return "o_counter"
             case .ratingDesc, .ratingAsc: return "rating"
             case .random: return "random"
@@ -978,6 +1034,14 @@ class StashDBViewModel: ObservableObject {
         case nameDesc
         case sceneCountDesc
         case sceneCountAsc
+        case imageCountDesc
+        case imageCountAsc
+        case galleryCountDesc
+        case galleryCountAsc
+        case markerCountDesc
+        case markerCountAsc
+        case performerCountDesc
+        case performerCountAsc
         case updatedAtDesc
         case updatedAtAsc
         case createdAtDesc
@@ -989,6 +1053,14 @@ class StashDBViewModel: ObservableObject {
             case .nameDesc: return "Name (Z-A)"
             case .sceneCountDesc: return "Scene Count (High-Low)"
             case .sceneCountAsc: return "Scene Count (Low-High)"
+            case .imageCountDesc: return "Image Count (High-Low)"
+            case .imageCountAsc: return "Image Count (Low-High)"
+            case .galleryCountDesc: return "Gallery Count (High-Low)"
+            case .galleryCountAsc: return "Gallery Count (Low-High)"
+            case .markerCountDesc: return "Marker Count (High-Low)"
+            case .markerCountAsc: return "Marker Count (Low-High)"
+            case .performerCountDesc: return "Performer Count (High-Low)"
+            case .performerCountAsc: return "Performer Count (Low-High)"
             case .updatedAtDesc: return "Updated (Newest First)"
             case .updatedAtAsc: return "Updated (Oldest First)"
             case .createdAtDesc: return "Created (Newest First)"
@@ -999,8 +1071,8 @@ class StashDBViewModel: ObservableObject {
 
         var direction: String {
             switch self {
-            case .nameAsc, .sceneCountAsc, .updatedAtAsc, .createdAtAsc: return "ASC"
-            case .nameDesc, .sceneCountDesc, .updatedAtDesc, .createdAtDesc, .random: return "DESC"
+            case .nameAsc, .sceneCountAsc, .imageCountAsc, .galleryCountAsc, .markerCountAsc, .performerCountAsc, .updatedAtAsc, .createdAtAsc: return "ASC"
+            case .nameDesc, .sceneCountDesc, .imageCountDesc, .galleryCountDesc, .markerCountDesc, .performerCountDesc, .updatedAtDesc, .createdAtDesc, .random: return "DESC"
             }
         }
 
@@ -1008,6 +1080,10 @@ class StashDBViewModel: ObservableObject {
             switch self {
             case .nameAsc, .nameDesc: return "name"
             case .sceneCountAsc, .sceneCountDesc: return "scenes_count"
+            case .imageCountAsc, .imageCountDesc: return "images_count"
+            case .galleryCountAsc, .galleryCountDesc: return "galleries_count"
+            case .markerCountAsc, .markerCountDesc: return "scene_markers_count"
+            case .performerCountAsc, .performerCountDesc: return "performers_count"
             case .updatedAtAsc, .updatedAtDesc: return "updated_at"
             case .createdAtAsc, .createdAtDesc: return "created_at"
             case .random: return "random"
@@ -1383,15 +1459,27 @@ class StashDBViewModel: ObservableObject {
 
     /// Busts scene cover URLs in catalog lists after a cover mutation.
     func patchSceneCoverInLists(sceneId: String, updatedAt: String) {
-        if let idx = scenes.firstIndex(where: { $0.id == sceneId }) {
-            let s = scenes[idx]
-            scenes[idx] = s.withUpdatedAt(updatedAt)
+        func patched(_ list: [Scene]) -> [Scene] {
+            guard let idx = list.firstIndex(where: { $0.id == sceneId }) else { return list }
+            guard list[idx].updatedAt != updatedAt else { return list }
+            var copy = list
+            copy[idx] = copy[idx].withUpdatedAt(updatedAt)
+            return copy
         }
+        let nextScenes = patched(scenes)
+        if nextScenes != scenes { scenes = nextScenes }
+        let nextPerformer = patched(performerScenes)
+        if nextPerformer != performerScenes { performerScenes = nextPerformer }
+        let nextStudio = patched(studioScenes)
+        if nextStudio != studioScenes { studioScenes = nextStudio }
+        let nextTag = patched(tagScenes)
+        if nextTag != tagScenes { tagScenes = nextTag }
+        let nextGroup = patched(groupScenes)
+        if nextGroup != groupScenes { groupScenes = nextGroup }
         for key in homeRowScenes.keys {
-            guard var row = homeRowScenes[key],
-                  let idx = row.firstIndex(where: { $0.id == sceneId }) else { continue }
-            row[idx] = row[idx].withUpdatedAt(updatedAt)
-            homeRowScenes[key] = row
+            let current = homeRowScenes[key] ?? []
+            let next = patched(current)
+            if next != current { homeRowScenes[key] = next }
         }
     }
 
@@ -1478,6 +1566,53 @@ class StashDBViewModel: ObservableObject {
         _ = patch(&galleryImages)
         _ = patch(&detailImages)
         _ = patch(&clips)
+    }
+
+    /// Live-listener: patch `o_counter` across in-memory scene lists.
+    func patchSceneOCounterInLists(sceneId: String, oCounter: Int) {
+        func patch(_ list: inout [Scene]) {
+            guard let idx = list.firstIndex(where: { $0.id == sceneId }) else { return }
+            guard list[idx].oCounter != oCounter else { return }
+            list[idx] = list[idx].withOCounter(oCounter)
+        }
+        patch(&scenes)
+        patch(&performerScenes)
+        patch(&studioScenes)
+        patch(&tagScenes)
+        patch(&groupScenes)
+        for (rowType, rowScenes) in homeRowScenes {
+            var copy = rowScenes
+            patch(&copy)
+            homeRowScenes[rowType] = copy
+        }
+    }
+
+    /// Live-listener: merge title / details / studio / performers / tags / groups / rating
+    /// from Scene Detail onto list stubs without replacing files, paths, or play stats.
+    func mergeSceneListMetadata(_ updatedScene: Scene) {
+        func patched(_ list: [Scene]) -> [Scene] {
+            guard let idx = list.firstIndex(where: { $0.id == updatedScene.id }) else { return list }
+            let merged = list[idx].mergingListMetadata(from: updatedScene)
+            guard merged != list[idx] else { return list }
+            var copy = list
+            copy[idx] = merged
+            return copy
+        }
+        let nextScenes = patched(scenes)
+        if nextScenes != scenes { scenes = nextScenes }
+        let nextPerformer = patched(performerScenes)
+        if nextPerformer != performerScenes { performerScenes = nextPerformer }
+        let nextStudio = patched(studioScenes)
+        if nextStudio != studioScenes { studioScenes = nextStudio }
+        let nextTag = patched(tagScenes)
+        if nextTag != tagScenes { tagScenes = nextTag }
+        let nextGroup = patched(groupScenes)
+        if nextGroup != groupScenes { groupScenes = nextGroup }
+        for rowType in homeRowScenes.keys {
+            let current = homeRowScenes[rowType] ?? []
+            let next = patched(current)
+            if next != current { homeRowScenes[rowType] = next }
+        }
     }
 
     /// Updates just the resume time of a scene in place
@@ -5271,7 +5406,6 @@ class StashDBViewModel: ObservableObject {
             currentClipSortOption = sortBy
             currentClipFilter = filter
             currentClipLiveFilter = liveFilter ?? [:]
-            isLoading = true // Set global loading for initial clips load
         } else {
             isLoadingClips = true
         }
@@ -5338,12 +5472,16 @@ class StashDBViewModel: ObservableObject {
         guard let dataRequest = ["query": query, "variables": variables] as [String: Any]?,
               let bodyData = try? JSONSerialization.data(withJSONObject: dataRequest),
               let bodyString = String(data: bodyData, encoding: .utf8) else {
+            isLoadingClips = false
+            if errorMessage == nil {
+                errorMessage = "Could not load clips"
+            }
             return
         }
-        
+
         print("🔍 fetchClips: Raw Body = \(bodyString)")
-        
-        performGraphQLQuery(query: bodyString) { (response: GalleryImagesResponse?) in
+
+        performGraphQLQuery(query: bodyString, clearsGlobalErrorMessageOnStart: false) { (response: GalleryImagesResponse?) in
             DispatchQueue.main.async {
                 guard requestGeneration == self.clipsFetchGeneration else { return }
                 if let result = response?.data?.findImages {
@@ -5351,7 +5489,6 @@ class StashDBViewModel: ObservableObject {
                         self.clips = result.images
                         self.totalClips = result.count
                     } else {
-                        // Deduplicate: Only add clips that aren't already in the list
                         let existingIds = Set(self.clips.map { $0.id })
                         let newClips = result.images.filter { !existingIds.contains($0.id) }
                         self.clips.append(contentsOf: newClips)
@@ -5359,9 +5496,13 @@ class StashDBViewModel: ObservableObject {
 
                     self.hasMoreClips = result.images.count == perPage
                     self.currentClipsPage = page
+                    self.errorMessage = nil
+                } else if isInitialLoad, self.clips.isEmpty {
+                    if self.errorMessage == nil {
+                        self.errorMessage = "Could not load clips"
+                    }
                 }
                 self.isLoadingClips = false
-                if isInitialLoad { self.isLoading = false }
             }
         }
     }
@@ -5539,6 +5680,11 @@ class StashDBViewModel: ObservableObject {
                 print("✅ SCENE O: Success for scene \(sceneId). New count: \(count)")
                 DispatchQueue.main.async {
                     completion?(count)
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("SceneOCounterUpdated"),
+                        object: nil,
+                        userInfo: ["sceneId": sceneId, "oCounter": count]
+                    )
                 }
             } else {
                 print("❌ SCENE O: Failed for scene \(sceneId)")
@@ -7383,6 +7529,14 @@ struct StashID: Codable, Equatable {
     }
 }
 
+/// NSNotification `userInfo` drops nested Swift structs. Keep Scene on the heap.
+final class SceneUpdatedPayload {
+    let scene: Scene
+    init(_ scene: Scene) {
+        self.scene = scene
+    }
+}
+
 struct Scene: Codable, Identifiable, Equatable {
     let id: String
     let title: String?
@@ -7398,6 +7552,8 @@ struct Scene: Codable, Identifiable, Equatable {
     let organized: Bool?
     let resumeTime: Double?
     let playCount: Int?
+    let playDuration: Double?
+    let lastPlayedAt: String?
     let oCounter: Int?
     let rating100: Int?
     let createdAt: String?
@@ -7423,9 +7579,9 @@ struct Scene: Codable, Identifiable, Equatable {
     }
 
     /// Spoken language from Stash custom field `language`, accepting codes as well as names
-    /// ("de", "de-DE", "German", "deu"). `nil` when the field holds something unresolvable.
+    /// ("de", "de-DE", "yue-CN", "German", "Cantonese"). `nil` when unresolvable.
     var spokenLanguageCode: String? {
-        SubtitleTargetLanguage.canonicalCode(from: customFields?["language"]?.stringValue)
+        SubtitleTargetLanguage.normalizedSceneLanguageTag(from: customFields?["language"]?.stringValue)
     }
 
     /// Prefer Direct/MP4 for speech reader; fall back to paths.stream.
@@ -7453,6 +7609,8 @@ struct Scene: Codable, Identifiable, Equatable {
         case id, title, details, date, duration, studio, performers, files, tags, galleries, groups, organized, rating100, paths, interactive, streams, captions
         case resumeTime = "resume_time"
         case playCount = "play_count"
+        case playDuration = "play_duration"
+        case lastPlayedAt = "last_played_at"
         case oCounter = "o_counter"
         case createdAt = "created_at"
         case updatedAt = "updated_at"
@@ -7462,7 +7620,7 @@ struct Scene: Codable, Identifiable, Equatable {
     }
 
     // Explicit initializer to handle manual updates like 'withStreams'
-    init(id: String, title: String?, details: String?, date: String?, duration: Double?, studio: SceneStudio?, performers: [ScenePerformer], files: [SceneFile]?, tags: [Tag]?, galleries: [Gallery]?, groups: [SceneGroupEntry]? = nil, organized: Bool?, resumeTime: Double?, playCount: Int?, oCounter: Int?, rating100: Int?, createdAt: String?, updatedAt: String?, paths: ScenePaths?, sceneMarkers: [SceneMarker]?, interactive: Bool?, streams: [SceneStream]? = nil, stashIds: [StashID]? = nil, captions: [VideoCaption]? = nil, customFields: [String: StashJSONValue]? = nil) {
+    init(id: String, title: String?, details: String?, date: String?, duration: Double?, studio: SceneStudio?, performers: [ScenePerformer], files: [SceneFile]?, tags: [Tag]?, galleries: [Gallery]?, groups: [SceneGroupEntry]? = nil, organized: Bool?, resumeTime: Double?, playCount: Int?, oCounter: Int?, rating100: Int?, createdAt: String?, updatedAt: String?, paths: ScenePaths?, sceneMarkers: [SceneMarker]?, interactive: Bool?, streams: [SceneStream]? = nil, stashIds: [StashID]? = nil, captions: [VideoCaption]? = nil, customFields: [String: StashJSONValue]? = nil, playDuration: Double? = nil, lastPlayedAt: String? = nil) {
         self.id = id
         self.title = title
         self.details = details
@@ -7477,6 +7635,8 @@ struct Scene: Codable, Identifiable, Equatable {
         self.organized = organized
         self.resumeTime = resumeTime
         self.playCount = playCount
+        self.playDuration = playDuration
+        self.lastPlayedAt = lastPlayedAt
         self.oCounter = oCounter
         self.rating100 = rating100
         self.createdAt = createdAt
@@ -7507,6 +7667,8 @@ struct Scene: Codable, Identifiable, Equatable {
         organized = try container.decodeIfPresent(Bool.self, forKey: .organized)
         resumeTime = try container.decodeIfPresent(Double.self, forKey: .resumeTime)
         playCount = try container.decodeIfPresent(Int.self, forKey: .playCount)
+        playDuration = try container.decodeIfPresent(Double.self, forKey: .playDuration)
+        lastPlayedAt = try container.decodeIfPresent(String.self, forKey: .lastPlayedAt)
         oCounter = try container.decodeIfPresent(Int.self, forKey: .oCounter)
         rating100 = try container.decodeIfPresent(Int.self, forKey: .rating100)
         createdAt = try container.decodeIfPresent(String.self, forKey: .createdAt)
@@ -7813,7 +7975,8 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: newResumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields,
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt
         )
     }
 
@@ -7825,7 +7988,8 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: newRating, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields,
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt
         )
     }
 
@@ -7837,7 +8001,8 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: newStreams, stashIds: stashIds, captions: captions, customFields: customFields
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: newStreams, stashIds: stashIds, captions: captions, customFields: customFields,
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt
         )
     }
 
@@ -7849,7 +8014,8 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: newPlayCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields,
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt
         )
     }
 
@@ -7861,8 +8027,109 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: newOCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields,
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt
         )
+    }
+
+    /// Copies list-visible metadata from a Scene Detail edit onto this list stub.
+    /// Card badges (studio, release date, duration, performer count) prefer the
+    /// incoming scene when present and never get wiped by empty notification payloads.
+    func mergingListMetadata(from other: Scene) -> Scene {
+        let mergedFiles: [SceneFile]? = {
+            if let incoming = other.files, incoming.contains(where: { ($0.duration ?? 0) > 0 }) {
+                return incoming
+            }
+            if let existing = files, existing.contains(where: { ($0.duration ?? 0) > 0 }) {
+                return existing
+            }
+            return other.files ?? files
+        }()
+        let mergedDuration = other.duration
+            ?? duration
+            ?? mergedFiles?.compactMap(\.duration).max()
+        let mergedDate: String? = {
+            if let incoming = other.date, !incoming.isEmpty { return incoming }
+            return date
+        }()
+        let mergedStudio = other.studio ?? studio
+        let mergedPerformers = other.performers.isEmpty ? performers : other.performers
+
+        return Scene(
+            id: id,
+            title: other.title ?? title,
+            details: other.details ?? details,
+            date: mergedDate,
+            duration: mergedDuration,
+            studio: mergedStudio,
+            performers: mergedPerformers,
+            files: mergedFiles,
+            tags: other.tags ?? tags,
+            galleries: other.galleries ?? galleries,
+            groups: other.groups ?? groups,
+            organized: other.organized ?? organized,
+            resumeTime: resumeTime,
+            playCount: playCount,
+            oCounter: oCounter,
+            rating100: other.rating100 ?? rating100,
+            createdAt: createdAt,
+            updatedAt: Self.newerUpdatedAt(other.updatedAt, updatedAt),
+            paths: paths,
+            sceneMarkers: sceneMarkers,
+            interactive: interactive,
+            streams: streams,
+            stashIds: other.stashIds ?? stashIds,
+            captions: captions,
+            customFields: customFields,
+            playDuration: playDuration,
+            lastPlayedAt: lastPlayedAt
+        )
+    }
+
+    /// Broadcasts title / details / studio / date / files / performers / tags / rating
+    /// so catalog lists merge the edit when popping Scene Detail.
+    func postListMetadataUpdated() {
+        NotificationCenter.default.post(
+            name: NSNotification.Name("SceneUpdated"),
+            object: nil,
+            userInfo: ["payload": SceneUpdatedPayload(self)]
+        )
+    }
+
+    static func fromListMetadataNotification(_ notification: Notification) -> Scene? {
+        if let payload = notification.userInfo?["payload"] as? SceneUpdatedPayload {
+            return payload.scene
+        }
+        return notification.userInfo?["scene"] as? Scene
+    }
+
+    /// Cover cache-bust timestamps must never go backwards during a metadata merge.
+    static func newerUpdatedAt(_ a: String?, _ b: String?) -> String? {
+        switch (a, b) {
+        case let (a?, b?):
+            if let da = parseUpdatedAt(a), let db = parseUpdatedAt(b) {
+                return da >= db ? a : b
+            }
+            return a > b ? a : b
+        case let (a?, nil):
+            return a
+        case let (nil, b?):
+            return b
+        default:
+            return nil
+        }
+    }
+
+    private static func parseUpdatedAt(_ raw: String) -> Date? {
+        if let millis = Int64(raw), (12...14).contains(raw.count) {
+            return Date(timeIntervalSince1970: TimeInterval(millis) / 1000)
+        }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let date = iso.date(from: raw) { return date }
+        iso.formatOptions = [.withInternetDateTime]
+        if let date = iso.date(from: raw) { return date }
+        return nil
     }
 
     /// Creates a copy with updated `updatedAt` (cache-busts screenshot / cover URLs).
@@ -7873,7 +8140,8 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: newUpdatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields,
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt
         )
     }
 
@@ -7885,7 +8153,8 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: newFields
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: newFields,
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt
         )
     }
 
@@ -8522,6 +8791,36 @@ struct Performer: Codable, Identifiable, Equatable {
         let thumbnailURLString = "\(config.baseURL)/performer/\(id)/image"
         return signedURL(URL(string: thumbnailURLString))
     }
+
+    func withOCounter(_ newOCounter: Int?) -> Performer {
+        Performer(
+            id: id,
+            name: name,
+            disambiguation: disambiguation,
+            birthdate: birthdate,
+            country: country,
+            imagePath: imagePath,
+            sceneCount: sceneCount,
+            imageCount: imageCount,
+            galleryCount: galleryCount,
+            gender: gender,
+            ethnicity: ethnicity,
+            height: height,
+            weight: weight,
+            measurements: measurements,
+            fakeTits: fakeTits,
+            penis_length: penis_length,
+            careerLength: careerLength,
+            tattoos: tattoos,
+            piercings: piercings,
+            aliasList: aliasList,
+            favorite: favorite,
+            rating100: rating100,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            oCounter: newOCounter
+        )
+    }
 }
 
 // MARK: - Studios Models
@@ -8795,6 +9094,7 @@ struct Gallery: Codable, Identifiable, Equatable {
     var date: String?
     var details: String?
     let imageCount: Int?
+    var rating100: Int? = nil
     let organized: Bool?
     let createdAt: String?
     let updatedAt: String?
@@ -8803,7 +9103,7 @@ struct Gallery: Codable, Identifiable, Equatable {
     let cover: GalleryCover?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, date, details, imageCount = "image_count", organized, createdAt = "created_at", updatedAt = "updated_at", studio, performers, cover
+        case id, title, date, details, imageCount = "image_count", rating100, organized, createdAt = "created_at", updatedAt = "updated_at", studio, performers, cover
     }
     var thumbnailURL: URL? {
         guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
@@ -9483,8 +9783,15 @@ extension DownloadManager: URLSessionDownloadDelegate {
 /// AVPlayerViewController drops hardware-keyboard skip on Mac / iPad fullscreen.
 /// We re-apply ±15s arrow seeks only while fullscreen so inline Apple shortcuts stay single-fire.
 final class StashyPlayerViewController: AVPlayerViewController {
-    var handlesFullscreenKeyboardSkip = false
+    var handlesFullscreenKeyboardSkip = false {
+        didSet {
+            if handlesFullscreenKeyboardSkip {
+                becomeFirstResponder()
+            }
+        }
+    }
     private let skipInterval: TimeInterval = 15
+    private var windowFullscreenObservers: [NSObjectProtocol] = []
 
     override var canBecomeFirstResponder: Bool { true }
 
@@ -9500,9 +9807,16 @@ final class StashyPlayerViewController: AVPlayerViewController {
 
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
+        observeMacWindowFullscreenIfNeeded()
         if handlesFullscreenKeyboardSkip {
             becomeFirstResponder()
         }
+    }
+
+    override func viewDidDisappear(_ animated: Bool) {
+        super.viewDidDisappear(animated)
+        windowFullscreenObservers.forEach { NotificationCenter.default.removeObserver($0) }
+        windowFullscreenObservers.removeAll()
     }
 
     override func pressesBegan(_ presses: Set<UIPress>, with event: UIPressesEvent?) {
@@ -9544,6 +9858,27 @@ final class StashyPlayerViewController: AVPlayerViewController {
             toleranceBefore: .positiveInfinity,
             toleranceAfter: .positiveInfinity
         )
+    }
+
+    /// Designed-for-iPad on Mac: the green-button window fullscreen is not
+    /// `AVPlayerViewController` fullscreen, so Apple's skip shortcuts disappear.
+    private func observeMacWindowFullscreenIfNeeded() {
+        guard ProcessInfo.processInfo.isiOSAppOnMac, windowFullscreenObservers.isEmpty else { return }
+        let center = NotificationCenter.default
+        windowFullscreenObservers.append(center.addObserver(
+            forName: NSNotification.Name("NSWindowDidEnterFullScreenNotification"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handlesFullscreenKeyboardSkip = true
+        })
+        windowFullscreenObservers.append(center.addObserver(
+            forName: NSNotification.Name("NSWindowDidExitFullScreenNotification"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handlesFullscreenKeyboardSkip = false
+        })
     }
 }
 
@@ -9605,6 +9940,9 @@ struct VideoPlayerView: UIViewControllerRepresentable {
         }
         context.coordinator.installSubtitleOverlay(on: uiViewController)
         context.coordinator.updateSubtitleText(subtitleText)
+        if let stashyPlayer = uiViewController as? StashyPlayerViewController {
+            stashyPlayer.handlesFullscreenKeyboardSkip = isFullscreen
+        }
     }
 
     class Coordinator: NSObject, AVPlayerViewControllerDelegate {
@@ -10082,7 +10420,7 @@ class HandyManager: ObservableObject {
         }
 
         #if !os(tvOS)
-        stashCancellable = StashSyncManager.shared.$currentIntensity
+        stashCancellable = StashSyncManager.shared.currentIntensityPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] intensity in
                 guard let self = self else { return }
@@ -10431,7 +10769,7 @@ class ButtplugManager: ObservableObject {
     private func setupStashSync() {
         print("📱 Buttplug: setupStashSync() initiated")
         #if !os(tvOS)
-        stashCancellable = StashSyncManager.shared.$currentIntensity
+        stashCancellable = StashSyncManager.shared.currentIntensityPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] intensity in
                 guard let self = self, self.isStashSyncMode, self.isConnected, self.isEnabled, !self.devices.isEmpty else { return }
@@ -10813,7 +11151,7 @@ class LoveSpouseManager: NSObject, ObservableObject {
     private func setupStashSync() {
         print("📱 LoveSpouse: setupStashSync() initiated")
         #if !os(tvOS)
-        stashCancellable = StashSyncManager.shared.$currentIntensity
+        stashCancellable = StashSyncManager.shared.currentIntensityPublisher
             .receive(on: DispatchQueue.main)
             .sink { [weak self] intensity in
                 guard let self = self, self.isStashSyncMode, self.isConnected, self.isEnabled else { return }

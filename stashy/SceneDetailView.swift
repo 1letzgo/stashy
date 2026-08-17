@@ -26,6 +26,7 @@ struct SceneDetailView: View {
     @StateObject private var subtitleController = SubtitleController()
     @StateObject private var transcriptionController = SceneLiveTranscriptionController()
     @StateObject private var captionTranslator = SceneCaptionTranslator()
+    @StateObject private var audioTrackController = SceneAudioTrackController()
     
     let autoPlay: Bool
     
@@ -47,7 +48,7 @@ struct SceneDetailView: View {
     @State private var isFullscreen = false
     @State private var isPlaybackStarted = false
     @State private var tagsTotalHeight: CGFloat = 0
-    @State private var isMuted = !isHeadphonesConnected()
+    @State private var isMuted = ScenePlayerMute.initialValue()
     @State private var hasAddedPlay = false
     @State private var showingAddMarkerSheet = false
     @State private var capturedMarkerTime: Double = 0
@@ -180,7 +181,9 @@ struct SceneDetailView: View {
                     if let streams = preservedStreams, !streams.isEmpty {
                         newScene = newScene.withStreams(streams)
                     }
+                    newScene = newScene.withUpdatedAt(Scene.newerUpdatedAt(newScene.updatedAt, self.activeScene.updatedAt))
                     self.activeScene = newScene
+                    self.activeScene.postListMetadataUpdated()
                 }
 
                 self.isIdentifying = false
@@ -280,9 +283,10 @@ struct SceneDetailView: View {
                     subtitleController: subtitleController,
                     transcriptionController: transcriptionController,
                     captionTranslator: captionTranslator,
+                    audioTrackController: audioTrackController,
                     onSeek: { seconds in seekTo(seconds) },
                     onTitleUpdated: { newTitle, newDetails in
-                        activeScene = Scene(id: activeScene.id, title: newTitle, details: newDetails, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields)
+                        applyLocalSceneEdit(Scene(id: activeScene.id, title: newTitle, details: newDetails, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                     }
                 )
 
@@ -299,7 +303,12 @@ struct SceneDetailView: View {
                         currentTimeSeconds: currentPlaybackTime,
                         onSeek: { seconds in seekTo(seconds) },
                         onSeekCommit: { seconds in commitScrub(to: seconds) },
-                        onScrubStateChange: { active in isScrubbing = active }
+                        onScrubStateChange: { active in
+                            isScrubbing = active
+                            if active {
+                                playbackActivityTracker.stop()
+                            }
+                        }
                     )
                 }
 
@@ -317,7 +326,7 @@ struct SceneDetailView: View {
                             sceneDate: activeScene.date,
                             performers: activeScene.performers,
                             onPerformersUpdated: { updated in
-                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields)
+                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                             },
                             viewModel: viewModel
                         )
@@ -328,7 +337,7 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             studio: activeScene.studio,
                             onStudioUpdated: { updated in
-                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields)
+                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                             },
                             viewModel: viewModel
                         )
@@ -338,7 +347,7 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             groups: activeScene.groups ?? [],
                             onGroupsUpdated: { updated in
-                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields)
+                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                             },
                             viewModel: viewModel
                         )
@@ -353,7 +362,7 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             tags: activeScene.tags,
                             onTagsUpdated: { updated in
-                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields)
+                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                             },
                             viewModel: viewModel,
                             isTagsExpanded: $isTagsExpanded,
@@ -383,7 +392,7 @@ struct SceneDetailView: View {
                         sceneDate: activeScene.date,
                         performers: activeScene.performers,
                         onPerformersUpdated: { updated in
-                            activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields)
+                            applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                         },
                         viewModel: viewModel
                     )
@@ -394,7 +403,7 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             studio: activeScene.studio,
                             onStudioUpdated: { updated in
-                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields)
+                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                             },
                             viewModel: viewModel
                         )
@@ -402,7 +411,7 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             groups: activeScene.groups ?? [],
                             onGroupsUpdated: { updated in
-                                activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields)
+                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                             },
                             viewModel: viewModel
                         )
@@ -417,7 +426,7 @@ struct SceneDetailView: View {
                         sceneId: activeScene.id,
                         tags: activeScene.tags,
                         onTagsUpdated: { updated in
-                            activeScene = Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields)
+                            applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                         },
                         viewModel: viewModel,
                         isTagsExpanded: $isTagsExpanded,
@@ -538,6 +547,7 @@ struct SceneDetailView: View {
                     if let streams = preservedStreams, !streams.isEmpty {
                         newScene = newScene.withStreams(streams)
                     }
+                    newScene = newScene.withUpdatedAt(Scene.newerUpdatedAt(newScene.updatedAt, self.activeScene.updatedAt))
                     self.activeScene = newScene
                     self.configureSubtitles()
                 }
@@ -580,6 +590,7 @@ struct SceneDetailView: View {
                         if let resTime = preservedResumeTime, resTime > 0 {
                             newScene = newScene.withResumeTime(resTime)
                         }
+                        newScene = newScene.withUpdatedAt(Scene.newerUpdatedAt(newScene.updatedAt, self.activeScene.updatedAt))
                         self.activeScene = newScene
                         self.configureSubtitles()
                     }
@@ -621,7 +632,14 @@ struct SceneDetailView: View {
 
     private func finishDisappearTeardown() {
         if isDeleting { return }
+
+        // Always persist resume/play duration, including when this view only
+        // disappears because native fullscreen hid it.
+        persistPlaybackActivity(stopTracking: !isFullscreen)
+
         if isFullscreen { return }
+
+        activeScene.postListMetadataUpdated()
 
         player?.pause()
         StashSyncManager.shared.stop()
@@ -629,7 +647,13 @@ struct SceneDetailView: View {
         if buttplugManager.isConnected { buttplugManager.stop() }
         if loveSpouseManager.isConnected { loveSpouseManager.stop() }
         removeTimeObserver()
+        subtitleController.detach()
+        audioTrackController.detach()
+        captionTranslator.deactivate()
+        Task { await transcriptionController.disable() }
+    }
 
+    private func persistPlaybackActivity(stopTracking: Bool) {
         if let player {
             let currentTime = player.currentTime().seconds
             let duration = player.currentItem?.duration.seconds ?? activeScene.sceneDuration ?? 0
@@ -638,10 +662,11 @@ struct SceneDetailView: View {
             }
         }
         ensurePlaybackActivityConfigured()
-        playbackActivityTracker.stop()
-        subtitleController.detach()
-        captionTranslator.deactivate()
-        Task { await transcriptionController.disable() }
+        if stopTracking {
+            playbackActivityTracker.stop()
+        } else {
+            playbackActivityTracker.flush()
+        }
     }
 
     private func handlePeriodicSync() {
@@ -650,6 +675,8 @@ struct SceneDetailView: View {
             let currentTime = player.currentTime().seconds
             let duration = player.currentItem?.duration.seconds ?? activeScene.sceneDuration ?? 0
             playbackActivityTracker.setPosition(currentTime: currentTime, duration: duration)
+            ensurePlaybackActivityConfigured()
+            playbackActivityTracker.start()
             if !hasAddedPlay, currentTime > 1 {
                 registerScenePlay()
             }
@@ -698,6 +725,9 @@ struct SceneDetailView: View {
             if loveSpouseManager.isSyncing || loveSpouseManager.isStashSyncMode { loveSpouseManager.pause() }
         } else if status == .playing {
             playbackActivityTracker.start()
+            if audioTrackController.tracks.isEmpty {
+                audioTrackController.attach(player: player)
+            }
             ensureVideoAnalysis(for: player.currentItem)
             let stashSyncActive = handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode
             if stashSyncActive { StashSyncManager.shared.start() }
@@ -705,6 +735,12 @@ struct SceneDetailView: View {
             if buttplugManager.isSyncing || buttplugManager.isStashSyncMode { buttplugManager.play(at: currentTime) }
             if loveSpouseManager.isSyncing || loveSpouseManager.isStashSyncMode { loveSpouseManager.play(at: currentTime) }
         }
+    }
+
+    /// Updates local Scene Detail state and notifies catalog lists (title, studio, tags, …).
+    private func applyLocalSceneEdit(_ updated: Scene) {
+        activeScene = updated
+        updated.postListMetadataUpdated()
     }
 
     private func startPlayback(resume: Bool) {
@@ -731,6 +767,7 @@ struct SceneDetailView: View {
         }
         player?.play()
         subtitleController.attach(player: player)
+        audioTrackController.attach(player: player)
         if handyManager.isSyncing {
             handyManager.play(at: player?.currentTime().seconds ?? 0)
         }
@@ -741,6 +778,8 @@ struct SceneDetailView: View {
             loveSpouseManager.play(at: player?.currentTime().seconds ?? 0)
         }
         player?.rate = Float(playbackSpeed)
+        ensurePlaybackActivityConfigured()
+        playbackActivityTracker.start()
         
         if !hasAddedPlay {
             registerScenePlay()
@@ -757,6 +796,10 @@ struct SceneDetailView: View {
                     currentPlaybackTime = seconds
                     let duration = player.currentItem?.duration.seconds ?? activeScene.sceneDuration ?? 0
                     playbackActivityTracker.setPosition(currentTime: seconds, duration: duration)
+                    if player.timeControlStatus == .playing {
+                        ensurePlaybackActivityConfigured()
+                        playbackActivityTracker.start()
+                    }
                 }
                 if !hasAddedPlay, seconds > 1 {
                     registerScenePlay()
@@ -845,6 +888,7 @@ struct SceneDetailView: View {
         // streams because AVPlayer can snap to the nearest I-frame instead of
         // forcing the server to re-encode up to the exact frame.
         player?.seek(to: targetTime, toleranceBefore: .positiveInfinity, toleranceAfter: .positiveInfinity)
+        playbackActivityTracker.noteSeek(to: seconds)
 
         // While actively scrubbing we don't kick device-syncs on every micro-seek
         // (that explodes network/Bluetooth traffic). Final commit happens on
@@ -873,6 +917,7 @@ struct SceneDetailView: View {
         // Final commit should be precise; only intermediate drag seeks are
         // keyframe-tolerant for responsiveness.
         player?.seek(to: targetTime, toleranceBefore: .zero, toleranceAfter: .zero)
+        playbackActivityTracker.noteSeek(to: seconds)
         player?.play()
         if handyManager.isSyncing { handyManager.play(at: seconds) }
         if buttplugManager.isConnected { buttplugManager.play(at: seconds) }
@@ -920,6 +965,7 @@ struct SceneDetailView: View {
 
         let item = makeVODPlayerItem(for: newURL)
         player?.replaceCurrentItem(with: item)
+        audioTrackController.attach(player: player)
         if currentTime > .zero {
             player?.seek(to: currentTime, toleranceBefore: .positiveInfinity, toleranceAfter: .positiveInfinity)
         }
@@ -1289,7 +1335,10 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
         content
             .onAppear { onAppear() }
             .onDisappear { onDisappear() }
-            .onChange(of: isMuted) { _, v in player?.isMuted = v }
+            .onChange(of: isMuted) { _, v in
+                player?.isMuted = v
+                ScenePlayerMute.persist(v)
+            }
             .onReceive(Timer.publish(every: 10, on: .main, in: .common).autoconnect()) { _ in onPeriodicSync() }
             // The 0.5s fallback timer was removed — `addPeriodicTimeObserver`
             // (in SceneDetailView) publishes time at 0.25s already.
@@ -1301,7 +1350,14 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
     private var playerOverlay: some View {
         if let player {
             Color.clear
-                .onReceive(player.publisher(for: \.timeControlStatus)) { onTimeControlChange($0) }
+                .onReceive(player.publisher(for: \.isMuted)) { muted in
+                    if muted != isMuted {
+                        isMuted = muted
+                    }
+                }
+                .onReceive(player.publisher(for: \.timeControlStatus)) { status in
+                    onTimeControlChange(status)
+                }
                 .onReceive(player.publisher(for: \.status)) { _ in }
                 .onChange(of: player.currentItem) { _, item in onEnsureAnalysis(item) }
                 .onChange(of: handyManager.isStashSyncMode) { _, on in

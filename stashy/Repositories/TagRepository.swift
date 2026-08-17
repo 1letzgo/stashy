@@ -14,6 +14,7 @@ protocol TagRepositoryProtocol {
     func fetchTags(
         page: Int,
         perPage: Int,
+        sortBy: StashDBViewModel.TagSortOption,
         searchQuery: String,
         filter: StashDBViewModel.SavedFilter?
     ) async throws -> (tags: [Tag], total: Int)
@@ -37,6 +38,7 @@ class TagRepository: TagRepositoryProtocol {
     func fetchTags(
         page: Int,
         perPage: Int,
+        sortBy: StashDBViewModel.TagSortOption = .nameAsc,
         searchQuery: String,
         filter: StashDBViewModel.SavedFilter?
     ) async throws -> (tags: [Tag], total: Int) {
@@ -58,8 +60,8 @@ class TagRepository: TagRepositoryProtocol {
             "filter": [
                 "page": page,
                 "per_page": perPage,
-                "sort": "name",
-                "direction": "ASC"
+                "sort": sortBy.sortField,
+                "direction": sortBy.direction
             ]
         ]
         

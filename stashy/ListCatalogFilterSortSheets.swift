@@ -463,6 +463,10 @@ private enum PerformerCatalogSortPickerValue: Hashable {
 private enum TagCatalogSortFieldKind: String, CaseIterable, Identifiable {
     case name
     case scenes_count
+    case images_count
+    case galleries_count
+    case scene_markers_count
+    case performers_count
     case updated_at
     case created_at
     case random
@@ -473,6 +477,10 @@ private enum TagCatalogSortFieldKind: String, CaseIterable, Identifiable {
         switch self {
         case .name: return "Name"
         case .scenes_count: return "Scene count"
+        case .images_count: return "Image count"
+        case .galleries_count: return "Gallery count"
+        case .scene_markers_count: return "Marker count"
+        case .performers_count: return "Performer count"
         case .updated_at: return "Updated"
         case .created_at: return "Created"
         case .random: return "Random"
@@ -488,6 +496,10 @@ private enum TagCatalogSortFieldKind: String, CaseIterable, Identifiable {
         switch self {
         case .name: return ascending ? .nameAsc : .nameDesc
         case .scenes_count: return ascending ? .sceneCountAsc : .sceneCountDesc
+        case .images_count: return ascending ? .imageCountAsc : .imageCountDesc
+        case .galleries_count: return ascending ? .galleryCountAsc : .galleryCountDesc
+        case .scene_markers_count: return ascending ? .markerCountAsc : .markerCountDesc
+        case .performers_count: return ascending ? .performerCountAsc : .performerCountDesc
         case .updated_at: return ascending ? .updatedAtAsc : .updatedAtDesc
         case .created_at: return ascending ? .createdAtAsc : .createdAtDesc
         case .random: return .random
@@ -526,6 +538,10 @@ private enum TagCatalogSortPickerValue: Hashable {
 private enum StudioCatalogSortFieldKind: String, CaseIterable, Identifiable {
     case name
     case scenes_count
+    case rating
+    case performer_count
+    case galleries_count
+    case images_count
     case updated_at
     case created_at
     case random
@@ -536,6 +552,10 @@ private enum StudioCatalogSortFieldKind: String, CaseIterable, Identifiable {
         switch self {
         case .name: return "Name"
         case .scenes_count: return "Scene count"
+        case .rating: return "Rating"
+        case .performer_count: return "Performer count"
+        case .galleries_count: return "Gallery count"
+        case .images_count: return "Image count"
         case .updated_at: return "Updated"
         case .created_at: return "Created"
         case .random: return "Random"
@@ -551,6 +571,10 @@ private enum StudioCatalogSortFieldKind: String, CaseIterable, Identifiable {
         switch self {
         case .name: return ascending ? .nameAsc : .nameDesc
         case .scenes_count: return ascending ? .sceneCountAsc : .sceneCountDesc
+        case .rating: return ascending ? .ratingAsc : .ratingDesc
+        case .performer_count: return ascending ? .performerCountAsc : .performerCountDesc
+        case .galleries_count: return ascending ? .galleryCountAsc : .galleryCountDesc
+        case .images_count: return ascending ? .imageCountAsc : .imageCountDesc
         case .updated_at: return ascending ? .updatedAtAsc : .updatedAtDesc
         case .created_at: return ascending ? .createdAtAsc : .createdAtDesc
         case .random: return .random
@@ -1530,6 +1554,7 @@ struct ImagesCatalogFilterSortSheet: View {
             )
         }
         .presentationDetents([.medium, .large])
+        .presentationBackgroundInteraction(.disabled)
     }
 
     private var filterPickerCard: some View {
@@ -1538,33 +1563,33 @@ struct ImagesCatalogFilterSortSheet: View {
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
                 .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-            Menu {
-                Button("None") {
-                    selectedPresetRowId = ""
+            Picker("Filter", selection: $selectedPresetRowId) {
+                Text("None").tag("")
+                if selectedPresetRowId.isEmpty == false,
+                   serverFilters.contains(where: { ListLivePresetTag.serverRow($0.id) == selectedPresetRowId }) == false,
+                   localPresets.contains(where: { ListLivePresetTag.localRow($0.id) == selectedPresetRowId }) == false {
+                    Text(filterMenuCollapsedTitle).tag(selectedPresetRowId)
                 }
-                ForEach(serverFilters) { f in
-                    Button(f.name) {
-                        selectedPresetRowId = ListLivePresetTag.serverRow(f.id)
+                if !serverFilters.isEmpty {
+                    Section {
+                        ForEach(serverFilters) { f in
+                            Text(f.name).tag(ListLivePresetTag.serverRow(f.id))
+                        }
                     }
                 }
-                ForEach(localPresets) { preset in
-                    Button(preset.name) {
-                        selectedPresetRowId = ListLivePresetTag.localRow(preset.id)
+                if !localPresets.isEmpty {
+                    Section {
+                        ForEach(localPresets) { preset in
+                            Text(preset.name).tag(ListLivePresetTag.localRow(preset.id))
+                        }
                     }
                 }
-            } label: {
-                HStack(spacing: 6) {
-                    Spacer(minLength: 0)
-                    Text(filterMenuCollapsedTitle)
-                        .font(.body)
-                        .foregroundColor(appearance.tintColor)
-                        .lineLimit(1)
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.system(size: 10, weight: .semibold))
-                        .foregroundColor(appearance.tintColor)
-                }
-                .frame(maxWidth: .infinity, alignment: .trailing)
             }
+            .pickerStyle(.menu)
+            .labelsHidden()
+            .accessibilityLabel("Filter")
+            .tint(appearance.tintColor)
+            .frame(maxWidth: .infinity, alignment: .trailing)
         }
         .catalogFilterSortControlCardChrome()
     }

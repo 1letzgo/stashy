@@ -154,7 +154,9 @@ final class SceneCaptionTranslator: ObservableObject {
         let key = Self.cacheKey(for: text)
         guard !key.isEmpty else { return }
         if let cached = cache[key] {
-            onTranslated?(id, cached)
+            Task { @MainActor [weak self] in
+                self?.onTranslated?(id, cached)
+            }
             return
         }
         queue.append(Job(id: id, key: key, text: text))
@@ -357,7 +359,7 @@ final class SceneCaptionTranslator: ObservableObject {
         "de": "de-DE", "en": "en-US", "fr": "fr-FR", "es": "es-ES",
         "it": "it-IT", "pt": "pt-BR", "nl": "nl-NL", "sv": "sv-SE",
         "da": "da-DK", "nb": "nb-NO", "fi": "fi-FI", "ja": "ja-JP",
-        "ko": "ko-KR", "zh": "zh-CN", "ru": "ru-RU", "ar": "ar-SA",
+        "ko": "ko-KR", "zh": "zh-CN", "yue": "yue-CN", "ru": "ru-RU", "ar": "ar-SA",
         "tr": "tr-TR", "th": "th-TH", "vi": "vi-VN", "he": "he-IL",
     ]
 

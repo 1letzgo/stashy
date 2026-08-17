@@ -344,6 +344,7 @@ struct SceneDetailMetadataCard: View {
     @ObservedObject var subtitleController: SubtitleController
     @ObservedObject var transcriptionController: SceneLiveTranscriptionController
     @ObservedObject var captionTranslator: SceneCaptionTranslator
+    @ObservedObject var audioTrackController: SceneAudioTrackController
 
     @State private var showingEditTitleSheet = false
     @State private var showingSetTagImageSheet = false
@@ -352,8 +353,9 @@ struct SceneDetailMetadataCard: View {
     @State private var isSettingSceneCover = false
     @State private var capturedTagImageDataURL: String?
     @State private var showSpeechModelDownloadOffer = false
-    /// Filled from `SpeechTranscriber.supportedLocales` — excludes unsupported codes like `cs`.
+    /// Filled from `SpeechTranscriber.supportedLocales` — one row per language.
     @State private var speechSupportedLanguageOptions: [(id: String, label: String)] = []
+    @State private var captionRestoreInFlight = false
 
     var onSeek: (Double) -> Void
     var onTitleUpdated: ((String?, String?) -> Void)?
@@ -414,6 +416,16 @@ struct SceneDetailMetadataCard: View {
         .onChange(of: player) { _, newPlayer in
             if let item = newPlayer?.currentItem {
                 StashVideoSyncManager.shared.setup(for: item)
+            }
+        }
+        .background {
+            if let player {
+                Color.clear
+                    .onReceive(player.publisher(for: \.timeControlStatus)) { status in
+                        if status == .playing {
+                            restorePreferredCaptionsIfNeeded()
+                        }
+                    }
             }
         }
         .onAppear {
@@ -636,20 +648,22 @@ struct SceneDetailMetadataCard: View {
                 DispatchQueue.main.async {
                     isSettingSceneCover = false
                     if success {
-                        let bust = ISO8601DateFormatter().string(from: Date())
+                        let bust = String(Int(Date().timeIntervalSince1970 * 1000))
                         activeScene = activeScene.withUpdatedAt(bust)
-                        ToastManager.shared.show(
-                            "Scene cover updated",
-                            icon: "photo",
-                            style: .success
-                        )
                         NotificationCenter.default.post(
                             name: NSNotification.Name("SceneCoverUpdated"),
                             object: nil,
                             userInfo: [
                                 "sceneId": activeScene.id,
-                                "updatedAt": bust
+                                "updatedAt": bust,
+                                "screenshotPath": activeScene.paths?.screenshot as Any
                             ]
+                        )
+                        activeScene.postListMetadataUpdated()
+                        ToastManager.shared.show(
+                            "Scene cover updated",
+                            icon: "photo",
+                            style: .success
                         )
                     } else {
                         ToastManager.shared.show(
@@ -673,12 +687,15 @@ struct SceneDetailMetadataCard: View {
                 spacing: 2,
                 onRatingChanged: { newRating in
                     let originalScene = activeScene
+                    let ratedScene = activeScene.withRating(newRating)
                     DispatchQueue.main.async {
-                        activeScene = activeScene.withRating(newRating)
+                        activeScene = ratedScene
                     }
 
                     viewModel.updateSceneRating(sceneId: activeScene.id, rating100: newRating) { success in
-                        if !success {
+                        if success {
+                            ratedScene.postListMetadataUpdated()
+                        } else {
                             DispatchQueue.main.async {
                                 activeScene = originalScene
                                 ToastManager.shared.show("Failed to update rating", icon: "exclamationmark.triangle", style: .error)
@@ -707,6 +724,7 @@ struct SceneDetailMetadataCard: View {
         if wasPlaying { player.play() }
 
         StashVideoSyncManager.shared.setup(for: newItem)
+        audioTrackController.attach(player: player)
 
         if transcriptionController.isTeleprompterModeActive {
             // Prefer dedicated transcription URL (MP4/direct); fall back to the new player URL.
@@ -908,13 +926,19 @@ struct SceneDetailMetadataCard: View {
     @ViewBuilder
     private var setLanguageMenu: some View {
         // Stable label + frozen options: rebuilding Menu content/label while open makes it flicker.
-        let code = activeScene.spokenLanguageCode?.uppercased() ?? "Lang"
-        let selected = activeScene.spokenLanguageCode
+        let selected = SpeechTranscriberAvailability.matchingPickerId(
+            stored: activeScene.spokenLanguageCode,
+            optionIds: speechSupportedLanguageOptions.map(\.id)
+        )
+        let code = SpeechTranscriberAvailability.shortPickerLabel(
+            stored: activeScene.spokenLanguageCode,
+            selectedId: selected
+        )
         SceneLanguageMenu(
             options: speechSupportedLanguageOptions,
             selectedCode: selected,
             labelCode: code,
-            onSelect: applySceneLanguage
+            onSelect: { applySceneLanguage($0) }
         )
         .equatable()
     }
@@ -934,7 +958,7 @@ struct SceneDetailMetadataCard: View {
                 needsSpeechModelDownload: transcriptionController.needsSpeechModelDownload,
                 speechModelName: transcriptionController.downloadingModelLanguage,
                 needsTranslationPack: captionTranslator.needsLanguageDownload,
-                onSelect: setTeleprompterMode,
+                onSelect: { setTeleprompterMode($0) },
                 onDownloadSpeechModel: { transcriptionController.approveSpeechModelDownload() },
                 onDownloadTranslationPack: { captionTranslator.approveDownload() }
             )
@@ -1041,25 +1065,48 @@ struct SceneDetailMetadataCard: View {
         }
     }
 
-    private func setTeleprompterMode(_ mode: SceneTeleprompterMode) {
+    private func restorePreferredCaptionsIfNeeded() {
+        guard !captionRestoreInFlight else { return }
+        guard transcriptionController.mode == .off, !transcriptionController.isTeleprompterModeActive else { return }
+        let preferred = SceneTeleprompterMode.preferred
+        guard preferred != .off else { return }
+        captionRestoreInFlight = true
+        setTeleprompterMode(preferred, userInitiated: false)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+            captionRestoreInFlight = false
+        }
+    }
+
+    private func setTeleprompterMode(_ mode: SceneTeleprompterMode, userInitiated: Bool = true) {
+        if userInitiated {
+            SceneTeleprompterMode.persist(mode)
+        }
         guard mode != .off else {
             stopLiveCaptionsIfNeeded()
             return
         }
         guard StashyPlusManager.shared.isUnlocked else {
-            ToastManager.shared.show("AI captions are part of stashy+ — unlock in Settings", icon: "sparkles", style: .error)
+            if userInitiated {
+                ToastManager.shared.show("AI captions are part of stashy+ — unlock in Settings", icon: "sparkles", style: .error)
+            }
             return
         }
         guard transcriptionController.isReadAlongAvailable else {
-            ToastManager.shared.show("Teleprompter requires iOS 26+ and supported hardware", icon: "text.viewfinder", style: .error)
+            if userInitiated {
+                ToastManager.shared.show("Teleprompter requires iOS 26+ and supported hardware", icon: "text.viewfinder", style: .error)
+            }
             return
         }
         guard let player else {
-            ToastManager.shared.show("Start playback first", icon: "play.circle", style: .error)
+            if userInitiated {
+                ToastManager.shared.show("Start playback first", icon: "play.circle", style: .error)
+            }
             return
         }
-        if activeScene.spokenLanguageCode == nil {
-            ToastManager.shared.show("Set scene language first", icon: "globe", style: .error)
+        guard let sceneLanguage = activeScene.spokenLanguageCode else {
+            if userInitiated {
+                ToastManager.shared.show("Set scene language first", icon: "globe", style: .error)
+            }
             return
         }
         let url = activeScene.transcriptionStreamURL
@@ -1074,10 +1121,8 @@ struct SceneDetailMetadataCard: View {
             }
         }
 
-        let sceneLanguage = activeScene.spokenLanguageCode
-        let targetLanguage = SubtitleTargetLanguage.load()
-        let wantsTranslation = mode == .userLanguage
-            && !SubtitleTargetLanguage.sameLanguage(sceneLanguage, targetLanguage)
+        let targetLanguage = mode.captionTargetCode ?? SubtitleTargetLanguage.load()
+        let wantsTranslation = !SubtitleTargetLanguage.sameLanguage(sceneLanguage, targetLanguage)
 
         // Every CC enable gets a clean caption channel + brand-new speech session.
         Task {
@@ -1317,12 +1362,20 @@ private struct TeleprompterModeMenu: View, Equatable {
             && lhs.needsTranslationPack == rhs.needsTranslationPack
     }
 
+    private var targetCode: String {
+        mode.captionTargetCode ?? userLanguage
+    }
+
+    private var showUserLanguageRow: Bool {
+        SubtitleTargetLanguage.languageCode(from: userLanguage)?.lowercased() != "en"
+    }
+
     var body: some View {
         let color: Color = isActive ? .orange : .secondary
         let label: String = {
             if needsSpeechModelDownload { return speechModelName ?? "AI CC↓" }
             if needsTranslationPack { return "AI CC↓" }
-            if isActive && translationEnabled { return "AI CC·\(userLanguage.uppercased())" }
+            if isActive { return "AI CC·\(targetCode.uppercased())" }
             return "AI CC"
         }()
 
@@ -1334,18 +1387,20 @@ private struct TeleprompterModeMenu: View, Equatable {
                     if mode == .off { Image(systemName: "checkmark") }
                 }
             }
-            Button { onSelect(.sceneLanguage) } label: {
+            Button { onSelect(.english) } label: {
                 Label {
-                    Text(SceneTeleprompterMode.sceneLanguage.title)
+                    Text(SceneTeleprompterMode.english.title)
                 } icon: {
-                    if mode == .sceneLanguage { Image(systemName: "checkmark") }
+                    if mode.captionTargetCode == "en" { Image(systemName: "checkmark") }
                 }
             }
-            Button { onSelect(.userLanguage) } label: {
-                Label {
-                    Text("\(SceneTeleprompterMode.userLanguage.title) (\(userLanguage.uppercased()))")
-                } icon: {
-                    if mode == .userLanguage { Image(systemName: "checkmark") }
+            if showUserLanguageRow {
+                Button { onSelect(.userLanguage) } label: {
+                    Label {
+                        Text(SubtitleTargetLanguage.displayName(for: userLanguage))
+                    } icon: {
+                        if mode == .userLanguage { Image(systemName: "checkmark") }
+                    }
                 }
             }
             if needsSpeechModelDownload {

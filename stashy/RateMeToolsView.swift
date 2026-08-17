@@ -266,6 +266,20 @@ private final class RateMeViewModel: ObservableObject {
             current.oCounter = newCount ?? (previous + 1)
             item = current
             HapticManager.success()
+            switch current.mode {
+            case .scenes:
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("SceneOCounterUpdated"),
+                    object: nil,
+                    userInfo: ["sceneId": current.id, "oCounter": current.oCounter]
+                )
+            case .images:
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("ImageOCounterUpdated"),
+                    object: nil,
+                    userInfo: ["imageId": current.id, "oCounter": current.oCounter]
+                )
+            }
         } catch {
             current.oCounter = previous
             item = current
@@ -692,13 +706,14 @@ private struct RateMeMediaView: View {
 // MARK: - UI
 
 struct RateMeToolsView: View {
-    private static let contentHorizontalPadding: CGFloat = 16
-
     @StateObject private var model = RateMeViewModel()
     @ObservedObject private var appearance = AppearanceManager.shared
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// Avoids reloading when returning from `NavigationLink` (Watch Scene): `.task` restarts after disappear/reappear.
     @State private var didRunInitialRateMeLoad = false
     @State private var showDeleteConfirmation = false
+
+    private var isRegular: Bool { horizontalSizeClass == .regular }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -707,17 +722,25 @@ struct RateMeToolsView: View {
                     .font(.footnote)
                     .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, Self.contentHorizontalPadding)
-                    .padding(.top, 8)
+                    .padding(.horizontal, DesignTokens.Tools.contentPadding)
+            }
+
+            ToolsPillMenuRow(
+                items: RateMeViewModel.Mode.allCases.map {
+                    ToolsPillMenuRow.Item(id: $0.rawValue, title: $0.label)
+                },
+                selectionID: model.mode.rawValue,
+                accessibilityLabel: "RateMe section"
+            ) { id in
+                if let mode = RateMeViewModel.Mode(rawValue: id) {
+                    model.mode = mode
+                }
             }
 
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
-            modeChrome
-        }
         .onAppear {
             guard !didRunInitialRateMeLoad else { return }
             didRunInitialRateMeLoad = true
@@ -762,34 +785,10 @@ struct RateMeToolsView: View {
             } else if let item = model.item {
                 mediaCard(item)
                     .layoutPriority(1)
-                    // Flex slot for sizing; card itself stays aspect-fitted and top-centered.
+                    .frame(maxWidth: isRegular ? 720 : .infinity)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-                detailsCard(item)
-
-                if let remaining = model.remainingHint {
-                    Text("\(remaining) unrated \(model.mode.label.lowercased())")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity, alignment: .center)
-                }
-
-                if item.mode == .scenes {
-                    watchSceneButton(for: item)
-                } else if item.mode == .images {
-                    openImageButton(for: item)
-                }
-
-                Button {
-                    Task { await model.skip() }
-                } label: {
-                    Label("Skip", systemImage: "forward.fill")
-                        .font(.subheadline.weight(.semibold))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                }
-                .buttonStyle(.bordered)
-                .disabled(model.isSubmitting || model.isLoading)
+                detailsAndActions(item)
             } else {
                 ContentUnavailableView(
                     "Nothing to rate",
@@ -799,10 +798,39 @@ struct RateMeToolsView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
             }
         }
-        .padding(.horizontal, Self.contentHorizontalPadding)
-        .padding(.top, 12)
-        .padding(.bottom, 12)
+        .toolsHorizontalPadding(horizontalSizeClass)
+        .padding(.bottom, DesignTokens.Tools.menuBottomPadding)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    @ViewBuilder
+    private func detailsAndActions(_ item: RateMeViewModel.Item) -> some View {
+        detailsCard(item)
+        ratingRow(item)
+
+        if let remaining = model.remainingHint {
+            Text("\(remaining) unrated \(model.mode.label.lowercased())")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .frame(maxWidth: .infinity, alignment: .center)
+        }
+
+        if item.mode == .scenes {
+            watchSceneButton(for: item)
+        } else if item.mode == .images {
+            openImageButton(for: item)
+        }
+
+        Button {
+            Task { await model.skip() }
+        } label: {
+            Label("Skip", systemImage: "forward.fill")
+                .font(.subheadline.weight(.semibold))
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 10)
+        }
+        .buttonStyle(.bordered)
+        .disabled(model.isSubmitting || model.isLoading)
     }
 
     private func mediaCard(_ item: RateMeViewModel.Item) -> some View {
@@ -883,101 +911,84 @@ struct RateMeToolsView: View {
     }
 
     private func detailsCard(_ item: RateMeViewModel.Item) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(item.title)
-                    .font(.title3.weight(.semibold))
+        VStack(alignment: .leading, spacing: 4) {
+            Text(item.title)
+                .font(.title3.weight(.semibold))
+                .lineLimit(2)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            if let performers = item.performerNames {
+                Text(performers)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
                     .lineLimit(2)
                     .frame(maxWidth: .infinity, alignment: .leading)
-
-                if let performers = item.performerNames {
-                    Text(performers)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
             }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondaryAppBackground)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
+                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+        )
+        .cardShadow()
+        .opacity(model.isSubmitting ? 0.85 : 1)
+    }
 
-            // Full-width row: Rate (flex) + compact O + Delete.
-            // Keep Rate wide enough for 5 stars — proportional side slots were clipping the 5th.
-            HStack(alignment: .center, spacing: 10) {
-                VStack(spacing: 14) {
-                    Text("Rate")
-                        .font(.subheadline.weight(.bold))
-                        .frame(maxWidth: .infinity, alignment: .leading)
+    private func ratingRow(_ item: RateMeViewModel.Item) -> some View {
+        HStack(alignment: .center, spacing: 10) {
+            StarRatingView(
+                rating100: model.draftRating100,
+                isInteractive: !model.isSubmitting && !model.isDeleting,
+                size: 24,
+                spacing: 4
+            ) { newRating in
+                Task { await model.submitRating(newRating) }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
 
-                    StarRatingView(
-                        rating100: model.draftRating100,
-                        isInteractive: !model.isSubmitting && !model.isDeleting,
-                        size: 24,
-                        spacing: 4
-                    ) { newRating in
-                        Task { await model.submitRating(newRating) }
-                    }
-                    .frame(maxWidth: .infinity)
+            Button {
+                Task { await model.incrementOCounter() }
+            } label: {
+                HStack(spacing: 6) {
+                    Image(systemName: item.oCounter > 0
+                          ? appearance.oCounterIconFilled
+                          : appearance.oCounterIcon)
+                        .font(.body.weight(.semibold))
+                        .foregroundStyle(item.oCounter > 0 ? appearance.tintColor : .secondary)
+                    Text("\(item.oCounter)")
+                        .font(.body.weight(.bold).monospacedDigit())
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
                 }
                 .padding(.horizontal, 10)
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
-                .layoutPriority(1)
+                .frame(height: 44)
                 .background(Color.appBackground)
                 .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
-
-                Button {
-                    Task { await model.incrementOCounter() }
-                } label: {
-                    VStack(spacing: 8) {
-                        Image(systemName: item.oCounter > 0
-                              ? appearance.oCounterIconFilled
-                              : appearance.oCounterIcon)
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(item.oCounter > 0 ? appearance.tintColor : .secondary)
-                        Text("\(item.oCounter)")
-                            .font(.title3.weight(.bold).monospacedDigit())
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
-                    .frame(width: 56)
-                    .frame(maxHeight: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.appBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
-                    .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .disabled(model.isSubmitting || model.isIncrementingO || model.isDeleting)
-                .accessibilityLabel("O-Counter \(item.oCounter), tap to increment")
-
-                Button {
-                    HapticManager.light()
-                    showDeleteConfirmation = true
-                } label: {
-                    VStack(spacing: 8) {
-                        Image(systemName: "trash.fill")
-                            .font(.title2.weight(.semibold))
-                            .foregroundStyle(.red)
-                        Text("Delete")
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(.red)
-                            .lineLimit(1)
-                            .minimumScaleFactor(0.7)
-                    }
-                    .frame(width: 56)
-                    .frame(maxHeight: .infinity)
-                    .padding(.vertical, 12)
-                    .background(Color.appBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
-                    .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
-                }
-                .buttonStyle(.plain)
-                .disabled(model.isSubmitting || model.isDeleting || model.isLoading)
-                .accessibilityLabel("Delete")
-                .accessibilityHint("Deletes this item and its files after confirmation")
+                .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
             }
-            .frame(maxWidth: .infinity)
-            .frame(height: 96)
+            .buttonStyle(.plain)
+            .disabled(model.isSubmitting || model.isIncrementingO || model.isDeleting)
+            .accessibilityLabel("O-Counter \(item.oCounter), tap to increment")
+
+            Button {
+                HapticManager.light()
+                showDeleteConfirmation = true
+            } label: {
+                Image(systemName: "trash.fill")
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.red)
+                    .frame(width: 44, height: 44)
+                    .background(Color.appBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(model.isSubmitting || model.isDeleting || model.isLoading)
+            .accessibilityLabel("Delete")
+            .accessibilityHint("Deletes this item and its files after confirmation")
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -992,7 +1003,7 @@ struct RateMeToolsView: View {
     }
 
     private var imageMediaKindChrome: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: StashyExpandingDock.itemSpacing) {
             ForEach(ImageListMediaKind.allCases) { kind in
                 imageMediaKindChip(kind)
             }
@@ -1013,55 +1024,20 @@ struct RateMeToolsView: View {
             model.imageMediaKind = kind
         } label: {
             Text(title)
-                .font(.subheadline.weight(.semibold))
+                .font(.caption.weight(.semibold))
                 .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.85))
                 .lineLimit(1)
+                .minimumScaleFactor(0.65)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
-                .background(
-                    Capsule(style: .continuous)
-                        .fill(selected ? appearance.tintColor : Color.secondary.opacity(0.15))
-                )
-                .clipShape(Capsule(style: .continuous))
-                .contentShape(Capsule(style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .disabled(model.isSubmitting)
-        .accessibilityLabel("\(title)\(selected ? ", selected" : "")")
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
-    private var modeChrome: some View {
-        HStack(spacing: StashyExpandingDock.itemSpacing) {
-            ForEach(RateMeViewModel.Mode.allCases) { mode in
-                modeChip(mode)
-            }
-        }
-        .padding(.horizontal, StashyExpandingDock.edgePadding)
-        .padding(.bottom, DesignTokens.Chrome.fabBottomPadding)
-    }
-
-    private func modeChip(_ mode: RateMeViewModel.Mode) -> some View {
-        let selected = model.mode == mode
-        return Button {
-            HapticManager.selection()
-            model.mode = mode
-        } label: {
-            Text(mode.label)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.85))
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
-                .frame(maxWidth: .infinity)
-                .frame(height: StashyExpandingDock.activeHeight)
+                .frame(height: 28)
                 .background(
                     Capsule(style: .continuous)
                         .fill(selected ? appearance.tintColor : Color.secondary.opacity(0.15))
                         .shadow(
                             color: selected ? appearance.tintColor.opacity(0.35) : .clear,
-                            radius: 6,
+                            radius: 4,
                             x: 0,
-                            y: 3
+                            y: 2
                         )
                 )
                 .clipShape(Capsule(style: .continuous))
@@ -1069,7 +1045,7 @@ struct RateMeToolsView: View {
         }
         .buttonStyle(.plain)
         .disabled(model.isSubmitting)
-        .accessibilityLabel("\(mode.label)\(selected ? ", selected" : "")")
+        .accessibilityLabel("\(title)\(selected ? ", selected" : "")")
         .accessibilityAddTraits(selected ? .isSelected : [])
     }
 }

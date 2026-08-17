@@ -762,7 +762,7 @@ private struct HotOrNotGauntletStarterPickCard: View {
                 }
                 .padding(10)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             .background(Color.secondaryAppBackground)
             .clipShape(RoundedRectangle(cornerRadius: cardCornerRadius))
             .overlay(
@@ -774,7 +774,7 @@ private struct HotOrNotGauntletStarterPickCard: View {
         }
         .buttonStyle(.plain)
         .disabled(model.isSubmitting)
-        .frame(maxWidth: .infinity)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .accessibilityLabel("Pick \(performer.displayName) as Rise starter")
     }
 
@@ -819,8 +819,10 @@ private struct HotOrNotGauntletStarterPickCard: View {
         Text(performer.displayName)
             .font(.subheadline.weight(.bold))
             .foregroundStyle(.primary)
-            .lineLimit(3)
-            .frame(maxWidth: .infinity, alignment: .leading)
+            .lineLimit(2, reservesSpace: true)
+            .minimumScaleFactor(0.72)
+            .multilineTextAlignment(.leading)
+            .frame(maxWidth: .infinity, alignment: .topLeading)
     }
 
     /// Same label/value typography as one cell in `HotOrNotBattleColumn`’s `detailGrid`, but only rating.
@@ -949,7 +951,7 @@ private struct HotOrNotDuelVoteFeedback: Equatable {
 
 @MainActor
 private final class HotOrNotViewModel: ObservableObject {
-    enum Section: String {
+    enum Section: String, CaseIterable {
         case battle = "Game"
         case leaderboard = "Charts"
         case settings = "Settings"
@@ -1606,13 +1608,13 @@ private final class HotOrNotViewModel: ObservableObject {
 // MARK: - UI
 
 struct HotOrNotToolsView: View {
-    /// Matches main scroll content in `PerformerDetailView` (e.g. header + lists).
-    private static let contentHorizontalPadding: CGFloat = 16
-
     @StateObject private var model = HotOrNotViewModel()
     @ObservedObject private var appearance = AppearanceManager.shared
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// Avoids re-running `loadDuelPair` when returning from `NavigationLink` (e.g. Profile): `.task` restarts after disappear/reappear.
     @State private var didRunInitialHotOrNotLoad = false
+
+    private var isRegular: Bool { horizontalSizeClass == .regular }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -1621,13 +1623,20 @@ struct HotOrNotToolsView: View {
                     .font(.footnote)
                     .foregroundStyle(.red)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, Self.contentHorizontalPadding)
+                    .padding(.horizontal, DesignTokens.Tools.contentPadding)
             }
 
-            hotOrNotTopMenu
-                .padding(.horizontal, Self.contentHorizontalPadding)
-                .padding(.top, 8)
-                .padding(.bottom, 12)
+            ToolsPillMenuRow(
+                items: HotOrNotViewModel.Section.allCases.map {
+                    ToolsPillMenuRow.Item(id: $0.rawValue, title: $0.rawValue)
+                },
+                selectionID: model.section.rawValue,
+                accessibilityLabel: "Match section"
+            ) { id in
+                if let section = HotOrNotViewModel.Section(rawValue: id) {
+                    model.section = section
+                }
+            }
 
             switch model.section {
             case .battle:
@@ -1644,7 +1653,7 @@ struct HotOrNotToolsView: View {
             VStack(spacing: 8) {
                 if shouldShowDuelActionsAboveFloatingBar {
                     hotOrNotDuelActionsRow
-                        .padding(.horizontal, Self.contentHorizontalPadding)
+                        .toolsHorizontalPadding(horizontalSizeClass)
                 }
                 // Mode pills only while playing — not on Charts / Settings.
                 if model.section == .battle {
@@ -1762,69 +1771,6 @@ struct HotOrNotToolsView: View {
         .padding(.bottom, DesignTokens.Chrome.fabBottomPadding)
     }
 
-    /// Top menu: Game · Charts · Settings (pinned above content, not inside ScrollView).
-    private var hotOrNotTopMenu: some View {
-        HStack(spacing: StashyExpandingDock.itemSpacing) {
-            hotOrNotTopMenuChip(
-                title: "Game",
-                selected: model.section == .battle
-            ) {
-                guard model.section != .battle else { return }
-                HapticManager.selection()
-                model.section = .battle
-            }
-            hotOrNotTopMenuChip(
-                title: "Charts",
-                selected: model.section == .leaderboard
-            ) {
-                guard model.section != .leaderboard else { return }
-                HapticManager.selection()
-                model.section = .leaderboard
-            }
-            hotOrNotTopMenuChip(
-                title: "Settings",
-                selected: model.section == .settings
-            ) {
-                guard model.section != .settings else { return }
-                HapticManager.selection()
-                model.section = .settings
-            }
-        }
-    }
-
-    private func hotOrNotTopMenuChip(
-        title: String,
-        selected: Bool,
-        action: @escaping () -> Void
-    ) -> some View {
-        Button(action: action) {
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.85))
-                .lineLimit(1)
-                .minimumScaleFactor(0.78)
-                .frame(maxWidth: .infinity)
-                .frame(height: StashyExpandingDock.activeHeight)
-                .background(hotOrNotPillBackground(selected: selected))
-                .clipShape(Capsule(style: .continuous))
-                .contentShape(Capsule(style: .continuous))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("\(title)\(selected ? ", selected" : "")")
-        .accessibilityAddTraits(selected ? .isSelected : [])
-    }
-
-    private func hotOrNotPillBackground(selected: Bool) -> some View {
-        Capsule(style: .continuous)
-            .fill(selected ? appearance.tintColor : Color.secondary.opacity(0.15))
-            .shadow(
-                color: selected ? appearance.tintColor.opacity(0.35) : .clear,
-                radius: 6,
-                x: 0,
-                y: 3
-            )
-    }
-
     private func hotOrNotDuelModeChip(_ mode: HotOrNotViewModel.DuelMode) -> some View {
         let selected = model.section == .battle && model.duelMode == mode
         return Button {
@@ -1841,7 +1787,16 @@ struct HotOrNotToolsView: View {
                 .minimumScaleFactor(0.78)
                 .frame(maxWidth: .infinity)
                 .frame(height: StashyExpandingDock.activeHeight)
-                .background(hotOrNotPillBackground(selected: selected))
+                .background(
+                    Capsule(style: .continuous)
+                        .fill(selected ? appearance.tintColor : Color.secondary.opacity(0.15))
+                        .shadow(
+                            color: selected ? appearance.tintColor.opacity(0.35) : .clear,
+                            radius: 6,
+                            x: 0,
+                            y: 3
+                        )
+                )
                 .clipShape(Capsule(style: .continuous))
                 .contentShape(Capsule(style: .continuous))
         }
@@ -1865,11 +1820,7 @@ struct HotOrNotToolsView: View {
                 )
             } else {
                 LazyVGrid(
-                    columns: [
-                        GridItem(.flexible(), spacing: 10),
-                        GridItem(.flexible(), spacing: 10),
-                        GridItem(.flexible(), spacing: 10)
-                    ],
+                    columns: DesignTokens.Tools.rankedColumns(for: horizontalSizeClass, compact: 3, regular: 3, spacing: 12),
                     spacing: 12
                 ) {
                     ForEach(Array(model.placementStarters.prefix(6)), id: \.id) { p in
@@ -1923,7 +1874,7 @@ struct HotOrNotToolsView: View {
                     StandardLoadingView(message: "Loading pair...")
                         .frame(minHeight: 320)
                 } else if let l = model.left, let r = model.right {
-                    HStack(alignment: .top, spacing: 10) {
+                    HStack(alignment: .top, spacing: isRegular ? 20 : 10) {
                         VStack(spacing: 10) {
                             HotOrNotBattleColumn(
                                 model: model,
@@ -1948,10 +1899,12 @@ struct HotOrNotToolsView: View {
                         }
                         .frame(maxWidth: .infinity)
                     }
+                    .frame(maxWidth: isRegular ? 920 : .infinity)
+                    .frame(maxWidth: .infinity)
                 }
             }
-            .padding(.horizontal, Self.contentHorizontalPadding)
-            .padding(.bottom, 12)
+            .toolsHorizontalPadding(horizontalSizeClass)
+            .padding(.bottom, DesignTokens.Tools.menuBottomPadding)
         }
     }
 
@@ -1961,14 +1914,16 @@ struct HotOrNotToolsView: View {
                 StandardLoadingView(message: "Loading charts...")
             } else {
                 ScrollView {
-                    LazyVStack(spacing: 10) {
-                        ForEach(Array(model.leaderboard.enumerated()), id: \.element.id) { index, p in
-                            NavigationLink {
-                                PerformerDetailView(performer: p.toPerformerStub())
-                            } label: {
-                                HotOrNotLeaderboardCard(model: model, performer: p, place: index + 1)
+                    VStack(spacing: 12) {
+                        LazyVGrid(columns: DesignTokens.Tools.rankedColumns(for: horizontalSizeClass), spacing: 12) {
+                            ForEach(Array(model.leaderboard.enumerated()), id: \.element.id) { index, p in
+                                NavigationLink {
+                                    PerformerDetailView(performer: p.toPerformerStub())
+                                } label: {
+                                    HotOrNotLeaderboardCard(model: model, performer: p, place: index + 1)
+                                }
+                                .buttonStyle(.plain)
                             }
-                            .buttonStyle(.plain)
                         }
                         if model.leaderboardHasMore {
                             PaginationLoadingFooter()
@@ -1977,8 +1932,8 @@ struct HotOrNotToolsView: View {
                                 }
                         }
                     }
-                    .padding(.horizontal, Self.contentHorizontalPadding)
-                    .padding(.bottom, 12)
+                    .toolsHorizontalPadding(horizontalSizeClass)
+                    .padding(.bottom, DesignTokens.Tools.menuBottomPadding)
                 }
             }
         }
@@ -2149,6 +2104,7 @@ private struct HotOrNotLeaderboardCard: View {
 private struct HotOrNotPoolSettingsView: View {
     @ObservedObject var viewModel: HotOrNotViewModel
     @ObservedObject private var appearance = AppearanceManager.shared
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
     private static let genderRows: [(code: String, label: String)] = [
         ("FEMALE", "Female"),
@@ -2191,8 +2147,10 @@ private struct HotOrNotPoolSettingsView: View {
                         .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
                 )
                 .cardShadow()
-                .padding(.horizontal, 16)
-                .padding(.bottom, 12)
+                .toolsHorizontalPadding(horizontalSizeClass)
+                .padding(.bottom, DesignTokens.Tools.menuBottomPadding)
+                .frame(maxWidth: DesignTokens.Tools.regularMaxContentWidth)
+                .frame(maxWidth: .infinity)
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)

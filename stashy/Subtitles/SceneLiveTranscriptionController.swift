@@ -111,7 +111,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
     /// `true` when captions are timed to the playhead (lookahead feed).
     var onLookaheadModeChanged: ((Bool) -> Void)?
     /// Hands a finished sentence to on-device translation; the result comes back via
-    /// `applyTranslation(cueID:text:)`. Set only while `mode == .userLanguage`.
+    /// `applyTranslation(cueID:text:)`. Set when captions are translated into the target language.
     var translationRequestHandler: ((UUID, String) -> Void)?
 
     private weak var player: AVPlayer?
@@ -140,6 +140,9 @@ final class SceneLiveTranscriptionController: ObservableObject {
     /// Closed subtitle sentences timed like classic SRT/VTT cues.
     private var subtitleCues: [SubtitleCue] = []
     private var pendingSentenceWords: [SceneTranscriptWord] = []
+    /// Prevents `flushPendingSentence` → translation cache-hit → `applyTranslation` →
+    /// `refreshSubtitleText` → `flushPendingSentence` from overflowing the stack.
+    private var isFlushingPendingSentence = false
     /// In-progress sentence from volatile ASR — shown at first-word time before finalization.
     private var draftCue: SubtitleCue?
     /// Extra seconds to bring captions forward when ASR consistently finishes late.
@@ -283,11 +286,9 @@ final class SceneLiveTranscriptionController: ObservableObject {
         }
         let preferred = SpeechTranscriptionLocaleResolver.locale(fromMetadataLanguage: languageTag)
             ?? Locale(identifier: languageTag ?? "")
-        let code = preferred.language.languageCode?.identifier
-            ?? preferred.identifier(.bcp47)
-        let name = Locale.current.localizedString(forLanguageCode: code) ?? code.uppercased()
+        let name = SpeechTranscriberAvailability.speechLocaleDisplayName(for: preferred)
 
-        guard let locale = await SpeechTranscriber.supportedLocale(equivalentTo: preferred) else {
+        guard let locale = await SpeechTranscriptionLocaleResolver.supportedLocaleMatching(preferred) else {
             // Dictation covers more languages; report that separately so the UI can explain.
             if let _ = await DictationTranscriber.supportedLocale(equivalentTo: preferred) {
                 return .unsupported(languageName: "\(name) (SpeechTranscriber; dictation-only)")
@@ -453,12 +454,17 @@ final class SceneLiveTranscriptionController: ObservableObject {
             return
         }
 
-        if !pendingSentenceWords.isEmpty,
+        if !isFlushingPendingSentence,
+           !pendingSentenceWords.isEmpty,
            let last = pendingSentenceWords.last(where: { !$0.isWhitespaceOnly }),
            time - last.globalEnd >= Self.sentenceGapFlushSeconds {
             flushPendingSentence(force: true)
         }
 
+        updateDisplayedSubtitle(at: time)
+    }
+
+    private func updateDisplayedSubtitle(at time: Double) {
         // Show only when the playhead is inside a cue — i.e. at/after the first word.
         let timed = captionText(at: time)
         if currentSubtitleText != timed {
@@ -473,8 +479,10 @@ final class SceneLiveTranscriptionController: ObservableObject {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         subtitleCues[index].translated = clipCaption(trimmed)
+        // Display-only: a full `refreshSubtitleText` can flush pending words and re-enter
+        // translation while `flushPendingSentence` is still on the stack (cache hits are sync).
         if let seconds = player?.currentTime().seconds, seconds.isFinite {
-            refreshSubtitleText(at: seconds)
+            updateDisplayedSubtitle(at: seconds)
         }
     }
 
@@ -560,6 +568,10 @@ final class SceneLiveTranscriptionController: ObservableObject {
     }
 
     private func flushPendingSentence(force: Bool) {
+        guard !isFlushingPendingSentence else { return }
+        isFlushingPendingSentence = true
+        defer { isFlushingPendingSentence = false }
+
         let text = pendingSentencePlainText()
         let spoken = pendingSentenceWords.filter { !$0.isWhitespaceOnly }
         guard force, !text.isEmpty, let first = spoken.first, let last = spoken.last else {
@@ -596,15 +608,15 @@ final class SceneLiveTranscriptionController: ObservableObject {
         if subtitleCues.count > 40 {
             subtitleCues.removeFirst(subtitleCues.count - 40)
         }
-        // Only finished sentences get translated — a volatile hypothesis would re-translate
-        // several times per second for no gain.
-        translationRequestHandler?(cue.id, clipped)
         pendingSentenceWords = []
         draftCue = nil
         captionHoldUntil = Date.distantPast
+        // Translate after clearing pending words. Cache hits call `applyTranslation`
+        // synchronously and must not see the same pending sentence still sitting here.
+        translationRequestHandler?(cue.id, clipped)
 
         if let seconds = player?.currentTime().seconds, seconds.isFinite {
-            refreshSubtitleText(at: seconds)
+            updateDisplayedSubtitle(at: seconds)
         }
     }
 
@@ -723,7 +735,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
         // broken download of another language.
         if let languageTag,
            let preferred = SpeechTranscriptionLocaleResolver.locale(fromMetadataLanguage: languageTag),
-           await SpeechTranscriber.supportedLocale(equivalentTo: preferred) == nil {
+           await SpeechTranscriptionLocaleResolver.supportedLocaleMatching(preferred) == nil {
             throw SceneLiveTranscriptionError.localeNotSupported
         }
 
@@ -1436,6 +1448,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
         transcriptLines = []
         subtitleCues = []
         pendingSentenceWords = []
+        isFlushingPendingSentence = false
         draftCue = nil
         lineAccumulator.reset()
     }
@@ -1637,11 +1650,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
 
     @available(iOS 26.0, *)
     private static func canonicalSpeechLocale(for locale: Locale) async -> Locale {
-        if let exact = await SpeechTranscriber.supportedLocale(equivalentTo: locale) {
-            return exact
-        }
-        let supported = await SpeechTranscriber.supportedLocales
-        return SpeechTranscriptionLocaleResolver.matchLocale(locale, in: supported) ?? locale
+        await SpeechTranscriptionLocaleResolver.supportedLocaleMatching(locale) ?? locale
     }
 
     /// Free reservation slots so `assetInstallationRequest` can auto-reserve the target locale.

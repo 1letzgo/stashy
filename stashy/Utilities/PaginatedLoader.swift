@@ -205,6 +205,7 @@ extension PaginatedLoader {
             return try await repository.fetchTags(
                 page: page,
                 perPage: perPage,
+                sortBy: .nameAsc,
                 searchQuery: searchQuery,
                 filter: filter
             )

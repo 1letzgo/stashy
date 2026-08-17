@@ -1108,6 +1108,12 @@ struct GalleryItemView: View {
         }
         .onChange(of: isMuted) { _, newValue in
             player?.isMuted = newValue
+            ScenePlayerMute.persist(newValue)
+            if newValue {
+                applyAmbientMixingAudioSession()
+            } else {
+                applyPlaybackAudioSession()
+            }
         }
         .onChange(of: currentVisibleId) { _, _ in
             applyActivePlaybackState()
@@ -1233,7 +1239,7 @@ struct GalleryItemView: View {
             }
             existingPlayer.replaceCurrentItem(with: newItem)
         } else {
-            self.player = createPlayer(for: streamURL)
+            self.player = createPlayer(for: streamURL, takesAudioSession: !isMuted)
         }
 
         guard let player = self.player else { return }
@@ -1293,7 +1299,7 @@ struct FullScreenImageView: View {
     @Environment(\.dismiss) var dismiss
     @State private var isMediaZoomed = false
     @State private var showingDeleteConfirmation = false
-    @State private var isMuted: Bool = !isHeadphonesConnected()
+    @State private var isMuted: Bool = ScenePlayerMute.initialValue()
     @State private var currentVisibleId: String?
     @State private var showUI = true
     @State private var shareItems: [Any] = []
@@ -1309,6 +1315,7 @@ struct FullScreenImageView: View {
         self._images = images
         self.selectedImageId = selectedImageId
         self.onLoadMore = onLoadMore
+        self._isMuted = State(initialValue: ScenePlayerMute.initialValue())
         self._currentVisibleId = State(initialValue: selectedImageId)
     }
 
@@ -1420,8 +1427,14 @@ struct FullScreenImageView: View {
                 scrubberState.seeking = false
                 scrubberState.seekTarget = nil
             }
+            .onAppear {
+                if !isMuted {
+                    applyPlaybackAudioSession()
+                }
+            }
             .onDisappear {
                 showUI = true
+                applyAmbientMixingAudioSession()
             }
             .task(id: selectedImageId) {
                 currentVisibleId = selectedImageId

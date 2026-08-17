@@ -47,6 +47,30 @@ enum DesignTokens {
         static let strokeOpacity: Double = 0.07
     }
 
+    /// Shared insets for Tools sub-views (Overview, O-Count, Top, Match, RateMe, Downloads).
+    enum Tools {
+        static let contentPadding: CGFloat = Spacing.md
+        static let regularContentPadding: CGFloat = Spacing.xl
+        static let menuTopPadding: CGFloat = Spacing.sm
+        static let menuBottomPadding: CGFloat = Spacing.sm
+        static let regularMaxContentWidth: CGFloat = 1100
+        static let rankedGridSpacing: CGFloat = 12
+
+        static func horizontalPadding(for sizeClass: UserInterfaceSizeClass?) -> CGFloat {
+            sizeClass == .regular ? regularContentPadding : contentPadding
+        }
+
+        static func rankedColumns(
+            for sizeClass: UserInterfaceSizeClass?,
+            compact: Int = 1,
+            regular: Int = 2,
+            spacing: CGFloat = rankedGridSpacing
+        ) -> [GridItem] {
+            let count = sizeClass == .regular ? regular : compact
+            return Array(repeating: GridItem(.flexible(), spacing: spacing), count: count)
+        }
+    }
+
     // MARK: - Spacing
 
     enum Spacing {
@@ -130,5 +154,9 @@ extension View {
     func floatingShadow() -> some View {
         let s = DesignTokens.Shadow.floating
         return self.shadow(color: s.color, radius: s.radius, x: s.x, y: s.y)
+    }
+
+    func toolsHorizontalPadding(_ sizeClass: UserInterfaceSizeClass?) -> some View {
+        padding(.horizontal, DesignTokens.Tools.horizontalPadding(for: sizeClass))
     }
 }

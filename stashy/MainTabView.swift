@@ -264,22 +264,28 @@ extension MainTabView {
 
 struct ToolsView: View {
     @EnvironmentObject private var coordinator: NavigationCoordinator
-    @ObservedObject private var appearanceManager = AppearanceManager.shared
     @ObservedObject private var tabManager = TabManager.shared
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
-    /// Shared across Tools sub-tabs so Statistics stay warm when switching Downloads / Statistics / Match.
+    /// Shared across Tools sub-tabs so Overview / Charts stay warm when switching Downloads / Match.
     @StateObject private var statisticsViewModel = StashDBViewModel()
-    
+    @StateObject private var topListsViewModel = TopListsViewModel()
+
     enum ToolsTab: String, CaseIterable {
         case downloads = "Downloads"
-        case statistics = "Statistics"
+        case overview = "Overview"
+        case oCount = "O-Count"
+        case timeline = "Timeline"
+        case topLists = "Charts"
         case hotOrNot = "Match"
         case rateMe = "RateMe"
         
         var icon: String {
             switch self {
             case .downloads: return "square.and.arrow.down"
-            case .statistics: return "chart.bar.fill"
+            case .overview: return "chart.bar.fill"
+            case .oCount: return "calendar"
+            case .timeline: return "calendar.day.timeline.left"
+            case .topLists: return "list.number"
             case .hotOrNot: return "flame.fill"
             case .rateMe: return "star.fill"
             }
@@ -291,7 +297,10 @@ struct ToolsView: View {
         tabManager.enabledTools.compactMap { item in
             switch item {
             case .downloads: return .downloads
-            case .statistics: return .statistics
+            case .statistics: return .overview
+            case .oCount: return .oCount
+            case .timeline: return .timeline
+            case .topLists: return .topLists
             case .hotOrNot: return .hotOrNot
             case .rateMe: return .rateMe
             case .server: return nil
@@ -303,7 +312,7 @@ struct ToolsView: View {
         if let current = ToolsTab(rawValue: coordinator.toolsSubTab), sortedTabs.contains(current) {
             return current
         }
-        return sortedTabs.first ?? .statistics
+        return sortedTabs.first ?? .overview
     }
 
     private var selectedTabBinding: Binding<ToolsTab> {
@@ -318,8 +327,14 @@ struct ToolsView: View {
             switch effectiveTab {
             case .downloads:
                 DownloadsView()
-            case .statistics:
+            case .overview:
                 ToolsStatisticsView(viewModel: statisticsViewModel)
+            case .oCount:
+                OCountHeatmapToolsView()
+            case .timeline:
+                SessionTimelineToolsView()
+            case .topLists:
+                TopListsToolsContainerView(viewModel: topListsViewModel)
             case .hotOrNot:
                 HotOrNotToolsView()
             case .rateMe:
@@ -329,7 +344,7 @@ struct ToolsView: View {
         .onAppear { normalizeToolsSubTab() }
         .onChange(of: stashyPlus.isUnlocked) { _, _ in normalizeToolsSubTab() }
         .navigationBarHidden(true)
-        .popNavigationToRootOnChange(coordinator.toolsSubTab)
+        .popNavigationToRootOnChange(effectiveTab.rawValue)
         .stashyCustomChromeInset(spacing: 0) {
             StashySectionChromeBar {
                 toolsCategoryRow
@@ -358,10 +373,14 @@ struct ToolsView: View {
 
     private func normalizeToolsSubTab() {
         if coordinator.toolsSubTab == "Hot or Not" || coordinator.toolsSubTab == "Server" {
-            coordinator.toolsSubTab = (sortedTabs.first ?? .statistics).rawValue
+            coordinator.toolsSubTab = (sortedTabs.first ?? .overview).rawValue
+        } else if coordinator.toolsSubTab == "Statistics" {
+            coordinator.toolsSubTab = ToolsTab.overview.rawValue
+        } else if coordinator.toolsSubTab == "Top 10" || coordinator.toolsSubTab == "Top" {
+            coordinator.toolsSubTab = ToolsTab.topLists.rawValue
         } else if ToolsTab(rawValue: coordinator.toolsSubTab) == nil
                     || !sortedTabs.contains(where: { $0.rawValue == coordinator.toolsSubTab }) {
-            coordinator.toolsSubTab = (sortedTabs.first ?? .statistics).rawValue
+            coordinator.toolsSubTab = (sortedTabs.first ?? .overview).rawValue
         }
     }
 }

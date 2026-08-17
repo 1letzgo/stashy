@@ -76,12 +76,42 @@ struct StashyChromePillStyle: ViewModifier {
     }
 }
 
+/// Color treatment for expanding-dock chips.
+enum StashyExpandingDockPalette {
+    /// Dark chrome bar: translucent white circles, white icons.
+    case chrome
+    /// Content background: secondary fill, primary icons.
+    case surface
+
+    var inactiveBackground: Color {
+        switch self {
+        case .chrome: return StashyExpandingDock.inactiveBackground
+        case .surface: return Color.secondary.opacity(0.15)
+        }
+    }
+
+    var inactiveForeground: Color {
+        switch self {
+        case .chrome: return Color.white
+        case .surface: return Color.primary
+        }
+    }
+
+    var inactiveForegroundOpacity: CGFloat {
+        switch self {
+        case .chrome: return StashyExpandingDock.inactiveIconOpacity
+        case .surface: return 0.85
+        }
+    }
+}
+
 /// Horizontal icon/pill strip: selected item expands into a labeled capsule.
 struct StashyExpandingDockBrowseStrip: View {
     let items: [StashyNavMenuItem]
     let selectionID: String
     var accessibilityLabel: String = "Section"
     var accessibilityHint: String = "Chooses which section to show"
+    var palette: StashyExpandingDockPalette = .chrome
     let onSelect: (String) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
@@ -94,6 +124,7 @@ struct StashyExpandingDockBrowseStrip: View {
                         StashyExpandingDockChip(
                             item: item,
                             isSelected: item.id == selectionID,
+                            palette: palette,
                             onSelect: {
                                 guard item.id != selectionID else { return }
                                 HapticManager.light()
@@ -126,14 +157,15 @@ struct StashyExpandingDockBrowseStrip: View {
 private struct StashyExpandingDockChip: View {
     let item: StashyNavMenuItem
     let isSelected: Bool
+    var palette: StashyExpandingDockPalette = .chrome
     let onSelect: () -> Void
 
     @ObservedObject private var appearance = AppearanceManager.shared
 
     private var activeBackground: Color { appearance.tintColor }
     private var activeForeground: Color { .white }
-    private var inactiveBackground: Color { StashyExpandingDock.inactiveBackground }
-    private var inactiveForeground: Color { Color.white }
+    private var inactiveBackground: Color { palette.inactiveBackground }
+    private var inactiveForeground: Color { palette.inactiveForeground }
 
     var body: some View {
         Button(action: onSelect) {
@@ -143,7 +175,7 @@ private struct StashyExpandingDockChip: View {
                     .foregroundStyle(
                         isSelected
                             ? activeForeground
-                            : inactiveForeground.opacity(StashyExpandingDock.inactiveIconOpacity)
+                            : inactiveForeground.opacity(palette.inactiveForegroundOpacity)
                     )
                     .frame(width: StashyExpandingDock.iconSize, height: StashyExpandingDock.iconSize)
 
@@ -181,6 +213,61 @@ private struct StashyExpandingDockChip: View {
         .buttonStyle(StashyExpandingDockButtonStyle())
         .accessibilityLabel(item.title)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+}
+
+/// Equal-width tinted pills for Tools section menus (Match, RateMe, Top).
+struct ToolsPillMenuRow: View {
+    struct Item: Identifiable, Hashable {
+        let id: String
+        let title: String
+    }
+
+    let items: [Item]
+    let selectionID: String
+    var accessibilityLabel: String = "Section"
+    let onSelect: (String) -> Void
+
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        HStack(spacing: StashyExpandingDock.itemSpacing) {
+            ForEach(items) { item in
+                let selected = item.id == selectionID
+                Button {
+                    guard item.id != selectionID else { return }
+                    HapticManager.selection()
+                    onSelect(item.id)
+                } label: {
+                    Text(item.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.85))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: StashyExpandingDock.activeHeight)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(selected ? appearance.tintColor : Color.secondary.opacity(0.15))
+                                .shadow(
+                                    color: selected ? appearance.tintColor.opacity(0.35) : .clear,
+                                    radius: 6,
+                                    x: 0,
+                                    y: 3
+                                )
+                        )
+                        .clipShape(Capsule(style: .continuous))
+                        .contentShape(Capsule(style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(item.title)\(selected ? ", selected" : "")")
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+        .padding(.horizontal, DesignTokens.Tools.contentPadding)
+        .padding(.top, DesignTokens.Tools.menuTopPadding)
+        .padding(.bottom, DesignTokens.Tools.menuBottomPadding)
+        .accessibilityLabel(accessibilityLabel)
     }
 }
 

@@ -697,13 +697,27 @@ struct TagDetailView: View {
         }
     }
     @State private var selectedDetailTab: DetailTab
+    private let preferredInitialTab: DetailTab?
 
-    init(selectedTag: Tag) {
+    init(selectedTag: Tag, initialTab: DetailTab? = nil) {
         _selectedTag = State(initialValue: selectedTag)
+        preferredInitialTab = initialTab
         let sc = selectedTag.sceneCount ?? 0
         let gal = selectedTag.galleryCount ?? 0
-        let initialTab: DetailTab = sc > 0 ? .scenes : (gal > 0 ? .galleries : .scenes)
-        _selectedDetailTab = State(initialValue: initialTab)
+        let img = selectedTag.imageCount ?? 0
+        let resolvedTab: DetailTab
+        if let initialTab {
+            resolvedTab = initialTab
+        } else if sc > 0 {
+            resolvedTab = .scenes
+        } else if gal > 0 {
+            resolvedTab = .galleries
+        } else if img > 0 {
+            resolvedTab = .images
+        } else {
+            resolvedTab = .scenes
+        }
+        _selectedDetailTab = State(initialValue: resolvedTab)
         _linkedStudios = StateObject(wrappedValue: DetailLinkedStudiosFilterModel(scope: .tag(selectedTag.id)))
         _linkedGalleries = StateObject(wrappedValue: DetailLinkedGalleriesFilterModel(scope: .tag(selectedTag.id)))
         _linkedImages = StateObject(wrappedValue: DetailLinkedImagesFilterModel(scope: .tag(selectedTag.id)))
@@ -744,14 +758,18 @@ struct TagDetailView: View {
     private var effectiveGalleries: Int {
         max(viewModel.totalTagGalleries, selectedTag.galleryCount ?? 0)
     }
-    
+
+    private var effectiveImages: Int {
+        max(viewModel.totalDetailImages, selectedTag.imageCount ?? 0)
+    }
+
     private var availableTabs: [DetailTab] {
         var tabs: [DetailTab] = []
         if effectiveScenes > 0 { tabs.append(.scenes) }
         if effectiveGalleries > 0 { tabs.append(.galleries) }
         if viewModel.totalDetailStudios > 0 { tabs.append(.studios) }
         if viewModel.totalDetailGroups > 0 { tabs.append(.groups) }
-        if viewModel.totalDetailImages > 0 { tabs.append(.images) }
+        if effectiveImages > 0 { tabs.append(.images) }
         return tabs
     }
 
@@ -784,6 +802,25 @@ struct TagDetailView: View {
             && viewModel.totalTagGalleries > 0
             && effectiveScenes == 0
             && !viewModel.isTagDetailSceneListConstrained
+    }
+
+    private var shouldAutoSwitchToTagImagesForEmptyScenes: Bool {
+        viewModel.totalTagScenes == 0
+            && !viewModel.isLoadingTagScenes
+            && effectiveImages > 0
+            && effectiveGalleries == 0
+            && effectiveScenes == 0
+            && !viewModel.isTagDetailSceneListConstrained
+    }
+
+    private func autoSwitchAwayFromEmptyTagScenes() {
+        if shouldAutoSwitchToTagGalleriesForEmptyScenes {
+            withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = .galleries }
+        } else if shouldAutoSwitchToTagImagesForEmptyScenes {
+            withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = .images }
+        } else if selectedDetailTab == .scenes, effectiveScenes == 0, let first = availableTabs.first {
+            withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = first }
+        }
     }
 
     @ViewBuilder
@@ -1080,16 +1117,28 @@ struct TagDetailView: View {
             isFavorite = selectedTag.favorite ?? false
         }
         .onChange(of: viewModel.totalTagGalleries) { oldValue, newValue in
+            guard preferredInitialTab == nil else { return }
             if newValue > 0 && shouldAutoSwitchToTagGalleriesForEmptyScenes {
                 withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = .galleries }
             }
         }
+        .onChange(of: viewModel.totalDetailImages) { _, newValue in
+            guard preferredInitialTab == nil else { return }
+            if newValue > 0 && shouldAutoSwitchToTagImagesForEmptyScenes {
+                withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = .images }
+            }
+        }
         .onChange(of: viewModel.totalTagScenes) { oldValue, newValue in
+            guard preferredInitialTab == nil else { return }
             if newValue > 0 {
                 withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = .scenes }
-            } else if shouldAutoSwitchToTagGalleriesForEmptyScenes {
-                withAnimation(DesignTokens.Animation.quick) { selectedDetailTab = .galleries }
+            } else {
+                autoSwitchAwayFromEmptyTagScenes()
             }
+        }
+        .onChange(of: viewModel.isLoadingTagScenes) { _, loading in
+            guard preferredInitialTab == nil else { return }
+            if !loading { autoSwitchAwayFromEmptyTagScenes() }
         }
         .sceneLiveUpdates(using: viewModel)
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("TagImageUpdated"))) { notification in

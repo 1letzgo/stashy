@@ -318,6 +318,9 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
     case server
     case downloads
     case statistics
+    case oCount
+    case timeline
+    case topLists
     case hotOrNot
     case rateMe
     
@@ -327,7 +330,10 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
         switch self {
         case .server: return "Server"
         case .downloads: return "Downloads"
-        case .statistics: return "Statistics"
+        case .statistics: return "Overview"
+        case .oCount: return "O-Count"
+        case .timeline: return "Timeline"
+        case .topLists: return "Charts"
         case .hotOrNot: return "Match"
         case .rateMe: return "RateMe"
         }
@@ -336,7 +342,6 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
     /// Name used in stashy+ settings / paywall lists.
     var plusFeatureTitle: String {
         switch self {
-        case .statistics: return "Advanced Statistics"
         case .hotOrNot: return "Performer Match"
         default: return title
         }
@@ -347,6 +352,9 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
         case .server: return "server.rack"
         case .downloads: return "square.and.arrow.down"
         case .statistics: return "chart.bar.fill"
+        case .oCount: return "calendar"
+        case .timeline: return "calendar.day.timeline.left"
+        case .topLists: return "list.number"
         case .hotOrNot: return "flame.fill"
         case .rateMe: return "star.fill"
         }
@@ -420,6 +428,7 @@ class TabManager: ObservableObject {
     private let userDefaultsKey = "AppTabsConfig"
     private let detailSortKey = "DetailViewsSortConfig"
     private let homeRowsKey = "HomeRowsConfig"
+    private let lastPlayedOnTopMigrationKey = "HomeRowsLastPlayedOnTop_v1"
     private let reelsModesKey = "ReelsModesConfig"
     private let toolsKey = "ToolsConfig"
     private let reelsFillHeightKey = "ReelsFillHeight"
@@ -746,6 +755,7 @@ class TabManager: ObservableObject {
             }
             if unique.count != decoded.count { saveHomeRows() }
             ensureStatisticsRow()
+            ensureLastPlayedRow()
             ensureMostViewedRow()
             ensureRandomRow()
             ensureTopCounterRow()
@@ -758,11 +768,12 @@ class TabManager: ObservableObject {
             ensurePerformersHighestOCountRow()
             ensurePerformersHighestRatingRow()
             ensureGalleriesHighestImageCountRow()
+            promoteLastPlayedRowToTopIfNeeded()
         } else {
             // Default Home Rows
             self.homeRows = [
-                HomeRowConfig(id: UUID(), title: HomeRowType.statistics.defaultTitle, isEnabled: true, sortOrder: 0, type: .statistics),
-                HomeRowConfig(id: UUID(), title: HomeRowType.lastPlayed.defaultTitle, isEnabled: true, sortOrder: 1, type: .lastPlayed),
+                HomeRowConfig(id: UUID(), title: HomeRowType.lastPlayed.defaultTitle, isEnabled: true, sortOrder: 0, type: .lastPlayed),
+                HomeRowConfig(id: UUID(), title: HomeRowType.statistics.defaultTitle, isEnabled: true, sortOrder: 1, type: .statistics),
                 HomeRowConfig(id: UUID(), title: HomeRowType.lastAdded3Min.defaultTitle, isEnabled: true, sortOrder: 2, type: .lastAdded3Min),
                 HomeRowConfig(id: UUID(), title: HomeRowType.newPerformers.defaultTitle, isEnabled: true, sortOrder: 3, type: .newPerformers),
                 HomeRowConfig(id: UUID(), title: HomeRowType.performersHighestSceneCount.defaultTitle, isEnabled: true, sortOrder: 4, type: .performersHighestSceneCount),
@@ -796,6 +807,32 @@ class TabManager: ObservableObject {
              homeRows.append(statsRow)
              saveHomeRows()
          }
+    }
+
+    private func ensureLastPlayedRow() {
+        if !homeRows.contains(where: { $0.type == .lastPlayed }) {
+            let row = HomeRowConfig(id: UUID(), title: HomeRowType.lastPlayed.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .lastPlayed)
+            homeRows.append(row)
+            saveHomeRows()
+        }
+    }
+
+    /// One-shot: Scenes – Last Played becomes the first dashboard row (hero).
+    private func promoteLastPlayedRowToTopIfNeeded() {
+        let key = "\(lastPlayedOnTopMigrationKey)\(currentServerSuffix)"
+        guard !UserDefaults.standard.bool(forKey: key) else { return }
+        UserDefaults.standard.set(true, forKey: key)
+
+        guard let index = homeRows.firstIndex(where: { $0.type == .lastPlayed }) else { return }
+        if index != 0 {
+            let row = homeRows.remove(at: index)
+            homeRows.insert(row, at: 0)
+        }
+        homeRows[0].isEnabled = true
+        for i in 0..<homeRows.count {
+            homeRows[i].sortOrder = i
+        }
+        saveHomeRows()
     }
     
     private func ensureRandomRow() {
@@ -996,18 +1033,33 @@ class TabManager: ObservableObject {
         if let data = data,
            let decoded = try? JSONDecoder().decode([ToolsItemConfig].self, from: data) {
             var result = decoded.sorted { $0.sortOrder < $1.sortOrder }
-            
-            // Ensure all tools exist (migration for new tools)
             var hasChanges = false
-            for item in ToolsItem.allCases {
-                if !result.contains(where: { $0.id == item }) {
-                    result.append(ToolsItemConfig(id: item, isEnabled: true, sortOrder: result.count))
-                    hasChanges = true
+
+            func ensureTool(_ item: ToolsItem, after: ToolsItem?, enabled: Bool) {
+                guard !result.contains(where: { $0.id == item }) else { return }
+                let config = ToolsItemConfig(id: item, isEnabled: enabled, sortOrder: 0)
+                if let after, let idx = result.firstIndex(where: { $0.id == after }) {
+                    result.insert(config, at: idx + 1)
+                } else {
+                    result.append(config)
                 }
+                hasChanges = true
             }
-            
-            self.tools = result.sorted { $0.sortOrder < $1.sortOrder }
-            
+
+            ensureTool(.statistics, after: .downloads, enabled: true)
+            let statsEnabled = result.first(where: { $0.id == .statistics })?.isEnabled ?? true
+            ensureTool(.oCount, after: .statistics, enabled: statsEnabled)
+            ensureTool(.timeline, after: .oCount, enabled: statsEnabled)
+            ensureTool(.topLists, after: .timeline, enabled: statsEnabled)
+            for item in ToolsItem.allCases {
+                ensureTool(item, after: nil, enabled: true)
+            }
+
+            result = result.enumerated().map { idx, item in
+                ToolsItemConfig(id: item.id, isEnabled: item.isEnabled, sortOrder: idx)
+            }
+            self.tools = result
+
             enforceFixedTools()
             if hasChanges { saveTools() }
         } else {
@@ -1016,8 +1068,11 @@ class TabManager: ObservableObject {
                 ToolsItemConfig(id: .downloads, isEnabled: true, sortOrder: 0),
                 ToolsItemConfig(id: .server, isEnabled: true, sortOrder: 1),
                 ToolsItemConfig(id: .statistics, isEnabled: true, sortOrder: 2),
-                ToolsItemConfig(id: .hotOrNot, isEnabled: true, sortOrder: 3),
-                ToolsItemConfig(id: .rateMe, isEnabled: true, sortOrder: 4)
+                ToolsItemConfig(id: .oCount, isEnabled: true, sortOrder: 3),
+                ToolsItemConfig(id: .timeline, isEnabled: true, sortOrder: 4),
+                ToolsItemConfig(id: .topLists, isEnabled: true, sortOrder: 5),
+                ToolsItemConfig(id: .hotOrNot, isEnabled: true, sortOrder: 6),
+                ToolsItemConfig(id: .rateMe, isEnabled: true, sortOrder: 7)
             ]
             enforceFixedTools()
             saveTools()
@@ -1035,7 +1090,7 @@ class TabManager: ObservableObject {
     var enabledTools: [ToolsItem] {
         let sorted = tools.sorted { $0.sortOrder < $1.sortOrder }
         // Server tasks live under Settings.
-        // Downloads / Advanced Statistics / Match / RateMe require stashy+ on iOS.
+        // Downloads / Overview / O-Count / Charts / Match / RateMe require stashy+ on iOS.
         return sorted.compactMap { item -> ToolsItem? in
             guard item.isEnabled, item.id != .server else { return nil }
             #if !os(tvOS)
@@ -1049,7 +1104,7 @@ class TabManager: ObservableObject {
 
     /// Tools managed / gated under stashy+.
     static func isStashyPlusTool(_ item: ToolsItem) -> Bool {
-        item == .downloads || item == .statistics || item == .hotOrNot || item == .rateMe
+        item == .downloads || item == .statistics || item == .oCount || item == .timeline || item == .topLists || item == .hotOrNot || item == .rateMe
     }
     
     func toggleTool(_ item: ToolsItem) {

@@ -220,7 +220,7 @@ struct SceneCardView: View {
     
     // Helper to format duration
     private var durationString: String? {
-        guard let duration = scene.files?.first?.duration, duration > 0 else { return nil }
+        guard let duration = scene.files?.first?.duration ?? scene.sceneDuration, duration > 0 else { return nil }
         
         let totalSeconds = Int(duration)
         let hours = totalSeconds / 3600

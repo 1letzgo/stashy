@@ -1,0 +1,230 @@
+{
+  "identifier" : "E1C8C08A",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+    {
+      "displayPrice" : "14.99",
+      "familyShareable" : false,
+      "internalID" : "A7B3C91E",
+      "localizations" : [
+        {
+          "description" : "Unlock stashy+ forever with a one-time purchase.",
+          "displayName" : "stashy+ Lifetime",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Schalte stashy+ einmalig für immer frei.",
+          "displayName" : "stashy+ Lifetime",
+          "locale" : "de"
+        }
+      ],
+      "productID" : "de.stashy.plus.l",
+      "referenceName" : "stashy+ Lifetime",
+      "type" : "NonConsumable"
+    },
+    {
+      "displayPrice" : "2.99",
+      "familyShareable" : false,
+      "internalID" : "E91B2C40",
+      "localizations" : [
+        {
+          "description" : "A small tip to support stashy. Does not unlock stashy+.",
+          "displayName" : "Small Tip",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Ein kleines Trinkgeld für stashy. Schaltet stashy+ nicht frei.",
+          "displayName" : "Kleiner Tipp",
+          "locale" : "de"
+        }
+      ],
+      "productID" : "de.stashy.tip1",
+      "referenceName" : "Small Tip",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "4.99",
+      "familyShareable" : false,
+      "internalID" : "F02C3D51",
+      "localizations" : [
+        {
+          "description" : "A medium tip to support stashy. Does not unlock stashy+.",
+          "displayName" : "Medium Tip",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Ein mittleres Trinkgeld für stashy. Schaltet stashy+ nicht frei.",
+          "displayName" : "Mittlerer Tipp",
+          "locale" : "de"
+        }
+      ],
+      "productID" : "de.stashy.tip2",
+      "referenceName" : "Medium Tip",
+      "type" : "Consumable"
+    },
+    {
+      "displayPrice" : "9.99",
+      "familyShareable" : false,
+      "internalID" : "A13D4E62",
+      "localizations" : [
+        {
+          "description" : "A large tip to support stashy. Does not unlock stashy+.",
+          "displayName" : "Large Tip",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Ein großes Trinkgeld für stashy. Schaltet stashy+ nicht frei.",
+          "displayName" : "Großer Tipp",
+          "locale" : "de"
+        }
+      ],
+      "productID" : "de.stashy.tip3",
+      "referenceName" : "Large Tip",
+      "type" : "Consumable"
+    }
+  ],
+  "settings" : {
+    "_failTransactionsEnabled" : false,
+    "_locale" : "en_US",
+    "_storefront" : "USA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Verification"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Store Sync"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Subscription Status"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "App Transaction"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Manage Subscriptions Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Refund Request Sheet"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Offer Code Redeem Sheet"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "B4E91D20",
+      "localizations" : [
+        {
+          "description" : "Premium features for stashy",
+          "displayName" : "stashy+",
+          "locale" : "en_US"
+        },
+        {
+          "description" : "Premium-Funktionen für stashy",
+          "displayName" : "stashy+",
+          "locale" : "de"
+        }
+      ],
+      "name" : "stashy+",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "1.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "C12F88A0",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlock AI subtitles and translation, Download Scenes, Match, RateMe, and AI Motion.",
+              "displayName" : "stashy+ Monthly",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "Schaltet AI-Untertitel und Übersetzung, Download Scenes, Match, RateMe und AI Motion frei.",
+              "displayName" : "stashy+ Monatlich",
+              "locale" : "de"
+            }
+          ],
+          "productID" : "de.stashy.plus.m",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "stashy+ Monthly",
+          "subscriptionGroupID" : "B4E91D20",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        },
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "9.99",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "D83A11F4",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlock AI subtitles and translation, Download Scenes, Match, RateMe, and AI Motion.",
+              "displayName" : "stashy+ Yearly",
+              "locale" : "en_US"
+            },
+            {
+              "description" : "Schaltet AI-Untertitel und Übersetzung, Download Scenes, Match, RateMe und AI Motion frei.",
+              "displayName" : "stashy+ Jährlich",
+              "locale" : "de"
+            }
+          ],
+          "productID" : "de.stashy.plus.y",
+          "recurringSubscriptionPeriod" : "P1Y",
+          "referenceName" : "stashy+ Yearly",
+          "subscriptionGroupID" : "B4E91D20",
+          "type" : "RecurringSubscription",
+          "winbackOffers" : [
+
+          ]
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}

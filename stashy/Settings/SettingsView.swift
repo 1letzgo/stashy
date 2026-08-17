@@ -231,36 +231,51 @@ struct SettingsView: View {
             Section {
                 stashyScrollingSectionHeader("Tools")
                 StashyPlusToolToggle(item: .downloads)
-                    .stashyGroupedBlockRow(index: 0, count: 4)
+                    .stashyGroupedBlockRow(index: 0, count: 7)
                 StashyPlusToolToggle(item: .statistics)
-                    .stashyGroupedBlockRow(index: 1, count: 4)
+                    .stashyGroupedBlockRow(index: 1, count: 7)
+                StashyPlusToolToggle(item: .oCount)
+                    .stashyGroupedBlockRow(index: 2, count: 7)
+                StashyPlusToolToggle(item: .timeline)
+                    .stashyGroupedBlockRow(index: 3, count: 7)
+                StashyPlusToolToggle(item: .topLists)
+                    .stashyGroupedBlockRow(index: 4, count: 7)
                 StashyPlusToolToggle(item: .hotOrNot)
-                    .stashyGroupedBlockRow(index: 2, count: 4)
+                    .stashyGroupedBlockRow(index: 5, count: 7)
                 StashyPlusToolToggle(item: .rateMe)
-                    .stashyGroupedBlockRow(index: 3, count: 4)
+                    .stashyGroupedBlockRow(index: 6, count: 7)
             }
         } else {
             Section {
                 stashyScrollingSectionHeader("Included with stashy+")
                 Label("Custom App Icons", systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 0, count: 7)
+                    .stashyGroupedBlockRow(index: 0, count: 10)
                 Label("Download Scenes", systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 1, count: 7)
+                    .stashyGroupedBlockRow(index: 1, count: 10)
                 lockedPlusFeature("AI Subtitles and translation", systemImage: "lock.fill", isBeta: true)
-                    .stashyGroupedBlockRow(index: 2, count: 7)
+                    .stashyGroupedBlockRow(index: 2, count: 10)
                 lockedPlusFeature(AIMotionCopy.name, systemImage: "lock.fill", isBeta: true)
-                    .stashyGroupedBlockRow(index: 3, count: 7)
+                    .stashyGroupedBlockRow(index: 3, count: 10)
                 Label(ToolsItem.statistics.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 4, count: 7)
+                    .stashyGroupedBlockRow(index: 4, count: 10)
+                Label(ToolsItem.oCount.plusFeatureTitle, systemImage: "lock.fill")
+                    .foregroundColor(.secondary)
+                    .stashyGroupedBlockRow(index: 5, count: 10)
+                Label(ToolsItem.timeline.plusFeatureTitle, systemImage: "lock.fill")
+                    .foregroundColor(.secondary)
+                    .stashyGroupedBlockRow(index: 6, count: 10)
+                Label(ToolsItem.topLists.plusFeatureTitle, systemImage: "lock.fill")
+                    .foregroundColor(.secondary)
+                    .stashyGroupedBlockRow(index: 7, count: 10)
                 Label(ToolsItem.hotOrNot.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 5, count: 7)
+                    .stashyGroupedBlockRow(index: 8, count: 10)
                 Label(ToolsItem.rateMe.title, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 6, count: 7)
+                    .stashyGroupedBlockRow(index: 9, count: 10)
             }
         }
 
@@ -284,7 +299,7 @@ struct SettingsView: View {
 
     private var appStoreBanner: some View {
         Button {
-            if let url = URL(string: "https://discord.gg/cGpVgRbHQ") {
+            if let url = URL(string: "https://apps.apple.com/us/app/stashy/id6754876029") {
                 openURL(url)
             }
         } label: {
@@ -316,7 +331,7 @@ struct SettingsView: View {
 
                 HStack {
                     Spacer()
-                    Text("Join Discord")
+                    Text("Open App Store")
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.white)
                         .padding(.horizontal, 16)
@@ -484,7 +499,7 @@ struct SettingsView: View {
                     }
 
                     if !stashyPlus.isUnlocked {
-                        stashyScrollingSectionFooter("Monthly, Yearly, or Lifetime. If you bought the app at full price, tap Restore Purchases.")
+                        stashyScrollingSectionFooter("Monthly, Yearly, or Lifetime. If you bought stashy as a paid app before 3.0, tap Restore Purchases.")
                     }
                 }
             }
@@ -557,6 +572,13 @@ struct SettingsView: View {
         product.displayPrice
     }
 
+    private var restoreFailureMessage: String {
+        if isTestFlightBuild() {
+            return "TestFlight can’t restore a paid App Store purchase from before 3.0. Lifetime and subscriptions restore in the App Store build."
+        }
+        return "No stashy+ subscription or Lifetime purchase on this Apple ID. Pre-3.0 paid-app buyers get Lifetime via Restore Purchases."
+    }
+
     private func restorePurchases() async {
         let wasUnlocked = stashyPlus.isUnlocked
         await storeManager.restorePurchases()
@@ -568,7 +590,7 @@ struct SettingsView: View {
             )
         } else {
             ToastManager.shared.show(
-                "No stashy+ purchase found on this Apple ID",
+                restoreFailureMessage,
                 icon: "info.circle",
                 style: .error
             )
@@ -640,7 +662,7 @@ struct SettingsView: View {
                     .stashyGroupedSettingsRow()
                 }
             } else {
-                ForEach(sortedTipProducts) { product in
+                ForEach(Array(sortedTipProducts.enumerated()), id: \.element.id) { index, product in
                     Button {
                         Task { await purchaseTip(product) }
                     } label: {
@@ -660,7 +682,7 @@ struct SettingsView: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(storeManager.isPurchasing)
-                    .stashySettingsCardRow()
+                    .stashyGroupedBlockRow(index: index, count: sortedTipProducts.count)
                 }
             }
             stashyScrollingSectionFooter("Support stashy. Tips do not unlock stashy+.")
@@ -816,8 +838,7 @@ class StoreManager: ObservableObject {
         }
     }
 
-    /// Refresh entitlements from StoreKit (subscriptions, lifetime, legacy paid app).
-    /// Existing UserDefaults from the old tip-unlock era still count; new tips do not.
+    /// Refresh entitlements from StoreKit (subscriptions, lifetime, paid app before 3.0).
     func syncUnlockFromStore() async {
         for await result in Transaction.unfinished {
             guard case .verified(let transaction) = result else { continue }
@@ -830,8 +851,6 @@ class StoreManager: ObservableObject {
         var hasLifetimePurchase = false
         var subscriptionProductID: String?
         var subscriptionExpiration: Date?
-        let legacyTip = UserDefaults.standard.integer(forKey: StashyPlusManager.tipsCountKey) > 0
-            || UserDefaults.standard.bool(forKey: StashyPlusManager.unlockedKey)
 
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else { continue }
@@ -860,7 +879,6 @@ class StoreManager: ObservableObject {
             // previously persisted grandfathering and retry a few times.
             legacyPaidApp = UserDefaults.standard.string(forKey: StashyPlusManager.sourceKey)
                 == StashyPlusSource.legacyPaidApp.rawValue
-                || UserDefaults.standard.bool(forKey: StashyPlusManager.lifetimeKey)
             if legacyPaidRetryCount < 3 {
                 legacyPaidRetryCount += 1
                 let attempt = legacyPaidRetryCount
@@ -875,8 +893,7 @@ class StoreManager: ObservableObject {
             hasLifetimePurchase: hasLifetimePurchase,
             subscriptionProductID: subscriptionProductID,
             subscriptionExpiration: subscriptionExpiration,
-            legacyPaidApp: legacyPaidApp,
-            legacyTip: legacyTip
+            legacyPaidApp: legacyPaidApp
         )
 
         if StashyPlusManager.shared.isUnlocked {
@@ -966,8 +983,6 @@ class StoreManager: ObservableObject {
         var hasLifetimePurchase = false
         var subscriptionProductID: String?
         var subscriptionExpiration: Date?
-        let legacyTip = UserDefaults.standard.integer(forKey: StashyPlusManager.tipsCountKey) > 0
-            || UserDefaults.standard.bool(forKey: StashyPlusManager.unlockedKey)
 
         for await result in Transaction.currentEntitlements {
             guard case .verified(let transaction) = result else { continue }
@@ -989,15 +1004,13 @@ class StoreManager: ObservableObject {
         case .unknown:
             legacyPaidApp = UserDefaults.standard.string(forKey: StashyPlusManager.sourceKey)
                 == StashyPlusSource.legacyPaidApp.rawValue
-                || UserDefaults.standard.bool(forKey: StashyPlusManager.lifetimeKey)
         }
         await MainActor.run {
             StashyPlusManager.shared.applyStoreEntitlements(
                 hasLifetimePurchase: hasLifetimePurchase,
                 subscriptionProductID: subscriptionProductID,
                 subscriptionExpiration: subscriptionExpiration,
-                legacyPaidApp: legacyPaidApp,
-                legacyTip: legacyTip
+                legacyPaidApp: legacyPaidApp
             )
         }
     }

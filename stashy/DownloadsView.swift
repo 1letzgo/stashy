@@ -82,10 +82,10 @@ struct DownloadsView: View {
                                     .background(Color.secondaryAppBackground)
                                     .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                                     .subtleShadow()
-                                    .padding(.horizontal)
+                                    .padding(.horizontal, DesignTokens.Tools.contentPadding)
                                 }
                             }
-                            .padding(.top)
+                            .padding(.top, DesignTokens.Tools.menuTopPadding)
                         }
                         
                         // Completed Downloads Section
@@ -94,7 +94,7 @@ struct DownloadsView: View {
                                 if !downloadManager.activeDownloads.isEmpty {
                                     Text("Completed")
                                         .font(.headline)
-                                        .padding(.horizontal)
+                                        .padding(.horizontal, DesignTokens.Tools.contentPadding)
                                 }
                                 
                                 LazyVStack(spacing: 12) {
@@ -105,9 +105,9 @@ struct DownloadsView: View {
                                         .buttonStyle(.plain)
                                     }
                                 }
-                                .padding(.horizontal)
+                                .padding(.horizontal, DesignTokens.Tools.contentPadding)
                             }
-                            .padding(.top, downloadManager.activeDownloads.isEmpty ? 16 : 0)
+                            .padding(.top, downloadManager.activeDownloads.isEmpty ? DesignTokens.Tools.menuTopPadding : 0)
                         }
                     }
                 }

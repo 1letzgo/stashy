@@ -3,8 +3,8 @@
 //  stashy
 //
 //  Entitlement gate for stashy+ (AI subtitles, Downloads, Advanced Statistics, Match, RateMe, AI Motion, App Icon).
-//  Unlocked via subscription, lifetime IAP, or legacy paid-app purchase.
-//  Old tip-jar UserDefaults still grant lifetime; new tips never do.
+//  Unlocked via subscription, lifetime IAP, or a paid App Store purchase before 3.0.
+//  Tips never grant stashy+.
 //
 
 #if !os(tvOS)
@@ -52,30 +52,28 @@ enum StashyPlusSource: String, Equatable {
     case subscription
     case lifetime
     case legacyPaidApp
+    /// Stored by older builds that unlocked from tips — treated as locked.
     case legacyTip
 
     var statusTitle: String {
         switch self {
-        case .none: return "Not unlocked"
+        case .none, .legacyTip: return "Not unlocked"
         case .subscription: return "stashy+ active"
         case .lifetime: return "stashy+ Lifetime"
         case .legacyPaidApp: return "stashy+ Lifetime"
-        case .legacyTip: return "stashy+ Lifetime"
         }
     }
 
     var statusDetail: String {
         switch self {
-        case .none:
+        case .none, .legacyTip:
             return "Subscribe or buy Lifetime to unlock premium features."
         case .subscription:
             return "Thanks for supporting stashy."
         case .lifetime:
             return "Unlocked forever on this Apple ID."
         case .legacyPaidApp:
-            return "Included because you bought stashy at full price."
-        case .legacyTip:
-            return "Included from your earlier tip — thank you!"
+            return "Included because you bought stashy at full price before 3.0."
         }
     }
 }
@@ -85,9 +83,9 @@ enum StashyPlusSource: String, Equatable {
 final class StashyPlusManager: ObservableObject {
     static let shared = StashyPlusManager()
 
-    /// Permanent unlock (lifetime IAP, paid-app grandfathering, or migrated tip jar).
+    /// Permanent unlock (lifetime IAP or paid-app grandfathering).
     nonisolated static let lifetimeKey = "stashy_plus_lifetime"
-    /// Legacy tip-era flag — treated as lifetime.
+    /// Legacy tip-era flag — no longer grants access.
     nonisolated static let unlockedKey = "stashy_plus_unlocked"
     nonisolated static let tipsCountKey = "totalTipsCount"
     nonisolated static let subscriptionExpirationKey = "stashy_plus_subscription_expiration"
@@ -115,10 +113,8 @@ final class StashyPlusManager: ObservableObject {
     var hasStashyPlus: Bool { isUnlocked }
     var hasLifetime: Bool {
         if UserDefaults.standard.bool(forKey: Self.debugForceLockedKey) { return false }
-        return source == .lifetime || source == .legacyPaidApp || source == .legacyTip
-            || UserDefaults.standard.bool(forKey: Self.lifetimeKey)
-            || UserDefaults.standard.bool(forKey: Self.unlockedKey)
-            || UserDefaults.standard.integer(forKey: Self.tipsCountKey) > 0
+        return source == .lifetime || source == .legacyPaidApp
+            || (UserDefaults.standard.bool(forKey: Self.lifetimeKey) && Self.storedSourceGrantsLifetime)
     }
 
     /// Whether the paywall / plan list should be shown.
@@ -129,13 +125,18 @@ final class StashyPlusManager: ObservableObject {
         return source == .subscription
     }
 
+    private static var storedSourceGrantsLifetime: Bool {
+        let raw = UserDefaults.standard.string(forKey: sourceKey) ?? ""
+        let stored = StashyPlusSource(rawValue: raw) ?? .none
+        return stored == .lifetime || stored == .legacyPaidApp
+    }
+
     /// Thread-safe read for non-`MainActor` call sites.
     nonisolated static var isUnlockedNow: Bool {
         let defaults = UserDefaults.standard
         if defaults.bool(forKey: debugForceLockedKey) { return false }
-        if defaults.bool(forKey: lifetimeKey)
-            || defaults.bool(forKey: unlockedKey)
-            || defaults.integer(forKey: tipsCountKey) > 0 {
+        let stored = StashyPlusSource(rawValue: defaults.string(forKey: sourceKey) ?? "") ?? .none
+        if defaults.bool(forKey: lifetimeKey), stored == .lifetime || stored == .legacyPaidApp {
             return true
         }
         let exp = defaults.double(forKey: subscriptionExpirationKey)
@@ -144,16 +145,10 @@ final class StashyPlusManager: ObservableObject {
 
     private init() {
         let defaults = UserDefaults.standard
-        // Migrate tip-era unlock → lifetime.
-        if defaults.bool(forKey: Self.unlockedKey) || defaults.integer(forKey: Self.tipsCountKey) > 0 {
-            defaults.set(true, forKey: Self.lifetimeKey)
-            if defaults.string(forKey: Self.sourceKey) == nil {
-                defaults.set(StashyPlusSource.legacyTip.rawValue, forKey: Self.sourceKey)
-            }
-        }
+        Self.revokeTipEraUnlockIfNeeded()
 
         let storedSource = StashyPlusSource(rawValue: defaults.string(forKey: Self.sourceKey) ?? "") ?? .none
-        self.source = storedSource
+        self.source = storedSource == .legacyTip ? .none : storedSource
         self.activeProductID = defaults.string(forKey: Self.activeProductIDKey)
         let exp = defaults.double(forKey: Self.subscriptionExpirationKey)
         self.subscriptionExpiration = exp > 0 ? Date(timeIntervalSince1970: exp) : nil
@@ -165,13 +160,28 @@ final class StashyPlusManager: ObservableObject {
         }
     }
 
+    /// Tips must not keep stashy+ from older builds.
+    nonisolated private static func revokeTipEraUnlockIfNeeded() {
+        let defaults = UserDefaults.standard
+        let stored = StashyPlusSource(rawValue: defaults.string(forKey: sourceKey) ?? "") ?? .none
+        let tipFlag = defaults.bool(forKey: unlockedKey) || defaults.integer(forKey: tipsCountKey) > 0
+        guard stored == .legacyTip || (tipFlag && stored != .lifetime && stored != .legacyPaidApp && stored != .subscription) else {
+            return
+        }
+        defaults.set(false, forKey: lifetimeKey)
+        defaults.set(false, forKey: unlockedKey)
+        defaults.set(StashyPlusSource.none.rawValue, forKey: sourceKey)
+        if stored == .legacyTip {
+            defaults.removeObject(forKey: activeProductIDKey)
+        }
+    }
+
     /// Apply a verified StoreKit entitlement snapshot.
     func applyStoreEntitlements(
         hasLifetimePurchase: Bool,
         subscriptionProductID: String?,
         subscriptionExpiration: Date?,
-        legacyPaidApp: Bool,
-        legacyTip: Bool
+        legacyPaidApp: Bool
     ) {
         let defaults = UserDefaults.standard
         if defaults.bool(forKey: Self.debugForceLockedKey) {
@@ -183,13 +193,15 @@ final class StashyPlusManager: ObservableObject {
             return
         }
 
-        let permanent = hasLifetimePurchase || legacyPaidApp || legacyTip
-            || defaults.bool(forKey: Self.lifetimeKey)
-            || defaults.bool(forKey: Self.unlockedKey)
-            || defaults.integer(forKey: Self.tipsCountKey) > 0
+        let stored = StashyPlusSource(rawValue: defaults.string(forKey: Self.sourceKey) ?? "") ?? .none
+        let persistedPaidLifetime = defaults.bool(forKey: Self.lifetimeKey)
+            && (stored == .lifetime || stored == .legacyPaidApp)
+        let permanent = hasLifetimePurchase || legacyPaidApp || persistedPaidLifetime
 
         if permanent {
             defaults.set(true, forKey: Self.lifetimeKey)
+        } else {
+            defaults.set(false, forKey: Self.lifetimeKey)
         }
 
         let subActive: Bool = {
@@ -210,12 +222,10 @@ final class StashyPlusManager: ObservableObject {
             newSource = .lifetime
         } else if legacyPaidApp {
             newSource = .legacyPaidApp
-        } else if legacyTip || defaults.bool(forKey: Self.unlockedKey) || defaults.integer(forKey: Self.tipsCountKey) > 0 {
-            newSource = .legacyTip
         } else if subActive {
             newSource = .subscription
         } else if permanent {
-            newSource = StashyPlusSource(rawValue: defaults.string(forKey: Self.sourceKey) ?? "") ?? .lifetime
+            newSource = stored == .legacyPaidApp ? .legacyPaidApp : .lifetime
         } else {
             newSource = .none
         }
@@ -236,7 +246,7 @@ final class StashyPlusManager: ObservableObject {
         }
     }
 
-    /// Permanent unlock after lifetime IAP (or migrated tip).
+    /// Permanent unlock after lifetime IAP.
     func unlockLifetime(source newSource: StashyPlusSource = .lifetime) {
         let defaults = UserDefaults.standard
         clearDebugForceLock()
@@ -258,14 +268,17 @@ final class StashyPlusManager: ObservableObject {
         }
     }
 
-    /// @available backward-compatible alias used by older call sites.
-    func unlockFromTip(incrementCount: Bool = true) {
+    /// Record a consumable tip. Does **not** unlock stashy+.
+    func recordTip(incrementCount: Bool = true) {
         if incrementCount {
             let tips = UserDefaults.standard.integer(forKey: Self.tipsCountKey)
             UserDefaults.standard.set(tips + 1, forKey: Self.tipsCountKey)
         }
-        UserDefaults.standard.set(true, forKey: Self.unlockedKey)
-        unlockLifetime(source: .legacyTip)
+    }
+
+    /// @available backward-compatible alias — tips never grant access.
+    func unlockFromTip(incrementCount: Bool = true) {
+        recordTip(incrementCount: incrementCount)
     }
 
     func unlockFromExistingPurchase() {

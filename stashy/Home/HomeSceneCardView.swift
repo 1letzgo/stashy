@@ -70,7 +70,7 @@ struct HomeSceneCardView: View {
                             .clipShape(Capsule())
                     }
                     Spacer()
-                    if let duration = scene.files?.first?.duration {
+                    if let duration = scene.files?.first?.duration ?? scene.sceneDuration {
                         Text(formatDuration(duration))
                             .font(.system(size: isLarge ? 10 : 10, weight: .bold))
                             .foregroundColor(.white)
