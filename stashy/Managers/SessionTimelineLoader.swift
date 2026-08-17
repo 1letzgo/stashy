@@ -14,6 +14,7 @@ struct TimelineSceneSnapshot: Equatable {
     let title: String
     let thumbnailPath: String?
     let duration: Double?
+    let resumeTime: Double?
     let studio: SceneStudio?
     let tags: [Tag]
     let performers: [ScenePerformer]
@@ -39,7 +40,7 @@ struct TimelineSceneSnapshot: Equatable {
             tags: tags.isEmpty ? nil : tags,
             galleries: nil,
             organized: nil,
-            resumeTime: nil,
+            resumeTime: resumeTime,
             playCount: nil,
             oCounter: nil,
             rating100: nil,
@@ -67,9 +68,52 @@ struct TimelineVisit: Identifiable, Equatable {
     let scene: TimelineSceneSnapshot
     let startedAt: Date
     let watchedSeconds: TimeInterval
+    let sceneStartSeconds: TimeInterval?
     let oCountTimes: [Date]
 
     var oCount: Int { oCountTimes.count }
+}
+
+/// In-scene playhead when Stashy recorded a play. Stash `play_history` is wall-clock only.
+enum TimelinePlayStartStore {
+    private struct Entry: Codable {
+        let sceneId: String
+        let playedAt: TimeInterval
+        let startSeconds: Double
+    }
+
+    static func record(sceneId: String, startSeconds: Double, at date: Date = Date()) {
+        guard startSeconds.isFinite, startSeconds >= 0 else { return }
+        var entries = load()
+        entries.append(Entry(sceneId: sceneId, playedAt: date.timeIntervalSince1970, startSeconds: startSeconds))
+        let cutoff = Date().addingTimeInterval(-SessionTimelineLoader.maxLookbackSeconds).timeIntervalSince1970
+        entries.removeAll { $0.playedAt < cutoff }
+        save(entries)
+    }
+
+    static func startSeconds(sceneId: String, playedAt: Date) -> Double? {
+        let target = playedAt.timeIntervalSince1970
+        let match = load()
+            .filter { $0.sceneId == sceneId }
+            .min { abs($0.playedAt - target) < abs($1.playedAt - target) }
+        guard let match, abs(match.playedAt - target) <= 120 else { return nil }
+        return match.startSeconds
+    }
+
+    private static func defaultsKey() -> String {
+        let id = ServerConfigManager.shared.activeConfig?.id.uuidString ?? "default"
+        return "stashy_timeline_play_starts_\(id)"
+    }
+
+    private static func load() -> [Entry] {
+        guard let data = UserDefaults.standard.data(forKey: defaultsKey()) else { return [] }
+        return (try? JSONDecoder().decode([Entry].self, from: data)) ?? []
+    }
+
+    private static func save(_ entries: [Entry]) {
+        guard let data = try? JSONEncoder().encode(entries) else { return }
+        UserDefaults.standard.set(data, forKey: defaultsKey())
+    }
 }
 
 struct TimelineSession: Identifiable, Equatable {
@@ -281,6 +325,9 @@ final class SessionTimelineLoader: ObservableObject {
             let plays = playTimes(for: row).filter { range.contains($0) }.sorted()
             let os = (row.o_history ?? []).compactMap(\.date).filter { range.contains($0) }.sorted()
 
+            let latestPlay = playTimes(for: row).sorted().last ?? row.last_played_at?.date
+            let resume = row.resume_time ?? 0
+
             if plays.isEmpty {
                 for stamp in os {
                     visits.append(
@@ -289,6 +336,7 @@ final class SessionTimelineLoader: ObservableObject {
                             scene: snapshot,
                             startedAt: stamp,
                             watchedSeconds: 60,
+                            sceneStartSeconds: nil,
                             oCountTimes: [stamp]
                         )
                     )
@@ -311,6 +359,13 @@ final class SessionTimelineLoader: ObservableObject {
                         scene: snapshot,
                         startedAt: start,
                         watchedSeconds: watched,
+                        sceneStartSeconds: Self.sceneStartSeconds(
+                            sceneId: snapshot.id,
+                            playedAt: start,
+                            watchedSeconds: watched,
+                            resumeTime: resume,
+                            isLatestPlay: latestPlay.map { abs($0.timeIntervalSince(start)) < 2 } ?? false
+                        ),
                         oCountTimes: attached
                     )
                 )
@@ -324,6 +379,7 @@ final class SessionTimelineLoader: ObservableObject {
                         scene: snapshot,
                         startedAt: stamp,
                         watchedSeconds: 60,
+                        sceneStartSeconds: nil,
                         oCountTimes: [stamp]
                     )
                 )
@@ -361,6 +417,21 @@ final class SessionTimelineLoader: ObservableObject {
             endedAt: max(end, start),
             visits: chronological
         )
+    }
+
+    private static func sceneStartSeconds(
+        sceneId: String,
+        playedAt: Date,
+        watchedSeconds: TimeInterval,
+        resumeTime: Double,
+        isLatestPlay: Bool
+    ) -> TimeInterval? {
+        if let stored = TimelinePlayStartStore.startSeconds(sceneId: sceneId, playedAt: playedAt), stored >= 5 {
+            return stored
+        }
+        guard isLatestPlay, resumeTime > 5 else { return nil }
+        let estimated = max(0, resumeTime - watchedSeconds)
+        return estimated >= 5 ? estimated : nil
     }
 
     private static func playTimes(for row: TimelineSceneRow) -> [Date] {
@@ -445,6 +516,7 @@ private enum QueryVariant: CaseIterable {
               title
               last_played_at
               play_duration
+              resume_time
               paths { screenshot }
               studio { id name }
               \(extraSceneFields)
@@ -478,6 +550,7 @@ private struct TimelineSceneRow: Decodable {
     let title: String?
     let last_played_at: FlexibleJSONTime?
     let play_duration: Double?
+    let resume_time: Double?
     let play_history: [FlexibleJSONTime]?
     let o_history: [FlexibleJSONTime]?
     let files: [FileDuration]?
@@ -551,6 +624,7 @@ private struct TimelineSceneRow: Decodable {
                 ? title! : "Untitled",
             thumbnailPath: paths?.screenshot,
             duration: duration,
+            resumeTime: resume_time,
             studio: studioModel,
             tags: tagModels,
             performers: performerModels

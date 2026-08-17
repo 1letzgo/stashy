@@ -106,7 +106,7 @@ private struct TimelineDayBlock: View {
     var body: some View {
         VStack(alignment: isRegular ? .center : .leading, spacing: 18) {
             Text(Self.dayFormatter.string(from: day.day))
-                .font(.headline)
+                .font(.title3.weight(.semibold))
                 .frame(maxWidth: .infinity, alignment: isRegular ? .center : .leading)
 
             ForEach(day.sessions) { session in
@@ -214,6 +214,12 @@ private struct TimelineSessionBlock: View {
         if minutes < 60 { return "\(minutes)m watched" }
         return "\(minutes / 60)h \(minutes % 60)m watched"
     }
+
+    static func watchedLine(for visit: TimelineVisit) -> String {
+        let watched = watchedLabel(visit.watchedSeconds)
+        guard let start = visit.sceneStartSeconds, start >= 5 else { return watched }
+        return "started at \(clock(start))  ·  \(watched)"
+    }
 }
 
 private struct TimelineSpine: View {
@@ -224,7 +230,7 @@ private struct TimelineSpine: View {
     private var isRegular: Bool { sizeClass == .regular }
 
     var body: some View {
-        LazyVStack(spacing: 16) {
+        VStack(spacing: 16) {
             ForEach(visits) { visit in
                 TimelineVisitRow(visit: visit, largeThumb: isRegular)
             }
@@ -308,9 +314,10 @@ private struct TimelineVisitCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            Text(TimelineSessionBlock.watchedLabel(visit.watchedSeconds))
+            Text(TimelineSessionBlock.watchedLine(for: visit))
                 .font(.caption)
                 .foregroundStyle(.secondary)
+                .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             if visit.oCount > 0 {

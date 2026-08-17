@@ -4897,6 +4897,10 @@ extension ReelItemView {
     }
     
     func incrementPlayCount() {
+        if case .scene = item, let sceneId = item.sceneID {
+            let seconds = player?.currentTime().seconds ?? item.startTime
+            TimelinePlayStartStore.record(sceneId: sceneId, startSeconds: seconds)
+        }
         if let currentCount = item.playCount {
             onPlayCountChanged(currentCount + 1)
         }

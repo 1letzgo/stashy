@@ -809,6 +809,7 @@ struct SceneDetailView: View {
     }
 
     private func registerScenePlay() {
+        TimelinePlayStartStore.record(sceneId: activeScene.id, startSeconds: currentPlaybackTime)
         viewModel.addScenePlay(sceneId: activeScene.id)
         hasAddedPlay = true
         NotificationCenter.default.post(
