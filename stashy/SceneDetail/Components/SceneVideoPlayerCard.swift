@@ -331,6 +331,10 @@ struct SceneVideoPlayerCard: View {
 
 // MARK: - Scene metadata (separate card under the player)
 
+private enum SceneMetadataPillStyle {
+    static let height: CGFloat = 28
+}
+
 struct SceneDetailMetadataCard: View {
     @Binding var activeScene: Scene
     @Binding var player: AVPlayer?
@@ -507,11 +511,11 @@ struct SceneDetailMetadataCard: View {
             .frame(maxWidth: .infinity)
 
             HStack(spacing: 0) {
+                languageAndCaptionsControls
+                Spacer(minLength: 4)
                 addMarkerButton
                 Spacer(minLength: 4)
-                setTagImageButton
-                Spacer(minLength: 4)
-                setSceneCoverButton
+                setImageMenu
                 Spacer(minLength: 4)
                 qualityMenu
                 if activeScene.hasCaptions {
@@ -520,13 +524,6 @@ struct SceneDetailMetadataCard: View {
                 }
             }
             .frame(maxWidth: .infinity)
-
-            HStack(spacing: 4) {
-                setLanguageMenu
-                teleprompterControls
-                Spacer(minLength: 0)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
         }
     }
 
@@ -557,38 +554,32 @@ struct SceneDetailMetadataCard: View {
     }
 
     @ViewBuilder
-    private var setTagImageButton: some View {
-        Button(action: captureTagImageFrameAndPresentSheet) {
-            infoPill(
-                icon: isCapturingTagFrame ? "hourglass" : "tag.fill",
-                text: "Tag Image",
-                color: .orange
-            )
-        }
-        .buttonStyle(.plain)
-        // Only dim this pill while it is busy — do not couple to Scene Cover.
-        .disabled(isCapturingTagFrame)
-        .opacity(isCapturingTagFrame ? 0.7 : 1)
-        .accessibilityLabel("Set tag image from current frame")
-    }
+    private var setImageMenu: some View {
+        let isBusy = isCapturingTagFrame || isSettingSceneCover
+        Menu {
+            Button(action: captureTagImageFrameAndPresentSheet) {
+                Label("Tag Image", systemImage: "tag.fill")
+            }
+            .disabled(isBusy)
 
-    @ViewBuilder
-    private var setSceneCoverButton: some View {
-        Button {
-            guard !isSettingSceneCover, !isCapturingTagFrame else { return }
-            HapticManager.light()
-            showingSetSceneCoverConfirm = true
+            Button {
+                guard !isBusy else { return }
+                HapticManager.light()
+                showingSetSceneCoverConfirm = true
+            } label: {
+                Label("Scene Cover", systemImage: "photo")
+            }
+            .disabled(isBusy)
         } label: {
             infoPill(
-                icon: isSettingSceneCover ? "hourglass" : "photo",
-                text: "Scene Cover",
+                icon: isBusy ? "hourglass" : "photo.on.rectangle.angled",
+                text: "Set Image",
                 color: .purple
             )
         }
-        .buttonStyle(.plain)
-        .disabled(isSettingSceneCover)
-        .opacity(isSettingSceneCover ? 0.7 : 1)
-        .accessibilityLabel("Set scene cover from current frame")
+        .disabled(isBusy)
+        .opacity(isBusy ? 0.7 : 1)
+        .accessibilityLabel("Set image from current frame")
     }
 
     private func currentCaptureTime() -> CMTime {
@@ -706,7 +697,7 @@ struct SceneDetailMetadataCard: View {
             )
         }
         .padding(.horizontal, 8)
-        .frame(height: 24)
+        .frame(height: SceneMetadataPillStyle.height)
         .background(Color.pillAccent.opacity(0.1))
         .foregroundColor(Color.pillAccent)
         .clipShape(Capsule())
@@ -924,128 +915,29 @@ struct SceneDetailMetadataCard: View {
     }
 
     @ViewBuilder
-    private var setLanguageMenu: some View {
-        // Stable label + frozen options: rebuilding Menu content/label while open makes it flicker.
+    private var languageAndCaptionsControls: some View {
+        let userLang = SubtitleTargetLanguage.load()
+        let active = transcriptionController.isTeleprompterModeActive
         let selected = SpeechTranscriberAvailability.matchingPickerId(
             stored: activeScene.spokenLanguageCode,
             optionIds: speechSupportedLanguageOptions.map(\.id)
         )
-        let code = SpeechTranscriberAvailability.shortPickerLabel(
-            stored: activeScene.spokenLanguageCode,
-            selectedId: selected
-        )
-        SceneLanguageMenu(
-            options: speechSupportedLanguageOptions,
-            selectedCode: selected,
-            labelCode: code,
-            onSelect: { applySceneLanguage($0) }
+
+        SceneLanguageAndCaptionsMenu(
+            languageOptions: speechSupportedLanguageOptions,
+            selectedLanguageCode: selected,
+            onSelectLanguage: { applySceneLanguage($0) },
+            mode: transcriptionController.mode,
+            userLanguage: userLang,
+            isActive: active,
+            needsSpeechModelDownload: transcriptionController.needsSpeechModelDownload,
+            speechModelName: transcriptionController.downloadingModelLanguage,
+            needsTranslationPack: captionTranslator.needsLanguageDownload,
+            onSelectMode: { setTeleprompterMode($0) },
+            onDownloadSpeechModel: { transcriptionController.approveSpeechModelDownload() },
+            onDownloadTranslationPack: { captionTranslator.approveDownload() }
         )
         .equatable()
-    }
-
-    @ViewBuilder
-    private var teleprompterControls: some View {
-        let userLang = SubtitleTargetLanguage.load()
-        let active = transcriptionController.isTeleprompterModeActive
-        let mode = transcriptionController.mode
-        // Menu label must stay identity-stable. Progress ticks (prep/model %) live beside it.
-        HStack(spacing: 4) {
-            TeleprompterModeMenu(
-                mode: mode,
-                userLanguage: userLang,
-                isActive: active,
-                translationEnabled: captionTranslator.isEnabled,
-                needsSpeechModelDownload: transcriptionController.needsSpeechModelDownload,
-                speechModelName: transcriptionController.downloadingModelLanguage,
-                needsTranslationPack: captionTranslator.needsLanguageDownload,
-                onSelect: { setTeleprompterMode($0) },
-                onDownloadSpeechModel: { transcriptionController.approveSpeechModelDownload() },
-                onDownloadTranslationPack: { captionTranslator.approveDownload() }
-            )
-            .equatable()
-            if active {
-                liveCaptionStatusChip(targetLanguage: userLang)
-            }
-        }
-    }
-
-    /// Progress / busy chip outside the Menu so label identity does not thrash.
-    @ViewBuilder
-    private func liveCaptionStatusChip(targetLanguage: String) -> some View {
-        let modelDownload = transcriptionController.modelDownloadProgress
-        let isModelFetch = modelDownload != nil
-        let packDownload = captionTranslator.isDownloadingLanguagePack
-        let preparing = transcriptionController.isPreparing && !isModelFetch && !packDownload
-        let prep = transcriptionController.prepProgress
-        let building = !preparing && !isModelFetch && !packDownload && (prep ?? 1) >= 0.05 && (prep ?? 1) < 1
-        let color = Color.orange
-        let modelFraction = modelDownload ?? 0
-
-        if isModelFetch || packDownload || preparing || building {
-            pillContainer(color: color) {
-                Group {
-                    if isModelFetch {
-                        ZStack {
-                            Circle().stroke(color.opacity(0.3), lineWidth: 2)
-                            Circle()
-                                .trim(from: 0, to: modelFraction > 0 ? max(0.03, modelFraction) : 0.08)
-                                .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                                .rotationEffect(.degrees(-90))
-                        }
-                        .padding(1)
-                    } else if building, let prep {
-                        ZStack {
-                            Circle().stroke(color.opacity(0.3), lineWidth: 2)
-                            Circle()
-                                .trim(from: 0, to: max(0.03, prep))
-                                .stroke(color, style: StrokeStyle(lineWidth: 2, lineCap: .round))
-                                .rotationEffect(.degrees(-90))
-                        }
-                        .padding(1)
-                    } else {
-                        ProgressView()
-                            .scaleEffect(0.5)
-                            .tint(color)
-                    }
-                }
-                .frame(width: 12, height: 12)
-
-                Text(statusChipLabel(
-                    isModelFetch: isModelFetch,
-                    modelFraction: modelFraction,
-                    packDownload: packDownload,
-                    preparing: preparing,
-                    building: building,
-                    prep: prep,
-                    targetLanguage: targetLanguage
-                ))
-                .font(.system(size: 10, weight: .bold))
-                .monospacedDigit()
-                .lineLimit(1)
-            }
-        }
-    }
-
-    private func statusChipLabel(
-        isModelFetch: Bool,
-        modelFraction: Double,
-        packDownload: Bool,
-        preparing: Bool,
-        building: Bool,
-        prep: Double?,
-        targetLanguage: String
-    ) -> String {
-        if isModelFetch {
-            if modelFraction > 0 { return "\(Int((modelFraction * 100).rounded()))%" }
-            if let status = transcriptionController.speechAssetStatusText, !status.isEmpty {
-                return String(status.prefix(8))
-            }
-            return transcriptionController.downloadingModelLanguage ?? "Model"
-        }
-        if packDownload { return targetLanguage.uppercased() }
-        if preparing { return "…" }
-        if building, let prep { return "\(Int(prep * 100))%" }
-        return "AI CC"
     }
 
     private func applySceneLanguage(_ code: String) {
@@ -1256,7 +1148,7 @@ struct SceneDetailMetadataCard: View {
             content()
         }
         .padding(.horizontal, 8)
-        .frame(height: 24)
+        .frame(height: SceneMetadataPillStyle.height)
         .background(color.opacity(0.1))
         .foregroundColor(color)
         .clipShape(Capsule())
@@ -1289,105 +1181,110 @@ struct SceneDetailMetadataCard: View {
     private static var cachedSpeechLanguageOptions: [(id: String, label: String)]?
 }
 
-/// Scene-language Menu isolated from player/transcription churn so the popup does not rebuild.
-private struct SceneLanguageMenu: View, Equatable {
-    let options: [(id: String, label: String)]
-    let selectedCode: String?
-    let labelCode: String
-    let onSelect: (String) -> Void
+/// Scene language + AI captions in one pill; flat sections instead of nested submenus.
+private struct SceneLanguageAndCaptionsMenu: View, Equatable {
+    let languageOptions: [(id: String, label: String)]
+    let selectedLanguageCode: String?
+    let onSelectLanguage: (String) -> Void
 
-    static func == (lhs: SceneLanguageMenu, rhs: SceneLanguageMenu) -> Bool {
-        lhs.selectedCode == rhs.selectedCode
-            && lhs.labelCode == rhs.labelCode
-            && lhs.options.map(\.id) == rhs.options.map(\.id)
-    }
-
-    var body: some View {
-        Menu {
-            if options.isEmpty {
-                Text("Loading languages…")
-            } else {
-                ForEach(options, id: \.id) { option in
-                    Button {
-                        onSelect(option.id)
-                    } label: {
-                        Label {
-                            Text(option.label)
-                        } icon: {
-                            if selectedCode == option.id {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: "globe")
-                    .font(.system(size: 10, weight: .bold))
-                Text(labelCode)
-                    .font(.system(size: 10, weight: .bold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
-            }
-            .padding(.horizontal, 8)
-            .frame(height: 24)
-            .background(Color.teal.opacity(0.1))
-            .foregroundColor(.teal)
-            .clipShape(Capsule())
-        }
-    }
-}
-
-/// CC mode Menu with a stable label — progress UI must not live in the label.
-private struct TeleprompterModeMenu: View, Equatable {
     let mode: SceneTeleprompterMode
     let userLanguage: String
     let isActive: Bool
-    let translationEnabled: Bool
     let needsSpeechModelDownload: Bool
     let speechModelName: String?
     let needsTranslationPack: Bool
-    let onSelect: (SceneTeleprompterMode) -> Void
+    let onSelectMode: (SceneTeleprompterMode) -> Void
     let onDownloadSpeechModel: () -> Void
     let onDownloadTranslationPack: () -> Void
 
-    static func == (lhs: TeleprompterModeMenu, rhs: TeleprompterModeMenu) -> Bool {
-        lhs.mode == rhs.mode
+    static func == (lhs: SceneLanguageAndCaptionsMenu, rhs: SceneLanguageAndCaptionsMenu) -> Bool {
+        lhs.selectedLanguageCode == rhs.selectedLanguageCode
+            && lhs.languageOptions.map(\.id) == rhs.languageOptions.map(\.id)
+            && lhs.mode == rhs.mode
             && lhs.userLanguage == rhs.userLanguage
             && lhs.isActive == rhs.isActive
-            && lhs.translationEnabled == rhs.translationEnabled
             && lhs.needsSpeechModelDownload == rhs.needsSpeechModelDownload
             && lhs.speechModelName == rhs.speechModelName
             && lhs.needsTranslationPack == rhs.needsTranslationPack
-    }
-
-    private var targetCode: String {
-        mode.captionTargetCode ?? userLanguage
     }
 
     private var showUserLanguageRow: Bool {
         SubtitleTargetLanguage.languageCode(from: userLanguage)?.lowercased() != "en"
     }
 
-    var body: some View {
-        let color: Color = isActive ? .orange : .secondary
-        let label: String = {
-            if needsSpeechModelDownload { return speechModelName ?? "AI CC↓" }
-            if needsTranslationPack { return "AI CC↓" }
-            if isActive { return "AI CC·\(targetCode.uppercased())" }
-            return "AI CC"
-        }()
+    private var accentColor: Color {
+        isActive ? .orange : .teal
+    }
 
+    private var isSceneLanguageSet: Bool {
+        selectedLanguageCode != nil
+    }
+
+    private var selectedLanguageLabel: String {
+        guard let selectedLanguageCode,
+              let label = languageOptions.first(where: { $0.id == selectedLanguageCode })?.label
+        else { return selectedLanguageCode?.uppercased() ?? "Language" }
+        return label
+    }
+
+    private var selectedCaptionModeLabel: String {
+        switch mode {
+        case .off:
+            return SceneTeleprompterMode.off.title
+        case .english, .sceneLanguage:
+            return SceneTeleprompterMode.english.title
+        case .userLanguage:
+            return SubtitleTargetLanguage.displayName(for: userLanguage)
+        }
+    }
+
+    var body: some View {
         Menu {
-            Button { onSelect(.off) } label: {
+            Section("AI Captions") {
+                aiCaptionsPicker(collapsed: !isSceneLanguageSet)
+            }
+
+            Section("Scene Language") {
+                if isSceneLanguageSet {
+                    sceneLanguagePicker(collapsed: true)
+                } else if languageOptions.isEmpty {
+                    Text("Loading languages…")
+                } else {
+                    sceneLanguagePicker(collapsed: false)
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: isActive ? "captions.bubble.fill" : "captions.bubble")
+                Text("AI Subs")
+                if needsSpeechModelDownload || needsTranslationPack {
+                    Image(systemName: "arrow.down.circle.fill")
+                        .font(.system(size: 9, weight: .bold))
+                }
+            }
+            .font(.system(size: 10, weight: .bold))
+            .lineLimit(1)
+            .minimumScaleFactor(0.8)
+            .padding(.horizontal, 8)
+            .frame(height: SceneMetadataPillStyle.height)
+            .background(accentColor.opacity(0.1))
+            .foregroundColor(accentColor)
+            .clipShape(Capsule())
+        }
+        .accessibilityLabel("AI Subs")
+    }
+
+    @ViewBuilder
+    private func aiCaptionsPicker(collapsed: Bool) -> some View {
+        let picker = Group {
+            Button { onSelectMode(.off) } label: {
                 Label {
                     Text(SceneTeleprompterMode.off.title)
                 } icon: {
                     if mode == .off { Image(systemName: "checkmark") }
                 }
             }
-            Button { onSelect(.english) } label: {
+            Button { onSelectMode(.english) } label: {
                 Label {
                     Text(SceneTeleprompterMode.english.title)
                 } icon: {
@@ -1395,7 +1292,7 @@ private struct TeleprompterModeMenu: View, Equatable {
                 }
             }
             if showUserLanguageRow {
-                Button { onSelect(.userLanguage) } label: {
+                Button { onSelectMode(.userLanguage) } label: {
                     Label {
                         Text(SubtitleTargetLanguage.displayName(for: userLanguage))
                     } icon: {
@@ -1404,7 +1301,6 @@ private struct TeleprompterModeMenu: View, Equatable {
                 }
             }
             if needsSpeechModelDownload {
-                Divider()
                 Button(action: onDownloadSpeechModel) {
                     Label(
                         "Download \(speechModelName ?? "speech") speech model",
@@ -1413,7 +1309,6 @@ private struct TeleprompterModeMenu: View, Equatable {
                 }
             }
             if needsTranslationPack {
-                Divider()
                 Button(action: onDownloadTranslationPack) {
                     Label(
                         "Download \(userLanguage.uppercased()) language pack",
@@ -1421,20 +1316,45 @@ private struct TeleprompterModeMenu: View, Equatable {
                     )
                 }
             }
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: isActive ? "captions.bubble.fill" : "captions.bubble")
-                    .font(.system(size: 10, weight: .bold))
-                Text(label)
-                    .font(.system(size: 10, weight: .bold))
-                    .lineLimit(1)
-                    .minimumScaleFactor(0.8)
+        }
+
+        if collapsed {
+            Menu {
+                picker
+            } label: {
+                Label(selectedCaptionModeLabel, systemImage: "captions.bubble")
             }
-            .padding(.horizontal, 8)
-            .frame(height: 24)
-            .background(color.opacity(0.1))
-            .foregroundColor(color)
-            .clipShape(Capsule())
+        } else {
+            picker
+        }
+    }
+
+    @ViewBuilder
+    private func sceneLanguagePicker(collapsed: Bool) -> some View {
+        let picker = Group {
+            ForEach(languageOptions, id: \.id) { option in
+                Button {
+                    onSelectLanguage(option.id)
+                } label: {
+                    Label {
+                        Text(option.label)
+                    } icon: {
+                        if selectedLanguageCode == option.id {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        }
+
+        if collapsed {
+            Menu {
+                picker
+            } label: {
+                Label(selectedLanguageLabel, systemImage: "globe")
+            }
+        } else {
+            picker
         }
     }
 }

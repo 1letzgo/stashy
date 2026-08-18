@@ -34,6 +34,7 @@ struct ReelsModeSettingsView: View {
     var body: some View {
         List {
             Section {
+                stashyScrollingSectionHeader("Tab")
                 Toggle(isOn: Binding(
                     get: { isEnabled },
                     set: { _ in tabManager.toggle(.reels) }
@@ -41,10 +42,11 @@ struct ReelsModeSettingsView: View {
                     Label("Show Feeds Tab", systemImage: "play.rectangle.on.rectangle")
                 }
                 .tint(appearanceManager.tintColor)
+                .stashyGroupedSettingsRow()
             }
-            .listRowBackground(Color.secondaryAppBackground)
 
             Section {
+                stashyScrollingSectionHeader("Modes")
                 ForEach(tabManager.configurableReelsModes) { modeConfig in
                     VStack(alignment: .leading, spacing: 0) {
                         // Header
@@ -80,19 +82,14 @@ struct ReelsModeSettingsView: View {
                         }
                     }
                     .padding(.vertical, 6)
-                    .listRowSeparator(.hidden)
-                    .listRowBackground(
-                        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
-                            .fill(Color.secondaryAppBackground)
-                            .padding(.vertical, 4)
-                    )
+                    .stashySettingsCardRow()
                 }
                 .onMove { indices, newOffset in
                     tabManager.moveReelsMode(from: indices, to: newOffset)
                 }
             }
         }
-        .listStyle(.insetGrouped)
+        .stashyMovableCardsList()
         .environment(\.editMode, .constant(.active))
         .deleteDisabled(true)
         .applyAppBackground()

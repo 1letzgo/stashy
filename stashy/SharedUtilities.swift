@@ -731,26 +731,30 @@ private struct StashyGroupedBlockBackground: View {
     var body: some View {
         let radius = DesignTokens.CornerRadius.small
         let fill = Color.secondaryAppBackground(for: appearance.currentTheme)
-        if count <= 1 {
-            RoundedRectangle(cornerRadius: radius).fill(fill)
-        } else if index == 0 {
-            UnevenRoundedRectangle(
-                topLeadingRadius: radius,
-                bottomLeadingRadius: 0,
-                bottomTrailingRadius: 0,
-                topTrailingRadius: radius
-            )
-            .fill(fill)
-        } else if index == count - 1 {
-            UnevenRoundedRectangle(
-                topLeadingRadius: 0,
-                bottomLeadingRadius: radius,
-                bottomTrailingRadius: radius,
-                topTrailingRadius: 0
-            )
-            .fill(fill)
-        } else {
-            Rectangle().fill(fill)
+        let page = Color.appBackground(for: appearance.currentTheme)
+        ZStack {
+            page
+            if count <= 1 {
+                RoundedRectangle(cornerRadius: radius).fill(fill)
+            } else if index == 0 {
+                UnevenRoundedRectangle(
+                    topLeadingRadius: radius,
+                    bottomLeadingRadius: 0,
+                    bottomTrailingRadius: 0,
+                    topTrailingRadius: radius
+                )
+                .fill(fill)
+            } else if index == count - 1 {
+                UnevenRoundedRectangle(
+                    topLeadingRadius: 0,
+                    bottomLeadingRadius: radius,
+                    bottomTrailingRadius: radius,
+                    topTrailingRadius: 0
+                )
+                .fill(fill)
+            } else {
+                Rectangle().fill(fill)
+            }
         }
     }
 }
@@ -775,9 +779,13 @@ private struct StashySettingsCardRowBackground: View {
     @ObservedObject private var appearance = AppearanceManager.shared
 
     var body: some View {
-        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
-            .fill(Color.secondaryAppBackground(for: appearance.currentTheme))
-            .padding(.vertical, 4)
+        let theme = appearance.currentTheme
+        ZStack {
+            Color.appBackground(for: theme)
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
+                .fill(Color.secondaryAppBackground(for: theme))
+                .padding(.vertical, 4)
+        }
     }
 }
 
@@ -785,8 +793,12 @@ private struct StashyGroupedSettingsRowBackground: View {
     @ObservedObject private var appearance = AppearanceManager.shared
 
     var body: some View {
-        RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
-            .fill(Color.secondaryAppBackground(for: appearance.currentTheme))
+        let theme = appearance.currentTheme
+        ZStack {
+            Color.appBackground(for: theme)
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
+                .fill(Color.secondaryAppBackground(for: theme))
+        }
     }
 }
 

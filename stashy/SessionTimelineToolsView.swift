@@ -26,10 +26,13 @@ struct SessionTimelineToolsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .applyAppBackground()
-        .id(loader.contentID)
-        .task(id: loader.contentID) { await loader.loadIfNeeded() }
+        .task { await loader.reload() }
         .onChange(of: enabledKinds) { _, kinds in
             TimelineKind.saveFilter(kinds)
+        }
+        .onChange(of: configManager.activeConfig?.id) { _, _ in
+            loader.reset()
+            Task { await loader.reload() }
         }
     }
 

@@ -209,14 +209,16 @@ final class SessionTimelineLoader: ObservableObject {
     @Published private(set) var didFail = false
     @Published private(set) var hasMore = true
     @Published private(set) var loadedWindowStart: Date?
-    @Published private(set) var contentID = UUID()
 
     private var loadedServerID: UUID?
     private var nextWindowEnd: Date?
     private var consecutiveEmptyWindows = 0
     private var fetchGeneration = 0
-    /// Server scene `o_history` stamps loaded once per reload (scene-only).
+    /// Scene `o_history` stamps for the full lookback; filtered per 24h window when building.
     private var oStampsCache: [TimelineOStamp] = []
+    private var liveReloadTask: Task<Void, Never>?
+    /// Pending live reload should refetch O-history (OR’d across debounced notifications).
+    private var pendingLiveRefreshOHistory = false
 
     private init() {
         NotificationCenter.default.addObserver(
@@ -226,34 +228,49 @@ final class SessionTimelineLoader: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor in self?.reset() }
         }
-        for name in ["ScenePlayAdded", "SceneOCounterUpdated", "SceneMarkerCreated"] {
-            NotificationCenter.default.addObserver(
-                forName: NSNotification.Name(name),
-                object: nil,
-                queue: .main
-            ) { [weak self] _ in
-                Task { @MainActor in await self?.reload() }
-            }
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("ScenePlayAdded"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.scheduleLiveReload(refreshOHistory: false) }
+        }
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SceneMarkerCreated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.scheduleLiveReload(refreshOHistory: false) }
+        }
+        NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SceneOCounterUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.scheduleLiveReload(refreshOHistory: true) }
         }
     }
 
-    func loadIfNeeded() async {
-        let serverID = ServerConfigManager.shared.activeConfig?.id
-        if loadedServerID != serverID {
-            reset()
+    /// Debounced live refresh so rapid O-taps / plays do not stack full pipeline runs.
+    private func scheduleLiveReload(refreshOHistory: Bool) {
+        if refreshOHistory {
+            pendingLiveRefreshOHistory = true
         }
-        if isLoading {
-            let generation = fetchGeneration
-            while isLoading, fetchGeneration == generation {
-                try? await Task.sleep(nanoseconds: 50_000_000)
-            }
-            return
+        liveReloadTask?.cancel()
+        liveReloadTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 450_000_000)
+            guard !Task.isCancelled else { return }
+            let refreshO = self.pendingLiveRefreshOHistory
+            self.pendingLiveRefreshOHistory = false
+            await self.reload(refreshOHistory: refreshO)
         }
-        guard sessions.isEmpty else { return }
-        await reload()
     }
 
-    func reload() async {
+    /// Full reload of the latest 24h window. Pass `refreshOHistory: false` for play/marker live updates.
+    func reload(refreshOHistory: Bool = true) async {
+        liveReloadTask?.cancel()
+        liveReloadTask = nil
+        pendingLiveRefreshOHistory = false
         fetchGeneration += 1
         let generation = fetchGeneration
         loadedServerID = ServerConfigManager.shared.activeConfig?.id
@@ -264,11 +281,18 @@ final class SessionTimelineLoader: ObservableObject {
         consecutiveEmptyWindows = 0
         nextWindowEnd = Date()
         loadedWindowStart = nil
-        oStampsCache = []
+        let shouldRefreshOHistory = refreshOHistory || oStampsCache.isEmpty
+        if shouldRefreshOHistory {
+            oStampsCache = []
+        }
 
         // Unstructured so SwiftUI cancelling `.refreshable` does not abort the fetch.
         let work = Task { @MainActor in
-            await self.loadNextWindow(isInitial: true, generation: generation)
+            await self.loadNextWindow(
+                isInitial: true,
+                generation: generation,
+                refreshOHistory: shouldRefreshOHistory
+            )
             guard generation == self.fetchGeneration else { return }
             self.isLoading = false
         }
@@ -285,13 +309,16 @@ final class SessionTimelineLoader: ObservableObject {
         isLoadingMore = true
         let before = sessions.count
         while hasMore, sessions.count == before, generation == fetchGeneration {
-            await loadNextWindow(isInitial: false, generation: generation)
+            await loadNextWindow(isInitial: false, generation: generation, refreshOHistory: false)
         }
         guard generation == fetchGeneration else { return }
         isLoadingMore = false
     }
 
     func reset() {
+        liveReloadTask?.cancel()
+        liveReloadTask = nil
+        pendingLiveRefreshOHistory = false
         fetchGeneration += 1
         sessions = []
         isLoading = false
@@ -314,7 +341,7 @@ final class SessionTimelineLoader: ObservableObject {
         sessions = Self.groupedSessions(from: visits)
     }
 
-    private func loadNextWindow(isInitial: Bool, generation: Int) async {
+    private func loadNextWindow(isInitial: Bool, generation: Int, refreshOHistory: Bool) async {
         guard generation == fetchGeneration, let windowEnd = nextWindowEnd else { return }
         let windowStart = windowEnd.addingTimeInterval(-Self.windowSeconds)
         let earliest = Date().addingTimeInterval(-Self.maxLookbackSeconds)
@@ -325,21 +352,21 @@ final class SessionTimelineLoader: ObservableObject {
 
         do {
             let lookbackStart = Date().addingTimeInterval(-Self.maxLookbackSeconds)
+            let eventRange = windowStart..<windowEnd
             async let raw = fetchScenes(from: windowStart)
-            async let markerRows = fetchMarkers(from: isInitial ? lookbackStart : windowStart)
-            if isInitial {
+            async let markerRows = fetchMarkers(from: windowStart)
+            if isInitial, refreshOHistory || oStampsCache.isEmpty {
                 oStampsCache = await fetchSceneOStamps(from: lookbackStart)
             }
             let rows = try await raw
             let fetchedMarkers = await markerRows
             guard generation == fetchGeneration else { return }
 
-            let eventRange = isInitial ? lookbackStart..<windowEnd : windowStart..<windowEnd
             let built = Self.makeSessions(
                 from: rows,
                 oStamps: oStampsCache.filter { eventRange.contains($0.date) },
                 fetchedMarkers: fetchedMarkers.filter { eventRange.contains($0.date) },
-                in: windowStart..<windowEnd
+                in: eventRange
             )
             if isInitial {
                 sessions = built
