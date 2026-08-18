@@ -261,35 +261,40 @@ struct SceneDetailView: View {
     private var mainContentView: some View {
         ScrollView {
             VStack(spacing: 12) {
-                SceneVideoPlayerCard(
-                    activeScene: $activeScene,
-                    player: $player,
-                    isPlaybackStarted: $isPlaybackStarted,
-                    isFullscreen: $isFullscreen,
-                    isPreviewing: $isPreviewing,
-                    subtitleController: subtitleController,
-                    transcriptionController: transcriptionController,
-                    onSeek: { seconds in seekTo(seconds) },
-                    onStartPlayback: { resume in startPlayback(resume: resume) }
-                )
+                VStack(spacing: 0) {
+                    SceneVideoPlayerCard(
+                        activeScene: $activeScene,
+                        player: $player,
+                        isPlaybackStarted: $isPlaybackStarted,
+                        isFullscreen: $isFullscreen,
+                        isPreviewing: $isPreviewing,
+                        subtitleController: subtitleController,
+                        transcriptionController: transcriptionController,
+                        onSeek: { seconds in seekTo(seconds) },
+                        onStartPlayback: { resume in startPlayback(resume: resume) }
+                    )
 
-                SceneDetailMetadataCard(
-                    activeScene: $activeScene,
-                    player: $player,
-                    isHeaderExpanded: $isHeaderExpanded,
-                    showingAddMarkerSheet: $showingAddMarkerSheet,
-                    capturedMarkerTime: $capturedMarkerTime,
-                    playbackSpeed: $playbackSpeed,
-                    viewModel: viewModel,
-                    subtitleController: subtitleController,
-                    transcriptionController: transcriptionController,
-                    captionTranslator: captionTranslator,
-                    audioTrackController: audioTrackController,
-                    onSeek: { seconds in seekTo(seconds) },
-                    onTitleUpdated: { newTitle, newDetails in
-                        applyLocalSceneEdit(Scene(id: activeScene.id, title: newTitle, details: newDetails, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                    }
-                )
+                    SceneDetailMetadataCard(
+                        activeScene: $activeScene,
+                        player: $player,
+                        isHeaderExpanded: $isHeaderExpanded,
+                        showingAddMarkerSheet: $showingAddMarkerSheet,
+                        capturedMarkerTime: $capturedMarkerTime,
+                        playbackSpeed: $playbackSpeed,
+                        viewModel: viewModel,
+                        subtitleController: subtitleController,
+                        transcriptionController: transcriptionController,
+                        captionTranslator: captionTranslator,
+                        audioTrackController: audioTrackController,
+                        onSeek: { seconds in seekTo(seconds) },
+                        onTitleUpdated: { newTitle, newDetails in
+                            applyLocalSceneEdit(Scene(id: activeScene.id, title: newTitle, details: newDetails, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                        }
+                    )
+                }
+                .background(Color.secondaryAppBackground)
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                .cardShadow()
 
                 // Live captions render inside AVPlayer overlay — no separate teleprompter panel.
                 
@@ -471,6 +476,7 @@ struct SceneDetailView: View {
                 title: activeScene.title ?? "Unknown Title",
                 capturedMarkerTime: capturedMarkerTime,
                 sceneId: activeScene.id,
+                sceneTagIds: Set((activeScene.tags ?? []).map(\.id)),
                 player: player,
                 videoURL: activeScene.videoURL,
                 viewModel: viewModel,
@@ -1036,6 +1042,7 @@ extension SceneStudio {
 struct AddMarkerSheet: View {
     let sceneId: String
     let sceneTitle: String
+    let sceneTagIds: Set<String>
     let seconds: Double
     /// Used to capture a still at the marker start (same path as Scene Cover).
     let player: AVPlayer?
@@ -1054,11 +1061,22 @@ struct AddMarkerSheet: View {
     @State private var endTimeString: String = ""
     
     var filteredTags: [Tag] {
+        let base: [Tag]
         if searchText.isEmpty {
-            return tags
+            base = tags
         } else {
-            return tags.filter { $0.name.lowercased().contains(searchText.lowercased()) }
+            base = tags.filter { $0.name.lowercased().contains(searchText.lowercased()) }
         }
+        var sceneTags: [Tag] = []
+        var otherTags: [Tag] = []
+        for tag in base {
+            if sceneTagIds.contains(tag.id) {
+                sceneTags.append(tag)
+            } else {
+                otherTags.append(tag)
+            }
+        }
+        return sceneTags + otherTags
     }
     
     private var canAddMarker: Bool {
@@ -1299,6 +1317,7 @@ private struct SceneDetailAlertModifier: ViewModifier {
     let title:              String
     let capturedMarkerTime: Double
     let sceneId:            String
+    let sceneTagIds:        Set<String>
     let player:             AVPlayer?
     let videoURL:           URL?
     let viewModel:          StashDBViewModel
@@ -1317,6 +1336,7 @@ private struct SceneDetailAlertModifier: ViewModifier {
                 AddMarkerSheet(
                     sceneId: sceneId,
                     sceneTitle: title,
+                    sceneTagIds: sceneTagIds,
                     seconds: capturedMarkerTime,
                     player: player,
                     videoURL: videoURL,

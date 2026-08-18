@@ -26,9 +26,6 @@ struct SceneVideoPlayerCard: View {
             videoPlayerArea
             markerScrollView
         }
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-        .cardShadow()
     }
 
     @ViewBuilder
@@ -126,13 +123,13 @@ struct SceneVideoPlayerCard: View {
                 } else {
                     largePlayButton
                 }
-                
-                if let resumeTime = activeScene.resumeTime, resumeTime > 0, let duration = activeScene.sceneDuration, duration > 0 {
-                    ProgressView(value: resumeTime, total: duration)
-                        .progressViewStyle(LinearProgressViewStyle(tint: appearanceManager.tintColor))
-                        .frame(height: 6)
-                        .frame(maxHeight: .infinity, alignment: .bottom)
-                }
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if !isPreviewing,
+               let resumeTime = activeScene.resumeTime, resumeTime > 0,
+               let duration = activeScene.sceneDuration, duration > 0 {
+                resumeProgressBar(progress: min(1, resumeTime / duration))
             }
         }
         .frame(maxWidth: .infinity)
@@ -149,6 +146,20 @@ struct SceneVideoPlayerCard: View {
         .onLongPressGesture(minimumDuration: 0.15, pressing: { pressing in
             if pressing { startPreview() } else { stopPreview() }
         }, perform: {})
+    }
+
+    @ViewBuilder
+    private func resumeProgressBar(progress: Double) -> some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Rectangle()
+                    .fill(Color.white.opacity(0.25))
+                Rectangle()
+                    .fill(appearanceManager.tintColor)
+                    .frame(width: max(0, geo.size.width * CGFloat(progress)))
+            }
+        }
+        .frame(height: 4)
     }
 
     @ViewBuilder
@@ -244,7 +255,7 @@ struct SceneVideoPlayerCard: View {
                 .padding(.horizontal, 12)
             }
             .padding(.top, markerStripTopPadding)
-            .padding(.bottom, 8)
+            .padding(.bottom, 2)
         }
     }
 
@@ -291,7 +302,8 @@ struct SceneVideoPlayerCard: View {
             Text(marker.title ?? "Marker at \(formatTime(marker.seconds))")
                 .font(.system(size: 10))
                 .fontWeight(.medium)
-                .lineLimit(2)
+                .lineLimit(1)
+                .truncationMode(.tail)
                 .frame(width: 80, alignment: .leading)
         }
     }
@@ -365,6 +377,10 @@ struct SceneDetailMetadataCard: View {
     var onSeek: (Double) -> Void
     var onTitleUpdated: ((String?, String?) -> Void)?
 
+    private var hasSceneMarkers: Bool {
+        !(activeScene.sceneMarkers?.isEmpty ?? true)
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
@@ -410,10 +426,9 @@ struct SceneDetailMetadataCard: View {
 
             metadataSwipeBar
         }
-        .padding(12)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-        .cardShadow()
+        .padding(.horizontal, 12)
+        .padding(.bottom, 12)
+        .padding(.top, hasSceneMarkers ? 4 : 12)
         .onChange(of: player) { _, newPlayer in
             if let item = newPlayer?.currentItem {
                 StashVideoSyncManager.shared.setup(for: item)
@@ -538,7 +553,7 @@ struct SceneDetailMetadataCard: View {
                 }
             }
         }) {
-            infoPill(icon: AppearanceManager.shared.oCounterIconFilled, text: "\(activeScene.oCounter ?? 0)", color: .red)
+            infoPill(icon: AppearanceManager.shared.oCounterIconFilled, text: "\(activeScene.oCounter ?? 0)")
         }
         .buttonStyle(.plain)
     }
