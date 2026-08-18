@@ -21,6 +21,7 @@ struct SceneDetailView: View {
     @ObservedObject var handyManager = HandyManager.shared
     @ObservedObject var buttplugManager = ButtplugManager.shared
     @ObservedObject var loveSpouseManager = LoveSpouseManager.shared
+    @ObservedObject private var stashSyncManager = StashSyncManager.shared
     
     @ObservedObject private var downloadManager = DownloadManager.shared
     @StateObject private var subtitleController = SubtitleController()
@@ -293,7 +294,6 @@ struct SceneDetailView: View {
                 // Live captions render inside AVPlayer overlay — no separate teleprompter panel.
                 
                 let isStashSyncActive = handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode
-                let isStashSyncEnabled = StashSyncManager.shared.isStashSyncEnabled
                 
                 if activeScene.interactive == true && activeScene.funscriptURL != nil && !isStashSyncActive {
                     SceneHeatmapCard(
@@ -312,7 +312,7 @@ struct SceneDetailView: View {
                     )
                 }
 
-                if isStashSyncEnabled {
+                if stashSyncManager.isSyncing {
                     StashSyncCard()
                 }
                 

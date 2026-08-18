@@ -1930,20 +1930,6 @@ struct StashSyncCard: View {
                             }
                             .frame(maxWidth: .infinity, alignment: .leading)
                         }
-
-                        Button {
-                            HapticManager.medium()
-                            StashSyncManager.shared.toggle()
-                        } label: {
-                            Text("Deactivate on Scene")
-                                .font(.subheadline.weight(.semibold))
-                                .frame(maxWidth: .infinity)
-                                .padding(.vertical, 10)
-                                .foregroundColor(.white)
-                                .background(Color.red.opacity(0.85))
-                                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.button, style: .continuous))
-                        }
-                        .buttonStyle(.plain)
                     }
                 } else {
                     Button {

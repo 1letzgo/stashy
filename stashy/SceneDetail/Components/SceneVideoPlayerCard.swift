@@ -349,6 +349,7 @@ struct SceneDetailMetadataCard: View {
     @ObservedObject var transcriptionController: SceneLiveTranscriptionController
     @ObservedObject var captionTranslator: SceneCaptionTranslator
     @ObservedObject var audioTrackController: SceneAudioTrackController
+    @ObservedObject private var stashSyncManager = StashSyncManager.shared
 
     @State private var showingEditTitleSheet = false
     @State private var showingSetTagImageSheet = false
@@ -386,37 +387,33 @@ struct SceneDetailMetadataCard: View {
                 }
             }
 
-            metadataSwipeBar
-
             if let details = activeScene.details, !details.isEmpty {
                 Text(details)
                     .font(.body)
                     .foregroundColor(.primary.opacity(0.8))
                     .lineLimit(isHeaderExpanded ? nil : 3)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.top, 4)
+                    .padding(.bottom, 20)
+                    .overlay(alignment: .bottomTrailing) {
+                        Button(action: {
+                            withAnimation(.spring()) { isHeaderExpanded.toggle() }
+                        }) {
+                            Image(systemName: isHeaderExpanded ? "chevron.up" : "chevron.down")
+                                .font(.system(size: 10, weight: .bold))
+                                .foregroundColor(appearanceManager.tintColor)
+                                .padding(6)
+                                .background(appearanceManager.tintColor.opacity(0.1))
+                                .clipShape(Circle())
+                        }
+                    }
             }
+
+            metadataSwipeBar
         }
         .padding(12)
-        .padding(.bottom, (activeScene.details?.isEmpty ?? true) ? 0 : 20)
         .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
-        .overlay(alignment: .bottomTrailing) {
-            if let details = activeScene.details, !details.isEmpty {
-                Button(action: {
-                    withAnimation(.spring()) { isHeaderExpanded.toggle() }
-                }) {
-                    Image(systemName: isHeaderExpanded ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(appearanceManager.tintColor)
-                        .padding(6)
-                        .background(appearanceManager.tintColor.opacity(0.1))
-                        .clipShape(Circle())
-                }
-                .padding(8)
-            }
-        }
         .onChange(of: player) { _, newPlayer in
             if let item = newPlayer?.currentItem {
                 StashVideoSyncManager.shared.setup(for: item)
@@ -494,24 +491,28 @@ struct SceneDetailMetadataCard: View {
     private var metadataSwipeBar: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 0) {
-                ratingMenu
+                if let date = activeScene.date {
+                    infoPill(icon: "calendar", text: date)
+                    Spacer(minLength: 4)
+                }
+                if let duration = activeScene.sceneDuration {
+                    infoPill(icon: "clock", text: formatMetaTime(duration))
+                    Spacer(minLength: 4)
+                }
+                infoPill(icon: "play.circle", text: "\(activeScene.playCount ?? 0)")
                 Spacer(minLength: 4)
                 oCounterButton
                 Spacer(minLength: 4)
-                infoPill(icon: "play.circle", text: "\(activeScene.playCount ?? 0)")
-                if let duration = activeScene.sceneDuration {
-                    Spacer(minLength: 4)
-                    infoPill(icon: "clock", text: formatMetaTime(duration))
-                }
-                if let date = activeScene.date {
-                    Spacer(minLength: 4)
-                    infoPill(icon: "calendar", text: date)
-                }
+                ratingMenu
             }
             .frame(maxWidth: .infinity)
 
             HStack(spacing: 0) {
                 languageAndCaptionsControls
+                if stashSyncManager.isStashSyncEnabled {
+                    Spacer(minLength: 4)
+                    aiMotionPill
+                }
                 Spacer(minLength: 4)
                 addMarkerButton
                 Spacer(minLength: 4)
@@ -543,12 +544,29 @@ struct SceneDetailMetadataCard: View {
     }
 
     @ViewBuilder
+    private var aiMotionPill: some View {
+        Button {
+            HapticManager.selection()
+            stashSyncManager.setSyncing(!stashSyncManager.isSyncing)
+        } label: {
+            infoPill(
+                icon: stashSyncManager.isSyncing ? "bolt.horizontal.fill" : "bolt.horizontal",
+                text: "AI Motion",
+                color: .blue
+            )
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(AIMotionCopy.name)
+        .accessibilityValue(stashSyncManager.isSyncing ? "On" : "Off")
+    }
+
+    @ViewBuilder
     private var addMarkerButton: some View {
         Button(action: {
             capturedMarkerTime = player?.currentTime().seconds ?? 0
             showingAddMarkerSheet = true
         }) {
-            infoPill(icon: "plus.square.fill.on.square.fill", text: "Add marker", color: .green)
+            infoPill(icon: "plus.square.fill.on.square.fill", text: "Marker", color: .green)
         }
         .buttonStyle(.plain)
     }
@@ -1212,10 +1230,6 @@ private struct SceneLanguageAndCaptionsMenu: View, Equatable {
         SubtitleTargetLanguage.languageCode(from: userLanguage)?.lowercased() != "en"
     }
 
-    private var accentColor: Color {
-        isActive ? .orange : .teal
-    }
-
     private var isSceneLanguageSet: Bool {
         selectedLanguageCode != nil
     }
@@ -1267,8 +1281,8 @@ private struct SceneLanguageAndCaptionsMenu: View, Equatable {
             .minimumScaleFactor(0.8)
             .padding(.horizontal, 8)
             .frame(height: SceneMetadataPillStyle.height)
-            .background(accentColor.opacity(0.1))
-            .foregroundColor(accentColor)
+            .background(Color.orange.opacity(0.1))
+            .foregroundColor(.orange)
             .clipShape(Capsule())
         }
         .accessibilityLabel("AI Subs")
