@@ -1540,6 +1540,13 @@ class StashDBViewModel: ObservableObject {
         totalClips = max(0, totalClips - 1)
     }
 
+    func imageInLists(id: String) -> StashImage? {
+        allImages.first(where: { $0.id == id })
+            ?? galleryImages.first(where: { $0.id == id })
+            ?? detailImages.first(where: { $0.id == id })
+            ?? clips.first(where: { $0.id == id })
+    }
+
     /// Live-listener: patch `rating100` across in-memory image lists (FullScreen / feed sync).
     func patchImageRatingInLists(imageId: String, rating100: Int?) {
         func patch(_ list: inout [StashImage]) -> Bool {
@@ -6280,10 +6287,23 @@ struct GenerateData: Codable {
             if let _ = response?.data?.imageUpdate {
                 DispatchQueue.main.async {
                     self.patchImageRatingInLists(imageId: imageId, rating100: rating100)
+                    var userInfo: [String: Any] = ["imageId": imageId]
+                    if let rating100 {
+                        userInfo["rating100"] = rating100
+                    }
+                    if let image = self.imageInLists(id: imageId) {
+                        let title = image.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                        if !title.isEmpty {
+                            userInfo["title"] = title
+                        }
+                        if let thumb = image.paths?.thumbnail ?? image.paths?.preview ?? image.paths?.image {
+                            userInfo["thumbnailPath"] = thumb
+                        }
+                    }
                     NotificationCenter.default.post(
                         name: NSNotification.Name("ImageRatingUpdated"),
                         object: nil,
-                        userInfo: ["imageId": imageId, "rating100": rating100 as Any]
+                        userInfo: userInfo
                     )
                 }
                 completion(true)
@@ -6417,10 +6437,14 @@ struct GenerateData: Codable {
             if let _ = response?.data?.sceneUpdate {
                 // Notify observers that the rating changed
                 DispatchQueue.main.async {
+                    var userInfo: [String: Any] = ["sceneId": sceneId]
+                    if let rating100 {
+                        userInfo["rating100"] = rating100
+                    }
                     NotificationCenter.default.post(
                         name: NSNotification.Name("SceneRatingUpdated"),
                         object: nil,
-                        userInfo: ["sceneId": sceneId, "rating100": rating100 as Any]
+                        userInfo: userInfo
                     )
                 }
                 completion(true)

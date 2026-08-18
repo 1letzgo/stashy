@@ -809,7 +809,6 @@ struct SceneDetailView: View {
     }
 
     private func registerScenePlay() {
-        TimelinePlayStartStore.record(sceneId: activeScene.id, startSeconds: currentPlaybackTime)
         viewModel.addScenePlay(sceneId: activeScene.id)
         hasAddedPlay = true
         NotificationCenter.default.post(
@@ -1036,6 +1035,7 @@ extension SceneStudio {
 
 struct AddMarkerSheet: View {
     let sceneId: String
+    let sceneTitle: String
     let seconds: Double
     /// Used to capture a still at the marker start (same path as Scene Cover).
     let player: AVPlayer?
@@ -1185,6 +1185,18 @@ struct AddMarkerSheet: View {
                     self.isCreating = false
                     guard success, let createdMarker else { return }
 
+                    NotificationCenter.default.post(
+                        name: NSNotification.Name("SceneMarkerCreated"),
+                        object: nil,
+                        userInfo: [
+                            "sceneId": sceneId,
+                            "markerId": createdMarker.id,
+                            "title": createdMarker.title ?? title,
+                            "sceneTitle": sceneTitle,
+                            "thumbnailPath": createdMarker.screenshot as Any
+                        ]
+                    )
+
                     if let frameDataURL {
                         self.seedMarkerThumbnailCache(marker: createdMarker, dataURL: frameDataURL)
                     }
@@ -1304,6 +1316,7 @@ private struct SceneDetailAlertModifier: ViewModifier {
             .sheet(isPresented: $showingAddMarkerSheet) {
                 AddMarkerSheet(
                     sceneId: sceneId,
+                    sceneTitle: title,
                     seconds: capturedMarkerTime,
                     player: player,
                     videoURL: videoURL,

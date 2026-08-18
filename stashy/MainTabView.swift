@@ -341,7 +341,10 @@ struct ToolsView: View {
                 RateMeToolsView()
             }
         }
-        .onAppear { normalizeToolsSubTab() }
+        .onAppear {
+            tabManager.repairMissingToolsIfNeeded()
+            normalizeToolsSubTab()
+        }
         .onChange(of: stashyPlus.isUnlocked) { _, _ in normalizeToolsSubTab() }
         .navigationBarHidden(true)
         .popNavigationToRootOnChange(effectiveTab.rawValue)

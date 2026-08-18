@@ -239,10 +239,6 @@ final class TopListsViewModel: ObservableObject {
     private let performerRepository = PerformerRepository()
     private let studioRepository = StudioRepository()
     private let tagRepository = TagRepository()
-    private var hasLoadedScenes = false
-    private var hasLoadedPerformers = false
-    private var hasLoadedStudios = false
-    private var hasLoadedTags = false
     private var scenePaging: [SceneTopMetric: TopListPage] = [:]
     private var performerPaging: [PerformerTopMetric: TopListPage] = [:]
     private var studioPaging: [StudioTopMetric: TopListPage] = [:]
@@ -250,6 +246,10 @@ final class TopListsViewModel: ObservableObject {
     private var sceneOCounterObserver: NSObjectProtocol?
     private var sceneUpdatedObserver: NSObjectProtocol?
     private var sceneCoverObserver: NSObjectProtocol?
+    private var scenesFetchGeneration = 0
+    private var performersFetchGeneration = 0
+    private var studiosFetchGeneration = 0
+    private var tagsFetchGeneration = 0
 
     init() {
         sceneOCounterObserver = NotificationCenter.default.addObserver(
@@ -298,30 +298,16 @@ final class TopListsViewModel: ObservableObject {
         }
     }
 
-    func loadScenesIfNeeded() async {
-        guard !hasLoadedScenes else { return }
-        await reloadScenes()
-    }
-
-    func loadPerformersIfNeeded() async {
-        guard !hasLoadedPerformers else { return }
-        await reloadPerformers()
-    }
-
-    func loadStudiosIfNeeded() async {
-        guard !hasLoadedStudios else { return }
-        await reloadStudios()
-    }
-
-    func loadTagsIfNeeded() async {
-        guard !hasLoadedTags else { return }
-        await reloadTags()
-    }
-
     func reloadScenes() async {
+        scenesFetchGeneration += 1
+        let generation = scenesFetchGeneration
         isLoadingScenes = true
         didFailScenes = false
-        defer { isLoadingScenes = false }
+        defer {
+            if generation == scenesFetchGeneration {
+                isLoadingScenes = false
+            }
+        }
 
         async let viewed = fetchScenes(sortedBy: .playCountDesc)
         async let oScenes = fetchScenes(sortedBy: .oCounterDesc)
@@ -332,6 +318,7 @@ final class TopListsViewModel: ObservableObject {
         let oScenesResult = await oScenes
         let watchResult = await watch
         let ratingResult = await rating
+        guard generation == scenesFetchGeneration else { return }
 
         store(viewedResult, metric: .views, into: &scenesByViews, paging: &scenePaging)
         store(oScenesResult, metric: .oCount, into: &scenesByOCount, paging: &scenePaging)
@@ -341,13 +328,18 @@ final class TopListsViewModel: ObservableObject {
         let anySuccess = viewedResult != nil || oScenesResult != nil
             || watchResult != nil || ratingResult != nil
         didFailScenes = !anySuccess
-        hasLoadedScenes = anySuccess
     }
 
     func reloadPerformers() async {
+        performersFetchGeneration += 1
+        let generation = performersFetchGeneration
         isLoadingPerformers = true
         didFailPerformers = false
-        defer { isLoadingPerformers = false }
+        defer {
+            if generation == performersFetchGeneration {
+                isLoadingPerformers = false
+            }
+        }
 
         async let oCount = fetchPerformers(sortedBy: .oCountDesc)
         async let scenes = fetchPerformers(sortedBy: .sceneCountDesc)
@@ -360,6 +352,7 @@ final class TopListsViewModel: ObservableObject {
         let ratingResult = await rating
         let imagesResult = await images
         let galleriesResult = await galleries
+        guard generation == performersFetchGeneration else { return }
 
         store(oCountResult, metric: .oCount, into: &performersByOCount, paging: &performerPaging)
         store(scenesResult, metric: .scenes, into: &performersByScenes, paging: &performerPaging)
@@ -370,13 +363,18 @@ final class TopListsViewModel: ObservableObject {
         let anySuccess = oCountResult != nil || scenesResult != nil
             || ratingResult != nil || imagesResult != nil || galleriesResult != nil
         didFailPerformers = !anySuccess
-        hasLoadedPerformers = anySuccess
     }
 
     func reloadStudios() async {
+        studiosFetchGeneration += 1
+        let generation = studiosFetchGeneration
         isLoadingStudios = true
         didFailStudios = false
-        defer { isLoadingStudios = false }
+        defer {
+            if generation == studiosFetchGeneration {
+                isLoadingStudios = false
+            }
+        }
 
         async let scenes = fetchStudios(sortedBy: .sceneCountDesc)
         async let galleries = fetchStudios(sortedBy: .galleryCountDesc)
@@ -387,6 +385,7 @@ final class TopListsViewModel: ObservableObject {
         let galleriesResult = await galleries
         let ratingResult = await rating
         let imagesResult = await images
+        guard generation == studiosFetchGeneration else { return }
 
         store(scenesResult, metric: .scenes, into: &studiosByScenes, paging: &studioPaging)
         store(galleriesResult, metric: .galleries, into: &studiosByGalleries, paging: &studioPaging)
@@ -396,13 +395,18 @@ final class TopListsViewModel: ObservableObject {
         let anySuccess = scenesResult != nil || galleriesResult != nil
             || ratingResult != nil || imagesResult != nil
         didFailStudios = !anySuccess
-        hasLoadedStudios = anySuccess
     }
 
     func reloadTags() async {
+        tagsFetchGeneration += 1
+        let generation = tagsFetchGeneration
         isLoadingTags = true
         didFailTags = false
-        defer { isLoadingTags = false }
+        defer {
+            if generation == tagsFetchGeneration {
+                isLoadingTags = false
+            }
+        }
 
         async let scenes = fetchTags(sortedBy: .sceneCountDesc)
         async let images = fetchTags(sortedBy: .imageCountDesc)
@@ -413,6 +417,7 @@ final class TopListsViewModel: ObservableObject {
         let imagesResult = await images
         let galleriesResult = await galleries
         let markersResult = await markers
+        guard generation == tagsFetchGeneration else { return }
 
         store(scenesResult, metric: .scenes, into: &tagsByScenes, paging: &tagPaging)
         store(imagesResult, metric: .images, into: &tagsByImages, paging: &tagPaging)
@@ -422,7 +427,6 @@ final class TopListsViewModel: ObservableObject {
         let anySuccess = scenesResult != nil || imagesResult != nil
             || galleriesResult != nil || markersResult != nil
         didFailTags = !anySuccess
-        hasLoadedTags = anySuccess
     }
 
     func loadMoreScenes() async {
@@ -503,10 +507,10 @@ final class TopListsViewModel: ObservableObject {
     }
 
     func reset() {
-        hasLoadedScenes = false
-        hasLoadedPerformers = false
-        hasLoadedStudios = false
-        hasLoadedTags = false
+        scenesFetchGeneration += 1
+        performersFetchGeneration += 1
+        studiosFetchGeneration += 1
+        tagsFetchGeneration += 1
         scenePaging = [:]
         performerPaging = [:]
         studioPaging = [:]
@@ -532,6 +536,10 @@ final class TopListsViewModel: ObservableObject {
         didFailPerformers = false
         didFailStudios = false
         didFailTags = false
+        isLoadingScenes = false
+        isLoadingPerformers = false
+        isLoadingStudios = false
+        isLoadingTags = false
         isLoadingMoreScenes = false
         isLoadingMorePerformers = false
         isLoadingMoreStudios = false
@@ -768,6 +776,7 @@ struct TopListsToolsContainerView: View {
                     TopTagsToolsView(viewModel: viewModel)
                 }
             }
+            .id(section)
             .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -798,7 +807,10 @@ struct TopScenesToolsView: View {
             }
         }
         .applyAppBackground()
-        .task { await viewModel.loadScenesIfNeeded() }
+        .task { await viewModel.reloadScenes() }
+        .onChange(of: viewModel.sceneMetric) { _, _ in
+            Task { await viewModel.reloadScenes() }
+        }
         .onChange(of: configManager.activeConfig?.id) { _, _ in
             viewModel.reset()
             Task { await viewModel.reloadScenes() }
@@ -866,7 +878,10 @@ struct TopPerformersToolsView: View {
             }
         }
         .applyAppBackground()
-        .task { await viewModel.loadPerformersIfNeeded() }
+        .task { await viewModel.reloadPerformers() }
+        .onChange(of: viewModel.performerMetric) { _, _ in
+            Task { await viewModel.reloadPerformers() }
+        }
         .onChange(of: configManager.activeConfig?.id) { _, _ in
             viewModel.reset()
             Task { await viewModel.reloadPerformers() }
@@ -934,7 +949,10 @@ struct TopStudiosToolsView: View {
             }
         }
         .applyAppBackground()
-        .task { await viewModel.loadStudiosIfNeeded() }
+        .task { await viewModel.reloadStudios() }
+        .onChange(of: viewModel.studioMetric) { _, _ in
+            Task { await viewModel.reloadStudios() }
+        }
         .onChange(of: configManager.activeConfig?.id) { _, _ in
             viewModel.reset()
             Task { await viewModel.reloadStudios() }
@@ -1002,7 +1020,10 @@ struct TopTagsToolsView: View {
             }
         }
         .applyAppBackground()
-        .task { await viewModel.loadTagsIfNeeded() }
+        .task { await viewModel.reloadTags() }
+        .onChange(of: viewModel.tagMetric) { _, _ in
+            Task { await viewModel.reloadTags() }
+        }
         .onChange(of: configManager.activeConfig?.id) { _, _ in
             viewModel.reset()
             Task { await viewModel.reloadTags() }

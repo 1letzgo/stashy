@@ -1102,6 +1102,15 @@ class TabManager: ObservableObject {
         }
     }
 
+    /// Re-adds O-Count if an older Tools settings pass removed it from persistence.
+    func repairMissingToolsIfNeeded() {
+        let before = tools.map(\.id)
+        enforceFixedTools()
+        guard tools.map(\.id) != before else { return }
+        saveTools()
+        objectWillChange.send()
+    }
+
     /// Tools managed / gated under stashy+.
     static func isStashyPlusTool(_ item: ToolsItem) -> Bool {
         item == .downloads || item == .statistics || item == .oCount || item == .timeline || item == .topLists || item == .hotOrNot || item == .rateMe
@@ -1131,6 +1140,19 @@ class TabManager: ObservableObject {
         // Ensure downloads exists (stashy+ tool — visibility gated separately).
         if !tools.contains(where: { $0.id == .downloads }) {
             tools.append(ToolsItemConfig(id: .downloads, isEnabled: true, sortOrder: (tools.map(\.sortOrder).max() ?? 0) + 1))
+        }
+        // Re-insert O-Count if an older Tools reorder wiped it from persistence.
+        if !tools.contains(where: { $0.id == .oCount }) {
+            let statsEnabled = tools.first(where: { $0.id == .statistics })?.isEnabled ?? true
+            let config = ToolsItemConfig(id: .oCount, isEnabled: statsEnabled, sortOrder: 0)
+            if let idx = tools.firstIndex(where: { $0.id == .statistics }) {
+                tools.insert(config, at: idx + 1)
+            } else {
+                tools.append(config)
+            }
+            tools = tools.enumerated().map { idx, item in
+                ToolsItemConfig(id: item.id, isEnabled: item.isEnabled, sortOrder: idx)
+            }
         }
     }
 

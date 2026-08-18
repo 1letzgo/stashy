@@ -248,21 +248,32 @@ private final class RateMeViewModel: ObservableObject {
                 NotificationCenter.default.post(
                     name: NSNotification.Name("SceneRatingUpdated"),
                     object: nil,
-                    userInfo: [
-                        "sceneId": current.id,
-                        "rating100": rating100 as Any,
-                        "title": current.title
-                    ]
+                    userInfo: {
+                        var info: [String: Any] = [
+                            "sceneId": current.id,
+                            "title": current.title
+                        ]
+                        if let rating100 { info["rating100"] = rating100 }
+                        return info
+                    }()
                 )
             case .images:
+                var userInfo: [String: Any] = [
+                    "imageId": current.id,
+                    "title": current.title
+                ]
+                if let rating100 {
+                    userInfo["rating100"] = rating100
+                }
+                if let thumb = current.openableImage?.paths?.thumbnail
+                    ?? current.openableImage?.paths?.preview
+                    ?? current.openableImage?.paths?.image {
+                    userInfo["thumbnailPath"] = thumb
+                }
                 NotificationCenter.default.post(
                     name: NSNotification.Name("ImageRatingUpdated"),
                     object: nil,
-                    userInfo: [
-                        "imageId": current.id,
-                        "rating100": rating100 as Any,
-                        "title": current.title
-                    ]
+                    userInfo: userInfo
                 )
             }
             // Keep the selected stars visible briefly before advancing.

@@ -47,7 +47,7 @@ enum DesignTokens {
         static let strokeOpacity: Double = 0.07
     }
 
-    /// Shared insets for Tools sub-views (Overview, O-Count, Top, Match, RateMe, Downloads).
+    /// Shared insets for Tools sub-views (Overview, Timeline, Charts, Match, RateMe, Downloads).
     enum Tools {
         static let contentPadding: CGFloat = Spacing.md
         static let regularContentPadding: CGFloat = Spacing.xl

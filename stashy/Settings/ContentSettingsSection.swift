@@ -93,12 +93,15 @@ struct ToolsSettingsView: View {
                         var rebuilt = working.enumerated().map { idx, item in
                             ToolsItemConfig(id: item.id, isEnabled: item.isEnabled, sortOrder: idx)
                         }
-                        if let server = tabManager.tools.first(where: { $0.id == .server }) {
-                            rebuilt.append(ToolsItemConfig(
-                                id: .server,
-                                isEnabled: server.isEnabled,
-                                sortOrder: rebuilt.count
-                            ))
+                        // Keep tools not shown here (currently Server under Settings → Actions).
+                        for hidden in tabManager.tools where !rebuilt.contains(where: { $0.id == hidden.id }) {
+                            rebuilt.append(
+                                ToolsItemConfig(
+                                    id: hidden.id,
+                                    isEnabled: hidden.isEnabled,
+                                    sortOrder: rebuilt.count
+                                )
+                            )
                         }
                         tabManager.tools = rebuilt
                         tabManager.saveTools()
@@ -111,6 +114,7 @@ struct ToolsSettingsView: View {
         .deleteDisabled(true)
         .applyAppBackground()
         .stashySettingsDetailChrome("Tools")
+        .onAppear { tabManager.repairMissingToolsIfNeeded() }
     }
 }
 #endif

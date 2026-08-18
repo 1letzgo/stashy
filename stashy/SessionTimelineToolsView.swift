@@ -2,7 +2,7 @@
 //  SessionTimelineToolsView.swift
 //  stashy
 //
-//  Tools → Timeline: last 24h of Stash plays, then older windows on demand.
+//  Tools → Timeline: server scene plays, O-counts, and markers.
 //
 
 #if !os(tvOS)
@@ -12,12 +12,13 @@ struct SessionTimelineToolsView: View {
     @ObservedObject private var loader = SessionTimelineLoader.shared
     @ObservedObject private var configManager = ServerConfigManager.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    @State private var enabledKinds: Set<TimelineKind> = TimelineKind.savedFilter()
 
     var body: some View {
         Group {
             if configManager.activeConfig == nil {
                 ConnectionErrorView {
-                    Task { await loader.reload(refreshOCounts: true) }
+                    Task { await loader.reload() }
                 }
             } else {
                 timelineList
@@ -25,7 +26,15 @@ struct SessionTimelineToolsView: View {
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .applyAppBackground()
-        .task { await loader.loadIfNeeded() }
+        .id(loader.contentID)
+        .task(id: loader.contentID) { await loader.loadIfNeeded() }
+        .onChange(of: enabledKinds) { _, kinds in
+            TimelineKind.saveFilter(kinds)
+        }
+    }
+
+    private var visibleDays: [TimelineDayGroup] {
+        Self.days(from: loader.sessions.compactMap { $0.filtered(to: enabledKinds) })
     }
 
     private var timelineList: some View {
@@ -41,14 +50,16 @@ struct SessionTimelineToolsView: View {
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
                         .padding(.top, 40)
-                } else if loader.sessions.isEmpty {
-                    Text("No plays, O-counts, or ratings in the last 24 hours.")
+                } else if visibleDays.isEmpty {
+                    Text(loader.sessions.isEmpty
+                         ? "No plays, O-counts, or markers in the last 24 hours."
+                         : "No matching activity for the selected filters.")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .frame(maxWidth: .infinity)
                         .padding(.top, 40)
                 } else {
-                    ForEach(Self.days(from: loader.sessions)) { day in
+                    ForEach(visibleDays) { day in
                         TimelineDayBlock(day: day)
                     }
                 }
@@ -57,7 +68,7 @@ struct SessionTimelineToolsView: View {
                     ProgressView()
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                } else if loader.hasMore, !loader.sessions.isEmpty, !loader.isLoading {
+                } else if loader.hasMore, !loader.isLoading, !loader.sessions.isEmpty {
                     Color.clear
                         .frame(height: 1)
                         .onAppear {
@@ -66,13 +77,21 @@ struct SessionTimelineToolsView: View {
                 }
             }
             .toolsHorizontalPadding(horizontalSizeClass)
-            .padding(.top, DesignTokens.Tools.menuTopPadding)
             .padding(.bottom, DesignTokens.Tools.menuBottomPadding + 12)
             .frame(maxWidth: DesignTokens.Tools.regularMaxContentWidth)
             .frame(maxWidth: .infinity)
         }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            TimelineFilterChipRow(enabled: $enabledKinds)
+                .toolsHorizontalPadding(horizontalSizeClass)
+                .padding(.top, DesignTokens.Tools.menuTopPadding)
+                .padding(.bottom, 10)
+                .frame(maxWidth: DesignTokens.Tools.regularMaxContentWidth)
+                .frame(maxWidth: .infinity)
+                .background(TimelineFilterBarBackground())
+        }
         .refreshable {
-            await loader.reload(refreshOCounts: true)
+            await loader.reload()
         }
         .scrollBounceBehavior(.always)
     }
@@ -96,6 +115,63 @@ private struct TimelineDayGroup: Identifiable {
     let day: Date
     let sessions: [TimelineSession]
     var id: Date { day }
+}
+
+private struct TimelineFilterBarBackground: View {
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        Color.appBackground(for: appearance.currentTheme)
+    }
+}
+
+private struct TimelineFilterChipRow: View {
+    @Binding var enabled: Set<TimelineKind>
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        HStack(spacing: StashyExpandingDock.itemSpacing) {
+            ForEach(TimelineKind.allCases) { kind in
+                let selected = enabled.contains(kind)
+                Button {
+                    HapticManager.selection()
+                    toggle(kind)
+                } label: {
+                    Text(kind.label)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.85))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.65)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 28)
+                        .background(
+                            Capsule(style: .continuous)
+                                .fill(selected ? appearance.tintColor : Color.secondary.opacity(0.15))
+                                .shadow(
+                                    color: selected ? appearance.tintColor.opacity(0.35) : .clear,
+                                    radius: 4,
+                                    x: 0,
+                                    y: 2
+                                )
+                        )
+                        .clipShape(Capsule(style: .continuous))
+                        .contentShape(Capsule(style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("\(kind.label)\(selected ? ", selected" : "")")
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
+        }
+    }
+
+    private func toggle(_ kind: TimelineKind) {
+        if enabled.contains(kind) {
+            guard enabled.count > 1 else { return }
+            enabled.remove(kind)
+        } else {
+            enabled.insert(kind)
+        }
+    }
 }
 
 private struct TimelineDayBlock: View {
@@ -172,12 +248,12 @@ private struct TimelineSessionBlock: View {
                 }
                 .foregroundStyle(appearance.tintColor)
             }
-            if session.ratingCount > 0 {
+            if session.markerCount > 0 {
                 Label {
-                    Text("\(session.ratingCount)")
+                    Text("\(session.markerCount)")
                         .font(.subheadline.weight(.semibold).monospacedDigit())
                 } icon: {
-                    Image(systemName: "star.fill")
+                    Image(systemName: "bookmark.fill")
                         .font(.caption)
                 }
                 .foregroundStyle(appearance.tintColor)
@@ -273,7 +349,7 @@ private struct TimelineVisitRow: View {
 
     var body: some View {
         NavigationLink {
-            destination
+            OCountMediaDestination(item: visit.scene.asHeatmapItem)
         } label: {
             HStack(alignment: .center, spacing: 10) {
                 timeNode
@@ -281,11 +357,6 @@ private struct TimelineVisitRow: View {
             }
         }
         .buttonStyle(.plain)
-    }
-
-    @ViewBuilder
-    private var destination: some View {
-        OCountMediaDestination(item: visit.media.asHeatmapItem)
     }
 
     private var timeNode: some View {
@@ -314,19 +385,7 @@ private struct TimelineVisitCard: View {
     @ObservedObject private var appearance = AppearanceManager.shared
 
     private var isOCountAction: Bool { !visit.isPlayback }
-    private var isImageThumb: Bool {
-        if case .image = visit.media { return true }
-        return false
-    }
-
     private var cardHeight: CGFloat { thumbWidth * 9 / 16 }
-
-    private var renderedThumbWidth: CGFloat {
-        guard isImageThumb else { return thumbWidth }
-        let ratio = visit.media.thumbnailAspectRatio
-        guard ratio > 0 else { return thumbWidth }
-        return min(thumbWidth, cardHeight * ratio)
-    }
 
     var body: some View {
         HStack(alignment: .center, spacing: 0) {
@@ -346,16 +405,16 @@ private struct TimelineVisitCard: View {
                     lineWidth: 0.5
                 )
         )
-        .overlay(alignment: .topTrailing) {
-            if visit.isLocal {
-                localBadge
-            }
-        }
         .overlay(alignment: .bottomTrailing) {
-            if let rating = visit.ratingAction {
-                ratingActionBadge(rating)
+            if visit.isMarkerAction {
+                markerBadge
             } else if visit.isPlayback {
-                playBadge
+                HStack(spacing: 2) {
+                    if visit.oCount > 0 {
+                        oCountBadge
+                    }
+                    playBadge
+                }
             } else if visit.oCount > 0 {
                 oCountBadge
             }
@@ -366,7 +425,7 @@ private struct TimelineVisitCard: View {
 
     private var textColumn: some View {
         VStack(alignment: .leading, spacing: 4) {
-            Text(visit.media.displayTitle)
+            Text(visit.scene.displayTitle)
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(.primary)
                 .lineLimit(2)
@@ -374,16 +433,22 @@ private struct TimelineVisitCard: View {
 
             Spacer(minLength: 0)
 
-            if let subtitle = visit.media.subtitle, !subtitle.isEmpty {
-                Text(subtitle)
+            if let line = TimelineSessionBlock.watchedLine(for: visit) {
+                Text(line)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
 
-            if let line = TimelineSessionBlock.watchedLine(for: visit) {
-                Text(line)
+            if let subtitle = visit.markerTitle, !subtitle.isEmpty {
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            } else if let subtitle = visit.scene.studioName {
+                Text(subtitle)
                     .font(.caption)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
@@ -396,27 +461,6 @@ private struct TimelineVisitCard: View {
         .padding(.vertical, 6)
     }
 
-    private var localBadge: some View {
-        Image(systemName: "iphone")
-            .font(.caption2.weight(.semibold))
-            .foregroundStyle(.secondary.opacity(0.35))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
-            .accessibilityLabel("Stored on this device")
-    }
-
-    private func ratingActionBadge(_ rating100: Int) -> some View {
-        StarRatingView(
-            rating100: rating100,
-            isInteractive: false,
-            size: 10,
-            spacing: 1
-        )
-        .padding(.horizontal, 8)
-        .padding(.vertical, 6)
-        .allowsHitTesting(false)
-    }
-
     private var playBadge: some View {
         Image(systemName: "play.fill")
             .font(.caption.weight(.semibold))
@@ -424,6 +468,16 @@ private struct TimelineVisitCard: View {
             .padding(.horizontal, 8)
             .padding(.vertical, 6)
             .allowsHitTesting(false)
+    }
+
+    private var markerBadge: some View {
+        Image(systemName: "bookmark.fill")
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(appearance.tintColor)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .allowsHitTesting(false)
+            .accessibilityLabel("Marker created")
     }
 
     private var oCountBadge: some View {
@@ -442,7 +496,7 @@ private struct TimelineVisitCard: View {
 
     private var thumbnail: some View {
         ZStack(alignment: .leading) {
-            if let url = visit.media.thumbnailURL {
+            if let url = visit.scene.thumbnailURL {
                 CustomAsyncImage(url: url) { loader in
                     if loader.isLoading {
                         Color.gray.opacity(DesignTokens.Opacity.placeholder)
@@ -451,7 +505,7 @@ private struct TimelineVisitCard: View {
                         image
                             .resizable()
                             .aspectRatio(contentMode: .fill)
-                            .frame(width: renderedThumbWidth, height: cardHeight)
+                            .frame(width: thumbWidth, height: cardHeight)
                             .clipped()
                     } else {
                         placeholderThumb
@@ -461,14 +515,14 @@ private struct TimelineVisitCard: View {
                 placeholderThumb
             }
         }
-        .frame(width: renderedThumbWidth, height: cardHeight, alignment: .leading)
+        .frame(width: thumbWidth, height: cardHeight, alignment: .leading)
         .clipped()
     }
 
     private var placeholderThumb: some View {
         Color.gray.opacity(DesignTokens.Opacity.placeholder)
             .overlay {
-                Image(systemName: visit.media.placeholderSystemImage)
+                Image(systemName: "film")
                     .foregroundStyle(.secondary)
             }
     }
