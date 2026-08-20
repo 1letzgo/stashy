@@ -286,8 +286,9 @@ class StashDBViewModel: ObservableObject {
         ) { [weak self] notification in
             guard let performerId = notification.userInfo?["performerId"] as? String,
                   let newImagePath = notification.userInfo?["newImagePath"] as? String else { return }
+            let viewModel = self
             Task { @MainActor in
-                self?.patchPerformerImageInLists(performerId: performerId, newImagePath: newImagePath)
+                viewModel?.patchPerformerImageInLists(performerId: performerId, newImagePath: newImagePath)
             }
         }
 
@@ -299,8 +300,9 @@ class StashDBViewModel: ObservableObject {
             guard let tagId = notification.userInfo?["tagId"] as? String,
                   let newImagePath = notification.userInfo?["newImagePath"] as? String else { return }
             let updatedAt = notification.userInfo?["updatedAt"] as? String
+            let viewModel = self
             Task { @MainActor in
-                self?.patchTagImageInLists(tagId: tagId, newImagePath: newImagePath, updatedAt: updatedAt)
+                viewModel?.patchTagImageInLists(tagId: tagId, newImagePath: newImagePath, updatedAt: updatedAt)
             }
         }
 
@@ -311,8 +313,9 @@ class StashDBViewModel: ObservableObject {
         ) { [weak self] notification in
             guard let sceneId = notification.userInfo?["sceneId"] as? String,
                   let updatedAt = notification.userInfo?["updatedAt"] as? String else { return }
+            let viewModel = self
             Task { @MainActor in
-                self?.patchSceneCoverInLists(sceneId: sceneId, updatedAt: updatedAt)
+                viewModel?.patchSceneCoverInLists(sceneId: sceneId, updatedAt: updatedAt)
             }
         }
 
@@ -323,8 +326,9 @@ class StashDBViewModel: ObservableObject {
         ) { [weak self] notification in
             guard let imageId = notification.userInfo?["imageId"] as? String else { return }
             let rating100 = notification.userInfo?["rating100"] as? Int
+            let viewModel = self
             Task { @MainActor in
-                self?.patchImageRatingInLists(imageId: imageId, rating100: rating100)
+                viewModel?.patchImageRatingInLists(imageId: imageId, rating100: rating100)
             }
         }
 
@@ -335,8 +339,9 @@ class StashDBViewModel: ObservableObject {
         ) { [weak self] notification in
             guard let imageId = notification.userInfo?["imageId"] as? String,
                   let oCounter = notification.userInfo?["oCounter"] as? Int else { return }
+            let viewModel = self
             Task { @MainActor in
-                self?.patchImageOCounterInLists(imageId: imageId, oCounter: oCounter)
+                viewModel?.patchImageOCounterInLists(imageId: imageId, oCounter: oCounter)
             }
         }
 
@@ -347,8 +352,9 @@ class StashDBViewModel: ObservableObject {
         ) { [weak self] notification in
             guard let sceneId = notification.userInfo?["sceneId"] as? String,
                   let oCounter = notification.userInfo?["oCounter"] as? Int else { return }
+            let viewModel = self
             Task { @MainActor in
-                self?.patchSceneOCounterInLists(sceneId: sceneId, oCounter: oCounter)
+                viewModel?.patchSceneOCounterInLists(sceneId: sceneId, oCounter: oCounter)
             }
         }
 
@@ -358,8 +364,9 @@ class StashDBViewModel: ObservableObject {
             queue: .main
         ) { [weak self] notification in
             guard let scene = Scene.fromListMetadataNotification(notification) else { return }
+            let viewModel = self
             Task { @MainActor in
-                self?.mergeSceneListMetadata(scene)
+                viewModel?.mergeSceneListMetadata(scene)
             }
         }
         

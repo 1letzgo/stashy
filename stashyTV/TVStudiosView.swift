@@ -114,6 +114,14 @@ struct TVStudiosView: View {
         case .createdAtAsc: return "Oldest Added"
         case .updatedAtDesc: return "Recently Updated"
         case .updatedAtAsc: return "Least Recently Updated"
+        case .ratingDesc: return "Highest Rated"
+        case .ratingAsc: return "Lowest Rated"
+        case .performerCountDesc: return "Most Performers"
+        case .performerCountAsc: return "Least Performers"
+        case .galleryCountDesc: return "Most Galleries"
+        case .galleryCountAsc: return "Least Galleries"
+        case .imageCountDesc: return "Most Images"
+        case .imageCountAsc: return "Least Images"
         case .random: return "Random"
         }
     }

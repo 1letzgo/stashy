@@ -339,8 +339,9 @@ final class OCountHeatmapLoader: ObservableObject {
             object: nil,
             queue: .main
         ) { [weak self] _ in
+            let loader = self
             Task { @MainActor in
-                self?.reset()
+                loader?.reset()
             }
         }
 
@@ -350,8 +351,9 @@ final class OCountHeatmapLoader: ObservableObject {
             queue: .main
         ) { [weak self] notification in
             guard let sceneId = notification.userInfo?["sceneId"] as? String else { return }
+            let loader = self
             Task { @MainActor in
-                self?.applyLiveOIncrement(kind: .scene, stashID: sceneId)
+                loader?.applyLiveOIncrement(kind: .scene, stashID: sceneId)
             }
         }
         NotificationCenter.default.addObserver(
@@ -360,8 +362,9 @@ final class OCountHeatmapLoader: ObservableObject {
             queue: .main
         ) { [weak self] notification in
             guard let imageId = notification.userInfo?["imageId"] as? String else { return }
+            let loader = self
             Task { @MainActor in
-                self?.applyLiveOIncrement(kind: .image, stashID: imageId)
+                loader?.applyLiveOIncrement(kind: .image, stashID: imageId)
             }
         }
         NotificationCenter.default.addObserver(
@@ -370,8 +373,9 @@ final class OCountHeatmapLoader: ObservableObject {
             queue: .main
         ) { [weak self] notification in
             guard let scene = Scene.fromListMetadataNotification(notification) else { return }
+            let loader = self
             Task { @MainActor in
-                self?.applyLiveSceneMetadata(scene)
+                loader?.applyLiveSceneMetadata(scene)
             }
         }
         NotificationCenter.default.addObserver(
@@ -381,8 +385,9 @@ final class OCountHeatmapLoader: ObservableObject {
         ) { [weak self] notification in
             guard let sceneId = notification.userInfo?["sceneId"] as? String else { return }
             let rating = notification.userInfo?["rating100"] as? Int
+            let loader = self
             Task { @MainActor in
-                self?.applyLiveRating(kind: .scene, stashID: sceneId, rating100: rating)
+                loader?.applyLiveRating(kind: .scene, stashID: sceneId, rating100: rating)
             }
         }
         NotificationCenter.default.addObserver(
@@ -392,8 +397,9 @@ final class OCountHeatmapLoader: ObservableObject {
         ) { [weak self] notification in
             guard let imageId = notification.userInfo?["imageId"] as? String else { return }
             let rating = notification.userInfo?["rating100"] as? Int
+            let loader = self
             Task { @MainActor in
-                self?.applyLiveRating(kind: .image, stashID: imageId, rating100: rating)
+                loader?.applyLiveRating(kind: .image, stashID: imageId, rating100: rating)
             }
         }
     }
@@ -1227,14 +1233,14 @@ private struct OCountDayBuckets {
     }
 }
 
-private enum OCountTimestamp {
-    static let fractional: ISO8601DateFormatter = {
+private nonisolated enum OCountTimestamp {
+    nonisolated(unsafe) static let fractional: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
         return formatter
     }()
 
-    static let plain: ISO8601DateFormatter = {
+    nonisolated(unsafe) static let plain: ISO8601DateFormatter = {
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
         return formatter

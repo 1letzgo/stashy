@@ -137,6 +137,8 @@ struct TVScenesView: View {
         case .durationAsc: return "Shortest First"
         case .playCountDesc: return "Most Viewed"
         case .playCountAsc: return "Least Viewed"
+        case .playDurationDesc: return "Most Watch Time"
+        case .playDurationAsc: return "Least Watch Time"
         case .oCounterDesc: return "O Count (High-Low)"
         case .oCounterAsc: return "O Count (Low-High)"
         case .ratingDesc: return "Highest Rated"

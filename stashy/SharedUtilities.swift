@@ -460,8 +460,9 @@ final class ScenePlaybackActivityTracker {
         guard timer == nil else { return }
         lastMediaTime = currentTime
         let timer = Timer(timeInterval: tickInterval, repeats: true) { [weak self] _ in
+            let tracker = self
             Task { @MainActor in
-                self?.tick()
+                tracker?.tick()
             }
         }
         RunLoop.main.add(timer, forMode: .common)
