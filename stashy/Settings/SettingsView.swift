@@ -10,6 +10,12 @@ import SwiftUI
 import StoreKit
 import UIKit
 
+private enum StashyLegalLinks {
+    /// Apple Standard EULA — required in App Store metadata for auto-renewable subscriptions.
+    static let termsOfUse = URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
+    static let privacyPolicy = URL(string: "https://github.com/1letzgo/stashy#privacy")!
+}
+
 struct SettingsView: View {
     /// When true, this instance is the locked stashy+ tab (paywall only — no Settings chrome).
     var stashyPlusOnly: Bool = false
@@ -202,12 +208,6 @@ struct SettingsView: View {
 
     @ViewBuilder
     private var stashyPlusSettings: some View {
-        if isTestFlightBuild() {
-            Section {
-                appStoreBanner
-            }
-        }
-
         if stashyPlus.isUnlocked {
             Section {
                 stashyScrollingSectionHeader("Custom App Icons")
@@ -293,81 +293,6 @@ struct SettingsView: View {
         }
     }
 
-    // MARK: - TestFlight Banner
-
-    @Environment(\.openURL) private var openURL
-
-    private var appStoreBanner: some View {
-        Button {
-            if let url = URL(string: "https://apps.apple.com/us/app/stashy/id6754876029") {
-                openURL(url)
-            }
-        } label: {
-            VStack(alignment: .leading, spacing: 14) {
-                HStack(spacing: 10) {
-                    Image(systemName: "calendar.badge.exclamationmark")
-                        .font(.system(size: 22, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: 44, height: 44)
-                        .background(Color.white.opacity(0.15))
-                        .clipShape(RoundedRectangle(cornerRadius: 10))
-
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("TestFlight ends 15 September")
-                            .font(.subheadline.weight(.bold))
-                            .foregroundColor(.white)
-                        Text("From then on, stashy is free on the App Store.")
-                            .font(.caption)
-                            .foregroundColor(.white.opacity(0.8))
-                    }
-
-                    Spacer()
-                }
-
-                VStack(alignment: .leading, spacing: 6) {
-                    featureRow(icon: "infinity", text: "Grab a Lifetime license at the current price before then")
-                    featureRow(icon: "checkmark.seal.fill", text: "Lifetime keeps stashy+ unlocked forever on this Apple ID")
-                }
-
-                HStack {
-                    Spacer()
-                    Text("Open App Store")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 8)
-                        .background(Color.white.opacity(0.2))
-                        .clipShape(Capsule())
-                }
-                .padding(.top, 2)
-            }
-            .padding(.vertical, 6)
-        }
-        .buttonStyle(.plain)
-        .listRowBackground(
-            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small)
-                .fill(
-                    LinearGradient(
-                        colors: [Color(red: 0.18, green: 0.38, blue: 0.95), Color(red: 0.55, green: 0.2, blue: 0.85)],
-                        startPoint: .topLeading,
-                        endPoint: .bottomTrailing
-                    )
-                )
-        )
-    }
-
-    private func featureRow(icon: String, text: String) -> some View {
-        HStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(.white.opacity(0.9))
-                .frame(width: 18)
-            Text(text)
-                .font(.caption)
-                .foregroundColor(.white.opacity(0.9))
-        }
-    }
-
     // MARK: - stashy+ In-App Purchases
 
     private var sortedProducts: [Product] {
@@ -428,11 +353,6 @@ struct SettingsView: View {
                                     Text(storeManager.lastProductError ?? "stashy+ products unavailable.")
                                         .font(.caption)
                                         .foregroundColor(.secondary)
-                                    if isTestFlightBuild() {
-                                        Text("TestFlight loads products from App Store Connect. Create de.stashy.plus.m / .y / .l there (and wait until Ready to Submit), or run from Xcode with the StoreKit config.")
-                                            .font(.caption2)
-                                            .foregroundColor(.secondary)
-                                    }
                                     Button("Retry") {
                                         Task { await storeManager.fetchProducts() }
                                     }
@@ -440,28 +360,7 @@ struct SettingsView: View {
                                 .stashyGroupedSettingsRow()
                             }
                         } else {
-                            ForEach(sortedProducts) { product in
-                                Button {
-                                    Task { await purchaseStashyPlus(product) }
-                                } label: {
-                                    HStack {
-                                        stashyPlusRowLabel(
-                                            StashyPlusProduct.displayNames[product.id] ?? product.displayName,
-                                            systemImage: iconFor(productID: product.id)
-                                        )
-                                        Spacer()
-                                        if storeManager.isPurchasing {
-                                            ProgressView()
-                                        } else {
-                                            Text(priceLabel(for: product))
-                                                .foregroundColor(.secondary)
-                                        }
-                                    }
-                                }
-                                .buttonStyle(.plain)
-                                .disabled(storeManager.isPurchasing)
-                                .stashySettingsCardRow()
-                            }
+                            stashyPlusPurchaseOptionsCard
                             if let missing = storeManager.lastProductError, missing.hasPrefix("Missing from StoreKit") {
                                 Text(missing)
                                     .font(.caption2)
@@ -471,35 +370,26 @@ struct SettingsView: View {
                         }
                     }
 
-                    if !stashyPlus.isUnlocked {
-                        Button {
-                            Task { await restorePurchases() }
-                        } label: {
-                            HStack {
-                                stashyPlusRowLabel("Restore Purchases", systemImage: "arrow.clockwise")
-                                Spacer()
-                                if storeManager.isRestoringPurchases {
-                                    ProgressView()
-                                }
-                            }
-                        }
-                        .buttonStyle(.plain)
-                        .disabled(storeManager.isPurchasing || storeManager.isRestoringPurchases)
-                        .stashyGroupedSettingsRow()
+                    if !stashyPlus.isUnlocked, storeManager.products.isEmpty || !stashyPlus.shouldOfferPurchases {
+                        stashyPlusRestoreCard
                     }
 
                     if stashyPlus.source == .subscription {
-                        Button {
+                        stashyPlusSecondaryActionCard(
+                            title: "Manage Subscription",
+                            systemImage: "creditcard",
+                            showsProgress: false
+                        ) {
                             Task { await storeManager.manageSubscriptions() }
-                        } label: {
-                            stashyPlusRowLabel("Manage Subscription", systemImage: "creditcard")
                         }
-                        .buttonStyle(.plain)
-                        .stashyGroupedSettingsRow()
                     }
 
                     if !stashyPlus.isUnlocked {
                         stashyScrollingSectionFooter("Monthly, Yearly, or Lifetime. If you bought stashy as a paid app before 3.0, tap Restore Purchases.")
+                    }
+
+                    if stashyPlus.shouldOfferPurchases {
+                        stashyPlusSubscriptionLegalDisclosure
                     }
                 }
             }
@@ -516,6 +406,26 @@ struct SettingsView: View {
         !showsLegacyAppLifetimeButton
             || stashyPlus.shouldOfferPurchases
             || !stashyPlus.isUnlocked
+    }
+
+    @ViewBuilder
+    private var stashyPlusSubscriptionLegalDisclosure: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Subscriptions renew automatically unless canceled at least 24 hours before the end of the current period. Manage or cancel in your App Store account settings.")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: 16) {
+                Link("Terms of Use (EULA)", destination: StashyLegalLinks.termsOfUse)
+                Link("Privacy Policy", destination: StashyLegalLinks.privacyPolicy)
+            }
+            .font(.caption)
+            .foregroundColor(appearanceManager.tintColor)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .listRowInsets(EdgeInsets(top: 8, leading: 0, bottom: 0, trailing: 0))
+        .listRowBackground(Color.clear)
+        .listRowSeparator(.hidden)
     }
 
     private var legacyAppLifetimeButton: some View {
@@ -538,13 +448,122 @@ struct SettingsView: View {
     }
 
     private func stashyPlusRowLabel(_ title: String, systemImage: String) -> some View {
-        Label {
-            Text(title)
-                .foregroundColor(.primary)
-        } icon: {
+        HStack(spacing: 8) {
             Image(systemName: systemImage)
+                .font(.body)
                 .foregroundColor(appearanceManager.tintColor)
+                .frame(width: 22, alignment: .center)
+            Text(title)
+                .font(.body)
+                .foregroundColor(.primary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
         }
+    }
+
+    @ViewBuilder
+    private var stashyPlusPurchaseOptionsCard: some View {
+        VStack(spacing: 0) {
+            ForEach(Array(sortedProducts.enumerated()), id: \.element.id) { index, product in
+                stashyPlusPurchaseButton(for: product)
+                if index < sortedProducts.count - 1 {
+                    Divider()
+                }
+            }
+
+            if !stashyPlus.isUnlocked {
+                Divider()
+                    .padding(.top, 8)
+                stashyPlusRestoreButton
+            }
+        }
+        .stashySettingsCardRow()
+    }
+
+    @ViewBuilder
+    private var stashyPlusRestoreCard: some View {
+        VStack(spacing: 0) {
+            stashyPlusRestoreButton
+        }
+        .listRowInsets(EdgeInsets(top: 12, leading: 0, bottom: 4, trailing: 0))
+        .stashySettingsCardRow()
+    }
+
+    private var stashyPlusRestoreButton: some View {
+        stashyPlusSecondaryButton(
+            title: "Restore Purchases",
+            systemImage: "arrow.clockwise",
+            showsProgress: storeManager.isRestoringPurchases
+        ) {
+            Task { await restorePurchases() }
+        }
+        .disabled(storeManager.isPurchasing || storeManager.isRestoringPurchases)
+    }
+
+    private func stashyPlusSecondaryActionCard(
+        title: String,
+        systemImage: String,
+        showsProgress: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        VStack(spacing: 0) {
+            stashyPlusSecondaryButton(
+                title: title,
+                systemImage: systemImage,
+                showsProgress: showsProgress,
+                action: action
+            )
+        }
+        .stashySettingsCardRow()
+    }
+
+    private func stashyPlusPurchaseButton(for product: Product) -> some View {
+        Button {
+            Task { await purchaseStashyPlus(product) }
+        } label: {
+            HStack(alignment: .center, spacing: 12) {
+                stashyPlusRowLabel(
+                    StashyPlusProduct.displayNames[product.id] ?? product.displayName,
+                    systemImage: iconFor(productID: product.id)
+                )
+                Spacer(minLength: 8)
+                if storeManager.purchasingProductID == product.id {
+                    ProgressView()
+                } else {
+                    Text(priceLabel(for: product))
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.85)
+                }
+            }
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .disabled(storeManager.isPurchasing)
+    }
+
+    private func stashyPlusSecondaryButton(
+        title: String,
+        systemImage: String,
+        showsProgress: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            HStack(alignment: .center, spacing: 12) {
+                stashyPlusRowLabel(title, systemImage: systemImage)
+                Spacer(minLength: 8)
+                if showsProgress {
+                    ProgressView()
+                }
+            }
+            .padding(.vertical, 14)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func purchaseStashyPlus(_ product: Product) async {
@@ -573,10 +592,7 @@ struct SettingsView: View {
     }
 
     private var restoreFailureMessage: String {
-        if isTestFlightBuild() {
-            return "TestFlight can’t restore a paid App Store purchase from before 3.0. Lifetime and subscriptions restore in the App Store build."
-        }
-        return "No stashy+ subscription or Lifetime purchase on this Apple ID. Pre-3.0 paid-app buyers get Lifetime via Restore Purchases."
+        "No stashy+ subscription or Lifetime purchase on this Apple ID. Pre-3.0 paid-app buyers get Lifetime via Restore Purchases."
     }
 
     private func restorePurchases() async {
@@ -672,7 +688,7 @@ struct SettingsView: View {
                                 systemImage: iconFor(productID: product.id)
                             )
                             Spacer()
-                            if storeManager.isPurchasing {
+                            if storeManager.purchasingProductID == product.id {
                                 ProgressView()
                             } else {
                                 Text(product.displayPrice)
@@ -748,8 +764,10 @@ class StoreManager: ObservableObject {
     @Published var tipProducts: [Product] = []
     @Published var isLoadingProducts = false
     @Published var lastProductError: String?
-    @Published var isPurchasing = false
+    @Published private(set) var purchasingProductID: String?
     @Published var isRestoringPurchases = false
+
+    var isPurchasing: Bool { purchasingProductID != nil }
 
     private var transactionListener: Task<Void, Never>?
     private var legacyPaidRetryCount = 0
@@ -792,7 +810,7 @@ class StoreManager: ObservableObject {
             let loadedPlus = Set(self.products.map(\.id))
             let missing = plusIDs.subtracting(loadedPlus).sorted()
             if self.products.isEmpty {
-                lastProductError = "No stashy+ products returned. For Xcode runs, enable Configuration.storekit on the stashy scheme. For TestFlight, the products must exist in App Store Connect."
+                lastProductError = "No stashy+ products returned. For Xcode runs, enable Configuration.storekit on the stashy scheme."
                 print("💬 StoreKit returned 0 stashy+ products for \(plusIDs.sorted())")
             } else if !missing.isEmpty {
                 lastProductError = "Missing from StoreKit/App Store Connect: \(missing.joined(separator: ", "))"
@@ -810,8 +828,8 @@ class StoreManager: ObservableObject {
     /// Result used by the Settings UI for toasts.
     @discardableResult
     func purchase(_ product: Product) async -> String? {
-        isPurchasing = true
-        defer { isPurchasing = false }
+        purchasingProductID = product.id
+        defer { purchasingProductID = nil }
         do {
             let result = try await product.purchase()
             switch result {
@@ -934,8 +952,8 @@ class StoreManager: ObservableObject {
     }
 
     /// Paid-app buyers (original version before 3.0) get Lifetime.
-    /// TestFlight / Sandbox cannot prove a real App Store paid purchase — Apple always
-    /// reports `originalAppVersion == "1.0"` there, so we skip grandfathering.
+    /// Sandbox / Xcode cannot prove a real App Store paid purchase — Apple reports
+    /// `originalAppVersion == "1.0"` there, so we skip grandfathering.
     private enum LegacyPaidAppResult {
         case yes, no, unknown
     }

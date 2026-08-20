@@ -317,6 +317,52 @@ struct ReelsViewBody: View {
         "reels_session_filter_\(Self.reelsSessionServerID())_\(mode.rawValue)"
     }
 
+    private static func reelsSessionPerformerKey() -> String {
+        "reels_session_performer_\(reelsSessionServerID())"
+    }
+
+    private static func reelsSessionTagsKey() -> String {
+        "reels_session_tags_\(reelsSessionServerID())"
+    }
+
+    private var hasActiveCriterionOverlay: Bool {
+        selectedPerformer != nil || !selectedTags.isEmpty
+    }
+
+    private func persistSessionCriteria() {
+        if let performer = selectedPerformer,
+           let data = try? JSONEncoder().encode(performer),
+           let json = String(data: data, encoding: .utf8) {
+            ReelsSessionRAM.setString(json, forKey: Self.reelsSessionPerformerKey())
+        } else {
+            ReelsSessionRAM.setString(nil, forKey: Self.reelsSessionPerformerKey())
+        }
+        if selectedTags.isEmpty {
+            ReelsSessionRAM.setString(nil, forKey: Self.reelsSessionTagsKey())
+        } else if let data = try? JSONEncoder().encode(selectedTags),
+                  let json = String(data: data, encoding: .utf8) {
+            ReelsSessionRAM.setString(json, forKey: Self.reelsSessionTagsKey())
+        }
+    }
+
+    /// Restores performer/tag chips across tab remounts (warm VM keeps lists; criteria live in RAM).
+    private func restoreSessionCriteria() {
+        if let json = ReelsSessionRAM.string(forKey: Self.reelsSessionPerformerKey()),
+           let data = json.data(using: .utf8),
+           let performer = try? JSONDecoder().decode(ScenePerformer.self, from: data) {
+            selectedPerformer = performer
+        } else {
+            selectedPerformer = nil
+        }
+        if let json = ReelsSessionRAM.string(forKey: Self.reelsSessionTagsKey()),
+           let data = json.data(using: .utf8),
+           let tags = try? JSONDecoder().decode([Tag].self, from: data) {
+            selectedTags = tags
+        } else {
+            selectedTags = []
+        }
+    }
+
     private func sessionSortRaw(for mode: ReelsMode) -> String? {
         ReelsSessionRAM.string(forKey: reelsSessionSortKey(for: mode))
     }
@@ -360,6 +406,49 @@ struct ReelsViewBody: View {
             ReelsSessionRAM.setString(id, forKey: reelsSessionFilterKey(for: mode))
         } else {
             ReelsSessionRAM.setString(nil, forKey: reelsSessionFilterKey(for: mode))
+        }
+
+        persistSessionCriteria()
+    }
+
+    /// Re-fetch the active sub-mode with performer/tag overlay and without injecting Settings defaults.
+    private func syncFeedToCriterionOverlay(rerollRandom: Bool = false) {
+        guard hasActiveCriterionOverlay else { return }
+        switch reelsMode {
+        case .scenes:
+            applySettings(
+                sortBy: selectedSortOption,
+                sceneFilter: selectedFilter,
+                performer: selectedPerformer,
+                tags: selectedTags,
+                rerollRandom: rerollRandom
+            )
+        case .markers:
+            applySettings(
+                markerSortBy: selectedMarkerSortOption,
+                markerFilter: selectedMarkerFilter,
+                performer: selectedPerformer,
+                tags: selectedTags,
+                rerollRandom: rerollRandom
+            )
+        case .clips:
+            applySettings(
+                clipSortBy: reelsClipImageFilters.selectedSortOption,
+                clipFilter: reelsClipImageFilters.selectedFilter,
+                performer: selectedPerformer,
+                tags: selectedTags,
+                rerollRandom: rerollRandom
+            )
+        case .previews:
+            applySettings(
+                previewSortBy: selectedSortOption,
+                previewFilter: selectedPreviewFilter,
+                performer: selectedPerformer,
+                tags: selectedTags,
+                rerollRandom: rerollRandom
+            )
+        case .pics:
+            applyReelsPicsNavigation(performer: selectedPerformer, tags: selectedTags)
         }
     }
 
@@ -1353,6 +1442,7 @@ struct ReelsViewBody: View {
             reelsPicsFilters.selectedFilter = nil
             reelsPicsFilters.catalogPresetRowSelection = ""
             reelsPicsViewModel.currentImageFilter = nil
+            persistSessionCriteria()
             reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
         }
     }
@@ -1378,6 +1468,7 @@ struct ReelsViewBody: View {
                 reelsPicsFilters.catalogPresetRowSelection = ""
                 reelsPicsViewModel.currentImageFilter = nil
             }
+            persistSessionCriteria()
             reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
         }
     }
@@ -1398,6 +1489,7 @@ struct ReelsViewBody: View {
             if selectedTags.isEmpty {
                 reelsPicsRestoreDefaultFilterAfterDeepLinkIfNeeded()
             }
+            persistSessionCriteria()
             reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
         }
     }
@@ -2719,33 +2811,45 @@ struct ReelsViewBody: View {
             case .scenes:
                 let savedSortStr = TabManager.shared.getReelsDefaultSort(for: .scenes)
                 let savedSort = StashDBViewModel.SceneSortOption(rawValue: savedSortStr ?? "") ?? .random
-                var baseFilter = selectedFilter
-                if baseFilter == nil, let defId = TabManager.shared.getDefaultFilterId(for: .reels) {
-                    baseFilter = viewModel.savedFilters[defId]
+                var baseFilter: StashDBViewModel.SavedFilter?
+                if initialPerformer == nil && initialTags.isEmpty {
+                    baseFilter = selectedFilter
+                    if baseFilter == nil, let defId = TabManager.shared.getDefaultFilterId(for: .reels) {
+                        baseFilter = viewModel.savedFilters[defId]
+                    }
                 }
                 applySettings(sortBy: savedSort, sceneFilter: baseFilter, performer: initialPerformer, tags: initialTags, mode: .scenes)
             case .markers:
                 let savedSortStr = TabManager.shared.getReelsDefaultSort(for: .markers)
                 let savedSort = StashDBViewModel.SceneMarkerSortOption(rawValue: savedSortStr ?? "") ?? .random
-                var baseFilter = selectedMarkerFilter
-                if baseFilter == nil, let defId = TabManager.shared.getDefaultMarkerFilterId(for: .reels) {
-                    baseFilter = viewModel.savedFilters[defId]
+                var baseFilter: StashDBViewModel.SavedFilter?
+                if initialPerformer == nil && initialTags.isEmpty {
+                    baseFilter = selectedMarkerFilter
+                    if baseFilter == nil, let defId = TabManager.shared.getDefaultMarkerFilterId(for: .reels) {
+                        baseFilter = viewModel.savedFilters[defId]
+                    }
                 }
                 applySettings(markerSortBy: savedSort, markerFilter: baseFilter, performer: initialPerformer, tags: initialTags, mode: .markers)
             case .previews:
                 let savedSortStr = TabManager.shared.getReelsDefaultSort(for: .previews)
                 let savedSort = StashDBViewModel.SceneSortOption(rawValue: savedSortStr ?? "") ?? .random
-                var baseFilter = selectedPreviewFilter
-                if baseFilter == nil, let defId = TabManager.shared.getDefaultPreviewFilterId(for: .reels) {
-                    baseFilter = viewModel.savedFilters[defId]
+                var baseFilter: StashDBViewModel.SavedFilter?
+                if initialPerformer == nil && initialTags.isEmpty {
+                    baseFilter = selectedPreviewFilter
+                    if baseFilter == nil, let defId = TabManager.shared.getDefaultPreviewFilterId(for: .reels) {
+                        baseFilter = viewModel.savedFilters[defId]
+                    }
                 }
                 applySettings(previewSortBy: savedSort, previewFilter: baseFilter, performer: initialPerformer, tags: initialTags, mode: .previews)
             case .clips:
                 let savedSortStr = TabManager.shared.getReelsDefaultSort(for: .clips)
                 let savedSort = StashDBViewModel.ImageSortOption(rawValue: savedSortStr ?? "") ?? .random
-                var clipF = reelsClipImageFilters.selectedFilter
-                if clipF == nil, let defId = TabManager.shared.getDefaultClipFilterId(for: .reels) {
-                    clipF = viewModel.savedFilters[defId]
+                var clipF: StashDBViewModel.SavedFilter?
+                if initialPerformer == nil && initialTags.isEmpty {
+                    clipF = reelsClipImageFilters.selectedFilter
+                    if clipF == nil, let defId = TabManager.shared.getDefaultClipFilterId(for: .reels) {
+                        clipF = viewModel.savedFilters[defId]
+                    }
                 }
                 reelsClipImageFilters.selectedFilter = clipF
                 applySettings(clipSortBy: savedSort, clipFilter: clipF, performer: initialPerformer, tags: initialTags, mode: .clips)
@@ -2810,19 +2914,25 @@ struct ReelsViewBody: View {
 
     /// Session / Settings defaults for embedded Images 1/row (Pics).
     private func bootstrapReelsPicsFiltersIfNeeded() {
-        // Normal Pics entry may apply Settings default again.
-        reelsPicsFilters.suppressSettingsDefaultFilter = false
+        if hasActiveCriterionOverlay {
+            reelsPicsFilters.suppressSettingsDefaultFilter = true
+            reelsPicsFilters.selectedFilter = nil
+            reelsPicsFilters.catalogPresetRowSelection = ""
+        } else {
+            // Normal Pics entry may apply Settings default again.
+            reelsPicsFilters.suppressSettingsDefaultFilter = false
+            if let fid = sessionFilterId(for: .pics) {
+                reelsPicsFilters.selectedFilter = viewModel.savedFilters[fid] ?? reelsPicsViewModel.savedFilters[fid]
+            } else if let defId = TabManager.shared.getDefaultFilterId(for: .images) {
+                reelsPicsFilters.selectedFilter = viewModel.savedFilters[defId] ?? reelsPicsViewModel.savedFilters[defId]
+            }
+        }
         if let raw = sessionSortRaw(for: .pics),
            let opt = StashDBViewModel.ImageSortOption(rawValue: raw) {
             reelsPicsFilters.selectedSortOption = opt
         } else if let def = TabManager.shared.getReelsDefaultSort(for: .pics),
                   let opt = StashDBViewModel.ImageSortOption(rawValue: def) {
             reelsPicsFilters.selectedSortOption = opt
-        }
-        if let fid = sessionFilterId(for: .pics) {
-            reelsPicsFilters.selectedFilter = viewModel.savedFilters[fid] ?? reelsPicsViewModel.savedFilters[fid]
-        } else if let defId = TabManager.shared.getDefaultFilterId(for: .images) {
-            reelsPicsFilters.selectedFilter = viewModel.savedFilters[defId] ?? reelsPicsViewModel.savedFilters[defId]
         }
         reelsPicsViewModel.imagePerformerIdFilter = selectedPerformer?.id
         reelsPicsFilters.liveFilterTagIds = selectedTags.map(\.id)
@@ -2853,6 +2963,9 @@ struct ReelsViewBody: View {
         if applyPendingReelsNavigationFromCoordinator() {
             return
         }
+
+        restoreSessionCriteria()
+        let restoredCriterionOverlay = hasActiveCriterionOverlay
 
         // After the first full setup, re-onAppear must NOT re-run session restore /
         // autoSelectFirstItem (that reset scroll). Just resume autoplay + seek.
@@ -2960,15 +3073,15 @@ struct ReelsViewBody: View {
                     var initialMarkerFilter = selectedMarkerFilter
                     switch reelsMode {
                     case .scenes:
-                        if initialSceneFilter == nil, let defId = defaultId {
+                        if initialSceneFilter == nil, let defId = defaultId, !restoredCriterionOverlay {
                             initialSceneFilter = viewModel.savedFilters[defId]
                         }
                     case .markers:
-                        if initialMarkerFilter == nil, let defId = defaultId {
+                        if initialMarkerFilter == nil, let defId = defaultId, !restoredCriterionOverlay {
                             initialMarkerFilter = viewModel.savedFilters[defId]
                         }
                     default:
-                        if initialSceneFilter == nil, let defId = defaultId {
+                        if initialSceneFilter == nil, let defId = defaultId, !restoredCriterionOverlay {
                             initialSceneFilter = viewModel.savedFilters[defId]
                         }
                     }
@@ -2994,7 +3107,7 @@ struct ReelsViewBody: View {
                         let savedSort = StashDBViewModel.SceneSortOption(rawValue: savedSortStr ?? "") ?? .random
                         selectedSortOption = savedSort
                         var prevFilter = selectedPreviewFilter
-                        if prevFilter == nil, let defId = defaultId {
+                        if prevFilter == nil, let defId = defaultId, !restoredCriterionOverlay {
                             prevFilter = viewModel.savedFilters[defId]
                         }
                         selectedPreviewFilter = prevFilter
@@ -3014,6 +3127,8 @@ struct ReelsViewBody: View {
 
         if restartFromTop {
             refetchCurrentReelsModeFromTop()
+        } else if restoredCriterionOverlay {
+            syncFeedToCriterionOverlay()
         } else if reelsMode == .clips {
             // Fresh view identity with warm VM — rebind ScrollView via fetch.
             ensureReelsClipsLoaded(rerollRandom: false)
@@ -3091,9 +3206,14 @@ struct ReelsViewBody: View {
         let sortRaw = sessionSortRaw(for: .clips) ?? TabManager.shared.getReelsDefaultSort(for: .clips) ?? ""
         let sort = StashDBViewModel.ImageSortOption(rawValue: sortRaw) ?? reelsClipImageFilters.selectedSortOption
         reelsClipImageFilters.selectedSortOption = sort
-        let fid = sessionFilterId(for: .clips) ?? TabManager.shared.getDefaultClipFilterId(for: .reels)
+        let defaultClipFilterId = hasActiveCriterionOverlay
+            ? nil
+            : TabManager.shared.getDefaultClipFilterId(for: .reels)
+        let fid = sessionFilterId(for: .clips) ?? defaultClipFilterId
         if let fid, let filter = viewModel.savedFilters[fid] {
             reelsClipImageFilters.selectedFilter = filter
+        } else if hasActiveCriterionOverlay {
+            reelsClipImageFilters.selectedFilter = nil
         }
         applySettings(
             clipSortBy: sort,
@@ -3144,24 +3264,28 @@ struct ReelsViewBody: View {
         case .scenes:
             let sortRaw = sessionSortRaw(for: .scenes) ?? TabManager.shared.getReelsDefaultSort(for: .scenes) ?? ""
             selectedSortOption = StashDBViewModel.SceneSortOption(rawValue: sortRaw) ?? selectedSortOption
-            let fid = sessionFilterId(for: .scenes) ?? TabManager.shared.getDefaultFilterId(for: .reels)
+            let defaultId = hasActiveCriterionOverlay ? nil : TabManager.shared.getDefaultFilterId(for: .reels)
+            let fid = sessionFilterId(for: .scenes) ?? defaultId
             let f = fid != nil ? viewModel.savedFilters[fid!] : nil
             selectedFilter = f
         case .markers:
             let sortRaw = sessionSortRaw(for: .markers) ?? TabManager.shared.getReelsDefaultSort(for: .markers) ?? ""
             selectedMarkerSortOption = StashDBViewModel.SceneMarkerSortOption(rawValue: sortRaw) ?? selectedMarkerSortOption
-            let fid = sessionFilterId(for: .markers) ?? TabManager.shared.getDefaultMarkerFilterId(for: .reels)
+            let defaultId = hasActiveCriterionOverlay ? nil : TabManager.shared.getDefaultMarkerFilterId(for: .reels)
+            let fid = sessionFilterId(for: .markers) ?? defaultId
             let f = fid != nil ? viewModel.savedFilters[fid!] : nil
             selectedMarkerFilter = f
         case .clips:
             let sortRaw = sessionSortRaw(for: .clips) ?? TabManager.shared.getReelsDefaultSort(for: .clips) ?? ""
             reelsClipImageFilters.selectedSortOption = StashDBViewModel.ImageSortOption(rawValue: sortRaw) ?? reelsClipImageFilters.selectedSortOption
-            let fid = sessionFilterId(for: .clips) ?? TabManager.shared.getDefaultClipFilterId(for: .reels)
+            let defaultId = hasActiveCriterionOverlay ? nil : TabManager.shared.getDefaultClipFilterId(for: .reels)
+            let fid = sessionFilterId(for: .clips) ?? defaultId
             reelsClipImageFilters.selectedFilter = (fid != nil ? viewModel.savedFilters[fid!] : nil)
         case .previews:
             let sortRaw = sessionSortRaw(for: .previews) ?? TabManager.shared.getReelsDefaultSort(for: .previews) ?? ""
             selectedSortOption = StashDBViewModel.SceneSortOption(rawValue: sortRaw) ?? selectedSortOption
-            let fid = sessionFilterId(for: .previews) ?? TabManager.shared.getDefaultPreviewFilterId(for: .reels)
+            let defaultId = hasActiveCriterionOverlay ? nil : TabManager.shared.getDefaultPreviewFilterId(for: .reels)
+            let fid = sessionFilterId(for: .previews) ?? defaultId
             selectedPreviewFilter = (fid != nil ? viewModel.savedFilters[fid!] : nil)
         case .pics:
             bootstrapReelsPicsFiltersIfNeeded()

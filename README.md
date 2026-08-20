@@ -24,10 +24,10 @@ GraphQL documents live under `graphql/` and are loaded at runtime.
 
 ## Platforms & distribution
 
-| Platform | App Store | TestFlight |
-|----------|-----------|------------|
-| **iOS** | [stashy](https://apps.apple.com/us/app/stashy/id6754876029) | [Join](https://testflight.apple.com/join/KBYqHCuD) |
-| **tvOS** | — | Early beta (same TestFlight link) |
+| Platform | App Store |
+|----------|-----------|
+| **iOS** | [stashy](https://apps.apple.com/us/app/stashy/id6754876029) |
+| **tvOS** | Early beta |
 
 
 ## Roadmap (excerpt)

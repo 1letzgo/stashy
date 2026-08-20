@@ -91,7 +91,7 @@ final class StashyPlusManager: ObservableObject {
     nonisolated static let subscriptionExpirationKey = "stashy_plus_subscription_expiration"
     nonisolated static let activeProductIDKey = "stashy_plus_active_product_id"
     nonisolated static let sourceKey = "stashy_plus_source"
-    /// TestFlight-only: keep UI locked even if StoreKit would re-grant access.
+    /// Debug helper: keep the paywall locked even if StoreKit would re-grant access.
     nonisolated static let debugForceLockedKey = "stashy_plus_debug_force_locked"
 
     /// First freemium release is **3.0**. Every App Store purchase before that was paid
@@ -101,7 +101,7 @@ final class StashyPlusManager: ObservableObject {
     /// the marketing version. Pre-3.0 binaries used build `1`; 3.0 starts at `100`.
     /// Marketing strings (`2.1`, `2.0.1`) are compared against `3.0` so a reported
     /// `"3.0"` is not treated as paid (which a naive `< 100` check would do).
-    /// Sandbox / TestFlight always report `"1.0"` and must be ignored.
+    /// Sandbox always reports `"1.0"` and must be ignored.
     nonisolated static let firstFreemiumMarketingVersion = "3.0"
     nonisolated static let firstFreemiumBuild = "100"
 
@@ -307,7 +307,7 @@ final class StashyPlusManager: ObservableObject {
         return false
     }
 
-    /// TestFlight helper: clear local unlock and keep the paywall locked until the next purchase.
+    /// Debug helper: clear local unlock and keep the paywall locked until the next purchase.
     func resetUnlockForTesting() {
         let defaults = UserDefaults.standard
         defaults.set(true, forKey: Self.debugForceLockedKey)
@@ -324,7 +324,7 @@ final class StashyPlusManager: ObservableObject {
         objectWillChange.send()
     }
 
-    /// Clears TestFlight force-lock (e.g. before Restore or after a fresh purchase).
+    /// Clears debug force-lock (e.g. before Restore or after a fresh purchase).
     func clearDebugForceLock() {
         UserDefaults.standard.set(false, forKey: Self.debugForceLockedKey)
     }

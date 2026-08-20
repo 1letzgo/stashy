@@ -234,37 +234,6 @@ func authenticatedStashRequest(for url: URL) -> URLRequest {
     return request
 }
 
-private var _cachedIsTestFlight: Bool?
-
-func isTestFlightBuild() -> Bool {
-    #if targetEnvironment(simulator) || DEBUG
-    return true
-    #else
-    if let cached = _cachedIsTestFlight {
-        return cached
-    }
-    
-    let isTestFlight: Bool
-    if #available(iOS 18.0, *) {
-        // For iOS 18+, we rely primarily on the async Task below to update the cache.
-        isTestFlight = Bundle.main.bundleURL.lastPathComponent.contains("sandbox")
-        
-        // Start an async task to update the cache properly via AppTransaction
-        Task {
-            if let result = try? await AppTransaction.shared,
-               case .verified(let appTransaction) = result {
-                _cachedIsTestFlight = appTransaction.environment == .sandbox
-            }
-        }
-    } else {
-        isTestFlight = Bundle.main.appStoreReceiptURL?.lastPathComponent == "sandboxReceipt"
-    }
-    
-    _cachedIsTestFlight = isTestFlight
-    return isTestFlight
-    #endif
-}
-
 func isHeadphonesConnected() -> Bool {
     let currentRoute = AVAudioSession.sharedInstance().currentRoute
     return currentRoute.outputs.contains(where: { port in
