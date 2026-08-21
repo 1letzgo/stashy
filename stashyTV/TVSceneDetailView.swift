@@ -494,55 +494,8 @@ struct TVSceneDetailView: View {
         }
         
         let quality = selectedQuality ?? ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original
-        let compatible = ["mp4", "m4v", "mov"]
-        let fileFormat = scene.files?.first?.format?.lowercased() ?? ""
-        let isNativelyCompatible = compatible.contains(fileFormat)
-        
-        // Use bestStream() which respects quality settings and format compatibility.
-        // For compatible formats (MP4) at Original quality, bestStream returns nil
-        // → use direct stream path (much faster seeking than HLS transcoding).
-        let sceneWithStreams = scene.withStreams(sceneStreams)
-        if let streamURL = sceneWithStreams.bestStream(for: quality) {
-            print("📺 TV: Using quality-selected stream (\(quality.displayName)) for format: \(fileFormat)")
+        if let streamURL = tvPlaybackURL(for: scene, streams: sceneStreams, quality: quality) {
             playerViewModel.setupPlayer(url: streamURL, sceneId: scene.id, viewModel: viewModel, startAt: startTime)
-            return
-        }
-        
-        // Non-compatible format (MKV, AVI, WMV, etc.): force HLS even if bestStream
-        // returned nil (e.g. because sceneStreams were not loaded).
-        // Apple TV cannot play these formats via direct stream.
-        if !isNativelyCompatible {
-            // Try any available HLS stream first
-            if let hlsStream = sceneStreams.first(where: { $0.mime_type == "application/vnd.apple.mpegurl" }),
-               let url = URL(string: hlsStream.url) {
-                print("📺 TV: Non-MP4 (\(fileFormat)) — forcing HLS stream")
-                playerViewModel.setupPlayer(url: url, sceneId: scene.id, viewModel: viewModel, startAt: startTime)
-                return
-            }
-            // Try MP4 transcode stream as fallback
-            if let mp4Stream = sceneStreams.first(where: { $0.mime_type == "video/mp4" }),
-               let url = URL(string: mp4Stream.url) {
-                print("📺 TV: Non-MP4 (\(fileFormat)) — using MP4 transcode stream")
-                playerViewModel.setupPlayer(url: url, sceneId: scene.id, viewModel: viewModel, startAt: startTime)
-                return
-            }
-        }
-        
-        // Direct stream fallback — only safe for natively compatible formats (MP4/MOV/M4V)
-        // or when format is unknown (Stash transcodes on the fly via /stream endpoint)
-        if let directPath = scene.paths?.stream {
-            let fullURL: String
-            if directPath.starts(with: "http://") || directPath.starts(with: "https://") {
-                fullURL = directPath
-            } else if let config = ServerConfigManager.shared.activeConfig {
-                fullURL = "\(config.baseURL)\(directPath)"
-            } else {
-                return
-            }
-            if let url = URL(string: fullURL) {
-                print("📺 TV: Using direct stream for \(isNativelyCompatible ? "compatible" : "unknown") format (\(fileFormat))")
-                playerViewModel.setupPlayer(url: url, sceneId: scene.id, viewModel: viewModel, startAt: startTime)
-            }
         }
     }
 
@@ -773,11 +726,14 @@ class TVPlayerViewModel: ObservableObject {
     @Published var player: AVPlayer?
     @Published var isShowingPlayer = false
     @Published var error: Error?
+    /// Called when the current item finishes. Used by channel continuous play.
+    var onPlaybackEnded: (() -> Void)?
 
     private var statusObserver: NSKeyValueObservation?
     private var progressTimer: AnyCancellable?
     /// Nach System-Spulen bleibt der Player oft bei rate 0; Apple-TV+-ähnlich wieder anspielen.
     private var timeJumpedObserver: NSObjectProtocol?
+    private var playbackEndedObserver: NSObjectProtocol?
     /// Lifecycle-Observer für robuste Resume-Saves (Home-Knopf, Sleep, App-Switch).
     private var willResignActiveObserver: NSObjectProtocol?
     private var didEnterBackgroundObserver: NSObjectProtocol?
@@ -814,6 +770,7 @@ class TVPlayerViewModel: ObservableObject {
         if let t = willResignActiveObserver { NotificationCenter.default.removeObserver(t) }
         if let t = didEnterBackgroundObserver { NotificationCenter.default.removeObserver(t) }
         removeTimeJumpedObserver()
+        removePlaybackEndedObserver()
         statusObserver = nil
         progressTimer = nil
         scrubSettleWorkItem?.cancel()
@@ -827,8 +784,11 @@ class TVPlayerViewModel: ObservableObject {
         self.didApplyInitialPlayback = false
 
         let newPlayer = createPlayer(for: url)
+        let previousPlayer = self.player
         self.player = newPlayer
         self.isShowingPlayer = true
+        previousPlayer?.pause()
+        previousPlayer?.replaceCurrentItem(with: nil)
 
         let startSeconds = max(0, timestamp)
 
@@ -857,6 +817,9 @@ class TVPlayerViewModel: ObservableObject {
             }
 
         registerAutoResumeAfterScrub(on: newPlayer)
+        if let item = newPlayer.currentItem {
+            registerPlaybackEndedObserver(on: item)
+        }
     }
 
     private func registerAutoResumeAfterScrub(on player: AVPlayer) {
@@ -888,6 +851,27 @@ class TVPlayerViewModel: ObservableObject {
             if player.rate == 0 {
                 player.play()
             }
+        }
+    }
+
+    private func registerPlaybackEndedObserver(on item: AVPlayerItem) {
+        removePlaybackEndedObserver()
+        playbackEndedObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: item,
+            queue: .main
+        ) { [weak self] _ in
+            let vm = self
+            Task { @MainActor in
+                vm?.onPlaybackEnded?()
+            }
+        }
+    }
+
+    private func removePlaybackEndedObserver() {
+        if let token = playbackEndedObserver {
+            NotificationCenter.default.removeObserver(token)
+            playbackEndedObserver = nil
         }
     }
 
@@ -953,6 +937,7 @@ class TVPlayerViewModel: ObservableObject {
         scrubSettleWorkItem?.cancel()
         scrubSettleWorkItem = nil
         removeTimeJumpedObserver()
+        removePlaybackEndedObserver()
         progressTimer = nil
         statusObserver = nil
         didApplyInitialPlayback = true

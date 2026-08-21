@@ -70,12 +70,16 @@ private struct HomeViewContent: View {
             VStack(spacing: 24) {
                 let activeRows = tabManager.homeRows.filter { $0.isEnabled }
                 let firstRowId = activeRows.first?.id
-                let firstSceneRowId = activeRows.first(where: { $0.type != .statistics })?.id
+                let firstSceneRowId = activeRows.first(where: { $0.type != .statistics && $0.type != .channels })?.id
 
                 ForEach(tabManager.homeRows) { row in
                     if row.isEnabled {
                         if row.type == .statistics {
                             HomeStatisticsRowView(viewModel: viewModel, isFirst: row.id == firstRowId)
+                        } else if row.type == .channels {
+                            HomeChannelsRowView(config: row,
+                                                viewModel: viewModel,
+                                                isFirst: row.id == firstRowId)
                         } else {
                             HomeRowView(config: row,
                                         viewModel: viewModel,

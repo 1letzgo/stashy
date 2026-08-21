@@ -6,7 +6,11 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
     let heroAspectRatio: CGFloat
     let placeholderSystemImage: String
     let heroImageOverride: AnyView?
-    
+    /// When set, the header offers continuous playback of everything in this scope.
+    let channel: TVChannel?
+
+    @State private var playingChannel: TVChannel?
+
     // Scenes related
     let scenes: [Scene]
     let isLoadingScenes: Bool
@@ -30,6 +34,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
         heroAspectRatio: CGFloat,
         placeholderSystemImage: String,
         heroImageOverride: AnyView? = nil,
+        channel: TVChannel? = nil,
         scenes: [Scene],
         isLoadingScenes: Bool,
         totalScenes: Int,
@@ -43,6 +48,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
         self.heroAspectRatio = heroAspectRatio
         self.placeholderSystemImage = placeholderSystemImage
         self.heroImageOverride = heroImageOverride
+        self.channel = channel
         self.scenes = scenes
         self.isLoadingScenes = isLoadingScenes
         self.totalScenes = totalScenes
@@ -66,6 +72,14 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                             .font(.largeTitle)
                             .fontWeight(.bold)
                             .foregroundColor(.white)
+
+                        if let channel {
+                            Button {
+                                playingChannel = channel
+                            } label: {
+                                Label("Play as Channel", systemImage: "play.tv.fill")
+                            }
+                        }
 
                         if isLoading {
                             ProgressView().scaleEffect(1.2)
@@ -164,6 +178,11 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
             }
         }
         .background(Color.appBackground)
+        .fullScreenCover(item: $playingChannel, onDismiss: {
+            playingChannel = nil
+        }) { channel in
+            TVChannelPlayerView(channel: channel)
+        }
     }
 
     @ViewBuilder

@@ -32,6 +32,7 @@ struct TVStudioDetailView: View {
             heroImageOverride: AnyView(
                 TVStudioImageView(studioId: studioId, studioName: studioName, contentMode: .fit)
             ),
+            channel: .studio(id: studioId, name: studio?.name ?? studioName),
             scenes: viewModel.studioScenes,
             isLoadingScenes: viewModel.isLoadingStudioScenes,
             totalScenes: viewModel.totalStudioScenes,

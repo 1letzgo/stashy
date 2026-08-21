@@ -2761,20 +2761,22 @@ struct ReelsViewBody: View {
         }
     }
 
-    /// Applies the remount-captured ``deepLink`` only. Dying Feeds instances were created
-    /// with `.empty` and must not touch coordinator state (that raced away performer/tags).
+    /// Applies a Feeds deep link. Prefer the remount-captured snapshot; if this instance was
+    /// created earlier in the session (TabView kept it alive), fall back to the live coordinator.
     @discardableResult
     private func applyPendingReelsNavigationFromCoordinator() -> Bool {
-        guard !didConsumeDeepLink, !deepLink.isEmpty else { return false }
+        let link = !deepLink.isEmpty ? deepLink : coordinator.reelsDeepLink
+        guard !didConsumeDeepLink, !link.isEmpty else { return false }
         didConsumeDeepLink = true
         // Drop coordinator copy so icon remounts / later appears cannot re-apply stale criteria.
         coordinator.clearReelsDeepLink()
+        coordinator.suppressNextFeedsIconRemount = false
         prepareFreshFeedForDeepLink()
 
-        let initialPerformer = deepLink.performer
-        let initialTags = deepLink.tags
-        let targetModeStr = deepLink.mode
-        let picsPerformer = deepLink.picsPerformer
+        let initialPerformer = link.performer
+        let initialTags = link.tags
+        let targetModeStr = link.mode
+        let picsPerformer = link.picsPerformer
 
         if let modeStr = targetModeStr {
             if modeStr == "Pics" {
@@ -2794,6 +2796,34 @@ struct ReelsViewBody: View {
         // apply performer/tags there — do not drop them (old path skipped refetch / cleared tags).
         if reelsMode == .pics, initialPerformer != nil || !initialTags.isEmpty {
             applyReelsPicsNavigation(performer: initialPerformer, tags: initialTags)
+            return true
+        }
+
+        // Dashboard image channel: Clips mode scoped to a saved image filter.
+        if let clipFilter = link.clipFilter {
+            reelsMode = .clips
+            let sort = StashDBViewModel.ImageSortOption(rawValue: link.clipSort ?? "")
+                ?? StashDBViewModel.ImageSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .clips) ?? "")
+                ?? .random
+            reelsClipImageFilters.clearLiveChipsOnly()
+            applySettings(clipSortBy: sort, clipFilter: clipFilter, mode: .clips)
+            reelsSyncFilterSheetPresetAndLiveChips(savedFilters: viewModel.savedFilters)
+            isInitialized = true
+            return true
+        }
+
+        // Dashboard channel: Scenes mode scoped to the channel's saved filter. Live chips from a
+        // previous session must not narrow it further.
+        if let channelFilter = link.sceneFilter {
+            reelsMode = .scenes
+            let sort = StashDBViewModel.SceneSortOption(rawValue: link.sceneSort ?? "")
+                ?? StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .scenes) ?? "")
+                ?? .random
+            selectedSortOption = sort
+            reelsClearActiveLiveChipsOnly()
+            applySettings(sortBy: sort, sceneFilter: channelFilter, mode: .scenes)
+            reelsSyncFilterSheetPresetAndLiveChips(savedFilters: viewModel.savedFilters)
+            isInitialized = true
             return true
         }
 

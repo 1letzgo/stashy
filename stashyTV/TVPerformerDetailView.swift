@@ -28,6 +28,7 @@ struct TVPerformerDetailView: View {
             isLoading: isLoadingPerformer,
             heroAspectRatio: 2/3,
             placeholderSystemImage: "person.fill",
+            channel: .performer(id: performerId, name: performer?.name ?? performerName),
             scenes: viewModel.performerScenes,
             isLoadingScenes: viewModel.isLoadingPerformerScenes,
             totalScenes: viewModel.totalPerformerScenes,

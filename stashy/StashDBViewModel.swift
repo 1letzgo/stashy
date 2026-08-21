@@ -220,13 +220,73 @@ class StashDBViewModel: ObservableObject {
         let object_filter: StashJSONValue?
         /// Stash UI / plugin metadata; stashy uses `stashy` key for live-preset round-trip (see ScenesView).
         let ui_options: StashJSONValue?
+        /// Server-side list sort (`findScenes` / `findImages` `FindFilterType`).
+        var find_filter: SavedFindFilter? = nil
         
         var filterDict: [String: Any]? {
             if let obj = object_filter {
                 return obj.value as? [String: Any]
             }
-            if let str = filter, let data = str.data(using: .utf8) {
-                return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+            return uiFilterJSON
+        }
+
+        /// Raw Stash UI filter JSON (`sortby` / `sortdir` live here, not in `object_filter`).
+        var uiFilterJSON: [String: Any]? {
+            guard let str = filter, let data = str.data(using: .utf8) else { return nil }
+            return try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        }
+
+        /// Sort encoded on the filter: stashy `sortRaw`, then `find_filter`, then the UI JSON.
+        var encodedSortPair: (field: String, direction: String)? {
+            if let field = find_filter?.sort?.trimmingCharacters(in: .whitespacesAndNewlines), !field.isEmpty {
+                let dir = find_filter?.direction?.trimmingCharacters(in: .whitespacesAndNewlines)
+                return (field, (dir?.isEmpty == false ? dir! : "DESC"))
+            }
+            if let dict = uiFilterJSON {
+                let field = (dict["sort"] as? String)
+                    ?? (dict["sortby"] as? String)
+                    ?? (dict["sortBy"] as? String)
+                let dir = (dict["direction"] as? String)
+                    ?? (dict["sortdir"] as? String)
+                    ?? (dict["sortDirection"] as? String)
+                    ?? (dict["dir"] as? String)
+                if let field, !field.isEmpty {
+                    return (field, (dir?.isEmpty == false ? dir! : "DESC"))
+                }
+            }
+            return nil
+        }
+
+        var stashySortRaw: String? {
+            guard let ui = Self.stringKeyed(ui_options?.value),
+                  let stashy = Self.stringKeyed(ui["stashy"]) else { return nil }
+            if let raw = stashy["sortRaw"] as? String {
+                let t = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                return t.isEmpty ? nil : t
+            }
+            return nil
+        }
+
+        var resolvedSceneSort: SceneSortOption? {
+            if let raw = stashySortRaw, let opt = SceneSortOption(rawValue: raw) { return opt }
+            if let pair = encodedSortPair { return SceneSortOption(graphqlField: pair.field, direction: pair.direction) }
+            return nil
+        }
+
+        var resolvedImageSort: ImageSortOption? {
+            if let raw = stashySortRaw, let opt = ImageSortOption(rawValue: raw) { return opt }
+            if let pair = encodedSortPair { return ImageSortOption(graphqlField: pair.field, direction: pair.direction) }
+            return nil
+        }
+
+        private static func stringKeyed(_ value: Any?) -> [String: Any]? {
+            if let dict = value as? [String: Any] { return dict }
+            if let dict = value as? [AnyHashable: Any] {
+                var out: [String: Any] = [:]
+                for (k, v) in dict {
+                    if let s = k as? String { out[s] = v }
+                }
+                return out.isEmpty ? nil : out
             }
             return nil
         }
@@ -238,6 +298,11 @@ class StashDBViewModel: ObservableObject {
         func hash(into hasher: inout Hasher) {
             hasher.combine(id)
         }
+    }
+
+    struct SavedFindFilter: Codable, Equatable {
+        let sort: String?
+        let direction: String?
     }
 
     struct SavedFiltersData: Codable {
@@ -784,6 +849,23 @@ class StashDBViewModel: ObservableObject {
             case .random: return "random"
             }
         }
+
+        init?(graphqlField field: String, direction: String) {
+            let f = field.lowercased()
+            if f.hasPrefix("random") {
+                self = .random
+                return
+            }
+            let isAsc = direction.uppercased() == "ASC"
+            switch f {
+            case "title": self = isAsc ? .titleAsc : .titleDesc
+            case "date": self = isAsc ? .dateAsc : .dateDesc
+            case "rating", "rating100": self = isAsc ? .ratingAsc : .ratingDesc
+            case "created_at": self = isAsc ? .createdAtAsc : .createdAtDesc
+            case "updated_at": self = isAsc ? .updatedAtAsc : .updatedAtDesc
+            default: return nil
+            }
+        }
     }
 
     // Performer sort options
@@ -986,6 +1068,27 @@ class StashDBViewModel: ObservableObject {
             case .oCounterDesc, .oCounterAsc: return "o_counter"
             case .ratingDesc, .ratingAsc: return "rating"
             case .random: return "random"
+            }
+        }
+
+        init?(graphqlField field: String, direction: String) {
+            let f = field.lowercased()
+            if f.hasPrefix("random") {
+                self = .random
+                return
+            }
+            let isAsc = direction.uppercased() == "ASC"
+            switch f {
+            case "date": self = isAsc ? .dateAsc : .dateDesc
+            case "created_at": self = isAsc ? .createdAtAsc : .createdAtDesc
+            case "title": self = isAsc ? .titleAsc : .titleDesc
+            case "duration": self = isAsc ? .durationAsc : .durationDesc
+            case "last_played_at": self = isAsc ? .lastPlayedAtAsc : .lastPlayedAtDesc
+            case "play_count": self = isAsc ? .playCountAsc : .playCountDesc
+            case "play_duration": self = isAsc ? .playDurationAsc : .playDurationDesc
+            case "o_counter": self = isAsc ? .oCounterAsc : .oCounterDesc
+            case "rating", "rating100": self = isAsc ? .ratingAsc : .ratingDesc
+            default: return nil
             }
         }
     }
@@ -1722,7 +1825,7 @@ class StashDBViewModel: ObservableObject {
         
         let query = """
         {
-          "query": "query GetAllFilterDefinitions { findSavedFilters { id name mode filter object_filter ui_options } }"
+          "query": "query GetAllFilterDefinitions { findSavedFilters { id name mode filter object_filter ui_options find_filter { sort direction } } }"
         }
         """
         
@@ -2528,6 +2631,103 @@ class StashDBViewModel: ObservableObject {
         loadScenesPage(page: page, sortBy: currentSceneSortOption, searchQuery: currentSceneSearchQuery, fetchGeneration: scenesFetchGeneration)
     }
 
+    /// One-shot scene page that does not mutate catalog `scenes` (tvOS Feeds channels / playlist).
+    func fetchScenePage(
+        sortBy: SceneSortOption,
+        filter: SavedFilter? = nil,
+        page: Int = 1,
+        perPage: Int = 20,
+        completion: @escaping (_ scenes: [Scene], _ total: Int) -> Void
+    ) {
+        let query = GraphQLQueries.queryWithFragments("findScenes")
+        let filterDict: [String: Any] = [
+            "page": page,
+            "per_page": perPage,
+            "sort": sortBy.sortField == "random" ? randomSort(.scenes) : sortBy.sortField,
+            "direction": sortBy.direction
+        ]
+        var variables: [String: Any] = ["filter": filterDict]
+        if let savedFilter = filter {
+            if let dict = savedFilter.filterDict {
+                variables["scene_filter"] = sanitizeFilter(dict)
+            } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
+                variables["scene_filter"] = sanitizeFilter(objDict)
+            }
+        }
+        let body: [String: Any] = [
+            "query": query,
+            "variables": variables
+        ]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion([], 0)
+            return
+        }
+        performGraphQLQuery(query: bodyString) { (response: AltScenesResponse?) in
+            let result = response?.data?.findScenes
+            let scenes = result?.scenes ?? []
+            let total = result?.count ?? scenes.count
+            DispatchQueue.main.async {
+                completion(scenes, total)
+            }
+        }
+    }
+
+    /// One-shot clip page (video images) that does not mutate catalog `clips`.
+    func fetchClipPage(
+        sortBy: ImageSortOption,
+        filter: SavedFilter? = nil,
+        page: Int = 1,
+        perPage: Int = 20,
+        completion: @escaping (_ images: [StashImage], _ total: Int) -> Void
+    ) {
+        let query = GraphQLQueries.queryWithFragments("findImages")
+        let videoRegex = "(?i).*\\.(mp4|gif|webp|mov|webm|m4v|mkv)$"
+        var imageFilter: [String: Any] = [
+            "path": [
+                "value": videoRegex,
+                "modifier": "MATCHES_REGEX"
+            ]
+        ]
+        if let savedFilter = filter {
+            if let dict = savedFilter.filterDict {
+                for (key, value) in sanitizeFilter(dict) where key != "path" {
+                    imageFilter[key] = value
+                }
+            } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
+                for (key, value) in sanitizeFilter(objDict) where key != "path" {
+                    imageFilter[key] = value
+                }
+            }
+        }
+        let variables: [String: Any] = [
+            "filter": [
+                "page": page,
+                "per_page": perPage,
+                "sort": sortBy.sortField == "random" ? randomSort(.images) : sortBy.sortField,
+                "direction": sortBy.direction
+            ],
+            "image_filter": sanitizeFilter(imageFilter)
+        ]
+        let body: [String: Any] = [
+            "query": query,
+            "variables": variables
+        ]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion([], 0)
+            return
+        }
+        performGraphQLQuery(query: bodyString) { (response: GalleryImagesResponse?) in
+            let result = response?.data?.findImages
+            let images = result?.images ?? []
+            let total = result?.count ?? images.count
+            DispatchQueue.main.async {
+                completion(images, total)
+            }
+        }
+    }
+
     func fetchPreviews(sortBy: SceneSortOption = .dateDesc, searchQuery: String = "", isInitialLoad: Bool = true, filter: SavedFilter? = nil, liveFilter: [String: Any]? = nil) {
         if isInitialLoad {
             previewsFetchGeneration += 1
@@ -2895,7 +3095,7 @@ class StashDBViewModel: ObservableObject {
             setSort(.ratingDesc)
         case .random:
             setSort(.random)
-        case .statistics, .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating, .newStudios, .studiosHighestSceneCount, .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
+        case .statistics, .channels, .newPerformers, .performersHighestSceneCount, .performersHighestOCount, .performersHighestRating, .newStudios, .studiosHighestSceneCount, .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
             homeRowLoadingState[rowType] = false
             completion([])
             return

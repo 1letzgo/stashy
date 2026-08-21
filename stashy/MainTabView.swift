@@ -57,7 +57,13 @@ struct MainTabView: View {
                         } else if newValue == .reels {
                             // Re-tap Feeds only: pop detail + rebuild UI. Do not remount when
                             // merely entering the tab — that aborted in-flight Clips fetches.
-                            remountFeedsTab()
+                            // TabView also echoes programmatic `selectedTab = .reels` as a re-tap;
+                            // swallowing that keeps a pending channel / performer deep link intact.
+                            if coordinator.suppressNextFeedsIconRemount {
+                                coordinator.suppressNextFeedsIconRemount = false
+                            } else {
+                                remountFeedsTab()
+                            }
                         }
                     } else {
                         coordinator.selectedTab = newValue
@@ -90,6 +96,9 @@ struct MainTabView: View {
                 showConfigWarning = true
             }
             .onChange(of: coordinator.selectedTab) { oldTab, newTab in
+                if newTab != .reels {
+                    coordinator.suppressNextFeedsIconRemount = false
+                }
                 guard oldTab == .reels, newTab != .reels else { return }
                 // Suspend before audio teardown so deferred Reel `play()` races cannot restart audio.
                 ReelsPlayerRegistry.suspendPlayback()

@@ -24,6 +24,10 @@ struct TVDashboardView: View {
     @State private var isLoadingTopRated: Bool = true
     @State private var isLoadingRandom: Bool = true
 
+    @State private var channelPreviews: [String: [Scene]] = [:]
+    @State private var isLoadingChannelPreviews = false
+    @State private var playingChannel: TVChannel?
+
     var body: some View {
         Group {
             if !hasValidConfig {
@@ -42,6 +46,11 @@ struct TVDashboardView: View {
             }
         }
         .background(Color.appBackground)
+        .fullScreenCover(item: $playingChannel, onDismiss: {
+            playingChannel = nil
+        }) { channel in
+            TVChannelPlayerView(channel: channel)
+        }
         .onAppear { loadData(forceRefresh: true) }
         // Nicht auf `ServerConfigChanged` laden: `handleServerChange` bricht alle GraphQL-Tasks ab —
         // ein sofortiges `loadData()` würde nur leer/cancelled enden. Stattdessen nach init neu laden.
@@ -50,6 +59,12 @@ struct TVDashboardView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneResumeTimeUpdated"))) { _ in
             refreshContinueWatching()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
+            // Saved filters are server-scoped, so previews must not survive a switch.
+            channelPreviews = [:]
+            playingChannel = nil
+            isLoadingChannelPreviews = false
         }
         .sceneLiveUpdates(using: viewModel)
     }
@@ -89,6 +104,11 @@ struct TVDashboardView: View {
                     cardHeight: 315
                 )
                 .focusSection()
+            }
+
+            if !channels.isEmpty {
+                channelsRow
+                    .focusSection()
             }
 
             if !recentlyReleasedScenes.isEmpty {
@@ -155,11 +175,59 @@ struct TVDashboardView: View {
 
     private var hasValidConfig: Bool { configManager.activeConfig?.hasValidConfig == true }
 
+    // MARK: - Channels
+
+    private var channels: [TVChannel] {
+        let filters = viewModel.savedFilters.values
+            .filter { $0.mode == .scenes }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            .map { TVChannel(kind: .savedFilter, title: $0.name, savedFilter: $0) }
+        return [.recentlyReleased, .recentlyAdded] + filters
+    }
+
     // MARK: - Data Loading
 
     private func loadData(forceRefresh: Bool = false) {
         guard hasValidConfig else { return }
         fetchHomeRows(forceRefresh: forceRefresh)
+        fetchChannels()
+    }
+
+    private func fetchChannels() {
+        viewModel.fetchSavedFilters { _ in
+            loadChannelPreviews()
+        }
+        loadChannelPreviews()
+    }
+
+    private func loadChannelPreviews() {
+        let pending = channels.filter { channelPreviews[$0.id] == nil }
+        guard !pending.isEmpty else { return }
+        if isLoadingChannelPreviews { return }
+        isLoadingChannelPreviews = true
+        loadChannelPreview(at: 0, from: pending)
+    }
+
+    private func loadChannelPreview(at index: Int, from pending: [TVChannel], retrying: Bool = false) {
+        guard index < pending.count else {
+            isLoadingChannelPreviews = false
+            // Saved filters may have arrived while the first two built-in cards were loading.
+            let leftover = channels.filter { channelPreviews[$0.id] == nil }
+            if !leftover.isEmpty {
+                isLoadingChannelPreviews = true
+                loadChannelPreview(at: 0, from: leftover)
+            }
+            return
+        }
+        let channel = pending[index]
+        viewModel.fetchScenePage(sortBy: channel.sortBy, filter: channel.sceneFilter, page: 1, perPage: 4) { scenes, _ in
+            if scenes.isEmpty && !retrying {
+                loadChannelPreview(at: index, from: pending, retrying: true)
+                return
+            }
+            channelPreviews[channel.id] = scenes
+            loadChannelPreview(at: index + 1, from: pending)
+        }
     }
 
     private func refreshContinueWatching() {
@@ -245,6 +313,51 @@ struct TVDashboardView: View {
         }
     }
 
+    // MARK: - Channels Row
+
+    @ViewBuilder
+    private var channelsRow: some View {
+        let cardWidth: CGFloat = 400
+        let cardHeight: CGFloat = 225
+
+        VStack(alignment: .leading, spacing: 18) {
+            Text("Channels")
+                .font(.headline)
+                .fontWeight(.semibold)
+                .foregroundColor(.white.opacity(0.6))
+                .padding(.horizontal, 50)
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 30) {
+                    ForEach(channels) { channel in
+                        VStack(alignment: .leading, spacing: 10) {
+                            Button {
+                                playingChannel = channel
+                            } label: {
+                                TVChannelCardView(
+                                    channel: channel,
+                                    scenes: channelPreviews[channel.id] ?? [],
+                                    width: cardWidth + 10,
+                                    height: cardHeight + 5
+                                )
+                            }
+                            .buttonStyle(.card)
+
+                            Text(channel.subtitle)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .frame(width: cardWidth)
+                    }
+                }
+                .padding(.horizontal, 50)
+                .padding(.vertical, 20)
+            }
+        }
+    }
+
     // MARK: - Scene Row
 
     @ViewBuilder
@@ -291,5 +404,111 @@ struct TVDashboardView: View {
                 .padding(.vertical, 20)
             }
         }
+    }
+}
+
+/// Channel card matching the scene card look of the surrounding dashboard rows.
+private struct TVChannelCardView: View {
+    let channel: TVChannel
+    let scenes: [Scene]
+    var width: CGFloat = 410
+    var height: CGFloat = 230
+    @Environment(\.isFocused) private var isFocused
+
+    var body: some View {
+        ZStack(alignment: .bottomLeading) {
+            artwork
+                .frame(width: width, height: height)
+                .clipped()
+                .clipShape(RoundedRectangle(cornerRadius: 10))
+
+            LinearGradient(
+                colors: [.clear, .black.opacity(0.3), .black.opacity(0.8)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .clipShape(RoundedRectangle(cornerRadius: 10))
+            .opacity(isFocused ? 0.3 : 1.0)
+
+            VStack {
+                HStack(alignment: .top) {
+                    Label(channel.subtitle.uppercased(), systemImage: channel.icon)
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(.white)
+                        .tracking(1)
+                        .lineLimit(1)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+                    Spacer()
+
+                    Image(systemName: "play.fill")
+                        .font(.caption.weight(.bold))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.black.opacity(0.6))
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+                .padding(12)
+                Spacer()
+            }
+
+            VStack {
+                Spacer()
+                Text(channel.title)
+                    .font(.body)
+                    .fontWeight(.bold)
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+            }
+        }
+        .frame(width: width, height: height)
+    }
+
+    @ViewBuilder
+    private var artwork: some View {
+        if scenes.isEmpty {
+            placeholder
+        } else if scenes.count == 1 {
+            thumbnail(for: scenes[0])
+        } else {
+            HStack(spacing: 2) {
+                ForEach(Array(scenes.prefix(4))) { scene in
+                    thumbnail(for: scene)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func thumbnail(for scene: Scene) -> some View {
+        if let url = scene.thumbnailURL {
+            CustomAsyncImage(url: url) { loader in
+                if let image = loader.image {
+                    image
+                        .resizable()
+                        .scaledToFill()
+                } else {
+                    Rectangle().fill(Color.gray.opacity(0.08))
+                }
+            }
+        } else {
+            placeholder
+        }
+    }
+
+    private var placeholder: some View {
+        Rectangle()
+            .fill(Color.gray.opacity(0.08))
+            .overlay(
+                Image(systemName: channel.icon)
+                    .font(.system(size: 36))
+                    .foregroundColor(.secondary)
+            )
     }
 }

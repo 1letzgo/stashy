@@ -62,6 +62,35 @@ struct DashboardSettingsView: View {
                     tabManager.moveHomeRow(from: indices, to: newOffset)
                 }
             }
+
+            Section {
+                stashyScrollingSectionHeader("Channels")
+                if channelSettingItems.isEmpty {
+                    Text(viewModel.isLoadingSavedFilters ? "Loading filters…" : "No saved scene or image filters")
+                        .foregroundColor(.secondary)
+                        .stashyGroupedBlockRow(index: 0, count: 1)
+                        .moveDisabled(true)
+                } else {
+                    ForEach(Array(channelSettingItems.enumerated()), id: \.element.id) { index, item in
+                        Toggle(isOn: Binding(
+                            get: { item.isEnabled },
+                            set: { _ in tabManager.toggleHomeChannelItem(item.id) }
+                        )) {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(channelTitle(for: item))
+                                Text(item.destination.title)
+                                    .font(.caption)
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .tint(appearanceManager.tintColor)
+                        .stashyGroupedBlockRow(index: index, count: channelSettingItems.count)
+                    }
+                    .onMove { indices, newOffset in
+                        tabManager.moveHomeChannelItem(from: indices, to: newOffset)
+                    }
+                }
+            }
         }
         .stashyMovableCardsList()
         .environment(\.editMode, .constant(.active))
@@ -69,8 +98,21 @@ struct DashboardSettingsView: View {
         .applyAppBackground()
         .stashySettingsDetailChrome("Dashboard")
         .onAppear {
-            viewModel.fetchSavedFilters()
+            viewModel.fetchSavedFilters { _ in
+                tabManager.syncHomeChannelItems(with: Array(viewModel.savedFilters.values))
+            }
         }
+        .onChange(of: viewModel.savedFilters) { _, newValue in
+            tabManager.syncHomeChannelItems(with: Array(newValue.values))
+        }
+    }
+
+    private var channelSettingItems: [HomeChannelItemConfig] {
+        tabManager.homeChannelItems.sorted { $0.sortOrder < $1.sortOrder }
+    }
+
+    private func channelTitle(for item: HomeChannelItemConfig) -> String {
+        viewModel.savedFilters[item.filterId]?.name ?? "Filter"
     }
 
     private var dashboardCard: some View {

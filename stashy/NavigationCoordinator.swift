@@ -27,6 +27,9 @@ class NavigationCoordinator: ObservableObject {
     /// Snapshot captured by the remounted Feeds instance (avoids race where a dying
     /// ReelsView clears performer/tags before the new instance can read them).
     @Published private(set) var reelsDeepLink = ReelsDeepLink.empty
+    /// TabView echoes a programmatic `selectedTab = .reels` as an icon re-tap. That would
+    /// remount Feeds with an empty deep link and drop the channel / performer handoff.
+    var suppressNextFeedsIconRemount = false
 
     // StashLine Navigation
     @Published var stashlinePath = NavigationPath()
@@ -179,6 +182,51 @@ class NavigationCoordinator: ObservableObject {
         // Tear down players, then remount so performer/tag handoff cannot reuse a stale session.
         NotificationCenter.default.post(name: Notification.Name("ReelsWillRemount"), object: nil)
         self.reelsTabID = UUID()
+        self.suppressNextFeedsIconRemount = true
+        self.selectedTab = .reels
+        self.reelsNavigationToken = UUID()
+    }
+
+    /// Dashboard channel → Feeds in Scenes mode, scoped to a saved scene filter.
+    func navigateToReelsChannel(filter: StashDBViewModel.SavedFilter, sort: StashDBViewModel.SceneSortOption) {
+        let link = ReelsDeepLink(
+            performer: nil,
+            tags: [],
+            mode: "Scenes",
+            picsPerformer: nil,
+            sceneFilter: filter,
+            sceneSort: sort.rawValue
+        )
+        self.reelsDeepLink = link
+        self.reelsPerformer = nil
+        self.reelsTags = []
+        self.reelsTargetMode = "Scenes"
+        self.picsPerformerFilter = nil
+        NotificationCenter.default.post(name: Notification.Name("ReelsWillRemount"), object: nil)
+        self.reelsTabID = UUID()
+        self.suppressNextFeedsIconRemount = true
+        self.selectedTab = .reels
+        self.reelsNavigationToken = UUID()
+    }
+
+    /// Dashboard image channel → Feeds in Clips mode, scoped to a saved image filter.
+    func navigateToReelsClipsChannel(filter: StashDBViewModel.SavedFilter, sort: StashDBViewModel.ImageSortOption) {
+        let link = ReelsDeepLink(
+            performer: nil,
+            tags: [],
+            mode: "Clips",
+            picsPerformer: nil,
+            clipFilter: filter,
+            clipSort: sort.rawValue
+        )
+        self.reelsDeepLink = link
+        self.reelsPerformer = nil
+        self.reelsTags = []
+        self.reelsTargetMode = "Clips"
+        self.picsPerformerFilter = nil
+        NotificationCenter.default.post(name: Notification.Name("ReelsWillRemount"), object: nil)
+        self.reelsTabID = UUID()
+        self.suppressNextFeedsIconRemount = true
         self.selectedTab = .reels
         self.reelsNavigationToken = UUID()
     }
@@ -192,6 +240,7 @@ class NavigationCoordinator: ObservableObject {
         self.reelsTargetMode = "Pics"
         NotificationCenter.default.post(name: Notification.Name("ReelsWillRemount"), object: nil)
         self.reelsTabID = UUID()
+        self.suppressNextFeedsIconRemount = true
         self.selectedTab = .reels
         self.reelsNavigationToken = UUID()
     }
@@ -237,11 +286,21 @@ struct ReelsDeepLink: Equatable {
     var tags: [Tag]
     var mode: String?
     var picsPerformer: GalleryPerformer?
+    /// Channel deep link: saved scene filter to apply instead of the Feeds default filter.
+    var sceneFilter: StashDBViewModel.SavedFilter? = nil
+    /// `SceneSortOption.rawValue` for a channel deep link.
+    var sceneSort: String? = nil
+    /// Channel deep link: saved image filter applied in Feeds → Clips.
+    var clipFilter: StashDBViewModel.SavedFilter? = nil
+    /// `ImageSortOption.rawValue` for a Clips channel deep link.
+    var clipSort: String? = nil
 
     static let empty = ReelsDeepLink(performer: nil, tags: [], mode: nil, picsPerformer: nil)
 
     var isEmpty: Bool {
         performer == nil && tags.isEmpty && mode == nil && picsPerformer == nil
+            && sceneFilter == nil && sceneSort == nil
+            && clipFilter == nil && clipSort == nil
     }
 }
 

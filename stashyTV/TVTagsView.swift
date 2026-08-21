@@ -301,6 +301,7 @@ struct TVTagDetailView: View {
             isLoading: isLoadingTag,
             heroAspectRatio: 16/9,
             placeholderSystemImage: "tag.fill",
+            channel: .tag(id: tagId, name: loadedTag?.name ?? tagName),
             scenes: viewModel.tagScenes,
             isLoadingScenes: viewModel.isLoadingTagScenes,
             totalScenes: viewModel.totalTagScenes,

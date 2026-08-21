@@ -239,6 +239,7 @@ enum HomeRowType: String, Codable {
     case performersHighestOCount
     case performersHighestRating
     case galleriesHighestImageCount
+    case channels
     
     var defaultTitle: String {
         switch self {
@@ -259,8 +260,33 @@ enum HomeRowType: String, Codable {
         case .performersHighestOCount: return "Performers - Counter"
         case .performersHighestRating: return "Performers - Rating"
         case .galleriesHighestImageCount: return "Galleries - Image Count"
+        case .channels: return "Channels"
         }
     }
+}
+
+enum HomeChannelSourceKind: String, Codable, CaseIterable, Identifiable {
+    case scenes
+    case clips
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .scenes: return "Scenes"
+        case .clips: return "Clips"
+        }
+    }
+}
+
+/// One saved filter in the Dashboard Channels row.
+struct HomeChannelItemConfig: Codable, Identifiable, Equatable {
+    let filterId: String
+    var destination: HomeChannelSourceKind
+    var isEnabled: Bool
+    var sortOrder: Int
+
+    var id: String { "\(destination.rawValue).\(filterId)" }
 }
 
 enum DashboardHeroSize: String, Codable, CaseIterable {
@@ -374,6 +400,7 @@ class TabManager: ObservableObject {
     @Published var tabs: [TabConfig] = []
     @Published var detailViews: [DetailViewConfig] = []
     @Published var homeRows: [HomeRowConfig] = []
+    @Published var homeChannelItems: [HomeChannelItemConfig] = []
     @Published var reelsModes: [ReelsModeConfig] = []
     @Published var tools: [ToolsItemConfig] = []
     @Published var reelsFillHeight: Bool = true {
@@ -428,6 +455,8 @@ class TabManager: ObservableObject {
     private let userDefaultsKey = "AppTabsConfig"
     private let detailSortKey = "DetailViewsSortConfig"
     private let homeRowsKey = "HomeRowsConfig"
+    private let homeChannelItemsKey = "HomeChannelItemsConfig"
+    private let homeChannelSourcesKey = "HomeChannelSourcesConfig"
     private let lastPlayedOnTopMigrationKey = "HomeRowsLastPlayedOnTop_v1"
     private let reelsModesKey = "ReelsModesConfig"
     private let toolsKey = "ToolsConfig"
@@ -467,6 +496,7 @@ class TabManager: ObservableObject {
         loadConfig()
         loadDetailConfigs()
         loadHomeRows()
+        loadHomeChannelItems()
         loadReelsModes()
         loadTools()
         self.reelsFillHeight = UserDefaults.standard.object(forKey: reelsFillHeightKey) as? Bool ?? true
@@ -768,6 +798,7 @@ class TabManager: ObservableObject {
             ensurePerformersHighestOCountRow()
             ensurePerformersHighestRatingRow()
             ensureGalleriesHighestImageCountRow()
+            ensureChannelsRow()
             promoteLastPlayedRowToTopIfNeeded()
         } else {
             // Default Home Rows
@@ -788,7 +819,8 @@ class TabManager: ObservableObject {
                 HomeRowConfig(id: UUID(), title: HomeRowType.mostViewed3Min.defaultTitle, isEnabled: true, sortOrder: 13, type: .mostViewed3Min),
                 HomeRowConfig(id: UUID(), title: HomeRowType.random.defaultTitle, isEnabled: true, sortOrder: 14, type: .random),
                 HomeRowConfig(id: UUID(), title: HomeRowType.topCounter3Min.defaultTitle, isEnabled: false, sortOrder: 15, type: .topCounter3Min),
-                HomeRowConfig(id: UUID(), title: HomeRowType.topRating3Min.defaultTitle, isEnabled: false, sortOrder: 16, type: .topRating3Min)
+                HomeRowConfig(id: UUID(), title: HomeRowType.topRating3Min.defaultTitle, isEnabled: false, sortOrder: 16, type: .topRating3Min),
+                HomeRowConfig(id: UUID(), title: HomeRowType.channels.defaultTitle, isEnabled: true, sortOrder: 17, type: .channels)
             ]
             saveHomeRows()
         }
@@ -938,6 +970,14 @@ class TabManager: ObservableObject {
              saveHomeRows()
          }
     }
+
+    private func ensureChannelsRow() {
+         if !homeRows.contains(where: { $0.type == .channels }) {
+             let newRow = HomeRowConfig(id: UUID(), title: HomeRowType.channels.defaultTitle, isEnabled: true, sortOrder: homeRows.count, type: .channels)
+             homeRows.append(newRow)
+             saveHomeRows()
+         }
+    }
     
     func toggleHomeRow(_ id: UUID) {
         if let index = homeRows.firstIndex(where: { $0.id == id }) {
@@ -952,6 +992,94 @@ class TabManager: ObservableObject {
             homeRows[i].sortOrder = i
         }
         saveHomeRows()
+    }
+
+    // MARK: - Channel filters (per saved filter)
+
+    func loadHomeChannelItems() {
+        let key = "\(homeChannelItemsKey)\(currentServerSuffix)"
+        if let data = UserDefaults.standard.data(forKey: key),
+           let decoded = try? JSONDecoder().decode([HomeChannelItemConfig].self, from: data) {
+            homeChannelItems = decoded.sorted { $0.sortOrder < $1.sortOrder }
+            for i in 0..<homeChannelItems.count {
+                homeChannelItems[i].sortOrder = i
+            }
+            return
+        }
+        homeChannelItems = []
+    }
+
+    func saveHomeChannelItems() {
+        let key = "\(homeChannelItemsKey)\(currentServerSuffix)"
+        if let encoded = try? JSONEncoder().encode(homeChannelItems) {
+            UserDefaults.standard.set(encoded, forKey: key)
+        }
+    }
+
+    /// Keep the dashboard channel list in sync with the server's scene + image saved filters.
+    /// Existing enable/order are preserved; new filters append enabled at the end.
+    func syncHomeChannelItems(with filters: [StashDBViewModel.SavedFilter]) {
+        let eligible = filters.filter { $0.mode == .scenes || $0.mode == .images }
+        guard !eligible.isEmpty else { return }
+
+        let kindEnabled = legacyChannelKindEnabled()
+        let existingById = Dictionary(uniqueKeysWithValues: homeChannelItems.map { ($0.id, $0) })
+        var result: [HomeChannelItemConfig] = []
+
+        for item in homeChannelItems.sorted(by: { $0.sortOrder < $1.sortOrder }) {
+            guard eligible.contains(where: { $0.id == item.filterId }) else { continue }
+            result.append(item)
+        }
+
+        let newFilters = eligible.sorted {
+            $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+        }
+        for filter in newFilters {
+            let destination: HomeChannelSourceKind = filter.mode == .images ? .clips : .scenes
+            let id = "\(destination.rawValue).\(filter.id)"
+            if existingById[id] == nil {
+                result.append(HomeChannelItemConfig(
+                    filterId: filter.id,
+                    destination: destination,
+                    isEnabled: kindEnabled[destination] ?? true,
+                    sortOrder: result.count
+                ))
+            }
+        }
+
+        for i in 0..<result.count {
+            result[i].sortOrder = i
+        }
+        if result != homeChannelItems {
+            homeChannelItems = result
+            saveHomeChannelItems()
+        }
+    }
+
+    /// First launch after per-filter channels: honour the old Scenes/Clips master toggles once.
+    private func legacyChannelKindEnabled() -> [HomeChannelSourceKind: Bool] {
+        let key = "\(homeChannelSourcesKey)\(currentServerSuffix)"
+        guard let data = UserDefaults.standard.data(forKey: key) else { return [:] }
+        struct Legacy: Codable {
+            var kind: HomeChannelSourceKind
+            var isEnabled: Bool
+        }
+        guard let decoded = try? JSONDecoder().decode([Legacy].self, from: data) else { return [:] }
+        return Dictionary(uniqueKeysWithValues: decoded.map { ($0.kind, $0.isEnabled) })
+    }
+
+    func toggleHomeChannelItem(_ id: String) {
+        guard let index = homeChannelItems.firstIndex(where: { $0.id == id }) else { return }
+        homeChannelItems[index].isEnabled.toggle()
+        saveHomeChannelItems()
+    }
+
+    func moveHomeChannelItem(from source: IndexSet, to destination: Int) {
+        homeChannelItems.move(fromOffsets: source, toOffset: destination)
+        for i in 0..<homeChannelItems.count {
+            homeChannelItems[i].sortOrder = i
+        }
+        saveHomeChannelItems()
     }
     
     func addCustomHomeRow(title: String, filterId: String) {

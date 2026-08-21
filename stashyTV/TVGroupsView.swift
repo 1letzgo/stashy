@@ -314,6 +314,7 @@ struct TVGroupDetailView: View {
             heroAspectRatio: 16/9,
             placeholderSystemImage: "rectangle.stack.fill",
             heroImageOverride: AnyView(groupHeroImage()),
+            channel: .group(id: groupId, name: item.name),
             scenes: viewModel.groupScenes,
             isLoadingScenes: viewModel.isLoadingGroupScenes,
             totalScenes: viewModel.totalGroupScenes,

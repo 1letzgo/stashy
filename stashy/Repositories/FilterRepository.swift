@@ -36,6 +36,10 @@ class FilterRepository: FilterRepositoryProtocol {
             filter
             object_filter
             ui_options
+            find_filter {
+              sort
+              direction
+            }
           }
         }
         """

@@ -755,6 +755,7 @@ private struct TVTabVisibilitySettingsView: View {
     var body: some View {
         List {
             Section {
+                tabVisibilityRow(.reels, label: "Feeds", icon: "play.rectangle.on.rectangle")
                 tabVisibilityRow(.scenes, label: "Scenes", icon: "film.fill")
                 tabVisibilityRow(.performers, label: "Performers", icon: "person.3.fill")
                 tabVisibilityRow(.studios, label: "Studios", icon: "building.2.fill")
