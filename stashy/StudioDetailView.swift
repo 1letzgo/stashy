@@ -15,6 +15,7 @@ struct StudioDetailView: View {
     @ObservedObject var configManager = ServerConfigManager.shared
     @ObservedObject private var tabManager = TabManager.shared
     @StateObject private var viewModel = StashDBViewModel()
+    @EnvironmentObject var coordinator: NavigationCoordinator
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var studioLiveFilterSheetPresented = false
@@ -30,6 +31,9 @@ struct StudioDetailView: View {
 
     private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
     private var navActionGroupSpacing: CGFloat { 7 }
+    private var showsFeedsNavButton: Bool {
+        tabManager.tabs.first(where: { $0.id == .reels })?.isVisible ?? true
+    }
     
     enum DetailTab: String, CaseIterable {
         case scenes = "Scenes"
@@ -823,13 +827,37 @@ struct StudioDetailView: View {
     
     private var headerCard: some View {
         VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top) {
+            HStack(alignment: .top, spacing: 8) {
                 Text(studio.name)
                     .font(.title2)
                     .fontWeight(.bold)
                     .foregroundColor(.primary)
-                    .lineLimit(2)
+                    .lineLimit(isHeaderExpanded ? nil : 2)
+
                 Spacer()
+
+                if showsFeedsNavButton {
+                    Button(action: {
+                        let sceneStudio = SceneStudio(
+                            id: studio.id,
+                            name: studio.name,
+                            updatedAt: studio.updatedAt
+                        )
+                        coordinator.navigateToReels(studio: sceneStudio, mode: nil)
+                    }) {
+                        HStack(spacing: 4) {
+                            Image(systemName: AppTab.reels.icon)
+                                .font(.system(size: 12, weight: .bold))
+                            Text("Feeds")
+                                .font(.system(size: 11, weight: .bold))
+                        }
+                        .foregroundColor(Color.pillAccent)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(appearanceManager.tintColor.opacity(0.15))
+                        .clipShape(Capsule())
+                    }
+                }
             }
             
             // Info List

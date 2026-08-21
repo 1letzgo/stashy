@@ -420,30 +420,11 @@ enum StudioListLiveFilterPresetStore {
 enum CatalogLiveChipFilterSupport {
     // MARK: Studio criterion parsing (saved filters / JSON may use Int ids or a single string `value`)
 
-    private static func singleStudioIdString(_ value: Any) -> String? {
-        if let s = value as? String {
-            let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
-            return t.isEmpty ? nil : t
-        }
-        if let n = value as? NSNumber { return String(n.intValue) }
-        if let i = value as? Int { return String(i) }
-        return nil
-    }
-
-    private static func studioIdStrings(from value: Any?) -> [String] {
-        guard let value else { return [] }
-        if let arr = value as? [Any] {
-            return arr.compactMap { singleStudioIdString($0) }
-        }
-        if let s = singleStudioIdString(value) { return [s] }
-        return []
-    }
-
     /// Ids for `studios` / `tags` with modifier `INCLUDES` (catalog live filters).
     static func includesIds(fromCriterion value: Any?) -> [String] {
         guard let d = value as? [String: Any] else { return [] }
         guard (d["modifier"] as? String) == "INCLUDES" else { return [] }
-        return studioIdStrings(from: d["value"])
+        return FilterMapper.idStrings(from: d["value"])
     }
 
     /// First id for `studios` with modifier `INCLUDES` (catalog live filters).

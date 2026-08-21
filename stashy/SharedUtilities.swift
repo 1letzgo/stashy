@@ -1549,17 +1549,19 @@ public struct FilterMapper {
     public static func sanitize(_ dict: [String: Any], isMarker: Bool = false) -> [String: Any] {
         var newDict = dict
         
-        // 1. Handle the "c" (criteria) array format used by Stash UI
+        // 1. Handle the "c" (criteria) array format used by Stash UI.
+        // Build `c` into a side dict first, then overlay remaining GraphQL keys so live-chip
+        // fields (e.g. tags) are not overwritten by an empty "any" criterion from `c`.
         if let criteria = newDict["c"] as? [[String: Any]] {
-            var rules: [[String: Any]] = []
-            
+            var fromC: [String: Any] = [:]
+
             for item in criteria {
                 if var key = item["id"] as? String {
                     let outputItem = item
-                    
+
                     // Map "rating" to "rating100" for GraphQL compatibility
                     if key == "rating" { key = "rating100" }
-                    
+
                     // If this is a nested logic node (has its own "c" array), sanitize recursively.
                     // Otherwise, it's a leaf criterion - process it directly using its ID as the field key.
                     let processedItem: Any
@@ -1568,31 +1570,23 @@ public struct FilterMapper {
                     } else {
                         processedItem = processCriterion(key: key, dict: outputItem)
                     }
-                    
-                    // Add to rules list
+
                     if isMarker && isSceneSpecificKey(key) {
-                        rules.append(["scene_filter": [key: processedItem]])
+                        var sceneNested = (fromC["scene_filter"] as? [String: Any]) ?? [:]
+                        sceneNested[key] = processedItem
+                        fromC["scene_filter"] = sceneNested
                     } else {
-                        if let dict = processedItem as? [String: Any] {
-                            rules.append([key: dict])
-                        } else if let b = processedItem as? Bool {
-                            rules.append([key: b])
-                        } else {
-                            rules.append([key: processedItem])
-                        }
+                        fromC[key] = processedItem
                     }
                 }
             }
-            
-            // Merge all rules as top-level keys (Stash implicitly ANDs all top-level criteria).
-            // Do NOT use AND:[array] — Stash's AND field is a single nested FilterType object, not an array.
-            for rule in rules {
-                for (k, v) in rule {
-                    newDict[k] = v
-                }
-            }
-            
+
             newDict.removeValue(forKey: "c")
+            var combined = fromC
+            for (k, v) in newDict {
+                combined[k] = v
+            }
+            newDict = combined
         }
         
         // 2. Clean up top-level UI-only keys
@@ -1626,8 +1620,28 @@ public struct FilterMapper {
                 newDict[key] = processCriterion(key: key, dict: subDict)
             }
         }
-        
+
+        omitEmptyMultiIdCriteria(&newDict)
         return newDict
+    }
+
+    /// `INCLUDES` with no ids is Stash UI "Any" — omit the criterion instead of persisting an empty filter.
+    private static func omitEmptyMultiIdCriteria(_ dict: inout [String: Any]) {
+        let keys = ["tags", "studios", "groups", "performers", "galleries", "scenes", "movies"]
+        for key in keys {
+            guard let criterion = dict[key] as? [String: Any] else { continue }
+            if idStrings(from: criterion["value"]).isEmpty {
+                dict.removeValue(forKey: key)
+            }
+        }
+        if var nested = dict["scene_filter"] as? [String: Any] {
+            omitEmptyMultiIdCriteria(&nested)
+            if nested.isEmpty {
+                dict.removeValue(forKey: "scene_filter")
+            } else {
+                dict["scene_filter"] = nested
+            }
+        }
     }
     
     // MARK: - Private Helpers
@@ -1647,13 +1661,16 @@ public struct FilterMapper {
             subDict.removeValue(forKey: uiKey)
         }
         
-        // Unwrap nested value structures
+        // Unwrap nested value structures (Stash UI `{ items: [...] }` and Swift `[String]` arrays).
         if let valueDict = subDict["value"] as? [String: Any] {
             if let inner = valueDict["value"] { subDict["value"] = inner }
             else if let inner = valueDict["id"] { subDict["value"] = inner }
-            else if let items = valueDict["items"] as? [Any] {
-                subDict["value"] = items
-                if let depth = valueDict["depth"] { subDict["depth"] = depth }
+            else {
+                let items = jsonArray(valueDict["items"])
+                if !items.isEmpty {
+                    subDict["value"] = items
+                    if let depth = valueDict["depth"] { subDict["depth"] = depth }
+                }
             }
         }
         if let vd2 = subDict["value2"] as? [String: Any], let iv2 = vd2["value"] {
@@ -1662,10 +1679,13 @@ public struct FilterMapper {
         if let excludesDict = subDict["excludes"] as? [String: Any] {
             if let inner = excludesDict["value"] { subDict["excludes"] = inner }
             else if let inner = excludesDict["id"] { subDict["excludes"] = inner }
-            else if let items = excludesDict["items"] as? [Any] {
-                subDict["excludes"] = items
-                if subDict["depth"] == nil, let depth = excludesDict["depth"] {
-                    subDict["depth"] = depth
+            else {
+                let items = jsonArray(excludesDict["items"])
+                if !items.isEmpty {
+                    subDict["excludes"] = items
+                    if subDict["depth"] == nil, let depth = excludesDict["depth"] {
+                        subDict["depth"] = depth
+                    }
                 }
             }
         }
@@ -1713,14 +1733,24 @@ public struct FilterMapper {
             }
         }
         
-        // Multi-select/ID mapping
+        // Multi-select/ID mapping (`[String]` does not cast to `[Any]` in Swift).
         let multiSelectFields: Set<String> = ["performers", "studios", "tags", "galleries", "scenes", "groups", "movies"]
         if multiSelectFields.contains(key) {
-            if let valArray = subDict["value"] as? [Any] {
-                subDict["value"] = mapToIds(valArray)
+            if subDict["value"] != nil {
+                subDict["value"] = idStrings(from: subDict["value"])
             }
-            if let exArr = subDict["excludes"] as? [Any] {
-                subDict["excludes"] = mapToIds(exArr)
+            if subDict["excludes"] != nil {
+                subDict["excludes"] = idStrings(from: subDict["excludes"])
+            }
+            // HierarchicalMultiCriterionInput requires optional `depth`; MultiCriterionInput (performers etc.) rejects it.
+            // Empty value is "Any" and is dropped later — don't persist `depth` on a blank criterion.
+            let hierarchicalFields: Set<String> = ["tags", "studios", "groups", "movies"]
+            if hierarchicalFields.contains(key) {
+                if subDict["depth"] == nil, !idStrings(from: subDict["value"]).isEmpty {
+                    subDict["depth"] = 0
+                }
+            } else {
+                subDict.removeValue(forKey: "depth")
             }
         }
         
@@ -1762,19 +1792,44 @@ public struct FilterMapper {
     }
     
     
-    private static func mapToIds(_ array: [Any]) -> [String] {
-        return array.compactMap { item -> String? in
-            if let s = item as? String { return s }
-            if let i = item as? Int { return String(i) }
-            if let obj = item as? [String: Any] {
-                if let id = obj["id"] as? String { return id }
-                if let id = obj["id"] as? Int { return String(id) }
-                // Stash sometimes uses "value" key instead of "id" for exclude items
-                if let id = obj["value"] as? String { return id }
-                if let id = obj["value"] as? Int { return String(id) }
-            }
-            return nil
+    /// JSON arrays decoded as `[String]` / `[[String: Any]]` do not succeed `as? [Any]`.
+    public static func jsonArray(_ value: Any?) -> [Any] {
+        guard let value else { return [] }
+        if let arr = value as? [Any] { return arr }
+        if let arr = value as? [String] { return arr }
+        if let arr = value as? [Int] { return arr }
+        if let arr = value as? [[String: Any]] { return arr }
+        if let ns = value as? NSArray { return ns.map { $0 as Any } }
+        return []
+    }
+
+    public static func idString(from value: Any) -> String? {
+        if let s = value as? String {
+            let t = s.trimmingCharacters(in: .whitespacesAndNewlines)
+            return t.isEmpty ? nil : t
         }
+        if let i = value as? Int { return String(i) }
+        if let n = value as? NSNumber { return String(n.intValue) }
+        if let obj = value as? [String: Any] {
+            if let id = obj["id"] { return idString(from: id) }
+            if let inner = obj["value"] { return idString(from: inner) }
+        }
+        return nil
+    }
+
+    /// IDs from a criterion `value` / `items` / single string or number.
+    public static func idStrings(from value: Any?) -> [String] {
+        guard let value else { return [] }
+        if let d = value as? [String: Any] {
+            if d["items"] != nil { return idStrings(from: d["items"]) }
+            if d["id"] != nil { return idStrings(from: d["id"]) }
+        }
+        let arr = jsonArray(value)
+        if !arr.isEmpty {
+            return arr.compactMap { idString(from: $0) }
+        }
+        if let s = idString(from: value) { return [s] }
+        return []
     }
 }
 

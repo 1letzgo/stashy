@@ -22,6 +22,7 @@ class NavigationCoordinator: ObservableObject {
     // Reels Selection
     @Published var reelsPerformer: ScenePerformer?
     @Published var reelsTags: [Tag] = []
+    @Published var reelsStudio: SceneStudio?
     @Published var reelsTargetMode: String? = nil
     @Published var reelsNavigationToken = UUID()
     /// Snapshot captured by the remounted Feeds instance (avoids race where a dying
@@ -172,14 +173,15 @@ class NavigationCoordinator: ObservableObject {
         self.selectedTab = .catalogue
     }
     
-    func navigateToReels(performer: ScenePerformer? = nil, tags: [Tag] = [], mode: String? = nil) {
-        let link = ReelsDeepLink(performer: performer, tags: tags, mode: mode, picsPerformer: nil)
+    func navigateToReels(performer: ScenePerformer? = nil, tags: [Tag] = [], studio: SceneStudio? = nil, mode: String? = nil) {
+        let link = ReelsDeepLink(performer: performer, tags: tags, studio: studio, mode: mode, picsPerformer: nil)
         self.reelsDeepLink = link
         self.reelsPerformer = performer
         self.reelsTags = tags
+        self.reelsStudio = studio
         self.reelsTargetMode = mode
         self.picsPerformerFilter = nil
-        // Tear down players, then remount so performer/tag handoff cannot reuse a stale session.
+        // Tear down players, then remount so performer/tag/studio handoff cannot reuse a stale session.
         NotificationCenter.default.post(name: Notification.Name("ReelsWillRemount"), object: nil)
         self.reelsTabID = UUID()
         self.suppressNextFeedsIconRemount = true
@@ -249,6 +251,7 @@ class NavigationCoordinator: ObservableObject {
         reelsDeepLink = .empty
         reelsPerformer = nil
         reelsTags = []
+        reelsStudio = nil
         reelsTargetMode = nil
         picsPerformerFilter = nil
     }
@@ -284,6 +287,7 @@ class NavigationCoordinator: ObservableObject {
 struct ReelsDeepLink: Equatable {
     var performer: ScenePerformer?
     var tags: [Tag]
+    var studio: SceneStudio? = nil
     var mode: String?
     var picsPerformer: GalleryPerformer?
     /// Channel deep link: saved scene filter to apply instead of the Feeds default filter.
@@ -295,10 +299,10 @@ struct ReelsDeepLink: Equatable {
     /// `ImageSortOption.rawValue` for a Clips channel deep link.
     var clipSort: String? = nil
 
-    static let empty = ReelsDeepLink(performer: nil, tags: [], mode: nil, picsPerformer: nil)
+    static let empty = ReelsDeepLink(performer: nil, tags: [], studio: nil, mode: nil, picsPerformer: nil)
 
     var isEmpty: Bool {
-        performer == nil && tags.isEmpty && mode == nil && picsPerformer == nil
+        performer == nil && tags.isEmpty && studio == nil && mode == nil && picsPerformer == nil
             && sceneFilter == nil && sceneSort == nil
             && clipFilter == nil && clipSort == nil
     }

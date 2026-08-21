@@ -267,6 +267,14 @@ class StashDBViewModel: ObservableObject {
             return nil
         }
 
+        /// Live-chip fragment written by stashy (`ui_options.stashy.liveFragment`).
+        var stashyLiveFragment: [String: Any] {
+            guard let ui = Self.stringKeyed(ui_options?.value),
+                  let stashy = Self.stringKeyed(ui["stashy"]),
+                  let live = Self.stringKeyed(stashy["liveFragment"]) else { return [:] }
+            return live
+        }
+
         var resolvedSceneSort: SceneSortOption? {
             if let raw = stashySortRaw, let opt = SceneSortOption(rawValue: raw) { return opt }
             if let pair = encodedSortPair { return SceneSortOption(graphqlField: pair.field, direction: pair.direction) }
@@ -1855,15 +1863,26 @@ class StashDBViewModel: ObservableObject {
     }
 
     /// Merges a base scene saved filter with live chip criteria (same rules as `findScenes`).
+    /// Sanitize the base first so an empty UI `c` tags-criterion cannot overwrite live tags.
     func mergedSceneObjectFilterForSave(base: SavedFilter?, live: [String: Any]) -> [String: Any] {
         var merged: [String: Any] = [:]
-        if let base = base, let dict = base.filterDict {
-            merged = dict
+        if let base {
+            if let dict = base.filterDict, !dict.isEmpty {
+                merged = sanitizeFilter(dict)
+            } else if let obj = base.object_filter, let objDict = obj.value as? [String: Any], !objDict.isEmpty {
+                merged = sanitizeFilter(objDict)
+            }
         }
-        for (k, v) in live {
+        let liveSan = sanitizeFilter(live)
+        for (k, v) in liveSan {
             merged[k] = v
         }
-        return sanitizeFilter(merged)
+        // Live chips: "Any" means omit the criterion. Do not keep a leftover tags/studios/groups
+        // filter from the base saved filter (Stash UI would show that as "Any").
+        for key in ["tags", "studios", "groups"] where liveSan[key] == nil {
+            merged.removeValue(forKey: key)
+        }
+        return merged
     }
 
     /// Merges a base marker saved filter with **scene-style** live chips by nesting live criteria under
@@ -1884,6 +1903,9 @@ class StashDBViewModel: ObservableObject {
         let liveSan = sanitizeFilter(live, isMarker: false)
         for (k, v) in liveSan {
             sceneNested[k] = v
+        }
+        for key in ["tags", "studios", "groups"] where liveSan[key] == nil {
+            sceneNested.removeValue(forKey: key)
         }
         marker["scene_filter"] = sanitizeFilter(sceneNested, isMarker: false)
         return sanitizeFilter(marker, isMarker: true)
@@ -2648,10 +2670,19 @@ class StashDBViewModel: ObservableObject {
         ]
         var variables: [String: Any] = ["filter": filterDict]
         if let savedFilter = filter {
+            var sceneFilter: [String: Any] = [:]
             if let dict = savedFilter.filterDict {
-                variables["scene_filter"] = sanitizeFilter(dict)
+                sceneFilter = sanitizeFilter(dict)
             } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
-                variables["scene_filter"] = sanitizeFilter(objDict)
+                sceneFilter = sanitizeFilter(objDict)
+            }
+            if savedFilter.id != "merged_temp" {
+                for (key, value) in sanitizeFilter(savedFilter.stashyLiveFragment) {
+                    sceneFilter[key] = value
+                }
+            }
+            if !sceneFilter.isEmpty {
+                variables["scene_filter"] = sceneFilter
             }
         }
         let body: [String: Any] = [
@@ -2696,6 +2727,11 @@ class StashDBViewModel: ObservableObject {
                 }
             } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
                 for (key, value) in sanitizeFilter(objDict) where key != "path" {
+                    imageFilter[key] = value
+                }
+            }
+            if savedFilter.id != "merged_temp" {
+                for (key, value) in sanitizeFilter(savedFilter.stashyLiveFragment) where key != "path" {
                     imageFilter[key] = value
                 }
             }
@@ -2907,6 +2943,14 @@ class StashDBViewModel: ObservableObject {
                 } else {
                     variables["scene_filter"] = obj.value
                 }
+            }
+            let stashyLive = savedFilter.stashyLiveFragment
+            if !stashyLive.isEmpty, savedFilter.id != "merged_temp" {
+                var merged = (variables["scene_filter"] as? [String: Any]) ?? [:]
+                for (key, value) in sanitizeFilter(stashyLive) {
+                    merged[key] = value
+                }
+                variables["scene_filter"] = merged
             }
         }
 
@@ -3382,57 +3426,50 @@ class StashDBViewModel: ObservableObject {
         }
     }
     
-    func mergeFilterWithCriteria(filter: SavedFilter?, performer: ScenePerformer? = nil, tags: [Tag] = [], mode: FilterMode = .scenes) -> SavedFilter {
+    func mergeFilterWithCriteria(filter: SavedFilter?, performer: ScenePerformer? = nil, tags: [Tag] = [], studio: SceneStudio? = nil, mode: FilterMode = .scenes) -> SavedFilter {
         var baseDict: [String: Any] = [:]
-        
-        // 1. Recover filter data
-        if let filter = filter, let dict = filter.filterDict {
-            baseDict = dict
-        }
-        
-        // 2. Extract or create criteria array
-        var criteria = baseDict["c"] as? [[String: Any]] ?? []
-        
-        // 3. Force Performer if selected
-        if let performer = performer {
-            print("🔍 mergeFilterWithCriteria: Forcing Performer \(performer.name) (\(performer.id))")
-            criteria.removeAll { ($0["id"] as? String) == "performers" }
-            criteria.append([
-                "id": "performers",
-                "value": [performer.id],
-                "modifier": "INCLUDES"
-            ])
+
+        if let filter {
+            if let dict = filter.filterDict {
+                baseDict = dict
+            } else if let obj = filter.object_filter, let objDict = obj.value as? [String: Any] {
+                baseDict = objDict
+            }
         }
 
-        // 4. Force Tags if selected
+        if let performer {
+            print("🔍 mergeFilterWithCriteria: Forcing Performer \(performer.name) (\(performer.id))")
+            // MultiCriterionInput — no `depth` (that field is only on HierarchicalMultiCriterionInput).
+            baseDict["performers"] = ["modifier": "INCLUDES", "value": [performer.id]]
+        }
+
         if !tags.isEmpty {
             print("🔍 mergeFilterWithCriteria: Forcing Tags \(tags.map { $0.name })")
-            criteria.removeAll { ($0["id"] as? String) == "tags" }
-            criteria.append([
-                "id": "tags",
-                "value": tags.map { $0.id },
-                "modifier": "INCLUDES"
-            ])
+            baseDict["tags"] = ["modifier": "INCLUDES", "value": tags.map(\.id), "depth": 0]
         }
-        
-        baseDict["c"] = criteria
-        
-        // 5. Serialize back to StashJSONValue
+
+        if let studio {
+            print("🔍 mergeFilterWithCriteria: Forcing Studio \(studio.name) (\(studio.id))")
+            baseDict["studios"] = ["modifier": "INCLUDES", "value": [studio.id], "depth": 0]
+        }
+
         let jsonValue: StashJSONValue? = {
-            if let data = try? JSONSerialization.data(withJSONObject: baseDict),
+            if JSONSerialization.isValidJSONObject(baseDict),
+               let data = try? JSONSerialization.data(withJSONObject: baseDict),
                let decoded = try? JSONDecoder().decode(StashJSONValue.self, from: data) {
                 return decoded
             }
-            return nil
+            return filter?.object_filter
         }()
-    
+
         return SavedFilter(
             id: filter?.id ?? "merged_temp",
             name: filter?.name ?? "Merged Filter",
             mode: mode,
-            filter: nil,
+            filter: filter?.filter,
             object_filter: jsonValue,
-            ui_options: nil
+            ui_options: filter?.ui_options,
+            find_filter: filter?.find_filter
         )
     }
     
@@ -5660,6 +5697,11 @@ class StashDBViewModel: ObservableObject {
                     if key != "path" {
                         imageFilter[key] = value
                     }
+                }
+            }
+            if savedFilter.id != "merged_temp" {
+                for (key, value) in sanitizeFilter(savedFilter.stashyLiveFragment) where key != "path" {
+                    imageFilter[key] = value
                 }
             }
         }
@@ -8735,7 +8777,7 @@ struct SceneFile: Codable, Identifiable, Equatable {
     }
 }
 
-struct SceneStudio: Codable, Equatable {
+struct SceneStudio: Codable, Identifiable, Equatable {
     let id: String
     let name: String
     let updatedAt: String?

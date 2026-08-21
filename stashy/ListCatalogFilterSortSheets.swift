@@ -1783,13 +1783,13 @@ struct SceneLiveChipRowState: Equatable {
             dict["o_counter"] = oc
         }
         if !studioIds.isEmpty {
-            dict["studios"] = ["modifier": "INCLUDES", "value": studioIds]
+            dict["studios"] = ["modifier": "INCLUDES", "value": studioIds, "depth": 0]
         }
         if !tagIds.isEmpty {
-            dict["tags"] = ["modifier": "INCLUDES", "value": tagIds]
+            dict["tags"] = ["modifier": "INCLUDES", "value": tagIds, "depth": 0]
         }
         if !groupIds.isEmpty {
-            dict["groups"] = ["modifier": "INCLUDES", "value": groupIds]
+            dict["groups"] = ["modifier": "INCLUDES", "value": groupIds, "depth": 0]
         }
         return dict
     }
@@ -1799,13 +1799,13 @@ struct SceneLiveChipRowState: Equatable {
             ? activeLiveFilterDict()
             : [:]
         if !studioIds.isEmpty {
-            dict["studios"] = ["modifier": "INCLUDES", "value": studioIds]
+            dict["studios"] = ["modifier": "INCLUDES", "value": studioIds, "depth": 0]
         }
         if !tagIds.isEmpty {
-            dict["tags"] = ["modifier": "INCLUDES", "value": tagIds]
+            dict["tags"] = ["modifier": "INCLUDES", "value": tagIds, "depth": 0]
         }
         if !groupIds.isEmpty {
-            dict["groups"] = ["modifier": "INCLUDES", "value": groupIds]
+            dict["groups"] = ["modifier": "INCLUDES", "value": groupIds, "depth": 0]
         }
         if minRating == -1 {
             dict["rating100"] = ["modifier": "IS_NULL"]

@@ -1626,10 +1626,10 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
             dict["o_counter"] = oc
         }
         if !liveFilterStudioIds.isEmpty {
-            dict["studios"] = ["modifier": "INCLUDES", "value": liveFilterStudioIds]
+            dict["studios"] = ["modifier": "INCLUDES", "value": liveFilterStudioIds, "depth": 0]
         }
         if !liveFilterTagIds.isEmpty {
-            dict["tags"] = ["modifier": "INCLUDES", "value": liveFilterTagIds]
+            dict["tags"] = ["modifier": "INCLUDES", "value": liveFilterTagIds, "depth": 0]
         }
         if let pathCrit = liveFilterMediaKind.pathCriterion {
             if case .reelsStashLine = scope { /* images-only feed; ignore preset path */ } else {
