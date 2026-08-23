@@ -95,21 +95,42 @@ final class StashyPlusManager: ObservableObject {
     nonisolated static let debugForceLockedKey = "stashy_plus_debug_force_locked"
 
     /// First freemium release is **3.0**. Every **App Store** purchase before that
-    /// was paid and gets stashy+ Lifetime — including buyers who later installed
-    /// TestFlight (which can rewrite `originalAppVersion` to a 3.x build).
+    /// was paid and gets stashy+ Lifetime.
     ///
     /// On iOS, `AppTransaction.originalAppVersion` is `CFBundleVersion` (build), not
-    /// the marketing version. Pre-3.0 binaries used build `1`; 3.0 starts at `100`.
-    /// Marketing strings (`2.1`, `2.0.1`) are compared against `3.0` so a reported
-    /// `"3.0"` is not treated as paid (which a naive `< 100` check would do).
-    /// Sandbox / Xcode always report `"1.0"` and must be ignored — TestFlight-only
-    /// installs are not App Store purchases.
+    /// the marketing version. `CFBundleVersion` was hardcoded in `Info.plist` and
+    /// stayed at `106` from April 2026 (marketing 1.4.5) through the freemium 3.0 and
+    /// 3.1 releases, so **builds 100…299 do not identify the era on their own** — the
+    /// paid 1.x/2.x releases and the free 3.0/3.1 releases share them. Only
+    /// `originalPurchaseDate` separates those two groups.
+    ///
+    /// Builds below `firstAmbiguousBuild` shipped exclusively in paid releases, and
+    /// builds from `firstFreemiumBuild` on ship exclusively after this fix, so both
+    /// ends are decided by version alone. macOS reports marketing strings (`2.1`),
+    /// which are compared against `3.0` instead. Sandbox / Xcode always report `"1.0"`
+    /// and must be ignored — TestFlight-only installs are not App Store purchases.
     nonisolated static let firstFreemiumMarketingVersion = "3.0"
-    nonisolated static let firstFreemiumBuild = "100"
-    /// First calendar day the freemium 3.0 listing is treated as live (UTC).
-    /// Production `originalPurchaseDate` before this still counts as a paid app
-    /// when TestFlight polluted `originalAppVersion`.
+    /// Lowest build that a freemium release ever shipped with (see `Info.plist`).
+    /// Everything from here on is unambiguously post-paid-era.
+    nonisolated static let firstFreemiumBuild = "300"
+    /// Lowest build that both a paid and a freemium release shipped with.
+    /// Builds below this are unambiguously paid-era.
+    nonisolated static let firstAmbiguousBuild = "100"
+    /// Calendar day the freemium 3.0 listing went live on the App Store (UTC).
+    ///
+    /// This is the decisive signal, so it is deliberately rounded **up**: 3.0 went live
+    /// somewhere between 2026-08-21 and 2026-08-23, and the 24th covers that whole
+    /// window. Erring late costs at most a handful of free downloads from those three
+    /// days; erring early would lock paying customers out of what they bought.
     nonisolated static let firstFreemiumReleaseDate: Date? = utcDate(year: 2026, month: 8, day: 24)
+
+    /// Which pricing era an `originalAppVersion` belongs to.
+    enum OriginalVersionEra: Equatable, Sendable {
+        case paid
+        case freemium
+        /// Build number reused across both eras — only the purchase date can decide.
+        case ambiguous
+    }
 
     nonisolated static func utcDate(year: Int, month: Int, day: Int) -> Date {
         var calendar = Calendar(identifier: .gregorian)
@@ -302,20 +323,34 @@ final class StashyPlusManager: ObservableObject {
         unlockLifetime(source: .lifetime)
     }
 
-    /// `true` when the customer's original App Store version was a paid build (before 3.0).
-    nonisolated static func isLegacyPaidAppVersion(_ originalAppVersion: String) -> Bool {
+    /// Classifies the customer's original App Store version into a pricing era.
+    nonisolated static func originalVersionEra(_ originalAppVersion: String) -> OriginalVersionEra {
         let raw = originalAppVersion.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !raw.isEmpty else { return false }
+        // An empty or non-numeric value tells us nothing — let the purchase date decide.
+        guard !raw.isEmpty else { return .ambiguous }
         if raw.contains(".") {
-            return version(raw, isLessThan: firstFreemiumMarketingVersion)
+            return version(raw, isLessThan: firstFreemiumMarketingVersion) ? .paid : .freemium
         }
-        return version(raw, isLessThan: firstFreemiumBuild)
+        guard raw.allSatisfy(\.isNumber) else { return .ambiguous }
+        if version(raw, isLessThan: firstAmbiguousBuild) { return .paid }
+        if version(raw, isLessThan: firstFreemiumBuild) { return .ambiguous }
+        return .freemium
+    }
+
+    /// `true` when the original App Store version alone proves a paid purchase.
+    nonisolated static func isLegacyPaidAppVersion(_ originalAppVersion: String) -> Bool {
+        originalVersionEra(originalAppVersion) == .paid
     }
 
     /// Production-only grandfathering. Sandbox / Xcode always report `"1.0"` and
-    /// must not unlock (TestFlight-only ≠ App Store purchase). After TestFlight,
-    /// `originalAppVersion` can be a 3.x build while `originalPurchaseDate` still
-    /// reflects the paid App Store purchase — that date is the fallback.
+    /// must not unlock (TestFlight-only ≠ App Store purchase).
+    ///
+    /// `originalPurchaseDate` is the authoritative signal and decides on its own
+    /// whenever it is available: build numbers were reused across both pricing eras
+    /// on iOS (100…299) and the tvOS target — which shares the `de.letzgo.stashy`
+    /// Universal Purchase — still ships build `1`, so a free download that starts on
+    /// Apple TV would otherwise look like an early paid purchase. The version era is
+    /// the fallback for the (practically nonexistent) case of a missing date.
     nonisolated static func legacyPaidAppDecision(
         environment: AppStore.Environment,
         originalAppVersion: String,
@@ -323,13 +358,14 @@ final class StashyPlusManager: ObservableObject {
         firstFreemiumReleaseDate: Date? = StashyPlusManager.firstFreemiumReleaseDate
     ) -> LegacyPaidAppDecision {
         guard environment == .production else { return .no }
-        if isLegacyPaidAppVersion(originalAppVersion) { return .yes }
-        if let cutoff = firstFreemiumReleaseDate,
-           let purchased = originalPurchaseDate,
-           purchased < cutoff {
-            return .yes
+        let era = originalVersionEra(originalAppVersion)
+        if era == .freemium { return .no }
+        guard let cutoff = firstFreemiumReleaseDate,
+              let purchased = originalPurchaseDate else {
+            // No date to check against — trust the version only when it is unambiguous.
+            return era == .paid ? .yes : .no
         }
-        return .no
+        return purchased < cutoff ? .yes : .no
     }
 
     nonisolated static func version(_ lhs: String, isLessThan rhs: String) -> Bool {

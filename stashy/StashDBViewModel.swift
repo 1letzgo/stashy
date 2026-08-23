@@ -7936,6 +7936,8 @@ struct Scene: Codable, Identifiable, Equatable {
     let id: String
     let title: String?
     let details: String?
+    /// Free-text field in Stash — there is no director entity, so it is matched by name.
+    let director: String?
     let date: String?
     let duration: Double?
     let studio: SceneStudio?
@@ -7973,6 +7975,13 @@ struct Scene: Codable, Identifiable, Equatable {
         !(captions ?? []).isEmpty
     }
 
+    /// Stash returns `""` rather than `null` for an unset director.
+    var normalizedDirector: String? {
+        guard let trimmed = director?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !trimmed.isEmpty else { return nil }
+        return trimmed
+    }
+
     /// Spoken language from Stash custom field `language`, accepting codes as well as names
     /// ("de", "de-DE", "yue-CN", "German", "Cantonese"). `nil` when unresolvable.
     var spokenLanguageCode: String? {
@@ -8001,7 +8010,7 @@ struct Scene: Codable, Identifiable, Equatable {
     
     
     enum CodingKeys: String, CodingKey {
-        case id, title, details, date, duration, studio, performers, files, tags, galleries, groups, organized, rating100, paths, interactive, streams, captions
+        case id, title, details, director, date, duration, studio, performers, files, tags, galleries, groups, organized, rating100, paths, interactive, streams, captions
         case resumeTime = "resume_time"
         case playCount = "play_count"
         case playDuration = "play_duration"
@@ -8015,10 +8024,11 @@ struct Scene: Codable, Identifiable, Equatable {
     }
 
     // Explicit initializer to handle manual updates like 'withStreams'
-    init(id: String, title: String?, details: String?, date: String?, duration: Double?, studio: SceneStudio?, performers: [ScenePerformer], files: [SceneFile]?, tags: [Tag]?, galleries: [Gallery]?, groups: [SceneGroupEntry]? = nil, organized: Bool?, resumeTime: Double?, playCount: Int?, oCounter: Int?, rating100: Int?, createdAt: String?, updatedAt: String?, paths: ScenePaths?, sceneMarkers: [SceneMarker]?, interactive: Bool?, streams: [SceneStream]? = nil, stashIds: [StashID]? = nil, captions: [VideoCaption]? = nil, customFields: [String: StashJSONValue]? = nil, playDuration: Double? = nil, lastPlayedAt: String? = nil) {
+    init(id: String, title: String?, details: String?, director: String? = nil, date: String?, duration: Double?, studio: SceneStudio?, performers: [ScenePerformer], files: [SceneFile]?, tags: [Tag]?, galleries: [Gallery]?, groups: [SceneGroupEntry]? = nil, organized: Bool?, resumeTime: Double?, playCount: Int?, oCounter: Int?, rating100: Int?, createdAt: String?, updatedAt: String?, paths: ScenePaths?, sceneMarkers: [SceneMarker]?, interactive: Bool?, streams: [SceneStream]? = nil, stashIds: [StashID]? = nil, captions: [VideoCaption]? = nil, customFields: [String: StashJSONValue]? = nil, playDuration: Double? = nil, lastPlayedAt: String? = nil) {
         self.id = id
         self.title = title
         self.details = details
+        self.director = director
         self.date = date
         self.duration = duration
         self.studio = studio
@@ -8051,6 +8061,7 @@ struct Scene: Codable, Identifiable, Equatable {
         id = try container.decode(String.self, forKey: .id)
         title = try container.decodeIfPresent(String.self, forKey: .title)
         details = try container.decodeIfPresent(String.self, forKey: .details)
+        director = try container.decodeIfPresent(String.self, forKey: .director)
         date = try container.decodeIfPresent(String.self, forKey: .date)
         duration = try container.decodeIfPresent(Double.self, forKey: .duration)
         studio = try container.decodeIfPresent(SceneStudio.self, forKey: .studio)
@@ -8365,7 +8376,7 @@ struct Scene: Codable, Identifiable, Equatable {
     /// Creates a copy with updated resume time
     func withResumeTime(_ newResumeTime: Double) -> Scene {
         return Scene(
-            id: id, title: title, details: details, date: date, duration: duration,
+            id: id, title: title, details: details, director: director, date: date, duration: duration,
             studio: studio, performers: performers, files: files, tags: tags,
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: newResumeTime, playCount: playCount, oCounter: oCounter,
@@ -8378,7 +8389,7 @@ struct Scene: Codable, Identifiable, Equatable {
     /// Creates a copy with updated rating
     func withRating(_ newRating: Int?) -> Scene {
         return Scene(
-            id: id, title: title, details: details, date: date, duration: duration,
+            id: id, title: title, details: details, director: director, date: date, duration: duration,
             studio: studio, performers: performers, files: files, tags: tags,
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
@@ -8391,7 +8402,7 @@ struct Scene: Codable, Identifiable, Equatable {
     /// Creates a copy with updated streams
     func withStreams(_ newStreams: [SceneStream]?) -> Scene {
         return Scene(
-            id: id, title: title, details: details, date: date, duration: duration,
+            id: id, title: title, details: details, director: director, date: date, duration: duration,
             studio: studio, performers: performers, files: files, tags: tags,
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
@@ -8404,7 +8415,7 @@ struct Scene: Codable, Identifiable, Equatable {
     /// Creates a copy with updated play count
     func withPlayCount(_ newPlayCount: Int?) -> Scene {
         return Scene(
-            id: id, title: title, details: details, date: date, duration: duration,
+            id: id, title: title, details: details, director: director, date: date, duration: duration,
             studio: studio, performers: performers, files: files, tags: tags,
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: newPlayCount, oCounter: oCounter,
@@ -8417,7 +8428,7 @@ struct Scene: Codable, Identifiable, Equatable {
     /// Creates a copy with updated o count
     func withOCounter(_ newOCounter: Int?) -> Scene {
         return Scene(
-            id: id, title: title, details: details, date: date, duration: duration,
+            id: id, title: title, details: details, director: director, date: date, duration: duration,
             studio: studio, performers: performers, files: files, tags: tags,
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: newOCounter,
@@ -8454,6 +8465,7 @@ struct Scene: Codable, Identifiable, Equatable {
             id: id,
             title: other.title ?? title,
             details: other.details ?? details,
+            director: other.director ?? director,
             date: mergedDate,
             duration: mergedDuration,
             studio: mergedStudio,
@@ -8530,7 +8542,7 @@ struct Scene: Codable, Identifiable, Equatable {
     /// Creates a copy with updated `updatedAt` (cache-busts screenshot / cover URLs).
     func withUpdatedAt(_ newUpdatedAt: String?) -> Scene {
         return Scene(
-            id: id, title: title, details: details, date: date, duration: duration,
+            id: id, title: title, details: details, director: director, date: date, duration: duration,
             studio: studio, performers: performers, files: files, tags: tags,
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
@@ -8543,7 +8555,7 @@ struct Scene: Codable, Identifiable, Equatable {
     /// Creates a copy with updated custom fields (e.g. spoken `language`).
     func withCustomFields(_ newFields: [String: StashJSONValue]?) -> Scene {
         return Scene(
-            id: id, title: title, details: details, date: date, duration: duration,
+            id: id, title: title, details: details, director: director, date: date, duration: duration,
             studio: studio, performers: performers, files: files, tags: tags,
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,

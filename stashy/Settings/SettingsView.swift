@@ -1015,48 +1015,11 @@ class StoreManager: ObservableObject {
                         }
                     }
                     await transaction.finish()
-                    await Self.refreshEntitlements()
+                    await StoreManager.shared.syncUnlockFromStore()
                 } else {
                     await transaction.finish()
                 }
             }
-        }
-    }
-
-    /// Keeps entitlement fresh after renewals / revocations outside the purchase UI.
-    private static func refreshEntitlements() async {
-        var hasLifetimePurchase = false
-        var subscriptionProductID: String?
-        var subscriptionExpiration: Date?
-
-        for await result in Transaction.currentEntitlements {
-            guard case .verified(let transaction) = result else { continue }
-            if transaction.productID == StashyPlusProduct.lifetime {
-                hasLifetimePurchase = true
-            } else if StashyPlusProduct.subscriptionIDs.contains(transaction.productID) {
-                let exp = transaction.expirationDate ?? .distantFuture
-                if exp > Date() {
-                    subscriptionExpiration = exp
-                    subscriptionProductID = transaction.productID
-                }
-            }
-        }
-
-        let legacyPaidApp: Bool
-        switch await isLegacyPaidAppPurchaser() {
-        case .yes: legacyPaidApp = true
-        case .no: legacyPaidApp = false
-        case .unknown:
-            legacyPaidApp = UserDefaults.standard.string(forKey: StashyPlusManager.sourceKey)
-                == StashyPlusSource.legacyPaidApp.rawValue
-        }
-        await MainActor.run {
-            StashyPlusManager.shared.applyStoreEntitlements(
-                hasLifetimePurchase: hasLifetimePurchase,
-                subscriptionProductID: subscriptionProductID,
-                subscriptionExpiration: subscriptionExpiration,
-                legacyPaidApp: legacyPaidApp
-            )
         }
     }
 

@@ -288,7 +288,7 @@ struct SceneDetailView: View {
                         audioTrackController: audioTrackController,
                         onSeek: { seconds in seekTo(seconds) },
                         onTitleUpdated: { newTitle, newDetails in
-                            applyLocalSceneEdit(Scene(id: activeScene.id, title: newTitle, details: newDetails, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                            applyLocalSceneEdit(Scene(id: activeScene.id, title: newTitle, details: newDetails, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                         }
                     )
                 }
@@ -331,7 +331,7 @@ struct SceneDetailView: View {
                             sceneDate: activeScene.date,
                             performers: activeScene.performers,
                             onPerformersUpdated: { updated in
-                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                             },
                             viewModel: viewModel
                         )
@@ -342,7 +342,7 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             studio: activeScene.studio,
                             onStudioUpdated: { updated in
-                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                             },
                             viewModel: viewModel
                         )
@@ -352,10 +352,15 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             groups: activeScene.groups ?? [],
                             onGroupsUpdated: { updated in
-                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                             },
                             viewModel: viewModel
                         )
+
+                        if let director = activeScene.normalizedDirector {
+                            SceneDirectorCard(director: director)
+                                .gridCellColumns(2)
+                        }
 
                         // Item 4: Galleries
                         if let galleries = activeScene.galleries, !galleries.isEmpty {
@@ -367,7 +372,7 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             tags: activeScene.tags,
                             onTagsUpdated: { updated in
-                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                             },
                             viewModel: viewModel,
                             isTagsExpanded: $isTagsExpanded,
@@ -397,7 +402,7 @@ struct SceneDetailView: View {
                         sceneDate: activeScene.date,
                         performers: activeScene.performers,
                         onPerformersUpdated: { updated in
-                            applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                            applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                         },
                         viewModel: viewModel
                     )
@@ -408,7 +413,7 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             studio: activeScene.studio,
                             onStudioUpdated: { updated in
-                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: updated, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                             },
                             viewModel: viewModel
                         )
@@ -416,10 +421,14 @@ struct SceneDetailView: View {
                             sceneId: activeScene.id,
                             groups: activeScene.groups ?? [],
                             onGroupsUpdated: { updated in
-                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: updated, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                             },
                             viewModel: viewModel
                         )
+                    }
+
+                    if let director = activeScene.normalizedDirector {
+                        SceneDirectorCard(director: director)
                     }
 
                     if let galleries = activeScene.galleries, !galleries.isEmpty {
@@ -431,7 +440,7 @@ struct SceneDetailView: View {
                         sceneId: activeScene.id,
                         tags: activeScene.tags,
                         onTagsUpdated: { updated in
-                            applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                            applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: updated, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                         },
                         viewModel: viewModel,
                         isTagsExpanded: $isTagsExpanded,

@@ -1,5 +1,5 @@
 fragment SceneFields on Scene {
-  id title details date organized resume_time play_count play_duration last_played_at o_counter rating100 created_at updated_at interactive
+  id title details director date organized resume_time play_count play_duration last_played_at o_counter rating100 created_at updated_at interactive
   studio { ...StudioFields }
   performers { ...PerformerFields }
   files { id path format width height duration video_codec audio_codec bit_rate frame_rate }

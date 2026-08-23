@@ -112,6 +112,8 @@
 		DF675E7B2F2A6392004CA019 /* SceneVideoPlayerCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E772F2A6392004CA019 /* SceneVideoPlayerCard.swift */; };
 		DF675E7C2F2A6392004CA019 /* SceneStudioCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E752F2A6392004CA019 /* SceneStudioCard.swift */; };
 		DF675E7D2F2A6392004CA019 /* ScenePerformersCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E742F2A6392004CA019 /* ScenePerformersCard.swift */; };
+		DFA1B2C42F3A6500004CA019 /* SceneDirectorCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFA1B2C32F3A6500004CA019 /* SceneDirectorCard.swift */; };
+		DFA1B2C62F3A6500004CA019 /* DirectorDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFA1B2C52F3A6500004CA019 /* DirectorDetailView.swift */; };
 		DF675E7E2F2A6392004CA019 /* SceneTagsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E762F2A6392004CA019 /* SceneTagsCard.swift */; };
 		DF90B75E2F1A5ECF003ED852 /* StarRatingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */; };
 		DF90B7642F1ACEA3003ED852 /* ServerSetupWizardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B7632F1ACEA3003ED852 /* ServerSetupWizardView.swift */; };
@@ -234,6 +236,8 @@
 		DF675E732F2A6392004CA019 /* SceneGalleriesCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneGalleriesCard.swift; sourceTree = "<group>"; };
 		DF675E742F2A6392004CA019 /* ScenePerformersCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenePerformersCard.swift; sourceTree = "<group>"; };
 		DF675E752F2A6392004CA019 /* SceneStudioCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneStudioCard.swift; sourceTree = "<group>"; };
+		DFA1B2C32F3A6500004CA019 /* SceneDirectorCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDirectorCard.swift; sourceTree = "<group>"; };
+		DFA1B2C52F3A6500004CA019 /* DirectorDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectorDetailView.swift; sourceTree = "<group>"; };
 		DF675E762F2A6392004CA019 /* SceneTagsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneTagsCard.swift; sourceTree = "<group>"; };
 		DF675E772F2A6392004CA019 /* SceneVideoPlayerCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneVideoPlayerCard.swift; sourceTree = "<group>"; };
 		DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarRatingView.swift; sourceTree = "<group>"; };
@@ -352,6 +356,7 @@
 				DF06EF252F18EC1100299105 /* SceneCardView.swift */,
 				DFE504632E8A8C5000323FF0 /* SceneDelegate.swift */,
 				DFE5045D2E8A8C2000323FF1 /* SceneDetailView.swift */,
+				DFA1B2C52F3A6500004CA019 /* DirectorDetailView.swift */,
 				37D092D52F8980B400DB7A08 /* MarkersView.swift */,
 				DFE5045D2E8A8C2000323FF0 /* ScenesView.swift */,
 				CA7A10D02F500000 /* ListCatalogFilterSortModels.swift */,
@@ -429,6 +434,7 @@
 				DF675E732F2A6392004CA019 /* SceneGalleriesCard.swift */,
 				DF675E742F2A6392004CA019 /* ScenePerformersCard.swift */,
 				DF675E752F2A6392004CA019 /* SceneStudioCard.swift */,
+				DFA1B2C32F3A6500004CA019 /* SceneDirectorCard.swift */,
 				DF675E762F2A6392004CA019 /* SceneTagsCard.swift */,
 				FA617C2A62174FFFB0912B44 /* SceneGroupsCard.swift */,
 				DF675E772F2A6392004CA019 /* SceneVideoPlayerCard.swift */,
@@ -608,6 +614,8 @@
 				DF675E7B2F2A6392004CA019 /* SceneVideoPlayerCard.swift in Sources */,
 				DF675E7C2F2A6392004CA019 /* SceneStudioCard.swift in Sources */,
 				DF675E7D2F2A6392004CA019 /* ScenePerformersCard.swift in Sources */,
+				DFA1B2C42F3A6500004CA019 /* SceneDirectorCard.swift in Sources */,
+				DFA1B2C62F3A6500004CA019 /* DirectorDetailView.swift in Sources */,
 				DF675E7E2F2A6392004CA019 /* SceneTagsCard.swift in Sources */,
 				9BA6D13B444E433980610D36 /* SceneGroupsCard.swift in Sources */,
 				DFST000032F30A0000000003 /* SettingsView.swift in Sources */,
@@ -891,7 +899,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 100;
+				CURRENT_PROJECT_VERSION = 300;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -902,7 +910,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.1;
+				MARKETING_VERSION = 3.2;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -921,7 +929,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 100;
+				CURRENT_PROJECT_VERSION = 300;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -932,7 +940,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.1;
+				MARKETING_VERSION = 3.2;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -955,7 +963,7 @@
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 300;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -997,7 +1005,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 1;
+				CURRENT_PROJECT_VERSION = 300;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
