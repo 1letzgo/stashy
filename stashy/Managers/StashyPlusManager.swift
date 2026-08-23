@@ -94,16 +94,33 @@ final class StashyPlusManager: ObservableObject {
     /// Debug helper: keep the paywall locked even if StoreKit would re-grant access.
     nonisolated static let debugForceLockedKey = "stashy_plus_debug_force_locked"
 
-    /// First freemium release is **3.0**. Every App Store purchase before that was paid
-    /// and gets stashy+ Lifetime.
+    /// First freemium release is **3.0**. Every **App Store** purchase before that
+    /// was paid and gets stashy+ Lifetime — including buyers who later installed
+    /// TestFlight (which can rewrite `originalAppVersion` to a 3.x build).
     ///
     /// On iOS, `AppTransaction.originalAppVersion` is `CFBundleVersion` (build), not
     /// the marketing version. Pre-3.0 binaries used build `1`; 3.0 starts at `100`.
     /// Marketing strings (`2.1`, `2.0.1`) are compared against `3.0` so a reported
     /// `"3.0"` is not treated as paid (which a naive `< 100` check would do).
-    /// Sandbox always reports `"1.0"` and must be ignored.
+    /// Sandbox / Xcode always report `"1.0"` and must be ignored — TestFlight-only
+    /// installs are not App Store purchases.
     nonisolated static let firstFreemiumMarketingVersion = "3.0"
     nonisolated static let firstFreemiumBuild = "100"
+    /// First calendar day the freemium 3.0 listing is treated as live (UTC).
+    /// Production `originalPurchaseDate` before this still counts as a paid app
+    /// when TestFlight polluted `originalAppVersion`.
+    nonisolated static let firstFreemiumReleaseDate: Date? = utcDate(year: 2026, month: 8, day: 24)
+
+    nonisolated static func utcDate(year: Int, month: Int, day: Int) -> Date {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = TimeZone(secondsFromGMT: 0)!
+        return calendar.date(from: DateComponents(year: year, month: month, day: day))!
+    }
+
+    enum LegacyPaidAppDecision: Equatable, Sendable {
+        case yes
+        case no
+    }
 
     @Published private(set) var isUnlocked: Bool
     @Published private(set) var source: StashyPlusSource
@@ -293,6 +310,26 @@ final class StashyPlusManager: ObservableObject {
             return version(raw, isLessThan: firstFreemiumMarketingVersion)
         }
         return version(raw, isLessThan: firstFreemiumBuild)
+    }
+
+    /// Production-only grandfathering. Sandbox / Xcode always report `"1.0"` and
+    /// must not unlock (TestFlight-only ≠ App Store purchase). After TestFlight,
+    /// `originalAppVersion` can be a 3.x build while `originalPurchaseDate` still
+    /// reflects the paid App Store purchase — that date is the fallback.
+    nonisolated static func legacyPaidAppDecision(
+        environment: AppStore.Environment,
+        originalAppVersion: String,
+        originalPurchaseDate: Date?,
+        firstFreemiumReleaseDate: Date? = StashyPlusManager.firstFreemiumReleaseDate
+    ) -> LegacyPaidAppDecision {
+        guard environment == .production else { return .no }
+        if isLegacyPaidAppVersion(originalAppVersion) { return .yes }
+        if let cutoff = firstFreemiumReleaseDate,
+           let purchased = originalPurchaseDate,
+           purchased < cutoff {
+            return .yes
+        }
+        return .no
     }
 
     nonisolated static func version(_ lhs: String, isLessThan rhs: String) -> Bool {

@@ -27,7 +27,6 @@
 		372E2D9D2F645A0100603361 /* SubtitleController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2D9C2F645A0100603361 /* SubtitleController.swift */; };
 		372E2DA32F646B0100603361 /* SceneTranscriptionSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DA22F646B0100603361 /* SceneTranscriptionSupport.swift */; };
 		372E2DA52F646B0100603361 /* SceneLiveTranscriptionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DA42F646B0100603361 /* SceneLiveTranscriptionController.swift */; };
-		372E2DA72F646B0100603361 /* SceneTeleprompterPanel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DA62F646B0100603361 /* SceneTeleprompterPanel.swift */; };
 		372E2DA92F646B0100603361 /* SceneTranscodeAudioPrefetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DA82F646B0100603361 /* SceneTranscodeAudioPrefetcher.swift */; };
 		372E2DAB2F646B0100603361 /* SceneCaptionTranslator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DAA2F646B0100603361 /* SceneCaptionTranslator.swift */; };
 		372E2DAD2F64A01000603361 /* SceneAudioTrackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DAC2F64A01000603361 /* SceneAudioTrackController.swift */; };
@@ -52,7 +51,6 @@
 		64D0D9557F7C404B8C16EF39 /* TagRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E6B2F2A6386004CA019 /* TagRepository.swift */; };
 		6B7F79949CEB4E2CB62F2650 /* ReelsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1B2F16743C007C2090 /* ReelsView.swift */; };
 		6BC1E5F563B84AA4B9FA20D9 /* StudioDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE5045D2E8A8C2000323FF4 /* StudioDetailView.swift */; };
-		757D103CB6294F49B8301A7B /* FilterRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E662F2A6386004CA019 /* FilterRepository.swift */; };
 		790261AAF80B42C485B72074 /* TabManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFF7EE402F0D3D2800344A8B /* TabManager.swift */; };
 		7B48CDF007B7469B93ACF595 /* AppearanceSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */; };
 		7BB701173C934CC5AD19DC74 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFE504632E8A8C5000323FF0 /* SceneDelegate.swift */; };
@@ -72,8 +70,6 @@
 		A1IMGDS012345678901234AB /* StashImageDateSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1IMGDS022345678901234AB /* StashImageDateSort.swift */; };
 		A1IMGDS032345678901234AB /* StashImageDateSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1IMGDS022345678901234AB /* StashImageDateSort.swift */; };
 		A1PLUS012F30B00000000001 /* StashyPlusManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1PLUS022F30B00000000002 /* StashyPlusManager.swift */; };
-		A1SP1C0012345678901234AB /* StashyPicView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1SP1C0112345678901234AB /* StashyPicView.swift */; };
-		A1SP1C0212345678901234AB /* StashyPicView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1SP1C0112345678901234AB /* StashyPicView.swift */; };
 		A448F31312224C5CA0763758 /* SceneTagsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E762F2A6392004CA019 /* SceneTagsCard.swift */; };
 		A519E23C8BE040F79C6EFE18 /* ImagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF4A022B2F1E8B6800E5EAFB /* ImagesView.swift */; };
 		A8FA63740E8A43609EDB1AAD /* AppearanceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB312F1831C7007C2090 /* AppearanceManager.swift */; };
@@ -109,7 +105,6 @@
 		DF675E652F2A46A2004CA019 /* HomeSceneCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E5E2F2A46A1004CA019 /* HomeSceneCardView.swift */; };
 		DF675E6D2F2A6386004CA019 /* GalleryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E672F2A6386004CA019 /* GalleryRepository.swift */; };
 		DF675E6E2F2A6386004CA019 /* StudioRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E6A2F2A6386004CA019 /* StudioRepository.swift */; };
-		DF675E6F2F2A6386004CA019 /* FilterRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E662F2A6386004CA019 /* FilterRepository.swift */; };
 		DF675E702F2A6386004CA019 /* TagRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E6B2F2A6386004CA019 /* TagRepository.swift */; };
 		DF675E712F2A6386004CA019 /* SceneRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E692F2A6386004CA019 /* SceneRepository.swift */; };
 		DF675E722F2A6386004CA019 /* PerformerRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E682F2A6386004CA019 /* PerformerRepository.swift */; };
@@ -143,7 +138,6 @@
 		DFST0000B2F30A000000000B /* ContentSettingsSection.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST0000A2F30A000000000A /* ContentSettingsSection.swift */; };
 		DFST0000D2F30A000000000D /* DashboardSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST0000C2F30A000000000C /* DashboardSettingsView.swift */; };
 		DFST0000F2F30A000000000F /* ReelsModeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST0000E2F30A000000000E /* ReelsModeSettingsView.swift */; };
-		DFST000112F30A0000000011 /* DefaultSortView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000102F30A0000000010 /* DefaultSortView.swift */; };
 		DFST000132F30A0000000013 /* DefaultFilterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000122F30A0000000012 /* DefaultFilterView.swift */; };
 		DFST000152F30A0000000015 /* ServerStatisticsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFST000142F30A0000000014 /* ServerStatisticsView.swift */; };
 		DFUI000012F3AUDIT001 /* DesignTokens.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFUI000022F3AUDIT002 /* DesignTokens.swift */; };
@@ -192,7 +186,6 @@
 		372E2D9C2F645A0100603361 /* SubtitleController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleController.swift; sourceTree = "<group>"; };
 		372E2DA22F646B0100603361 /* SceneTranscriptionSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneTranscriptionSupport.swift; sourceTree = "<group>"; };
 		372E2DA42F646B0100603361 /* SceneLiveTranscriptionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneLiveTranscriptionController.swift; sourceTree = "<group>"; };
-		372E2DA62F646B0100603361 /* SceneTeleprompterPanel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneTeleprompterPanel.swift; sourceTree = "<group>"; };
 		372E2DA82F646B0100603361 /* SceneTranscodeAudioPrefetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneTranscodeAudioPrefetcher.swift; sourceTree = "<group>"; };
 		372E2DAA2F646B0100603361 /* SceneCaptionTranslator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCaptionTranslator.swift; sourceTree = "<group>"; };
 		372E2DAC2F64A01000603361 /* SceneAudioTrackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneAudioTrackController.swift; sourceTree = "<group>"; };
@@ -211,7 +204,6 @@
 		A1IMGDS022345678901234AB /* StashImageDateSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashImageDateSort.swift; sourceTree = "<group>"; };
 		A1PLUS022F30B00000000002 /* StashyPlusManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyPlusManager.swift; sourceTree = "<group>"; };
 		A1PLUS032F30B00000000003 /* Configuration.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Configuration.storekit; sourceTree = "<group>"; };
-		A1SP1C0112345678901234AB /* StashyPicView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyPicView.swift; sourceTree = "<group>"; };
 		AA0000022E8A9C0000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		CA7A10D02F500000 /* ListCatalogFilterSortModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListCatalogFilterSortModels.swift; sourceTree = "<group>"; };
 		CA7A10D32F500002 /* ListCatalogFilterSortSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListCatalogFilterSortSheets.swift; sourceTree = "<group>"; };
@@ -234,7 +226,6 @@
 		DF675E5E2F2A46A1004CA019 /* HomeSceneCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeSceneCardView.swift; sourceTree = "<group>"; };
 		DF675E5F2F2A46A1004CA019 /* HomeStatisticsRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeStatisticsRowView.swift; sourceTree = "<group>"; };
 		DFC1A2B32F3A46A1004CA019 /* HomeChannelsRowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeChannelsRowView.swift; sourceTree = "<group>"; };
-		DF675E662F2A6386004CA019 /* FilterRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterRepository.swift; sourceTree = "<group>"; };
 		DF675E672F2A6386004CA019 /* GalleryRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleryRepository.swift; sourceTree = "<group>"; };
 		DF675E682F2A6386004CA019 /* PerformerRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PerformerRepository.swift; sourceTree = "<group>"; };
 		DF675E692F2A6386004CA019 /* SceneRepository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneRepository.swift; sourceTree = "<group>"; };
@@ -271,7 +262,6 @@
 		DFST0000A2F30A000000000A /* ContentSettingsSection.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentSettingsSection.swift; sourceTree = "<group>"; };
 		DFST0000C2F30A000000000C /* DashboardSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardSettingsView.swift; sourceTree = "<group>"; };
 		DFST0000E2F30A000000000E /* ReelsModeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReelsModeSettingsView.swift; sourceTree = "<group>"; };
-		DFST000102F30A0000000010 /* DefaultSortView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultSortView.swift; sourceTree = "<group>"; };
 		DFST000122F30A0000000012 /* DefaultFilterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DefaultFilterView.swift; sourceTree = "<group>"; };
 		DFST000142F30A0000000014 /* ServerStatisticsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerStatisticsView.swift; sourceTree = "<group>"; };
 		DFUI000022F3AUDIT002 /* DesignTokens.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DesignTokens.swift; sourceTree = "<group>"; };
@@ -355,7 +345,6 @@
 				DF22BB352F1832AD007C2090 /* NavigationCoordinator.swift */,
 				DF4A022B2F1E8B6800E5EAFB /* ImagesView.swift */,
 				LIMG000022345678901234AB /* LinkedImagesCatalogGrid.swift */,
-				A1SP1C0112345678901234AB /* StashyPicView.swift */,
 				A1IMGDS022345678901234AB /* StashImageDateSort.swift */,
 				DFE5045D2E8A8C2000323FF2 /* PerformerDetailView.swift */,
 				DF22BB392F1832E8007C2090 /* PerformersView.swift */,
@@ -389,7 +378,6 @@
 			children = (
 				372E2DA22F646B0100603361 /* SceneTranscriptionSupport.swift */,
 				372E2DA42F646B0100603361 /* SceneLiveTranscriptionController.swift */,
-				372E2DA62F646B0100603361 /* SceneTeleprompterPanel.swift */,
 				372E2DA82F646B0100603361 /* SceneTranscodeAudioPrefetcher.swift */,
 				372E2DAA2F646B0100603361 /* SceneCaptionTranslator.swift */,
 			);
@@ -426,7 +414,6 @@
 		DF675E6C2F2A6386004CA019 /* Repositories */ = {
 			isa = PBXGroup;
 			children = (
-				DF675E662F2A6386004CA019 /* FilterRepository.swift */,
 				DF675E672F2A6386004CA019 /* GalleryRepository.swift */,
 				DF675E682F2A6386004CA019 /* PerformerRepository.swift */,
 				DF675E692F2A6386004CA019 /* SceneRepository.swift */,
@@ -475,7 +462,6 @@
 				DFST0000A2F30A000000000A /* ContentSettingsSection.swift */,
 				DFST0000C2F30A000000000C /* DashboardSettingsView.swift */,
 				DFST000122F30A0000000012 /* DefaultFilterView.swift */,
-				DFST000102F30A0000000010 /* DefaultSortView.swift */,
 				DFST000082F30A0000000008 /* PlaybackSettingsSection.swift */,
 				DFST0000E2F30A000000000E /* ReelsModeSettingsView.swift */,
 				DFST000062F30A0000000006 /* ServerDetailView.swift */,
@@ -632,7 +618,6 @@
 				DFST0000B2F30A000000000B /* ContentSettingsSection.swift in Sources */,
 				DFST0000D2F30A000000000D /* DashboardSettingsView.swift in Sources */,
 				DFST0000F2F30A000000000F /* ReelsModeSettingsView.swift in Sources */,
-				DFST000112F30A0000000011 /* DefaultSortView.swift in Sources */,
 				372E2D992F64272300603361 /* VideoAnalysisManager.swift in Sources */,
 				A1PLUS012F30B00000000001 /* StashyPlusManager.swift in Sources */,
 				A1ICON012F30B00000000001 /* AppIconManager.swift in Sources */,
@@ -641,7 +626,6 @@
 				372E2DB12F64C10000603361 /* OCountHeatmapLoader.swift in Sources */,
 				372E2DA32F646B0100603361 /* SceneTranscriptionSupport.swift in Sources */,
 				372E2DA52F646B0100603361 /* SceneLiveTranscriptionController.swift in Sources */,
-				372E2DA72F646B0100603361 /* SceneTeleprompterPanel.swift in Sources */,
 				372E2DA92F646B0100603361 /* SceneTranscodeAudioPrefetcher.swift in Sources */,
 				372E2DAB2F646B0100603361 /* SceneCaptionTranslator.swift in Sources */,
 				DFST000132F30A0000000013 /* DefaultFilterView.swift in Sources */,
@@ -651,7 +635,6 @@
 				DFE5045F2E8A8C2000323FF0 /* SceneDetailView.swift in Sources */,
 				DF675E6D2F2A6386004CA019 /* GalleryRepository.swift in Sources */,
 				DF675E6E2F2A6386004CA019 /* StudioRepository.swift in Sources */,
-				DF675E6F2F2A6386004CA019 /* FilterRepository.swift in Sources */,
 				DF675E702F2A6386004CA019 /* TagRepository.swift in Sources */,
 				DF675E712F2A6386004CA019 /* SceneRepository.swift in Sources */,
 				DF675E722F2A6386004CA019 /* PerformerRepository.swift in Sources */,
@@ -681,7 +664,6 @@
 				DF90B75E2F1A5ECF003ED852 /* StarRatingView.swift in Sources */,
 				DF22BB1F2F16743C007C2090 /* DownloadsView.swift in Sources */,
 				DF4A022C2F1E8B6900E5EAFB /* ImagesView.swift in Sources */,
-				A1SP1C0012345678901234AB /* StashyPicView.swift in Sources */,
 				A1IMGDS012345678901234AB /* StashImageDateSort.swift in Sources */,
 				DF22BB202F16743C007C2090 /* GalleriesView.swift in Sources */,
 				DF22BB222F16743C007C2090 /* ReelsView.swift in Sources */,
@@ -743,13 +725,11 @@
 				101EE38B25B74B1BBA920AEA /* NavigationCoordinator.swift in Sources */,
 				F4BF2858338E42E6AA292FCC /* PerformersView.swift in Sources */,
 				A519E23C8BE040F79C6EFE18 /* ImagesView.swift in Sources */,
-				A1SP1C0212345678901234AB /* StashyPicView.swift in Sources */,
 				A1IMGDS032345678901234AB /* StashImageDateSort.swift in Sources */,
 				BB58741767674753BACDD0BA /* HomeRowView.swift in Sources */,
 				42AECC4BE2264997B0333A90 /* HomeSceneCardView.swift in Sources */,
 				BFFDBA13C2414AB6B3120A34 /* HomeStatisticsRowView.swift in Sources */,
 				BFC1A2B5C2414AB6B3120A34 /* HomeChannelsRowView.swift in Sources */,
-				757D103CB6294F49B8301A7B /* FilterRepository.swift in Sources */,
 				F21C93AC1160498EB0A17AF4 /* GalleryRepository.swift in Sources */,
 				F6BC02EF04794FCAA2460E89 /* PerformerRepository.swift in Sources */,
 				85D2DEBA701341D2A43E2EAA /* SceneRepository.swift in Sources */,

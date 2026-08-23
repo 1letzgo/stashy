@@ -161,7 +161,7 @@ class StashSyncManager: ObservableObject {
 
     /// Simple on/off used by Feeds settings (and `toggle()`).
     func setSyncing(_ enabled: Bool) {
-        print("⚡ StashSyncManager.setSyncing(\(enabled)) handy.enabled:\(HandyManager.shared.isEnabled) handy.connected:\(HandyManager.shared.isConnected)")
+        AppLog.debug("⚡ StashSyncManager.setSyncing(\(enabled)) handy.enabled:\(HandyManager.shared.isEnabled) handy.connected:\(HandyManager.shared.isConnected)")
 
         if enabled, !StashyPlusManager.isUnlockedNow {
             DispatchQueue.main.async {

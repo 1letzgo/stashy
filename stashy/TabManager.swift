@@ -482,7 +482,7 @@ class TabManager: ObservableObject {
     }
     
     @objc private func handleServerChange() {
-        print("🔄 TabManager: Server changed, reloading configurations")
+        AppLog.debug("🔄 TabManager: Server changed, reloading configurations")
         loadAllConfigs()
     }
 
@@ -636,7 +636,7 @@ class TabManager: ObservableObject {
                     }
                     if let modifiedData = try? JSONEncoder().encode(decoded) {
                         data = modifiedData
-                        print("💾 TabManager: Migrated legacy config (filters cleared) for server \(suffix)")
+                        AppLog.debug("💾 TabManager: Migrated legacy config (filters cleared) for server \(suffix)")
                         // Save it immediately for the new server suffix
                         UserDefaults.standard.set(modifiedData, forKey: serverSpecificKey)
                     }

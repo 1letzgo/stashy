@@ -18,9 +18,6 @@ protocol PerformerRepositoryProtocol {
         searchQuery: String,
         filter: StashDBViewModel.SavedFilter?
     ) async throws -> (performers: [Performer], total: Int)
-    
-    /// Fetches a single performer by ID
-    func fetchPerformerDetails(performerId: String) async throws -> Performer?
 }
 
 // MARK: - Performer Repository Implementation
@@ -73,15 +70,5 @@ class PerformerRepository: PerformerRepositoryProtocol {
         let performers = response.data?.findPerformers.performers ?? []
         let total = response.data?.findPerformers.count ?? 0
         return (performers, total)
-    }
-    
-    // MARK: - Fetch Performer Details
-    
-    func fetchPerformerDetails(performerId: String) async throws -> Performer? {
-        let query = GraphQLQueries.queryWithFragments("findPerformer")
-        let variables: [String: Any] = ["id": performerId]
-        
-        let response: SinglePerformerResponse = try await graphQLClient.execute(query: query, variables: variables)
-        return response.data?.findPerformer
     }
 }

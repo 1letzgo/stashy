@@ -59,7 +59,7 @@ struct CatalogsView: View {
     }
     
     private var sortedVisibleTabs: [CatalogsTab] {
-        tabManager.tabs
+        var tabs = tabManager.tabs
             .filter { ($0.id == .dashboard || $0.id == .performers || $0.id == .studios || $0.id == .tags || $0.id == .scenes || $0.id == .galleries || $0.id == .images || $0.id == .groups || $0.id == .markers) && $0.isVisible }
             .sorted { $0.sortOrder < $1.sortOrder }
             .compactMap { (config: TabConfig) -> CatalogsTab? in
@@ -76,6 +76,11 @@ struct CatalogsView: View {
                 default: return nil
                 }
             }
+        // Search → Show All / stats deep links can target a hidden catalog tab.
+        if let current = CatalogsTab(rawValue: coordinator.catalogueSubTab), !tabs.contains(current) {
+            tabs.append(current)
+        }
+        return tabs
     }
     
     private var selectedTabBinding: Binding<CatalogsTab> {
@@ -100,33 +105,41 @@ struct CatalogsView: View {
         // Otherwise fallback to the first visible one (respecting sortOrder)
         return visible.first
     }
+
+    @ViewBuilder
+    private func catalogRoot(for tab: CatalogsTab) -> some View {
+        switch tab {
+        case .dashboard:
+            HomeView(catalogBrowserViewModel: catalogBrowserViewModel)
+        case .scenes:
+            ScenesView.catalogTab(viewModel: catalogBrowserViewModel)
+        case .images:
+            ImagesView(
+                catalogBrowserViewModel: catalogBrowserViewModel,
+                sharedImageListFilters: catalogImagesFilters,
+                initialSearch: coordinator.activeSearchText
+            )
+        case .galleries:
+            GalleriesView(catalogBrowserViewModel: catalogBrowserViewModel)
+        case .performers:
+            PerformersView(catalogBrowserViewModel: catalogBrowserViewModel)
+        case .studios:
+            StudiosView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
+        case .tags:
+            TagsView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
+        case .groups:
+            GroupsView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
+        case .markers:
+            MarkersView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
+        }
+    }
     
     var body: some View {
         Group {
             if let tab = effectiveTab {
-                switch tab {
-                case .dashboard:
-                    HomeView(catalogBrowserViewModel: catalogBrowserViewModel)
-                case .scenes:
-                    ScenesView.catalogTab(viewModel: catalogBrowserViewModel)
-                case .images:
-                    ImagesView(
-                        catalogBrowserViewModel: catalogBrowserViewModel,
-                        sharedImageListFilters: catalogImagesFilters
-                    )
-                case .galleries:
-                    GalleriesView(catalogBrowserViewModel: catalogBrowserViewModel)
-                case .performers:
-                    PerformersView(catalogBrowserViewModel: catalogBrowserViewModel)
-                case .studios:
-                    StudiosView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
-                case .tags:
-                    TagsView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
-                case .groups:
-                    GroupsView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
-                case .markers:
-                    MarkersView(hideTitle: false, catalogBrowserViewModel: catalogBrowserViewModel)
-                }
+                catalogRoot(for: tab)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .transition(.identity)
             } else {
                 VStack {
                     Spacer()
@@ -137,11 +150,15 @@ struct CatalogsView: View {
                         .foregroundColor(.secondary)
                     Spacer()
                 }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .transition(.identity)
             }
         }
+        .transaction(value: coordinator.catalogueSubTab) { $0.animation = nil }
+        .animation(nil, value: coordinator.catalogueSubTab)
         .navigationBarHidden(true)
         // Swipe-back can desync UIKit/SwiftUI stacks; menu switches must always clear details.
-        .popNavigationToRootOnChange(coordinator.catalogueSubTab)
+        .popNavigationToRootOnChange("\(coordinator.catalogueSubTab)|\(coordinator.cataloguePopToken.uuidString)")
         .stashyCustomChromeInset(spacing: 0) {
             if showTabSwitcher {
                 StashySectionChromeBar {

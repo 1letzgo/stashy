@@ -146,7 +146,7 @@ struct ServerDetailView: View {
     private func connectServer() {
         configManager.saveConfig(server)
         viewModel.resetData()
-        viewModel.testConnection()
+        viewModel.testConnection(force: true)
         viewModel.fetchStatistics()
         coordinator.resetAllStacks()
     }

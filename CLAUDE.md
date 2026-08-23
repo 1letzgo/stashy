@@ -19,13 +19,7 @@ xcodebuild -project stashy.xcodeproj -scheme stashyTV -destination 'generic/plat
 ```
 
 ### Running Tests
-```bash
-# Run all tests
-xcodebuild test -project stashy.xcodeproj -scheme stashy -destination 'platform=iOS Simulator,name=iPhone 15'
-
-# Run specific test class
-xcodebuild test -project stashy.xcodeproj -scheme stashy -destination 'platform=iOS Simulator,name=iPhone 15' -only-testing:stashyTests/SpecificTestClass
-```
+No unit test target is currently wired into the Xcode project (`stashyTests/` exists on disk with Swift Testing files, ready to attach to a future test target). Verification is done via the two build commands above plus manual testing.
 
 ## Architecture Overview
 
@@ -36,8 +30,9 @@ xcodebuild test -project stashy.xcodeproj -scheme stashy -destination 'platform=
 - `ServerConfigManager.shared` - Multi-server config storage, active server selection
 - `TabManager.shared` - Tab visibility, ordering, dashboard rows, and reels mode configuration
 - `KeychainManager.shared` - Secure API key storage (iOS only, not tvOS)
-- `GraphQLClient.shared` - Centralized network client with SSL handling for local servers
+- `GraphQLClient.shared` - Actor-based GraphQL client (async/await + completion APIs)
 - `ImageCacheManager.shared` - Dual-tier image cache (memory + disk, server-scoped)
+- Additional singletons live in `stashy/Managers/` (`SecurityManager`, `SessionTimelineLoader`, `OCountHeatmapLoader`, `StashyPlusManager`, `AppIconManager`, `LoginAuthHelper`) and nested in `StashDBViewModel.swift` (`DownloadManager`, `HandyManager`, `ButtplugManager`, `LoveSpouseManager`, `SceneStreamsRAMCache`, `StoreManager` in SettingsView)
 
 **Navigation**: `NavigationCoordinator` is passed as an `@EnvironmentObject` throughout the app. It manages:
 - Tab selection and deep linking
@@ -69,9 +64,13 @@ xcodebuild test -project stashy.xcodeproj -scheme stashy -destination 'platform=
 
 1. **Network Layer**: `GraphQLClient` handles all GraphQL requests
    - Actor-based design for thread safety
-   - Custom `URLSessionDelegate` for self-signed SSL certificates on local networks
-   - Automatic retry logic for "database is locked" errors (common with SQLite-backed Stash)
-   - Supports async/await, Combine, and completion handler APIs
+   - Shared `StashTrustDelegate` (GraphQLClient.swift) accepts self-signed certs for localhost/private IP ranges + `gole.tz`; used by GraphQLClient, ImageCacheManager and `StashNetworking.session`
+   - Automatic retry via `withDatabaseRetry` for "database is locked" errors (execute, executeRaw, performMutation)
+   - Typed GraphQL envelope validation (errors with null data are fatal; partial errors tolerated)
+   - Supports async/await + completion handler APIs
+   - Direct requests outside GraphQLClient use `stashRequest(to:config:)` + `StashNetworking.session`
+2. **Logging**: `AppLog.debug`/`AppLog.error` (SharedUtilities.swift) gate all output behind DEBUG; `AppLog.redacted` masks secrets in logs. Never use raw `print()` or log API keys.
+2b. **Reels feeds**: initial fetches are single-flight (`*InitialInflightKey` in StashDBViewModel); feed paging has safety valves (failure streaks, no-progress detection, preview chase cap, restore budget in ReelsView); stream resolution is prefetched after page 1 lands and never cached when empty.
 
 2. **Image Loading**: `ImageCacheManager` provides dual-tier caching:
    - Memory cache: 300 MB, 300 items max
@@ -80,11 +79,10 @@ xcodebuild test -project stashy.xcodeproj -scheme stashy -destination 'platform=
    - `CustomAsyncImage` view component for easy image loading with fallbacks
    - Auto-cleanup runs every 4 hours
 
-3. **GraphQL Queries**: Stored as `.graphql` files in `graphql/` directory
-   - Loaded at runtime via `GraphQLQueries.loadQuery(named:)`
-   - Thread-safe in-memory caching after first load (concurrent DispatchQueue)
+3. **GraphQL Queries**: Two coexisting sources
+   - `.graphql` files in `graphql/` directory, loaded at runtime via `GraphQLQueries.loadQuery(named:)` / `queryWithFragments(...)` (thread-safe caching)
+   - Inline mutation/query constants defined in `GraphQLQueries.swift` (`static let`) for the ~38 extracted StashDBViewModel mutations
    - Contains fragment files (`fragment_*.graphql`) for reusable field sets
-   - `queryWithFragments` method for composing queries with fragments
 
 4. **Server Configuration**:
    - Multi-server support via `ServerConfig` (Codable, persisted in UserDefaults)
@@ -145,11 +143,7 @@ xcodebuild test -project stashy.xcodeproj -scheme stashy -destination 'platform=
 ## Important Patterns
 
 ### Adding/Removing Files
-When modifying Xcode project structure, update `project.pbxproj` in 4 sections:
-1. `PBXBuildFile` - Build file references
-2. `PBXFileReference` - File system references
-3. `PBXGroup` - Logical file tree
-4. `PBXSourcesBuildPhase` - Compile sources for target(s)
+The `stashy` target uses classic Xcode groups: when adding/removing files, update `project.pbxproj` in 4 sections (`PBXBuildFile`, `PBXFileReference`, `PBXGroup`, `PBXSourcesBuildPhase`). The `stashyTV` target uses a filesystem-synchronized group (auto-pickup). Resources in `graphql/` are a folder reference (contents picked up automatically).
 
 ### Server Config Changes
 When ServerConfigManager saves a new active config:
@@ -206,8 +200,4 @@ Both `GraphQLClient` and `ImageCacheManager` include custom URLSession delegates
 
 ## Testing
 
-Test targets:
-- `stashyTests` - Unit tests
-- `stashyUITests` - UI automation tests
-
-No extensive test coverage currently exists; most testing is manual.
+No test target is currently attached to the Xcode project. `stashyTests/` contains Swift Testing files (`InfrastructureTests.swift`: StashTrustDelegate, GraphQL retry, PaginatedLoader generation logic, AppLog redaction) ready to be wired into a future test target. Most verification is manual.

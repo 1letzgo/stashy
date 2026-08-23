@@ -746,7 +746,7 @@ struct OCountImageDestination: View {
             images[idx] = full
             isReady = true
         } catch {
-            print("❌ O-Count image hydrate: \(error)")
+            AppLog.error("❌ O-Count image hydrate: \(error)")
             isReady = true
         }
     }

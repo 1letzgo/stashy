@@ -483,7 +483,7 @@ struct ServerSetupWizardView: View {
 
 #Preview {
     ServerSetupWizardView { config in
-        print("Config saved: \(config)")
+        AppLog.debug("Config saved: \(config)")
     }
 }
 #endif

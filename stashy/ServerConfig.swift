@@ -97,11 +97,11 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         if let sub = subpath, !sub.isEmpty {
             let cleanSub = sub.hasPrefix("/") ? sub : "/\(sub)"
             let finalURL = url + cleanSub
-            print("🌐 SERVER CONFIG: Using URL with subpath: \(finalURL)")
+            AppLog.debug("🌐 SERVER CONFIG: Using URL with subpath: \(finalURL)")
             return finalURL
         }
         
-        print("🌐 SERVER CONFIG: Using URL: \(url)")
+        AppLog.debug("🌐 SERVER CONFIG: Using URL: \(url)")
         return url
     }
 
@@ -179,7 +179,7 @@ struct ServerConfig: Codable, Identifiable, Equatable {
                 self.serverProtocol = useHTTPS ? .https : .http
             }
             
-            print("📦 Migrated legacy server config: \(name)")
+            AppLog.debug("📦 Migrated legacy server config: \(name)")
         }
     }
     
@@ -281,7 +281,7 @@ class ServerConfigManager: ObservableObject {
         if let encoded = try? encoder.encode(config) {
             UserDefaults.standard.set(encoded, forKey: activeConfigKey)
             self.activeConfig = config
-            print("✅ Active server updated: \(config.name)")
+            AppLog.debug("✅ Active server updated: \(config.name)")
             
             let coreSettingsChanged = oldConfig == nil ||
                 oldConfig?.baseURL != config.baseURL ||
@@ -341,7 +341,7 @@ class ServerConfigManager: ObservableObject {
         }
         if changed {
             saveServersList(servers)
-            print("🧹 Scrubbed plaintext API keys from UserDefaults")
+            AppLog.debug("🧹 Scrubbed plaintext API keys from UserDefaults")
         }
         #endif
     }
@@ -430,7 +430,7 @@ class ServerConfigManager: ObservableObject {
     private func clearActiveConfig() {
         UserDefaults.standard.removeObject(forKey: activeConfigKey)
         self.activeConfig = nil
-        print("⚠️ Active server deleted, config cleared.")
+        AppLog.error("⚠️ Active server deleted, config cleared.")
         
         // Notify app to reset UI state
         NotificationCenter.default.post(name: NSNotification.Name("ServerConfigChanged"), object: nil)

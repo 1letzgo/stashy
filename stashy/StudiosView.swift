@@ -730,7 +730,7 @@ struct StudioImageView: View {
 
             guard let httpResponse = response as? HTTPURLResponse,
                   httpResponse.statusCode == 200 else {
-                print("❌ Studio Image HTTP Error: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
+                AppLog.error("❌ Studio Image HTTP Error: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
                 imageLoadState = .failure
                 return
             }
@@ -758,11 +758,11 @@ struct StudioImageView: View {
             }
 
             // Fail
-            print("❌ Failed to decode studio image for \(studio.name)")
+            AppLog.error("❌ Failed to decode studio image for \(studio.name)")
             imageLoadState = .failure
             
         } catch {
-            print("❌ Error loading studio image: \(error.localizedDescription)")
+            AppLog.error("❌ Error loading studio image: \(error.localizedDescription)")
             imageLoadState = .failure
         }
     }

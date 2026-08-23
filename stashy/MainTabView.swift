@@ -84,6 +84,7 @@ struct MainTabView: View {
                 }
             }
             .id(coordinator.serverSwitchID)
+            .animation(nil, value: coordinator.selectedTab)
             .tint(appearanceManager.tintColor)
             .withToasts()
             .onAppear {
@@ -168,7 +169,7 @@ struct MainTabView: View {
                 showConfigWarning = true
             }
         } else if ServerConfigManager.shared.savedServers.isEmpty {
-            print("❌ NO SERVER CONFIGURATION FOUND - SHOWING WIZARD")
+            AppLog.error("❌ NO SERVER CONFIGURATION FOUND - SHOWING WIZARD")
             hasValidConfig = false
             showOnboarding = true
         } else {

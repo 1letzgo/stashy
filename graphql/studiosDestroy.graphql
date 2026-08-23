@@ -1,3 +1,0 @@
-mutation studiosDestroy($ids: [ID!]!) {
-  studiosDestroy(ids: $ids)
-}

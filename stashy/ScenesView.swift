@@ -1380,7 +1380,7 @@ private struct ScenesViewContent: View {
                         guard !didRunEmptyListSavedFilterFallback else { return }
                         didRunEmptyListSavedFilterFallback = true
                     }
-                    print("🔄 Fallback: Filters loaded (empty), triggering initial scene fetch")
+                    AppLog.debug("🔄 Fallback: Filters loaded (empty), triggering initial scene fetch")
                     performSearch()
                 }
             }

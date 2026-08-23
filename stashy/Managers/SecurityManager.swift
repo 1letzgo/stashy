@@ -31,6 +31,7 @@ class SecurityManager: ObservableObject {
     private var lockoutTimer: Timer?
     
     private init() {
+        Self.clearOrphanedPasscodeAfterReinstallIfNeeded()
         self.isBiometricsEnabled = UserDefaults.standard.bool(forKey: kBiometricsEnabled)
         self.autoLockOnBackground = UserDefaults.standard.bool(forKey: kAutoLockOnBackground)
         // Triggers legacy plaintext → hash migration if needed.
@@ -44,6 +45,22 @@ class SecurityManager: ObservableObject {
         }
     }
     
+    /// UserDefaults die with the app; the Keychain PIN does not. After delete+reinstall
+    /// the lock screen came back without Face ID (`kBiometricsEnabled` was gone) and
+    /// no way to recover a forgotten 4-digit code. Treat "no app data + leftover PIN"
+    /// as a fresh install and drop the orphaned hash.
+    private static func clearOrphanedPasscodeAfterReinstallIfNeeded() {
+        let defaults = UserDefaults.standard
+        let hasAppData =
+            defaults.object(forKey: "stashy_server_config") != nil
+            || defaults.object(forKey: "stashy_saved_servers") != nil
+            || defaults.object(forKey: "kBiometricsEnabled") != nil
+            || defaults.object(forKey: "kAutoLockOnBackground") != nil
+        guard !hasAppData, KeychainManager.shared.hasAppPasscode() else { return }
+        KeychainManager.shared.deleteAppPasscode()
+        AppLog.debug("🔓 Cleared Keychain passcode left over after reinstall")
+    }
+
     func checkPasscodeStatus() {
         self.isPasscodeSet = KeychainManager.shared.hasAppPasscode()
     }

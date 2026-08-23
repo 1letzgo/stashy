@@ -1,3 +1,0 @@
-mutation tagsDestroy($ids: [ID!]!) {
-  tagsDestroy(ids: $ids)
-}

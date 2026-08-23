@@ -23,19 +23,23 @@ struct ImagesView: View {
     /// (e.g. after FullScreenImageView / heavy video memory pressure).
     private let sharedImageListFilters: DetailLinkedImagesFilterModel?
     @StateObject private var ownedImageListFilters: DetailLinkedImagesFilterModel
+    /// Search → Show All: seed the chip before first layout so the search drawer does not animate in.
+    let initialSearch: String
 
     init(
         gallery: Gallery? = nil,
         catalogBrowserViewModel: StashDBViewModel? = nil,
         forceOneColumnFeed: Bool = false,
         feedsEmbedded: Bool = false,
-        sharedImageListFilters: DetailLinkedImagesFilterModel? = nil
+        sharedImageListFilters: DetailLinkedImagesFilterModel? = nil,
+        initialSearch: String = ""
     ) {
         self.initialGallery = gallery
         self.catalogBrowserViewModel = catalogBrowserViewModel
         self.forceOneColumnFeed = forceOneColumnFeed
         self.feedsEmbedded = feedsEmbedded
         self.sharedImageListFilters = sharedImageListFilters
+        self.initialSearch = initialSearch
         let scope: DetailLinkedImagesScope = gallery.map { .gallery($0.id) } ?? .catalogRoot
         _ownedImageListFilters = StateObject(wrappedValue: DetailLinkedImagesFilterModel(scope: scope))
     }
@@ -46,7 +50,8 @@ struct ImagesView: View {
             forceOneColumnFeed: forceOneColumnFeed,
             feedsEmbedded: feedsEmbedded,
             viewModel: initialGallery != nil ? ownedViewModel : (catalogBrowserViewModel ?? ownedViewModel),
-            imageListFilters: sharedImageListFilters ?? ownedImageListFilters
+            imageListFilters: sharedImageListFilters ?? ownedImageListFilters,
+            initialSearch: initialSearch
         )
     }
 }
@@ -64,6 +69,7 @@ private struct ImagesViewBody: View {
     @ObservedObject private var tabManager = TabManager.shared
 
     @State private var lastOpenedImageId: String?
+    @State private var searchText: String
     @State private var sessionKeyCache: [String: String] = [:]
     @State private var showingEditGallerySheet = false
     @State private var isHeaderExpanded = false
@@ -91,13 +97,19 @@ private struct ImagesViewBody: View {
         forceOneColumnFeed: Bool,
         feedsEmbedded: Bool = false,
         viewModel: StashDBViewModel,
-        imageListFilters: DetailLinkedImagesFilterModel
+        imageListFilters: DetailLinkedImagesFilterModel,
+        initialSearch: String = ""
     ) {
         _gallery = State(initialValue: initialGallery)
         self.forceOneColumnFeed = forceOneColumnFeed
         self.feedsEmbedded = feedsEmbedded
         self.viewModel = viewModel
         self.imageListFilters = imageListFilters
+        let seeded = initialSearch.trimmingCharacters(in: .whitespacesAndNewlines)
+        _searchText = State(initialValue: seeded)
+        if !seeded.isEmpty {
+            viewModel.currentImageSearchQuery = seeded
+        }
     }
 
     /// Same grouping prefs as Feeds → Pics.
@@ -173,6 +185,28 @@ private struct ImagesViewBody: View {
 
     private var catalogFilterSortFABActive: Bool {
         imageListFilters.catalogFilterSortFABActive
+    }
+
+    /// Search → Show All: apply `q` even after catalog bootstrap / Settings defaults.
+    @discardableResult
+    private func consumeCoordinatorImageSearchIfNeeded() -> Bool {
+        guard gallery == nil, !feedsEmbedded else { return false }
+        let incoming = coordinator.activeSearchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !incoming.isEmpty else { return false }
+
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            if searchText != incoming {
+                searchText = incoming
+            }
+            viewModel.currentImageSearchQuery = incoming
+            coordinator.activeSearchText = ""
+            coordinator.noDefaultFilter = false
+            imageListFilters.hasCompletedInitialBootstrap = true
+            imageListFilters.refetchImages(viewModel: viewModel, initial: true)
+        }
+        return true
     }
 
     /// Applies Settings → Default Filters for Images. Returns `true` if selection changed.
@@ -342,7 +376,16 @@ private struct ImagesViewBody: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .modifier(OpenedGalleryNavigationChrome(isOpenedGallery: isOpenedGallery, feedsEmbedded: feedsEmbedded))
+        .modifier(OpenedGalleryNavigationChrome(
+            isOpenedGallery: isOpenedGallery,
+            feedsEmbedded: feedsEmbedded,
+            searchText: $searchText,
+            onClearSearch: {
+                searchText = ""
+                viewModel.currentImageSearchQuery = ""
+                imageListFilters.refetchImages(viewModel: viewModel, initial: true)
+            }
+        ))
         .applyAppBackground()
         .overlay(alignment: .bottom) {
             if isSelectionMode {
@@ -383,6 +426,14 @@ private struct ImagesViewBody: View {
                 return
             }
 
+            // Search → Show All must win over bootstrap / Settings default filter.
+            if consumeCoordinatorImageSearchIfNeeded() {
+                if viewModel.savedFilters.isEmpty {
+                    viewModel.fetchSavedFilters()
+                }
+                return
+            }
+
             // Catalog: after the first bootstrap, returning from FullScreenImageView (or a view remount)
             // must keep filter/sort/session — do not re-apply Settings defaults.
             if gallery == nil, imageListFilters.hasCompletedInitialBootstrap {
@@ -412,10 +463,7 @@ private struct ImagesViewBody: View {
                  }
             }
 
-            if gallery == nil, !coordinator.activeSearchText.isEmpty {
-                viewModel.currentImageSearchQuery = coordinator.activeSearchText
-                coordinator.activeSearchText = ""
-                imageListFilters.refetchImages(viewModel: viewModel, initial: true)
+            if consumeCoordinatorImageSearchIfNeeded() {
                 imageListFilters.hasCompletedInitialBootstrap = true
             } else if gallery != nil, viewModel.galleryImages.isEmpty {
                 imageListFilters.refetchImages(viewModel: viewModel, initial: true)
@@ -463,11 +511,28 @@ private struct ImagesViewBody: View {
             imageListFilters.sessionLastOpenedImageId = nil
             imageListFilters.refetchImages(viewModel: viewModel, initial: true)
         }
+        .onChange(of: coordinator.activeSearchText) { _, _ in
+            _ = consumeCoordinatorImageSearchIfNeeded()
+        }
+        .onChange(of: searchText) { _, newValue in
+            guard gallery == nil, !feedsEmbedded else { return }
+            guard viewModel.currentImageSearchQuery != newValue else { return }
+            viewModel.currentImageSearchQuery = newValue
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                guard newValue == searchText else { return }
+                imageListFilters.refetchImages(viewModel: viewModel, initial: true)
+            }
+        }
         .onChange(of: viewModel.savedFilters) { _, _ in
             guard gallery == nil else { return }
+            if consumeCoordinatorImageSearchIfNeeded() { return }
             // After bootstrap, a later `fetchSavedFilters` (e.g. onAppear while returning from
             // fullscreen) must not replace the user's active filter with Settings defaults.
             // `suppressSettingsDefaultFilter` blocks Settings default during Feeds deep-links.
+            if !searchText.isEmpty || coordinator.noDefaultFilter {
+                coordinator.noDefaultFilter = false
+                return
+            }
             if imageListFilters.hasCompletedInitialBootstrap,
                imageListFilters.selectedFilter != nil
                 || !imageListFilters.catalogPresetRowSelection.isEmpty
@@ -489,6 +554,11 @@ private struct ImagesViewBody: View {
         .onChange(of: viewModel.isLoadingSavedFilters) { oldValue, isLoading in
             if oldValue == true && isLoading == false, gallery == nil,
                !viewModel.isLoadingImages {
+                if consumeCoordinatorImageSearchIfNeeded() { return }
+                if !searchText.isEmpty || coordinator.noDefaultFilter {
+                    coordinator.noDefaultFilter = false
+                    return
+                }
                 if imageListFilters.hasCompletedInitialBootstrap,
                    imageListFilters.selectedFilter != nil
                     || !imageListFilters.catalogPresetRowSelection.isEmpty
@@ -1705,6 +1775,8 @@ private struct ImageThumbnailCardChrome: ViewModifier {
 private struct OpenedGalleryNavigationChrome: ViewModifier {
     let isOpenedGallery: Bool
     var feedsEmbedded: Bool = false
+    @Binding var searchText: String
+    var onClearSearch: () -> Void
 
     @ViewBuilder
     func body(content: Content) -> some View {
@@ -1722,6 +1794,29 @@ private struct OpenedGalleryNavigationChrome: ViewModifier {
             content
                 .navigationTitle("Images")
                 .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    if !searchText.isEmpty {
+                        ToolbarItem(placement: .principal) {
+                            Button {
+                                searchText = ""
+                                onClearSearch()
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "xmark")
+                                        .font(.system(size: 10, weight: .bold))
+                                    Text(searchText)
+                                        .font(.system(size: 12, weight: .bold))
+                                        .lineLimit(1)
+                                }
+                                .foregroundColor(.white.opacity(0.9))
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 8)
+                                .background(Color.black.opacity(DesignTokens.Opacity.badge))
+                                .clipShape(Capsule())
+                            }
+                        }
+                    }
+                }
         }
     }
 }

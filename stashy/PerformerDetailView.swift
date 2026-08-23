@@ -518,7 +518,7 @@ struct PerformerDetailView: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneDeleted"))) { _ in
-            print("🔄 SceneDeleted - Refreshing performer metadata")
+            AppLog.debug("🔄 SceneDeleted - Refreshing performer metadata")
             loadPerformerMetadata()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("PerformerImageUpdated"))) { notification in

@@ -521,7 +521,7 @@ struct SceneDetailView: View {
         guard let item = item else { return }
         let needsForDevice = handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode
         if needsForDevice {
-            print("🎬 SceneDetail: Ensuring Video Analysis for StashSync")
+            AppLog.debug("🎬 SceneDetail: Ensuring Video Analysis for StashSync")
             StashVideoSyncManager.shared.setup(for: item)
             StashVideoSyncManager.shared.isActive = true
         }
@@ -533,7 +533,7 @@ struct SceneDetailView: View {
         
         if player.timeControlStatus == .playing {
             let currentTime = player.currentTime().seconds
-            print("🎬 SceneDetail: Executing initial StashSync play at \(currentTime)s")
+            AppLog.debug("🎬 SceneDetail: Executing initial StashSync play at \(currentTime)s")
             if handyManager.isStashSyncMode { handyManager.play(at: currentTime) }
             if buttplugManager.isStashSyncMode { buttplugManager.play(at: currentTime) }
             if loveSpouseManager.isStashSyncMode { loveSpouseManager.play(at: currentTime) }
@@ -562,7 +562,7 @@ struct SceneDetailView: View {
     }
 
     private func handleOnAppear() {
-        print("🔍 Scene Detail: ID=\(activeScene.id), PlayCount=\(activeScene.playCount ?? -1)")
+        AppLog.debug("🔍 Scene Detail: ID=\(activeScene.id), PlayCount=\(activeScene.playCount ?? -1)")
         isFullscreen = false
         
         // Reset all SYNC states only on very first appear - WE WANT MANUAL ACTIVATION
@@ -753,7 +753,7 @@ struct SceneDetailView: View {
         guard let videoURL = activeScene.videoURL else { return }
 
         if player == nil {
-            print("🎬 Player initializing with URL: \(redactedURLString(videoURL))")
+            AppLog.debug("🎬 Player initializing with URL: \(redactedURLString(videoURL))")
             player = createPlayer(for: videoURL)
             player?.isMuted = isMuted
             addTimeObserverIfNeeded()
@@ -834,13 +834,13 @@ struct SceneDetailView: View {
         isDeleting = true
         viewModel.deleteSceneWithFiles(scene: activeScene) { success in
             if success {
-                print("🎉 Scene and files completely removed!")
+                AppLog.debug("🎉 Scene and files completely removed!")
                 ToastManager.shared.show("Scene deleted", icon: "trash", style: .success)
                 self.dismiss()
             } else {
                 isDeleting = false
                 ToastManager.shared.show("Failed to delete scene", icon: "exclamationmark.triangle", style: .error)
-                print("❌ Failed to delete scene or files")
+                AppLog.error("❌ Failed to delete scene or files")
             }
         }
     }
@@ -964,7 +964,7 @@ struct SceneDetailView: View {
         let newIsStream = newURL.pathExtension.lowercased() == "mp4" || newURL.absoluteString.contains("/stream")
         guard oldIsFallback || newIsStream else { return }
 
-        print("♻️ Upgrading stream from \(currentAsset.url.lastPathComponent) to \(newURL.lastPathComponent)…")
+        AppLog.debug("♻️ Upgrading stream from \(currentAsset.url.lastPathComponent) to \(newURL.lastPathComponent)…")
 
         let currentTime = player?.currentTime() ?? .zero
         let wasPlaying = (player?.rate ?? 0) > 0
@@ -1227,7 +1227,7 @@ struct AddMarkerSheet: View {
                     // Must scope by sceneIDs so Stash creates `generated/markers/<hash>/`.
                     self.viewModel.generateMarkerScreenshots(sceneId: self.sceneId) { genStarted, jobId in
                         guard genStarted else {
-                            print("⚠️ Marker screenshot generate failed to start for scene \(self.sceneId)")
+                            AppLog.error("⚠️ Marker screenshot generate failed to start for scene \(self.sceneId)")
                             return
                         }
                         let finish: (Bool) -> Void = { success in
@@ -1249,7 +1249,7 @@ struct AddMarkerSheet: View {
                         }
                         self.viewModel.waitForJob(id: jobId, timeout: 120) { jobSuccess, message in
                             if !jobSuccess {
-                                print("⚠️ Marker screenshot generate job failed: \(message)")
+                                AppLog.error("⚠️ Marker screenshot generate job failed: \(message)")
                             }
                             finish(jobSuccess)
                         }

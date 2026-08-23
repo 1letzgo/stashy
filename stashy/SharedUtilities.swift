@@ -20,7 +20,63 @@ import UIKit
 #endif
 import StoreKit
 
+// MARK: - Logging
+
+enum AppLog {
+    static func debug(_ message: @autoclosure () -> String) {
+        #if DEBUG
+        print(message())
+        #endif
+    }
+
+    static func error(_ message: @autoclosure () -> String) {
+        #if DEBUG
+        print("❌ " + message())
+        #endif
+    }
+
+    /// Never log full secrets — only a fixed-length, non-reversible marker.
+    static func redacted(_ secret: String?, label: String = "") -> String {
+        guard let secret, !secret.isEmpty else { return "\(label)<empty>" }
+        return "\(label)<red:\(secret.count) chars>"
+    }
+}
+
+/// Sleep that reports task cancellation instead of swallowing it.
+/// Returns `true` when the enclosing task was cancelled and the caller should unwind.
+@discardableResult
+func cancellableSleep(nanoseconds: UInt64) async -> Bool {
+    do {
+        try await Task.sleep(nanoseconds: nanoseconds)
+        return false
+    } catch {
+        return true
+    }
+}
+
 // MARK: - Shared Enums
+
+/// Builds the Stash `birthdate` filter dict for performer age-range chips.
+enum PerformerAgeFilterSupport {
+    static func birthdateFilter(for ageRange: String) -> [String: Any]? {
+        let cal = Calendar.current
+        let now = Date()
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+
+        func iso(yearsAgo: Int) -> String {
+            fmt.string(from: cal.date(byAdding: .year, value: -yearsAgo, to: now) ?? now)
+        }
+
+        switch ageRange {
+        case "18-21": return ["value": iso(yearsAgo: 21), "value2": iso(yearsAgo: 18), "modifier": "BETWEEN"]
+        case "22-26": return ["value": iso(yearsAgo: 26), "value2": iso(yearsAgo: 22), "modifier": "BETWEEN"]
+        case "26-30": return ["value": iso(yearsAgo: 30), "value2": iso(yearsAgo: 26), "modifier": "BETWEEN"]
+        case "30+": return ["value": iso(yearsAgo: 30), "modifier": "LESS_THAN"]
+        default: return nil
+        }
+    }
+}
 
 enum PerformerBadgeType {
     case sceneCount
@@ -220,6 +276,31 @@ func redactedURLString(_ url: URL) -> String {
             : item
     }
     return comps.url?.absoluteString ?? url.absoluteString
+}
+
+// MARK: - Shared Networking
+
+enum StashNetworking {
+    /// Shared session for direct (non-GraphQLClient) requests against the Stash server.
+    /// Uses StashTrustDelegate so self-signed local servers behave identically app-wide.
+    static let session: URLSession = {
+        let config = URLSessionConfiguration.default
+        config.timeoutIntervalForRequest = 30
+        config.timeoutIntervalForResource = 60
+        return URLSession(configuration: config, delegate: StashTrustDelegate(), delegateQueue: nil)
+    }()
+}
+
+/// Builds an authenticated POST/JSON URLRequest against an explicit server config
+/// (use when testing a not-yet-active config).
+func stashRequest(to url: URL, config: ServerConfig?, timeout: TimeInterval = 30) -> URLRequest {
+    var request = URLRequest(url: url)
+    request.timeoutInterval = timeout
+    if let apiKey = config?.secureApiKey?.trimmingCharacters(in: .whitespacesAndNewlines),
+       !apiKey.isEmpty {
+        request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
+    }
+    return request
 }
 
 /// Funscript / media download request using `ApiKey` header instead of query secrets.

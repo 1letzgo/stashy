@@ -11,6 +11,7 @@ import AVFoundation
 import AVKit
 import Foundation
 import CoreBluetooth
+import Synchronization
 
 // MARK: - App Colors
 
@@ -443,9 +444,10 @@ class StashDBViewModel: ObservableObject {
             }
         }
         
-        // Initial connection test if config exists
-        if let config = ServerConfigManager.shared.loadConfig(), config.hasValidConfig {
-             testConnection(with: config)
+        // Initial connection test if config exists (throttled — many VM instances
+        // are created across tabs; the version is stable per session)
+        if ServerConfigManager.shared.loadConfig()?.hasValidConfig == true {
+             testConnection()
         }
     }
     
@@ -478,7 +480,7 @@ class StashDBViewModel: ObservableObject {
         guard !isInitializing else { return }
         isInitializing = true
         
-        print("🚀 Starting staggered server initialization...")
+        AppLog.debug("🚀 Starting staggered server initialization...")
         
         // 1. First, fetch saved filters as they are needed for dashboard row queries
         fetchSavedFilters { [weak self] success in
@@ -494,7 +496,7 @@ class StashDBViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     self.isLoading = false
                     self.isInitializing = false
-                    print("✅ Staggered initialization sequence completed")
+                    AppLog.debug("✅ Staggered initialization sequence completed")
                     NotificationCenter.default.post(name: .stashServerInitializationFinished, object: nil)
                 }
             }
@@ -506,7 +508,7 @@ class StashDBViewModel: ObservableObject {
             await GraphQLClient.shared.cancelAllRequests()
             self.isLoading = true
             self.resetData()
-            print("🔄 StashDBViewModel reset due to server change")
+            AppLog.debug("🔄 StashDBViewModel reset due to server change")
             self.initializeServerConnection()
         }
     }
@@ -582,6 +584,191 @@ class StashDBViewModel: ObservableObject {
     @Published var hasMoreScenes = true
     private var currentScenePage = 1
     private var currentSceneSortOption: SceneSortOption = .dateDesc
+
+    // Feed-paging safety valves. Client-side filtering (previews without a preview path,
+    // markers without streams) and dedup against random-sort pages can otherwise page
+    // through an entire library and hammer the server with unbounded requests.
+    // Caps are deliberately generous: sparse libraries NEED many-page chases to
+    // surface their first playable items.
+    static let maxFeedNoProgressPages = 6
+    static let maxFeedConsecutiveFailures = 3
+    static let maxPreviewsEmptyChasePages = 30
+    private var scenesNoProgressStreak = 0
+    private var markersNoProgressStreak = 0
+    private var previewsNoProgressStreak = 0
+    private var clipsNoProgressStreak = 0
+    private var previewsEmptyChaseCount = 0
+    private var feedFailureStreaks: [String: Int] = [:]
+
+    // Single-flight guard: TabView remounts fire `onAppear` multiple times, each
+    // re-triggering an initial fetch that resets arrays while rows/players mount —
+    // the root of the black-first-cell startup. Identical in-flight initial
+    // requests are deduplicated per feed.
+    private var scenesInitialInflightKey: String?
+    private var markersInitialInflightKey: String?
+    private var previewsInitialInflightKey: String?
+    private var clipsInitialInflightKey: String?
+
+    /// Visible Reels sub-feed. Prefetch / stale completions for other modes are dropped.
+    enum ReelsFeedKind: String {
+        case scenes, markers, clips, previews
+    }
+
+    /// Stable identity of a Reels page-1 query (sort + saved filter + live chips + overlay).
+    struct ReelsFeedSignature: Equatable {
+        let kind: ReelsFeedKind
+        let sortField: String
+        let direction: String
+        let filterId: String?
+        let liveKey: String
+        let performerId: String?
+        let tagIds: String
+        let studioId: String?
+    }
+
+    private var activeReelsFeed: ReelsFeedKind?
+    private var reelsFeedSignatures: [ReelsFeedKind: ReelsFeedSignature] = [:]
+    private var streamPrefetchGeneration = 0
+
+    func makeReelsFeedSignature(
+        kind: ReelsFeedKind,
+        sortField: String,
+        direction: String,
+        filterId: String?,
+        liveFilter: [String: Any]?,
+        performerId: String?,
+        tagIds: [String],
+        studioId: String?
+    ) -> ReelsFeedSignature {
+        ReelsFeedSignature(
+            kind: kind,
+            sortField: sortField,
+            direction: direction,
+            filterId: filterId,
+            liveKey: liveFilterKey(liveFilter),
+            performerId: performerId,
+            tagIds: tagIds.sorted().joined(separator: ","),
+            studioId: studioId
+        )
+    }
+
+    func rememberReelsFeedSignature(_ signature: ReelsFeedSignature) {
+        reelsFeedSignatures[signature.kind] = signature
+    }
+
+    /// True when this mode already has rows that match `signature` — skip a page-1 refetch.
+    func hasWarmReelsFeed(_ kind: ReelsFeedKind, signature: ReelsFeedSignature) -> Bool {
+        guard reelsFeedSignatures[kind] == signature else { return false }
+        switch kind {
+        case .scenes: return !scenes.isEmpty && !isLoadingScenes
+        case .markers: return !sceneMarkers.isEmpty && !isLoadingMarkers
+        case .clips: return !clips.isEmpty && !isLoadingClips
+        case .previews: return !previews.isEmpty && !isLoadingPreviews
+        }
+    }
+
+    /// Drop in-flight work for every Reels feed except `kind` so a mode switch
+    /// does not keep hammering Stash (old find* + stream prefetch).
+    func abandonInactiveReelsFeeds(keeping kind: ReelsFeedKind) {
+        streamPrefetchGeneration += 1
+        activeReelsFeed = kind
+        if kind != .scenes {
+            scenesFetchGeneration += 1
+            scenesInitialInflightKey = nil
+            isLoadingScenes = false
+            isLoadingMoreScenes = false
+        }
+        if kind != .markers {
+            markersFetchGeneration += 1
+            markersInitialInflightKey = nil
+            isLoadingMarkers = false
+            isLoading = false
+        }
+        if kind != .clips {
+            clipsFetchGeneration += 1
+            clipsInitialInflightKey = nil
+            isLoadingClips = false
+        }
+        if kind != .previews {
+            previewsFetchGeneration += 1
+            previewsInitialInflightKey = nil
+            isLoadingPreviews = false
+            isLoadingMorePreviews = false
+        }
+    }
+
+    func setActiveReelsFeed(_ kind: ReelsFeedKind?) {
+        if activeReelsFeed != kind {
+            streamPrefetchGeneration += 1
+        }
+        activeReelsFeed = kind
+    }
+
+    func forgetAllReelsFeedSignatures() {
+        reelsFeedSignatures.removeAll()
+        streamPrefetchGeneration += 1
+        activeReelsFeed = nil
+    }
+
+    private func feedCriteriaKey(_ parts: [String?]) -> String {
+        parts.map { $0 ?? "-" }.joined(separator: "|")
+    }
+
+    private func liveFilterKey(_ liveFilter: [String: Any]?) -> String {
+        guard let liveFilter else { return "none" }
+        return liveFilter.keys.sorted().joined(separator: ",") + "#\(liveFilter.count)"
+    }
+
+    private func feedAllowsLoadMore(_ feed: String) -> Bool {
+        (feedFailureStreaks[feed] ?? 0) < Self.maxFeedConsecutiveFailures
+    }
+
+    private func noteFeedFailure(_ feed: String) {
+        feedFailureStreaks[feed] = (feedFailureStreaks[feed] ?? 0) + 1
+        if feedFailureStreaks[feed] == Self.maxFeedConsecutiveFailures {
+            AppLog.error("⚠️ Feed \(feed): \(Self.maxFeedConsecutiveFailures) consecutive page failures — pausing auto-paging")
+            errorMessage = "Feed paused after repeated loading failures. Reopen or change filters to retry."
+        }
+    }
+
+    private func resetFeedPagingState(_ feed: String) {
+        feedFailureStreaks[feed] = 0
+        switch feed {
+        case "scenes": scenesNoProgressStreak = 0
+        case "markers": markersNoProgressStreak = 0
+        case "previews":
+            previewsNoProgressStreak = 0
+            previewsEmptyChaseCount = 0
+        case "clips": clipsNoProgressStreak = 0
+        default: break
+        }
+    }
+
+    /// Returns true when paging should stop because the last pages added nothing new.
+    private func noteFeedProgress(feed: String, addedCount: Int, isInitialLoad: Bool, markHasMore: (Bool) -> Void) {
+        if isInitialLoad || addedCount > 0 {
+            switch feed {
+            case "scenes": scenesNoProgressStreak = 0
+            case "markers": markersNoProgressStreak = 0
+            case "previews": previewsNoProgressStreak = 0
+            case "clips": clipsNoProgressStreak = 0
+            default: break
+            }
+            return
+        }
+        let streak: Int
+        switch feed {
+        case "scenes": scenesNoProgressStreak += 1; streak = scenesNoProgressStreak
+        case "markers": markersNoProgressStreak += 1; streak = markersNoProgressStreak
+        case "previews": previewsNoProgressStreak += 1; streak = previewsNoProgressStreak
+        case "clips": clipsNoProgressStreak += 1; streak = clipsNoProgressStreak
+        default: streak = 0
+        }
+        if streak >= Self.maxFeedNoProgressPages {
+            AppLog.debug("📥 Feed \(feed): \(streak) pages without new items — stopping pagination")
+            markHasMore(false)
+        }
+    }
     #if os(tvOS)
     // tvOS has many large thumbnails on screen; smaller pages reduce memory spikes and crash risk.
     private let scenesPerPage = 12
@@ -1471,6 +1658,9 @@ class StashDBViewModel: ObservableObject {
         scenesFetchGeneration += 1
         previewsFetchGeneration += 1
         markersFetchGeneration += 1
+        streamPrefetchGeneration += 1
+        reelsFeedSignatures.removeAll()
+        activeReelsFeed = nil
         
         currentSceneSortOption = .dateDesc
         currentSceneFilter = nil
@@ -1831,11 +2021,7 @@ class StashDBViewModel: ObservableObject {
         isFetchingFilters = true
         isLoadingSavedFilters = true
         
-        let query = """
-        {
-          "query": "query GetAllFilterDefinitions { findSavedFilters { id name mode filter object_filter ui_options find_filter { sort direction } } }"
-        }
-        """
+        let query = GraphQLQueries.findSavedFiltersQuery
         
         // Use execute with variables: nil to send the raw JSON body, same as performGraphQLQuery does
         GraphQLClient.shared.execute(query: query, variables: nil) { [weak self] (result: Result<SavedFiltersResponse, GraphQLNetworkError>) in
@@ -1847,14 +2033,14 @@ class StashDBViewModel: ObservableObject {
                 case .success(let response):
                     if let findResult = response.data?.findSavedFilters {
                         self.savedFilters = Dictionary(findResult.map { ($0.id, $0) }, uniquingKeysWith: { (first, second) in second })
-                        print("✅ Fetched \(findResult.count) saved filters")
+                        AppLog.debug("✅ Fetched \(findResult.count) saved filters")
                         completion?(true)
                     } else {
-                        print("⚠️ Saved filters query successful but data is missing")
+                        AppLog.error("⚠️ Saved filters query successful but data is missing")
                         completion?(false)
                     }
                 case .failure(let error):
-                    print("❌ Error fetching saved filters: \(error.localizedDescription)")
+                    AppLog.error("❌ Error fetching saved filters: \(error.localizedDescription)")
                     self.errorMessage = "Failed to load filters: \(error.localizedDescription)"
                     completion?(false)
                 }
@@ -1971,18 +2157,7 @@ class StashDBViewModel: ObservableObject {
             input["id"] = existingId
         }
         let variables: [String: Any] = ["input": input]
-        let mutation = """
-        mutation SaveSceneFilter($input: SaveFilterInput!) {
-          saveFilter(input: $input) {
-            id
-            name
-            mode
-            filter
-            object_filter
-            ui_options
-          }
-        }
-        """
+        let mutation = GraphQLQueries.saveSceneFilterMutation
         GraphQLClient.shared.execute(query: mutation, variables: variables) { [weak self] (result: Result<SaveFilterGraphQLEnvelope, GraphQLNetworkError>) in
             guard let self = self else { return }
             Task { @MainActor in
@@ -2056,18 +2231,7 @@ class StashDBViewModel: ObservableObject {
             input["id"] = existingId
         }
         let variables: [String: Any] = ["input": input]
-        let mutation = """
-        mutation SaveCatalogFilter($input: SaveFilterInput!) {
-          saveFilter(input: $input) {
-            id
-            name
-            mode
-            filter
-            object_filter
-            ui_options
-          }
-        }
-        """
+        let mutation = GraphQLQueries.saveCatalogFilterMutation
         GraphQLClient.shared.execute(query: mutation, variables: variables) { [weak self] (result: Result<SaveFilterGraphQLEnvelope, GraphQLNetworkError>) in
             guard let self = self else { return }
             Task { @MainActor in
@@ -2096,11 +2260,7 @@ class StashDBViewModel: ObservableObject {
     }
 
     func destroySavedSceneFilter(id: String, completion: @escaping (Result<Void, Error>) -> Void) {
-        let mutation = """
-        mutation DestroySavedSceneFilter($input: DestroyFilterInput!) {
-          destroySavedFilter(input: $input)
-        }
-        """
+        let mutation = GraphQLQueries.destroySavedFilterMutation
         let variables: [String: Any] = ["input": ["id": id]]
         GraphQLClient.shared.execute(query: mutation, variables: variables) { [weak self] (result: Result<DestroyFilterGraphQLEnvelope, GraphQLNetworkError>) in
             guard let self = self else { return }
@@ -2129,15 +2289,33 @@ class StashDBViewModel: ObservableObject {
         }
     }
     
-    func testConnection() {
+    func testConnection(force: Bool = false) {
         guard let config = ServerConfigManager.shared.loadConfig(),
               config.hasValidConfig else {
             errorMessage = "Server configuration is missing or incomplete"
-            print("❌ Test connection: No valid server configuration found")
+            AppLog.error("❌ Test connection: No valid server configuration found")
             return
         }
 
+        // Passive checks (onAppear / init across many VM instances) are throttled
+        // per server — the version does not change within a session.
+        if !force {
+            if let last = Self.lastConnectionCheckByServer[config.id],
+               Date().timeIntervalSince(last) < Self.connectionCheckInterval {
+                AppLog.debug("📱 Skipping throttled connection check (\(Int(Date().timeIntervalSince(last)))s ago)")
+                return
+            }
+            Self.lastConnectionCheckByServer[config.id] = Date()
+        }
+
         testConnection(with: config)
+    }
+
+    nonisolated private static let connectionCheckInterval: TimeInterval = 300
+    nonisolated private static let lastConnectionCheckStore = Mutex<[UUID: Date]>([:])
+    nonisolated private static var lastConnectionCheckByServer: [UUID: Date] {
+        get { lastConnectionCheckStore.withLock { $0 } }
+        set { lastConnectionCheckStore.withLock { $0 = newValue } }
     }
 
     func testConnection(with customConfig: ServerConfig) {
@@ -2145,15 +2323,11 @@ class StashDBViewModel: ObservableObject {
         errorMessage = nil
 
         // GraphQL query for version
-        let versionQuery = """
-        {
-          "query": "{ version { version } }"
-        }
-        """
+        let versionQuery = GraphQLQueries.serverVersionQuery
 
         let urlString = "\(customConfig.baseURL)/graphql"
-        // print("📱 Testing connection with custom config to: \(urlString)")
-        // print("📱 Server config: Type=\(customConfig.connectionType), Domain=\(customConfig.domain), IP=\(customConfig.ipAddress), Port=\(customConfig.port)")
+        // AppLog.debug("📱 Testing connection with custom config to: \(urlString)")
+        // AppLog.debug("📱 Server config: Type=\(customConfig.connectionType), Domain=\(customConfig.domain), IP=\(customConfig.ipAddress), Port=\(customConfig.port)")
 
         guard let url = URL(string: urlString) else {
             errorMessage = "Invalid URL: \(urlString)"
@@ -2161,29 +2335,29 @@ class StashDBViewModel: ObservableObject {
             return
         }
 
-        var request = URLRequest(url: url)
+        var request = stashRequest(to: url, config: customConfig)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.timeoutInterval = 30 // Match GraphQLClient
-        
+
         // Add API Key if available
         if let apiKey = customConfig.secureApiKey, !apiKey.isEmpty {
-            request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
-            print("📱 API Key wird verwendet (erste 8 Zeichen): \(String(apiKey.prefix(8)))...")
+            AppLog.debug("📱 Test connection using \(AppLog.redacted(apiKey, label: "ApiKey"))")
         }
-        
-        request.httpBody = versionQuery.data(using: .utf8)
-        print("📱 Query: \(versionQuery)")
 
-        URLSession.shared.dataTaskPublisher(for: request)
+        request.httpBody = versionQuery.data(using: .utf8)
+        AppLog.debug("📱 Testing version query against \(urlString)")
+
+        StashNetworking.session.dataTaskPublisher(for: request)
             .tryMap { data, response in
                 // Debug: Show server response
                 if let httpResponse = response as? HTTPURLResponse {
-                    print("📱 Test Status Code: \(httpResponse.statusCode)")
+                    AppLog.debug("📱 Test Status Code: \(httpResponse.statusCode)")
                 }
+                #if DEBUG
                 if let responseString = String(data: data, encoding: .utf8) {
-                    print("📱 Server response: \(responseString)")
+                    AppLog.debug("📱 Server response: \(responseString.prefix(500))")
                 }
+                #endif
                 return data
             }
             .decode(type: VersionResponse.self, decoder: JSONDecoder())
@@ -2200,7 +2374,7 @@ class StashDBViewModel: ObservableObject {
                          self?.isServerConnected = false
                          self?.errorMessage = "Connection timed out after 30 seconds."
                     } else {
-                        print("❌ Connection Error: \(error.localizedDescription)")
+                        AppLog.error("❌ Connection Error: \(error.localizedDescription)")
                         self?.isServerConnected = false
                         self?.handleError(error)
                     }
@@ -2208,7 +2382,7 @@ class StashDBViewModel: ObservableObject {
             } receiveValue: { [weak self] response in
                 self?.isLoading = false
                 let version = response.data?.version.version ?? "Unknown"
-                print("📱 Version erhalten: \(version)")
+                AppLog.debug("📱 Version erhalten: \(version)")
                 self?.serverStatus = "Connected - Version: \(version)"
                 self?.isServerConnected = true
                 self?.errorMessage = nil // Clear error on success
@@ -2232,11 +2406,7 @@ class StashDBViewModel: ObservableObject {
         
         isFetchingStats = true
         errorMessage = nil // Clear error when starting
-        let statisticsQuery = """
-        {
-          "query": "{ stats { scene_count scenes_size scenes_duration image_count images_size gallery_count performer_count studio_count group_count tag_count total_o_count total_play_duration total_play_count scenes_played movie_count } }"
-        }
-        """
+        let statisticsQuery = GraphQLQueries.serverStatsQuery
 
         performGraphQLQuery(query: statisticsQuery) { [weak self] (response: StashStatisticsResponse?) in
             guard let self = self else { return }
@@ -2581,11 +2751,7 @@ class StashDBViewModel: ObservableObject {
             }
         }
 
-        let markersCountQuery = """
-        {
-          "query": "{ findSceneMarkers(filter: { per_page: 1 }) { count } }"
-        }
-        """
+        let markersCountQuery = GraphQLQueries.findSceneMarkersCountQuery
         performGraphQLQuery(query: markersCountQuery) { [weak self] (response: MarkersResponse?) in
             guard let self = self, let count = response?.data?.findSceneMarkers.count else { return }
             UserDefaults.standard.set(count, forKey: self.cachedMarkerCountKey)
@@ -2625,11 +2791,20 @@ class StashDBViewModel: ObservableObject {
     
     func fetchScenes(sortBy: SceneSortOption = .dateDesc, searchQuery: String = "", isInitialLoad: Bool = true, filter: SavedFilter? = nil, liveFilter: [String: Any]? = nil) {
         if isInitialLoad {
+            let key = feedCriteriaKey([
+                "scenes", sortBy.sortField, sortBy.direction, searchQuery,
+                filter?.id, liveFilterKey(liveFilter)
+            ])
+            if scenesInitialInflightKey == key, isLoadingScenes {
+                AppLog.debug("📥 fetchScenes: identical initial fetch already in flight — skipping")
+                return
+            }
+            scenesInitialInflightKey = key
+
             scenesFetchGeneration += 1
-            // Reset pagination
+            // Reset pagination — keep stale rows until the new page arrives so
+            // Reels does not unmount the list (black first cell on remount).
             currentScenePage = 1
-            scenes = [] // Clear scenes to show loading state
-            totalScenes = 0
             isLoadingScenes = true
             isLoadingMoreScenes = false
             hasMoreScenes = true
@@ -2648,7 +2823,7 @@ class StashDBViewModel: ObservableObject {
     }
 
     func loadMoreScenes() {
-        guard !isLoadingMoreScenes && hasMoreScenes else { return }
+        guard !isLoadingMoreScenes, hasMoreScenes, feedAllowsLoadMore("scenes") else { return }
         let page = currentScenePage + 1
         loadScenesPage(page: page, sortBy: currentSceneSortOption, searchQuery: currentSceneSearchQuery, fetchGeneration: scenesFetchGeneration)
     }
@@ -2766,10 +2941,18 @@ class StashDBViewModel: ObservableObject {
 
     func fetchPreviews(sortBy: SceneSortOption = .dateDesc, searchQuery: String = "", isInitialLoad: Bool = true, filter: SavedFilter? = nil, liveFilter: [String: Any]? = nil) {
         if isInitialLoad {
+            let key = feedCriteriaKey([
+                "previews", sortBy.sortField, sortBy.direction, searchQuery,
+                filter?.id, liveFilterKey(liveFilter)
+            ])
+            if previewsInitialInflightKey == key, isLoadingPreviews {
+                AppLog.debug("📥 fetchPreviews: identical initial fetch already in flight — skipping")
+                return
+            }
+            previewsInitialInflightKey = key
+
             previewsFetchGeneration += 1
             currentPreviewPage = 1
-            previews = []
-            totalPreviews = 0
             isLoadingPreviews = true
             isLoadingMorePreviews = false
             hasMorePreviews = true
@@ -2788,12 +2971,22 @@ class StashDBViewModel: ObservableObject {
     }
 
     func loadMorePreviews() {
-        guard !isLoadingMorePreviews && hasMorePreviews else { return }
+        guard !isLoadingMorePreviews, hasMorePreviews, feedAllowsLoadMore("previews") else { return }
         let page = currentPreviewPage + 1
         loadScenesPage(page: page, sortBy: currentPreviewSortOption, searchQuery: currentPreviewSearchQuery, previewOnly: true, fetchGeneration: previewsFetchGeneration)
     }
 
     func fetchSceneMarkers(sortBy: SceneMarkerSortOption = .createdAtDesc, searchQuery: String = "", filter: SavedFilter? = nil, liveFilter: [String: Any]? = nil) {
+        let key = feedCriteriaKey([
+            "markers", sortBy.sortField, sortBy.direction, searchQuery,
+            filter?.id, liveFilterKey(liveFilter)
+        ])
+        if markersInitialInflightKey == key, isLoadingMarkers {
+            AppLog.debug("📥 fetchSceneMarkers: identical initial fetch already in flight — skipping")
+            return
+        }
+        markersInitialInflightKey = key
+
         markersFetchGeneration += 1
         currentMarkerPage = 1
         currentMarkerSortOption = sortBy
@@ -2801,14 +2994,14 @@ class StashDBViewModel: ObservableObject {
         currentMarkerFilter = filter
         currentMarkerLiveFilter = liveFilter ?? [:]
         hasMoreMarkers = true
-        sceneMarkers = []
+        isLoadingMarkers = true
         isLoading = true // Set global loading for initial markers load
-        
+
         loadMarkersPage(page: currentMarkerPage, sortBy: sortBy, searchQuery: searchQuery, fetchGeneration: markersFetchGeneration)
     }
 
     func loadMoreMarkers() {
-        guard !isLoadingMarkers && hasMoreMarkers else { return }
+        guard !isLoadingMarkers, hasMoreMarkers, feedAllowsLoadMore("markers") else { return }
         let page = currentMarkerPage + 1
         loadMarkersPage(page: page, sortBy: currentMarkerSortOption, searchQuery: currentMarkerSearchQuery, fetchGeneration: markersFetchGeneration)
     }
@@ -2868,17 +3061,27 @@ class StashDBViewModel: ObservableObject {
             if let result = response?.data?.findSceneMarkers {
                 DispatchQueue.main.async {
                     guard fetchGeneration == self.markersFetchGeneration else { return }
+                    let rawMarkers = result.scene_markers ?? []
+                    var addedCount = 0
                     if isInitialLoad {
-                        self.sceneMarkers = result.scene_markers ?? []
+                        self.markersInitialInflightKey = nil
+                        self.sceneMarkers = rawMarkers
                         self.totalSceneMarkers = result.count
+                        self.resetFeedPagingState("markers")
                     } else {
                         // Deduplicate: Only add markers that aren't already in the list
                         let existingIds = Set(self.sceneMarkers.map { $0.id })
-                        let newMarkers = (result.scene_markers ?? []).filter { !existingIds.contains($0.id) }
+                        let newMarkers = rawMarkers.filter { !existingIds.contains($0.id) }
                         self.sceneMarkers.append(contentsOf: newMarkers)
+                        addedCount = newMarkers.count
                     }
-                    
-                    self.hasMoreMarkers = (result.scene_markers ?? []).count == self.markersPerPage
+
+                    self.hasMoreMarkers = rawMarkers.count == self.markersPerPage
+                    if !isInitialLoad {
+                        self.noteFeedProgress(feed: "markers", addedCount: addedCount, isInitialLoad: false) {
+                            self.hasMoreMarkers = $0
+                        }
+                    }
                     self.currentMarkerPage = page
                     self.isLoadingMarkers = false
                     self.isLoading = false
@@ -2886,9 +3089,11 @@ class StashDBViewModel: ObservableObject {
             } else {
                 DispatchQueue.main.async {
                     guard fetchGeneration == self.markersFetchGeneration else { return }
+                    self.markersInitialInflightKey = nil
                     self.isLoadingMarkers = false
                     self.isLoading = false
                     self.errorMessage = "Could not load markers"
+                    self.noteFeedFailure("markers")
                 }
             }
         }
@@ -2929,7 +3134,7 @@ class StashDBViewModel: ObservableObject {
             if let dict = savedFilter.filterDict {
                 let sanitized = sanitizeFilter(dict)
                 #if DEBUG
-                print("🔍 Scene Filter sanitized: \(sanitized)")
+                AppLog.debug("🔍 Scene Filter sanitized: \(sanitized)")
                 #endif
                 variables["scene_filter"] = sanitized
             } else if let obj = savedFilter.object_filter {
@@ -2937,7 +3142,7 @@ class StashDBViewModel: ObservableObject {
                 if let objDict = obj.value as? [String: Any] {
                     let sanitized = sanitizeFilter(objDict)
                     #if DEBUG
-                    print("🔍 Object Filter sanitized: \(sanitized)")
+                    AppLog.debug("🔍 Object Filter sanitized: \(sanitized)")
                     #endif
                     variables["scene_filter"] = sanitized
                 } else {
@@ -2971,13 +3176,13 @@ class StashDBViewModel: ObservableObject {
         
         guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
               let bodyString = String(data: bodyData, encoding: .utf8) else {
-            print("❌ Error constructing request body in loadScenesPage")
+            AppLog.error("❌ Error constructing request body in loadScenesPage")
             return
         }
         
         #if DEBUG
-        print("🔍 Debug loadScenesPage request body:")
-        print(bodyString)
+        AppLog.debug("🔍 Debug loadScenesPage request body:")
+        AppLog.debug(bodyString)
         #endif
         
         // Pass bodyString as the query argument
@@ -2992,23 +3197,52 @@ class StashDBViewModel: ObservableObject {
                             guard let preview = scene.paths?.preview else { return false }
                             return !preview.isEmpty
                         }
+                        if isInitialLoad {
+                            self.previewsInitialInflightKey = nil
+                        }
                         let hasMore = scenesResult.scenes.count == self.previewsPerPage
+                        var addedCount = 0
                         if isInitialLoad {
                             self.previews = scenesWithPreview
                             self.totalPreviews = scenesResult.count
+                            self.resetFeedPagingState("previews")
                         } else {
                             let existingIds = Set(self.previews.map { $0.id })
                             let newScenes = scenesWithPreview.filter { !existingIds.contains($0.id) }
                             self.previews.append(contentsOf: newScenes)
+                            addedCount = newScenes.count
+                        }
+                        if !self.previews.isEmpty, self.errorMessage?.contains("previews") == true {
+                            self.errorMessage = nil
                         }
                         self.hasMorePreviews = hasMore
                         self.currentPreviewPage = page
-                        // If the filtered result is still empty but there are more pages, fetch next page automatically
-                        if self.previews.isEmpty && hasMore {
+
+                        // If the filtered result is still empty but there are more pages,
+                        // chase a limited number of pages so a sparse library cannot cause
+                        // an unbounded request chain.
+                        if self.previews.isEmpty && hasMore
+                            && self.previewsEmptyChaseCount < Self.maxPreviewsEmptyChasePages {
+                            self.previewsEmptyChaseCount += 1
+                            AppLog.debug("📥 Previews empty after filter — chasing page \(page + 1) (\(self.previewsEmptyChaseCount)/\(Self.maxPreviewsEmptyChasePages))")
                             let nextPage = page + 1
                             self.loadScenesPage(page: nextPage, sortBy: self.currentPreviewSortOption, searchQuery: self.currentPreviewSearchQuery, previewOnly: true, fetchGeneration: fetchGeneration)
                             return
                         }
+
+                        // Chase exhausted without a single preview — surface it instead
+                        // of rendering a silent blank screen.
+                        if self.previews.isEmpty {
+                            let scanned = page * self.previewsPerPage
+                            self.errorMessage = "No scenes with previews found in the first \(scanned) scenes."
+                        }
+
+                        if !isInitialLoad {
+                            self.noteFeedProgress(feed: "previews", addedCount: addedCount, isInitialLoad: false) {
+                                self.hasMorePreviews = $0
+                            }
+                        }
+
                         if isInitialLoad {
                             self.isLoadingPreviews = false
                             self.isLoading = false
@@ -3016,20 +3250,33 @@ class StashDBViewModel: ObservableObject {
                             self.isLoadingMorePreviews = false
                         }
                     } else {
+                        var addedCount = 0
                         if isInitialLoad {
+                            self.scenesInitialInflightKey = nil
                             self.scenes = scenesResult.scenes
                             self.totalScenes = scenesResult.count
+                            self.resetFeedPagingState("scenes")
+                            // Only the visible Scenes feed — never Markers/Clips/Previews.
+                            if self.activeReelsFeed == .scenes {
+                                self.prefetchSceneStreams(sceneIds: self.scenes.map { $0.id })
+                            }
                         } else {
                             // Deduplicate: Only add scenes that aren't already in the list
                             let existingIds = Set(self.scenes.map { $0.id })
                             let newScenes = scenesResult.scenes.filter { !existingIds.contains($0.id) }
                             self.scenes.append(contentsOf: newScenes)
+                            addedCount = newScenes.count
                         }
-                        
+
                         // Check if there are more pages
                         self.hasMoreScenes = scenesResult.scenes.count == self.scenesPerPage
+                        if !isInitialLoad {
+                            self.noteFeedProgress(feed: "scenes", addedCount: addedCount, isInitialLoad: false) {
+                                self.hasMoreScenes = $0
+                            }
+                        }
                         self.currentScenePage = page
-                        
+
                         if isInitialLoad {
                             self.isLoadingScenes = false
                             self.errorMessage = nil // Success
@@ -3044,17 +3291,21 @@ class StashDBViewModel: ObservableObject {
                     guard fetchGeneration == expectedGen else { return }
                     if previewOnly {
                         if isInitialLoad {
+                            self.previewsInitialInflightKey = nil
                             self.isLoadingPreviews = false
                             self.isLoading = false
                         } else {
                             self.isLoadingMorePreviews = false
                         }
+                        self.noteFeedFailure("previews")
                     } else {
                         if isInitialLoad {
+                            self.scenesInitialInflightKey = nil
                             self.isLoadingScenes = false
                         } else {
                             self.isLoadingMoreScenes = false
                         }
+                        self.noteFeedFailure("scenes")
                     }
                     // Keep error message processing if present
                 }
@@ -3438,18 +3689,18 @@ class StashDBViewModel: ObservableObject {
         }
 
         if let performer {
-            print("🔍 mergeFilterWithCriteria: Forcing Performer \(performer.name) (\(performer.id))")
+            AppLog.debug("🔍 mergeFilterWithCriteria: Forcing Performer \(performer.name) (\(performer.id))")
             // MultiCriterionInput — no `depth` (that field is only on HierarchicalMultiCriterionInput).
             baseDict["performers"] = ["modifier": "INCLUDES", "value": [performer.id]]
         }
 
         if !tags.isEmpty {
-            print("🔍 mergeFilterWithCriteria: Forcing Tags \(tags.map { $0.name })")
+            AppLog.debug("🔍 mergeFilterWithCriteria: Forcing Tags \(tags.map { $0.name })")
             baseDict["tags"] = ["modifier": "INCLUDES", "value": tags.map(\.id), "depth": 0]
         }
 
         if let studio {
-            print("🔍 mergeFilterWithCriteria: Forcing Studio \(studio.name) (\(studio.id))")
+            AppLog.debug("🔍 mergeFilterWithCriteria: Forcing Studio \(studio.name) (\(studio.id))")
             baseDict["studios"] = ["modifier": "INCLUDES", "value": [studio.id], "depth": 0]
         }
 
@@ -4164,7 +4415,7 @@ class StashDBViewModel: ObservableObject {
                 if let performer = response?.data?.findPerformers.performers.first {
                     completion(performer)
                 } else {
-                    print("❌ Performer mit ID \(performerId) nicht gefunden")
+                    AppLog.error("❌ Performer mit ID \(performerId) nicht gefunden")
                     completion(nil)
                 }
             }
@@ -4338,13 +4589,13 @@ class StashDBViewModel: ObservableObject {
         if let savedFilter = currentPerformerFilter {
             if let dict = savedFilter.filterDict {
                 let sanitized = sanitizeFilter(dict)
-                print("🔍 PERFORMER filterDict raw: \(dict)")
-                print("🔍 PERFORMER filterDict sanitized: \(sanitized)")
+                AppLog.debug("🔍 PERFORMER filterDict raw: \(dict)")
+                AppLog.debug("🔍 PERFORMER filterDict sanitized: \(sanitized)")
                 variables["performer_filter"] = sanitized
             } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
-                print("🔍 PERFORMER object_filter raw: \(objDict)")
+                AppLog.debug("🔍 PERFORMER object_filter raw: \(objDict)")
                 let sanitized = sanitizeFilter(objDict)
-                print("🔍 PERFORMER object_filter sanitized: \(sanitized)")
+                AppLog.debug("🔍 PERFORMER object_filter sanitized: \(sanitized)")
                 variables["performer_filter"] = sanitized
             }
         }
@@ -4508,7 +4759,7 @@ class StashDBViewModel: ObservableObject {
         
         guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
               let bodyString = String(data: bodyData, encoding: .utf8) else {
-            print("❌ Error: Could not serialize Studios request body")
+            AppLog.error("❌ Error: Could not serialize Studios request body")
             return
         }
         
@@ -5152,13 +5403,13 @@ class StashDBViewModel: ObservableObject {
         // Use saved filter if provided
         if let savedFilter = filter {
             if let dict = savedFilter.filterDict {
-                print("🔍 Gallery filter (filterDict) RAW: \(dict)")
+                AppLog.debug("🔍 Gallery filter (filterDict) RAW: \(dict)")
                 galleryFilter = sanitizeFilter(dict)
-                print("🔍 Gallery filter (filterDict) sanitized: \(galleryFilter)")
+                AppLog.debug("🔍 Gallery filter (filterDict) sanitized: \(galleryFilter)")
             } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
-                print("🔍 Gallery filter (object_filter) RAW: \(objDict)")
+                AppLog.debug("🔍 Gallery filter (object_filter) RAW: \(objDict)")
                 galleryFilter = sanitizeFilter(objDict)
-                print("🔍 Gallery filter (object_filter) sanitized: \(galleryFilter)")
+                AppLog.debug("🔍 Gallery filter (object_filter) sanitized: \(galleryFilter)")
             }
         }
         
@@ -5195,7 +5446,7 @@ class StashDBViewModel: ObservableObject {
         
         guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
               let bodyString = String(data: bodyData, encoding: .utf8) else {
-            print("❌ Error: Could not serialize Galleries request body")
+            AppLog.error("❌ Error: Could not serialize Galleries request body")
             return
         }
         
@@ -5234,7 +5485,7 @@ class StashDBViewModel: ObservableObject {
     }
     
     func fetchGalleryImages(galleryId: String, sortBy: ImageSortOption = .dateDesc, isInitialLoad: Bool = true, filter: SavedFilter? = nil, liveFilter: [String: Any]? = nil) {
-        print("🖼️ fetchGalleryImages called for gallery: \(galleryId), sortBy: \(sortBy.rawValue), isInitialLoad: \(isInitialLoad)")
+        AppLog.debug("🖼️ fetchGalleryImages called for gallery: \(galleryId), sortBy: \(sortBy.rawValue), isInitialLoad: \(isInitialLoad)")
         
         if isInitialLoad {
             currentGalleryImagePage = 1
@@ -5322,7 +5573,7 @@ class StashDBViewModel: ObservableObject {
     }
     
     func fetchImages(sortBy: ImageSortOption = .dateDesc, isInitialLoad: Bool = true, filter: SavedFilter? = nil, staticPathFilter: Bool = false, performerId: String? = nil, liveFilter: [String: Any]? = nil) {
-        print("🖼️ fetchImages called, sortBy: \(sortBy.rawValue), isInitialLoad: \(isInitialLoad)")
+        AppLog.debug("🖼️ fetchImages called, sortBy: \(sortBy.rawValue), isInitialLoad: \(isInitialLoad)")
 
         if isInitialLoad {
             imagesFetchGeneration += 1
@@ -5383,14 +5634,14 @@ class StashDBViewModel: ObservableObject {
                 var sanitized = sanitizeFilter(dict)
                 if imageStaticPathFilter { sanitized.merge(staticFilter) { _, new in new } }
                 sanitized.merge(performerFilter) { _, new in new }
-                print("🔍 Image Filter sanitized: \(sanitized)")
+                AppLog.debug("🔍 Image Filter sanitized: \(sanitized)")
                 variables["image_filter"] = sanitized
             } else if let obj = savedFilter.object_filter {
                 if let objDict = obj.value as? [String: Any] {
                     var sanitized = sanitizeFilter(objDict)
                     if imageStaticPathFilter { sanitized.merge(staticFilter) { _, new in new } }
                     sanitized.merge(performerFilter) { _, new in new }
-                    print("🔍 Image Object Filter sanitized: \(sanitized)")
+                    AppLog.debug("🔍 Image Object Filter sanitized: \(sanitized)")
                     variables["image_filter"] = sanitized
                 } else {
                     variables["image_filter"] = obj.value
@@ -5648,10 +5899,18 @@ class StashDBViewModel: ObservableObject {
 
     func fetchClips(sortBy: ImageSortOption = .dateDesc, filter: SavedFilter? = nil, isInitialLoad: Bool = true, liveFilter: [String: Any]? = nil) {
         if isInitialLoad {
+            let key = feedCriteriaKey([
+                "clips", sortBy.sortField, sortBy.direction,
+                filter?.id, liveFilterKey(liveFilter)
+            ])
+            if clipsInitialInflightKey == key, isLoadingClips {
+                AppLog.debug("📥 fetchClips: identical initial fetch already in flight — skipping")
+                return
+            }
+            clipsInitialInflightKey = key
+
             clipsFetchGeneration += 1
             currentClipsPage = 1
-            clips = []
-            totalClips = 0
             isLoadingClips = true
             hasMoreClips = true
             currentClipSortOption = sortBy
@@ -5690,9 +5949,9 @@ class StashDBViewModel: ObservableObject {
                     }
                 }
             } else if let obj = savedFilter.object_filter, let objDict = obj.value as? [String: Any] {
-                print("🔍 fetchClips: Using object_filter = \(objDict)")
+                AppLog.debug("🔍 fetchClips: Using object_filter = \(objDict)")
                 let sanitized = sanitizeFilter(objDict)
-                print("🔍 fetchClips: Sanitized filter = \(sanitized)")
+                AppLog.debug("🔍 fetchClips: Sanitized filter = \(sanitized)")
                 for (key, value) in sanitized {
                     if key != "path" {
                         imageFilter[key] = value
@@ -5723,7 +5982,7 @@ class StashDBViewModel: ObservableObject {
             "image_filter": sanitizeFilter(imageFilter)
         ]
         
-        print("🔍 fetchClips: Variables = \(variables)")
+        AppLog.debug("🔍 fetchClips: Variables = \(variables)")
         
         guard let dataRequest = ["query": query, "variables": variables] as [String: Any]?,
               let bodyData = try? JSONSerialization.data(withJSONObject: dataRequest),
@@ -5735,28 +5994,43 @@ class StashDBViewModel: ObservableObject {
             return
         }
 
-        print("🔍 fetchClips: Raw Body = \(bodyString)")
+        AppLog.debug("🔍 fetchClips: Raw Body = \(bodyString)")
 
         performGraphQLQuery(query: bodyString, clearsGlobalErrorMessageOnStart: false) { (response: GalleryImagesResponse?) in
             DispatchQueue.main.async {
                 guard requestGeneration == self.clipsFetchGeneration else { return }
                 if let result = response?.data?.findImages {
+                    var addedCount = 0
                     if isInitialLoad {
+                        self.clipsInitialInflightKey = nil
                         self.clips = result.images
                         self.totalClips = result.count
+                        self.resetFeedPagingState("clips")
                     } else {
                         let existingIds = Set(self.clips.map { $0.id })
                         let newClips = result.images.filter { !existingIds.contains($0.id) }
                         self.clips.append(contentsOf: newClips)
+                        addedCount = newClips.count
                     }
 
                     self.hasMoreClips = result.images.count == perPage
+                    if !isInitialLoad {
+                        self.noteFeedProgress(feed: "clips", addedCount: addedCount, isInitialLoad: false) {
+                            self.hasMoreClips = $0
+                        }
+                    }
                     self.currentClipsPage = page
                     self.errorMessage = nil
-                } else if isInitialLoad, self.clips.isEmpty {
-                    if self.errorMessage == nil {
-                        self.errorMessage = "Could not load clips"
+                } else {
+                    if isInitialLoad {
+                        self.clipsInitialInflightKey = nil
                     }
+                    if isInitialLoad, self.clips.isEmpty {
+                        if self.errorMessage == nil {
+                            self.errorMessage = "Could not load clips"
+                        }
+                    }
+                    self.noteFeedFailure("clips")
                 }
                 self.isLoadingClips = false
             }
@@ -5764,7 +6038,7 @@ class StashDBViewModel: ObservableObject {
     }
     
     func loadMoreClips() {
-        if !isLoadingClips && hasMoreClips {
+        if !isLoadingClips, hasMoreClips, feedAllowsLoadMore("clips") {
             fetchClips(sortBy: currentClipSortOption, filter: currentClipFilter, isInitialLoad: false)
         }
     }
@@ -5791,7 +6065,7 @@ class StashDBViewModel: ObservableObject {
         }
         """
 
-        print("🗑️ IMAGE DELETE: Deleting image + files \(imageId)")
+        AppLog.debug("🗑️ IMAGE DELETE: Deleting image + files \(imageId)")
         performGraphQLMutationSilent(query: fileIdsQuery) { [weak self] preResult in
             let fileIds: [String] = {
                 guard
@@ -5810,7 +6084,7 @@ class StashDBViewModel: ObservableObject {
                     let data = result["data"]?.value as? [String: Any],
                     data["imageDestroy"] != nil
                 else {
-                    print("❌ IMAGE DELETE: Failed for image \(imageId)")
+                    AppLog.error("❌ IMAGE DELETE: Failed for image \(imageId)")
                     completion(false)
                     return
                 }
@@ -5826,16 +6100,16 @@ class StashDBViewModel: ObservableObject {
 
                 // 3) Delete the underlying files (best-effort; DB entity is already gone)
                 guard let self, !fileIds.isEmpty else {
-                    print("✅ IMAGE DELETE: Success for image \(imageId) (no files to delete)")
+                    AppLog.debug("✅ IMAGE DELETE: Success for image \(imageId) (no files to delete)")
                     completion(true)
                     return
                 }
 
                 self.deleteSceneFiles(fileIds: fileIds, config: config) { success in
                     if success {
-                        print("✅ IMAGE DELETE: Deleted files for image \(imageId)")
+                        AppLog.debug("✅ IMAGE DELETE: Deleted files for image \(imageId)")
                     } else {
-                        print("⚠️ IMAGE DELETE: Image destroyed but file deletion failed for \(imageId)")
+                        AppLog.error("⚠️ IMAGE DELETE: Image destroyed but file deletion failed for \(imageId)")
                     }
                     completion(true)
                 }
@@ -5843,78 +6117,64 @@ class StashDBViewModel: ObservableObject {
         }
     }
     func addScenePlay(sceneId: String, completion: ((Int?) -> Void)? = nil) {
-        let mutation = """
-        mutation SceneAddPlay($id: ID!, $times: [Timestamp!]) {
-          sceneAddPlay(id: $id, times: $times) {
-            count
-            history
-          }
-        }
-        """
+        let mutation = GraphQLQueries.sceneAddPlayMutation
 
         let variables: [String: Any] = [
             "id": sceneId,
             "times": []
         ]
 
-        print("🎬 SCENE PLAY: Sending mutation for scene \(sceneId)")
+        AppLog.debug("🎬 SCENE PLAY: Sending mutation for scene \(sceneId)")
         Task {
             do {
                 let result = try await GraphQLClient.shared.performMutation(mutation: mutation, variables: variables)
                 if let data = result["data"]?.value as? [String: Any],
                    let payload = data["sceneAddPlay"] as? [String: Any] {
                     if let newCount = payload["count"] as? Int {
-                        print("✅ SCENE PLAY: Success for scene \(sceneId). New count: \(newCount)")
+                        AppLog.debug("✅ SCENE PLAY: Success for scene \(sceneId). New count: \(newCount)")
                         await MainActor.run { completion?(newCount) }
                         return
                     } else if let newCount = payload["count"] as? Double {
                         let count = Int(newCount)
-                        print("✅ SCENE PLAY: Success for scene \(sceneId). New count: \(count)")
+                        AppLog.debug("✅ SCENE PLAY: Success for scene \(sceneId). New count: \(count)")
                         await MainActor.run { completion?(count) }
                         return
                     }
                 }
 
                 if let errors = result["errors"]?.value {
-                    print("❌ SCENE PLAY: Failed for scene \(sceneId). Errors: \(errors)")
+                    AppLog.error("❌ SCENE PLAY: Failed for scene \(sceneId). Errors: \(errors)")
                 } else {
-                    print("❌ SCENE PLAY: Failed for scene \(sceneId)")
+                    AppLog.error("❌ SCENE PLAY: Failed for scene \(sceneId)")
                 }
                 await MainActor.run { completion?(nil) }
             } catch {
-                print("❌ SCENE PLAY: Failed for scene \(sceneId). Error: \(error)")
+                AppLog.error("❌ SCENE PLAY: Failed for scene \(sceneId). Error: \(error)")
                 await MainActor.run { completion?(nil) }
             }
         }
     }
     
     func addSceneMarkerPlay(markerId: String, completion: ((Int?) -> Void)? = nil) {
-        let mutation = """
-        mutation SceneMarkerIncrementPlay($id: ID!) {
-          sceneMarkerUpdate(input: { id: $id }) {
-            id
-            play_count
-          }
-        }
-        """
+        let mutation = GraphQLQueries.sceneMarkerIncrementPlayMutation
         
         let variables: [String: Any] = ["id": markerId]
         
-        print("🎬 MARKER PLAY: Sending increment via sceneMarkerUpdate for marker \(markerId)")
+        AppLog.debug("🎬 MARKER PLAY: Sending increment via sceneMarkerUpdate for marker \(markerId)")
         Task {
             do {
                 let result = try await GraphQLClient.shared.performMutation(mutation: mutation, variables: variables)
                 if let data = result["data"]?.value as? [String: Any],
                    let payload = data["sceneMarkerUpdate"] as? [String: Any] {
                     if let newCount = payload["play_count"] as? Int {
-                        print("✅ MARKER PLAY: Success for marker \(markerId). New count: \(newCount)")
+                        AppLog.debug("✅ MARKER PLAY: Success for marker \(markerId). New count: \(newCount)")
                         await MainActor.run { completion?(newCount) }
                         return
                     }
                 }
                 await MainActor.run { completion?(nil) }
             } catch {
-                print("❌ MARKER PLAY: Error for marker \(markerId): \(error)")
+                AppLog.error("❌ MARKER PLAY: Error for marker \(markerId): \(error)")
                 await MainActor.run { completion?(nil) }
             }
         }
@@ -5928,12 +6188,12 @@ class StashDBViewModel: ObservableObject {
         }
         """
         
-        print("🎬 SCENE O: Sending increment mutation for scene \(sceneId)")
+        AppLog.debug("🎬 SCENE O: Sending increment mutation for scene \(sceneId)")
         performGraphQLMutationSilent(query: mutation) { result in
             if let result = result,
                let data = result["data"]?.value as? [String: Any],
                let count = data["sceneIncrementO"] as? Int {
-                print("✅ SCENE O: Success for scene \(sceneId). New count: \(count)")
+                AppLog.debug("✅ SCENE O: Success for scene \(sceneId). New count: \(count)")
                 DispatchQueue.main.async {
                     completion?(count)
                     NotificationCenter.default.post(
@@ -5943,7 +6203,7 @@ class StashDBViewModel: ObservableObject {
                     )
                 }
             } else {
-                print("❌ SCENE O: Failed for scene \(sceneId)")
+                AppLog.error("❌ SCENE O: Failed for scene \(sceneId)")
                 DispatchQueue.main.async {
                     completion?(nil)
                 }
@@ -6000,13 +6260,13 @@ class StashDBViewModel: ObservableObject {
                         }
                     }
                 } else if let errors = result["errors"] {
-                    print("❌ ACTIVITY SAVE ERROR for scene \(sceneId): \(errors)")
+                    AppLog.error("❌ ACTIVITY SAVE ERROR for scene \(sceneId): \(errors)")
                     DispatchQueue.main.async {
                         completion?(false)
                     }
                 }
             } else {
-                print("❌ ACTIVITY SAVE FAILED for scene \(sceneId)")
+                AppLog.error("❌ ACTIVITY SAVE FAILED for scene \(sceneId)")
                 DispatchQueue.main.async {
                     completion?(false)
                 }
@@ -6049,28 +6309,37 @@ class StashDBViewModel: ObservableObject {
         }
     }
     
-    private func performGraphQLQuery<T: Decodable>(query: String, clearsGlobalErrorMessageOnStart: Bool = true, completion: @escaping (T?) -> Void) {
+    private func performGraphQLQuery<T: Decodable>(
+        query: String,
+        clearsGlobalErrorMessageOnStart: Bool = true,
+        setsGlobalLoading: Bool = true,
+        completion: @escaping (T?) -> Void
+    ) {
         guard ServerConfigManager.shared.loadConfig()?.hasValidConfig == true else {
             errorMessage = "Server configuration is missing or incomplete"
-            print("❌ No valid server configuration found")
+            AppLog.error("❌ No valid server configuration found")
             completion(nil)
             return
         }
-        
-        isLoading = true
+
+        if setsGlobalLoading {
+            isLoading = true
+        }
         if clearsGlobalErrorMessageOnStart {
             errorMessage = nil
         }
-        
+
         // Delegate to new GraphQLClient
         GraphQLClient.shared.execute(query: query) { [weak self] (result: Result<T, GraphQLNetworkError>) in
             DispatchQueue.main.async {
-                self?.isLoading = false
+                if setsGlobalLoading {
+                    self?.isLoading = false
+                }
                 switch result {
                 case .success(let response):
                     completion(response)
                 case .failure(let error):
-                    print("📱 GraphQL Error: \(error)")
+                    AppLog.debug("📱 GraphQL Error: \(error)")
                     self?.handleNetworkError(error)
                     completion(nil)
                 }
@@ -6090,7 +6359,7 @@ class StashDBViewModel: ObservableObject {
 
     
     private func handleError(_ error: Error) {
-        print("📱 StashDB Error: \(error)")
+        AppLog.debug("📱 StashDB Error: \(error)")
         
         if let urlError = error as? URLError {
             let urlContext = ServerConfigManager.shared.loadConfig()?.baseURL ?? "Unknown URL"
@@ -6105,7 +6374,7 @@ class StashDBViewModel: ObservableObject {
                 errorMessage = "Network Error: \(urlError.localizedDescription) (\(urlContext))"
             }
         } else if let decodingError = error as? DecodingError {
-            print("📱 Decoding Error: \(decodingError)")
+            AppLog.debug("📱 Decoding Error: \(decodingError)")
             errorMessage = "Could not process server response"
         } else {
             errorMessage = "Error: \(error.localizedDescription)"
@@ -6116,11 +6385,7 @@ class StashDBViewModel: ObservableObject {
     // MARK: - Library Actions
     
     func triggerLibraryScan(completion: @escaping (Bool, String) -> Void) {
-        let scanMutation = """
-        {
-          "query": "mutation { metadataScan(input: {}) }"
-        }
-        """
+        let scanMutation = GraphQLQueries.metadataScanMutation
 
         performGraphQLQuery(query: scanMutation) { (response: GenericMutationResponse?) in
             if response != nil {
@@ -6450,11 +6715,7 @@ struct GenerateData: Codable {
     // MARK: - Mutations
     
     func toggleTagFavorite(tagId: String, favorite: Bool, completion: @escaping (Bool) -> Void) {
-        let mutation = """
-        mutation TagUpdate($input: TagUpdateInput!) {
-            tagUpdate(input: $input) { id favorite }
-        }
-        """
+        let mutation = GraphQLQueries.tagUpdateFavoriteMutation
         
         let variables: [String: Any] = [
             "input": [
@@ -6485,11 +6746,7 @@ struct GenerateData: Codable {
         description: String?,
         completion: @escaping (Bool) -> Void
     ) {
-        let mutation = """
-        mutation TagUpdate($input: TagUpdateInput!) {
-            tagUpdate(input: $input) { id name description }
-        }
-        """
+        let mutation = GraphQLQueries.tagUpdateDetailsMutation
         var input: [String: Any] = [
             "id": tagId,
             "name": name
@@ -6509,15 +6766,11 @@ struct GenerateData: Codable {
     
     func showScene(sceneId: String) {
         // Implement logic to show scene details or play it
-        print("Show scene not implemented")
+        AppLog.debug("Show scene not implemented")
     }
 
     func updateImageRating(imageId: String, rating100: Int?, completion: @escaping (Bool) -> Void) {
-        let mutation = """
-        mutation ImageUpdate($input: ImageUpdateInput!) {
-            imageUpdate(input: $input) { id rating100 }
-        }
-        """
+        let mutation = GraphQLQueries.imageUpdateRatingMutation
         
         let variables: [String: Any] = [
             "input": [
@@ -6570,12 +6823,12 @@ struct GenerateData: Codable {
         }
         """
         
-        print("📷 IMAGE O: Sending increment mutation for image \(imageId)")
+        AppLog.debug("📷 IMAGE O: Sending increment mutation for image \(imageId)")
         performGraphQLMutationSilent(query: mutation) { result in
             if let result = result,
                let data = result["data"]?.value as? [String: Any],
                let count = data["imageIncrementO"] as? Int {
-                print("✅ IMAGE O: Success for image \(imageId). New count: \(count)")
+                AppLog.debug("✅ IMAGE O: Success for image \(imageId). New count: \(count)")
                 DispatchQueue.main.async {
                     self.patchImageOCounterInLists(imageId: imageId, oCounter: count)
                     NotificationCenter.default.post(
@@ -6586,7 +6839,7 @@ struct GenerateData: Codable {
                     completion?(count)
                 }
             } else {
-                print("❌ IMAGE O: Failed for image \(imageId)")
+                AppLog.error("❌ IMAGE O: Failed for image \(imageId)")
                 DispatchQueue.main.async {
                     completion?(nil)
                 }
@@ -6595,11 +6848,7 @@ struct GenerateData: Codable {
     }
     
     func updateImageOCounter(imageId: String, oCounter: Int?, completion: @escaping (Bool) -> Void) {
-        let mutation = """
-        mutation ImageUpdate($input: ImageUpdateInput!) {
-            imageUpdate(input: $input) { id o_counter }
-        }
-        """
+        let mutation = GraphQLQueries.imageUpdateOCounterMutation
         
         let variables: [String: Any] = [
             "input": [
@@ -6634,11 +6883,7 @@ struct GenerateData: Codable {
     }
     
     func toggleSceneOrganized(sceneId: String, organized: Bool, completion: @escaping (Bool) -> Void) {
-        let mutation = """
-        mutation SceneUpdate($input: SceneUpdateInput!) {
-            sceneUpdate(input: $input) { id organized }
-        }
-        """
+        let mutation = GraphQLQueries.sceneUpdateOrganizedMutation
         
         let variables: [String: Any] = [
             "input": [
@@ -6663,11 +6908,7 @@ struct GenerateData: Codable {
     }
     
     func updateSceneRating(sceneId: String, rating100: Int?, completion: @escaping (Bool) -> Void) {
-        let mutation = """
-        mutation SceneUpdate($input: SceneUpdateInput!) {
-            sceneUpdate(input: $input) { id rating100 }
-        }
-        """
+        let mutation = GraphQLQueries.sceneUpdateRatingMutation
         
         let variables: [String: Any] = [
             "input": [
@@ -6705,16 +6946,7 @@ struct GenerateData: Codable {
     
     /// Creates a scene marker. Completion receives `(success, createdMarker)`.
     func createSceneMarker(sceneId: String, title: String, seconds: Double, endSeconds: Double? = nil, primaryTagId: String, completion: @escaping (Bool, SceneMarker?) -> Void) {
-        let mutation = """
-        mutation SceneMarkerCreate($input: SceneMarkerCreateInput!) {
-            sceneMarkerCreate(input: $input) {
-                id
-                title
-                seconds
-                screenshot
-            }
-        }
-        """
+        let mutation = GraphQLQueries.sceneMarkerCreateMutation
         
         var input: [String: Any] = [
             "scene_id": sceneId,
@@ -6901,11 +7133,7 @@ struct GenerateData: Codable {
     }
 
     func updateScenePerformers(sceneId: String, performerIds: [String], completion: @escaping (Bool) -> Void) {
-        let mutation = """
-        mutation SceneUpdate($input: SceneUpdateInput!) {
-            sceneUpdate(input: $input) { id performers { id name scene_count gallery_count o_counter updated_at } }
-        }
-        """
+        let mutation = GraphQLQueries.sceneUpdatePerformersMutation
         let variables: [String: Any] = ["input": ["id": sceneId, "performer_ids": performerIds]]
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
               let bodyString = String(data: bodyData, encoding: .utf8) else {
@@ -6917,11 +7145,7 @@ struct GenerateData: Codable {
     }
 
     func updateSceneStudio(sceneId: String, studioId: String?, completion: @escaping (Bool) -> Void) {
-        let mutation = """
-        mutation SceneUpdate($input: SceneUpdateInput!) {
-            sceneUpdate(input: $input) { id studio { id name updated_at } }
-        }
-        """
+        let mutation = GraphQLQueries.sceneUpdateStudioMutation
         var input: [String: Any] = ["id": sceneId]
         if let sid = studioId { input["studio_id"] = sid } else { input["studio_id"] = NSNull() }
         let variables: [String: Any] = ["input": input]
@@ -6935,11 +7159,7 @@ struct GenerateData: Codable {
     }
 
     func updateSceneTags(sceneId: String, tagIds: [String], completion: @escaping (Bool) -> Void) {
-        let mutation = """
-        mutation SceneUpdate($input: SceneUpdateInput!) {
-            sceneUpdate(input: $input) { id tags { id name } }
-        }
-        """
+        let mutation = GraphQLQueries.sceneUpdateTagsMutation
         let variables: [String: Any] = ["input": ["id": sceneId, "tag_ids": tagIds]]
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
               let bodyString = String(data: bodyData, encoding: .utf8) else {
@@ -6951,13 +7171,7 @@ struct GenerateData: Codable {
     }
 
     func fetchAllGroupsForScene(completion: @escaping ([StashGroup]) -> Void) {
-        let query = """
-        query FindGroups($filter: FindFilterType) {
-            findGroups(filter: $filter) {
-                groups { id name updated_at front_image_path }
-            }
-        }
-        """
+        let query = GraphQLQueries.findGroupsForSceneQuery
         let variables: [String: Any] = ["filter": ["per_page": -1, "sort": "name", "direction": "ASC"]]
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
               let bodyString = String(data: bodyData, encoding: .utf8) else { completion([]); return }
@@ -6970,11 +7184,7 @@ struct GenerateData: Codable {
     }
 
     func updateSceneGroups(sceneId: String, groupIds: [String], completion: @escaping (Bool) -> Void) {
-        let mutation = """
-        mutation SceneUpdate($input: SceneUpdateInput!) {
-            sceneUpdate(input: $input) { id groups { group { id name updated_at front_image_path } scene_index } }
-        }
-        """
+        let mutation = GraphQLQueries.sceneUpdateGroupsMutation
         let groupsInput = groupIds.map { ["group_id": $0] }
         let variables: [String: Any] = ["input": ["id": sceneId, "groups": groupsInput]]
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
@@ -6985,11 +7195,7 @@ struct GenerateData: Codable {
     }
 
     func updateSceneTitleAndDetails(sceneId: String, title: String?, details: String?, completion: @escaping (Bool) -> Void) {
-        let mutation = """
-        mutation SceneUpdate($input: SceneUpdateInput!) {
-            sceneUpdate(input: $input) { id title details }
-        }
-        """
+        let mutation = GraphQLQueries.sceneUpdateTitleDetailsMutation
         var input: [String: Any] = ["id": sceneId]
         if let t = title { input["title"] = t } else { input["title"] = NSNull() }
         if let d = details { input["details"] = d } else { input["details"] = NSNull() }
@@ -7005,11 +7211,7 @@ struct GenerateData: Codable {
 
     /// Writes spoken language into Stash scene `custom_fields.language`.
     func updateSceneLanguage(sceneId: String, languageCode: String?, completion: @escaping (Bool) -> Void) {
-        let mutation = """
-        mutation SceneUpdate($input: SceneUpdateInput!) {
-            sceneUpdate(input: $input) { id }
-        }
-        """
+        let mutation = GraphQLQueries.sceneUpdateLanguageMutation
         var partial: [String: Any] = [:]
         if let languageCode, !languageCode.isEmpty {
             partial["language"] = languageCode
@@ -7031,11 +7233,7 @@ struct GenerateData: Codable {
     }
 
     func createPerformer(name: String, completion: @escaping (Performer?) -> Void) {
-        let mutation = """
-        mutation PerformerCreate($input: PerformerCreateInput!) {
-            performerCreate(input: $input) { id name scene_count gallery_count updated_at }
-        }
-        """
+        let mutation = GraphQLQueries.performerCreateMutation
         let variables: [String: Any] = ["input": ["name": name]]
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
               let bodyString = String(data: bodyData, encoding: .utf8) else { completion(nil); return }
@@ -7045,11 +7243,7 @@ struct GenerateData: Codable {
     }
 
     func createStudio(name: String, completion: @escaping (Studio?) -> Void) {
-        let mutation = """
-        mutation StudioCreate($input: StudioCreateInput!) {
-            studioCreate(input: $input) { id name scene_count updated_at }
-        }
-        """
+        let mutation = GraphQLQueries.studioCreateMutation
         let variables: [String: Any] = ["input": ["name": name]]
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
               let bodyString = String(data: bodyData, encoding: .utf8) else { completion(nil); return }
@@ -7059,11 +7253,7 @@ struct GenerateData: Codable {
     }
 
     func createGroup(name: String, completion: @escaping (StashGroup?) -> Void) {
-        let mutation = """
-        mutation GroupCreate($input: GroupCreateInput!) {
-            groupCreate(input: $input) { id name updated_at front_image_path scene_count }
-        }
-        """
+        let mutation = GraphQLQueries.groupCreateMutation
         let variables: [String: Any] = ["input": ["name": name]]
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
               let bodyString = String(data: bodyData, encoding: .utf8) else { completion(nil); return }
@@ -7073,11 +7263,7 @@ struct GenerateData: Codable {
     }
 
     func createTag(name: String, completion: @escaping (Tag?) -> Void) {
-        let mutation = """
-        mutation TagCreate($input: TagCreateInput!) {
-            tagCreate(input: $input) { id name scene_count }
-        }
-        """
+        let mutation = GraphQLQueries.tagCreateMutation
         let variables: [String: Any] = ["input": ["name": name]]
         guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
               let bodyString = String(data: bodyData, encoding: .utf8) else { completion(nil); return }
@@ -7110,11 +7296,7 @@ struct GenerateData: Codable {
     }
     
     func togglePerformerFavorite(performerId: String, favorite: Bool, completion: @escaping (Bool) -> Void) {
-        let mutation = """
-        mutation PerformerUpdate($input: PerformerUpdateInput!) {
-            performerUpdate(input: $input) { id favorite }
-        }
-        """
+        let mutation = GraphQLQueries.performerUpdateFavoriteMutation
         
         let variables: [String: Any] = [
             "input": [
@@ -7139,11 +7321,7 @@ struct GenerateData: Codable {
     }
     
     func setPerformerImage(performerId: String, imageURL: String, completion: @escaping (Bool) -> Void) {
-        let mutation = """
-        mutation PerformerUpdate($input: PerformerUpdateInput!) {
-            performerUpdate(input: $input) { id image_path }
-        }
-        """
+        let mutation = GraphQLQueries.performerUpdateImageMutation
         let variables: [String: Any] = [
             "input": [
                 "id": performerId,
@@ -7162,11 +7340,7 @@ struct GenerateData: Codable {
 
     /// Sets a tag's image from a URL or `data:image/...;base64,…` payload (same as Stash web / performer image).
     func setTagImage(tagId: String, image: String, completion: @escaping (Bool) -> Void) {
-        let mutation = """
-        mutation TagUpdate($input: TagUpdateInput!) {
-            tagUpdate(input: $input) { id }
-        }
-        """
+        let mutation = GraphQLQueries.tagUpdateImageMutation
         let variables: [String: Any] = [
             "input": [
                 "id": tagId,
@@ -7185,11 +7359,7 @@ struct GenerateData: Codable {
 
     /// Sets a scene cover / thumbnail from a URL or `data:image/...;base64,…` payload.
     func setSceneCoverImage(sceneId: String, image: String, completion: @escaping (Bool) -> Void) {
-        let mutation = """
-        mutation SceneUpdate($input: SceneUpdateInput!) {
-            sceneUpdate(input: $input) { id }
-        }
-        """
+        let mutation = GraphQLQueries.sceneUpdateCoverImageMutation
         let variables: [String: Any] = [
             "input": [
                 "id": sceneId,
@@ -7227,15 +7397,7 @@ struct GenerateData: Codable {
         rating100: Int?,
         completion: @escaping (Bool) -> Void
     ) {
-        let mutation = """
-        mutation PerformerUpdate($input: PerformerUpdateInput!) {
-            performerUpdate(input: $input) {
-                id name disambiguation birthdate country gender ethnicity
-                height_cm weight measurements fake_tits penis_length
-                career_length tattoos piercings alias_list rating100
-            }
-        }
-        """
+        let mutation = GraphQLQueries.performerUpdateDetailsMutation
         var input: [String: Any] = [
             "id": performerId,
             "name": name
@@ -7268,11 +7430,7 @@ struct GenerateData: Codable {
     }
 
     func toggleStudioFavorite(studioId: String, favorite: Bool, completion: @escaping (Bool) -> Void) {
-        let mutation = """
-        mutation StudioUpdate($input: StudioUpdateInput!) {
-            studioUpdate(input: $input) { id favorite }
-        }
-        """
+        let mutation = GraphQLQueries.studioUpdateFavoriteMutation
         
         let variables: [String: Any] = [
             "input": [
@@ -7305,11 +7463,7 @@ struct GenerateData: Codable {
         rating100: Int?,
         completion: @escaping (Bool) -> Void
     ) {
-        let mutation = """
-        mutation StudioUpdate($input: StudioUpdateInput!) {
-            studioUpdate(input: $input) { id name url details rating100 }
-        }
-        """
+        let mutation = GraphQLQueries.studioUpdateDetailsMutation
         var input: [String: Any] = [
             "id": studioId,
             "name": name
@@ -7338,11 +7492,7 @@ struct GenerateData: Codable {
         rating100: Int?,
         completion: @escaping (Bool) -> Void
     ) {
-        let mutation = """
-        mutation GroupUpdate($input: GroupUpdateInput!) {
-            groupUpdate(input: $input) { id name date synopsis rating100 }
-        }
-        """
+        let mutation = GraphQLQueries.groupUpdateDetailsMutation
         var input: [String: Any] = [
             "id": groupId,
             "name": name
@@ -7370,11 +7520,7 @@ struct GenerateData: Codable {
         details: String?,
         completion: @escaping (Bool) -> Void
     ) {
-        let mutation = """
-        mutation GalleryUpdate($input: GalleryUpdateInput!) {
-            galleryUpdate(input: $input) { id title date details }
-        }
-        """
+        let mutation = GraphQLQueries.galleryUpdateDetailsMutation
         var input: [String: Any] = [
             "id": galleryId,
             "title": title
@@ -7419,67 +7565,49 @@ extension StashDBViewModel {
             return
         }
 
-        var request = URLRequest(url: url)
+        var request = stashRequest(to: url, config: config)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        if let apiKey = config.secureApiKey, !apiKey.isEmpty {
-            request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
-        }
-        
         request.httpBody = sceneJsonData
 
-        URLSession.shared.dataTask(with: request) { [weak self] data, response, error in
+        StashNetworking.session.dataTask(with: request) { [weak self] data, response, error in
             if let error = error {
-                print("❌ Network error during deletion: \(error.localizedDescription)")
+                AppLog.error("Network error during scene deletion: \(error.localizedDescription)")
                 DispatchQueue.main.async { completion(false) }
                 return
             }
 
-            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                if let data = data {
-                    do {
-                        if let jsonResponse = try JSONSerialization.jsonObject(with: data, options: []) as? [String: Any] {
-                            if let dataDict = jsonResponse["data"] as? [String: Any],
-                               dataDict["sceneDestroy"] != nil {
-                                
-                                if !fileIds.isEmpty {
-                                    Task { @MainActor [weak self] in
-                                        self?.deleteSceneFiles(fileIds: fileIds, config: config) { success in
-                                            DispatchQueue.main.async {
-                                                if success {
-                                                    NotificationCenter.default.post(name: NSNotification.Name("SceneDeleted"), object: nil, userInfo: ["sceneId": sceneId])
-                                                }
-                                                completion(success)
-                                            }
-                                        }
-                                    }
-                                } else {
-                                    DispatchQueue.main.async {
-                                        NotificationCenter.default.post(name: NSNotification.Name("SceneDeleted"), object: nil, userInfo: ["sceneId": sceneId])
-                                        completion(true)
-                                    }
-                                }
-                            } else {
-                                DispatchQueue.main.async { completion(false) }
+            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200,
+                  let data = data,
+                  let jsonResponse = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: Any],
+                  let dataDict = jsonResponse["data"] as? [String: Any],
+                  dataDict["sceneDestroy"] != nil else {
+                DispatchQueue.main.async { completion(false) }
+                return
+            }
+
+            if !fileIds.isEmpty {
+                Task { @MainActor [weak self] in
+                    self?.deleteSceneFiles(fileIds: fileIds, config: config) { success in
+                        DispatchQueue.main.async {
+                            if success {
+                                NotificationCenter.default.post(name: NSNotification.Name("SceneDeleted"), object: nil, userInfo: ["sceneId": sceneId])
                             }
+                            completion(success)
                         }
-                    } catch {
-                        DispatchQueue.main.async { completion(false) }
                     }
                 }
             } else {
-                DispatchQueue.main.async { completion(false) }
+                DispatchQueue.main.async {
+                    NotificationCenter.default.post(name: NSNotification.Name("SceneDeleted"), object: nil, userInfo: ["sceneId": sceneId])
+                    completion(true)
+                }
             }
         }.resume()
     }
 
     private func deleteSceneFiles(fileIds: [String], config: ServerConfig, completion: @escaping (Bool) -> Void) {
-        let filesMutation = """
-        mutation DeleteFiles($ids: [ID!]!) {
-            deleteFiles(ids: $ids)
-        }
-        """
+        let filesMutation = GraphQLQueries.deleteFilesMutation
 
         let variables: [String: Any] = ["ids": fileIds]
         let requestBody: [String: Any] = ["query": filesMutation, "variables": variables]
@@ -7490,26 +7618,20 @@ extension StashDBViewModel {
             return
         }
 
-        var request = URLRequest(url: url)
+        var request = stashRequest(to: url, config: config)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        
-        if let apiKey = config.secureApiKey, !apiKey.isEmpty {
-            request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
-        }
-        
         request.httpBody = jsonData
 
-        URLSession.shared.dataTask(with: request) { data, response, error in
-            if let _ = error {
+        StashNetworking.session.dataTask(with: request) { data, response, error in
+            if let error = error {
+                AppLog.error("Network error during file deletion: \(error.localizedDescription)")
                 DispatchQueue.main.async { completion(false) }
                 return
             }
 
-            if let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 {
-                completion(true)
-            } else {
-                completion(false)
+            DispatchQueue.main.async {
+                completion((response as? HTTPURLResponse)?.statusCode == 200)
             }
         }.resume()
     }
@@ -8043,7 +8165,7 @@ struct Scene: Codable, Identifiable, Equatable {
         // Rule: For compatible formats (MP4), always prefer direct streaming (Original)
         // unless the user specifically requested a different quality and we have a match.
         if isCompatible && (quality == .original) {
-            print("🎬 MP4 detected: Using direct stream for Original quality.")
+            AppLog.debug("🎬 MP4 detected: Using direct stream for Original quality.")
             return nil // Use direct URL from paths?.stream
         }
         
@@ -8067,14 +8189,14 @@ struct Scene: Codable, Identifiable, Equatable {
                     .first?.0
                 
                 if let stream = bestHLS, let url = URL(string: stream.url) {
-                    print("📺 Using HLS stream (\(stream.label)) for quality \(quality.displayName)")
+                    AppLog.debug("📺 Using HLS stream (\(stream.label)) for quality \(quality.displayName)")
                     return url
                 }
             }
             
             // Fallback: Use first HLS if no resolution match or for non-compatible formats
             if let firstHLS = hlsStreams.first, let url = URL(string: firstHLS.url) {
-                print("📺 Using default HLS stream (\(firstHLS.label))")
+                AppLog.debug("📺 Using default HLS stream (\(firstHLS.label))")
                 return url
             }
         }
@@ -8092,7 +8214,7 @@ struct Scene: Codable, Identifiable, Equatable {
                 .first?.0
             
             if let mp4 = matchingMP4, let url = URL(string: mp4.url) {
-                print("⚡ Using MP4 transcode (\(mp4.label)) for quality \(quality.displayName)")
+                AppLog.debug("⚡ Using MP4 transcode (\(mp4.label)) for quality \(quality.displayName)")
                 return url
             }
         }
@@ -8112,7 +8234,7 @@ struct Scene: Codable, Identifiable, Equatable {
         if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
             let localURL = docs.appendingPathComponent("Downloads/\(id)/video.mp4")
             if fileManager.fileExists(atPath: localURL.path) {
-                print("📂 Using local download for scene \(id)")
+                AppLog.debug("📂 Using local download for scene \(id)")
                 return localURL
             }
         }
@@ -8138,7 +8260,7 @@ struct Scene: Codable, Identifiable, Equatable {
         if let files = files, let first = files.first, let fmt = first.format {
             let compatible = ["mp4", "m4v", "mov"]
             if !compatible.contains(fmt.lowercased()) {
-                print("⛔️ Preventing fallback to incompatible '\(fmt)' file for scene \(id)")
+                AppLog.debug("⛔️ Preventing fallback to incompatible '\(fmt)' file for scene \(id)")
                 return nil
             }
         }
@@ -8190,14 +8312,14 @@ struct Scene: Codable, Identifiable, Equatable {
             let r2 = Int(s2.label.lowercased().replacingOccurrences(of: "p", with: "")) ?? 0
             return r1 > r2
         }).first, let url = URL(string: bestMP4.url) {
-            print("💾 Download: Using best MP4 transcode (\(bestMP4.label)) for scene \(id)")
+            AppLog.debug("💾 Download: Using best MP4 transcode (\(bestMP4.label)) for scene \(id)")
             return signedURL(url)
         }
         
         // 2. Fallback to original ONLY if it's compatible (MP4/MOV/etc)
         if isOriginalCompatible {
              if let streamPath = paths?.stream, let url = URL(string: streamPath) {
-                 print("💾 Download: Using compatible original file (\(fileFmt)) for scene \(id)")
+                 AppLog.debug("💾 Download: Using compatible original file (\(fileFmt)) for scene \(id)")
                  return signedURL(url)
              }
         }
@@ -8211,7 +8333,7 @@ struct Scene: Codable, Identifiable, Equatable {
             }
         }
         
-        print("⚠️ Download: No compatible MP4 file found for scene \(id). Original format: \(fileFmt)")
+        AppLog.error("⚠️ Download: No compatible MP4 file found for scene \(id). Original format: \(fileFmt)")
         return nil
     }
     
@@ -8711,7 +8833,7 @@ struct SceneMarker: Codable, Identifiable, Equatable {
             if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
                 let localURL = docs.appendingPathComponent("Downloads/\(sceneId)/video.mp4")
                 if fileManager.fileExists(atPath: localURL.path) {
-                    print("📂 Using local download for marker \(id)")
+                    AppLog.debug("📂 Using local download for marker \(id)")
                     return localURL
                 }
             }
@@ -8738,7 +8860,7 @@ struct SceneMarker: Codable, Identifiable, Equatable {
         if let scene = scene, let files = scene.files, let first = files.first, let fmt = first.format {
             let compatible = ["mp4", "m4v", "mov"]
             if !compatible.contains(fmt.lowercased()) {
-                print("⛔️ Preventing fallback to incompatible '\(fmt)' file for marker \(id)")
+                AppLog.debug("⛔️ Preventing fallback to incompatible '\(fmt)' file for marker \(id)")
                 return nil
             }
         }
@@ -8984,14 +9106,6 @@ struct SceneAggregates: Equatable {
     let durationCount: Int
     let averageDurationSeconds: Double?
     let maxDurationSeconds: Double
-}
-
-struct SinglePerformerResponse: Codable {
-    let data: SinglePerformerData?
-}
-
-struct SinglePerformerData: Codable {
-    let findPerformer: Performer?
 }
 
 struct FindPerformersByIdsResult: Codable {
@@ -9748,25 +9862,27 @@ struct ActiveDownload {
     var downloadedSize: Int64
 }
 
-final class DownloadTaskMap: @unchecked Sendable {
-    nonisolated(unsafe) private var tasks: [Int: (String, URL)] = [:]
-    private let lock = NSLock()
-    
+final class DownloadTaskMap: Sendable {
+    private let tasks = Mutex<[Int: (String, URL)]>([:])
+
     nonisolated init() {}
-    
+
     nonisolated func set(_ taskId: Int, info: (String, URL)) {
-        lock.lock(); defer { lock.unlock() }
-        tasks[taskId] = info
+        tasks.withLock { $0[taskId] = info }
     }
-    
+
     nonisolated func get(_ taskId: Int) -> (String, URL)? {
-        lock.lock(); defer { lock.unlock() }
-        return tasks[taskId]
+        tasks.withLock { $0[taskId] }
     }
-    
+
     nonisolated func remove(_ taskId: Int) -> (String, URL)? {
-        lock.lock(); defer { lock.unlock() }
-        return tasks.removeValue(forKey: taskId)
+        tasks.withLock { $0.removeValue(forKey: taskId) }
+    }
+
+    nonisolated func taskIds(matching id: String) -> [Int] {
+        tasks.withLock { map in
+            map.filter { $0.value.0 == id || $0.value.0 == "\(id)_thumb" }.map(\.key)
+        }
     }
 }
 
@@ -9788,6 +9904,7 @@ class DownloadManager: NSObject, ObservableObject {
         let config = URLSessionConfiguration.background(withIdentifier: "com.stashy.backgroundDownload")
         config.sessionSendsLaunchEvents = true
         config.isDiscretionary = false // Download immediately
+        config.timeoutIntervalForResource = 6 * 60 * 60
         return URLSession(configuration: config, delegate: self, delegateQueue: nil) // Delegate queue nil for background
     }()
 
@@ -9828,7 +9945,7 @@ class DownloadManager: NSObject, ObservableObject {
             if fileManager.fileExists(atPath: item.path, isDirectory: &isDir), isDir.boolValue {
                 if !completedIds.contains(itemName) {
                     try? fileManager.removeItem(at: item)
-                    print("🗑️ Removed incomplete/orphaned download folder: \(itemName)")
+                    AppLog.debug("🗑️ Removed incomplete/orphaned download folder: \(itemName)")
                 }
             }
         }
@@ -9959,10 +10076,25 @@ class DownloadManager: NSObject, ObservableObject {
         if let index = downloads.firstIndex(where: { $0.id == id }) {
             downloads.remove(at: index)
             saveMetadata()
-            
+
             let sceneFolder = downloadsFolder.appendingPathComponent(id, isDirectory: true)
             try? FileManager.default.removeItem(at: sceneFolder)
         }
+    }
+
+    /// Cancels an in-flight download (video + thumbnail tasks) and cleans up partial data.
+    func cancelDownload(id: String) {
+        guard activeDownloads[id] != nil else { return }
+
+        let taskIds = Set(taskMap.taskIds(matching: id))
+        guard !taskIds.isEmpty else { return }
+
+        session.getAllTasks { tasks in
+            for task in tasks where taskIds.contains(task.taskIdentifier) {
+                task.cancel()
+            }
+        }
+        AppLog.debug("📥 DownloadManager: Cancelling download \(id) (\(taskIds.count) task(s))")
     }
     
     func getLocalVideoURL(for scene: DownloadedScene) -> URL {
@@ -9993,7 +10125,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
                 self.completionHandlers.removeValue(forKey: id)
             }
         } catch {
-            print("❌ DownloadManager: Failed to move file: \(error)")
+            AppLog.error("❌ DownloadManager: Failed to move file: \(error)")
             // Failure: Remove task from map and notify
             _ = taskMap.remove(downloadTask.taskIdentifier)
             
@@ -10014,7 +10146,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
         }
         
         // Debug log moved to check if needed, but keeping logic clean first
-        // print("📥 Download Progress: \(totalBytesWritten) / \(totalBytesExpectedToWrite) (...)")
+        // AppLog.debug("📥 Download Progress: \(totalBytesWritten) / \(totalBytesExpectedToWrite) (...)")
         
         if let (id, _) = taskMap.get(downloadTask.taskIdentifier) {
             Task { @MainActor in
@@ -10025,7 +10157,7 @@ extension DownloadManager: URLSessionDownloadDelegate {
     
     nonisolated func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         if let capturedError = error {
-            print("❌ DownloadManager: Task \(task.taskIdentifier) completed with error: \(capturedError)")
+            AppLog.error("❌ DownloadManager: Task \(task.taskIdentifier) completed with error: \(capturedError)")
             
             if let (id, _) = taskMap.remove(task.taskIdentifier) {
                 Task { @MainActor in
@@ -10465,6 +10597,35 @@ extension StashDBViewModel {
             }
         }
     }
+
+    func searchImagesAsync(query: String, limit: Int = 5) async -> [StashImage] {
+        await withCheckedContinuation { continuation in
+            let graphqlQuery = GraphQLQueries.queryWithFragments("findImages")
+
+            let body: [String: Any] = [
+                "query": graphqlQuery,
+                "variables": [
+                    "filter": [
+                        "q": query,
+                        "per_page": limit,
+                        "page": 1,
+                        "sort": "date",
+                        "direction": "DESC"
+                    ]
+                ]
+            ]
+
+            guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
+                  let bodyString = String(data: bodyData, encoding: .utf8) else {
+                continuation.resume(returning: [])
+                return
+            }
+
+            performGraphQLQuery(query: bodyString) { (response: GalleryImagesResponse?) in
+                continuation.resume(returning: response?.data?.findImages.images ?? [])
+            }
+        }
+    }
     
     func searchGalleriesAsync(query: String, limit: Int = 5) async -> [Gallery] {
         await withCheckedContinuation { continuation in
@@ -10551,12 +10712,38 @@ extension StashDBViewModel {
             return
         }
 
-        performGraphQLQuery(query: bodyString) { (response: SceneStreamsResponse?) in
-            let streams = response?.data?.sceneStreams ?? []
-            print("📺 Fetched \(streams.count) transcoded streams for scene \(sceneId)")
-            SceneStreamsRAMCache.shared.set(streams, for: sceneId)
-            DispatchQueue.main.async {
-                completion(streams)
+        performGraphQLQuery(query: bodyString, clearsGlobalErrorMessageOnStart: false, setsGlobalLoading: false) { (response: SceneStreamsResponse?) in
+            if let response {
+                let streams = response.data?.sceneStreams ?? []
+                AppLog.debug("📺 Fetched \(streams.count) transcoded streams for scene \(sceneId)")
+                // Cache only real results — an empty list here is usually a failed
+                // request (nil response path below), and caching that would black-hole
+                // the reel's stream resolution for the whole TTL.
+                if !streams.isEmpty {
+                    SceneStreamsRAMCache.shared.set(streams, for: sceneId)
+                }
+                DispatchQueue.main.async {
+                    completion(streams)
+                }
+            } else {
+                AppLog.error("📺 Stream resolution failed for scene \(sceneId) — not caching, caller may retry")
+                DispatchQueue.main.async {
+                    completion([])
+                }
+            }
+        }
+    }
+
+    /// Warms `SceneStreamsRAMCache` right after a feed page lands so the first visible
+    /// rows can create their players synchronously. This removes the cold-start race
+    /// where row mount, player setup and stream resolution all collide during the
+    /// initial request burst (black first cell).
+    func prefetchSceneStreams(sceneIds: [String], limit: Int = 4) {
+        guard activeReelsFeed == .scenes else { return }
+        let generation = streamPrefetchGeneration
+        for id in sceneIds.prefix(limit) where SceneStreamsRAMCache.shared.streams(for: id) == nil {
+            fetchSceneStreams(sceneId: id) { [weak self] _ in
+                guard let self, generation == self.streamPrefetchGeneration else { return }
             }
         }
     }
@@ -10663,21 +10850,21 @@ class HandyManager: ObservableObject {
 
     private func setupStashSync() {
         let modeStr = deviceType == "Oh." ? "HVP" : "HAMP"
-        print("📲 Handy v3: setupStashSync() — starting \(modeStr)")
+        AppLog.debug("📲 Handy v3: setupStashSync() — starting \(modeStr)")
         // Put device in HAMP/HVP mode (mode2 = 0) then start motion
         sendRequest(path: "/mode2", method: "PUT", params: ["mode": 0]) { [weak self] result in
             guard let self = self else { return }
             switch result {
             case .success(let data):
                 let body = String(data: data, encoding: .utf8) ?? "(empty)"
-                print("📲 Handy /mode2 response: \(body)")
+                AppLog.debug("📲 Handy /mode2 response: \(body)")
             case .failure(let e):
-                print("❌ Handy /mode2 failed: \(e.localizedDescription)")
+                AppLog.error("❌ Handy /mode2 failed: \(e.localizedDescription)")
             }
             if self.deviceType == "Oh." {
                 self.sendRequest(path: "/hvp/start", method: "PUT") { r in
-                    if case .success(let d) = r { print("📲 Handy /hvp/start: \(String(data: d, encoding: .utf8) ?? "")") }
-                    else if case .failure(let e) = r { print("❌ Handy /hvp/start failed: \(e)") }
+                    if case .success(let d) = r { AppLog.debug("📲 Handy /hvp/start: \(String(data: d, encoding: .utf8) ?? "")") }
+                    else if case .failure(let e) = r { AppLog.error("❌ Handy /hvp/start failed: \(e)") }
                 }
             } else {
                 // Set stroke range before starting
@@ -10686,8 +10873,8 @@ class HandyManager: ObservableObject {
                 let slideMax = min(100, 50.0 + halfStroke)
                 self.sendRequest(path: "/hamp/slide", method: "PUT", params: ["min": slideMin, "max": slideMax]) { _ in }
                 self.sendRequest(path: "/hamp/start", method: "PUT") { r in
-                    if case .success(let d) = r { print("📲 Handy /hamp/start: \(String(data: d, encoding: .utf8) ?? "")") }
-                    else if case .failure(let e) = r { print("❌ Handy /hamp/start failed: \(e)") }
+                    if case .success(let d) = r { AppLog.debug("📲 Handy /hamp/start: \(String(data: d, encoding: .utf8) ?? "")") }
+                    else if case .failure(let e) = r { AppLog.error("❌ Handy /hamp/start failed: \(e)") }
                 }
             }
         }
@@ -10699,7 +10886,7 @@ class HandyManager: ObservableObject {
                 guard let self = self else { return }
                 if !self.isStashSyncMode || !self.isConnected || !self.isEnabled {
                     if intensity > 0.05 {
-                        print("📲 Handy StashSync BLOCKED — isStashSyncMode:\(self.isStashSyncMode) isConnected:\(self.isConnected) isEnabled:\(self.isEnabled) intensity:\(intensity)")
+                        AppLog.debug("📲 Handy StashSync BLOCKED — isStashSyncMode:\(self.isStashSyncMode) isConnected:\(self.isConnected) isEnabled:\(self.isEnabled) intensity:\(intensity)")
                     }
                     return
                 }
@@ -10764,7 +10951,7 @@ class HandyManager: ObservableObject {
                        let connected = resultObj["connected"] as? Bool {
                         self.isConnected = connected
                         self.statusMessage = connected ? "Connected" : "Device Offline"
-                        print("📲 Handy v3: connected=\(connected)")
+                        AppLog.debug("📲 Handy v3: connected=\(connected)")
                         completion?(connected)
                     } else {
                         self.isConnected = false
@@ -10774,7 +10961,7 @@ class HandyManager: ObservableObject {
                 case .failure(let error):
                     self.isConnected = false
                     self.statusMessage = "Offline"
-                    print("❌ Handy v3: checkConnection failed: \(error.localizedDescription)")
+                    AppLog.error("❌ Handy v3: checkConnection failed: \(error.localizedDescription)")
                     completion?(false)
                 }
             }
@@ -10785,7 +10972,7 @@ class HandyManager: ObservableObject {
 
     func setupScene(funscriptURL: URL, at seconds: Double? = nil) {
         #if DEBUG
-        print("📲 Handy v3: setupScene \(redactedURLString(funscriptURL))")
+        AppLog.debug("📲 Handy v3: setupScene \(redactedURLString(funscriptURL))")
         #endif
         isStashSyncMode = false
 
@@ -10812,7 +10999,7 @@ class HandyManager: ObservableObject {
 
     private func executeHSSPSetup(url: URL, at seconds: Double?) {
         #if DEBUG
-        print("📲 Handy v3: HSSP setup → \(redactedURLString(url))")
+        AppLog.debug("📲 Handy v3: HSSP setup → \(redactedURLString(url))")
         #endif
         sendRequest(path: "/mode2", method: "PUT", params: ["mode": 1]) { [weak self] result in
             guard let self = self else { return }
@@ -10828,19 +11015,19 @@ class HandyManager: ObservableObject {
                         case .success(let data):
                             #if DEBUG
                             if let str = String(data: data, encoding: .utf8) {
-                                print("📲 Handy v3: HSSP setup response: \(str)")
+                                AppLog.debug("📲 Handy v3: HSSP setup response: \(str)")
                             }
                             #endif
                             self.isSyncing = true
                             self.statusMessage = "Synced & Ready"
                             #if DEBUG
-                            print("✅ Handy v3: HSSP setup successful")
+                            AppLog.debug("✅ Handy v3: HSSP setup successful")
                             #endif
                             if let seconds = seconds { self.play(at: seconds) }
                         case .failure(let error):
                             self.statusMessage = "Sync Failed"
                             #if DEBUG
-                            print("❌ Handy v3: HSSP setup failed: \(error.localizedDescription)")
+                            AppLog.error("❌ Handy v3: HSSP setup failed: \(error.localizedDescription)")
                             #endif
                         }
                     }
@@ -10856,21 +11043,21 @@ class HandyManager: ObservableObject {
 
     private func uploadToHandyCloud(sourceUrl: URL, completion: @escaping (URL?) -> Void) {
         #if DEBUG
-        print("📲 Handy v3 Bridge: downloading \(redactedURLString(sourceUrl))...")
+        AppLog.debug("📲 Handy v3 Bridge: downloading \(redactedURLString(sourceUrl))...")
         #endif
         let request = authenticatedFunscriptRequest(from: sourceUrl)
         URLSession.shared.dataTask(with: request) { data, response, error in
             guard let data = data, error == nil else {
                 #if DEBUG
                 let errMsg = error?.localizedDescription ?? "no data"
-                print("❌ Handy v3 Bridge: download failed: \(errMsg)")
+                AppLog.error("❌ Handy v3 Bridge: download failed: \(errMsg)")
                 #endif
                 completion(nil)
                 return
             }
             if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
                 #if DEBUG
-                print("❌ Handy v3 Bridge: download HTTP \(http.statusCode)")
+                AppLog.error("❌ Handy v3 Bridge: download HTTP \(http.statusCode)")
                 #endif
                 completion(nil)
                 return
@@ -10893,7 +11080,7 @@ class HandyManager: ObservableObject {
                       let urlStr = json["url"] as? String,
                       let remoteUrl = URL(string: urlStr) else {
                     #if DEBUG
-                    print("❌ Handy v3 Bridge: upload failed")
+                    AppLog.error("❌ Handy v3 Bridge: upload failed")
                     #endif
                     completion(nil)
                     return
@@ -10914,8 +11101,8 @@ class HandyManager: ObservableObject {
             "serverTime": Int64(Date().timeIntervalSince1970 * 1000)
         ]) { result in
             switch result {
-            case .success: print("✅ Handy v3: play acknowledged")
-            case .failure(let e): print("❌ Handy v3: play failed: \(e.localizedDescription)")
+            case .success: AppLog.debug("✅ Handy v3: play acknowledged")
+            case .failure(let e): AppLog.error("❌ Handy v3: play failed: \(e.localizedDescription)")
             }
         }
     }
@@ -10929,8 +11116,8 @@ class HandyManager: ObservableObject {
 
         guard isConnected && isSyncing else { return }
         sendRequest(path: "/hssp/stop", method: "PUT") { result in
-            if case .failure(let e) = result { print("❌ Handy v3: pause failed: \(e.localizedDescription)") }
-            else { print("✅ Handy v3: pause acknowledged") }
+            if case .failure(let e) = result { AppLog.error("❌ Handy v3: pause failed: \(e.localizedDescription)") }
+            else { AppLog.debug("✅ Handy v3: pause acknowledged") }
         }
     }
 
@@ -10969,14 +11156,14 @@ class HandyManager: ObservableObject {
         let task = URLSession.shared.dataTask(with: request) { data, response, error in
             if let error = error {
                 if (error as NSError).code == NSURLErrorCancelled { return }
-                print("❌ Handy v3: \(method) \(path) error: \(error.localizedDescription)")
+                AppLog.error("❌ Handy v3: \(method) \(path) error: \(error.localizedDescription)")
                 completion(.failure(error))
                 return
             }
             if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
                 let msg = data.flatMap { String(data: $0, encoding: .utf8) } ?? "unknown"
                 if path != "/hvp/state" && path != "/hamp/velocity" {
-                    print("❌ Handy v3: \(method) \(path) [\(http.statusCode)] \(msg)")
+                    AppLog.error("❌ Handy v3: \(method) \(path) [\(http.statusCode)] \(msg)")
                 }
                 completion(.failure(NSError(domain: "HandyManager", code: http.statusCode,
                     userInfo: [NSLocalizedDescriptionKey: msg])))
@@ -11040,7 +11227,7 @@ class ButtplugManager: ObservableObject {
     
     
     private func setupStashSync() {
-        print("📱 Buttplug: setupStashSync() initiated")
+        AppLog.debug("📱 Buttplug: setupStashSync() initiated")
         #if !os(tvOS)
         stashCancellable = StashSyncManager.shared.currentIntensityPublisher
             .receive(on: DispatchQueue.main)
@@ -11119,7 +11306,7 @@ class ButtplugManager: ObservableObject {
         
         webSocket?.send(.string(string)) { error in
             if let error = error {
-                print("❌ Buttplug: Send failed: \(error)")
+                AppLog.error("❌ Buttplug: Send failed: \(error)")
                 // Do not disconnect immediately on send failure to avoid UI flickering during sync
             }
         }
@@ -11147,13 +11334,13 @@ class ButtplugManager: ObservableObject {
                     self.isSyncing = true
                     self.isStashSyncMode = false // EXCLUSIVITY
                     self.statusMessage = "Script Loaded"
-                    print("✅ Buttplug: Loaded script with \(script.actions?.count ?? 0) actions")
+                    AppLog.debug("✅ Buttplug: Loaded script with \(script.actions?.count ?? 0) actions")
                     if let seconds = seconds {
                         self.play(at: seconds)
                     }
                 }
             } catch {
-                print("❌ Buttplug: Failed to parse Funscript: \(error)")
+                AppLog.error("❌ Buttplug: Failed to parse Funscript: \(error)")
                 DispatchQueue.main.async {
                     self.statusMessage = "Script Error"
                 }
@@ -11164,7 +11351,7 @@ class ButtplugManager: ObservableObject {
     func play(at seconds: Double) {
         isPlayingScript = true
         guard isConnected, (isSyncing || isStashSyncMode) else {
-            print("📱 Buttplug: Play ignored - Connected: \(isConnected), Mode: \(isSyncing ? "Sync" : "Stash")")
+            AppLog.debug("📱 Buttplug: Play ignored - Connected: \(isConnected), Mode: \(isSyncing ? "Sync" : "Stash")")
             return
         }
         
@@ -11222,7 +11409,7 @@ class ButtplugManager: ObservableObject {
             // Calculate duration from NOW to the next point
             let duration = nextAction.at - currentMs
             if duration > 0 {
-                print("🎬 Buttplug Sync: Target \(nextAction.pos)% in \(duration)ms (Index: \(nextIndex))")
+                AppLog.debug("🎬 Buttplug Sync: Target \(nextAction.pos)% in \(duration)ms (Index: \(nextIndex))")
                 sendMovement(position: Double(nextAction.pos), duration: duration)
                 lastCommandSentAt = Double(nextAction.at)
             }
@@ -11283,7 +11470,7 @@ class ButtplugManager: ObservableObject {
                 }
                 self.receiveMessage()
             case .failure(let error):
-                print("❌ Buttplug: Receive failed: \(error)")
+                AppLog.error("❌ Buttplug: Receive failed: \(error)")
                 DispatchQueue.main.async {
                     self.isConnected = false
                     self.statusMessage = "Offline"
@@ -11313,7 +11500,7 @@ class ButtplugManager: ObservableObject {
                             let supportsLinear = messages["LinearCmd"] != nil
                             let supportsScalar = messages["ScalarCmd"] != nil || messages["VibrateCmd"] != nil
                             self.devices.append(ButtplugDevice(id: id, name: name, supportsScalar: supportsScalar, supportsLinear: supportsLinear))
-                            print("📱 Buttplug: Device Added: \(name) (Scalar: \(supportsScalar), Linear: \(supportsLinear))")
+                            AppLog.debug("📱 Buttplug: Device Added: \(name) (Scalar: \(supportsScalar), Linear: \(supportsLinear))")
                         }
                     }
                 }
@@ -11321,7 +11508,7 @@ class ButtplugManager: ObservableObject {
                 DispatchQueue.main.async {
                     if let id = deviceRemoved["DeviceIndex"] as? Int {
                         self.devices.removeAll(where: { $0.id == id })
-                        print("📱 Buttplug: Device Removed (ID: \(id))")
+                        AppLog.debug("📱 Buttplug: Device Removed (ID: \(id))")
                     }
                 }
             } else if let deviceList = dict["DeviceList"] as? [String: Any],
@@ -11335,12 +11522,12 @@ class ButtplugManager: ObservableObject {
                         let supportsScalar = messages["ScalarCmd"] != nil || messages["VibrateCmd"] != nil
                         return ButtplugDevice(id: id, name: name, supportsScalar: supportsScalar, supportsLinear: supportsLinear)
                     }
-                    print("📱 Buttplug: Found \(self.devices.count) devices")
+                    AppLog.debug("📱 Buttplug: Found \(self.devices.count) devices")
                 }
             } else if let _ = dict["Ok"] as? [String: Any] {
                 // Acknowledgement
             } else if let error = dict["Error"] as? [String: Any] {
-                print("⚠️ Buttplug Error: \(error["ErrorMessage"] ?? "Unknown")")
+                AppLog.error("⚠️ Buttplug Error: \(error["ErrorMessage"] ?? "Unknown")")
             }
         }
     }
@@ -11422,7 +11609,7 @@ class LoveSpouseManager: NSObject, ObservableObject {
     
     
     private func setupStashSync() {
-        print("📱 LoveSpouse: setupStashSync() initiated")
+        AppLog.debug("📱 LoveSpouse: setupStashSync() initiated")
         #if !os(tvOS)
         stashCancellable = StashSyncManager.shared.currentIntensityPublisher
             .receive(on: DispatchQueue.main)
@@ -11472,19 +11659,19 @@ class LoveSpouseManager: NSObject, ObservableObject {
             guard let self = self else { return }
 
             if let error = error {
-                print("❌ LoveSpouse: Network error fetching funscript: \(error)")
+                AppLog.error("❌ LoveSpouse: Network error fetching funscript: \(error)")
                 DispatchQueue.main.async { self.statusMessage = "Network Error" }
                 return
             }
 
             if let http = response as? HTTPURLResponse, http.statusCode != 200 {
-                print("❌ LoveSpouse: Funscript fetch returned HTTP \(http.statusCode) for \(redactedURLString(funscriptURL))")
+                AppLog.error("❌ LoveSpouse: Funscript fetch returned HTTP \(http.statusCode) for \(redactedURLString(funscriptURL))")
                 DispatchQueue.main.async { self.statusMessage = "Script Error (\(http.statusCode))" }
                 return
             }
 
             guard let data = data, !data.isEmpty else {
-                print("❌ LoveSpouse: Funscript data empty for \(redactedURLString(funscriptURL))")
+                AppLog.error("❌ LoveSpouse: Funscript data empty for \(redactedURLString(funscriptURL))")
                 DispatchQueue.main.async { self.statusMessage = "Script Empty" }
                 return
             }
@@ -11495,15 +11682,15 @@ class LoveSpouseManager: NSObject, ObservableObject {
                     self.currentScript = script
                     self.isSyncing = true
                     self.statusMessage = "Script Loaded"
-                    print("✅ LoveSpouse: Loaded script with \(script.actions?.count ?? 0) actions")
+                    AppLog.debug("✅ LoveSpouse: Loaded script with \(script.actions?.count ?? 0) actions")
                     if let seconds = seconds {
                         self.play(at: seconds)
                     }
                 }
             } catch {
-                print("❌ LoveSpouse: Failed to parse Funscript: \(error)")
+                AppLog.error("❌ LoveSpouse: Failed to parse Funscript: \(error)")
                 if let raw = String(data: data, encoding: .utf8)?.prefix(200) {
-                    print("❌ LoveSpouse: Raw response: \(raw)")
+                    AppLog.error("❌ LoveSpouse: Raw response: \(raw)")
                 }
                 DispatchQueue.main.async { self.statusMessage = "Script Error" }
             }
@@ -11513,7 +11700,7 @@ class LoveSpouseManager: NSObject, ObservableObject {
     func play(at seconds: Double) {
         isPlayingScript = true
         guard isConnected, (isSyncing || isStashSyncMode) else {
-            print("📱 LoveSpouse: Play ignored - Connected: \(isConnected), Mode: \(isSyncing ? "Sync" : "Stash")")
+            AppLog.debug("📱 LoveSpouse: Play ignored - Connected: \(isConnected), Mode: \(isSyncing ? "Sync" : "Stash")")
             return
         }
         

@@ -135,7 +135,7 @@ struct SettingsView: View {
         }
         .onAppear {
             if configManager.activeConfig != nil {
-                viewModel.testConnection()
+                viewModel.testConnection(force: true)
             }
             if !stashyPlusOnly && selectedSection == .stashyPlus && !stashyPlus.isUnlocked {
                 selectedSection = .main
@@ -385,7 +385,7 @@ struct SettingsView: View {
                     }
 
                     if !stashyPlus.isUnlocked {
-                        stashyScrollingSectionFooter("Monthly, Yearly, or Lifetime. If you bought stashy as a paid app before 3.0, tap Restore Purchases.")
+                        stashyScrollingSectionFooter("Monthly, Yearly, or Lifetime. If you bought stashy as a paid app before 3.0, or just switched from TestFlight, tap Restore Purchases.")
                     }
 
                     if stashyPlus.shouldOfferPurchases {
@@ -592,7 +592,10 @@ struct SettingsView: View {
     }
 
     private var restoreFailureMessage: String {
-        "No stashy+ subscription or Lifetime purchase on this Apple ID. Pre-3.0 paid-app buyers get Lifetime via Restore Purchases."
+        if storeManager.isAppTransactionSandbox {
+            return "This install is still TestFlight/Sandbox. Open the App Store version and tap Restore Purchases again."
+        }
+        return "No stashy+ subscription or Lifetime purchase on this Apple ID. Pre-3.0 paid-app buyers get Lifetime via Restore Purchases."
     }
 
     private func restorePurchases() async {
@@ -766,6 +769,9 @@ class StoreManager: ObservableObject {
     @Published var lastProductError: String?
     @Published private(set) var purchasingProductID: String?
     @Published var isRestoringPurchases = false
+    /// Last seen `AppTransaction.environment`. Used after Restore to explain a
+    /// still-sandbox install (TestFlight overlay).
+    @Published private(set) var isAppTransactionSandbox = false
 
     var isPurchasing: Bool { purchasingProductID != nil }
 
@@ -811,17 +817,17 @@ class StoreManager: ObservableObject {
             let missing = plusIDs.subtracting(loadedPlus).sorted()
             if self.products.isEmpty {
                 lastProductError = "No stashy+ products returned. For Xcode runs, enable Configuration.storekit on the stashy scheme."
-                print("💬 StoreKit returned 0 stashy+ products for \(plusIDs.sorted())")
+                AppLog.debug("💬 StoreKit returned 0 stashy+ products for \(plusIDs.sorted())")
             } else if !missing.isEmpty {
                 lastProductError = "Missing from StoreKit/App Store Connect: \(missing.joined(separator: ", "))"
-                print("💬 StoreKit loaded \(loadedPlus.sorted()), missing \(missing)")
+                AppLog.debug("💬 StoreKit loaded \(loadedPlus.sorted()), missing \(missing)")
             } else {
                 lastProductError = nil
-                print("💬 StoreKit loaded products: \(loaded.map(\.id))")
+                AppLog.debug("💬 StoreKit loaded products: \(loaded.map(\.id))")
             }
         } catch {
             lastProductError = error.localizedDescription
-            print("Failed product request from the App Store server: \(error)")
+            AppLog.debug("Failed product request from the App Store server: \(error)")
         }
     }
 
@@ -915,7 +921,7 @@ class StoreManager: ObservableObject {
         )
 
         if StashyPlusManager.shared.isUnlocked {
-            print("✅ stashy+ entitlement synced (\(StashyPlusManager.shared.source.rawValue))")
+            AppLog.debug("✅ stashy+ entitlement synced (\(StashyPlusManager.shared.source.rawValue))")
         }
     }
 
@@ -926,7 +932,12 @@ class StoreManager: ObservableObject {
         do {
             try await AppStore.sync()
         } catch {
-            print("AppStore.sync failed: \(error)")
+            AppLog.debug("AppStore.sync failed: \(error)")
+        }
+        do {
+            _ = try await AppTransaction.refresh()
+        } catch {
+            AppLog.debug("AppTransaction.refresh failed: \(error)")
         }
         await syncUnlockFromStore()
     }
@@ -940,7 +951,7 @@ class StoreManager: ObservableObject {
         do {
             try await AppStore.showManageSubscriptions(in: scene)
         } catch {
-            print("Manage subscriptions failed: \(error)")
+            AppLog.debug("Manage subscriptions failed: \(error)")
         }
     }
 
@@ -962,16 +973,32 @@ class StoreManager: ObservableObject {
         do {
             let result = try await AppTransaction.shared
             let appTransaction = try Self.checkVerifiedStatic(result)
-            if appTransaction.environment == .sandbox || appTransaction.environment == .xcode {
-                print("ℹ️ Skipping paid-app grandfathering in \(appTransaction.environment) (originalAppVersion=\(appTransaction.originalAppVersion))")
+            let environment = appTransaction.environment
+            let original = appTransaction.originalAppVersion
+            let purchased = appTransaction.originalPurchaseDate
+            let decision = StashyPlusManager.legacyPaidAppDecision(
+                environment: environment,
+                originalAppVersion: original,
+                originalPurchaseDate: purchased
+            )
+            await MainActor.run {
+                StoreManager.shared.isAppTransactionSandbox =
+                    environment == .sandbox || environment == .xcode
+            }
+            switch decision {
+            case .yes:
+                AppLog.debug("ℹ️ AppTransaction originalAppVersion=\(original) purchased=\(purchased) environment=\(environment) pre-3.0 paid=true")
+                return .yes
+            case .no:
+                if environment == .sandbox || environment == .xcode {
+                    AppLog.debug("ℹ️ Skipping paid-app grandfathering in \(environment) (App Store purchases only; originalAppVersion=\(original))")
+                } else {
+                    AppLog.debug("ℹ️ AppTransaction originalAppVersion=\(original) purchased=\(purchased) environment=\(environment) pre-3.0 paid=false")
+                }
                 return .no
             }
-            let original = appTransaction.originalAppVersion
-            let isLegacy = StashyPlusManager.isLegacyPaidAppVersion(original)
-            print("ℹ️ AppTransaction originalAppVersion=\(original) pre-3.0 paid=\(isLegacy)")
-            return isLegacy ? .yes : .no
         } catch {
-            print("AppTransaction check failed: \(error)")
+            AppLog.debug("AppTransaction check failed: \(error)")
             return .unknown
         }
     }

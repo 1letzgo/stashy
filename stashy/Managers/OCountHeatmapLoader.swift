@@ -427,7 +427,7 @@ final class OCountHeatmapLoader: ObservableObject {
             hasLoaded = true
             didFail = false
         } catch {
-            print("❌ O-Count heatmap: \(error)")
+            AppLog.error("❌ O-Count heatmap: \(error)")
             didFail = true
             countsByDay = [:]
             itemsByDay = [:]
@@ -479,7 +479,7 @@ final class OCountHeatmapLoader: ObservableObject {
         do {
             return try await fetchImageEvents(updatedSince: start)
         } catch {
-            print("❌ O-Count recent images: \(error)")
+            AppLog.error("❌ O-Count recent images: \(error)")
             return []
         }
     }
@@ -712,7 +712,7 @@ final class OCountHeatmapLoader: ObservableObject {
         do {
             return try await work()
         } catch {
-            print("❌ O-Count heatmap: \(error)")
+            AppLog.error("❌ O-Count heatmap: \(error)")
             return nil
         }
     }
@@ -1092,7 +1092,7 @@ final class OCountHeatmapLoader: ObservableObject {
                 countOnDay: max(1, image.o_counter ?? 1)
             )
         } catch {
-            print("❌ O-Count hydrate image: \(error)")
+            AppLog.error("❌ O-Count hydrate image: \(error)")
             return nil
         }
     }

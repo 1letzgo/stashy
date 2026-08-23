@@ -31,7 +31,7 @@ struct ServerListSection: View {
                     onConnect: {
                         configManager.saveConfig(server)
                         viewModel.resetData()
-                        viewModel.testConnection()
+                        viewModel.testConnection(force: true)
                         viewModel.fetchStatistics()
                         coordinator.resetAllStacks()
                     },

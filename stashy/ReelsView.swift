@@ -285,7 +285,17 @@ struct ReelsViewBody: View {
     @State private var showStashSyncSheet = false
     @State private var scrubberState = ScrubberState()
     @State private var isInitialized = false
+    /// Reentrancy guard: SwiftUI can fire `onAppear` multiple times during tab
+    /// remounts before `isInitialized` flips — each pass would re-bootstrap and
+    /// reset arrays/players mid-mount (black first cell).
+    @State private var isBootstrapping = false
     @State private var playTrigger = 0  // Incremented when first item should autoplay
+    /// Coalesces `activateFeed` delayed play kicks so mode switches don't stack timers.
+    @State private var feedActivationGeneration = 0
+    /// `reelsListView` is in the hierarchy (not the loading overlay).
+    @State private var reelsListMounted = false
+    /// Data is ready (or will be) — play only after the list has appeared and settled.
+    @State private var pendingFeedActivation = false
     @State private var pendingRestoreId: String? = nil
     @State private var shouldScrollToTopAfterCriterionChange: Bool = false
 
@@ -714,6 +724,10 @@ struct ReelsViewBody: View {
             studio: selectedStudio,
             mode: .images
         )
+        vm.abandonInactiveReelsFeeds(keeping: .clips)
+        if let signature = reelsFeedSignature(for: .clips) {
+            vm.rememberReelsFeedSignature(signature)
+        }
         vm.fetchClips(
             sortBy: reelsClipImageFilters.selectedSortOption,
             filter: merged,
@@ -723,7 +737,6 @@ struct ReelsViewBody: View {
         vm.clearReelsCriterionFrozenSnapshots()
         currentVisibleSceneId = nil
         saveSessionState(for: .clips)
-        playTrigger += 1
     }
 
     private func reelsRefreshSceneLivePresets() {
@@ -1127,9 +1140,19 @@ struct ReelsViewBody: View {
             currentVisibleSceneId = targetId
             return
         }
+        // Restores driven by a *saved* position: all feed types run on seeded random
+        // standard filters (`random_<seed>`), so pages stay stable within a session
+        // and the target remains findable — a generous chase is safe and correct.
         pendingRestoreId = targetId
+        restorePageBudget = Self.maxRestorePages
         continuePagedRestoreIfNeeded()
     }
+
+    /// Pages loaded while chasing a restore target. Prevents an unreachable target
+    /// (e.g. saved position without preview/stream after filter change) from paging
+    /// through the whole library. Generous: deep saved positions need many pages.
+    static let maxRestorePages = 24
+    @State private var restorePageBudget: Int = 0
 
     private func continuePagedRestoreIfNeeded() {
         guard let targetId = pendingRestoreId else { return }
@@ -1140,19 +1163,30 @@ struct ReelsViewBody: View {
             return
         }
 
+        // Stop when the chase budget is exhausted — give up on the target so it
+        // cannot re-trigger paging on every future items change.
+        guard restorePageBudget > 0 else {
+            pendingRestoreId = nil
+            return
+        }
+
         // Load more until we either find it or run out of pages.
         switch reelsMode {
         case .scenes:
             guard viewModel.hasMoreScenes, !viewModel.isLoadingMoreScenes else { return }
+            restorePageBudget -= 1
             viewModel.loadMoreScenes()
         case .markers:
             guard viewModel.hasMoreMarkers, !viewModel.isLoadingMarkers else { return }
+            restorePageBudget -= 1
             viewModel.loadMoreMarkers()
         case .clips:
             guard viewModel.hasMoreClips, !viewModel.isLoadingClips else { return }
+            restorePageBudget -= 1
             viewModel.loadMoreClips()
         case .previews:
             guard viewModel.hasMorePreviews, !viewModel.isLoadingMorePreviews else { return }
+            restorePageBudget -= 1
             viewModel.loadMorePreviews()
         case .pics: break
         }
@@ -1542,6 +1576,115 @@ struct ReelsViewBody: View {
         }
     }
 
+    private func reelsFeedKind(for mode: ReelsMode) -> StashDBViewModel.ReelsFeedKind? {
+        switch mode {
+        case .scenes: return .scenes
+        case .markers: return .markers
+        case .clips: return .clips
+        case .previews: return .previews
+        case .pics: return nil
+        }
+    }
+
+    /// Criteria identity for the given mode — used to skip a page-1 refetch when the VM list is still valid.
+    private func reelsFeedSignature(for mode: ReelsMode) -> StashDBViewModel.ReelsFeedSignature? {
+        guard let kind = reelsFeedKind(for: mode) else { return nil }
+        switch mode {
+        case .scenes:
+            return viewModel.makeReelsFeedSignature(
+                kind: kind,
+                sortField: selectedSortOption.sortField,
+                direction: selectedSortOption.direction,
+                filterId: selectedFilter?.id,
+                liveFilter: reelsSceneLiveChips.effectiveLiveFilter(for: selectedFilter),
+                performerId: selectedPerformer?.id,
+                tagIds: selectedTags.map(\.id),
+                studioId: selectedStudio?.id
+            )
+        case .markers:
+            return viewModel.makeReelsFeedSignature(
+                kind: kind,
+                sortField: selectedMarkerSortOption.sortField,
+                direction: selectedMarkerSortOption.direction,
+                filterId: selectedMarkerFilter?.id,
+                liveFilter: reelsMarkerLiveChips.effectiveLiveFilter(for: selectedMarkerFilter),
+                performerId: selectedPerformer?.id,
+                tagIds: selectedTags.map(\.id),
+                studioId: selectedStudio?.id
+            )
+        case .clips:
+            return viewModel.makeReelsFeedSignature(
+                kind: kind,
+                sortField: reelsClipImageFilters.selectedSortOption.sortField,
+                direction: reelsClipImageFilters.selectedSortOption.direction,
+                filterId: reelsClipImageFilters.selectedFilter?.id,
+                liveFilter: reelsClipImageFilters.imageLiveFragmentForFetch(),
+                performerId: selectedPerformer?.id,
+                tagIds: selectedTags.map(\.id),
+                studioId: selectedStudio?.id
+            )
+        case .previews:
+            return viewModel.makeReelsFeedSignature(
+                kind: kind,
+                sortField: selectedSortOption.sortField,
+                direction: selectedSortOption.direction,
+                filterId: selectedPreviewFilter?.id,
+                liveFilter: reelsPreviewLiveChips.effectiveLiveFilter(for: selectedPreviewFilter),
+                performerId: selectedPerformer?.id,
+                tagIds: selectedTags.map(\.id),
+                studioId: selectedStudio?.id
+            )
+        case .pics:
+            return nil
+        }
+    }
+
+    private func isWarmFeed(for mode: ReelsMode) -> Bool {
+        guard let kind = reelsFeedKind(for: mode),
+              let signature = reelsFeedSignature(for: mode) else { return false }
+        return viewModel.hasWarmReelsFeed(kind, signature: signature)
+    }
+
+    /// Queue play until GraphQL page-1 is in and `reelsListView` is actually on screen.
+    /// Calling this while the loading overlay is up wastes `playTrigger` (no rows exist yet).
+    private func activateFeed() {
+        requestFeedActivation()
+    }
+
+    private func requestFeedActivation() {
+        guard reelsMode != .pics else { return }
+        guard coordinator.selectedTab == .reels else { return }
+        pendingFeedActivation = true
+        guard !isFeedLoading, !isListEmpty else { return }
+        autoSelectFirstItem(bumpPlay: false)
+        guard reelsListMounted else { return }
+        activateFeedAfterListSettles()
+    }
+
+    /// First paint of a mode remounts the list; paging emits `.animating` after this frame.
+    /// Kick on the next runloop, then again after layout/paging has had time to go idle.
+    private func activateFeedAfterListSettles() {
+        guard reelsMode != .pics else { return }
+        guard !isFeedLoading, !isListEmpty else { return }
+        feedActivationGeneration += 1
+        let generation = feedActivationGeneration
+        let kick = {
+            guard generation == self.feedActivationGeneration else { return }
+            guard self.coordinator.selectedTab == .reels, self.reelsMode != .pics else { return }
+            guard !self.isFeedLoading, !self.isListEmpty else { return }
+            self.isUserScrollingReels = false
+            self.currentItemIsPlaying = true
+            self.reelsWasPlayingBeforeScrollGesture = true
+            ReelsPlayerRegistry.resumePlayback()
+            self.autoSelectFirstItem(bumpPlay: false)
+            self.playTrigger += 1
+            self.pendingFeedActivation = false
+        }
+        DispatchQueue.main.async(execute: kick)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.55, execute: kick)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.25, execute: kick)
+    }
+
     /// After clearing a Feeds deep-link, allow Settings default filter again.
     private func reelsPicsRestoreDefaultFilterAfterDeepLinkIfNeeded() {
         guard reelsPicsFilters.suppressSettingsDefaultFilter else { return }
@@ -1743,32 +1886,50 @@ struct ReelsViewBody: View {
         let sceneLiveForMarkers = stripLiveChips ? nil : reelsMarkerLiveChips.effectiveLiveFilter(for: resolvedMarkerFilterEarly)
         let sceneLiveForPreviews = stripLiveChips ? nil : reelsPreviewLiveChips.effectiveLiveFilter(for: resolvedPreviewFilter)
 
-        if !usedFrozenRestore {
-            switch currentMode {
-            case .scenes:
-                viewModel.fetchScenes(sortBy: selectedSortOption, filter: mergedSceneFilter, liveFilter: sceneLiveForScenes)
-            case .markers:
-                viewModel.fetchSceneMarkers(sortBy: selectedMarkerSortOption, filter: mergedMarkerFilter, liveFilter: sceneLiveForMarkers)
-            case .clips:
-                viewModel.fetchClips(
-                    sortBy: reelsClipImageFilters.selectedSortOption,
-                    filter: mergedClipFilter,
-                    isInitialLoad: true,
-                    liveFilter: stripLiveChips ? [:] : reelsClipImageFilters.imageLiveFragmentForFetch()
-                )
-            case .previews:
-                viewModel.fetchPreviews(sortBy: selectedSortOption, isInitialLoad: true, filter: mergedPreviewFilter, liveFilter: sceneLiveForPreviews)
-            case .pics: break
+        if usedFrozenRestore {
+            saveSessionState(for: currentMode)
+            activateFeed()
+            return
+        }
+
+        if !rerollRandom,
+           let kind = reelsFeedKind(for: currentMode),
+           let signature = reelsFeedSignature(for: currentMode),
+           viewModel.hasWarmReelsFeed(kind, signature: signature) {
+            viewModel.setActiveReelsFeed(kind)
+            saveSessionState(for: currentMode)
+            activateFeed()
+            return
+        }
+
+        if let kind = reelsFeedKind(for: currentMode) {
+            viewModel.abandonInactiveReelsFeeds(keeping: kind)
+            if let signature = reelsFeedSignature(for: currentMode) {
+                viewModel.rememberReelsFeedSignature(signature)
             }
         }
 
-        saveSessionState(for: currentMode)
-        if usedFrozenRestore {
-            playTrigger += 1
+        switch currentMode {
+        case .scenes:
+            viewModel.fetchScenes(sortBy: selectedSortOption, filter: mergedSceneFilter, liveFilter: sceneLiveForScenes)
+        case .markers:
+            viewModel.fetchSceneMarkers(sortBy: selectedMarkerSortOption, filter: mergedMarkerFilter, liveFilter: sceneLiveForMarkers)
+        case .clips:
+            viewModel.fetchClips(
+                sortBy: reelsClipImageFilters.selectedSortOption,
+                filter: mergedClipFilter,
+                isInitialLoad: true,
+                liveFilter: stripLiveChips ? [:] : reelsClipImageFilters.imageLiveFragmentForFetch()
+            )
+        case .previews:
+            viewModel.fetchPreviews(sortBy: selectedSortOption, isInitialLoad: true, filter: mergedPreviewFilter, liveFilter: sceneLiveForPreviews)
+        case .pics: break
         }
+
+        saveSessionState(for: currentMode)
     }
     
-    private func autoSelectFirstItem() {
+    private func autoSelectFirstItem(bumpPlay: Bool = true) {
         guard !currentReelItems.isEmpty else { return }
         let currentPrefix = currentVisibleSceneId?.split(separator: "-").first.map(String.init)
         guard let expectedPrefix = expectedPrefix(for: reelsMode) else { return }
@@ -1786,7 +1947,7 @@ struct ReelsViewBody: View {
                currentReelItems.contains(where: { $0.id == target }) {
                 currentVisibleSceneId = target
                 pendingRestoreId = nil
-                playTrigger += 1
+                if bumpPlay { playTrigger += 1 }
                 return
             }
             // Only fall back to session-RAM savedPosition if NO pending restore
@@ -1797,7 +1958,7 @@ struct ReelsViewBody: View {
                let saved = savedPosition(for: reelsMode),
                currentReelItems.contains(where: { $0.id == saved }) {
                 currentVisibleSceneId = saved
-                playTrigger += 1
+                if bumpPlay { playTrigger += 1 }
                 return
             }
 
@@ -1818,7 +1979,7 @@ struct ReelsViewBody: View {
                 // the background. Don't clear pendingRestoreId here — the snap
                 // will fire once the target is loaded.
                 currentVisibleSceneId = id
-                playTrigger += 1
+                if bumpPlay { playTrigger += 1 }
             }
         }
     }
@@ -2077,7 +2238,11 @@ struct ReelsViewBody: View {
     private var isListEmpty: Bool {
         switch reelsMode {
         case .scenes: return viewModel.scenes.isEmpty
-        case .markers: return viewModel.sceneMarkers.isEmpty
+        case .markers:
+            // Markers without streams are filtered out of the feed — an all-streamless
+            // marker list must count as empty, otherwise the UI renders zero rows
+            // without spinner/error (blank screen).
+            return viewModel.sceneMarkers.allSatisfy { $0.stream == nil || $0.stream!.isEmpty }
         case .clips: return viewModel.clips.isEmpty
         case .previews: return viewModel.previews.isEmpty
         case .pics: return false
@@ -2409,10 +2574,32 @@ struct ReelsViewBody: View {
         let clipCount = viewModel.clips.count
         let previewCount = viewModel.previews.count
         return content
-            .onChange(of: firstSceneId) { _, _ in autoSelectFirstItem(); continuePagedRestoreIfNeeded() }
-            .onChange(of: firstMarkerId) { _, _ in autoSelectFirstItem(); continuePagedRestoreIfNeeded() }
-            .onChange(of: firstClipId) { _, _ in autoSelectFirstItem(); continuePagedRestoreIfNeeded() }
-            .onChange(of: firstPreviewId) { _, _ in autoSelectFirstItem(); continuePagedRestoreIfNeeded() }
+            .onChange(of: firstSceneId) { _, new in
+                guard reelsMode == .scenes, new != nil else { return }
+                continuePagedRestoreIfNeeded()
+                activateFeed()
+            }
+            .onChange(of: firstMarkerId) { _, new in
+                guard reelsMode == .markers, new != nil else { return }
+                continuePagedRestoreIfNeeded()
+                activateFeed()
+            }
+            .onChange(of: firstClipId) { _, new in
+                guard reelsMode == .clips, new != nil else { return }
+                continuePagedRestoreIfNeeded()
+                activateFeed()
+            }
+            .onChange(of: firstPreviewId) { _, new in
+                guard reelsMode == .previews, new != nil else { return }
+                continuePagedRestoreIfNeeded()
+                activateFeed()
+            }
+            .onChange(of: isFeedLoading) { wasLoading, nowLoading in
+                if wasLoading && !nowLoading {
+                    continuePagedRestoreIfNeeded()
+                    activateFeed()
+                }
+            }
             .onChange(of: sceneCount) { _, _ in continuePagedRestoreIfNeeded() }
             .onChange(of: markerCount) { _, _ in continuePagedRestoreIfNeeded() }
             .onChange(of: clipCount) { _, _ in continuePagedRestoreIfNeeded() }
@@ -2625,6 +2812,13 @@ struct ReelsViewBody: View {
     }
 
     private func handleSavedFiltersChanged(_ newValue: [String: StashDBViewModel.SavedFilter]) {
+        // Deep-link already chose filter / overlay / fetch. A late saved-filters
+        // arrival must not inject Settings defaults and reset that timeline.
+        if didConsumeDeepLink {
+            reelsSyncFilterSheetPresetRow()
+            return
+        }
+
         let isCurrentlyEmpty: Bool = {
             switch reelsMode {
             case .scenes: return viewModel.scenes.isEmpty
@@ -2746,7 +2940,7 @@ struct ReelsViewBody: View {
         do {
             try AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         } catch {
-            print("🎬 Reels: Audio deactivation error: \(error)")
+            AppLog.debug("🎬 Reels: Audio deactivation error: \(error)")
         }
     }
 
@@ -2810,6 +3004,7 @@ struct ReelsViewBody: View {
         currentVisibleSceneId = nil
         shouldScrollToTopAfterCriterionChange = true
         viewModel.clearReelsCriterionFrozenSnapshots()
+        viewModel.forgetAllReelsFeedSignatures()
         viewModel.scenes = []
         viewModel.sceneMarkers = []
         viewModel.clips = []
@@ -3038,6 +3233,9 @@ struct ReelsViewBody: View {
         ReelsSessionRAM.clearLegacyUserDefaultsIfNeeded()
         
         applyReelsAudioSession(for: reelsMode)
+        if let kind = reelsFeedKind(for: reelsMode) {
+            viewModel.setActiveReelsFeed(kind)
+        }
 
         // 0. Guard against rotation-triggered onAppear
         if isRotating {
@@ -3050,6 +3248,9 @@ struct ReelsViewBody: View {
         }
 
         if applyPendingReelsNavigationFromCoordinator() {
+            // Deep-link path runs its own fetch cycle — release the bootstrap guard
+            // so the follow-up onAppear can complete normal initialization.
+            isBootstrapping = false
             return
         }
 
@@ -3062,6 +3263,11 @@ struct ReelsViewBody: View {
             reelsResumePlaybackAfterReturn()
             return
         }
+
+        // A bootstrap pass is already running (multi-onAppear remount) — let it finish
+        // instead of issuing a duplicate initial fetch that resets the feed mid-mount.
+        guard !isBootstrapping else { return }
+        isBootstrapping = true
 
         let restartFromTop = shouldRestartFeedFromTop
 
@@ -3140,7 +3346,7 @@ struct ReelsViewBody: View {
                 }
             }()
 
-            if isCurrentlyEmpty && !restartFromTop {
+            if isCurrentlyEmpty && !restartFromTop && !restoredCriterionOverlay {
                 // Priority 2: Try to apply default filter
                 let defaultId: String? = {
                     switch reelsMode {
@@ -3218,34 +3424,15 @@ struct ReelsViewBody: View {
             refetchCurrentReelsModeFromTop()
         } else if restoredCriterionOverlay {
             syncFeedToCriterionOverlay()
-        } else if reelsMode == .clips {
-            // Fresh view identity with warm VM — rebind ScrollView via fetch.
+        } else if reelsMode == .clips, !isWarmFeed(for: .clips) {
             ensureReelsClipsLoaded(rerollRandom: false)
         }
 
         persistSessionReelsMode()
         isInitialized = true
         clearRestartFeedFromTopFlag()
-        if reelsMode != .pics {
-            ReelsPlayerRegistry.resumePlayback()
-            currentItemIsPlaying = true
-            // Remount: old view's `onDisappear` can run after this appear — re-assert play next ticks.
-            DispatchQueue.main.async {
-                guard self.coordinator.selectedTab == .reels else { return }
-                ReelsPlayerRegistry.resumePlayback()
-                self.isUserScrollingReels = false
-                self.currentItemIsPlaying = true
-                self.playTrigger += 1
-            }
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                guard self.coordinator.selectedTab == .reels else { return }
-                ReelsPlayerRegistry.resumePlayback()
-                self.currentItemIsPlaying = true
-                if self.currentVisibleSceneId == nil {
-                    self.autoSelectFirstItem()
-                }
-                self.playTrigger += 1
-            }
+        if reelsMode != .pics, !isListEmpty {
+            activateFeed()
         }
     }
 
@@ -3307,6 +3494,10 @@ struct ReelsViewBody: View {
         } else if hasActiveCriterionOverlay {
             reelsClipImageFilters.selectedFilter = nil
         }
+        if !rerollRandom, isWarmFeed(for: .clips) {
+            activateFeed()
+            return
+        }
         applySettings(
             clipSortBy: sort,
             clipFilter: reelsClipImageFilters.selectedFilter,
@@ -3327,6 +3518,13 @@ struct ReelsViewBody: View {
         NotificationCenter.default.post(name: .reelsPauseAllPlayers, object: nil)
         isMediaZoomed = false
         isUserScrollingReels = false
+        feedActivationGeneration += 1
+
+        if let kind = reelsFeedKind(for: newValue) {
+            viewModel.abandonInactiveReelsFeeds(keeping: kind)
+        } else {
+            viewModel.setActiveReelsFeed(nil)
+        }
 
         if skipNextReelsModeSessionRestore {
             skipNextReelsModeSessionRestore = false
@@ -3334,11 +3532,8 @@ struct ReelsViewBody: View {
             if newValue == .pics {
                 NotificationCenter.default.post(name: .reelsTeardownAllPlayers, object: nil)
                 currentVisibleSceneId = nil
-            } else {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                    guard self.reelsMode != .pics else { return }
-                    self.currentItemIsPlaying = true
-                }
+            } else if !isListEmpty {
+                activateFeed()
             }
             return
         }
@@ -3353,13 +3548,6 @@ struct ReelsViewBody: View {
             // teardown and clear identity — otherwise Clips keep playing under Pics.
             NotificationCenter.default.post(name: .reelsTeardownAllPlayers, object: nil)
             currentVisibleSceneId = nil
-        } else {
-            // Some mode switches may not trigger a scrollPosition/currentVisibleSceneId change
-            // (e.g. when the list is already populated). Resume playback intent shortly after.
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
-                guard self.reelsMode != .pics else { return }
-                self.currentItemIsPlaying = true
-            }
         }
 
         restorePositionIfAvailable(for: newValue, forceIfPrefixMismatch: true)
@@ -3399,6 +3587,20 @@ struct ReelsViewBody: View {
 
         reelsSyncFilterSheetPresetAndLiveChips(for: newValue, savedFilters: viewModel.savedFilters)
 
+        if newValue == .pics {
+            bootstrapReelsPicsFiltersIfNeeded()
+            reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
+            return
+        }
+
+        if isWarmFeed(for: newValue) {
+            pendingFeedActivation = true
+            activateFeed()
+            return
+        }
+
+        pendingFeedActivation = true
+
         switch newValue {
         case .markers:
             applySettings(markerSortBy: selectedMarkerSortOption, markerFilter: selectedMarkerFilter, performer: selectedPerformer, tags: selectedTags, studio: selectedStudio, mode: newValue)
@@ -3409,8 +3611,7 @@ struct ReelsViewBody: View {
         case .previews:
             applySettings(previewSortBy: selectedSortOption, previewFilter: selectedPreviewFilter, performer: selectedPerformer, tags: selectedTags, studio: selectedStudio, mode: newValue)
         case .pics:
-            bootstrapReelsPicsFiltersIfNeeded()
-            reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
+            break
         }
     }
 
@@ -3578,6 +3779,9 @@ struct ReelsViewBody: View {
                         currentItemIsPlaying = true
                     }
                     isUserScrollingReels = false
+                    if pendingFeedActivation {
+                        requestFeedActivation()
+                    }
                 }
             }
             .onChange(of: items.count) { _, _ in
@@ -3596,6 +3800,7 @@ struct ReelsViewBody: View {
                 }
             }
             .onAppear {
+                reelsListMounted = true
                 // When returning from the loading overlay, items.count may already
                 // be at N (first page) but no onChange fires. Ensure paged restore
                 // resumes and attempt a snap if the target is already loaded.
@@ -3612,6 +3817,13 @@ struct ReelsViewBody: View {
                         }
                     }
                 }
+
+                if pendingFeedActivation || currentVisibleSceneId == nil {
+                    requestFeedActivation()
+                }
+            }
+            .onDisappear {
+                reelsListMounted = false
             }
             .onReceive(NotificationCenter.default.publisher(for: UIDevice.orientationDidChangeNotification)) { _ in
                 withAnimation(.easeInOut(duration: 0.3)) { isRotating = true }
@@ -3637,6 +3849,9 @@ struct ReelsViewBody: View {
                 proxy.scrollTo(target, anchor: .top)
             }
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                // The snap's scroll animation emits drift-suppressed phases that can
+                // strand the scroll flag; reset it alongside the play intent.
+                self.isUserScrollingReels = false
                 self.currentItemIsPlaying = true
             }
         }
@@ -4461,6 +4676,7 @@ struct ReelItemView: View {
     /// completions cannot attach a new `AVPlayerItem` after the user has scrolled away.
     @State private var playerSetupGeneration: Int = 0
     @State private var showTagsOverlay = false
+    @State private var playbackWatchdogTask: Task<Void, Never>?
     @Binding var isMenuOpen: Bool
     @Binding var isZoomed: Bool
     @Binding var isRotating: Bool
@@ -4471,6 +4687,12 @@ struct ReelItemView: View {
     /// Live decoded size (accounts for clip rotation / preferredTransform).
     @State private var playbackPresentationSize: CGSize? = nil
     @State private var playbackActivityTracker = ScenePlaybackActivityTracker()
+    /// Skipped Reels must not hit `sceneAddPlay` / `sceneSaveActivity` (those set last_played).
+    @State private var didCreditReelsWatch = false
+    @State private var reelsWatchedSeconds: Double = 0
+    @State private var heldReelsPlayDuration: Double = 0
+
+    private static let reelsMinWatchSecondsBeforePlayCredit: Double = 30
 
     /// Scenes + markers contribute watch time to the parent scene; previews/clips do not.
     private var tracksPlaybackActivity: Bool {
@@ -4561,11 +4783,13 @@ extension ReelItemView {
                         }
                     }
                 }
+                armPlaybackWatchdog()
                 videoSurfaceReadiness.observe(player: player)
             }
             .onDisappear {
                 // LazyVStack can call `onDisappear` briefly while the row is still the centered reel; tearing down
                 // the active `AVPlayer` there causes a second flash when paging settles.
+                disarmPlaybackWatchdog()
                 guard !isActive else { return }
                 cleanupPlayer()
                 cancelAnimationAdvanceTimer()
@@ -4600,7 +4824,9 @@ extension ReelItemView {
                             ReelsPlayerRegistry.playIfAllowed(self.player)
                         }
                     }
+                    armPlaybackWatchdog()
                 } else {
+                    disarmPlaybackWatchdog()
                     if isUserScrolling {
                         player?.pause()
                         player?.rate = 0
@@ -4650,25 +4876,21 @@ extension ReelItemView {
                 }
             }
             .onChange(of: playTrigger) { _, _ in
-                // Fired by autoSelectFirstItem after setting currentVisibleSceneId.
-                // At this point isActive should be true for the correct item.
-                guard isActive && !isUserScrolling else { return }
-                if player == nil { setupPlayer() }
-                if isPlaying && !isRotating {
+                // Fired after `activateFeedAfterListSettles`. Must not require
+                // `!isUserScrolling` — that flag is often still true from the
+                // first paging layout when this fires.
+                guard isActive else { return }
+                if player == nil { setupPlayer(forcePlay: true) }
+                if !isRotating {
                     ReelsPlayerRegistry.playIfAllowed(player)
                     videoSurfaceReadiness.notePlaybackStarted()
-                } else {
-                    videoSurfaceReadiness.resyncFromBoundLayer()
                 }
-                // After nav pop the layer can keep the last frame; force a display refresh.
                 DispatchQueue.main.async {
-                    if self.isActive && self.isPlaying && !self.isRotating && !self.isUserScrolling {
-                        ReelsPlayerRegistry.playIfAllowed(self.player)
-                        self.videoSurfaceReadiness.notePlaybackStarted()
-                    } else {
-                        self.videoSurfaceReadiness.resyncFromBoundLayer()
-                    }
+                    guard self.isActive, !self.isRotating else { return }
+                    ReelsPlayerRegistry.playIfAllowed(self.player)
+                    self.videoSurfaceReadiness.notePlaybackStarted()
                 }
+                armPlaybackWatchdog()
             }
             .onChange(of: isRotating) { _, newValue in
                 if !newValue && isPlaybackActive && isPlaying {
@@ -4768,6 +4990,11 @@ extension ReelItemView {
                         // bis der Player das **erste echte Frame** dekodiert hat (`AVPlayerLayer.isReadyForDisplay`).
                         // Spart pro Karte einen `CustomAsyncImage`-Request + Render-Pass und vermeidet das Aufblitzen
                         // eines Standbilds vor dem Video.
+                        //
+                        // WICHTIG: Der Player-Layer bleibt IMMER sichtbar (kein Opacity-Gating mehr).
+                        // Ein nicht-dekodierter Layer ist schwarz auf schwarzem Grund — visuell identisch.
+                        // Das frühere `isReadyForDisplay`-Gating konnte dauerhaft auf 0 hängen
+                        // (Layer-Instanzwechsel beim Listen-Relayout) → spielendes Video blieb schwarz.
                         if let player = player {
                             FullScreenVideoPlayer(
                                 player: player,
@@ -4777,9 +5004,7 @@ extension ReelItemView {
                                     videoSurfaceReadiness.bind(layer: layer)
                                 }
                             )
-                                .opacity(videoSurfaceReadiness.showsDecodedVideo ? 1 : 0)
-                                .animation(.easeInOut(duration: 0.18), value: videoSurfaceReadiness.showsDecodedVideo)
-                                .allowsHitTesting(false)
+                            .allowsHitTesting(false)
                         }
                     }
                 }
@@ -4968,7 +5193,56 @@ extension ReelItemView {
     }
     
     
-    func setupPlayer() {
+    /// Self-healing for the known "first reel stays black on initial load" stall:
+    /// if the active row should be playing but the player is missing or not actually
+    /// playing, rebuild it. Covers lost play triggers, audio-session hiccups and
+    /// stream-upgrade races that deterministic review could not pin down.
+    private func armPlaybackWatchdog() {
+        guard !item.isAnimated else { return }
+        playbackWatchdogTask?.cancel()
+        playbackWatchdogTask = Task {
+            if await cancellableSleep(nanoseconds: 2_500_000_000) { return }
+            // NOTE: deliberately not gated on `isUserScrolling` — that flag can strand
+            // `true` after initial programmatic scrolling, and this row is active
+            // (never an off-screen flasher), so recovery is always safe here.
+            guard self.isActive,
+                  !ReelsPlayerRegistry.isPlaybackSuspended else { return }
+
+            if self.player == nil {
+                AppLog.error("🎬 Reel watchdog: active row has no player — recovering (scrolling=\(self.isUserScrolling) playing=\(self.isPlaying))")
+                self.setupPlayer(forcePlay: true)
+                ReelsPlayerRegistry.playIfAllowed(self.player)
+                return
+            }
+
+            guard self.player?.timeControlStatus != .playing else {
+                // Playing but no decoded frame surfaced yet — force the readiness fallback.
+                if !self.videoSurfaceReadiness.showsDecodedVideo {
+                    AppLog.error("🎬 Reel watchdog: playing without decoded surface — forcing visibility")
+                    self.videoSurfaceReadiness.notePlaybackStarted()
+                }
+                return
+            }
+            ReelsPlayerRegistry.playIfAllowed(self.player)
+
+            if await cancellableSleep(nanoseconds: 1_200_000_000) { return }
+            guard self.isActive, self.isPlaying else { return }
+            if self.player?.timeControlStatus != .playing {
+                AppLog.error("🎬 Reel watchdog: player stalled after kick — rebuilding")
+                self.cleanupPlayer()
+                self.setupPlayer()
+                ReelsPlayerRegistry.playIfAllowed(self.player)
+                self.videoSurfaceReadiness.notePlaybackStarted()
+            }
+        }
+    }
+
+    private func disarmPlaybackWatchdog() {
+        playbackWatchdogTask?.cancel()
+        playbackWatchdogTask = nil
+    }
+
+    func setupPlayer(forcePlay: Bool = false) {
         // Animations don't need AVPlayer
         guard !item.isAnimated else { return }
         // Off-tab: do not create/upgrade players (createPlayer would re-activate AVAudioSession).
@@ -4979,7 +5253,7 @@ extension ReelItemView {
         if player != nil {
             refreshTimeObserver()
             updateBestStream(generation: playerSetupGeneration)
-            if isPlaying && isPlaybackActive && !isRotating {
+            if !isRotating && (forcePlay || (isPlaying && isPlaybackActive)) {
                 ReelsPlayerRegistry.playIfAllowed(player)
             }
             return
@@ -4989,13 +5263,13 @@ extension ReelItemView {
         let generation = playerSetupGeneration
         
         guard item.sceneID != nil else {
-            if let url = item.videoURL { initPlayer(with: url, generation: generation) }
+            if let url = item.videoURL { initPlayer(with: url, generation: generation, forcePlay: forcePlay) }
             return
         }
         
         // 1. Start with the immediate URL (legacy or cached) for instant playback
         if let url = item.videoURL {
-            initPlayer(with: url, generation: generation)
+            initPlayer(with: url, generation: generation, forcePlay: forcePlay)
         }
         
         // 2. Fetch best stream (MP4/HLS) only for the **active** reel — never for
@@ -5004,18 +5278,40 @@ extension ReelItemView {
     }
     
     private func updateBestStream(generation: Int) {
-        guard let sid = item.sceneID else { return }
-        
+        // Clips use imageURL, markers their own stream, previews previewURL —
+        // a sceneStreams round-trip here only hammers Stash and can replaceCurrentItem
+        // into a black first frame.
+        guard case .scene = item, let sid = item.sceneID else { return }
+
         // Optimization: If we are already using a local file, don't bother fetching streams
         // Local files are already the "best" possible quality/performance.
         if let currentURL = item.videoURL, !currentURL.absoluteString.hasPrefix("http") {
             return
         }
-        
-        // Background fetch for the "best" stream (MP4/HLS)
+
+        fetchBestStreamWithRetry(sceneId: sid, generation: generation, attempt: 0)
+    }
+
+    /// Stream resolution can transiently fail while the initial feed load hammers the
+    /// server (e.g. SQLite lock). Without a retry the reel's player stays `nil` and the
+    /// row renders permanently black (no thumbnail by design).
+    private func fetchBestStreamWithRetry(sceneId sid: String, generation: Int, attempt: Int) {
+        let maxAttempts = 3
         viewModel.fetchSceneStreams(sceneId: sid) { streams in
             guard generation == self.playerSetupGeneration else { return }
-            guard !streams.isEmpty else { return }
+            guard !streams.isEmpty else {
+                guard attempt < maxAttempts - 1 else {
+                    AppLog.error("📺 Stream resolution for scene \(sid) failed after \(maxAttempts) attempts")
+                    return
+                }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.2 * Double(attempt + 1)) {
+                    // Re-fetch is idempotent (RAM cache / fresh request); only skip
+                    // when the row is gone or the player was torn down meanwhile.
+                    guard generation == self.playerSetupGeneration, self.isActive else { return }
+                    self.fetchBestStreamWithRetry(sceneId: sid, generation: generation, attempt: attempt + 1)
+                }
+                return
+            }
             
             let quality = ServerConfigManager.shared.activeConfig?.reelsQuality ?? .sd
             
@@ -5043,7 +5339,7 @@ extension ReelItemView {
         }
     }
     
-    private func initPlayer(with streamURL: URL, generation: Int) {
+    private func initPlayer(with streamURL: URL, generation: Int, forcePlay: Bool = false) {
         guard generation == playerSetupGeneration else { return }
         guard !ReelsPlayerRegistry.isPlaybackSuspended else { return }
         let headers = ["ApiKey": ServerConfigManager.shared.activeConfig?.secureApiKey ?? ""]
@@ -5071,7 +5367,7 @@ extension ReelItemView {
             // Use isPlaying (binding = user intent) in addition to wasPlaying (AVPlayer state)
             // because the player may still be buffering (.waitingToPlayAtSpecifiedRate)
             // when the stream upgrade arrives.
-            if isPlaybackActive && (wasPlaying || isPlaying) {
+            if isActive && (forcePlay || wasPlaying || isPlaying) {
                 existingPlayer.seek(to: currentTime, toleranceBefore: .zero, toleranceAfter: .zero)
                 ReelsPlayerRegistry.playIfAllowed(existingPlayer)
             }
@@ -5084,7 +5380,7 @@ extension ReelItemView {
         ReelsPlayerRegistry.register(player)
         
         player.isMuted = isMuted
-        if isPlaying && isPlaybackActive && !isRotating {
+        if !isRotating && isActive && (forcePlay || isPlaying) {
             ReelsPlayerRegistry.playIfAllowed(player)
         } else {
             player.pause()
@@ -5115,7 +5411,6 @@ extension ReelItemView {
                     player.seek(to: .zero)
                 }
                 ReelsPlayerRegistry.playIfAllowed(player)
-                incrementPlayCount()
             } else if case .clip = self.item {
                 player.seek(to: .zero)
                 ReelsPlayerRegistry.playIfAllowed(player)
@@ -5145,14 +5440,10 @@ extension ReelItemView {
             // Rotation-aware size (especially clips): preferredTransform → presentationSize
             self.syncPlaybackPresentationSize(from: player)
             self.syncPlaybackActivityPosition(from: player)
+            self.noteReelsWatchProgress()
             if self.isPlaying && self.isPlaybackActive && !self.isRotating {
                 self.startPlaybackActivityTrackingIfNeeded()
             }
-        }
-        
-        // Increment play count (initial)
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
-            incrementPlayCount()
         }
 
         if isPlaying && isPlaybackActive && !isRotating {
@@ -5161,9 +5452,27 @@ extension ReelItemView {
     }
     
     func incrementPlayCount() {
-        if let currentCount = item.playCount {
-            onPlayCountChanged(currentCount + 1)
+        switch item {
+        case .scene, .marker:
+            onPlayCountChanged((item.playCount ?? 0) + 1)
+        case .preview, .clip:
+            break
         }
+    }
+
+    /// Count real playback only. Skipping away before 30s must not call `sceneAddPlay`.
+    private func noteReelsWatchProgress(delta: Double = 0.1) {
+        switch item {
+        case .scene, .marker: break
+        case .preview, .clip: return
+        }
+        guard isPlaying, isPlaybackActive, !isRotating else { return }
+        guard !ReelsPlayerRegistry.isPlaybackSuspended else { return }
+        reelsWatchedSeconds += delta
+        guard !didCreditReelsWatch, reelsWatchedSeconds >= Self.reelsMinWatchSecondsBeforePlayCredit else { return }
+        didCreditReelsWatch = true
+        incrementPlayCount()
+        playbackActivityTracker.flush()
     }
 
     private func configurePlaybackActivityTracker() {
@@ -5175,10 +5484,17 @@ extension ReelItemView {
         }()
         playbackActivityTracker.onSave = { resumeTime, playDuration in
             guard playDuration > 0 || resumeTime != nil else { return }
+            // Don't write last_played / resume until this reel has been watched 30s.
+            guard self.didCreditReelsWatch else {
+                self.heldReelsPlayDuration += max(0, playDuration)
+                return
+            }
+            let durationToSave = playDuration + self.heldReelsPlayDuration
+            self.heldReelsPlayDuration = 0
             vm.updateSceneResumeTime(
                 sceneId: sceneId,
                 resumeTime: resumeTime,
-                playDuration: playDuration
+                playDuration: durationToSave
             ) { success in
                 guard success, let resumeTime else { return }
                 DispatchQueue.main.async {
@@ -5212,6 +5528,9 @@ extension ReelItemView {
         playerSetupGeneration &+= 1
         syncPlaybackActivityPosition()
         playbackActivityTracker.stop()
+        didCreditReelsWatch = false
+        reelsWatchedSeconds = 0
+        heldReelsPlayDuration = 0
         player?.pause()
         if let timeObserver = timeObserver {
             player?.removeTimeObserver(timeObserver)
@@ -5250,6 +5569,7 @@ extension ReelItemView {
             }
             self.syncPlaybackPresentationSize(from: player)
             self.syncPlaybackActivityPosition(from: player)
+            self.noteReelsWatchProgress()
             if self.isPlaying && self.isPlaybackActive && !self.isRotating {
                 self.startPlaybackActivityTrackingIfNeeded()
             }

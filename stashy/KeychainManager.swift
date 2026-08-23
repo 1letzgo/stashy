@@ -17,43 +17,47 @@ class KeychainManager {
     private init() {}
     
     // MARK: - API Key Management
-    
-    /// Save API key for a server
-    func saveAPIKey(_ apiKey: String, forServerID serverID: UUID) -> Bool {
-        let key = "apikey_\(serverID.uuidString)"
-        
-        // Delete existing first
-        deleteAPIKey(forServerID: serverID)
-        
-        guard let data = apiKey.data(using: .utf8) else { return false }
-        
-        let query: [String: Any] = [
+
+    private func baseQuery(account: String) -> [String: Any] {
+        [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-            kSecValueData as String: data,
-            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlock
+            kSecAttrAccount as String: account,
+            kSecUseDataProtectionKeychain as String: true
         ]
-        
-        let status = SecItemAdd(query as CFDictionary, nil)
-        return status == errSecSuccess
     }
-    
+
+    /// Save API key for a server (add-or-update, atomic)
+    func saveAPIKey(_ apiKey: String, forServerID serverID: UUID) -> Bool {
+        let key = "apikey_\(serverID.uuidString)"
+
+        guard let data = apiKey.data(using: .utf8) else { return false }
+
+        let attributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
+
+        let updateStatus = SecItemUpdate(baseQuery(account: key) as CFDictionary, attributes as CFDictionary)
+        if updateStatus == errSecSuccess { return true }
+        guard updateStatus == errSecItemNotFound else { return false }
+
+        var addQuery = baseQuery(account: key)
+        attributes.forEach { addQuery[$0.key] = $0.value }
+        return SecItemAdd(addQuery as CFDictionary, nil) == errSecSuccess
+    }
+
     /// Load API key for a server
     func loadAPIKey(forServerID serverID: UUID) -> String? {
         let key = "apikey_\(serverID.uuidString)"
-        
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
-        
+
+        var query = baseQuery(account: key)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
-        
+
         if status == errSecSuccess,
            let data = result as? Data,
            let apiKey = String(data: data, encoding: .utf8) {
@@ -61,20 +65,12 @@ class KeychainManager {
         }
         return nil
     }
-    
+
     /// Delete API key for a server
     @discardableResult
     func deleteAPIKey(forServerID serverID: UUID) -> Bool {
         let key = "apikey_\(serverID.uuidString)"
-        
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: key
-        ]
-        
-        let status = SecItemDelete(query as CFDictionary)
-        return status == errSecSuccess || status == errSecItemNotFound
+        return deleteRaw(account: key)
     }
     
     // MARK: - App Passcode (salted hash only — never store plaintext PIN)
@@ -110,7 +106,7 @@ class KeychainManager {
             let hash = Self.sha256Hex(legacy + ":" + salt)
             if saveAppPasscodeHash(salt: salt, hash: hash) {
                 _ = deleteRaw(account: legacyPasscodeAccount)
-                print("🔄 Migrated plaintext passcode to salted hash")
+                AppLog.debug("🔄 Migrated plaintext passcode to salted hash")
                 return (salt, hash)
             }
         }
@@ -138,13 +134,10 @@ class KeychainManager {
     }
     
     private func loadRawString(account: String) -> String? {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account,
-            kSecReturnData as String: true,
-            kSecMatchLimit as String: kSecMatchLimitOne
-        ]
+        var query = baseQuery(account: account)
+        query[kSecReturnData as String] = true
+        query[kSecMatchLimit as String] = kSecMatchLimitOne
+
         var result: AnyObject?
         let status = SecItemCopyMatching(query as CFDictionary, &result)
         guard status == errSecSuccess,
@@ -152,15 +145,10 @@ class KeychainManager {
               let string = String(data: data, encoding: .utf8) else { return nil }
         return string
     }
-    
+
     @discardableResult
     private func deleteRaw(account: String) -> Bool {
-        let query: [String: Any] = [
-            kSecClass as String: kSecClassGenericPassword,
-            kSecAttrService as String: service,
-            kSecAttrAccount as String: account
-        ]
-        let status = SecItemDelete(query as CFDictionary)
+        let status = SecItemDelete(baseQuery(account: account) as CFDictionary)
         return status == errSecSuccess || status == errSecItemNotFound
     }
     
@@ -176,7 +164,7 @@ class KeychainManager {
         if let apiKey = config.apiKey, !apiKey.isEmpty {
             if loadAPIKey(forServerID: config.id) == nil {
                 _ = saveAPIKey(apiKey, forServerID: config.id)
-                print("🔄 Migrated API key to Keychain for server: \(config.name)")
+                AppLog.debug("🔄 Migrated API key to Keychain for server: \(config.name)")
             }
         }
     }

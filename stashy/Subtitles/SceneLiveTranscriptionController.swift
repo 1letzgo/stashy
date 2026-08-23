@@ -1015,7 +1015,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
             input.finish()
             if sessionIsCurrent(generation), !Self.isBenignStopError(error) {
                 // Reader died mid-session — fall back to tap without killing captions entirely.
-                print("💬 Lookahead feed failed, falling back to tap: \(error.localizedDescription)")
+                AppLog.debug("💬 Lookahead feed failed, falling back to tap: \(error.localizedDescription)")
                 if let item = player?.currentItem {
                     usesLookaheadFeed = false
                     onLookaheadModeChanged?(false)
@@ -1212,7 +1212,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
         } catch {
             input.finish()
             guard sessionIsCurrent(generation), !Self.isBenignStopError(error) else { return }
-            print("💬 Transcode prefetch failed, falling back to tap: \(error.localizedDescription)")
+            AppLog.debug("💬 Transcode prefetch failed, falling back to tap: \(error.localizedDescription)")
             transcodePrefetchFailed = true
             usesLookaheadFeed = false
             onLookaheadModeChanged?(false)
@@ -1565,7 +1565,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
             try Task.checkCancellation()
             let status = await AssetInventory.status(forModules: [transcriber])
             speechAssetStatusText = "\(status)"
-            print("💬 Speech asset \(installLocale.identifier(.bcp47)): \(status) progress=\(progress.fractionCompleted)")
+            AppLog.debug("💬 Speech asset \(installLocale.identifier(.bcp47)): \(status) progress=\(progress.fractionCompleted)")
 
             let installed = await SpeechTranscriber.installedLocales
             if status == .installed
@@ -1585,7 +1585,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
                     throw CancellationError()
                 } catch {
                     // Initial attempt often fails while the system queues a later retry.
-                    print("💬 downloadAndInstall interim error: \(error.localizedDescription)")
+                    AppLog.debug("💬 downloadAndInstall interim error: \(error.localizedDescription)")
                     speechAssetStatusText = error.localizedDescription
                 }
             }
@@ -1628,7 +1628,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
         )
         let status = await AssetInventory.status(forModules: [transcriber])
         let reservedIDs = await AssetInventory.reservedLocales.map { $0.identifier(.bcp47) }
-        print("💬 probe \(id): status=\(status) reserved=\(reservedIDs)")
+        AppLog.debug("💬 probe \(id): status=\(status) reserved=\(reservedIDs)")
 
         switch status {
         case .installed:

@@ -42,6 +42,8 @@ class NavigationCoordinator: ObservableObject {
     @Published var performersTabID = UUID()
     @Published var studiosTabID = UUID()
     @Published var catalogueTabID = UUID()
+    /// Pops catalogue details without remounting the stack (avoids a top-left zoom).
+    @Published var cataloguePopToken = UUID()
     @Published var downloadsTabID = UUID()
     @Published var toolsTabID = UUID()
     @Published var reelsTabID = UUID()
@@ -109,68 +111,69 @@ class NavigationCoordinator: ObservableObject {
     }
 
     // MARK: - Deep Links
+
+    /// Search → Show All / stats deep links: switch catalog instantly.
+    /// Do not remount `catalogueTabID` here — a new `NavigationStack` identity zooms
+    /// in from the top-left (especially when leaving the Search tab).
+    private func switchToCatalogue(_ subTab: String) {
+        UIView.setAnimationsEnabled(false)
+        var transaction = Transaction()
+        transaction.disablesAnimations = true
+        withTransaction(transaction) {
+            cataloguePopToken = UUID()
+            catalogueSubTab = subTab
+            selectedTab = .catalogue
+        }
+        DispatchQueue.main.async {
+            UIView.setAnimationsEnabled(true)
+        }
+    }
     
     func navigateToScenes(sort: StashDBViewModel.SceneSortOption? = nil, filter: StashDBViewModel.SavedFilter? = nil, search: String = "", noDefaultFilter: Bool = false) {
         self.activeSortOption = sort?.rawValue
         self.activeFilter = filter
         self.activeSearchText = search
         self.noDefaultFilter = noDefaultFilter
-        
-        self.catalogueTabID = UUID() // Force reset stack
-        self.catalogueSubTab = "Scenes"
-        self.selectedTab = .catalogue
+        switchToCatalogue("Scenes")
     }
     
     func navigateToPerformers(sort: StashDBViewModel.PerformerSortOption? = nil, search: String = "") {
         self.activeSortOption = sort?.rawValue
         self.activeSearchText = search
-        self.catalogueTabID = UUID()
-        self.catalogueSubTab = "Performers"
-        self.selectedTab = .catalogue
+        switchToCatalogue("Performers")
     }
     
     func navigateToStudios(sort: StashDBViewModel.StudioSortOption? = nil, search: String = "") {
         self.activeSortOption = sort?.rawValue
         self.activeSearchText = search
-        self.catalogueTabID = UUID()
-        self.catalogueSubTab = "Studios"
-        self.selectedTab = .catalogue
+        switchToCatalogue("Studios")
     }
     
     func navigateToTags(search: String = "") {
         self.activeSearchText = search
-        self.catalogueTabID = UUID()
-        self.catalogueSubTab = "Tags"
-        self.selectedTab = .catalogue
+        switchToCatalogue("Tags")
     }
     
     func navigateToGalleries(sort: StashDBViewModel.GallerySortOption? = nil, search: String = "") {
         self.activeSortOption = sort?.rawValue
         self.activeSearchText = search
-        self.catalogueTabID = UUID()
-        self.catalogueSubTab = "Galleries"
-        self.selectedTab = .catalogue
+        switchToCatalogue("Galleries")
     }
     
     func navigateToImages(search: String = "") {
         self.activeSearchText = search
-        self.catalogueTabID = UUID()
-        self.catalogueSubTab = "Images"
-        self.selectedTab = .catalogue
+        self.noDefaultFilter = !search.isEmpty
+        switchToCatalogue("Images")
     }
     
     func navigateToGroups(search: String = "") {
         self.activeSearchText = search
-        self.catalogueTabID = UUID()
-        self.catalogueSubTab = "Groups"
-        self.selectedTab = .catalogue
+        switchToCatalogue("Groups")
     }
 
     func navigateToMarkers(search: String = "") {
         self.activeSearchText = search
-        self.catalogueTabID = UUID()
-        self.catalogueSubTab = "Markers"
-        self.selectedTab = .catalogue
+        switchToCatalogue("Markers")
     }
     
     func navigateToReels(performer: ScenePerformer? = nil, tags: [Tag] = [], studio: SceneStudio? = nil, mode: String? = nil) {
@@ -361,7 +364,13 @@ struct FullScreenVideoPlayer: UIViewRepresentable {
         view.topContentInset = topContentInset
         view.bottomContentInset = bottomContentInset
         view.topAlignAspectFit = topAlignAspectFit
-        onLayerReady?(view.playerLayer)
+        // Deferred: the callback mutates ObservableObject state (`videoSurfaceReadiness`).
+        // Calling it synchronously from makeUIView triggers "Modifying state during view
+        // update", which invalidates the surrounding SwiftUI transaction.
+        DispatchQueue.main.async { [weak view] in
+            guard let view else { return }
+            onLayerReady?(view.playerLayer)
+        }
         return view
     }
 
@@ -395,7 +404,11 @@ struct FullScreenVideoPlayer: UIViewRepresentable {
         }
         // Only re-bind when the player instance changes (avoids SwiftUI update storms).
         if playerChanged {
-            onLayerReady?(uiView.playerLayer)
+            // Deferred for the same reason as in `makeUIView`.
+            DispatchQueue.main.async { [weak uiView] in
+                guard let uiView else { return }
+                onLayerReady?(uiView.playerLayer)
+            }
         }
     }
 }

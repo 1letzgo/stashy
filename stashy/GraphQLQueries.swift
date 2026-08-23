@@ -58,20 +58,20 @@ class GraphQLQueries {
         // DEBUG: Deep bundle inspection
         if !hasLoggedAllResources {
             hasLoggedAllResources = true
-            print("📁 --- BUNDLE INSPECTION START ---")
-            print("📁 Main Bundle Path: \(Bundle.main.bundlePath)")
+            AppLog.debug("📁 --- BUNDLE INSPECTION START ---")
+            AppLog.debug("📁 Main Bundle Path: \(Bundle.main.bundlePath)")
             
             // List everything in the root
             if let rootFiles = try? FileManager.default.contentsOfDirectory(atPath: Bundle.main.bundlePath) {
-                print("📁 Root files: \(rootFiles.joined(separator: ", "))")
+                AppLog.debug("📁 Root files: \(rootFiles.joined(separator: ", "))")
             }
             
             // Specifically list 'graphql' directory if it exists
             let graphqlPath = (Bundle.main.bundlePath as NSString).appendingPathComponent("graphql")
             if let gFiles = try? FileManager.default.contentsOfDirectory(atPath: graphqlPath) {
-                print("📁 'graphql' directory exists and contains: \(gFiles.joined(separator: ", "))")
+                AppLog.debug("📁 'graphql' directory exists and contains: \(gFiles.joined(separator: ", "))")
             } else {
-                print("❌ 'graphql' directory NOT found at \(graphqlPath)")
+                AppLog.error("❌ 'graphql' directory NOT found at \(graphqlPath)")
             }
             
             // Try recursive scan for .graphql files
@@ -82,8 +82,8 @@ class GraphQLQueries {
                     foundGraphql.append(file)
                 }
             }
-            print("📁 Recursive scan found: \(foundGraphql.joined(separator: ", "))")
-            print("📁 --- BUNDLE INSPECTION END ---")
+            AppLog.debug("📁 Recursive scan found: \(foundGraphql.joined(separator: ", "))")
+            AppLog.debug("📁 --- BUNDLE INSPECTION END ---")
         }
 
         // Load from bundle
@@ -114,12 +114,12 @@ class GraphQLQueries {
         if let url = foundUrl {
             do {
                 content = try String(contentsOf: url, encoding: .utf8)
-                print("✅ Found and loaded: \(fileName).graphql from \(url.lastPathComponent)")
+                AppLog.debug("✅ Found and loaded: \(fileName).graphql from \(url.lastPathComponent)")
             } catch {
-                print("❌ Critical: Failed to load GraphQL file: \(fileName).graphql - \(error)")
+                AppLog.error("❌ Critical: Failed to load GraphQL file: \(fileName).graphql - \(error)")
             }
         } else {
-            print("❌ Critical: Could not find GraphQL file: \(fileName).graphql in ANY location")
+            AppLog.error("❌ Critical: Could not find GraphQL file: \(fileName).graphql in ANY location")
         }
         
         // Cache the result (even if empty, to avoid repeated lookups)
@@ -182,12 +182,273 @@ class GraphQLQueries {
             fragments = ""
             
         default:
-            print("⚠️ Warning: No explicit fragment mapping for \(queryName)")
+            AppLog.error("⚠️ Warning: No explicit fragment mapping for \(queryName)")
         }
         
         let composed = "\(query)\n\(fragments)"
         setComposedQuery(queryName, value: composed)
         return composed
     }
+    
+    // MARK: - Inline Queries/Mutations (extracted from StashDBViewModel)
+
+    static let findSavedFiltersQuery = """
+        {
+          "query": "query GetAllFilterDefinitions { findSavedFilters { id name mode filter object_filter ui_options find_filter { sort direction } } }"
+        }
+        """
+
+    static let serverVersionQuery = """
+        {
+          "query": "{ version { version } }"
+        }
+        """
+
+    static let serverStatsQuery = """
+        {
+          "query": "{ stats { scene_count scenes_size scenes_duration image_count images_size gallery_count performer_count studio_count group_count tag_count total_o_count total_play_duration total_play_count scenes_played movie_count } }"
+        }
+        """
+
+    static let findSceneMarkersCountQuery = """
+        {
+          "query": "{ findSceneMarkers(filter: { per_page: 1 }) { count } }"
+        }
+        """
+
+    static let findGroupsForSceneQuery = """
+        query FindGroups($filter: FindFilterType) {
+            findGroups(filter: $filter) {
+                groups { id name updated_at front_image_path }
+            }
+        }
+        """
+
+    static let saveSceneFilterMutation = """
+        mutation SaveSceneFilter($input: SaveFilterInput!) {
+          saveFilter(input: $input) {
+            id
+            name
+            mode
+            filter
+            object_filter
+            ui_options
+          }
+        }
+        """
+
+    static let saveCatalogFilterMutation = """
+        mutation SaveCatalogFilter($input: SaveFilterInput!) {
+          saveFilter(input: $input) {
+            id
+            name
+            mode
+            filter
+            object_filter
+            ui_options
+          }
+        }
+        """
+
+    static let destroySavedFilterMutation = """
+        mutation DestroySavedSceneFilter($input: DestroyFilterInput!) {
+          destroySavedFilter(input: $input)
+        }
+        """
+
+    static let metadataScanMutation = """
+        {
+          "query": "mutation { metadataScan(input: {}) }"
+        }
+        """
+
+    static let sceneAddPlayMutation = """
+        mutation SceneAddPlay($id: ID!, $times: [Timestamp!]) {
+          sceneAddPlay(id: $id, times: $times) {
+            count
+            history
+          }
+        }
+        """
+
+    static let sceneMarkerIncrementPlayMutation = """
+        mutation SceneMarkerIncrementPlay($id: ID!) {
+          sceneMarkerUpdate(input: { id: $id }) {
+            id
+            play_count
+          }
+        }
+        """
+
+    static let sceneMarkerCreateMutation = """
+        mutation SceneMarkerCreate($input: SceneMarkerCreateInput!) {
+            sceneMarkerCreate(input: $input) {
+                id
+                title
+                seconds
+                screenshot
+            }
+        }
+        """
+
+    static let sceneUpdateOrganizedMutation = """
+        mutation SceneUpdate($input: SceneUpdateInput!) {
+            sceneUpdate(input: $input) { id organized }
+        }
+        """
+
+    static let sceneUpdateRatingMutation = """
+        mutation SceneUpdate($input: SceneUpdateInput!) {
+            sceneUpdate(input: $input) { id rating100 }
+        }
+        """
+
+    static let sceneUpdatePerformersMutation = """
+        mutation SceneUpdate($input: SceneUpdateInput!) {
+            sceneUpdate(input: $input) { id performers { id name scene_count gallery_count o_counter updated_at } }
+        }
+        """
+
+    static let sceneUpdateStudioMutation = """
+        mutation SceneUpdate($input: SceneUpdateInput!) {
+            sceneUpdate(input: $input) { id studio { id name updated_at } }
+        }
+        """
+
+    static let sceneUpdateTagsMutation = """
+        mutation SceneUpdate($input: SceneUpdateInput!) {
+            sceneUpdate(input: $input) { id tags { id name } }
+        }
+        """
+
+    static let sceneUpdateGroupsMutation = """
+        mutation SceneUpdate($input: SceneUpdateInput!) {
+            sceneUpdate(input: $input) { id groups { group { id name updated_at front_image_path } scene_index } }
+        }
+        """
+
+    static let sceneUpdateTitleDetailsMutation = """
+        mutation SceneUpdate($input: SceneUpdateInput!) {
+            sceneUpdate(input: $input) { id title details }
+        }
+        """
+
+    static let sceneUpdateLanguageMutation = """
+        mutation SceneUpdate($input: SceneUpdateInput!) {
+            sceneUpdate(input: $input) { id }
+        }
+        """
+
+    static let sceneUpdateCoverImageMutation = """
+        mutation SceneUpdate($input: SceneUpdateInput!) {
+            sceneUpdate(input: $input) { id }
+        }
+        """
+
+    static let tagUpdateFavoriteMutation = """
+        mutation TagUpdate($input: TagUpdateInput!) {
+            tagUpdate(input: $input) { id favorite }
+        }
+        """
+
+    static let tagUpdateDetailsMutation = """
+        mutation TagUpdate($input: TagUpdateInput!) {
+            tagUpdate(input: $input) { id name description }
+        }
+        """
+
+    static let tagUpdateImageMutation = """
+        mutation TagUpdate($input: TagUpdateInput!) {
+            tagUpdate(input: $input) { id }
+        }
+        """
+
+    static let tagCreateMutation = """
+        mutation TagCreate($input: TagCreateInput!) {
+            tagCreate(input: $input) { id name scene_count }
+        }
+        """
+
+    static let imageUpdateRatingMutation = """
+        mutation ImageUpdate($input: ImageUpdateInput!) {
+            imageUpdate(input: $input) { id rating100 }
+        }
+        """
+
+    static let imageUpdateOCounterMutation = """
+        mutation ImageUpdate($input: ImageUpdateInput!) {
+            imageUpdate(input: $input) { id o_counter }
+        }
+        """
+
+    static let performerCreateMutation = """
+        mutation PerformerCreate($input: PerformerCreateInput!) {
+            performerCreate(input: $input) { id name scene_count gallery_count updated_at }
+        }
+        """
+
+    static let performerUpdateFavoriteMutation = """
+        mutation PerformerUpdate($input: PerformerUpdateInput!) {
+            performerUpdate(input: $input) { id favorite }
+        }
+        """
+
+    static let performerUpdateImageMutation = """
+        mutation PerformerUpdate($input: PerformerUpdateInput!) {
+            performerUpdate(input: $input) { id image_path }
+        }
+        """
+
+    static let performerUpdateDetailsMutation = """
+        mutation PerformerUpdate($input: PerformerUpdateInput!) {
+            performerUpdate(input: $input) {
+                id name disambiguation birthdate country gender ethnicity
+                height_cm weight measurements fake_tits penis_length
+                career_length tattoos piercings alias_list rating100
+            }
+        }
+        """
+
+    static let studioCreateMutation = """
+        mutation StudioCreate($input: StudioCreateInput!) {
+            studioCreate(input: $input) { id name scene_count updated_at }
+        }
+        """
+
+    static let studioUpdateFavoriteMutation = """
+        mutation StudioUpdate($input: StudioUpdateInput!) {
+            studioUpdate(input: $input) { id favorite }
+        }
+        """
+
+    static let studioUpdateDetailsMutation = """
+        mutation StudioUpdate($input: StudioUpdateInput!) {
+            studioUpdate(input: $input) { id name url details rating100 }
+        }
+        """
+
+    static let groupCreateMutation = """
+        mutation GroupCreate($input: GroupCreateInput!) {
+            groupCreate(input: $input) { id name updated_at front_image_path scene_count }
+        }
+        """
+
+    static let groupUpdateDetailsMutation = """
+        mutation GroupUpdate($input: GroupUpdateInput!) {
+            groupUpdate(input: $input) { id name date synopsis rating100 }
+        }
+        """
+
+    static let galleryUpdateDetailsMutation = """
+        mutation GalleryUpdate($input: GalleryUpdateInput!) {
+            galleryUpdate(input: $input) { id title date details }
+        }
+        """
+
+    static let deleteFilesMutation = """
+        mutation DeleteFiles($ids: [ID!]!) {
+            deleteFiles(ids: $ids)
+        }
+        """
 }
 

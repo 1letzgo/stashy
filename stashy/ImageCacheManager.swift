@@ -254,7 +254,7 @@ class ImageCache {
                 try? fileManager.removeItem(at: file)
             }
         }
-        print("清理: Disk cleanup completed for \(serverDir.lastPathComponent)")
+        AppLog.debug("清理: Disk cleanup completed for \(serverDir.lastPathComponent)")
     }
     
     func data(forKey key: NSURL) -> Data? {
@@ -412,11 +412,10 @@ class ImageLoader: ObservableObject {
     init(url: URL?) {
         self.url = url
 
-        // Create session (standard TLS validation)
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = 15
         config.timeoutIntervalForResource = 30
-        self.session = URLSession(configuration: config)
+        self.session = URLSession(configuration: config, delegate: StashTrustDelegate(), delegateQueue: nil)
 
         imageRefreshObservers = [
             NotificationCenter.default.addObserver(
@@ -600,7 +599,7 @@ class ImageLoader: ObservableObject {
             
             if let httpResponse = response as? HTTPURLResponse,
                !(200...299).contains(httpResponse.statusCode) {
-                print("❌ ImageLoader Error: HTTP \(httpResponse.statusCode) for \(url)")
+                AppLog.error("❌ ImageLoader Error: HTTP \(httpResponse.statusCode) for \(url)")
                 // Check for specific server errors
                 if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
                      // Auth error?
@@ -610,7 +609,7 @@ class ImageLoader: ObservableObject {
             
             return data
         } catch {
-            print("❌ ImageLoader Network Error: \(error.localizedDescription) for \(url)")
+            AppLog.error("❌ ImageLoader Network Error: \(error.localizedDescription) for \(url)")
             // Re-throw NSURLErrorDomain errors (like cannotConnectToHost)
             // so they can be identified as connection issues
             throw error

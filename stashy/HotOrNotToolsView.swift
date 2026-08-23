@@ -305,7 +305,7 @@ private enum HotOrNotSwissMath {
         let eStr = String(format: "%.4f", ew)
         let wK = getProgressiveKFactor(rating: winnerRating, matchCount: mcW, mode: ascensionMode)
         let lK = getProgressiveKFactor(rating: loserRating, matchCount: mcL, mode: ascensionMode)
-        print(
+        AppLog.debug(
             "[HotOrNot ELO] \(duelLabel) [\(ascensionMode)] \(winnerDisplay) vs \(loserDisplay) rW=\(String(format: "%.1f", winnerRating)) rL=\(String(format: "%.1f", loserRating)) E=\(eStr) Kw=\(wK) Kl=\(lK) mcW=\(mcW) mcL=\(mcL) W(tm/w/l/d)=\(winnerStats.total_matches)/\(winnerStats.wins)/\(winnerStats.losses)/\(winnerStats.draws) L(tm/w/l/d)=\(loserStats.total_matches)/\(loserStats.wins)/\(loserStats.losses)/\(loserStats.draws) → gain=\(gain) loss=\(loss)"
         )
     }
@@ -328,7 +328,7 @@ private enum HotOrNotSwissMath {
         let eStr = String(format: "%.4f", ew)
         let kLeft = getProgressiveKFactor(rating: leftRating, matchCount: mcL, mode: "swiss")
         let kRight = getProgressiveKFactor(rating: rightRating, matchCount: mcR, mode: "swiss")
-        print(
+        AppLog.debug(
             "[HotOrNot ELO] draw/skip \(duelLabel) \(leftDisplay) vs \(rightDisplay) rL=\(String(format: "%.1f", leftRating)) rR=\(String(format: "%.1f", rightRating)) E(left wins)=\(eStr) K_left=\(kLeft) K_right=\(kRight) mcL=\(mcL) mcR=\(mcR) L(tm/w/l/d)=\(leftStats.total_matches)/\(leftStats.wins)/\(leftStats.losses)/\(leftStats.draws) R(tm/w/l/d)=\(rightStats.total_matches)/\(rightStats.wins)/\(rightStats.losses)/\(rightStats.draws) → dL=\(leftGain) dR=\(rightLoss)"
         )
     }

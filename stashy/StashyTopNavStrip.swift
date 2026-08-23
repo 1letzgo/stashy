@@ -128,9 +128,9 @@ struct StashyExpandingDockBrowseStrip: View {
                             onSelect: {
                                 guard item.id != selectionID else { return }
                                 HapticManager.light()
-                                withAnimation(reduceMotion ? nil : StashyExpandingDock.selectionAnimation) {
-                                    onSelect(item.id)
-                                }
+                                // Do not wrap `onSelect` in `withAnimation` — that fades the catalog root
+                                // (Scenes / Images). Chip expand is driven by `.animation(..., value:)` below.
+                                onSelect(item.id)
                             }
                         )
                         .id(item.id)
@@ -141,9 +141,7 @@ struct StashyExpandingDockBrowseStrip: View {
             }
             .scrollContentBackground(.hidden)
             .onChange(of: selectionID) { _, newID in
-                withAnimation(reduceMotion ? nil : StashyExpandingDock.selectionAnimation) {
-                    proxy.scrollTo(newID, anchor: .center)
-                }
+                proxy.scrollTo(newID, anchor: .center)
             }
             .onAppear {
                 proxy.scrollTo(selectionID, anchor: .center)

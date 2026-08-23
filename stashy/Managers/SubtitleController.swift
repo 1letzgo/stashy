@@ -246,7 +246,7 @@ final class SubtitleController: ObservableObject {
 
         guard let caption, let url = url(for: caption) else {
             if caption != nil {
-                print("💬 Caption URL missing for \(caption?.id ?? "?") (base=\(captionBaseURL?.absoluteString ?? "nil"))")
+                AppLog.debug("💬 Caption URL missing for \(caption?.id ?? "?") (base=\(captionBaseURL?.absoluteString ?? "nil"))")
             }
             return
         }
@@ -257,7 +257,7 @@ final class SubtitleController: ObservableObject {
             guard self.selectedCaption == caption else { return }
             let parsed = Self.parseCaptionFile(text ?? "")
             if parsed.isEmpty {
-                print("💬 Caption parse produced 0 cues from \(redactedURLString(url))")
+                AppLog.debug("💬 Caption parse produced 0 cues from \(redactedURLString(url))")
             }
             self.cues = parsed
             self.cueIndex = 0
@@ -451,19 +451,19 @@ final class SubtitleController: ObservableObject {
         do {
             let (data, response) = try await URLSession.shared.data(for: request)
             if let http = response as? HTTPURLResponse, !(200...299).contains(http.statusCode) {
-                print("💬 Caption fetch failed: HTTP \(http.statusCode) for \(redactedURLString(url))")
+                AppLog.debug("💬 Caption fetch failed: HTTP \(http.statusCode) for \(redactedURLString(url))")
                 return nil
             }
             guard !data.isEmpty else {
-                print("💬 Caption fetch returned empty body for \(redactedURLString(url))")
+                AppLog.debug("💬 Caption fetch returned empty body for \(redactedURLString(url))")
                 return nil
             }
             if let utf8 = String(data: data, encoding: .utf8) { return utf8 }
             if let utf16 = String(data: data, encoding: .utf16) { return utf16 }
-            print("💬 Caption fetch: unsupported encoding (\(data.count) bytes)")
+            AppLog.debug("💬 Caption fetch: unsupported encoding (\(data.count) bytes)")
             return nil
         } catch {
-            print("💬 Caption fetch error: \(error.localizedDescription)")
+            AppLog.debug("💬 Caption fetch error: \(error.localizedDescription)")
             return nil
         }
     }

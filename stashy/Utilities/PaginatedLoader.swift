@@ -25,6 +25,8 @@ class PaginatedLoader<T>: ObservableObject {
     private var currentPage: Int = 1
     private let perPage: Int
     private var totalItems: Int = 0
+    /// Guards against stale async results racing refresh()/reset().
+    private var generation: Int = 0
     
     // MARK: - Loader Function Type
     
@@ -43,53 +45,66 @@ class PaginatedLoader<T>: ObservableObject {
     /// Loads the initial page of data
     func loadInitial() async {
         guard !isLoading else { return }
-        
+
+        generation += 1
+        let requestedGeneration = generation
         isLoading = true
         error = nil
         currentPage = 1
-        
+
         do {
             let result = try await loaderFunction(currentPage, perPage)
+            guard requestedGeneration == generation else { return }
             items = result.items
             totalItems = result.total
             hasMore = items.count < totalItems
             currentPage += 1
+            isLoading = false
         } catch {
+            guard requestedGeneration == generation else { return }
+            if error is CancellationError {
+                isLoading = false
+                return
+            }
             self.error = error
             items = []
             hasMore = false
+            isLoading = false
         }
-        
-        isLoading = false
     }
-    
+
     /// Loads the next page of data and appends to existing items
     func loadMore() async {
         guard !isLoadingMore && hasMore && !isLoading else { return }
-        
+
+        generation += 1
+        let requestedGeneration = generation
         isLoadingMore = true
         error = nil
-        
+        defer { isLoadingMore = false }
+
         do {
             let result = try await loaderFunction(currentPage, perPage)
+            guard requestedGeneration == generation else { return }
             items.append(contentsOf: result.items)
             totalItems = result.total
             hasMore = items.count < totalItems
             currentPage += 1
         } catch {
+            guard requestedGeneration == generation else { return }
+            if error is CancellationError { return }
             self.error = error
         }
-        
-        isLoadingMore = false
     }
-    
+
     /// Refreshes the data by reloading the initial page
     func refresh() async {
         await loadInitial()
     }
-    
+
     /// Resets the loader to initial state
     func reset() {
+        generation += 1
         items = []
         currentPage = 1
         totalItems = 0

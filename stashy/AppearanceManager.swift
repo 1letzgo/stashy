@@ -108,7 +108,7 @@ class AppearanceManager: ObservableObject {
             defaults.set(Float(alpha), forKey: kTintColorAlpha)
             defaults.synchronize() // Force save just to be safe, though not strictly required in modern iOS
         } else {
-            print(NSLocalizedString("appearance.saveColor.failed", comment: "Failed to get color components for saving"))
+            AppLog.debug(NSLocalizedString("appearance.saveColor.failed", comment: "Failed to get color components for saving"))
         }
     }
     

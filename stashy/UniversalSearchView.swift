@@ -22,12 +22,14 @@ struct UniversalSearchView: View {
     @State private var studios: [Studio] = []
     @State private var tags: [Tag] = []
     @State private var scenes: [Scene] = []
+    @State private var images: [StashImage] = []
     @State private var galleries: [Gallery] = []
     @State private var groups: [StashGroup] = []
     @State private var markers: [SceneMarker] = []
     
     // Per-category result limits
     private let scenesLimit = 20
+    private let imagesLimit = 20
     private let performersLimit = 20
     private let galleriesLimit = 20
     private let tagsLimit = 50
@@ -103,7 +105,7 @@ struct UniversalSearchView: View {
                     .font(.title2)
                     .fontWeight(.bold)
                 
-                Text("Find scenes, performers, studios, tags, galleries, groups and markers")
+                Text("Find scenes, images, performers, studios, tags, galleries, groups and markers")
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.center)
                     .padding(.horizontal, 40)
@@ -125,10 +127,17 @@ struct UniversalSearchView: View {
                 } else {
                     ForEach(orderedSections, id: \.self) { section in
                         sectionView(for: section)
+                        if section == .scenes, !images.isEmpty {
+                            imagesSection
+                        }
+                    }
+
+                    if !orderedSections.contains(.scenes), !images.isEmpty {
+                        imagesSection
                     }
                     
                     // Show no results message if all empty
-                    if performers.isEmpty && studios.isEmpty && tags.isEmpty && scenes.isEmpty && galleries.isEmpty && groups.isEmpty && markers.isEmpty {
+                    if performers.isEmpty && studios.isEmpty && tags.isEmpty && scenes.isEmpty && images.isEmpty && galleries.isEmpty && groups.isEmpty && markers.isEmpty {
                         VStack(spacing: 16) {
                             Image(systemName: "doc.text.magnifyingglass")
                                 .font(.system(size: 50))
@@ -352,6 +361,69 @@ struct UniversalSearchView: View {
             .frame(width: 200, height: 112)
             .overlay(
                 Image(systemName: "film")
+                    .foregroundColor(.secondary)
+            )
+    }
+
+    private var imagesSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            sectionHeader(title: "Images", count: images.count, limit: imagesLimit) {
+                coordinator.navigateToImages(search: searchText)
+            }
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 12) {
+                    ForEach(images) { image in
+                        NavigationLink(destination: searchPushDestination {
+                            FullScreenImageView(images: $images, selectedImageId: image.id)
+                        }) {
+                            imageCard(image)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.bottom, 8)
+            }
+        }
+    }
+
+    private func imageCard(_ image: StashImage) -> some View {
+        ZStack(alignment: .bottom) {
+            if let thumbURL = image.thumbnailURL {
+                CustomAsyncImage(url: thumbURL) { loader in
+                    if loader.isLoading {
+                        Rectangle()
+                            .fill(Color.gray.opacity(0.2))
+                            .overlay(ProgressView())
+                    } else if let loaded = loader.image {
+                        loaded
+                            .resizable()
+                            .scaledToFill()
+                    } else {
+                        imagePlaceholder
+                    }
+                }
+            } else {
+                imagePlaceholder
+            }
+        }
+        .frame(width: 140, height: 140)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .overlay(
+            InfoPill(icon: image.isVideo ? "play.rectangle" : "photo", text: image.title ?? "Image")
+                .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                .offset(y: 8)
+            , alignment: .bottom
+        )
+        .zIndex(1)
+    }
+
+    private var imagePlaceholder: some View {
+        Rectangle()
+            .fill(Color.gray.opacity(0.2))
+            .overlay(
+                Image(systemName: "photo")
                     .foregroundColor(.secondary)
             )
     }
@@ -602,7 +674,7 @@ struct UniversalSearchView: View {
                         Image(systemName: "chevron.right")
                             .font(.caption)
                     }
-                    .foregroundColor(.appAccent)
+                    .foregroundColor(appearanceManager.tintColor)
                 }
             }
             .padding(.horizontal, 12)
@@ -644,16 +716,18 @@ struct UniversalSearchView: View {
             async let studiosTask = viewModel.searchStudiosAsync(query: query, limit: studiosLimit)
             async let tagsTask = viewModel.searchTagsAsync(query: query, limit: tagsLimit)
             async let scenesTask = viewModel.searchScenesAsync(query: query, limit: scenesLimit)
+            async let imagesTask = viewModel.searchImagesAsync(query: query, limit: imagesLimit)
             async let galleriesTask = viewModel.searchGalleriesAsync(query: query, limit: galleriesLimit)
             async let groupsTask = viewModel.searchGroupsAsync(query: query, limit: groupsLimit)
             async let markersTask = viewModel.searchMarkersAsync(query: query, limit: markersLimit)
             
             // Await all results
-            let (performersResult, studiosResult, tagsResult, scenesResult, galleriesResult, groupsResult, markersResult) = await (
+            let (performersResult, studiosResult, tagsResult, scenesResult, imagesResult, galleriesResult, groupsResult, markersResult) = await (
                 performersTask,
                 studiosTask,
                 tagsTask,
                 scenesTask,
+                imagesTask,
                 galleriesTask,
                 groupsTask,
                 markersTask
@@ -664,6 +738,7 @@ struct UniversalSearchView: View {
             studios = studiosResult
             tags = tagsResult
             scenes = scenesResult
+            images = imagesResult
             galleries = galleriesResult
             groups = groupsResult
             markers = markersResult
@@ -676,6 +751,7 @@ struct UniversalSearchView: View {
         studios = []
         tags = []
         scenes = []
+        images = []
         galleries = []
         groups = []
         markers = []

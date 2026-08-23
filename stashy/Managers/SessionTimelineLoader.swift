@@ -384,10 +384,10 @@ final class SessionTimelineLoader: ObservableObject {
         } catch {
             guard generation == fetchGeneration else { return }
             if Self.isCancellation(error) {
-                print("⚠️ Session timeline cancelled")
+                AppLog.error("⚠️ Session timeline cancelled")
                 return
             }
-            print("❌ Session timeline: \(error)")
+            AppLog.error("❌ Session timeline: \(error)")
             if isInitial, sessions.isEmpty {
                 didFail = true
                 hasMore = false
@@ -414,7 +414,7 @@ final class SessionTimelineLoader: ObservableObject {
             } catch {
                 if Self.isCancellation(error) { throw error }
                 lastError = error
-                print("⚠️ Session timeline query \(variant) failed: \(error)")
+                AppLog.error("⚠️ Session timeline query \(variant) failed: \(error)")
             }
         }
         throw lastError ?? GraphQLNetworkError.graphQLError(message: "Query failed")
@@ -490,7 +490,7 @@ final class SessionTimelineLoader: ObservableObject {
                 if let errors = response.errors, !errors.isEmpty,
                    response.data?.findScenes?.scenes == nil {
                     let message = errors.compactMap(\.message).joined(separator: "; ")
-                    print("⚠️ Session timeline o_history: \(message)")
+                    AppLog.error("⚠️ Session timeline o_history: \(message)")
                     return stamps
                 }
                 let scenes = response.data?.findScenes?.scenes ?? []
@@ -507,7 +507,7 @@ final class SessionTimelineLoader: ObservableObject {
             }
         } catch {
             if Self.isCancellation(error) { return stamps }
-            print("⚠️ Session timeline o_history failed: \(error)")
+            AppLog.error("⚠️ Session timeline o_history failed: \(error)")
         }
         return stamps
     }
@@ -559,7 +559,7 @@ final class SessionTimelineLoader: ObservableObject {
                 if let errors = response.errors, !errors.isEmpty,
                    response.data?.findSceneMarkers?.scene_markers == nil {
                     let message = errors.compactMap(\.message).joined(separator: "; ")
-                    print("⚠️ Session timeline markers: \(message)")
+                    AppLog.error("⚠️ Session timeline markers: \(message)")
                     return rows
                 }
                 let pageRows = (response.data?.findSceneMarkers?.scene_markers ?? [])
@@ -572,7 +572,7 @@ final class SessionTimelineLoader: ObservableObject {
             }
         } catch {
             if Self.isCancellation(error) { return rows }
-            print("⚠️ Session timeline markers failed: \(error)")
+            AppLog.error("⚠️ Session timeline markers failed: \(error)")
         }
         return rows
     }
