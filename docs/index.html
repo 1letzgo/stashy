@@ -87,7 +87,7 @@
       justify-content: center;
       flex-wrap: wrap;
       gap: 16px;
-      margin-bottom: 56px;
+      margin-bottom: 48px;
     }
 
     .shots img {
@@ -96,6 +96,40 @@
       border-radius: 20px;
       border: 1px solid var(--line);
       background: var(--card);
+    }
+
+    .store-copy {
+      text-align: left;
+      color: var(--muted);
+      font-size: 15px;
+      line-height: 1.55;
+      margin: 0 auto 56px;
+    }
+
+    .store-copy p + p,
+    .store-copy p + h2,
+    .store-copy ul + p,
+    .store-copy ul + h2 {
+      margin-top: 16px;
+    }
+
+    .store-copy h2 {
+      color: var(--text);
+      font-size: 17px;
+      font-weight: 620;
+      margin-top: 28px;
+    }
+
+    .store-copy ul {
+      margin: 10px 0 0 1.1em;
+    }
+
+    .store-copy li + li {
+      margin-top: 6px;
+    }
+
+    .store-copy a {
+      color: var(--text);
     }
 
     footer {
