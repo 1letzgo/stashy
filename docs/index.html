@@ -90,34 +90,12 @@
       margin-bottom: 56px;
     }
 
-    .phone {
+    .shots img {
       width: 168px;
-      aspect-ratio: 9 / 19.5;
-      background: var(--card);
-      border-radius: 28px;
-      border: 1px solid var(--line);
-      padding: 10px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      overflow: hidden;
-    }
-
-    .phone img {
-      width: 100%;
-      height: 100%;
-      object-fit: cover;
+      height: auto;
       border-radius: 20px;
-      display: none;
-    }
-
-    .phone.has-image img { display: block; }
-    .phone.has-image .ph { display: none; }
-
-    .ph {
-      color: var(--muted);
-      font-size: 13px;
-      padding: 0 12px;
+      border: 1px solid var(--line);
+      background: var(--card);
     }
 
     footer {
@@ -141,34 +119,17 @@
   <div class="actions">
     <a class="btn primary" href="https://apps.apple.com/us/app/stashy/id6754876029">App Store</a>
     <a class="btn" href="https://discord.gg/DMxEFaVzUM">Discord</a>
+    <a class="btn" href="https://github.com/1letzgo/stashy">GitHub</a>
   </div>
 
   <div class="shots">
-    <div class="phone">
-      <img src="screenshots/1.png" alt="stashy screenshot">
-      <span class="ph">iOS Screenshot</span>
-    </div>
-    <div class="phone">
-      <img src="screenshots/2.png" alt="stashy screenshot">
-      <span class="ph">iOS Screenshot</span>
-    </div>
-    <div class="phone">
-      <img src="screenshots/3.png" alt="stashy screenshot">
-      <span class="ph">iOS Screenshot</span>
-    </div>
+    <img src="https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/f9/87/42/f9874279-3c17-32b6-90a9-243bfb431a59/1.png/600x0w.jpg" alt="stashy dashboard">
+    <img src="https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/64/e9/1f/64e91f79-591d-7e74-e0fe-d2bf74248c8e/2.png/600x0w.jpg" alt="stashy scene view">
+    <img src="https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/c7/d6/cd/c7d6cdbc-728e-46b8-19be-379f7d03bcc4/Dein_Abschnittstext-2.png/600x0w.jpg" alt="stashy performer view">
   </div>
 
   <footer>
-    <a href="https://github.com/1letzgo/stashy">GitHub</a>
-    · no analytics, no tracking
+    no analytics, no tracking
   </footer>
-
-  <script>
-    document.querySelectorAll(".phone img").forEach(function (img) {
-      img.addEventListener("load", function () {
-        img.parentElement.classList.add("has-image");
-      });
-    });
-  </script>
 </body>
 </html>
