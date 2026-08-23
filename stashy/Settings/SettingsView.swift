@@ -641,7 +641,7 @@ struct SettingsView: View {
                         .foregroundColor(appearanceManager.tintColor)
                 }
                 .stashyGroupedBlockRow(index: 0, count: 2)
-                Link(destination: URL(string: "https://discord.gg/D8wXv6Pm")!) {
+                Link(destination: URL(string: "https://discord.gg/DMxEFaVzUM")!) {
                     Label("Discord", systemImage: "bubble.left.and.bubble.right.fill")
                         .foregroundColor(appearanceManager.tintColor)
                 }
