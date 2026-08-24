@@ -27,6 +27,7 @@ struct TVDashboardView: View {
     @State private var channelPreviews: [String: [Scene]] = [:]
     @State private var isLoadingChannelPreviews = false
     @State private var playingChannel: TVChannel?
+    @ObservedObject private var stashyPlus = StashyPlusManager.shared
 
     var body: some View {
         Group {
@@ -48,6 +49,9 @@ struct TVDashboardView: View {
         .background(Color.appBackground)
         .fullScreenCover(item: $playingChannel, onDismiss: {
             playingChannel = nil
+            // Fortschritte aus dem Kanal-Player nachholen, die während der
+            // Wiedergabe bewusst nicht verarbeitet wurden (s. u.).
+            refreshContinueWatching()
         }) { channel in
             TVChannelPlayerView(channel: channel)
         }
@@ -58,6 +62,10 @@ struct TVDashboardView: View {
             loadData(forceRefresh: true)
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneResumeTimeUpdated"))) { _ in
+            // Nicht mitten in der Kanal-Wiedergabe neu laden: Der 10s-Progress-Save des
+            // Players feuert dieses Notification laufend — jede Reaktion erzeugt Netzwerk-
+            // und Render-Churn unter dem aktiven fullScreenCover. Nachgeholt in `onDismiss`.
+            guard playingChannel == nil else { return }
             refreshContinueWatching()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
@@ -65,6 +73,10 @@ struct TVDashboardView: View {
             channelPreviews = [:]
             playingChannel = nil
             isLoadingChannelPreviews = false
+        }
+        // Kanäle nachträglich einblenden, wenn stashy+ im Settings gekauft wurde.
+        .onReceive(NotificationCenter.default.publisher(for: .stashyPlusUnlocked)) { _ in
+            fetchChannels()
         }
         .sceneLiveUpdates(using: viewModel)
     }
@@ -178,6 +190,9 @@ struct TVDashboardView: View {
     // MARK: - Channels
 
     private var channels: [TVChannel] {
+        // stashy+-Feature: ohne Entitlement gar keine Kanäle ausliefern,
+        // dann verschwinden Zeile und Previews automatisch.
+        guard stashyPlus.isUnlocked else { return [] }
         let filters = viewModel.savedFilters.values
             .filter { $0.mode == .scenes }
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -194,6 +209,7 @@ struct TVDashboardView: View {
     }
 
     private func fetchChannels() {
+        guard stashyPlus.isUnlocked else { return }
         viewModel.fetchSavedFilters { _ in
             loadChannelPreviews()
         }

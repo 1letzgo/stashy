@@ -20,6 +20,7 @@ private struct HomeViewContent: View {
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
+    @ObservedObject private var stashyPlus = StashyPlusManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
 
     var body: some View {
@@ -76,7 +77,7 @@ private struct HomeViewContent: View {
                     if row.isEnabled {
                         if row.type == .statistics {
                             HomeStatisticsRowView(viewModel: viewModel, isFirst: row.id == firstRowId)
-                        } else if row.type == .channels {
+                        } else if row.type == .channels && stashyPlus.isUnlocked {
                             HomeChannelsRowView(config: row,
                                                 viewModel: viewModel,
                                                 isFirst: row.id == firstRowId)

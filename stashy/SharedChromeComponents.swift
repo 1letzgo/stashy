@@ -121,6 +121,11 @@ private final class SwipeBackEnablerViewController: UIViewController {
         applyCustomChromeNavBar()
     }
 
+    override func viewDidLayoutSubviews() {
+        super.viewDidLayoutSubviews()
+        enforceHiddenNavigationBar()
+    }
+
     override func viewWillDisappear(_ animated: Bool) {
         super.viewWillDisappear(animated)
         guard let nav = navigationController else { return }
@@ -169,6 +174,30 @@ private final class SwipeBackEnablerViewController: UIViewController {
             nav.setNavigationBarHidden(true, animated: false)
         }
         StashyNavPopGestureStorage.install(on: nav)
+    }
+
+    /// Sheet present/dismiss über einem gepushten Detail (z. B. Filter-Sheet im Profil,
+    /// gepusht aus der Suche) blendet die System-Bar wieder ein — ohne Lifecycle-Callback,
+    /// den `applyCustomChromeNavBar` abfangen könnte → leere Zeile über dem Custom-Chrome.
+    /// Layout-Passes laufen beim Sheet-Auf/-Zu Abbau trotzdem; außerhalb von Push/Pop-
+    /// Transitionen erzwingen wir den Hidden-Zustand daher hier erneut — aber nur, solange
+    /// DIESES Detail Stack-Top ist, sonst würde die Bar gepushter Kinder (Szene-Detail etc.)
+    /// weggeräumt.
+    private func enforceHiddenNavigationBar() {
+        guard let nav = navigationController else { return }
+        guard transitionCoordinator == nil, nav.transitionCoordinator == nil else { return }
+        if let top = nav.topViewController, isContained(in: top), !nav.isNavigationBarHidden {
+            nav.setNavigationBarHidden(true, animated: false)
+        }
+    }
+
+    private func isContained(in ancestor: UIViewController) -> Bool {
+        var current: UIViewController? = self
+        while let vc = current {
+            if vc === ancestor { return true }
+            current = vc.parent
+        }
+        return false
     }
 }
 

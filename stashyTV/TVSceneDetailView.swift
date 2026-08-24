@@ -744,6 +744,8 @@ class TVPlayerViewModel: ObservableObject {
     private var viewModel: StashDBViewModel?
     /// Avoid duplicate seek/play when `status` KVO fires more than once at `.readyToPlay`.
     private var didApplyInitialPlayback = false
+    /// `saveProgress()` already ran in `suspend()` — skip the duplicate in `clear()`.
+    private var isSuspended = false
 
     init() {
         let center = NotificationCenter.default
@@ -778,7 +780,7 @@ class TVPlayerViewModel: ObservableObject {
     }
 
     func setupPlayer(url: URL, sceneId: String, viewModel: StashDBViewModel, startAt timestamp: Double = 0) {
-        print("🚀 TV PLAYER VM: Setting up player for URL: \(redactedURLString(url)) at \(timestamp)s")
+        AppLog.debug("🚀 TV PLAYER VM: Setting up player for URL: \(redactedURLString(url)) at \(timestamp)s")
         self.sceneId = sceneId
         self.viewModel = viewModel
         self.didApplyInitialPlayback = false
@@ -798,13 +800,13 @@ class TVPlayerViewModel: ObservableObject {
                 guard self.player === newPlayer else { return }
                 if item.status == .failed {
                     self.error = item.error
-                    print("❌ TV PLAYER VM: Playback FAILED: \(item.error?.localizedDescription ?? "Unknown error")")
+                    AppLog.debug("❌ TV PLAYER VM: Playback FAILED: \(item.error?.localizedDescription ?? "Unknown error")")
                     if let error = item.error as NSError? {
-                        print("❌ TV PLAYER VM: Error domain: \(error.domain), code: \(error.code)")
-                        print("❌ TV PLAYER VM: Error user info: \(error.userInfo)")
+                        AppLog.debug("❌ TV PLAYER VM: Error domain: \(error.domain), code: \(error.code)")
+                        AppLog.debug("❌ TV PLAYER VM: Error user info: \(error.userInfo)")
                     }
                 } else if item.status == .readyToPlay {
-                    print("✅ TV PLAYER VM: Player item READY to play")
+                    AppLog.debug("✅ TV PLAYER VM: Player item READY to play")
                     self.applyInitialPlaybackIfNeeded(player: newPlayer, startSeconds: startSeconds)
                 }
             }
@@ -917,7 +919,7 @@ class TVPlayerViewModel: ObservableObject {
         if currentTime > 0 {
             // Prefer the dedicated activity tracker when available; otherwise at least
             // persist resume. Play-duration deltas are accumulated on iOS Scene Detail / Feeds.
-            print("💾 TV PLAYER VM: Saving progress: \(currentTime)s for \(sceneId)")
+            AppLog.debug("💾 TV PLAYER VM: Saving progress: \(currentTime)s for \(sceneId)")
             let duration = player.currentItem?.duration.seconds ?? 0
             var resume = currentTime
             if duration.isFinite, duration > 0, (100.0 / duration) * currentTime >= 98 {
@@ -932,8 +934,30 @@ class TVPlayerViewModel: ObservableObject {
         }
     }
 
-    func clear() {
+    /// Stoppt Timer/Observer und pausiert, lässt den veröffentlichten `player` aber stehen.
+    /// `player = nil` während das fullScreenCover noch dismissed wird reißt die noch
+    /// sichtbare AVPlayerViewController-Hierarchie weg — auf tvOS ein sicherer Force-Close
+    /// beim Back-Exit aus dem Kanal-Player. Für diesen Moment gibt es `suspend()`;
+    /// `clear()` läuft erst in `onDisappear`, wenn das Cover bereits entfernt ist.
+    func suspend() {
+        guard !isSuspended else { return }
+        isSuspended = true
         saveProgress()
+        scrubSettleWorkItem?.cancel()
+        scrubSettleWorkItem = nil
+        removeTimeJumpedObserver()
+        removePlaybackEndedObserver()
+        progressTimer = nil
+        statusObserver = nil
+        didApplyInitialPlayback = true
+        player?.pause()
+    }
+
+    func clear() {
+        if !isSuspended {
+            saveProgress()
+        }
+        isSuspended = false
         scrubSettleWorkItem?.cancel()
         scrubSettleWorkItem = nil
         removeTimeJumpedObserver()

@@ -2,12 +2,11 @@
 //  StashyPlusManager.swift
 //  stashy
 //
-//  Entitlement gate for stashy+ (AI subtitles, Downloads, Advanced Statistics, Match, RateMe, AI Motion, App Icon).
+//  Entitlement gate for stashy+ (AI subtitles, Downloads, Advanced Statistics, Match, RateMe, AI Motion, App Icon, Channels).
 //  Unlocked via subscription, lifetime IAP, or a paid App Store purchase before 3.0.
 //  Tips never grant stashy+.
 //
 
-#if !os(tvOS)
 import Foundation
 import Combine
 import StoreKit
@@ -406,4 +405,3 @@ final class StashyPlusManager: ObservableObject {
 extension Notification.Name {
     static let stashyPlusUnlocked = Notification.Name("StashyPlusUnlocked")
 }
-#endif

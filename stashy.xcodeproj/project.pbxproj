@@ -70,6 +70,7 @@
 		A1IMGDS012345678901234AB /* StashImageDateSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1IMGDS022345678901234AB /* StashImageDateSort.swift */; };
 		A1IMGDS032345678901234AB /* StashImageDateSort.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1IMGDS022345678901234AB /* StashImageDateSort.swift */; };
 		A1PLUS012F30B00000000001 /* StashyPlusManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1PLUS022F30B00000000002 /* StashyPlusManager.swift */; };
+		A1PLUS042F30B00000000004 /* StashyPlusManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1PLUS022F30B00000000002 /* StashyPlusManager.swift */; };
 		A448F31312224C5CA0763758 /* SceneTagsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E762F2A6392004CA019 /* SceneTagsCard.swift */; };
 		A519E23C8BE040F79C6EFE18 /* ImagesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF4A022B2F1E8B6800E5EAFB /* ImagesView.swift */; };
 		A8FA63740E8A43609EDB1AAD /* AppearanceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB312F1831C7007C2090 /* AppearanceManager.swift */; };
@@ -760,6 +761,7 @@
 				790261AAF80B42C485B72074 /* TabManager.swift in Sources */,
 				C047CE6380F048858A91E6C9 /* GraphQLClient.swift in Sources */,
 				E909C6E8F4744C4D939F78BD /* GraphQLQueries.swift in Sources */,
+				A1PLUS042F30B00000000004 /* StashyPlusManager.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

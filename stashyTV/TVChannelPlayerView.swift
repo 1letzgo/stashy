@@ -203,7 +203,16 @@ final class TVChannelSession: ObservableObject {
         }
     }
 
+    /// Hält die Wiedergabe an, solange das Cover selbst noch auf dem Schirm ist
+    /// (Back-Command). Der Player bleibt veröffentlicht, damit SwiftUI die
+    /// AVPlayerViewController-Hierarchie nicht mitten im Dismiss abbaut.
     func stop() {
+        player.onPlaybackEnded = nil
+        player.suspend()
+    }
+
+    /// Kompletter Abbau nach dem Dismiss (onDisappear).
+    func teardown() {
         player.onPlaybackEnded = nil
         player.clear()
     }
@@ -312,6 +321,7 @@ final class TVChannelSession: ObservableObject {
 struct TVChannelPlayerView: View {
     @StateObject private var session: TVChannelSession
     @Environment(\.dismiss) private var dismiss
+    @State private var isClosing = false
 
     init(channel: TVChannel) {
         _session = StateObject(wrappedValue: TVChannelSession(channel: channel))
@@ -353,7 +363,7 @@ struct TVChannelPlayerView: View {
             }
         }
         .onAppear { session.start() }
-        .onDisappear { session.stop() }
+        .onDisappear { session.teardown() }
         .onExitCommand { close() }
     }
 
@@ -364,6 +374,8 @@ struct TVChannelPlayerView: View {
     }
 
     private func close() {
+        guard !isClosing else { return }
+        isClosing = true
         session.stop()
         dismiss()
     }
@@ -395,11 +407,11 @@ private struct TVChannelVideoPlayer: UIViewControllerRepresentable {
         coordinator.previousAction = UIAction(
             title: "Previous",
             image: UIImage(systemName: "backward.end.fill")
-        ) { _ in coordinator.onPrevious() }
+        ) { [weak coordinator] _ in coordinator?.onPrevious() }
         coordinator.nextAction = UIAction(
             title: "Next",
             image: UIImage(systemName: "forward.end.fill")
-        ) { _ in coordinator.onNext() }
+        ) { [weak coordinator] _ in coordinator?.onNext() }
 
         // Upcoming scenes as a tab in the native info panel (swipe down during playback).
         let upNext = UIHostingController(rootView: TVChannelUpNextView(session: session))

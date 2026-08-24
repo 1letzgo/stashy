@@ -10,6 +10,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
     let channel: TVChannel?
 
     @State private var playingChannel: TVChannel?
+    @ObservedObject private var stashyPlus = StashyPlusManager.shared
 
     // Scenes related
     let scenes: [Scene]
@@ -73,7 +74,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                             .fontWeight(.bold)
                             .foregroundColor(.white)
 
-                        if let channel {
+                        if let channel, stashyPlus.isUnlocked {
                             Button {
                                 playingChannel = channel
                             } label: {

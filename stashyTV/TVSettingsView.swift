@@ -38,6 +38,12 @@ struct TVSettingsView: View {
                 } label: {
                     settingsRow(title: "Playback", icon: "play.rectangle.fill", subtitle: "Streaming quality")
                 }
+
+                NavigationLink {
+                    TVStashyPlusSettingsView().tvExitDismissable()
+                } label: {
+                    settingsRow(title: "stashy+", icon: "sparkles.tv.fill", subtitle: "Premium features & Channels")
+                }
             } header: {
                 Text("General")
             }
@@ -110,7 +116,7 @@ private struct TVServersSettingsView: View {
             Section {
                 if let config = configManager.activeConfig {
                     NavigationLink {
-                        TVServerDetailView()
+                        TVServerDetailView().tvExitDismissable()
                     } label: {
                         HStack(spacing: 20) {
                             Image(systemName: "server.rack")
