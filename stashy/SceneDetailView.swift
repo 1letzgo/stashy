@@ -325,11 +325,12 @@ struct SceneDetailView: View {
                     // Landscape Mode: Grid Layout for Metadata
                     LazyVGrid(columns: [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)], spacing: 12) {
 
-                        // Item 1: Performers (full scroll row, spans both columns)
+                        // Item 1: Performers (+ Director, full scroll row, spans both columns)
                         ScenePerformersCard(
                             sceneId: activeScene.id,
                             sceneDate: activeScene.date,
                             performers: activeScene.performers,
+                            director: activeScene.normalizedDirector,
                             onPerformersUpdated: { updated in
                                 applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                             },
@@ -356,11 +357,6 @@ struct SceneDetailView: View {
                             },
                             viewModel: viewModel
                         )
-
-                        if let director = activeScene.normalizedDirector {
-                            SceneDirectorCard(director: director)
-                                .gridCellColumns(2)
-                        }
 
                         // Item 4: Galleries
                         if let galleries = activeScene.galleries, !galleries.isEmpty {
@@ -396,11 +392,12 @@ struct SceneDetailView: View {
                     }
                 } else {
                     // Portrait Mode: Vertical Stack
-                    // Row 1: Performers (full width, horizontal scroll)
+                    // Row 1: Performers (+ Director, full width, horizontal scroll)
                     ScenePerformersCard(
                         sceneId: activeScene.id,
                         sceneDate: activeScene.date,
                         performers: activeScene.performers,
+                        director: activeScene.normalizedDirector,
                         onPerformersUpdated: { updated in
                             applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: updated, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
                         },
@@ -425,10 +422,6 @@ struct SceneDetailView: View {
                             },
                             viewModel: viewModel
                         )
-                    }
-
-                    if let director = activeScene.normalizedDirector {
-                        SceneDirectorCard(director: director)
                     }
 
                     if let galleries = activeScene.galleries, !galleries.isEmpty {

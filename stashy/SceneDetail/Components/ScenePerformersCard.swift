@@ -6,6 +6,7 @@ struct ScenePerformersCard: View {
     let sceneId: String
     let sceneDate: String?
     let performers: [ScenePerformer]
+    var director: String?
     var onPerformersUpdated: (([ScenePerformer]) -> Void)?
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
@@ -41,7 +42,7 @@ struct ScenePerformersCard: View {
             .padding(.horizontal, 12)
             .padding(.top, 8)
 
-            if performers.isEmpty {
+            if performers.isEmpty && director == nil {
                 Text("No performers assigned")
                     .font(.subheadline)
                     .foregroundColor(.secondary)
@@ -93,6 +94,44 @@ struct ScenePerformersCard: View {
                                     }
 
                                     Text(scenePerformer.name)
+                                        .font(.caption2)
+                                        .fontWeight(.bold)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(
+                                            ZStack {
+                                                Color.secondaryAppBackground
+                                                appearanceManager.tintColor.opacity(0.1)
+                                            }
+                                        )
+                                        .foregroundColor(Color.pillAccent)
+                                        .clipShape(Capsule())
+                                        .overlay(Capsule().stroke(appearanceManager.tintColor.opacity(0.4), lineWidth: 0.5))
+                                        .shadow(color: .black.opacity(0.2), radius: 2, x: 0, y: 1)
+                                        .offset(y: 8)
+                                }
+                                .padding(.bottom, 8)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        if let director = director {
+                            NavigationLink(destination: DirectorDetailView(director: director)) {
+                                ZStack(alignment: .bottom) {
+                                    ZStack {
+                                        Circle()
+                                            .fill(Color.secondaryAppBackground)
+                                        Image(systemName: "megaphone.fill")
+                                            .font(.system(size: 30, weight: .medium))
+                                            .foregroundColor(Color.pillAccent)
+                                    }
+                                    .frame(width: 80, height: 80)
+                                    .padding(4)
+                                    .background(appearanceManager.tintColor)
+                                    .clipShape(Circle())
+                                    .overlay(Circle().stroke(appearanceManager.tintColor.opacity(0.1), lineWidth: 0.2))
+
+                                    Text(director)
                                         .font(.caption2)
                                         .fontWeight(.bold)
                                         .padding(.horizontal, 8)

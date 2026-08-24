@@ -112,7 +112,6 @@
 		DF675E7B2F2A6392004CA019 /* SceneVideoPlayerCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E772F2A6392004CA019 /* SceneVideoPlayerCard.swift */; };
 		DF675E7C2F2A6392004CA019 /* SceneStudioCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E752F2A6392004CA019 /* SceneStudioCard.swift */; };
 		DF675E7D2F2A6392004CA019 /* ScenePerformersCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E742F2A6392004CA019 /* ScenePerformersCard.swift */; };
-		DFA1B2C42F3A6500004CA019 /* SceneDirectorCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFA1B2C32F3A6500004CA019 /* SceneDirectorCard.swift */; };
 		DFA1B2C62F3A6500004CA019 /* DirectorDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFA1B2C52F3A6500004CA019 /* DirectorDetailView.swift */; };
 		DF675E7E2F2A6392004CA019 /* SceneTagsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E762F2A6392004CA019 /* SceneTagsCard.swift */; };
 		DF90B75E2F1A5ECF003ED852 /* StarRatingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */; };
@@ -236,7 +235,6 @@
 		DF675E732F2A6392004CA019 /* SceneGalleriesCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneGalleriesCard.swift; sourceTree = "<group>"; };
 		DF675E742F2A6392004CA019 /* ScenePerformersCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenePerformersCard.swift; sourceTree = "<group>"; };
 		DF675E752F2A6392004CA019 /* SceneStudioCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneStudioCard.swift; sourceTree = "<group>"; };
-		DFA1B2C32F3A6500004CA019 /* SceneDirectorCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDirectorCard.swift; sourceTree = "<group>"; };
 		DFA1B2C52F3A6500004CA019 /* DirectorDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectorDetailView.swift; sourceTree = "<group>"; };
 		DF675E762F2A6392004CA019 /* SceneTagsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneTagsCard.swift; sourceTree = "<group>"; };
 		DF675E772F2A6392004CA019 /* SceneVideoPlayerCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneVideoPlayerCard.swift; sourceTree = "<group>"; };
@@ -434,7 +432,6 @@
 				DF675E732F2A6392004CA019 /* SceneGalleriesCard.swift */,
 				DF675E742F2A6392004CA019 /* ScenePerformersCard.swift */,
 				DF675E752F2A6392004CA019 /* SceneStudioCard.swift */,
-				DFA1B2C32F3A6500004CA019 /* SceneDirectorCard.swift */,
 				DF675E762F2A6392004CA019 /* SceneTagsCard.swift */,
 				FA617C2A62174FFFB0912B44 /* SceneGroupsCard.swift */,
 				DF675E772F2A6392004CA019 /* SceneVideoPlayerCard.swift */,
@@ -614,7 +611,6 @@
 				DF675E7B2F2A6392004CA019 /* SceneVideoPlayerCard.swift in Sources */,
 				DF675E7C2F2A6392004CA019 /* SceneStudioCard.swift in Sources */,
 				DF675E7D2F2A6392004CA019 /* ScenePerformersCard.swift in Sources */,
-				DFA1B2C42F3A6500004CA019 /* SceneDirectorCard.swift in Sources */,
 				DFA1B2C62F3A6500004CA019 /* DirectorDetailView.swift in Sources */,
 				DF675E7E2F2A6392004CA019 /* SceneTagsCard.swift in Sources */,
 				9BA6D13B444E433980610D36 /* SceneGroupsCard.swift in Sources */,
