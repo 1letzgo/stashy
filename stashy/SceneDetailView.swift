@@ -325,7 +325,19 @@ struct SceneDetailView: View {
                     // Landscape Mode: Grid Layout for Metadata
                     LazyVGrid(columns: [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)], spacing: 12) {
 
-                        // Item 1: Performers (+ Director, full scroll row, spans both columns)
+                        // Item 1: Galleries — always visible (full width)
+                        SceneGalleriesCard(
+                            sceneId: activeScene.id,
+                            galleries: activeScene.galleries,
+                            performers: activeScene.performers,
+                            onGalleriesUpdated: { updated in
+                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: updated, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                            },
+                            viewModel: viewModel
+                        )
+                        .gridCellColumns(2)
+
+                        // Item 2: Performers (+ Director, full scroll row, spans both columns)
                         ScenePerformersCard(
                             sceneId: activeScene.id,
                             sceneDate: activeScene.date,
@@ -338,7 +350,7 @@ struct SceneDetailView: View {
                         )
                         .gridCellColumns(2)
 
-                        // Item 2: Studio
+                        // Item 3: Studio
                         SceneStudioCard(
                             sceneId: activeScene.id,
                             studio: activeScene.studio,
@@ -348,7 +360,7 @@ struct SceneDetailView: View {
                             viewModel: viewModel
                         )
 
-                        // Item 3: Groups
+                        // Item 4: Groups
                         SceneGroupsCard(
                             sceneId: activeScene.id,
                             groups: activeScene.groups ?? [],
@@ -357,11 +369,6 @@ struct SceneDetailView: View {
                             },
                             viewModel: viewModel
                         )
-
-                        // Item 4: Galleries
-                        if let galleries = activeScene.galleries, !galleries.isEmpty {
-                            SceneGalleriesCard(galleries: galleries)
-                        }
 
                         // Item 5: Tags — always visible
                         SceneTagsCard(
@@ -392,7 +399,18 @@ struct SceneDetailView: View {
                     }
                 } else {
                     // Portrait Mode: Vertical Stack
-                    // Row 1: Performers (+ Director, full width, horizontal scroll)
+                    // Row 1: Galleries — always visible
+                    SceneGalleriesCard(
+                        sceneId: activeScene.id,
+                        galleries: activeScene.galleries,
+                        performers: activeScene.performers,
+                        onGalleriesUpdated: { updated in
+                            applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: updated, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                        },
+                        viewModel: viewModel
+                    )
+
+                    // Row 2: Performers (+ Director, full width, horizontal scroll)
                     ScenePerformersCard(
                         sceneId: activeScene.id,
                         sceneDate: activeScene.date,
@@ -404,7 +422,7 @@ struct SceneDetailView: View {
                         viewModel: viewModel
                     )
 
-                    // Row 2: Studio + Groups side by side
+                    // Row 3: Studio + Groups side by side
                     HStack(alignment: .top, spacing: 12) {
                         SceneStudioCard(
                             sceneId: activeScene.id,
@@ -424,11 +442,7 @@ struct SceneDetailView: View {
                         )
                     }
 
-                    if let galleries = activeScene.galleries, !galleries.isEmpty {
-                        SceneGalleriesCard(galleries: galleries)
-                    }
-
-                    // Row 3: Tags — always visible
+                    // Row 4: Tags — always visible
                     SceneTagsCard(
                         sceneId: activeScene.id,
                         tags: activeScene.tags,

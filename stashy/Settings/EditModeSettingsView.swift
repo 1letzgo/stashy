@@ -10,7 +10,7 @@ struct EditModeSettingsView: View {
                 Toggle("Enable Editing", isOn: $appearanceManager.isEditModeEnabled)
                     .tint(appearanceManager.tintColor)
                     .stashyGroupedSettingsRow()
-                stashyScrollingSectionFooter("Show edit buttons on scene detail cards (performers, studio, groups, tags, title, description) and on performer / studio / tag / group / gallery detail.")
+                stashyScrollingSectionFooter("Show edit buttons on scene detail cards (performers, studio, groups, galleries, tags, title, description) and on performer / studio / tag / group / gallery detail.")
             }
         }
         .stashySettingsList()

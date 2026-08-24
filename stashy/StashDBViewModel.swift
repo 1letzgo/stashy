@@ -7194,6 +7194,69 @@ struct GenerateData: Codable {
         }
     }
 
+    func fetchAllGalleriesForScene(completion: @escaping ([Gallery]) -> Void) {
+        fetchGalleriesForSceneEdit(performerIds: [], completion: completion)
+    }
+
+    /// Galleries for the scene-edit sheet. When `performerIds` is non-empty, only galleries
+    /// that include at least one of those performers are returned (with cover thumbnails).
+    func fetchGalleriesForSceneEdit(performerIds: [String], completion: @escaping ([Gallery]) -> Void) {
+        let query = GraphQLQueries.findGalleriesForSceneQuery
+        var variables: [String: Any] = ["filter": ["per_page": -1, "sort": "title", "direction": "ASC"]]
+        if !performerIds.isEmpty {
+            variables["gallery_filter"] = [
+                "performers": [
+                    "value": performerIds,
+                    "modifier": "INCLUDES"
+                ]
+            ]
+        }
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else { completion([]); return }
+        struct Resp: Codable { let data: RData? }
+        struct RData: Codable { let findGalleries: RGalleries }
+        struct RGalleries: Codable { let galleries: [Gallery] }
+        performGraphQLQuery(query: bodyString) { (response: Resp?) in
+            completion(response?.data?.findGalleries.galleries ?? [])
+        }
+    }
+    func updateSceneGalleries(sceneId: String, galleryIds: [String], completion: @escaping (Bool) -> Void) {
+        let mutation = GraphQLQueries.sceneUpdateGalleriesMutation
+        let variables: [String: Any] = ["input": ["id": sceneId, "gallery_ids": galleryIds]]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else { completion(false); return }
+        performGraphQLQuery(query: bodyString) { (response: SceneUpdateResponse?) in
+            completion(response?.data?.sceneUpdate != nil)
+        }
+    }
+
+    /// One-shot gallery image preview for scene detail strips (does not touch `galleryImages`).
+    func fetchGalleryPreviewImages(galleryId: String, limit: Int = 30, completion: @escaping ([StashImage]) -> Void) {
+        let query = GraphQLQueries.queryWithFragments("findImages")
+        let variables: [String: Any] = [
+            "filter": [
+                "page": 1,
+                "per_page": limit,
+                "sort": "path",
+                "direction": "ASC"
+            ],
+            "image_filter": [
+                "galleries": [
+                    "value": [galleryId],
+                    "modifier": "INCLUDES"
+                ]
+            ]
+        ]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion([])
+            return
+        }
+        performGraphQLQuery(query: bodyString) { (response: GalleryImagesResponse?) in
+            completion(response?.data?.findImages.images ?? [])
+        }
+    }
+
     func updateSceneTitleAndDetails(sceneId: String, title: String?, details: String?, completion: @escaping (Bool) -> Void) {
         let mutation = GraphQLQueries.sceneUpdateTitleDetailsMutation
         var input: [String: Any] = ["id": sceneId]

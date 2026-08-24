@@ -1498,7 +1498,6 @@ private struct TopListsStatColumn: View {
     let title: String
     let value: String
     var emphasized: Bool = false
-    @ObservedObject private var appearance = AppearanceManager.shared
 
     var body: some View {
         VStack(alignment: .center, spacing: 1) {
@@ -1509,7 +1508,7 @@ private struct TopListsStatColumn: View {
                 .lineLimit(1)
             Text(value)
                 .font(.title2.monospacedDigit().weight(.bold))
-                .foregroundStyle(emphasized ? appearance.tintColor : Color.primary)
+                .foregroundStyle(emphasized ? Color.primary : Color.secondary)
                 .lineLimit(1)
                 .minimumScaleFactor(0.55)
                 .multilineTextAlignment(.center)

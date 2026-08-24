@@ -224,6 +224,20 @@ class GraphQLQueries {
         }
         """
 
+    static let findGalleriesForSceneQuery = """
+        query FindGalleries($filter: FindFilterType, $gallery_filter: GalleryFilterType) {
+            findGalleries(filter: $filter, gallery_filter: $gallery_filter) {
+                galleries {
+                    id
+                    title
+                    date
+                    image_count
+                    updated_at
+                    cover { id paths { thumbnail } }
+                }
+            }
+        }
+        """
     static let saveSceneFilterMutation = """
         mutation SaveSceneFilter($input: SaveFilterInput!) {
           saveFilter(input: $input) {
@@ -324,6 +338,12 @@ class GraphQLQueries {
     static let sceneUpdateGroupsMutation = """
         mutation SceneUpdate($input: SceneUpdateInput!) {
             sceneUpdate(input: $input) { id groups { group { id name updated_at front_image_path } scene_index } }
+        }
+        """
+
+    static let sceneUpdateGalleriesMutation = """
+        mutation SceneUpdate($input: SceneUpdateInput!) {
+            sceneUpdate(input: $input) { id galleries { id title date image_count updated_at cover { id paths { thumbnail } } } }
         }
         """
 

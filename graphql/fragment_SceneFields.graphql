@@ -4,7 +4,7 @@ fragment SceneFields on Scene {
   performers { ...PerformerFields }
   files { id path format width height duration video_codec audio_codec bit_rate frame_rate }
   tags { ...TagFields }
-  galleries { id title date image_count }
+  galleries { id title date image_count updated_at cover { id paths { thumbnail } } }
   groups { group { id name updated_at front_image_path } scene_index }
   paths { screenshot preview stream webp vtt sprite funscript interactive_heatmap caption }
   captions { language_code caption_type }
