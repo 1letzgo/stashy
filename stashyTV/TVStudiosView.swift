@@ -13,6 +13,7 @@ struct TVStudiosView: View {
     @ObservedObject private var tabManager = TabManager.shared
     @State private var sortBy: StashDBViewModel.StudioSortOption
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
+    @State private var focusResetToken = 0
     @FocusState private var focusedStudioID: String?
 
     init() {
@@ -20,38 +21,58 @@ struct TVStudiosView: View {
         _sortBy = State(initialValue: defaultSort)
     }
 
-    private let columns = [
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40)
-    ]
+    private static let sortOrder: [StashDBViewModel.StudioSortOption] = [.random, .nameAsc, .nameDesc, .sceneCountDesc, .sceneCountAsc, .createdAtDesc, .createdAtAsc, .updatedAtDesc, .updatedAtAsc]
+
+    private var sortOptions: [TVPickerOption<StashDBViewModel.StudioSortOption>] {
+        Self.sortOrder.map { TVPickerOption($0, label(for: $0)) }
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if !hasValidConfig {
-                TVConnectionErrorView(title: "Server not reachable", subtitle: "Add a server in Settings.") { reload() }
-            } else if viewModel.studios.isEmpty && (viewModel.errorMessage?.isEmpty == false) {
-                TVConnectionErrorView(title: "Error loading studios", subtitle: viewModel.errorMessage) { reload() }
-            } else if viewModel.isLoadingStudios && viewModel.studios.isEmpty {
-                loadingView
-            } else if viewModel.studios.isEmpty {
-                emptyView
-            } else {
-                contentGrid
+        TVCatalogGrid(
+            items: viewModel.studios,
+            hasValidConfig: hasValidConfig,
+            errorMessage: viewModel.errorMessage,
+            isLoading: viewModel.isLoadingStudios,
+            isLoadingMore: viewModel.isLoadingMoreStudios,
+            hasMore: viewModel.hasMoreStudios,
+            columnWidth: 410,
+            columnCount: 4,
+            emptySystemImage: "building.2",
+            emptyTitle: "No Studios Found",
+            loadingText: "Loading studios…",
+            errorTitle: "Error loading studios",
+            focusResetToken: focusResetToken,
+            loadMore: { viewModel.loadMoreStudios() },
+            reload: { reload() },
+            focusedID: $focusedStudioID,
+            header: {
+                STVHeaderView(
+                    sortMenu: {
+                        TVOptionPickerButton(
+                            title: "Sort By",
+                            icon: "arrow.up.arrow.down",
+                            options: sortOptions,
+                            selection: $sortBy
+                        )
+                    },
+                    filterMenu: {
+                        TVFilterPickerButton(filters: savedFilters, selection: $selectedFilter)
+                    },
+                    onRefresh: { reload() }
+                )
+            },
+            card: { item in
+                TVNavButton(value: TVStudioLink(id: item.id, name: item.name)) {
+                    TVStudioCardView(studio: item)
+                }
             }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.appBackground)
-        .onChange(of: viewModel.studios.first?.id) { oldID, newID in
-            if oldID != newID, let newID {
-                focusedStudioID = newID
-            }
-        }
+        )
         .onChange(of: sortBy) { _, newValue in
+            focusResetToken += 1
             viewModel.fetchStudios(sortBy: newValue, isInitialLoad: true, filter: selectedFilter)
         }
         .onChange(of: selectedFilter) { _, newValue in
+            focusResetToken += 1
             viewModel.fetchStudios(sortBy: sortBy, isInitialLoad: true, filter: newValue)
         }
         .onAppear {
@@ -76,6 +97,12 @@ struct TVStudiosView: View {
 
     private var hasValidConfig: Bool { configManager.activeConfig?.hasValidConfig == true }
 
+    private var savedFilters: [StashDBViewModel.SavedFilter] {
+        viewModel.savedFilters.values
+            .filter { $0.mode == .studios }
+            .sorted { $0.name < $1.name }
+    }
+
     private func applyDefaultFilterIfNeeded() {
         guard selectedFilter == nil,
               let filterId = tabManager.getDefaultFilterId(for: .studios),
@@ -87,21 +114,6 @@ struct TVStudiosView: View {
         guard hasValidConfig else { return }
         viewModel.testConnection()
         viewModel.fetchStudios(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
-    }
-
-
-    private func sortButton(option: StashDBViewModel.StudioSortOption) -> some View {
-        Button {
-            sortBy = option
-        } label: {
-            HStack {
-                Text(label(for: option))
-                if sortBy == option {
-                    Spacer()
-                    Image(systemName: "checkmark")
-                }
-            }
-        }
     }
 
     private func label(for option: StashDBViewModel.StudioSortOption) -> String {
@@ -124,145 +136,5 @@ struct TVStudiosView: View {
         case .imageCountAsc: return "Least Images"
         case .random: return "Random"
         }
-    }
-
-    @ViewBuilder
-    private var loadingView: some View {
-        Spacer()
-        VStack(spacing: 20) {
-            ProgressView().scaleEffect(1.5)
-            Text("Loading studios…")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        Spacer()
-    }
-
-    @ViewBuilder
-    private var emptyView: some View {
-        Spacer()
-        VStack(spacing: 32) {
-            Image(systemName: "building.2")
-                .font(.system(size: 80))
-                .foregroundColor(.secondary)
-            
-            Text("No Studios Found")
-                .font(.title2)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-        }
-        Spacer()
-    }
-
-    @ViewBuilder
-    private var contentGrid: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                STVHeaderView(
-                    sortMenu: { sortMenu },
-                    filterMenu: { filterMenu },
-                    onRefresh: { reload() }
-                )
-
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 40) {
-                    ForEach(viewModel.studios) { studio in
-                        TVNavButton(value: TVStudioLink(id: studio.id, name: studio.name)) {
-                            TVStudioCardView(studio: studio)
-                        }
-                        .focused($focusedStudioID, equals: studio.id)
-                        .frame(width: 410) // Fixed width for item container
-                        .onAppear {
-                            if studio.id == viewModel.studios.last?.id && viewModel.hasMoreStudios {
-                                viewModel.loadMoreStudios()
-                            }
-                        }
-                    }
-
-                    if viewModel.isLoadingMoreStudios {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 40)
-                    }
-                }
-                .padding(.horizontal, 60)
-                .padding(.bottom, 80)
-            }
-        }
-        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60).focusable(false) }
-    }
-
-    @ViewBuilder
-    private var sortMenu: some View {
-        Menu {
-            Section("Sort By") {
-                sortButton(option: .random)
-                Divider()
-                sortButton(option: .nameAsc)
-                sortButton(option: .nameDesc)
-                sortButton(option: .sceneCountDesc)
-                sortButton(option: .sceneCountAsc)
-                sortButton(option: .createdAtDesc)
-                sortButton(option: .createdAtAsc)
-                sortButton(option: .updatedAtDesc)
-                sortButton(option: .updatedAtAsc)
-            }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "arrow.up.arrow.down")
-                Text(label(for: sortBy))
-            }
-            .font(.headline)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 8)
-        }
-        .buttonStyle(.card)
-    }
-
-    @ViewBuilder
-    private var filterMenu: some View {
-        Menu {
-            Button {
-                selectedFilter = nil
-            } label: {
-                HStack {
-                    Text("No Filter")
-                    if selectedFilter == nil {
-                        Spacer()
-                        Image(systemName: "checkmark")
-                    }
-                }
-            }
-            
-            let studioFilters = viewModel.savedFilters.values
-                .filter { $0.mode == .studios }
-                .sorted { $0.name < $1.name }
-            
-            if !studioFilters.isEmpty {
-                Divider()
-                ForEach(studioFilters) { filter in
-                    Button {
-                        selectedFilter = filter
-                    } label: {
-                        HStack {
-                            Text(filter.name)
-                            if selectedFilter?.id == filter.id {
-                                Spacer()
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: selectedFilter != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                Text(selectedFilter?.name ?? "No Filter")
-            }
-            .font(.headline)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 8)
-        }
-        .buttonStyle(.card)
     }
 }

@@ -11,7 +11,8 @@ import Foundation
 import Combine
 import StoreKit
 
-enum StashyPlusProduct {
+/// `nonisolated`: reine Konstanten, werden auch aus `Task.detached` gelesen.
+nonisolated enum StashyPlusProduct {
     static let monthly = "de.stashy.plus.m"
     static let yearly = "de.stashy.plus.y"
     static let lifetime = "de.stashy.plus.l"
@@ -124,7 +125,7 @@ final class StashyPlusManager: ObservableObject {
     nonisolated static let firstFreemiumReleaseDate: Date? = utcDate(year: 2026, month: 8, day: 24)
 
     /// Which pricing era an `originalAppVersion` belongs to.
-    enum OriginalVersionEra: Equatable, Sendable {
+    nonisolated enum OriginalVersionEra: Equatable, Sendable {
         case paid
         case freemium
         /// Build number reused across both eras — only the purchase date can decide.
@@ -137,7 +138,7 @@ final class StashyPlusManager: ObservableObject {
         return calendar.date(from: DateComponents(year: year, month: month, day: day))!
     }
 
-    enum LegacyPaidAppDecision: Equatable, Sendable {
+    nonisolated enum LegacyPaidAppDecision: Equatable, Sendable {
         case yes
         case no
     }

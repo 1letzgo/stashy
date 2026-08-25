@@ -122,8 +122,8 @@ private struct TVOptionalCardButtonStyle: ViewModifier {
 
 // MARK: - tvOS Exit/Menu handling
 
-/// On tvOS the Menu button triggers an "exit" command. Prefer popping the tab
-/// `NavigationPath`; fall back to `dismiss` only when the view is presented.
+/// On tvOS the Menu button triggers an "exit" command. Dismiss first when the
+/// view is presented (sheet/cover), otherwise pop the tab `NavigationPath`.
 private struct TVExitCommandDismiss: ViewModifier {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.isPresented) private var isPresented
@@ -131,12 +131,15 @@ private struct TVExitCommandDismiss: ViewModifier {
 
     func body(content: Content) -> some View {
         content.onExitCommand {
-            if let path, !path.wrappedValue.isEmpty {
-                path.wrappedValue.removeLast()
+            // Presented (Sheet/Cover) hat Vorrang: sonst poppt die Menu-Taste den
+            // darunterliegenden Stack, statt das Cover zu schließen.
+            if isPresented {
+                dismiss()
                 return
             }
-            guard isPresented else { return }
-            dismiss()
+            if let path, !path.wrappedValue.isEmpty {
+                path.wrappedValue.removeLast()
+            }
         }
     }
 }

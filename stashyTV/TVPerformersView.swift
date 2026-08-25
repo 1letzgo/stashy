@@ -13,6 +13,7 @@ struct TVPerformersView: View {
     @ObservedObject private var tabManager = TabManager.shared
     @State private var sortBy: StashDBViewModel.PerformerSortOption
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
+    @State private var focusResetToken = 0
     @FocusState private var focusedPerformerID: String?
 
     init() {
@@ -20,40 +21,58 @@ struct TVPerformersView: View {
         _sortBy = State(initialValue: defaultSort)
     }
 
-    private let columns = [
-        GridItem(.fixed(260), spacing: 40),
-        GridItem(.fixed(260), spacing: 40),
-        GridItem(.fixed(260), spacing: 40),
-        GridItem(.fixed(260), spacing: 40),
-        GridItem(.fixed(260), spacing: 40),
-        GridItem(.fixed(260), spacing: 40)
-    ]
+    private static let sortOrder: [StashDBViewModel.PerformerSortOption] = [.random, .nameAsc, .nameDesc, .sceneCountDesc, .sceneCountAsc, .birthdateDesc, .birthdateAsc, .oCountDesc, .oCountAsc, .ratingDesc, .ratingAsc, .createdAtDesc, .createdAtAsc, .updatedAtDesc, .updatedAtAsc]
+
+    private var sortOptions: [TVPickerOption<StashDBViewModel.PerformerSortOption>] {
+        Self.sortOrder.map { TVPickerOption($0, label(for: $0)) }
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if !hasValidConfig {
-                TVConnectionErrorView(title: "Server not reachable", subtitle: "Add a server in Settings.") { reload() }
-            } else if viewModel.performers.isEmpty && (viewModel.errorMessage?.isEmpty == false) {
-                TVConnectionErrorView(title: "Error loading performers", subtitle: viewModel.errorMessage) { reload() }
-            } else if viewModel.isLoadingPerformers && viewModel.performers.isEmpty {
-                loadingView
-            } else if viewModel.performers.isEmpty {
-                emptyView
-            } else {
-                contentGrid
+        TVCatalogGrid(
+            items: viewModel.performers,
+            hasValidConfig: hasValidConfig,
+            errorMessage: viewModel.errorMessage,
+            isLoading: viewModel.isLoadingPerformers,
+            isLoadingMore: viewModel.isLoadingMorePerformers,
+            hasMore: viewModel.hasMorePerformers,
+            columnWidth: 260,
+            columnCount: 6,
+            emptySystemImage: "person.3",
+            emptyTitle: "No Performers Found",
+            loadingText: "Loading performers…",
+            errorTitle: "Error loading performers",
+            focusResetToken: focusResetToken,
+            loadMore: { viewModel.loadMorePerformers() },
+            reload: { reload() },
+            focusedID: $focusedPerformerID,
+            header: {
+                STVHeaderView(
+                    sortMenu: {
+                        TVOptionPickerButton(
+                            title: "Sort By",
+                            icon: "arrow.up.arrow.down",
+                            options: sortOptions,
+                            selection: $sortBy
+                        )
+                    },
+                    filterMenu: {
+                        TVFilterPickerButton(filters: savedFilters, selection: $selectedFilter)
+                    },
+                    onRefresh: { reload() }
+                )
+            },
+            card: { item in
+                TVNavButton(value: TVPerformerLink(id: item.id, name: item.name)) {
+                    TVPerformerCardView(performer: item)
+                }
             }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.appBackground)
-        .onChange(of: viewModel.performers.first?.id) { oldID, newID in
-            if oldID != newID, let newID {
-                focusedPerformerID = newID
-            }
-        }
+        )
         .onChange(of: sortBy) { _, newValue in
+            focusResetToken += 1
             viewModel.fetchPerformers(sortBy: newValue, isInitialLoad: true, filter: selectedFilter)
         }
         .onChange(of: selectedFilter) { _, newValue in
+            focusResetToken += 1
             viewModel.fetchPerformers(sortBy: sortBy, isInitialLoad: true, filter: newValue)
         }
         .onAppear {
@@ -78,6 +97,12 @@ struct TVPerformersView: View {
 
     private var hasValidConfig: Bool { configManager.activeConfig?.hasValidConfig == true }
 
+    private var savedFilters: [StashDBViewModel.SavedFilter] {
+        viewModel.savedFilters.values
+            .filter { $0.mode == .performers }
+            .sorted { $0.name < $1.name }
+    }
+
     private func applyDefaultFilterIfNeeded() {
         guard selectedFilter == nil,
               let filterId = tabManager.getDefaultFilterId(for: .performers),
@@ -89,21 +114,6 @@ struct TVPerformersView: View {
         guard hasValidConfig else { return }
         viewModel.testConnection()
         viewModel.fetchPerformers(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
-    }
-
-
-    private func sortButton(option: StashDBViewModel.PerformerSortOption) -> some View {
-        Button {
-            sortBy = option
-        } label: {
-            HStack {
-                Text(label(for: option))
-                if sortBy == option {
-                    Spacer()
-                    Image(systemName: "checkmark")
-                }
-            }
-        }
     }
 
     private func label(for option: StashDBViewModel.PerformerSortOption) -> String {
@@ -128,151 +138,5 @@ struct TVPerformersView: View {
         case .ratingAsc: return "Lowest Rated"
         case .random: return "Random"
         }
-    }
-
-    @ViewBuilder
-    private var loadingView: some View {
-        Spacer()
-        VStack(spacing: 20) {
-            ProgressView().scaleEffect(1.5)
-            Text("Loading performers…")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        Spacer()
-    }
-
-    @ViewBuilder
-    private var emptyView: some View {
-        Spacer()
-        VStack(spacing: 32) {
-            Image(systemName: "person.3")
-                .font(.system(size: 80))
-                .foregroundColor(.secondary)
-            
-            Text("No Performers Found")
-                .font(.title2)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-        }
-        Spacer()
-    }
-
-    @ViewBuilder
-    private var contentGrid: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                STVHeaderView(
-                    sortMenu: { sortMenu },
-                    filterMenu: { filterMenu },
-                    onRefresh: { reload() }
-                )
-
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 40) {
-                    ForEach(viewModel.performers) { performer in
-                        TVNavButton(value: TVPerformerLink(id: performer.id, name: performer.name)) {
-                            TVPerformerCardView(performer: performer)
-                        }
-                        .focused($focusedPerformerID, equals: performer.id)
-                        .frame(width: 260) // Fixed width for item container
-                        .onAppear {
-                            if performer.id == viewModel.performers.last?.id && viewModel.hasMorePerformers {
-                                viewModel.loadMorePerformers()
-                            }
-                        }
-                    }
-
-                    if viewModel.isLoadingMorePerformers {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 40)
-                    }
-                }
-                .padding(.horizontal, 60)
-                .padding(.bottom, 80)
-            }
-        }
-        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60).focusable(false) }
-    }
-
-    @ViewBuilder
-    private var sortMenu: some View {
-        Menu {
-            Section("Sort By") {
-                sortButton(option: .random)
-                Divider()
-                sortButton(option: .nameAsc)
-                sortButton(option: .nameDesc)
-                sortButton(option: .sceneCountDesc)
-                sortButton(option: .sceneCountAsc)
-                sortButton(option: .birthdateDesc)
-                sortButton(option: .birthdateAsc)
-                sortButton(option: .oCountDesc)
-                sortButton(option: .oCountAsc)
-                sortButton(option: .ratingDesc)
-                sortButton(option: .ratingAsc)
-                sortButton(option: .createdAtDesc)
-                sortButton(option: .createdAtAsc)
-                sortButton(option: .updatedAtDesc)
-                sortButton(option: .updatedAtAsc)
-            }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "arrow.up.arrow.down")
-                Text(label(for: sortBy))
-            }
-            .font(.headline)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 8)
-        }
-        .buttonStyle(.card)
-    }
-
-    @ViewBuilder
-    private var filterMenu: some View {
-        Menu {
-            Button {
-                selectedFilter = nil
-            } label: {
-                HStack {
-                    Text("No Filter")
-                    if selectedFilter == nil {
-                        Spacer()
-                        Image(systemName: "checkmark")
-                    }
-                }
-            }
-            
-            let performerFilters = viewModel.savedFilters.values
-                .filter { $0.mode == .performers }
-                .sorted { $0.name < $1.name }
-            
-            if !performerFilters.isEmpty {
-                Divider()
-                ForEach(performerFilters) { filter in
-                    Button {
-                        selectedFilter = filter
-                    } label: {
-                        HStack {
-                            Text(filter.name)
-                            if selectedFilter?.id == filter.id {
-                                Spacer()
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: selectedFilter != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                Text(selectedFilter?.name ?? "No Filter")
-            }
-            .font(.headline)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 8)
-        }
-        .buttonStyle(.card)
     }
 }

@@ -13,6 +13,7 @@ struct TVGroupsView: View {
     @ObservedObject private var tabManager = TabManager.shared
     @State private var sortBy: StashDBViewModel.GroupSortOption
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
+    @State private var focusResetToken = 0
     @FocusState private var focusedGroupID: String?
 
     init() {
@@ -20,40 +21,58 @@ struct TVGroupsView: View {
         _sortBy = State(initialValue: defaultSort)
     }
 
-    private let columns = [
-        GridItem(.fixed(260), spacing: 40),
-        GridItem(.fixed(260), spacing: 40),
-        GridItem(.fixed(260), spacing: 40),
-        GridItem(.fixed(260), spacing: 40),
-        GridItem(.fixed(260), spacing: 40),
-        GridItem(.fixed(260), spacing: 40)
-    ]
+    private static let sortOrder: [StashDBViewModel.GroupSortOption] = [.random, .nameAsc, .nameDesc, .sceneCountDesc, .sceneCountAsc, .dateDesc, .dateAsc, .ratingDesc, .ratingAsc, .createdAtDesc, .createdAtAsc, .updatedAtDesc, .updatedAtAsc]
+
+    private var sortOptions: [TVPickerOption<StashDBViewModel.GroupSortOption>] {
+        Self.sortOrder.map { TVPickerOption($0, label(for: $0)) }
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if !hasValidConfig {
-                TVConnectionErrorView(title: "Server not reachable", subtitle: "Add a server in Settings.") { reload() }
-            } else if viewModel.groups.isEmpty && (viewModel.errorMessage?.isEmpty == false) {
-                TVConnectionErrorView(title: "Error loading groups", subtitle: viewModel.errorMessage) { reload() }
-            } else if viewModel.isLoadingGroups && viewModel.groups.isEmpty {
-                loadingView
-            } else if viewModel.groups.isEmpty {
-                emptyView
-            } else {
-                contentGrid
+        TVCatalogGrid(
+            items: viewModel.groups,
+            hasValidConfig: hasValidConfig,
+            errorMessage: viewModel.errorMessage,
+            isLoading: viewModel.isLoadingGroups,
+            isLoadingMore: viewModel.isLoadingMoreGroups,
+            hasMore: viewModel.hasMoreGroups,
+            columnWidth: 260,
+            columnCount: 6,
+            emptySystemImage: "rectangle.stack",
+            emptyTitle: "No Groups Found",
+            loadingText: "Loading groups…",
+            errorTitle: "Error loading groups",
+            focusResetToken: focusResetToken,
+            loadMore: { viewModel.loadMoreGroups() },
+            reload: { reload() },
+            focusedID: $focusedGroupID,
+            header: {
+                STVHeaderView(
+                    sortMenu: {
+                        TVOptionPickerButton(
+                            title: "Sort By",
+                            icon: "arrow.up.arrow.down",
+                            options: sortOptions,
+                            selection: $sortBy
+                        )
+                    },
+                    filterMenu: {
+                        TVFilterPickerButton(filters: savedFilters, selection: $selectedFilter)
+                    },
+                    onRefresh: { reload() }
+                )
+            },
+            card: { item in
+                TVNavButton(value: TVGroupLink(id: item.id, name: item.name)) {
+                    TVGroupCardView(group: item)
+                }
             }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.appBackground)
-        .onChange(of: viewModel.groups.first?.id) { oldID, newID in
-            if oldID != newID, let newID {
-                focusedGroupID = newID
-            }
-        }
+        )
         .onChange(of: sortBy) { _, newValue in
+            focusResetToken += 1
             viewModel.fetchGroups(sortBy: newValue, isInitialLoad: true, filter: selectedFilter)
         }
         .onChange(of: selectedFilter) { _, newValue in
+            focusResetToken += 1
             viewModel.fetchGroups(sortBy: sortBy, isInitialLoad: true, filter: newValue)
         }
         .onAppear {
@@ -78,6 +97,12 @@ struct TVGroupsView: View {
 
     private var hasValidConfig: Bool { configManager.activeConfig?.hasValidConfig == true }
 
+    private var savedFilters: [StashDBViewModel.SavedFilter] {
+        viewModel.savedFilters.values
+            .filter { $0.mode == .groups }
+            .sorted { $0.name < $1.name }
+    }
+
     private func applyDefaultFilterIfNeeded() {
         guard selectedFilter == nil,
               let filterId = tabManager.getDefaultFilterId(for: .groups),
@@ -89,21 +114,6 @@ struct TVGroupsView: View {
         guard hasValidConfig else { return }
         viewModel.testConnection()
         viewModel.fetchGroups(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
-    }
-
-
-    private func sortButton(option: StashDBViewModel.GroupSortOption) -> some View {
-        Button {
-            sortBy = option
-        } label: {
-            HStack {
-                Text(label(for: option))
-                if sortBy == option {
-                    Spacer()
-                    Image(systemName: "checkmark")
-                }
-            }
-        }
     }
 
     private func label(for option: StashDBViewModel.GroupSortOption) -> String {
@@ -126,150 +136,6 @@ struct TVGroupsView: View {
         case .updatedAtAsc: return "Least Recently Updated"
         case .random: return "Random"
         }
-    }
-
-    @ViewBuilder
-    private var loadingView: some View {
-        Spacer()
-        VStack(spacing: 20) {
-            ProgressView().scaleEffect(1.5)
-            Text("Loading groups…")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        Spacer()
-    }
-
-    @ViewBuilder
-    private var emptyView: some View {
-        Spacer()
-        VStack(spacing: 32) {
-            Image(systemName: "rectangle.stack")
-                .font(.system(size: 80))
-                .foregroundColor(.secondary)
-            
-            Text("No Groups Found")
-                .font(.title2)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-        }
-        Spacer()
-    }
-
-    @ViewBuilder
-    private var contentGrid: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                STVHeaderView(
-                    sortMenu: { sortMenu },
-                    filterMenu: { filterMenu },
-                    onRefresh: { reload() }
-                )
-
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 40) {
-                    ForEach(viewModel.groups) { group in
-                        TVNavButton(value: TVGroupLink(id: group.id, name: group.name)) {
-                            TVGroupCardView(group: group)
-                        }
-                        .focused($focusedGroupID, equals: group.id)
-                        .frame(width: 260) // Fixed width for item container
-                        .onAppear {
-                            if group.id == viewModel.groups.last?.id && viewModel.hasMoreGroups {
-                                viewModel.loadMoreGroups()
-                            }
-                        }
-                    }
-
-                    if viewModel.isLoadingMoreGroups {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 40)
-                    }
-                }
-                .padding(.horizontal, 60)
-                .padding(.bottom, 80)
-            }
-        }
-        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60).focusable(false) }
-    }
-
-    @ViewBuilder
-    private var sortMenu: some View {
-        Menu {
-            Section("Sort By") {
-                sortButton(option: .random)
-                Divider()
-                sortButton(option: .nameAsc)
-                sortButton(option: .nameDesc)
-                sortButton(option: .sceneCountDesc)
-                sortButton(option: .sceneCountAsc)
-                sortButton(option: .dateDesc)
-                sortButton(option: .dateAsc)
-                sortButton(option: .ratingDesc)
-                sortButton(option: .ratingAsc)
-                sortButton(option: .createdAtDesc)
-                sortButton(option: .createdAtAsc)
-                sortButton(option: .updatedAtDesc)
-                sortButton(option: .updatedAtAsc)
-            }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "arrow.up.arrow.down")
-                Text(label(for: sortBy))
-            }
-            .font(.headline)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 8)
-        }
-        .buttonStyle(.card)
-    }
-
-    @ViewBuilder
-    private var filterMenu: some View {
-        Menu {
-            Button {
-                selectedFilter = nil
-            } label: {
-                HStack {
-                    Text("No Filter")
-                    if selectedFilter == nil {
-                        Spacer()
-                        Image(systemName: "checkmark")
-                    }
-                }
-            }
-            
-            let groupFilters = viewModel.savedFilters.values
-                .filter { $0.mode == .groups }
-                .sorted { $0.name < $1.name }
-            
-            if !groupFilters.isEmpty {
-                Divider()
-                ForEach(groupFilters) { filter in
-                    Button {
-                        selectedFilter = filter
-                    } label: {
-                        HStack {
-                            Text(filter.name)
-                            if selectedFilter?.id == filter.id {
-                                Spacer()
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: selectedFilter != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                Text(selectedFilter?.name ?? "No Filter")
-            }
-            .font(.headline)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 8)
-        }
-        .buttonStyle(.card)
     }
 }
 

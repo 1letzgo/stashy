@@ -18,5 +18,8 @@ struct STVHeaderView<SortMenu: View, FilterMenu: View>: View {
         }
         .padding(.horizontal, 60)
         .padding(.vertical, 30)
+        // Ohne focusSection springt der Fokus zwischen Grid und Header rein
+        // geometrisch — aus mittleren Spalten liegt nichts über dem Spacer.
+        .focusSection()
     }
 }

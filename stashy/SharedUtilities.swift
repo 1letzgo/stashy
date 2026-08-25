@@ -22,7 +22,9 @@ import StoreKit
 
 // MARK: - Logging
 
-enum AppLog {
+/// `nonisolated`, weil das Target mit `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor`
+/// baut — ohne das wäre Logging aus Actor-/nonisolated-Kontexten in Swift 6 ein Fehler.
+nonisolated enum AppLog {
     static func debug(_ message: @autoclosure () -> String) {
         #if DEBUG
         print(message())

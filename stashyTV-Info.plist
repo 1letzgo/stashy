@@ -18,8 +18,6 @@
 	<string>$(MARKETING_VERSION)</string>
 	<key>CFBundleVersion</key>
 	<string>$(CURRENT_PROJECT_VERSION)</string>
-	<key>LSRequiresIPhoneOS</key>
-	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>
@@ -32,11 +30,6 @@
 			<key>CFBundleIconName</key>
 			<string>AppIcon</string>
 		</dict>
-	</dict>
-	<key>TVTopShelfImage</key>
-	<dict>
-		<key>TVTopShelfPrimaryImageWide</key>
-		<string>TopShelfImageWide</string>
 	</dict>
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>

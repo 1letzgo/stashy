@@ -13,6 +13,7 @@ struct TVGalleriesView: View {
     @ObservedObject private var tabManager = TabManager.shared
     @State private var sortBy: StashDBViewModel.GallerySortOption
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
+    @State private var focusResetToken = 0
     @FocusState private var focusedGalleryID: String?
 
     init() {
@@ -20,38 +21,57 @@ struct TVGalleriesView: View {
         _sortBy = State(initialValue: defaultSort)
     }
 
-    private let columns = [
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40)
-    ]
+    private static let sortOrder: [StashDBViewModel.GallerySortOption] = [.random, .titleAsc, .titleDesc, .dateDesc, .dateAsc, .imageCountDesc, .imageCountAsc, .ratingDesc, .ratingAsc, .createdAtDesc, .createdAtAsc, .updatedAtDesc, .updatedAtAsc]
+
+    private var sortOptions: [TVPickerOption<StashDBViewModel.GallerySortOption>] {
+        Self.sortOrder.map { TVPickerOption($0, label(for: $0)) }
+    }
 
     var body: some View {
-        VStack(spacing: 0) {
-            if !hasValidConfig {
-                TVConnectionErrorView(title: "Server not reachable", subtitle: "Add a server in Settings.") { reload() }
-            } else if viewModel.galleries.isEmpty && (viewModel.errorMessage?.isEmpty == false) {
-                TVConnectionErrorView(title: "Error loading galleries", subtitle: viewModel.errorMessage) { reload() }
-            } else if viewModel.isLoadingGalleries && viewModel.galleries.isEmpty {
-                loadingView
-            } else if viewModel.galleries.isEmpty {
-                emptyView
-            } else {
-                contentGrid
+        TVCatalogGrid(
+            items: viewModel.galleries,
+            hasValidConfig: hasValidConfig,
+            errorMessage: viewModel.errorMessage,
+            isLoading: viewModel.isLoadingGalleries,
+            isLoadingMore: viewModel.isLoadingGalleries && !viewModel.galleries.isEmpty,
+            hasMore: viewModel.hasMoreGalleries,
+            columnWidth: 410,
+            emptySystemImage: "photo.stack",
+            emptyTitle: "No Galleries Found",
+            loadingText: "Loading galleries…",
+            errorTitle: "Error loading galleries",
+            focusResetToken: focusResetToken,
+            loadMore: { viewModel.loadMoreGalleries() },
+            reload: { reload() },
+            focusedID: $focusedGalleryID,
+            header: {
+                STVHeaderView(
+                    sortMenu: {
+                        TVOptionPickerButton(
+                            title: "Sort By",
+                            icon: "arrow.up.arrow.down",
+                            options: sortOptions,
+                            selection: $sortBy
+                        )
+                    },
+                    filterMenu: {
+                        TVFilterPickerButton(filters: savedFilters, selection: $selectedFilter)
+                    },
+                    onRefresh: { reload() }
+                )
+            },
+            card: { gallery in
+                TVNavButton(value: TVGalleryLink(id: gallery.id, title: gallery.displayName)) {
+                    TVGalleryCardView(gallery: gallery)
+                }
             }
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.appBackground)
-        .onChange(of: viewModel.galleries.first?.id) { oldID, newID in
-            if oldID != newID, let newID {
-                focusedGalleryID = newID
-            }
-        }
+        )
         .onChange(of: sortBy) { _, newValue in
+            focusResetToken += 1
             viewModel.fetchGalleries(sortBy: newValue, isInitialLoad: true, filter: selectedFilter)
         }
         .onChange(of: selectedFilter) { _, newValue in
+            focusResetToken += 1
             viewModel.fetchGalleries(sortBy: sortBy, isInitialLoad: true, filter: newValue)
         }
         .onAppear {
@@ -76,6 +96,12 @@ struct TVGalleriesView: View {
 
     private var hasValidConfig: Bool { configManager.activeConfig?.hasValidConfig == true }
 
+    private var savedFilters: [StashDBViewModel.SavedFilter] {
+        viewModel.savedFilters.values
+            .filter { $0.mode == .galleries }
+            .sorted { $0.name < $1.name }
+    }
+
     private func applyDefaultFilterIfNeeded() {
         guard selectedFilter == nil,
               let filterId = tabManager.getDefaultFilterId(for: .galleries),
@@ -87,20 +113,6 @@ struct TVGalleriesView: View {
         guard hasValidConfig else { return }
         viewModel.testConnection()
         viewModel.fetchGalleries(sortBy: sortBy, isInitialLoad: true, filter: selectedFilter)
-    }
-
-    private func sortButton(option: StashDBViewModel.GallerySortOption) -> some View {
-        Button {
-            sortBy = option
-        } label: {
-            HStack {
-                Text(label(for: option))
-                if sortBy == option {
-                    Spacer()
-                    Image(systemName: "checkmark")
-                }
-            }
-        }
     }
 
     private func label(for option: StashDBViewModel.GallerySortOption) -> String {
@@ -119,150 +131,6 @@ struct TVGalleriesView: View {
         case .imageCountAsc: return "Least Images"
         case .random: return "Random"
         }
-    }
-
-    @ViewBuilder
-    private var loadingView: some View {
-        Spacer()
-        VStack(spacing: 20) {
-            ProgressView().scaleEffect(1.5)
-            Text("Loading galleries…")
-                .font(.title3)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        Spacer()
-    }
-
-    @ViewBuilder
-    private var emptyView: some View {
-        Spacer()
-        VStack(spacing: 32) {
-            Image(systemName: "photo.stack")
-                .font(.system(size: 80))
-                .foregroundColor(.secondary)
-            Text("No Galleries Found")
-                .font(.title2)
-                .fontWeight(.semibold)
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity)
-        Spacer()
-    }
-
-    @ViewBuilder
-    private var contentGrid: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 0) {
-                STVHeaderView(
-                    sortMenu: { sortMenu },
-                    filterMenu: { filterMenu },
-                    onRefresh: { reload() }
-                )
-
-                LazyVGrid(columns: columns, alignment: .leading, spacing: 40) {
-                    ForEach(viewModel.galleries) { gallery in
-                        TVNavButton(value: TVGalleryLink(id: gallery.id, title: gallery.displayName)) {
-                            TVGalleryCardView(gallery: gallery)
-                        }
-                        .focused($focusedGalleryID, equals: gallery.id)
-                        .frame(width: 410)
-                        .onAppear {
-                            if gallery.id == viewModel.galleries.last?.id && viewModel.hasMoreGalleries {
-                                viewModel.loadMoreGalleries()
-                            }
-                        }
-                    }
-
-                    if viewModel.isLoadingGalleries && !viewModel.galleries.isEmpty {
-                        ProgressView()
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 40)
-                    }
-                }
-                .padding(.horizontal, 60)
-                .padding(.bottom, 80)
-            }
-        }
-        .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60).focusable(false) }
-    }
-
-    @ViewBuilder
-    private var sortMenu: some View {
-        Menu {
-            Section("Sort By") {
-                sortButton(option: .random)
-                Divider()
-                sortButton(option: .titleAsc)
-                sortButton(option: .titleDesc)
-                sortButton(option: .dateDesc)
-                sortButton(option: .dateAsc)
-                sortButton(option: .imageCountDesc)
-                sortButton(option: .imageCountAsc)
-                sortButton(option: .ratingDesc)
-                sortButton(option: .ratingAsc)
-                sortButton(option: .createdAtDesc)
-                sortButton(option: .createdAtAsc)
-                sortButton(option: .updatedAtDesc)
-                sortButton(option: .updatedAtAsc)
-            }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: "arrow.up.arrow.down")
-                Text(label(for: sortBy))
-            }
-            .font(.headline)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 8)
-        }
-        .buttonStyle(.card)
-    }
-
-    @ViewBuilder
-    private var filterMenu: some View {
-        Menu {
-            Button {
-                selectedFilter = nil
-            } label: {
-                HStack {
-                    Text("No Filter")
-                    if selectedFilter == nil {
-                        Spacer()
-                        Image(systemName: "checkmark")
-                    }
-                }
-            }
-
-            let galleryFilters = viewModel.savedFilters.values
-                .filter { $0.mode == .galleries }
-                .sorted { $0.name < $1.name }
-
-            if !galleryFilters.isEmpty {
-                Divider()
-                ForEach(galleryFilters) { filter in
-                    Button {
-                        selectedFilter = filter
-                    } label: {
-                        HStack {
-                            Text(filter.name)
-                            if selectedFilter?.id == filter.id {
-                                Spacer()
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            }
-        } label: {
-            HStack(spacing: 12) {
-                Image(systemName: selectedFilter != nil ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle")
-                Text(selectedFilter?.name ?? "No Filter")
-            }
-            .font(.headline)
-            .padding(.horizontal, 24)
-            .padding(.vertical, 8)
-        }
-        .buttonStyle(.card)
     }
 }
 

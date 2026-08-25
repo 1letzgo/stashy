@@ -97,7 +97,9 @@ final class StashTrustDelegate: NSObject, URLSessionDelegate {
 
 // MARK: - Session Factory
 
-enum StashSessionFactory {
+/// `nonisolated`: wird aus dem `GraphQLClient`-Actor und aus nonisolated
+/// Init-Kontexten heraus aufgerufen.
+nonisolated enum StashSessionFactory {
     static func make(timeout: TimeInterval = 30.0) -> URLSession {
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = timeout
