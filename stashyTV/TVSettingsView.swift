@@ -10,10 +10,12 @@ import UIKit
 
 struct TVSettingsView: View {
     @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @AppStorage("tvUseSidebar") private var useSidebar = true
 
     var body: some View {
         List {
-            // First row must be focusable so ↑ from Settings can reach the tab bar.
+            // Erste Zeile muss fokussierbar sein, damit der Fokus von hier aus
+            // die Navigation erreicht (früher die obere Leiste, jetzt die Sidebar).
             Section {
                 NavigationLink {
                     TVServersSettingsView().tvExitDismissable()
@@ -64,10 +66,24 @@ struct TVSettingsView: View {
                 NavigationLink {
                     TVTabVisibilitySettingsView().tvExitDismissable()
                 } label: {
-                    settingsRow(title: "Visible Tabs", icon: "rectangle.3.group.fill", subtitle: "Top navigation")
+                    settingsRow(title: "Visible Tabs", icon: "rectangle.3.group.fill", subtitle: "Sidebar entries")
                 }
             } header: {
                 Text("Content")
+            }
+
+            Section {
+                Toggle(isOn: $useSidebar) {
+                    settingsRow(
+                        title: "Sidebar Navigation",
+                        icon: "sidebar.leading",
+                        subtitle: useSidebar ? "Left sidebar" : "Top tab bar"
+                    )
+                }
+            } header: {
+                Text("Navigation")
+            } footer: {
+                Text("Turn off to go back to the classic tab bar along the top.")
             }
 
             Section {
