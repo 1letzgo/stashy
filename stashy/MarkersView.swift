@@ -19,6 +19,7 @@ private struct MarkersViewContent: View {
     @State private var showFilterSortSheet = false
     @State private var markerLiveChips = SceneLiveChipRowState()
     @State private var liveSheetPresetSelection = ""
+    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .sceneMarkers)
     @State private var markerLocalPresets: [MarkerLiveFilterPreset] = MarkerLiveFilterPresetStore.loadPresets()
     @State private var showSaveAsPresetAlert = false
     @State private var presetNameInput = ""
@@ -368,7 +369,8 @@ private struct MarkersViewContent: View {
             localPresets: [],
             markerLocalPresets: markerLocalPresets,
             selectedPresetId: $liveSheetPresetSelection,
-            liveChipRowsVisible: markerLiveChipRowsVisible,
+            criteriaDocument: criteriaDocument,
+            liveChipRowsVisible: true,
             sortOption: .dateDesc,
             onSortChange: { _ in },
             minRating: markerLiveMinRating,
@@ -395,6 +397,7 @@ private struct MarkersViewContent: View {
             onReset: {
                 liveSheetPresetSelection = ""
                 selectedFilter = nil
+                criteriaDocument.clear()
                 clearMarkerLiveChipsOnly()
                 applyLiveFilterFromSheet()
             },
@@ -421,6 +424,7 @@ private struct MarkersViewContent: View {
             markerSortOption: $selectedSortOption,
             onMarkerSortChange: { changeSortOption(to: $0) }
         )
+        .environmentObject(viewModel)
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
         .onAppear {

@@ -25,6 +25,7 @@ private struct PerformersViewContent: View {
 
     // Filter & sort sheet (unified)
     @State private var showFilterSortSheet = false
+    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .performers)
     @State private var catalogPresetRowSelection = ""
     @State private var localCatalogPresets: [PerformerListLiveFilterPreset] = PerformerListLiveFilterPresetStore.loadPresets()
     @State private var showSaveAsCatalogPresetAlert = false
@@ -564,6 +565,7 @@ private struct PerformersViewContent: View {
             serverFilters: sortedServerPerformerFilters,
             localPresets: localCatalogPresets,
             selectedPresetRowId: $catalogPresetRowSelection,
+            criteriaDocument: criteriaDocument,
             liveChipRowsVisible: performerLiveChipRowsVisible,
             sortOption: selectedSortOption,
             onSortChange: { changeSortOption(to: $0) },

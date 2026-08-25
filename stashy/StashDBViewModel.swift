@@ -2259,6 +2259,80 @@ class StashDBViewModel: ObservableObject {
         }
     }
 
+    /// Saves a full `object_filter` without chip live-fragment merge (full criteria editor / Tools → Filters).
+    func saveFullObjectFilter(
+        mode: FilterMode,
+        existingId: String?,
+        name: String,
+        sortField: String,
+        sortDirection: String,
+        sortRaw: String?,
+        objectFilter: [String: Any],
+        randomSeedKind: RandomSeedKind? = nil,
+        completion: @escaping (Result<SavedFilter, Error>) -> Void
+    ) {
+        let trimmedName = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmedName.isEmpty else {
+            completion(.failure(NSError(domain: "stashy", code: -2, userInfo: [NSLocalizedDescriptionKey: "Name is empty"])))
+            return
+        }
+        let sanitized = sanitizeFilter(objectFilter, isMarker: mode == .sceneMarkers)
+        var stashy: [String: Any] = [
+            "liveFragment": [String: Any](),
+            "sortRaw": sortRaw ?? "\(sortField)_\(sortDirection.lowercased())"
+        ]
+        let uiOptions: [String: Any] = ["stashy": stashy]
+        let sortResolved: String
+        if sortField == "random", let kind = randomSeedKind {
+            sortResolved = randomSort(kind)
+        } else {
+            sortResolved = sortField
+        }
+        let findFilter: [String: Any] = [
+            "sort": sortResolved,
+            "direction": sortDirection
+        ]
+        var input: [String: Any] = [
+            "mode": mode.rawValue,
+            "name": trimmedName,
+            "find_filter": findFilter,
+            "object_filter": sanitized,
+            "ui_options": uiOptions
+        ]
+        if let existingId {
+            input["id"] = existingId
+        }
+        let variables: [String: Any] = ["input": input]
+        let mutation = (mode == .scenes)
+            ? GraphQLQueries.saveSceneFilterMutation
+            : GraphQLQueries.saveCatalogFilterMutation
+        GraphQLClient.shared.execute(query: mutation, variables: variables) { [weak self] (result: Result<SaveFilterGraphQLEnvelope, GraphQLNetworkError>) in
+            guard let self = self else { return }
+            Task { @MainActor in
+                switch result {
+                case .success(let env):
+                    if let err = env.errors?.first?.message {
+                        self.errorMessage = err
+                        completion(.failure(NSError(domain: "graphql", code: -1, userInfo: [NSLocalizedDescriptionKey: err])))
+                        return
+                    }
+                    guard let saved = env.data?.saveFilter else {
+                        let msg = "Save filter response missing data"
+                        self.errorMessage = msg
+                        completion(.failure(NSError(domain: "graphql", code: -1, userInfo: [NSLocalizedDescriptionKey: msg])))
+                        return
+                    }
+                    self.savedFilters[saved.id] = saved
+                    self.fetchSavedFilters()
+                    completion(.success(saved))
+                case .failure(let error):
+                    self.handleNetworkError(error)
+                    completion(.failure(error))
+                }
+            }
+        }
+    }
+
     func destroySavedSceneFilter(id: String, completion: @escaping (Result<Void, Error>) -> Void) {
         let mutation = GraphQLQueries.destroySavedFilterMutation
         let variables: [String: Any] = ["input": ["id": id]]
@@ -7107,6 +7181,14 @@ struct GenerateData: Codable {
     }
 
     /// Groups with at least one scene — for scene live-filter pickers (no 50-cap; large `per_page` like catalog).
+    /// Top performers for full filter multi-ID pickers.
+    func fetchPerformersForFilterPicker(completion: @escaping ([FilterEntityOption]) -> Void) {
+        fetchAllPerformers { list in
+            let options = list.map { FilterEntityOption(id: $0.id, name: $0.name) }
+            Task { @MainActor in completion(options) }
+        }
+    }
+
     func fetchGroupsForSceneLiveFilterPicker(completion: @escaping ([StashGroup]) -> Void) {
         let query = GraphQLQueries.queryWithFragments("findGroups")
         let variables: [String: Any] = [

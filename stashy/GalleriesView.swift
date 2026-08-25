@@ -23,6 +23,7 @@ private struct GalleriesViewContent: View {
     var hideTitle: Bool = false
 
     @State private var showFilterSortSheet = false
+    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .galleries)
     @State private var catalogPresetRowSelection = ""
     @State private var localCatalogPresets: [GalleryListLiveFilterPreset] = GalleryListLiveFilterPresetStore.loadPresets()
     @State private var showSaveAsCatalogPresetAlert = false
@@ -708,6 +709,7 @@ private struct GalleriesViewContent: View {
             serverFilters: sortedServerGalleryFilters,
             localPresets: localCatalogPresets,
             selectedPresetRowId: $catalogPresetRowSelection,
+            criteriaDocument: criteriaDocument,
             liveChipRowsVisible: galleryLiveChipRowsVisible,
             sortOption: selectedSortOption,
             onSortChange: { changeSortOption(to: $0) },

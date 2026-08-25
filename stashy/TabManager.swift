@@ -347,6 +347,7 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
     case oCount
     case timeline
     case topLists
+    case filters
     case hotOrNot
     case rateMe
     
@@ -360,6 +361,7 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
         case .oCount: return "O-Count"
         case .timeline: return "Timeline"
         case .topLists: return "Charts"
+        case .filters: return "Filters"
         case .hotOrNot: return "Match"
         case .rateMe: return "RateMe"
         }
@@ -381,6 +383,7 @@ enum ToolsItem: String, Codable, CaseIterable, Identifiable {
         case .oCount: return "calendar"
         case .timeline: return "calendar.day.timeline.left"
         case .topLists: return "list.number"
+        case .filters: return "line.3.horizontal.decrease.circle"
         case .hotOrNot: return "flame.fill"
         case .rateMe: return "star.fill"
         }
@@ -1179,6 +1182,7 @@ class TabManager: ObservableObject {
             ensureTool(.oCount, after: .statistics, enabled: statsEnabled)
             ensureTool(.timeline, after: .oCount, enabled: statsEnabled)
             ensureTool(.topLists, after: .timeline, enabled: statsEnabled)
+            ensureTool(.filters, after: .topLists, enabled: true)
             for item in ToolsItem.allCases {
                 ensureTool(item, after: nil, enabled: true)
             }
@@ -1199,8 +1203,9 @@ class TabManager: ObservableObject {
                 ToolsItemConfig(id: .oCount, isEnabled: true, sortOrder: 3),
                 ToolsItemConfig(id: .timeline, isEnabled: true, sortOrder: 4),
                 ToolsItemConfig(id: .topLists, isEnabled: true, sortOrder: 5),
-                ToolsItemConfig(id: .hotOrNot, isEnabled: true, sortOrder: 6),
-                ToolsItemConfig(id: .rateMe, isEnabled: true, sortOrder: 7)
+                ToolsItemConfig(id: .filters, isEnabled: true, sortOrder: 6),
+                ToolsItemConfig(id: .hotOrNot, isEnabled: true, sortOrder: 7),
+                ToolsItemConfig(id: .rateMe, isEnabled: true, sortOrder: 8)
             ]
             enforceFixedTools()
             saveTools()
@@ -1241,7 +1246,7 @@ class TabManager: ObservableObject {
 
     /// Tools managed / gated under stashy+.
     static func isStashyPlusTool(_ item: ToolsItem) -> Bool {
-        item == .downloads || item == .statistics || item == .oCount || item == .timeline || item == .topLists || item == .hotOrNot || item == .rateMe
+        item == .downloads || item == .statistics || item == .oCount || item == .timeline || item == .topLists || item == .filters || item == .hotOrNot || item == .rateMe
     }
     
     func toggleTool(_ item: ToolsItem) {

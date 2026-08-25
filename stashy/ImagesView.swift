@@ -67,6 +67,7 @@ private struct ImagesViewBody: View {
     @EnvironmentObject private var coordinator: NavigationCoordinator
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var tabManager = TabManager.shared
+    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .images)
 
     @State private var lastOpenedImageId: String?
     @State private var searchText: String
@@ -887,6 +888,7 @@ private struct ImagesViewBody: View {
             serverFilters: imageListFilters.sortedServerImageFilters(viewModel: viewModel),
             localPresets: imageListFilters.localCatalogPresets,
             selectedPresetRowId: $imageListFilters.catalogPresetRowSelection,
+            criteriaDocument: criteriaDocument,
             filterMenuTitleFallback: imageListFilters.selectedFilter?.name,
             liveChipRowsVisible: imageListFilters.imageLiveChipRowsVisible,
             showMediaTypeFilter: imageListFilters.showImageMediaTypeFilter,

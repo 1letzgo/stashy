@@ -295,7 +295,7 @@ struct CatalogSettingsSheetChromeBar: View {
     var onRequestDelete: () -> Void
 
     var body: some View {
-        StashySectionChromeBar {
+        VStack(spacing: 0) {
             HStack(spacing: 8) {
                 Button(action: onReset) {
                     Text("Reset")
@@ -346,7 +346,19 @@ struct CatalogSettingsSheetChromeBar: View {
             .frame(minHeight: StashyExpandingDock.activeHeight)
             .padding(.horizontal, StashyExpandingDock.edgePadding)
             .padding(.vertical, 10)
+
+            Divider().overlay(Color.white.opacity(0.15))
         }
+        // Opaque + extend into status-bar safe area so the presenter never shows through.
+        .background {
+            Color(
+                UIColor.secondarySystemGroupedBackground.resolvedColor(
+                    with: UITraitCollection(userInterfaceStyle: .dark)
+                )
+            )
+            .ignoresSafeArea(edges: .top)
+        }
+        .colorScheme(.dark)
     }
 }
 
@@ -451,6 +463,15 @@ private struct StashySettingsDetailChromeModifier<Trailing: View>: ViewModifier 
             .stashyCustomChromeInset(spacing: 0) {
                 StashyDetailChromeBar(title: title, trailing: trailing)
             }
+    }
+}
+
+/// Shared sheet presentation: opaque background (iOS 26 glass) without `presentationSizing(.page)`,
+/// which collapses `ScrollView` content to an empty sheet.
+struct StashyEdgePinnedSheetModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .presentationBackground(Color(UIColor.systemGroupedBackground))
     }
 }
 

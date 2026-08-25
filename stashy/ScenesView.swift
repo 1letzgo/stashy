@@ -346,6 +346,7 @@ private struct ScenesViewContent: View {
     @State private var liveFilterPresets: [SceneLiveFilterPreset] = SceneLiveFilterPresetStore.loadPresets()
     /// Selected preset UUID string in the sheet; empty = none.
     @State private var liveSheetPresetSelection: String = ""
+    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .scenes)
     @State private var showSaveAsPresetAlert = false
     @State private var showRenamePresetAlert = false
     @State private var showDeletePresetAlert = false
@@ -519,26 +520,9 @@ private struct ScenesViewContent: View {
         return dict
     }
     
-    /// Live chip criteria merge only when the saved filter is chip-safe; studio / tag / group pickers always merge when set.
+    /// Full editor criteria drive fetch (no chip-safe gating).
     private var effectiveSceneLiveFilterForFetch: [String: Any] {
-        var dict: [String: Any] = SceneLiveChipFilterSupport.savedFilterSupportsLiveChipEditor(selectedFilter)
-            ? activeLiveFilterDict
-            : [:]
-        if !liveFilterStudioIds.isEmpty {
-            dict["studios"] = ["modifier": "INCLUDES", "value": liveFilterStudioIds, "depth": 0]
-        }
-        if !liveFilterTagIds.isEmpty {
-            dict["tags"] = ["modifier": "INCLUDES", "value": liveFilterTagIds, "depth": 0]
-        }
-        if !liveFilterGroupIds.isEmpty {
-            dict["groups"] = ["modifier": "INCLUDES", "value": liveFilterGroupIds, "depth": 0]
-        }
-        if liveFilterMinRating == -1 {
-            dict["rating100"] = ["modifier": "IS_NULL"]
-        } else if liveFilterMinRating > 0, dict["rating100"] == nil {
-            dict["rating100"] = ["value": (liveFilterMinRating * 20), "modifier": "EQUALS"]
-        }
-        return dict
+        criteriaDocument.sanitizedObjectFilter
     }
 
     /// Reads `INCLUDES` ids each for `studios`, `tags`, `groups` (after clearing other live chips).
@@ -667,15 +651,16 @@ private struct ScenesViewContent: View {
         }
         if let fid = preset.baseSavedFilterId, let f = viewModel.savedFilters[fid] {
             selectedFilter = f
+            var merged = f.criteriaObjectFilter()
+            for (k, v) in FilterMapper.sanitize(preset.liveFragment, isMarker: false) {
+                merged[k] = v
+            }
+            criteriaDocument.load(merged)
         } else {
             selectedFilter = nil
+            criteriaDocument.load(preset.liveFragment)
         }
-        if SceneLiveChipFilterSupport.savedFilterSupportsLiveChipEditor(selectedFilter) {
-            mapLiveFragmentToChips(preset.liveFragment)
-        } else {
-            clearLiveFilterChipsOnly()
-            applyLiveAuxIdsFromFragment(preset.liveFragment)
-        }
+        mapLiveFragmentToChips(preset.liveFragment)
         applyLiveFilter()
     }
 
@@ -721,18 +706,21 @@ private struct ScenesViewContent: View {
     }
 
     private func applyServerSceneSavedFilter(_ f: StashDBViewModel.SavedFilter) {
+        selectedFilter = f
         if let meta = f.stashyScenePresetMetadata {
+            var merged: [String: Any]
             if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
-                selectedFilter = base
+                merged = base.criteriaObjectFilter()
+                for (k, v) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
+                    merged[k] = v
+                }
+            } else if !meta.liveFragment.isEmpty {
+                merged = FilterMapper.sanitize(meta.liveFragment, isMarker: false)
             } else {
-                selectedFilter = nil
+                merged = f.criteriaObjectFilter()
             }
-            if SceneLiveChipFilterSupport.savedFilterSupportsLiveChipEditor(selectedFilter) {
-                mapLiveFragmentToChips(meta.liveFragment)
-            } else {
-                clearLiveFilterChipsOnly()
-                applyLiveAuxIdsFromFragment(meta.liveFragment)
-            }
+            criteriaDocument.load(merged)
+            mapLiveFragmentToChips(meta.liveFragment)
             let resolvedSort: StashDBViewModel.SceneSortOption
             if let sr = meta.sortRaw, let parsed = StashDBViewModel.SceneSortOption(rawValue: sr) {
                 resolvedSort = parsed
@@ -744,25 +732,11 @@ private struct ScenesViewContent: View {
                 persistSceneSort(resolvedSort)
             }
         } else {
-            selectedFilter = f
-            if SceneLiveChipFilterSupport.savedFilterSupportsLiveChipEditor(f) {
-                if let raw = f.filterDict {
-                    mapLiveFragmentToChips(raw)
-                } else {
-                    clearLiveFilterChipsOnly()
-                }
+            criteriaDocument.load(f.criteriaObjectFilter())
+            if let raw = f.filterDict {
+                mapLiveFragmentToChips(raw)
             } else {
                 clearLiveFilterChipsOnly()
-                let flat: [String: Any]? = {
-                    if let raw = f.filterDict { return FilterMapper.sanitize(raw, isMarker: false) }
-                    if let obj = f.object_filter, let objDict = obj.value as? [String: Any] {
-                        return FilterMapper.sanitize(objDict, isMarker: false)
-                    }
-                    return nil
-                }()
-                if let flat {
-                    applyLiveAuxIdsFromFragment(flat)
-                }
             }
         }
         applyLiveFilter()
@@ -812,12 +786,15 @@ private struct ScenesViewContent: View {
         let sel = liveSheetPresetSelection
         if let sid = SceneLivePresetTag.parseServerId(sel) {
             let currentName = viewModel.savedFilters[sid]?.name ?? "Filter"
-            viewModel.saveSceneSavedFilter(
+            viewModel.saveFullObjectFilter(
+                mode: .scenes,
                 existingId: sid,
                 name: currentName,
-                sort: selectedSortOption,
-                baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                sortField: selectedSortOption.sortField == "random" ? "random" : selectedSortOption.sortField,
+                sortDirection: selectedSortOption.direction,
+                sortRaw: selectedSortOption.rawValue,
+                objectFilter: criteriaDocument.sanitizedObjectFilter,
+                randomSeedKind: .scenes
             ) { _ in }
             return
         }
@@ -831,7 +808,7 @@ private struct ScenesViewContent: View {
             createdAt: old.createdAt,
             sort: selectedSortOption,
             baseSavedFilterId: selectedFilter?.id,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.sanitizedObjectFilter
         )
         SceneLiveFilterPresetStore.upsert(updated)
         refreshLivePresets()
@@ -840,15 +817,19 @@ private struct ScenesViewContent: View {
     private func saveLivePresetAs(name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        viewModel.saveSceneSavedFilter(
+        viewModel.saveFullObjectFilter(
+            mode: .scenes,
             existingId: nil,
             name: trimmed,
-            sort: selectedSortOption,
-            baseFilter: selectedFilter,
-            liveFragment: activeLiveFilterDict
+            sortField: selectedSortOption.sortField == "random" ? "random" : selectedSortOption.sortField,
+            sortDirection: selectedSortOption.direction,
+            sortRaw: selectedSortOption.rawValue,
+            objectFilter: criteriaDocument.sanitizedObjectFilter,
+            randomSeedKind: .scenes
         ) { result in
             if case .success(let saved) = result {
                 liveSheetPresetSelection = SceneLivePresetTag.serverRow(saved.id)
+                selectedFilter = saved
                 showSaveAsPresetAlert = false
             }
         }
@@ -859,12 +840,15 @@ private struct ScenesViewContent: View {
         guard !trimmed.isEmpty else { return }
         let sel = liveSheetPresetSelection
         if let sid = SceneLivePresetTag.parseServerId(sel) {
-            viewModel.saveSceneSavedFilter(
+            viewModel.saveFullObjectFilter(
+                mode: .scenes,
                 existingId: sid,
                 name: trimmed,
-                sort: selectedSortOption,
-                baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                sortField: selectedSortOption.sortField == "random" ? "random" : selectedSortOption.sortField,
+                sortDirection: selectedSortOption.direction,
+                sortRaw: selectedSortOption.rawValue,
+                objectFilter: criteriaDocument.sanitizedObjectFilter,
+                randomSeedKind: .scenes
             ) { result in
                 if case .success = result {
                     showRenamePresetAlert = false
@@ -1039,16 +1023,17 @@ private struct ScenesViewContent: View {
 
     private func applyLiveFilter() {
         persistSceneSort(selectedSortOption)
+        // Full criteria live in `criteriaDocument` — do not also pass `selectedFilter` or base criteria double-apply.
         switch scope {
         case .catalog:
             viewModel.currentSceneLiveFilter = effectiveSceneLiveFilterForFetch
-            viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: selectedFilter, liveFilter: effectiveSceneLiveFilterForFetch)
+            viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: nil, liveFilter: effectiveSceneLiveFilterForFetch)
         case .performer(let performerId):
             viewModel.fetchPerformerScenes(
                 performerId: performerId,
                 sortBy: selectedSortOption,
                 isInitialLoad: true,
-                filter: selectedFilter,
+                filter: nil,
                 liveFilter: effectiveSceneLiveFilterForFetch,
                 searchQuery: searchText
             )
@@ -1057,7 +1042,7 @@ private struct ScenesViewContent: View {
                 studioId: studioId,
                 sortBy: selectedSortOption,
                 isInitialLoad: true,
-                filter: selectedFilter,
+                filter: nil,
                 liveFilter: effectiveSceneLiveFilterForFetch,
                 searchQuery: searchText
             )
@@ -1066,7 +1051,7 @@ private struct ScenesViewContent: View {
                 tagId: tagId,
                 sortBy: selectedSortOption,
                 isInitialLoad: true,
-                filter: selectedFilter,
+                filter: nil,
                 liveFilter: effectiveSceneLiveFilterForFetch,
                 searchQuery: searchText
             )
@@ -1075,7 +1060,7 @@ private struct ScenesViewContent: View {
                 groupId: groupId,
                 sortBy: selectedSortOption,
                 isInitialLoad: true,
-                filter: selectedFilter,
+                filter: nil,
                 liveFilter: effectiveSceneLiveFilterForFetch,
                 searchQuery: searchText
             )
@@ -1140,7 +1125,8 @@ private struct ScenesViewContent: View {
                 serverSceneFilters: sortedServerSceneFilters,
                 localPresets: liveFilterPresets,
                 selectedPresetId: $liveSheetPresetSelection,
-                liveChipRowsVisible: SceneLiveChipFilterSupport.savedFilterSupportsLiveChipEditor(selectedFilter),
+                criteriaDocument: criteriaDocument,
+                liveChipRowsVisible: true,
                 sortOption: selectedSortOption,
                 onSortChange: { changeSortOption(to: $0) },
                 minRating: $liveFilterMinRating,
@@ -1165,6 +1151,7 @@ private struct ScenesViewContent: View {
                 onGroupPickerSectionAppear: { loadGroupsForSceneLivePicker() },
                 onApply: { applyLiveFilter() },
                 onReset: {
+                    criteriaDocument.clear()
                     liveFilterMinRating = 0
                     liveFilterOrganized = nil
                     liveFilterInteractive = nil
@@ -1202,8 +1189,7 @@ private struct ScenesViewContent: View {
                 markerSortOption: .constant(StashDBViewModel.SceneMarkerSortOption.createdAtDesc),
                 onMarkerSortChange: { _ in }
             )
-            .presentationDragIndicator(.visible)
-            .presentationBackground(Color.appBackground)
+            .environmentObject(viewModel)
             .onAppear {
                 SceneLivePresetTag.migrateLegacySelection(&liveSheetPresetSelection)
                 refreshLivePresets()
@@ -1683,8 +1669,9 @@ struct SceneLiveFilterSheet: View {
     /// When ``useMarkerSort`` is true, local on-device presets come from the markers store instead of ``localPresets``.
     var markerLocalPresets: [MarkerLiveFilterPreset] = []
     @Binding var selectedPresetId: String
-    /// `false` when the active saved filter uses criteria the chip rows cannot edit (tags, NOT, AND/OR, …).
-    var liveChipRowsVisible: Bool
+    @ObservedObject var criteriaDocument: FilterCriteriaDocument
+    /// Kept for call-site compatibility; full editor always shows all criteria.
+    var liveChipRowsVisible: Bool = true
     var sortOption: StashDBViewModel.SceneSortOption
     var onSortChange: (StashDBViewModel.SceneSortOption) -> Void
     @Binding var minRating: Int
@@ -1723,10 +1710,12 @@ struct SceneLiveFilterSheet: View {
     var onMarkerSortChange: (StashDBViewModel.SceneMarkerSortOption) -> Void
 
     @ObservedObject private var appearance = AppearanceManager.shared
+    @Environment(\.dismiss) private var dismiss
 
     private var hasSelectedPreset: Bool { !selectedPresetId.isEmpty }
 
     var body: some View {
+        // Match FiltersToolsEditorSheet structure so presentation matches Tools → Filters.
         NavigationView {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
@@ -1778,114 +1767,15 @@ struct SceneLiveFilterSheet: View {
                         FeedsPlaybackSettingsCard()
                     }
 
-                VStack(spacing: 0) {
-                        CatalogNamedEntityLiveFilterMultiPickerRow(
-                            title: "Studio",
-                            selectedIds: $studioSelectionIds,
-                            items: studioPickerOptions,
-                            displayName: { $0.name },
-                            isLoading: studioPickerLoading,
-                            onAppearLoad: onStudioPickerSectionAppear,
-                            onSelectionChange: onApply
-                        )
-                        Divider().padding(.leading, 16)
-                        CatalogNamedEntityLiveFilterMultiPickerRow(
-                            title: "Tag",
-                            selectedIds: $tagSelectionIds,
-                            items: tagPickerOptions,
-                            displayName: { $0.name },
-                            isLoading: tagPickerLoading,
-                            onAppearLoad: onTagPickerSectionAppear,
-                            onSelectionChange: onApply
-                        )
-                        Divider().padding(.leading, 16)
-                        CatalogNamedEntityLiveFilterMultiPickerRow(
-                            title: "Group",
-                            selectedIds: $groupSelectionIds,
-                            items: groupPickerOptions,
-                            displayName: { $0.name },
-                            isLoading: groupPickerLoading,
-                            onAppearLoad: onGroupPickerSectionAppear,
-                            onSelectionChange: onApply
-                        )
-                        if liveChipRowsVisible {
-                            Divider().padding(.leading, 16)
-                    filterRow(label: "Rating") {
-                        filterChip("Any", isActive: minRating == 0) { minRating = 0; onApply() }
-                        filterChip("None", isActive: minRating == -1) { minRating = -1; onApply() }
-                                ForEach([5, 4, 3, 2, 1], id: \.self) { star in
-                            filterChip("\(star)★", isActive: minRating == star) { minRating = star; onApply() }
-                        }
-                    }
-                    Divider().padding(.leading, 16)
-                    filterRow(label: "Organized") {
-                        filterChip("Any", isActive: organized == nil)   { organized = nil;   onApply() }
-                        filterChip("Yes", isActive: organized == true)  { organized = true;  onApply() }
-                        filterChip("No",  isActive: organized == false) { organized = false; onApply() }
-                    }
-                    Divider().padding(.leading, 16)
-                    filterRow(label: "Interactive") {
-                        filterChip("Any",  isActive: interactive == nil)   { interactive = nil;   onApply() }
-                        filterChip("Yes",  isActive: interactive == true)  { interactive = true;  onApply() }
-                        filterChip("No",   isActive: interactive == false) { interactive = false; onApply() }
-                    }
-                    Divider().padding(.leading, 16)
-                    filterRow(label: "Orientation") {
-                        filterChip("Any",       isActive: orientation == nil)          { orientation = nil;         onApply() }
-                        filterChip("Landscape", isActive: orientation == "LANDSCAPE") { orientation = "LANDSCAPE"; onApply() }
-                        filterChip("Portrait",  isActive: orientation == "PORTRAIT")  { orientation = "PORTRAIT";  onApply() }
-                    }
-                    Divider().padding(.leading, 16)
-                    filterRow(label: "Performers") {
-                        filterChip("Any", isActive: performerCount == nil) { performerCount = nil; onApply() }
-                        filterChip("1",   isActive: performerCount == 1)   { performerCount = 1;   onApply() }
-                        filterChip("2",   isActive: performerCount == 2)   { performerCount = 2;   onApply() }
-                        filterChip("3+",  isActive: performerCount == 3)   { performerCount = 3;   onApply() }
-                    }
-                    Divider().padding(.leading, 16)
-                    filterRow(label: "Resolution") {
-                        filterChip("Any", isActive: resolution == nil) { resolution = nil; onApply() }
-                        // Descending order (high → low)
-                        filterChip("4K",    isActive: resolution == "FOUR_K")      { resolution = "FOUR_K";      onApply() }
-                        filterChip("1440p", isActive: resolution == "QUAD_HD")     { resolution = "QUAD_HD";     onApply() }
-                        filterChip("1080p", isActive: resolution == "FULL_HD")     { resolution = "FULL_HD";     onApply() }
-                        filterChip("720p",  isActive: resolution == "STANDARD_HD") { resolution = "STANDARD_HD"; onApply() }
-                        filterChip("540p",  isActive: resolution == "WEB_HD")      { resolution = "WEB_HD";      onApply() }
-                        filterChip("480p",  isActive: resolution == "STANDARD")    { resolution = "STANDARD";    onApply() }
-                            }
-                            Divider().padding(.leading, 16)
-                            filterRow(label: "Perf. fav.") {
-                                filterChip("Any", isActive: performerFavorite == nil) { performerFavorite = nil; onApply() }
-                                filterChip("Yes", isActive: performerFavorite == true) { performerFavorite = true; onApply() }
-                                filterChip("No",  isActive: performerFavorite == false) { performerFavorite = false; onApply() }
-                            }
-                            Divider().padding(.leading, 16)
-                            filterRow(label: "O Count") {
-                                filterChip("Any", isActive: oCounterTag == nil) { oCounterTag = nil; onApply() }
-                                filterChip("0", isActive: oCounterTag == SceneLiveOCounterChip.equalZero) {
-                                    oCounterTag = SceneLiveOCounterChip.equalZero; onApply()
-                                }
-                                filterChip("1+", isActive: oCounterTag == SceneLiveOCounterChip.greaterThan0) {
-                                    oCounterTag = SceneLiveOCounterChip.greaterThan0; onApply()
-                                }
-                                filterChip("5+", isActive: oCounterTag == SceneLiveOCounterChip.greaterThan4) {
-                                    oCounterTag = SceneLiveOCounterChip.greaterThan4; onApply()
-                                }
-                                filterChip("10+", isActive: oCounterTag == SceneLiveOCounterChip.greaterThan9) {
-                                    oCounterTag = SceneLiveOCounterChip.greaterThan9; onApply()
-                                }
-                            }
-                        } else {
-                            Divider().padding(.leading, 16)
-                            serverManagedFilterNoticeInline
-                    }
+                    FilterCriteriaEditorView(
+                        document: criteriaDocument,
+                        onChange: onApply,
+                        embedsInCard: true
+                    )
                 }
-                .background(Color.secondaryAppBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-                .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
-                }
+                .padding(.top, 8)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .background(Color.appBackground)
             .catalogSettingsSheetChrome(
                 hasSelectedPreset: hasSelectedPreset,
@@ -1895,9 +1785,23 @@ struct SceneLiveFilterSheet: View {
                 onRequestRename: onRequestRename,
                 onRequestDelete: onRequestDelete
             )
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                HStack {
+                    Button("Close") { dismiss() }
+                        .foregroundColor(.secondary)
+                    Spacer()
+                }
+                .padding(.horizontal, 20)
+                .padding(.vertical, 14)
+                .background(.ultraThinMaterial)
+            }
         }
-        .presentationDetents([.medium, .large])
-        .presentationBackgroundInteraction(.disabled)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationViewStyle(.stack)
+        // iOS 26 insets/floats partial-height sheets; `.large` stays edge-attached like Tools feels.
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color(UIColor.systemGroupedBackground))
     }
 
     /// Shown inside the live-filter card when chip rows are hidden (same copy as standalone notice, without extra chrome).

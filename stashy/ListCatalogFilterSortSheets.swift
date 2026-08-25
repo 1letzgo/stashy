@@ -286,10 +286,12 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
                 onAppearLoad()
             } label: {
                 HStack(alignment: .center, spacing: 12) {
-                    Text(title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.secondary)
-                        .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                    if !title.isEmpty {
+                        Text(title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.secondary)
+                            .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                    }
                     Text(selectedSummary)
                         .font(.subheadline)
                         .foregroundColor(selectedIds.isEmpty ? .secondary : .primary)
@@ -306,8 +308,8 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
                 .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, title.isEmpty ? 0 : 16)
+            .padding(.vertical, title.isEmpty ? 4 : 12)
 
             if isExpanded {
                 VStack(spacing: 0) {
@@ -336,18 +338,20 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
         .onAppear { onAppearLoad() }
     }
 
-    private func multiPickerOptionRow(title: String, isSelected: Bool) -> some View {
+    private func multiPickerOptionRow(title optionTitle: String, isSelected: Bool) -> some View {
         HStack(spacing: 12) {
-            Spacer().frame(width: CatalogFilterSortSheetLayout.labelColumnWidth)
+            if !title.isEmpty {
+                Spacer().frame(width: CatalogFilterSortSheetLayout.labelColumnWidth)
+            }
             Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                 .foregroundColor(isSelected ? appearance.tintColor : .secondary)
-            Text(title)
+            Text(optionTitle)
                 .font(.subheadline)
                 .foregroundColor(.primary)
                 .lineLimit(1)
             Spacer()
         }
-        .padding(.horizontal, 16)
+        .padding(.horizontal, title.isEmpty ? 0 : 16)
         .padding(.vertical, 9)
         .contentShape(Rectangle())
     }
@@ -614,7 +618,8 @@ struct PerformersCatalogFilterSortSheet: View {
     var serverFilters: [StashDBViewModel.SavedFilter]
     var localPresets: [PerformerListLiveFilterPreset]
     @Binding var selectedPresetRowId: String
-    var liveChipRowsVisible: Bool
+    @ObservedObject var criteriaDocument: FilterCriteriaDocument
+    var liveChipRowsVisible: Bool = true
     var sortOption: StashDBViewModel.PerformerSortOption
     var onSortChange: (StashDBViewModel.PerformerSortOption) -> Void
 
@@ -644,16 +649,10 @@ struct PerformersCatalogFilterSortSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     filterPickerCard
                     performerSortCard
-                    if liveChipRowsVisible {
-                        performerLiveChipsCard
-                    } else {
-                        CatalogServerManagedFilterNotice()
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 8)
-                    }
+                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
                 }
             }
-            .background(Color.appBackground)
+            .background(Color.appBackground.ignoresSafeArea())
             .catalogSettingsSheetChrome(
                 hasSelectedPreset: hasSelectedPreset,
                 onReset: onReset,
@@ -663,7 +662,11 @@ struct PerformersCatalogFilterSortSheet: View {
                 onRequestDelete: onRequestDelete
             )
         }
-        .presentationDetents([.medium, .large])
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationViewStyle(.stack)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color(UIColor.systemGroupedBackground))
     }
 
     private var filterPickerCard: some View {
@@ -837,7 +840,8 @@ struct TagsCatalogFilterSortSheet: View {
     var serverFilters: [StashDBViewModel.SavedFilter]
     var localPresets: [TagListLiveFilterPreset]
     @Binding var selectedPresetRowId: String
-    var liveChipRowsVisible: Bool
+    @ObservedObject var criteriaDocument: FilterCriteriaDocument
+    var liveChipRowsVisible: Bool = true
     var sortOption: StashDBViewModel.TagSortOption
     var onSortChange: (StashDBViewModel.TagSortOption) -> Void
     @Binding var liveFavorite: Bool?
@@ -858,16 +862,10 @@ struct TagsCatalogFilterSortSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     filterPickerCard
                     tagSortCard
-                    if liveChipRowsVisible {
-                        tagLiveChipsCard
-                    } else {
-                        CatalogServerManagedFilterNotice()
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 8)
-                    }
+                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
                 }
             }
-            .background(Color.appBackground)
+            .background(Color.appBackground.ignoresSafeArea())
             .catalogSettingsSheetChrome(
                 hasSelectedPreset: hasSelectedPreset,
                 onReset: onReset,
@@ -877,7 +875,11 @@ struct TagsCatalogFilterSortSheet: View {
                 onRequestDelete: onRequestDelete
             )
         }
-        .presentationDetents([.medium, .large])
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationViewStyle(.stack)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color(UIColor.systemGroupedBackground))
     }
 
     private var filterPickerCard: some View {
@@ -990,7 +992,8 @@ struct StudiosCatalogFilterSortSheet: View {
     var serverFilters: [StashDBViewModel.SavedFilter]
     var localPresets: [StudioListLiveFilterPreset]
     @Binding var selectedPresetRowId: String
-    var liveChipRowsVisible: Bool
+    @ObservedObject var criteriaDocument: FilterCriteriaDocument
+    var liveChipRowsVisible: Bool = true
     var sortOption: StashDBViewModel.StudioSortOption
     var onSortChange: (StashDBViewModel.StudioSortOption) -> Void
     @Binding var liveMinRating: Int
@@ -1012,16 +1015,10 @@ struct StudiosCatalogFilterSortSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     filterPickerCard
                     studioSortCard
-                    if liveChipRowsVisible {
-                        studioLiveChipsCard
-                    } else {
-                        CatalogServerManagedFilterNotice()
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 8)
-                    }
+                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
                 }
             }
-            .background(Color.appBackground)
+            .background(Color.appBackground.ignoresSafeArea())
             .catalogSettingsSheetChrome(
                 hasSelectedPreset: hasSelectedPreset,
                 onReset: onReset,
@@ -1031,7 +1028,11 @@ struct StudiosCatalogFilterSortSheet: View {
                 onRequestDelete: onRequestDelete
             )
         }
-        .presentationDetents([.medium, .large])
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationViewStyle(.stack)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color(UIColor.systemGroupedBackground))
     }
 
     private var filterPickerCard: some View {
@@ -1225,7 +1226,8 @@ struct GalleriesCatalogFilterSortSheet: View {
     var serverFilters: [StashDBViewModel.SavedFilter]
     var localPresets: [GalleryListLiveFilterPreset]
     @Binding var selectedPresetRowId: String
-    var liveChipRowsVisible: Bool
+    @ObservedObject var criteriaDocument: FilterCriteriaDocument
+    var liveChipRowsVisible: Bool = true
     var sortOption: StashDBViewModel.GallerySortOption
     var onSortChange: (StashDBViewModel.GallerySortOption) -> Void
     @Binding var liveMinRating: Int
@@ -1251,16 +1253,10 @@ struct GalleriesCatalogFilterSortSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     filterPickerCard
                     gallerySortCard
-                    if liveChipRowsVisible {
-                        galleryLiveChipsCard
-                    } else {
-                        CatalogServerManagedFilterNotice()
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 8)
-                    }
+                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
                 }
             }
-            .background(Color.appBackground)
+            .background(Color.appBackground.ignoresSafeArea())
             .catalogSettingsSheetChrome(
                 hasSelectedPreset: hasSelectedPreset,
                 onReset: onReset,
@@ -1270,7 +1266,11 @@ struct GalleriesCatalogFilterSortSheet: View {
                 onRequestDelete: onRequestDelete
             )
         }
-        .presentationDetents([.medium, .large])
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationViewStyle(.stack)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color(UIColor.systemGroupedBackground))
     }
 
     private var filterPickerCard: some View {
@@ -1469,8 +1469,9 @@ struct ImagesCatalogFilterSortSheet: View {
     var serverFilters: [StashDBViewModel.SavedFilter]
     var localPresets: [ImageListLiveFilterPreset]
     @Binding var selectedPresetRowId: String
+    @ObservedObject var criteriaDocument: FilterCriteriaDocument
     var filterMenuTitleFallback: String? = nil
-    var liveChipRowsVisible: Bool
+    var liveChipRowsVisible: Bool = true
     /// Hidden for Reels clips (`fetchClips` pins `path` and ignores live `path`).
     var showMediaTypeFilter: Bool = true
     var sortOption: StashDBViewModel.ImageSortOption
@@ -1534,16 +1535,10 @@ struct ImagesCatalogFilterSortSheet: View {
                     if showsImagesFeedAutoplaySetting {
                         ImagesFeedAutoplaySettingsCard()
                     }
-                    if liveChipRowsVisible {
-                        imageLiveChipsCard
-                    } else {
-                        CatalogServerManagedFilterNotice()
-                            .padding(.horizontal, 16)
-                            .padding(.bottom, 8)
-                    }
+                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
                 }
             }
-            .background(Color.appBackground)
+            .background(Color.appBackground.ignoresSafeArea())
             .catalogSettingsSheetChrome(
                 hasSelectedPreset: hasSelectedPreset,
                 onReset: onReset,
@@ -1553,8 +1548,11 @@ struct ImagesCatalogFilterSortSheet: View {
                 onRequestDelete: onRequestDelete
             )
         }
-        .presentationDetents([.medium, .large])
-        .presentationBackgroundInteraction(.disabled)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationViewStyle(.stack)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color(UIColor.systemGroupedBackground))
     }
 
     private var filterPickerCard: some View {
@@ -1945,5 +1943,84 @@ struct SceneLiveChipRowState: Equatable {
         return nil
     }
 }
+
+
+// MARK: - Groups sheet
+
+struct GroupsCatalogFilterSortSheet: View {
+    var serverFilters: [StashDBViewModel.SavedFilter]
+    @Binding var selectedPresetRowId: String
+    @ObservedObject var criteriaDocument: FilterCriteriaDocument
+    var sortOption: StashDBViewModel.GroupSortOption
+    var onSortChange: (StashDBViewModel.GroupSortOption) -> Void
+    var onApply: () -> Void
+    var onReset: () -> Void
+    var onRequestSave: () -> Void
+    var onRequestSaveAs: () -> Void
+    var onRequestRename: () -> Void
+    var onRequestDelete: () -> Void
+
+    @ObservedObject private var appearance = AppearanceManager.shared
+    private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
+
+    var body: some View {
+        NavigationView {
+            ScrollView {
+                VStack(alignment: .leading, spacing: 16) {
+                    HStack(alignment: .center, spacing: 12) {
+                        Text("Filter")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.secondary)
+                            .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                        Picker("Filter", selection: $selectedPresetRowId) {
+                            Text("None").tag("")
+                            ForEach(serverFilters) { f in
+                                Text(f.name).tag(ListLivePresetTag.serverRow(f.id))
+                            }
+                        }
+                        .pickerStyle(.menu)
+                        .labelsHidden()
+                        .tint(appearance.tintColor)
+                        .frame(maxWidth: .infinity, alignment: .trailing)
+                    }
+                    .catalogFilterSortControlCardChrome()
+
+                    // Sort chips — reuse name/date style via GroupSortOption raw values in host if needed
+                    Text("Sort")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.secondary)
+                        .padding(.horizontal, 16)
+                    Picker("Sort", selection: Binding(
+                        get: { sortOption },
+                        set: { onSortChange($0) }
+                    )) {
+                        ForEach(StashDBViewModel.GroupSortOption.allCases, id: \.self) { opt in
+                            Text(opt.displayName).tag(opt)
+                        }
+                    }
+                    .pickerStyle(.menu)
+                    .padding(.horizontal, 16)
+
+                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
+                }
+            }
+            .background(Color.appBackground.ignoresSafeArea())
+            .catalogSettingsSheetChrome(
+                hasSelectedPreset: hasSelectedPreset,
+                onReset: onReset,
+                onRequestSave: onRequestSave,
+                onRequestSaveAs: onRequestSaveAs,
+                onRequestRename: onRequestRename,
+                onRequestDelete: onRequestDelete
+            )
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .navigationViewStyle(.stack)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color(UIColor.systemGroupedBackground))
+    }
+}
+
 
 #endif

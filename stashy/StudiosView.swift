@@ -24,6 +24,7 @@ private struct StudiosViewContent: View {
 
     // Filter & sort sheet
     @State private var showFilterSortSheet = false
+    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .studios)
     @State private var catalogPresetRowSelection = ""
     @State private var localCatalogPresets: [StudioListLiveFilterPreset] = StudioListLiveFilterPresetStore.loadPresets()
     @State private var showSaveAsCatalogPresetAlert = false
@@ -449,6 +450,7 @@ private struct StudiosViewContent: View {
             serverFilters: sortedServerStudioFilters,
             localPresets: localCatalogPresets,
             selectedPresetRowId: $catalogPresetRowSelection,
+            criteriaDocument: criteriaDocument,
             liveChipRowsVisible: studioLiveChipRowsVisible,
             sortOption: selectedSortOption,
             onSortChange: { changeSortOption(to: $0) },

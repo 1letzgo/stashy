@@ -15,6 +15,11 @@ struct StudioDetailView: View {
     @ObservedObject var configManager = ServerConfigManager.shared
     @ObservedObject private var tabManager = TabManager.shared
     @StateObject private var viewModel = StashDBViewModel()
+    @StateObject private var linkedPerformersCriteriaDocument = FilterCriteriaDocument(mode: .performers)
+    @StateObject private var linkedTagsCriteriaDocument = FilterCriteriaDocument(mode: .tags)
+    @StateObject private var linkedStudiosCriteriaDocument = FilterCriteriaDocument(mode: .studios)
+    @StateObject private var linkedGalleriesCriteriaDocument = FilterCriteriaDocument(mode: .galleries)
+    @StateObject private var linkedImagesCriteriaDocument = FilterCriteriaDocument(mode: .images)
     @EnvironmentObject var coordinator: NavigationCoordinator
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
@@ -579,6 +584,7 @@ struct StudioDetailView: View {
             serverFilters: linkedPerformers.sortedServerPerformerFilters(viewModel: viewModel),
             localPresets: linkedPerformers.localCatalogPresets,
             selectedPresetRowId: $linkedPerformers.catalogPresetRowSelection,
+            criteriaDocument: linkedPerformersCriteriaDocument,
             liveChipRowsVisible: linkedPerformers.performerLiveChipRowsVisible,
             sortOption: linkedPerformers.selectedSortOption,
             onSortChange: { linkedPerformers.changeSortOption(to: $0, viewModel: viewModel) },
@@ -630,6 +636,7 @@ struct StudioDetailView: View {
             serverFilters: linkedTags.sortedServerTagFilters(viewModel: viewModel),
             localPresets: linkedTags.localCatalogPresets,
             selectedPresetRowId: $linkedTags.catalogPresetRowSelection,
+            criteriaDocument: linkedTagsCriteriaDocument,
             liveChipRowsVisible: linkedTags.tagLiveChipRowsVisible,
             sortOption: linkedTags.selectedSortOption,
             onSortChange: { linkedTags.changeSortOption(to: $0, viewModel: viewModel) },
@@ -675,6 +682,7 @@ struct StudioDetailView: View {
             serverFilters: linkedChildStudios.sortedServerStudioFilters(viewModel: viewModel),
             localPresets: linkedChildStudios.localCatalogPresets,
             selectedPresetRowId: $linkedChildStudios.catalogPresetRowSelection,
+            criteriaDocument: linkedStudiosCriteriaDocument,
             liveChipRowsVisible: linkedChildStudios.studioLiveChipRowsVisible,
             sortOption: linkedChildStudios.selectedSortOption,
             onSortChange: { linkedChildStudios.changeSortOption(to: $0, viewModel: viewModel) },
@@ -721,6 +729,7 @@ struct StudioDetailView: View {
             serverFilters: linkedGalleries.sortedServerGalleryFilters(viewModel: viewModel),
             localPresets: linkedGalleries.localCatalogPresets,
             selectedPresetRowId: $linkedGalleries.catalogPresetRowSelection,
+            criteriaDocument: linkedGalleriesCriteriaDocument,
             liveChipRowsVisible: linkedGalleries.galleryLiveChipRowsVisible,
             sortOption: linkedGalleries.selectedSortOption,
             onSortChange: { linkedGalleries.changeSortOption(to: $0, viewModel: viewModel) },
@@ -773,6 +782,7 @@ struct StudioDetailView: View {
             serverFilters: linkedImages.sortedServerImageFilters(viewModel: viewModel),
             localPresets: linkedImages.localCatalogPresets,
             selectedPresetRowId: $linkedImages.catalogPresetRowSelection,
+            criteriaDocument: linkedImagesCriteriaDocument,
             filterMenuTitleFallback: linkedImages.selectedFilter?.name,
             liveChipRowsVisible: linkedImages.imageLiveChipRowsVisible,
             showMediaTypeFilter: linkedImages.showImageMediaTypeFilter,

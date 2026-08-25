@@ -286,6 +286,7 @@ struct ToolsView: View {
         case oCount = "O-Count"
         case timeline = "Timeline"
         case topLists = "Charts"
+        case filters = "Filters"
         case hotOrNot = "Match"
         case rateMe = "RateMe"
         
@@ -296,6 +297,7 @@ struct ToolsView: View {
             case .oCount: return "calendar"
             case .timeline: return "calendar.day.timeline.left"
             case .topLists: return "list.number"
+            case .filters: return "line.3.horizontal.decrease.circle"
             case .hotOrNot: return "flame.fill"
             case .rateMe: return "star.fill"
             }
@@ -311,6 +313,7 @@ struct ToolsView: View {
             case .oCount: return .oCount
             case .timeline: return .timeline
             case .topLists: return .topLists
+            case .filters: return .filters
             case .hotOrNot: return .hotOrNot
             case .rateMe: return .rateMe
             case .server: return nil
@@ -345,6 +348,8 @@ struct ToolsView: View {
                 SessionTimelineToolsView()
             case .topLists:
                 TopListsToolsContainerView(viewModel: topListsViewModel)
+            case .filters:
+                FiltersToolsView()
             case .hotOrNot:
                 HotOrNotToolsView()
             case .rateMe:

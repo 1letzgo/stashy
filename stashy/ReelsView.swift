@@ -271,6 +271,8 @@ struct ReelsViewBody: View {
     @State private var reelsSceneLivePresets: [SceneLiveFilterPreset] = SceneLiveFilterPresetStore.loadPresets()
     @State private var reelsScenePresetNameInput = ""
     @State private var showReelsSceneSaveAsAlert = false
+    @StateObject private var reelsCriteriaDocument = FilterCriteriaDocument(mode: .scenes)
+    @StateObject private var reelsImageCriteriaDocument = FilterCriteriaDocument(mode: .images)
     @State private var showReelsSceneRenameAlert = false
     @State private var showReelsSceneDeleteAlert = false
     @State private var isMenuOpen = false
@@ -2383,7 +2385,8 @@ struct ReelsViewBody: View {
             serverSceneFilters: reelsSceneStyleSheetServerFilters,
             localPresets: reelsSceneLivePresets,
             selectedPresetId: reelsActiveSceneStyleSheetPresetSelection,
-            liveChipRowsVisible: SceneLiveChipFilterSupport.savedFilterSupportsLiveChipEditor(reelsLiveChipTargetFilter),
+            criteriaDocument: reelsCriteriaDocument,
+            liveChipRowsVisible: true,
             sortOption: selectedSortOption,
             onSortChange: { changeReelsSceneSortFromSheet($0) },
             minRating: reelChipBinding(\.minRating),
@@ -2445,6 +2448,7 @@ struct ReelsViewBody: View {
             markerSortOption: $selectedMarkerSortOption,
             onMarkerSortChange: { changeReelsMarkerSortFromSheet($0) }
         )
+        .environmentObject(viewModel)
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
         .presentationBackgroundInteraction(.disabled)
@@ -2655,6 +2659,7 @@ struct ReelsViewBody: View {
             serverFilters: reelsClipImageFilters.sortedServerImageFilters(viewModel: viewModel),
             localPresets: reelsClipImageFilters.localCatalogPresets,
             selectedPresetRowId: $reelsClipImageFilters.catalogPresetRowSelection,
+            criteriaDocument: reelsImageCriteriaDocument,
             filterMenuTitleFallback: reelsClipImageFilters.selectedFilter?.name,
             liveChipRowsVisible: reelsClipImageFilters.imageLiveChipRowsVisible,
             showMediaTypeFilter: reelsClipImageFilters.showImageMediaTypeFilter,
