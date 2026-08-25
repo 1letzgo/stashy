@@ -356,3 +356,76 @@ enum FilterFieldCatalog {
         .init(key: "scene_filter", label: "Scene filter", kind: .nestedFilter, nestedMode: .scenes)
     ]
 }
+
+// MARK: - Sort catalog
+
+/// One selectable sort entry, mode-agnostic.
+struct FilterSortChoice: Identifiable, Hashable {
+    /// stashy `ui_options.stashy.sortRaw` (the `*SortOption` raw value).
+    let raw: String
+    let label: String
+    /// GraphQL `find_filter.sort`.
+    let field: String
+    /// `ASC` / `DESC`.
+    let direction: String
+
+    var id: String { raw }
+}
+
+/// Bridges the typed `StashDBViewModel.*SortOption` enums to a `FilterMode`-keyed list, so the
+/// filter editor (Tools → Filters) can offer the same sort choices as the catalog sheets.
+protocol FilterSortChoiceConvertible: CaseIterable, RawRepresentable where RawValue == String {
+    var displayName: String { get }
+    var direction: String { get }
+    var sortField: String { get }
+}
+
+extension StashDBViewModel.SceneSortOption: FilterSortChoiceConvertible {}
+extension StashDBViewModel.SceneMarkerSortOption: FilterSortChoiceConvertible {}
+extension StashDBViewModel.ImageSortOption: FilterSortChoiceConvertible {}
+extension StashDBViewModel.GallerySortOption: FilterSortChoiceConvertible {}
+extension StashDBViewModel.PerformerSortOption: FilterSortChoiceConvertible {}
+extension StashDBViewModel.StudioSortOption: FilterSortChoiceConvertible {}
+extension StashDBViewModel.TagSortOption: FilterSortChoiceConvertible {}
+extension StashDBViewModel.GroupSortOption: FilterSortChoiceConvertible {}
+
+enum FilterSortCatalog {
+    static func choices(for mode: StashDBViewModel.FilterMode) -> [FilterSortChoice] {
+        switch mode {
+        case .scenes: return map(StashDBViewModel.SceneSortOption.self)
+        case .sceneMarkers: return map(StashDBViewModel.SceneMarkerSortOption.self)
+        case .images: return map(StashDBViewModel.ImageSortOption.self)
+        case .galleries: return map(StashDBViewModel.GallerySortOption.self)
+        case .performers: return map(StashDBViewModel.PerformerSortOption.self)
+        case .studios: return map(StashDBViewModel.StudioSortOption.self)
+        case .tags: return map(StashDBViewModel.TagSortOption.self)
+        case .groups: return map(StashDBViewModel.GroupSortOption.self)
+        case .unknown: return []
+        }
+    }
+
+    /// Resolves the sort a saved filter currently carries: stashy `sortRaw` first, then the
+    /// encoded `find_filter` pair.
+    static func choice(forRaw raw: String?, pair: (field: String, direction: String)?, mode: StashDBViewModel.FilterMode) -> FilterSortChoice? {
+        let list = choices(for: mode)
+        if let raw, let hit = list.first(where: { $0.raw == raw }) { return hit }
+        guard let pair else { return nil }
+        let field = pair.field.lowercased()
+        let direction = pair.direction.uppercased()
+        if field.hasPrefix("random") { return list.first(where: { $0.field == "random" }) }
+        if let hit = list.first(where: { $0.field.lowercased() == field && $0.direction.uppercased() == direction }) {
+            return hit
+        }
+        // Stash writes both `rating` and `rating100` depending on version.
+        if field == "rating100" || field == "rating" {
+            return list.first(where: { $0.field.lowercased().hasPrefix("rating") && $0.direction.uppercased() == direction })
+        }
+        return nil
+    }
+
+    private static func map<T: FilterSortChoiceConvertible>(_ type: T.Type) -> [FilterSortChoice] {
+        T.allCases.map {
+            FilterSortChoice(raw: $0.rawValue, label: $0.displayName, field: $0.sortField, direction: $0.direction)
+        }
+    }
+}

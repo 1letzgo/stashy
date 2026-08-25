@@ -295,6 +295,8 @@ private struct FiltersToolsEditorSheet: View {
     @State private var saveAsName = ""
     @State private var showDelete = false
     @State private var isSaving = false
+    /// Selected `FilterSortChoice.raw`. Empty when this mode has no sort catalog.
+    @State private var selectedSortRaw: String
     @ObservedObject private var appearance = AppearanceManager.shared
 
     init(
@@ -315,7 +317,20 @@ private struct FiltersToolsEditorSheet: View {
             objectFilter: filter?.criteriaObjectFilter() ?? [:]
         ))
         _name = State(initialValue: filter?.name ?? "")
+        let resolved = FilterSortCatalog.choice(
+            forRaw: filter?.stashySortRaw,
+            pair: filter?.encodedSortPair,
+            mode: mode
+        )
+        let fallback = Self.defaultSort(for: mode)
+        _selectedSortRaw = State(initialValue: resolved?.raw
+            ?? FilterSortCatalog.choice(forRaw: nil, pair: fallback, mode: mode)?.raw
+            ?? FilterSortCatalog.choices(for: mode).first?.raw
+            ?? "")
     }
+
+    private var sortChoices: [FilterSortChoice] { FilterSortCatalog.choices(for: mode) }
+    private var selectedSortChoice: FilterSortChoice? { sortChoices.first { $0.raw == selectedSortRaw } }
 
     private var mode: StashDBViewModel.FilterMode { filter?.mode ?? createMode }
     private var isExisting: Bool { filter != nil }
@@ -334,6 +349,38 @@ private struct FiltersToolsEditorSheet: View {
                         .multilineTextAlignment(.trailing)
                 }
                 .catalogFilterSortControlCardChrome()
+
+                if !sortChoices.isEmpty {
+                    HStack(alignment: .center, spacing: DesignTokens.Spacing.sm) {
+                        Text("Sort")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.secondary)
+                            .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                        Spacer(minLength: 0)
+                        Menu {
+                            ForEach(sortChoices) { choice in
+                                Button {
+                                    selectedSortRaw = choice.raw
+                                } label: {
+                                    if choice.raw == selectedSortRaw {
+                                        Label(choice.label, systemImage: "checkmark")
+                                    } else {
+                                        Text(choice.label)
+                                    }
+                                }
+                            }
+                        } label: {
+                            HStack(spacing: DesignTokens.Spacing.xxs) {
+                                Text(selectedSortChoice?.label ?? "Select…")
+                                    .lineLimit(1)
+                                Image(systemName: "chevron.up.chevron.down")
+                                    .font(.caption2)
+                            }
+                            .foregroundColor(.primary)
+                        }
+                    }
+                    .catalogFilterSortControlCardChrome()
+                }
 
                 Text(FiltersToolsView.modeTitle(mode))
                     .font(.caption)
@@ -413,14 +460,17 @@ private struct FiltersToolsEditorSheet: View {
         let trimmed = saveName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         isSaving = true
-        let pair = filter?.encodedSortPair ?? Self.defaultSort(for: mode)
+        let choice = selectedSortChoice
+        let pair = choice.map { (field: $0.field, direction: $0.direction) }
+            ?? filter?.encodedSortPair
+            ?? Self.defaultSort(for: mode)
         viewModel.saveFullObjectFilter(
             mode: mode,
             existingId: existingId,
             name: trimmed,
             sortField: pair.field.hasPrefix("random") ? "random" : pair.field,
             sortDirection: pair.direction,
-            sortRaw: filter?.stashySortRaw,
+            sortRaw: choice?.raw ?? filter?.stashySortRaw,
             objectFilter: document.sanitizedObjectFilter,
             randomSeedKind: StashDBViewModel.randomSeedKind(for: mode)
         ) { result in

@@ -5,28 +5,42 @@ import Combine
 @MainActor
 final class FilterCriteriaDocument: ObservableObject {
     private(set) var mode: StashDBViewModel.FilterMode
-    @Published private(set) var objectFilter: [String: Any]
+    @Published private(set) var objectFilter: [String: Any] {
+        didSet { syncKeyOrder() }
+    }
+
+    /// Anzeige-Reihenfolge der Kriterien. Neu hinzugefügte hängen **hinten** an, damit ein
+    /// frisch hinzugefügtes Modul im Editor unter den bestehenden erscheint statt alphabetisch
+    /// dazwischen zu springen. Mehrere auf einmal (Laden eines Filters) werden stabil vorsortiert.
+    private var keyOrder: [String] = []
 
     init(mode: StashDBViewModel.FilterMode, objectFilter: [String: Any] = [:]) {
         self.mode = mode
         self.objectFilter = Self.sanitize(objectFilter, mode: mode)
+        self.keyOrder = Self.defaultSortedKeys(Array(self.objectFilter.keys), mode: mode)
     }
 
     /// Reconfigure for nested editors (AND/OR/NOT / `*_filter`) without allocating a new object.
     func reconfigure(mode: StashDBViewModel.FilterMode, objectFilter: [String: Any]) {
         self.mode = mode
+        // Anderer Modus = andere Felder: Reihenfolge komplett neu aufbauen.
+        keyOrder = []
         self.objectFilter = Self.sanitize(objectFilter, mode: mode)
         objectWillChange.send()
     }
 
-    var isMarkerMode: Bool { mode == .sceneMarkers }
-
-    var sanitizedObjectFilter: [String: Any] {
-        Self.sanitize(objectFilter, mode: mode)
+    /// Entfernte Keys raus, neue hinten anhängen. Ein einzelner neuer Key (``addDefaultCriterion``)
+    /// landet damit immer zuletzt; ein ganzer Satz (``load``) wird stabil vorsortiert.
+    private func syncKeyOrder() {
+        let present = Set(objectFilter.keys)
+        keyOrder.removeAll { !present.contains($0) }
+        let missing = present.subtracting(keyOrder)
+        guard !missing.isEmpty else { return }
+        keyOrder.append(contentsOf: Self.defaultSortedKeys(Array(missing), mode: mode))
     }
 
-    var criterionKeys: [String] {
-        let keys = Array(objectFilter.keys)
+    /// Ausgangsordnung für Keys ohne Einfüge-Historie: AND/OR/NOT zuerst, dann nach Label.
+    private static func defaultSortedKeys(_ keys: [String], mode: StashDBViewModel.FilterMode) -> [String] {
         let priority = ["AND", "OR", "NOT"]
         return keys.sorted { a, b in
             let ia = priority.firstIndex(of: a) ?? Int.max
@@ -38,13 +52,32 @@ final class FilterCriteriaDocument: ObservableObject {
         }
     }
 
+    var isMarkerMode: Bool { mode == .sceneMarkers }
+
+    var sanitizedObjectFilter: [String: Any] {
+        Self.sanitize(objectFilter, mode: mode)
+    }
+
+    var criterionKeys: [String] {
+        let present = Set(objectFilter.keys)
+        var out = keyOrder.filter { present.contains($0) }
+        let missing = present.subtracting(out)
+        if !missing.isEmpty {
+            out.append(contentsOf: Self.defaultSortedKeys(Array(missing), mode: mode))
+        }
+        return out
+    }
+
     var presentKeys: Set<String> { Set(objectFilter.keys) }
 
     func load(_ dict: [String: Any]?) {
+        // Fremd geladenes Dictionary hat keine Einfüge-Historie — Ordnung neu aufbauen.
+        keyOrder = []
         objectFilter = Self.sanitize(dict ?? [:], mode: mode)
     }
 
     func replaceObjectFilter(_ dict: [String: Any]) {
+        keyOrder = []
         objectFilter = Self.sanitize(dict, mode: mode)
     }
 
