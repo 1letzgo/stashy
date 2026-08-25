@@ -285,6 +285,8 @@ struct ReelsViewBody: View {
     @State private var currentItemIsPlaying = true
     @State private var currentItemShowRatingOverlay = false
     @State private var showStashSyncSheet = false
+    /// Bewusst `@State`, **nicht** `@StateObject`: Der Scrubber tickt mit 10 Hz und soll
+    /// `ReelsViewBody` nicht neu rendern. Observiert wird nur in ``IsolatedScrubberBar``.
     @State private var scrubberState = ScrubberState()
     @State private var isInitialized = false
     /// Reentrancy guard: SwiftUI can fire `onAppear` multiple times during tab
@@ -1368,15 +1370,6 @@ struct ReelsViewBody: View {
             }
         }
         
-        var startTime: Double {
-            switch self {
-            case .scene: return 0
-            case .marker: return 0
-            case .clip: return 0
-            case .preview: return 0
-            }
-        }
-
         var duration: Double? {
             switch self {
             case .scene(let s): return s.duration
@@ -1682,6 +1675,11 @@ struct ReelsViewBody: View {
         let generation = feedActivationGeneration
         let kick = {
             guard generation == self.feedActivationGeneration else { return }
+            // Die drei gestaffelten Kicks sind Retries, falls der erste vor dem Layout
+            // läuft — nicht drei Aktivierungen. Ohne diesen Guard würden 0.55s/1.25s
+            // später `isPlaying`/`isUserScrolling` überschrieben und eine zwischenzeitliche
+            // User-Pause (oder ein Scroll) wieder aufgehoben.
+            guard self.pendingFeedActivation else { return }
             guard self.coordinator.selectedTab == .reels, self.reelsMode != .pics else { return }
             guard !self.isFeedLoading, !self.isListEmpty else { return }
             self.isUserScrollingReels = false
@@ -4689,6 +4687,11 @@ struct ReelItemView: View {
     var playTrigger: Int
     @Environment(\.verticalSizeClass) var verticalSizeClass
     @State private var timeObserver: Any?
+    /// Token des `AVPlayerItemDidPlayToEndTime`-Block-Observers. Muss gemerkt werden:
+    /// `removeObserver(self, name:object:)` entfernt **keine** Block-Observer (und `self`
+    /// ist hier ein View-Struct, das bei jedem Call neu geboxt würde). Ohne Token blieben
+    /// die Blöcke für immer registriert → doppeltes Auto-Advance + AVPlayer-Leak.
+    @State private var endObserver: NSObjectProtocol?
     /// Bumped on each `setupPlayer` / `cleanupPlayer` so in-flight `fetchSceneStreams`
     /// completions cannot attach a new `AVPlayerItem` after the user has scrolled away.
     @State private var playerSetupGeneration: Int = 0
@@ -5222,7 +5225,10 @@ extension ReelItemView {
             // NOTE: deliberately not gated on `isUserScrolling` — that flag can strand
             // `true` after initial programmatic scrolling, and this row is active
             // (never an off-screen flasher), so recovery is always safe here.
+            // `isPlaying` = User-Intent. Ohne diesen Guard hebt der Watchdog eine
+            // Pause auf, die innerhalb von 2.5s nach dem Item-Wechsel getippt wurde.
             guard self.isActive,
+                  self.isPlaying,
                   !ReelsPlayerRegistry.isPlaybackSuspended else { return }
 
             if self.player == nil {
@@ -5332,19 +5338,11 @@ extension ReelItemView {
             
             let quality = ServerConfigManager.shared.activeConfig?.reelsQuality ?? .sd
             
-            // Re-evaluate the best URL now that we have the full stream list
-            let bestURL: URL?
-            switch item {
-            case .scene(let s):
-                bestURL = s.withStreams(streams).bestStream(for: quality)
-            case .marker(let m):
-                bestURL = m.scene?.withStreams(streams).bestStream(for: quality)
-            case .clip:
-                bestURL = nil  // Clips don't use scene streams
-            case .preview(let s):
-                bestURL = s.previewURL
-            }
-            
+            // Re-evaluate the best URL now that we have the full stream list.
+            // `updateBestStream` lässt nur `.scene` bis hierher durch.
+            guard case .scene(let scene) = item else { return }
+            let bestURL = scene.withStreams(streams).bestStream(for: quality)
+
             if let targetURL = bestURL {
                 // Only switch if the target is significantly different from current (e.g. not just apikey diff)
                 let currentURL = (player?.currentItem?.asset as? AVURLAsset)?.url
@@ -5363,9 +5361,7 @@ extension ReelItemView {
         let authenticatedURL = signedURL(streamURL) ?? streamURL
         let asset = AVURLAsset(url: authenticatedURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
         let newItem = AVPlayerItem(asset: asset)
-        
-        let startTime = item.startTime
-        
+
         if let existingPlayer = self.player {
             // Smooth Upgrade: Preserve state for active items
             let wasPlaying = existingPlayer.timeControlStatus == .playing
@@ -5376,8 +5372,8 @@ extension ReelItemView {
                 existingPlayer.removeTimeObserver(observer)
                 self.timeObserver = nil
             }
-            NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: existingPlayer.currentItem)
-            
+            removeEndObserver()
+
             existingPlayer.replaceCurrentItem(with: newItem)
             
             // Resume playback if this is the active item and the user intends to play.
@@ -5404,64 +5400,27 @@ extension ReelItemView {
             player.rate = 0
         }
         
-        if startTime > 0 {
-            player.seek(to: CMTime(seconds: startTime, preferredTimescale: 600))
-        }
-        
         // Initial duration guess from model
         if let d = item.duration, d > 0 {
             if isActive { scrubberState.duration = d }
         }
         
         // Loop or Auto-Advance (Scenes and Clips)
-        NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { _ in
+        // Streams sind bereits am gewünschten Startpunkt getrimmt (auch Marker), daher
+        // ist der Loop-Seek für alle Item-Typen `.zero`.
+        endObserver = NotificationCenter.default.addObserver(forName: .AVPlayerItemDidPlayToEndTime, object: player.currentItem, queue: .main) { [weak player] _ in
+            guard let player else { return }
             // Tab leave can race with end-of-item; never restart audio off-Feeds.
             guard !ReelsPlayerRegistry.isPlaybackSuspended, self.isPlaying, self.isPlaybackActive else { return }
             if TabManager.shared.reelsContinuousPlay {
                 self.onVideoEnded()
                 return
             }
-            if case .scene = self.item {
-                if startTime > 0 {
-                    player.seek(to: CMTime(seconds: startTime, preferredTimescale: 600))
-                } else {
-                    player.seek(to: .zero)
-                }
-                ReelsPlayerRegistry.playIfAllowed(player)
-            } else if case .clip = self.item {
-                player.seek(to: .zero)
-                ReelsPlayerRegistry.playIfAllowed(player)
-            } else if case .marker = self.item {
-                let start = self.item.startTime
-                player.seek(to: CMTime(seconds: start, preferredTimescale: 600), toleranceBefore: .zero, toleranceAfter: .zero)
-                ReelsPlayerRegistry.playIfAllowed(player)
-            } else if case .preview = self.item {
-                player.seek(to: .zero)
-                ReelsPlayerRegistry.playIfAllowed(player)
-            }
+            player.seek(to: .zero, toleranceBefore: .zero, toleranceAfter: .zero)
+            ReelsPlayerRegistry.playIfAllowed(player)
         }
-        
-        // Time Observer
-        let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
-        timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak player] time in
-            guard let player = player else { return }
-            if self.isActive && !self.scrubberState.seeking {
-                self.scrubberState.time = time.seconds
-            }
-            
-            // Media duration update
-            if self.isActive, let d = player.currentItem?.duration.seconds, d > 0, !d.isNaN {
-                self.scrubberState.duration = d
-            }
 
-            // Rotation-aware size (especially clips): preferredTransform → presentationSize
-            self.syncPlaybackPresentationSize(from: player)
-            self.syncPlaybackActivityPosition(from: player)
-            self.noteReelsWatchProgress()
-            if self.isPlaying && self.isPlaybackActive && !self.isRotating {
-                self.startPlaybackActivityTrackingIfNeeded()
-            }
-        }
+        installTimeObserver(on: player)
 
         if isPlaying && isPlaybackActive && !isRotating {
             startPlaybackActivityTrackingIfNeeded()
@@ -5555,8 +5514,8 @@ extension ReelItemView {
         }
         
         // Remove end of time observer
-        NotificationCenter.default.removeObserver(self, name: .AVPlayerItemDidPlayToEndTime, object: player?.currentItem)
-        
+        removeEndObserver()
+
         // Aggressively release resources
         if let p = player {
             ReelsPlayerRegistry.unregister(p)
@@ -5570,20 +5529,36 @@ extension ReelItemView {
     /// (with the correct `currentTime` / `duration` bindings). Called when the
     /// item becomes the active (visible) one after already having a player.
     func refreshTimeObserver() {
+        guard let player = player else {
+            if let old = timeObserver {
+                self.player?.removeTimeObserver(old)
+                timeObserver = nil
+            }
+            return
+        }
+        installTimeObserver(on: player)
+    }
+
+    /// Einzige Quelle für den periodischen Time-Observer (vorher doppelt in
+    /// `initPlayer` und `refreshTimeObserver`). Ersetzt einen ggf. vorhandenen.
+    private func installTimeObserver(on player: AVPlayer) {
         if let old = timeObserver {
-            player?.removeTimeObserver(old)
+            player.removeTimeObserver(old)
             timeObserver = nil
         }
-        guard let player = player else { return }
         let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak player] time in
             guard let player = player else { return }
             if self.isActive && !self.scrubberState.seeking {
                 self.scrubberState.time = time.seconds
             }
+
+            // Media duration update
             if self.isActive, let d = player.currentItem?.duration.seconds, d > 0, !d.isNaN {
                 self.scrubberState.duration = d
             }
+
+            // Rotation-aware size (especially clips): preferredTransform → presentationSize
             self.syncPlaybackPresentationSize(from: player)
             self.syncPlaybackActivityPosition(from: player)
             self.noteReelsWatchProgress()
@@ -5591,6 +5566,13 @@ extension ReelItemView {
                 self.startPlaybackActivityTrackingIfNeeded()
             }
         }
+    }
+
+    /// Block-Observer lassen sich nur über ihr Token entfernen.
+    private func removeEndObserver() {
+        guard let token = endObserver else { return }
+        NotificationCenter.default.removeObserver(token)
+        endObserver = nil
     }
 
     private func syncPlaybackPresentationSize(from player: AVPlayer) {
@@ -5634,7 +5616,15 @@ struct StashSyncManagerModifier: ViewModifier {
     let isActive: Bool
     let isPlaying: Bool
     let player: AVPlayer?
-    
+
+    // Ohne diese `@ObservedObject`s werden die `onChange(of:)` unten nur ausgewertet,
+    // wenn die View aus einem anderen Grund neu rendert — Sync-Mode-Toggles kamen
+    // dadurch verzögert oder gar nicht an.
+    @ObservedObject private var stashSyncManager = StashSyncManager.shared
+    @ObservedObject private var handyManager = HandyManager.shared
+    @ObservedObject private var buttplugManager = ButtplugManager.shared
+    @ObservedObject private var loveSpouseManager = LoveSpouseManager.shared
+
     func body(content: Content) -> some View {
         content
             .onAppear {
@@ -5645,7 +5635,7 @@ struct StashSyncManagerModifier: ViewModifier {
             .onChange(of: isActive) { _, active in
                 if active { initialSync() }
             }
-            .onChange(of: StashSyncManager.shared.isActive) { _, active in
+            .onChange(of: stashSyncManager.isActive) { _, active in
                 if active { initialSync() }
             }
             .onChange(of: player?.currentItem) { _, newItem in
@@ -5653,7 +5643,7 @@ struct StashSyncManagerModifier: ViewModifier {
                     ensureVideoAnalysis(for: newItem)
                 }
             }
-            .onChange(of: HandyManager.shared.isStashSyncMode) { _, isStash in
+            .onChange(of: handyManager.isStashSyncMode) { _, isStash in
                 if isStash && isActive {
                     ensureVideoAnalysis(for: player?.currentItem)
                     StashSyncManager.shared.isActive = true
@@ -5662,7 +5652,7 @@ struct StashSyncManagerModifier: ViewModifier {
                     checkAndStopStashSync()
                 }
             }
-            .onChange(of: ButtplugManager.shared.isStashSyncMode) { _, isStash in
+            .onChange(of: buttplugManager.isStashSyncMode) { _, isStash in
                 if isStash && isActive {
                     ensureVideoAnalysis(for: player?.currentItem)
                     StashSyncManager.shared.isActive = true
@@ -5671,7 +5661,7 @@ struct StashSyncManagerModifier: ViewModifier {
                     checkAndStopStashSync()
                 }
             }
-            .onChange(of: LoveSpouseManager.shared.isStashSyncMode) { _, isStash in
+            .onChange(of: loveSpouseManager.isStashSyncMode) { _, isStash in
                 if isStash && isActive {
                     ensureVideoAnalysis(for: player?.currentItem)
                     StashSyncManager.shared.isActive = true
