@@ -155,13 +155,6 @@ struct TVGroupDetailView: View {
         case back = "Back"
     }
 
-    private let sceneColumns = [
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40)
-    ]
-
     var body: some View {
         SwiftUI.Group {
             if let group = groupDetail ?? viewModel.groups.first(where: { $0.id == groupId }) {
@@ -187,10 +180,7 @@ struct TVGroupDetailView: View {
             hasMoreScenes: viewModel.hasMoreGroupScenes,
             loadMoreScenes: { viewModel.loadMoreGroupScenes(groupId: groupId) },
             infoGrid: { _ in
-                LazyVGrid(columns: [
-                    GridItem(.fixed(240), alignment: .leading),
-                    GridItem(.flexible(), alignment: .leading)
-                ], alignment: .leading, spacing: 12) {
+                LazyVGrid(columns: TVGridSpec.infoColumns, alignment: .leading, spacing: 12) {
                     if groupDetail != nil {
                         Text("Cover").font(.title3).foregroundStyle(.secondary)
                         HStack(spacing: 14) {

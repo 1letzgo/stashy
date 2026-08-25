@@ -16,13 +16,6 @@ struct TVStudioDetailView: View {
     @State private var studio: Studio?
     @State private var isLoadingStudio = true
 
-    private let sceneColumns = [
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40)
-    ]
-
     var body: some View {
         TVGenericDetailView(
             item: studio,
@@ -39,10 +32,7 @@ struct TVStudioDetailView: View {
             hasMoreScenes: viewModel.hasMoreStudioScenes,
             loadMoreScenes: { viewModel.loadMoreStudioScenes(studioId: studioId) },
             infoGrid: { studio in
-                LazyVGrid(columns: [
-                    GridItem(.fixed(240), alignment: .leading),
-                    GridItem(.flexible(), alignment: .leading)
-                ], alignment: .leading, spacing: 12) {
+                LazyVGrid(columns: TVGridSpec.infoColumns, alignment: .leading, spacing: 12) {
                     Text("Scenes").font(.title3).foregroundStyle(.secondary)
                     Text("\(studio.sceneCount)").font(.title3).foregroundColor(.white)
 

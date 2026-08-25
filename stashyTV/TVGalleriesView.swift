@@ -145,20 +145,15 @@ struct TVGalleryDetailView: View {
     @State private var isLoadingGallery: Bool = false
     @State private var presentedImage: TVImageLink?
     @FocusState private var emptyFocus: Bool
+    @Environment(\.tvContentWidth) private var contentWidth
+
+    private var imageSpec: TVGridSpec { .images }
     @Environment(\.dismiss) private var dismiss
 
     /// Still images for the grid — GIFs hidden; still WebP kept (tvOS can decode still WebP).
     private var displayImages: [StashImage] {
         viewModel.galleryImages.filter { !$0.isGifFile && !$0.isVideo }
     }
-
-    private let imageColumns = [
-        GridItem(.fixed(300), spacing: 30),
-        GridItem(.fixed(300), spacing: 30),
-        GridItem(.fixed(300), spacing: 30),
-        GridItem(.fixed(300), spacing: 30),
-        GridItem(.fixed(300), spacing: 30)
-    ]
 
     var body: some View {
         ScrollView {
@@ -202,7 +197,7 @@ struct TVGalleryDetailView: View {
                     .padding(.vertical, 60)
                     .onAppear { emptyFocus = true }
                 } else {
-                    LazyVGrid(columns: imageColumns, alignment: .leading, spacing: 30) {
+                    LazyVGrid(columns: imageSpec.columns(for: contentWidth), alignment: .leading, spacing: imageSpec.spacing) {
                         ForEach(displayImages) { image in
                             Button {
                                 presentedImage = TVImageLink(
@@ -292,10 +287,7 @@ struct TVGalleryDetailView: View {
                         Divider()
                             .background(Color.secondary)
 
-                        LazyVGrid(columns: [
-                            GridItem(.fixed(240), alignment: .leading),
-                            GridItem(.flexible(), alignment: .leading)
-                        ], alignment: .leading, spacing: 12) {
+                        LazyVGrid(columns: TVGridSpec.infoColumns, alignment: .leading, spacing: 12) {
                             if let count = gallery.imageCount {
                                 Text("Images").font(.title3).foregroundStyle(.secondary)
                                 Text("\(count)").font(.title3).foregroundColor(.white)

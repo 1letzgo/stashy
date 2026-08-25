@@ -15,13 +15,6 @@ struct TVPerformerDetailView: View {
     @State private var performer: Performer?
     @State private var isLoadingPerformer = true
 
-    private let sceneColumns = [
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40)
-    ]
-
     var body: some View {
         TVGenericDetailView(
             item: performer,
@@ -35,10 +28,7 @@ struct TVPerformerDetailView: View {
             hasMoreScenes: viewModel.hasMorePerformerScenes,
             loadMoreScenes: { viewModel.loadMorePerformerScenes(performerId: performerId) },
             infoGrid: { performer in
-                LazyVGrid(columns: [
-                    GridItem(.fixed(240), alignment: .leading),
-                    GridItem(.flexible(), alignment: .leading)
-                ], alignment: .leading, spacing: 12) {
+                LazyVGrid(columns: TVGridSpec.infoColumns, alignment: .leading, spacing: 12) {
                     if let gender = performer.gender, !gender.isEmpty {
                         Text("Gender").font(.title3).foregroundStyle(.secondary)
                         Text(gender.capitalized).font(.title3).foregroundColor(.white)

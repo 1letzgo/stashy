@@ -132,13 +132,6 @@ struct TVTagDetailView: View {
     @State private var loadedTag: Tag?
     @State private var isLoadingTag: Bool = false
 
-    private let sceneColumns = [
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40)
-    ]
-
     var body: some View {
         Group {
             if let tag = loadedTag {
@@ -163,10 +156,7 @@ struct TVTagDetailView: View {
             hasMoreScenes: viewModel.hasMoreTagScenes,
             loadMoreScenes: { viewModel.loadMoreTagScenes(tagId: tagId) },
             infoGrid: { _ in
-                LazyVGrid(columns: [
-                    GridItem(.fixed(240), alignment: .leading),
-                    GridItem(.flexible(), alignment: .leading)
-                ], alignment: .leading, spacing: 12) {
+                LazyVGrid(columns: TVGridSpec.infoColumns, alignment: .leading, spacing: 12) {
                     if viewModel.totalTagScenes > 0 {
                         Text("Scenes").font(.title3).foregroundStyle(.secondary)
                         Text("\(viewModel.totalTagScenes)").font(.title3).foregroundColor(.white)

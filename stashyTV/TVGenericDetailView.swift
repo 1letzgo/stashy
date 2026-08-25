@@ -12,6 +12,9 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
     @State private var playingChannel: TVChannel?
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
     @FocusState private var emptyFocus: Bool
+    @Environment(\.tvContentWidth) private var contentWidth
+
+    private var sceneSpec: TVGridSpec { .scenes }
     @Environment(\.dismiss) private var dismiss
 
     /// Der Kanal-Button ist im Leer-Zustand oft das einzige fokussierbare
@@ -27,13 +30,6 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
     
     @ViewBuilder let infoGrid: (Item) -> Info
     @ViewBuilder let additionalContent: () -> Content
-
-    private let sceneColumns = [
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40),
-        GridItem(.fixed(410), spacing: 40)
-    ]
 
     init(
         item: Item?,
@@ -180,7 +176,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                             emptyFocus = true
                         }
                     } else {
-                        LazyVGrid(columns: sceneColumns, spacing: 40) {
+                        LazyVGrid(columns: sceneSpec.columns(for: contentWidth), spacing: sceneSpec.spacing) {
                             ForEach(scenes) { scene in
                                 VStack(alignment: .leading, spacing: 10) {
                                     TVNavButton(value: TVSceneLink(sceneId: scene.id)) {
@@ -189,7 +185,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                                     
                                     TVSceneCardTitleView(scene: scene)
                                 }
-                                .frame(width: 410)
+                                .frame(width: sceneSpec.columnWidth)
                                 .onAppear {
                                     if scene.id == scenes.last?.id && hasMoreScenes {
                                         loadMoreScenes()
@@ -197,7 +193,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                                 }
                             }
                         }
-                        .padding(.horizontal, 60)
+                        .padding(.horizontal, sceneSpec.horizontalPadding)
                     }
                 }
                 .padding(.bottom, 80)
