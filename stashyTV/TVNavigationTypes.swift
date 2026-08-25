@@ -54,6 +54,9 @@ struct TVGalleryLink: Hashable {
     let title: String
 }
 
+/// Wird ausschließlich als `fullScreenCover`-Item benutzt (`presentedImage` in
+/// `TVImagesView` / `TVGalleryDetailView`), nie auf einen `NavigationPath`
+/// geschoben — daher kein `navigationDestination` dafür.
 struct TVImageLink: Hashable, Identifiable {
     let id: String
     let title: String
@@ -163,6 +166,13 @@ private struct TVOptionalCardButtonStyle: ViewModifier {
 
 /// On tvOS the Menu button triggers an "exit" command. Dismiss first when the
 /// view is presented (sheet/cover), otherwise pop the tab `NavigationPath`.
+///
+/// **Nur auf gepushte Ziele anwenden.** Der Handler verschluckt `onExitCommand`
+/// bedingungslos. Auf einer Tab-Wurzel wäre das falsch — dort soll die
+/// Menu-Taste den Fokus an die Sidebar geben. Das passiert hier nicht, weil
+/// `tvExitDismissable()` ausschließlich in `withTVDestinations()` gesetzt wird,
+/// wo der Pfad konstruktionsbedingt nicht leer ist. Wer den Modifier auf eine
+/// Root-View setzt, bricht die Sidebar-Rückkehr.
 private struct TVExitCommandDismiss: ViewModifier {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.isPresented) private var isPresented
@@ -220,14 +230,6 @@ struct TVNavigationDestinations: ViewModifier {
             .navigationDestination(for: TVGalleryLink.self) { link in
                 TVGalleryDetailView(galleryId: link.id, galleryTitle: link.title)
                     .tvExitDismissable()
-            }
-            .navigationDestination(for: TVImageLink.self) { link in
-                TVImageDetailView(
-                    imageId: link.id,
-                    imageTitle: link.title,
-                    galleryId: link.galleryId
-                )
-                .tvExitDismissable()
             }
             .navigationDestination(for: TVSceneListLink.self) { link in
                 TVScenesView(sortBy: link.sortBy)
