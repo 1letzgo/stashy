@@ -108,9 +108,23 @@ private struct TVServersSettingsView: View {
     @ObservedObject private var configManager = ServerConfigManager.shared
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
-    @State private var showingAddServer = false
-    @State private var managingServer: ServerConfig?
-    @State private var editingServer: ServerConfig?
+    /// Genau **eine** Presentation auf Ebene der `List`. Vorher lagen hier ein
+    /// `confirmationDialog` und zwei `.sheet` übereinander — SwiftUI erlaubt pro
+    /// View nur eine, gestapelt hoben sie sich gegenseitig auf (Sheet ging auf
+    /// und sofort wieder zu).
+    @State private var serverForm: ServerFormTarget?
+
+    private enum ServerFormTarget: Identifiable {
+        case new
+        case edit(ServerConfig)
+
+        var id: String {
+            switch self {
+            case .new: return "new"
+            case .edit(let server): return server.id.uuidString
+            }
+        }
+    }
 
     var body: some View {
         List {
@@ -155,50 +169,17 @@ private struct TVServersSettingsView: View {
 
             Section {
                 ForEach(configManager.savedServers) { server in
-                    // Aktivieren bleibt die Primäraktion; Bearbeiten/Löschen
-                    // liegen auf einem eigenen, sichtbaren Button. Vorher waren
-                    // sie nur über ein unsichtbares contextMenu erreichbar.
-                    HStack(spacing: 24) {
-                        Button {
-                            configManager.saveConfig(server)
-                        } label: {
-                            HStack(spacing: 16) {
-                                VStack(alignment: .leading, spacing: 4) {
-                                    Text(server.name)
-                                        .font(.headline)
-                                    Text(server.baseURL)
-                                        .font(.subheadline)
-                                        .foregroundStyle(.secondary)
-                                }
-
-                                Spacer()
-
-                                if server.id == configManager.activeConfig?.id {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(appearanceManager.tintColor)
-                                }
-                            }
-                        }
-
-                        Button {
-                            managingServer = server
-                        } label: {
-                            Image(systemName: "ellipsis.circle")
-                                .accessibilityLabel("Manage \(server.name)")
-                        }
-                    }
-                    .contextMenu {
-                        Button("Edit") {
-                            editingServer = server
-                        }
-                        Button("Delete", role: .destructive) {
-                            configManager.deleteServer(id: server.id)
-                        }
-                    }
+                    TVSavedServerRow(
+                        server: server,
+                        isActive: server.id == configManager.activeConfig?.id,
+                        onActivate: { configManager.saveConfig(server) },
+                        onEdit: { serverForm = .edit(server) },
+                        onDelete: { configManager.deleteServer(id: server.id) }
+                    )
                 }
 
                 Button {
-                    showingAddServer = true
+                    serverForm = .new
                 } label: {
                     Label("Add Server", systemImage: "plus")
                 }
@@ -209,35 +190,77 @@ private struct TVServersSettingsView: View {
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 80).focusable(false)
         }
-        .confirmationDialog(
-            managingServer?.name ?? "Server",
-            isPresented: Binding(get: { managingServer != nil }, set: { if !$0 { managingServer = nil } }),
-            titleVisibility: .visible
-        ) {
-            if let server = managingServer {
-                Button("Edit") { editingServer = server }
-                Button("Delete", role: .destructive) { configManager.deleteServer(id: server.id) }
-            }
-            Button("Cancel", role: .cancel) {}
-        }
-        .sheet(isPresented: $showingAddServer) {
-            TVServerFormView(server: nil) { newServer in
-                configManager.addOrUpdateServer(newServer)
-                configManager.saveConfig(newServer)
-                showingAddServer = false
-            }
-        }
-        .sheet(item: $editingServer) { server in
-            TVServerFormView(server: server) { updatedServer in
-                configManager.addOrUpdateServer(updatedServer)
-                if updatedServer.id == configManager.activeConfig?.id {
-                    configManager.saveConfig(updatedServer)
+        .sheet(item: $serverForm) { target in
+            switch target {
+            case .new:
+                TVServerFormView(server: nil) { newServer in
+                    configManager.addOrUpdateServer(newServer)
+                    configManager.saveConfig(newServer)
+                    serverForm = nil
                 }
-                editingServer = nil
+            case .edit(let server):
+                TVServerFormView(server: server) { updatedServer in
+                    configManager.addOrUpdateServer(updatedServer)
+                    if updatedServer.id == configManager.activeConfig?.id {
+                        configManager.saveConfig(updatedServer)
+                    }
+                    serverForm = nil
+                }
             }
         }
         .background(Color.appBackground)
         .navigationTitle("Servers")
+    }
+}
+
+/// Eigene View, damit der Aktions-Dialog **auf der Zeile** liegt und nicht auf
+/// der `List` — dort würde er mit dem Form-Sheet um dieselbe Presentation
+/// konkurrieren.
+private struct TVSavedServerRow: View {
+    let server: ServerConfig
+    let isActive: Bool
+    let onActivate: () -> Void
+    let onEdit: () -> Void
+    let onDelete: () -> Void
+
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @State private var showingActions = false
+
+    var body: some View {
+        HStack(spacing: 24) {
+            Button(action: onActivate) {
+                HStack(spacing: 16) {
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text(server.name)
+                            .font(.headline)
+                        Text(server.baseURL)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    Spacer()
+
+                    if isActive {
+                        Image(systemName: "checkmark")
+                            .foregroundColor(appearanceManager.tintColor)
+                    }
+                }
+            }
+
+            // Sichtbare Affordance für Bearbeiten/Löschen — vorher nur über ein
+            // unsichtbares contextMenu (Long-Press auf Select) erreichbar.
+            Button {
+                showingActions = true
+            } label: {
+                Image(systemName: "ellipsis.circle")
+                    .accessibilityLabel("Manage \(server.name)")
+            }
+        }
+        .confirmationDialog(server.name, isPresented: $showingActions, titleVisibility: .visible) {
+            Button("Edit", action: onEdit)
+            Button("Delete", role: .destructive, action: onDelete)
+            Button("Cancel", role: .cancel) {}
+        }
     }
 }
 
