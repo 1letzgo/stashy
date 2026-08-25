@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Combine
 
 // MARK: - Protocols for Unification
 
@@ -77,17 +78,52 @@ extension EnvironmentValues {
     }
 }
 
-/// Per-tab stack: stable `NavigationPath` + destinations registered inside the stack.
+// MARK: - Per-tab navigation paths
+
+/// Sidebar-Einträge. Liegt hier statt in `TVMainTabView`, weil `TVNavigationStore`
+/// und `TVTabStack` den Typ als Schlüssel brauchen.
+enum TVRootTab: String, Hashable, CaseIterable {
+    case home, scenes, performers, studios, tags, groups, galleries, images, search, settings
+}
+
+/// Hält die `NavigationPath`s **außerhalb** des View-Baums.
+///
+/// Vorher lag der Pfad als `@State` in `TVTabStack`, also an dessen View-Identität.
+/// Ob die unter `TabSection` und `.sidebarAdaptable` erhalten bleibt, ist
+/// undokumentiert — und ein Verlust wäre unsichtbar: `TVNavButton` hängt am
+/// Environment-Binding, ist das weg, passiert beim Select stillschweigend nichts.
+@MainActor
+final class TVNavigationStore: ObservableObject {
+    @Published private var paths: [TVRootTab: NavigationPath] = [:]
+
+    func binding(for tab: TVRootTab) -> Binding<NavigationPath> {
+        Binding(
+            get: { [weak self] in self?.paths[tab] ?? NavigationPath() },
+            set: { [weak self] newValue in self?.paths[tab] = newValue }
+        )
+    }
+
+    /// Zurück zur Wurzel — z. B. wenn der bereits aktive Sidebar-Eintrag erneut
+    /// gewählt wird.
+    func popToRoot(_ tab: TVRootTab) {
+        guard let path = paths[tab], !path.isEmpty else { return }
+        paths[tab] = NavigationPath()
+    }
+}
+
+/// Per-tab stack: `NavigationPath` aus dem Store + Destinations im Stack registriert.
 struct TVTabStack<Content: View>: View {
+    let tab: TVRootTab
+    @EnvironmentObject private var store: TVNavigationStore
     @ViewBuilder var content: () -> Content
-    @State private var path = NavigationPath()
 
     var body: some View {
-        NavigationStack(path: $path) {
+        let path = store.binding(for: tab)
+        NavigationStack(path: path) {
             content()
                 .withTVDestinations()
         }
-        .environment(\.tvNavigationPath, $path)
+        .environment(\.tvNavigationPath, path)
     }
 }
 

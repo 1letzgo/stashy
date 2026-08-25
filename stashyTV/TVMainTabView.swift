@@ -9,10 +9,6 @@
 
 import SwiftUI
 
-private enum TVRootTab: Hashable {
-    case home, scenes, performers, studios, tags, groups, galleries, images, search, settings
-}
-
 private struct TVContentTab: Identifiable {
     let id: TVRootTab
     let appTab: AppTab
@@ -25,6 +21,7 @@ private struct TVContentTab: Identifiable {
 /// Search + Settings sind tvOS-fixe Tabs, die immer sichtbar bleiben.
 struct TVMainTabView: View {
     @ObservedObject private var tabManager = TabManager.shared
+    @StateObject private var navigationStore = TVNavigationStore()
     @State private var selectedTab: TVRootTab = .home
 
     private let allContentTabs: [TVContentTab] = [
@@ -61,33 +58,34 @@ struct TVMainTabView: View {
             // Settings stays ahead of the search-role tab: tvOS pins that role to the
             // trailing edge, which pushed Settings out of the visible top bar.
             Tab("Settings", systemImage: "gear", value: TVRootTab.settings) {
-                TVTabStack { TVSettingsView() }
+                TVTabStack(tab: .settings) { TVSettingsView() }
             }
             Tab("Search", systemImage: "magnifyingglass", value: TVRootTab.search, role: .search) {
-                TVTabStack { TVSearchView() }
+                TVTabStack(tab: .search) { TVSearchView() }
             }
         }
+        .environmentObject(navigationStore)
     }
 
     @ViewBuilder
     private func tabContent(_ tab: TVRootTab) -> some View {
         switch tab {
         case .home:
-            TVTabStack { TVDashboardView() }
+            TVTabStack(tab: .home) { TVDashboardView() }
         case .scenes:
-            TVTabStack { TVScenesView() }
+            TVTabStack(tab: .scenes) { TVScenesView() }
         case .performers:
-            TVTabStack { TVPerformersView() }
+            TVTabStack(tab: .performers) { TVPerformersView() }
         case .studios:
-            TVTabStack { TVStudiosView() }
+            TVTabStack(tab: .studios) { TVStudiosView() }
         case .tags:
-            TVTabStack { TVTagsView() }
+            TVTabStack(tab: .tags) { TVTagsView() }
         case .groups:
-            TVTabStack { TVGroupsView() }
+            TVTabStack(tab: .groups) { TVGroupsView() }
         case .galleries:
-            TVTabStack { TVGalleriesView() }
+            TVTabStack(tab: .galleries) { TVGalleriesView() }
         case .images:
-            TVTabStack { TVImagesView() }
+            TVTabStack(tab: .images) { TVImagesView() }
         case .search, .settings:
             EmptyView()
         }
