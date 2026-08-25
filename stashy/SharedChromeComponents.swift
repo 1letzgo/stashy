@@ -458,7 +458,7 @@ private struct StashySettingsDetailChromeModifier<Trailing: View>: ViewModifier 
         content
             .hideSystemNavigationBarForCustomChrome()
             .enableSwipeBackWhenNavBarHidden()
-            .stashyCustomChromeInset(spacing: 0) {
+            .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
                 StashyDetailChromeBar(title: title, trailing: trailing)
             }
     }

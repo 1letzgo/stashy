@@ -473,6 +473,11 @@ struct SceneDetailView: View {
             }
             .padding(.horizontal, 16)
             .padding(.vertical, 16)
+            // Pins the content to the viewport width. Without this a single unbreakable
+            // string (long file-name title, URL in the details) grows the scroll content
+            // sideways, and the horizontal drag then pans the cards instead of triggering
+            // the interactive back gesture.
+            .containerRelativeFrame(.horizontal)
         }
     }
 

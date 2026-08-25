@@ -1184,7 +1184,7 @@ struct TagDetailView: View {
         }
         .hideSystemNavigationBarForCustomChrome()
         .enableSwipeBackWhenNavBarHidden()
-        .stashyCustomChromeInset(spacing: 0) {
+        .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
             tagDetailNavBar
         }
         .sheet(isPresented: $showingEditTagSheet) {

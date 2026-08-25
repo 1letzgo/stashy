@@ -2058,7 +2058,7 @@ struct SceneLiveFilterSheet: View {
                 .font(.system(size: 13, weight: .medium))
                 .padding(.horizontal, 12)
                 .padding(.vertical, 6)
-                .background(isActive ? appearance.tintColor : Color.secondary.opacity(0.15))
+                .background(isActive ? appearance.tintColor : Color.secondaryAppBackground)
                 .foregroundColor(isActive ? .white : .primary)
                 .clipShape(Capsule())
         }

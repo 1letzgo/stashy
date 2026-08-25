@@ -45,6 +45,9 @@ enum DesignTokens {
         static let fabIconSize: CGFloat = 18
         static let fabActiveDot: CGFloat = 7
         static let strokeOpacity: Double = 0.07
+        /// Luft zwischen der Chrome-Leiste und dem ersten Inhalt (erste Karte / Reihe)
+        /// in den Listen- und Katalog-Views. Detail-Views bleiben bewusst bündig.
+        static let contentTopGap: CGFloat = 8
     }
 
     /// Shared insets for Tools sub-views (Overview, Timeline, Charts, Match, RateMe, Downloads).

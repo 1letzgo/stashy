@@ -159,7 +159,7 @@ struct CatalogsView: View {
         .navigationBarHidden(true)
         // Swipe-back can desync UIKit/SwiftUI stacks; menu switches must always clear details.
         .popNavigationToRootOnChange("\(coordinator.catalogueSubTab)|\(coordinator.cataloguePopToken.uuidString)")
-        .stashyCustomChromeInset(spacing: 0) {
+        .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
             if showTabSwitcher {
                 StashySectionChromeBar {
                     CatalogCategoryRow(tabs: sortedVisibleTabs, selection: selectedTabBinding)
@@ -1147,7 +1147,7 @@ struct GroupDetailView: View {
         .sceneLiveUpdates(using: viewModel)
         .hideSystemNavigationBarForCustomChrome()
         .enableSwipeBackWhenNavBarHidden()
-        .stashyCustomChromeInset(spacing: 0) {
+        .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
             groupDetailNavBar
         }
         .sheet(isPresented: $showingEditGroupSheet) {

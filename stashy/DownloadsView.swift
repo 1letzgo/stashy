@@ -505,7 +505,7 @@ struct DownloadDetailView: View {
         .applyAppBackground()
         .hideSystemNavigationBarForCustomChrome()
         .enableSwipeBackWhenNavBarHidden()
-        .stashyCustomChromeInset(spacing: 0) {
+        .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
             downloadDetailNavBar
         }
     }

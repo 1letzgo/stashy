@@ -363,7 +363,7 @@ struct ToolsView: View {
         .onChange(of: stashyPlus.isUnlocked) { _, _ in normalizeToolsSubTab() }
         .navigationBarHidden(true)
         .popNavigationToRootOnChange(effectiveTab.rawValue)
-        .stashyCustomChromeInset(spacing: 0) {
+        .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
             StashySectionChromeBar {
                 toolsCategoryRow
                     .padding(.horizontal, StashyExpandingDock.edgePadding)

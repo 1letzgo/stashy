@@ -26,8 +26,6 @@ enum HomeChannelDestination: String {
 struct HomeChannel: Identifiable, Equatable {
     let id: String
     let title: String
-    let subtitle: String
-    let icon: String
     let destination: HomeChannelDestination
     let savedFilter: StashDBViewModel.SavedFilter
     let sceneSort: StashDBViewModel.SceneSortOption
@@ -37,8 +35,6 @@ struct HomeChannel: Identifiable, Equatable {
         HomeChannel(
             id: "channel.scenes.\(filter.id)",
             title: filter.name,
-            subtitle: "Saved filter",
-            icon: "film",
             destination: .scenes,
             savedFilter: filter,
             sceneSort: filter.resolvedSceneSort ?? .dateDesc,
@@ -50,8 +46,6 @@ struct HomeChannel: Identifiable, Equatable {
         HomeChannel(
             id: "channel.clips.\(filter.id)",
             title: filter.name,
-            subtitle: "Saved filter",
-            icon: "play.rectangle.on.rectangle.fill",
             destination: .clips,
             savedFilter: filter,
             sceneSort: .dateDesc,
@@ -60,8 +54,8 @@ struct HomeChannel: Identifiable, Equatable {
     }
 }
 
-/// Dashboard row of channels. Not backed by the `homeRow*` caches like the other rows,
-/// because a channel's artwork is a collage assembled from its own preview page.
+/// Dashboard row of channels. Cards show the channel's category logo (scenes / clips)
+/// on a square tile — no thumbnails, so the row needs no per-channel preview fetch.
 struct HomeChannelsRowView: View {
     let config: HomeRowConfig
     @ObservedObject var viewModel: StashDBViewModel
@@ -69,9 +63,6 @@ struct HomeChannelsRowView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
     var isFirst: Bool = false
-
-    @State private var previews: [String: [URL]] = [:]
-    @State private var isLoadingPreviews = false
 
     private var channels: [HomeChannel] {
         tabManager.homeChannelItems
@@ -107,17 +98,6 @@ struct HomeChannelsRowView: View {
         .onAppear { loadChannels() }
         .onChange(of: viewModel.savedFilters) { _, newValue in
             tabManager.syncHomeChannelItems(with: Array(newValue.values))
-            loadPreviews()
-        }
-        .onChange(of: tabManager.homeChannelItems) { _, _ in
-            previews = [:]
-            isLoadingPreviews = false
-            loadPreviews()
-        }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
-            // Saved filters are server-scoped, so previews must not survive a switch.
-            previews = [:]
-            isLoadingPreviews = false
         }
     }
 
@@ -137,7 +117,6 @@ struct HomeChannelsRowView: View {
                     } label: {
                         HomeChannelCardView(
                             channel: channel,
-                            previewURLs: previews[channel.id] ?? [],
                             width: cardWidth,
                             height: cardHeight
                         )
@@ -188,49 +167,10 @@ struct HomeChannelsRowView: View {
         if viewModel.savedFilters.isEmpty && !viewModel.isLoadingSavedFilters {
             viewModel.fetchSavedFilters { _ in
                 tabManager.syncHomeChannelItems(with: Array(viewModel.savedFilters.values))
-                loadPreviews()
             }
         } else {
             tabManager.syncHomeChannelItems(with: Array(viewModel.savedFilters.values))
         }
-        loadPreviews()
-    }
-
-    private func loadPreviews() {
-        guard !isLoadingPreviews else { return }
-        let pending = channels.filter { previews[$0.id] == nil }
-        guard !pending.isEmpty else { return }
-        isLoadingPreviews = true
-        loadPreview(at: 0, from: pending)
-    }
-
-    /// One request at a time. Firing every channel together races Stash's SQLite lock —
-    /// the first card in the row is the one that usually comes back empty.
-    private func loadPreview(at index: Int, from pending: [HomeChannel], retrying: Bool = false) {
-        guard index < pending.count else {
-            isLoadingPreviews = false
-            return
-        }
-        let channel = pending[index]
-        switch channel.destination {
-        case .scenes:
-            viewModel.fetchScenePage(sortBy: channel.sceneSort, filter: channel.savedFilter, page: 1, perPage: 4) { scenes, _ in
-                finishPreview(urls: scenes.compactMap(\.thumbnailURL), at: index, from: pending, retrying: retrying)
-            }
-        case .clips:
-            viewModel.fetchClipPage(sortBy: channel.clipSort, filter: channel.savedFilter, page: 1, perPage: 4) { images, _ in
-                finishPreview(urls: images.compactMap(\.thumbnailURL), at: index, from: pending, retrying: retrying)
-            }
-        }
-    }
-
-    private func finishPreview(urls: [URL], at index: Int, from pending: [HomeChannel], retrying: Bool) {
-        if urls.isEmpty && !retrying {
-            loadPreview(at: index, from: pending, retrying: true)
-            return
-        }
-        previews[pending[index].id] = urls
-        loadPreview(at: index + 1, from: pending)
     }
 }
 
@@ -238,41 +178,46 @@ struct HomeChannelsRowView: View {
 
 private struct HomeChannelCardView: View {
     let channel: HomeChannel
-    let previewURLs: [URL]
     let width: CGFloat
     let height: CGFloat
     @ObservedObject var appearanceManager = AppearanceManager.shared
 
     var body: some View {
         ZStack(alignment: .bottomLeading) {
-            artwork
-                .frame(width: width, height: height)
-                .clipped()
-
-            LinearGradient(
-                colors: [.clear, .black.opacity(0.35), .black.opacity(0.85)],
-                startPoint: .top,
-                endPoint: .bottom
-            )
+            logoBackdrop
 
             VStack {
-                HStack(alignment: .top, spacing: 6) {
-                    badge(icon: channel.icon, text: channel.subtitle)
+                HStack(spacing: 0) {
                     Spacer(minLength: 0)
                     badge(icon: channel.destination.icon, text: channel.destination.label)
                 }
-                Spacer()
+                Spacer(minLength: 0)
             }
             .padding(8)
 
             Text(channel.title)
                 .font(.system(size: 12, weight: .bold))
-                .foregroundColor(.white)
+                .foregroundColor(.primary)
                 .lineLimit(2)
                 .padding(8)
         }
         .frame(width: width, height: height)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+    }
+
+    /// Category logo on the shared card surface — replaces the former thumbnail collage.
+    private var logoBackdrop: some View {
+        ZStack {
+            Color.secondaryAppBackground
+
+            Image(systemName: channel.destination.icon)
+                .font(.system(size: min(width, height) * 0.34, weight: .semibold))
+                .foregroundColor(appearanceManager.tintColor)
+                // Logo sits slightly above center so the two-line title never crowds it.
+                .offset(y: -height * 0.06)
+        }
+        .frame(width: width, height: height)
+        .clipped()
     }
 
     private func badge(icon: String, text: String) -> some View {
@@ -282,49 +227,15 @@ private struct HomeChannelCardView: View {
                 .foregroundColor(appearanceManager.tintColor)
             Text(text.uppercased())
                 .font(.system(size: 8, weight: .bold))
-                .foregroundColor(.white.opacity(0.85))
+                .foregroundColor(.secondary)
         }
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
-        .background(Color.black.opacity(DesignTokens.Opacity.badge))
+        // Page colour reads as a recess on the card surface (the old black capsule
+        // was built for a photo backdrop).
+        .background(Color.appBackground)
         .clipShape(Capsule())
         .fixedSize()
-    }
-
-    @ViewBuilder
-    private var artwork: some View {
-        if previewURLs.isEmpty {
-            placeholder
-        } else if previewURLs.count == 1 {
-            thumbnail(previewURLs[0])
-        } else {
-            HStack(spacing: 1) {
-                ForEach(Array(previewURLs.prefix(4).enumerated()), id: \.offset) { _, url in
-                    thumbnail(url)
-                }
-            }
-        }
-    }
-
-    @ViewBuilder
-    private func thumbnail(_ url: URL) -> some View {
-        CustomAsyncImage(url: url) { loader in
-            if let image = loader.image {
-                image.resizable().scaledToFill()
-            } else {
-                Rectangle().fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-            }
-        }
-    }
-
-    private var placeholder: some View {
-        Rectangle()
-            .fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-            .overlay(
-                Image(systemName: channel.icon)
-                    .font(.system(size: 20))
-                    .foregroundColor(.secondary)
-            )
     }
 }
 #endif

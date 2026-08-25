@@ -1144,7 +1144,7 @@ private struct TopListsMetricChipRow<Metric: Identifiable & Hashable & TopListsM
                         .frame(height: 28)
                         .background(
                             Capsule(style: .continuous)
-                                .fill(selected ? appearance.tintColor : Color.secondary.opacity(0.15))
+                                .fill(selected ? appearance.tintColor : Color.secondaryAppBackground)
                                 .shadow(
                                     color: selected ? appearance.tintColor.opacity(0.35) : .clear,
                                     radius: 4,

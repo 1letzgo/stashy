@@ -91,7 +91,7 @@ struct SettingsView: View {
         .tint(appearanceManager.tintColor)
         .navigationBarHidden(true)
         .popNavigationToRootOnChange(activeSection.rawValue)
-        .stashyCustomChromeInset(spacing: 0) {
+        .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
             StashySectionChromeBar {
                 SettingsCategoryRow(
                     selection: Binding(

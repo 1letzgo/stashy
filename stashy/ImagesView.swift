@@ -1830,7 +1830,7 @@ private struct ImagesTopChromeInset<Chrome: View>: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         if isOpenedGallery {
-            content.stashyCustomChromeInset(spacing: 0, content: chrome)
+            content.stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap, content: chrome)
         } else {
             content
         }

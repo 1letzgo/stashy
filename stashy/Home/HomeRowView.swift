@@ -31,6 +31,9 @@ func homeCardWidth(for config: HomeRowConfig, isLarge: Bool, screenWidth: CGFloa
         return 125 * 2 / 3
     case .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
         return 125
+    case .channels:
+        // Channels show a category logo, not a thumbnail — square card.
+        return 125
     default:
         return 125 * 16 / 9
     }
@@ -44,6 +47,8 @@ func homeCardHeight(for config: HomeRowConfig, isLarge: Bool, screenWidth: CGFlo
             return width * 3 / 2
         case .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
             return 125
+        case .channels:
+            return width
         default:
             return width * 9 / 16
         }
@@ -53,6 +58,8 @@ func homeCardHeight(for config: HomeRowConfig, isLarge: Bool, screenWidth: CGFlo
         return width * 3 / 2
     case .newGalleries, .recentlyUpdatedGalleries, .galleriesHighestImageCount:
         return 125
+    case .channels:
+        return width
     default:
         return 125
     }
