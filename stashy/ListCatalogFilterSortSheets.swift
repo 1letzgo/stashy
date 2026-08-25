@@ -366,24 +366,6 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
     }
 }
 
-struct CatalogServerManagedFilterNotice: View {
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Server filter")
-                .font(.headline)
-            Text("This saved filter uses criteria stashy cannot simplify here. Edit it in Stash, or pick a different filter or preset.")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-    }
-}
-
 // MARK: - Performer sort (picker + asc/desc)
 
 private enum PerformerCatalogSortFieldKind: String, CaseIterable, Identifiable {
@@ -619,7 +601,6 @@ struct PerformersCatalogFilterSortSheet: View {
     var localPresets: [PerformerListLiveFilterPreset]
     @Binding var selectedPresetRowId: String
     @ObservedObject var criteriaDocument: FilterCriteriaDocument
-    var liveChipRowsVisible: Bool = true
     var sortOption: StashDBViewModel.PerformerSortOption
     var onSortChange: (StashDBViewModel.PerformerSortOption) -> Void
 
@@ -644,12 +625,13 @@ struct PerformersCatalogFilterSortSheet: View {
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     filterPickerCard
                     performerSortCard
-                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
+                    performerLiveChipsCard
+                    AdvancedCriteriaCard(document: criteriaDocument, onApply: onApply)
                 }
             }
             .background(Color.appBackground.ignoresSafeArea())
@@ -663,10 +645,9 @@ struct PerformersCatalogFilterSortSheet: View {
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationViewStyle(.stack)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Color(UIColor.systemGroupedBackground))
+        .presentationBackground(Color.appBackground)
     }
 
     private var filterPickerCard: some View {
@@ -841,7 +822,6 @@ struct TagsCatalogFilterSortSheet: View {
     var localPresets: [TagListLiveFilterPreset]
     @Binding var selectedPresetRowId: String
     @ObservedObject var criteriaDocument: FilterCriteriaDocument
-    var liveChipRowsVisible: Bool = true
     var sortOption: StashDBViewModel.TagSortOption
     var onSortChange: (StashDBViewModel.TagSortOption) -> Void
     @Binding var liveFavorite: Bool?
@@ -857,12 +837,13 @@ struct TagsCatalogFilterSortSheet: View {
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     filterPickerCard
                     tagSortCard
-                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
+                    tagLiveChipsCard
+                    AdvancedCriteriaCard(document: criteriaDocument, onApply: onApply)
                 }
             }
             .background(Color.appBackground.ignoresSafeArea())
@@ -876,10 +857,9 @@ struct TagsCatalogFilterSortSheet: View {
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationViewStyle(.stack)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Color(UIColor.systemGroupedBackground))
+        .presentationBackground(Color.appBackground)
     }
 
     private var filterPickerCard: some View {
@@ -993,7 +973,6 @@ struct StudiosCatalogFilterSortSheet: View {
     var localPresets: [StudioListLiveFilterPreset]
     @Binding var selectedPresetRowId: String
     @ObservedObject var criteriaDocument: FilterCriteriaDocument
-    var liveChipRowsVisible: Bool = true
     var sortOption: StashDBViewModel.StudioSortOption
     var onSortChange: (StashDBViewModel.StudioSortOption) -> Void
     @Binding var liveMinRating: Int
@@ -1010,12 +989,13 @@ struct StudiosCatalogFilterSortSheet: View {
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     filterPickerCard
                     studioSortCard
-                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
+                    studioLiveChipsCard
+                    AdvancedCriteriaCard(document: criteriaDocument, onApply: onApply)
                 }
             }
             .background(Color.appBackground.ignoresSafeArea())
@@ -1029,10 +1009,9 @@ struct StudiosCatalogFilterSortSheet: View {
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationViewStyle(.stack)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Color(UIColor.systemGroupedBackground))
+        .presentationBackground(Color.appBackground)
     }
 
     private var filterPickerCard: some View {
@@ -1227,7 +1206,6 @@ struct GalleriesCatalogFilterSortSheet: View {
     var localPresets: [GalleryListLiveFilterPreset]
     @Binding var selectedPresetRowId: String
     @ObservedObject var criteriaDocument: FilterCriteriaDocument
-    var liveChipRowsVisible: Bool = true
     var sortOption: StashDBViewModel.GallerySortOption
     var onSortChange: (StashDBViewModel.GallerySortOption) -> Void
     @Binding var liveMinRating: Int
@@ -1248,12 +1226,13 @@ struct GalleriesCatalogFilterSortSheet: View {
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     filterPickerCard
                     gallerySortCard
-                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
+                    galleryLiveChipsCard
+                    AdvancedCriteriaCard(document: criteriaDocument, onApply: onApply)
                 }
             }
             .background(Color.appBackground.ignoresSafeArea())
@@ -1267,10 +1246,9 @@ struct GalleriesCatalogFilterSortSheet: View {
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationViewStyle(.stack)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Color(UIColor.systemGroupedBackground))
+        .presentationBackground(Color.appBackground)
     }
 
     private var filterPickerCard: some View {
@@ -1471,7 +1449,6 @@ struct ImagesCatalogFilterSortSheet: View {
     @Binding var selectedPresetRowId: String
     @ObservedObject var criteriaDocument: FilterCriteriaDocument
     var filterMenuTitleFallback: String? = nil
-    var liveChipRowsVisible: Bool = true
     /// Hidden for Reels clips (`fetchClips` pins `path` and ignores live `path`).
     var showMediaTypeFilter: Bool = true
     var sortOption: StashDBViewModel.ImageSortOption
@@ -1521,7 +1498,7 @@ struct ImagesCatalogFilterSortSheet: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     filterPickerCard
@@ -1535,7 +1512,8 @@ struct ImagesCatalogFilterSortSheet: View {
                     if showsImagesFeedAutoplaySetting {
                         ImagesFeedAutoplaySettingsCard()
                     }
-                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
+                    imageLiveChipsCard
+                    AdvancedCriteriaCard(document: criteriaDocument, onApply: onApply)
                 }
             }
             .background(Color.appBackground.ignoresSafeArea())
@@ -1549,10 +1527,9 @@ struct ImagesCatalogFilterSortSheet: View {
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationViewStyle(.stack)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Color(UIColor.systemGroupedBackground))
+        .presentationBackground(Color.appBackground)
     }
 
     private var filterPickerCard: some View {
@@ -1964,7 +1941,7 @@ struct GroupsCatalogFilterSortSheet: View {
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(alignment: .center, spacing: 12) {
@@ -2001,7 +1978,7 @@ struct GroupsCatalogFilterSortSheet: View {
                     .pickerStyle(.menu)
                     .padding(.horizontal, 16)
 
-                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
+                    AdvancedCriteriaCard(document: criteriaDocument, onApply: onApply)
                 }
             }
             .background(Color.appBackground.ignoresSafeArea())
@@ -2015,10 +1992,9 @@ struct GroupsCatalogFilterSortSheet: View {
             )
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationViewStyle(.stack)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Color(UIColor.systemGroupedBackground))
+        .presentationBackground(Color.appBackground)
     }
 }
 

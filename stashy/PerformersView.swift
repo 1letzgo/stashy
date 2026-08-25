@@ -107,13 +107,25 @@ private struct PerformersViewContent: View {
         return dict
     }
 
+    /// Passed to `filter:` only while the advanced editor holds no copy of it. Once the editor has
+    /// the criteria, re-sending the server filter would resurrect criteria the user edited away;
+    /// while it is empty (e.g. a default filter applied on appear) the filter still has to be sent.
+    private var fetchBaseFilter: StashDBViewModel.SavedFilter? {
+        criteriaDocument.isEmpty ? selectedFilter : nil
+    }
+
+    /// Quick chips plus advanced criteria from the editor — what actually gets fetched.
+    private var effectiveLiveFilter: [String: Any]? {
+        criteriaDocument.merged(with: isLiveFilterActive ? activeLiveFilterDict : [:])
+    }
+
     private func applyLiveFilter() {
-        viewModel.currentPerformerLiveFilter = activeLiveFilterDict
-        viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: selectedFilter, liveFilter: activeLiveFilterDict)
+        viewModel.currentPerformerLiveFilter = effectiveLiveFilter ?? [:]
+        viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: fetchBaseFilter, liveFilter: effectiveLiveFilter)
     }
 
     private var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     private var sortedServerPerformerFilters: [StashDBViewModel.SavedFilter] {
@@ -122,9 +134,6 @@ private struct PerformersViewContent: View {
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
-    private var performerLiveChipRowsVisible: Bool {
-        CatalogLiveChipFilterSupport.performerSavedFilterSupportsLiveEditor(selectedFilter)
-    }
 
     private func refreshPerformerLocalPresets() {
         localCatalogPresets = PerformerListLiveFilterPresetStore.loadPresets()
@@ -202,6 +211,24 @@ private struct PerformersViewContent: View {
         applyLiveFilter()
     }
 
+
+    /// Mirrors a selected server filter into the advanced criteria editor so its criteria stay
+    /// editable in the app; fetches then pass `filter: nil` and send the document instead.
+    private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter) {
+        if let meta = filter.stashyCatalogPresetMetadata {
+            var merged: [String: Any] = [:]
+            if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
+                merged = base.criteriaObjectFilter()
+            }
+            for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
+                merged[key] = value
+            }
+            criteriaDocument.load(merged)
+        } else {
+            criteriaDocument.load(filter.criteriaObjectFilter())
+        }
+    }
+
     private func applyServerPerformerSavedFilter(_ f: StashDBViewModel.SavedFilter) {
         if let meta = f.stashyCatalogPresetMetadata {
             if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
@@ -229,6 +256,7 @@ private struct PerformersViewContent: View {
                 clearPerformerLiveChipsOnly()
             }
         }
+        loadCriteriaDocument(from: f)
         applyLiveFilter()
     }
 
@@ -405,14 +433,14 @@ private struct PerformersViewContent: View {
         TabManager.shared.setSortOption(for: .performers, option: newOption.rawValue)
 
         // Fetch new data immediately
-        viewModel.fetchPerformers(sortBy: newOption, searchQuery: searchText, filter: selectedFilter, liveFilter: isLiveFilterActive ? activeLiveFilterDict : nil)
+        viewModel.fetchPerformers(sortBy: newOption, searchQuery: searchText, filter: fetchBaseFilter, liveFilter: effectiveLiveFilter)
     }
     
     // Search function with debouncing
     private func performSearch() {
         scrollPosition = nil
         shouldRestoreScroll = false
-        viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: selectedFilter, liveFilter: isLiveFilterActive ? activeLiveFilterDict : nil)
+        viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: fetchBaseFilter, liveFilter: effectiveLiveFilter)
     }
 
     var body: some View {
@@ -566,7 +594,6 @@ private struct PerformersViewContent: View {
             localPresets: localCatalogPresets,
             selectedPresetRowId: $catalogPresetRowSelection,
             criteriaDocument: criteriaDocument,
-            liveChipRowsVisible: performerLiveChipRowsVisible,
             sortOption: selectedSortOption,
             onSortChange: { changeSortOption(to: $0) },
             liveAgeRange: $liveFilterAgeRange,
@@ -582,6 +609,7 @@ private struct PerformersViewContent: View {
                 catalogPresetRowSelection = ""
                 selectedFilter = nil
                 clearPerformerLiveChipsOnly()
+                criteriaDocument.clear()
                 applyLiveFilter()
             },
             onRequestSave: { savePerformerCatalogPresetOverwrite() },
@@ -642,7 +670,7 @@ private struct PerformersViewContent: View {
             searchText = coordinator.activeSearchText
             isSearchVisible = true
             coordinator.activeSearchText = ""
-            viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: selectedFilter)
+            viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: fetchBaseFilter, liveFilter: effectiveLiveFilter)
             viewModel.fetchSavedFilters()
             return
         }

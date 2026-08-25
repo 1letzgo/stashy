@@ -245,7 +245,12 @@ enum StashyChromePlacement {
 }
 
 /// Section dock (Home / Tools / Settings) with divider on the correct side for top vs bottom placement.
+///
+/// `isOpaque` adds a solid fill under the `.bar` material for sheets, where the presenting view would
+/// otherwise shine through. The bar stays on the app-wide dark chrome scheme, so the fill is resolved
+/// from the same environment instead of a hardcoded trait collection.
 struct StashySectionChromeBar<Content: View>: View {
+    var isOpaque: Bool = false
     @ViewBuilder var content: () -> Content
 
     var body: some View {
@@ -256,6 +261,11 @@ struct StashySectionChromeBar<Content: View>: View {
             } else {
                 content()
                 Divider().overlay(Color.white.opacity(0.15))
+            }
+        }
+        .background {
+            if isOpaque {
+                Color(UIColor.secondarySystemGroupedBackground)
             }
         }
         .background(.bar)
@@ -295,7 +305,7 @@ struct CatalogSettingsSheetChromeBar: View {
     var onRequestDelete: () -> Void
 
     var body: some View {
-        VStack(spacing: 0) {
+        StashySectionChromeBar(isOpaque: true) {
             HStack(spacing: 8) {
                 Button(action: onReset) {
                     Text("Reset")
@@ -346,19 +356,7 @@ struct CatalogSettingsSheetChromeBar: View {
             .frame(minHeight: StashyExpandingDock.activeHeight)
             .padding(.horizontal, StashyExpandingDock.edgePadding)
             .padding(.vertical, 10)
-
-            Divider().overlay(Color.white.opacity(0.15))
         }
-        // Opaque + extend into status-bar safe area so the presenter never shows through.
-        .background {
-            Color(
-                UIColor.secondarySystemGroupedBackground.resolvedColor(
-                    with: UITraitCollection(userInterfaceStyle: .dark)
-                )
-            )
-            .ignoresSafeArea(edges: .top)
-        }
-        .colorScheme(.dark)
     }
 }
 
@@ -463,15 +461,6 @@ private struct StashySettingsDetailChromeModifier<Trailing: View>: ViewModifier 
             .stashyCustomChromeInset(spacing: 0) {
                 StashyDetailChromeBar(title: title, trailing: trailing)
             }
-    }
-}
-
-/// Shared sheet presentation: opaque background (iOS 26 glass) without `presentationSizing(.page)`,
-/// which collapses `ScrollView` content to an empty sheet.
-struct StashyEdgePinnedSheetModifier: ViewModifier {
-    func body(content: Content) -> some View {
-        content
-            .presentationBackground(Color(UIColor.systemGroupedBackground))
     }
 }
 

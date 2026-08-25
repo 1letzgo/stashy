@@ -520,9 +520,35 @@ private struct ScenesViewContent: View {
         return dict
     }
     
-    /// Full editor criteria drive fetch (no chip-safe gating).
+    /// Passed to `filter:` only while the advanced editor holds no copy of it (see below).
+    private var fetchBaseFilter: StashDBViewModel.SavedFilter? {
+        criteriaDocument.isEmpty ? selectedFilter : nil
+    }
+
+    /// Quick chips merged with the advanced criteria editor; advanced criteria win per key.
+    ///
+    /// A selected saved filter is loaded into `criteriaDocument`, so fetches pass `filter: nil` —
+    /// otherwise the server filter would re-apply criteria the user just edited away.
     private var effectiveSceneLiveFilterForFetch: [String: Any] {
-        criteriaDocument.sanitizedObjectFilter
+        var dict = criteriaDocument.sanitizedObjectFilter
+        for (key, value) in activeLiveFilterDict {
+            dict[key] = value
+        }
+        if !liveFilterStudioIds.isEmpty {
+            dict["studios"] = ["modifier": "INCLUDES", "value": liveFilterStudioIds, "depth": 0]
+        }
+        if !liveFilterTagIds.isEmpty {
+            dict["tags"] = ["modifier": "INCLUDES", "value": liveFilterTagIds, "depth": 0]
+        }
+        if !liveFilterGroupIds.isEmpty {
+            dict["groups"] = ["modifier": "INCLUDES", "value": liveFilterGroupIds, "depth": 0]
+        }
+        if liveFilterMinRating == -1 {
+            dict["rating100"] = ["modifier": "IS_NULL"]
+        } else if liveFilterMinRating > 0, dict["rating100"] == nil {
+            dict["rating100"] = ["value": (liveFilterMinRating * 20), "modifier": "EQUALS"]
+        }
+        return dict
     }
 
     /// Reads `INCLUDES` ids each for `studios`, `tags`, `groups` (after clearing other live chips).
@@ -937,13 +963,13 @@ private struct ScenesViewContent: View {
 
         switch scope {
         case .catalog:
-            viewModel.fetchScenes(sortBy: newOption, searchQuery: searchText, filter: selectedFilter, liveFilter: effectiveSceneLiveFilterForFetch)
+            viewModel.fetchScenes(sortBy: newOption, searchQuery: searchText, filter: fetchBaseFilter, liveFilter: effectiveSceneLiveFilterForFetch)
         case .performer(let performerId):
             viewModel.fetchPerformerScenes(
                 performerId: performerId,
                 sortBy: newOption,
                 isInitialLoad: true,
-                filter: selectedFilter,
+                filter: fetchBaseFilter,
                 liveFilter: effectiveSceneLiveFilterForFetch,
                 searchQuery: searchText
             )
@@ -952,7 +978,7 @@ private struct ScenesViewContent: View {
                 studioId: studioId,
                 sortBy: newOption,
                 isInitialLoad: true,
-                filter: selectedFilter,
+                filter: fetchBaseFilter,
                 liveFilter: effectiveSceneLiveFilterForFetch,
                 searchQuery: searchText
             )
@@ -961,7 +987,7 @@ private struct ScenesViewContent: View {
                 tagId: tagId,
                 sortBy: newOption,
                 isInitialLoad: true,
-                filter: selectedFilter,
+                filter: fetchBaseFilter,
                 liveFilter: effectiveSceneLiveFilterForFetch,
                 searchQuery: searchText
             )
@@ -970,7 +996,7 @@ private struct ScenesViewContent: View {
                 groupId: groupId,
                 sortBy: newOption,
                 isInitialLoad: true,
-                filter: selectedFilter,
+                filter: fetchBaseFilter,
                 liveFilter: effectiveSceneLiveFilterForFetch,
                 searchQuery: searchText
             )
@@ -981,13 +1007,13 @@ private struct ScenesViewContent: View {
     private func performSearch() {
         switch scope {
         case .catalog:
-            viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: selectedFilter, liveFilter: effectiveSceneLiveFilterForFetch)
+            viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: fetchBaseFilter, liveFilter: effectiveSceneLiveFilterForFetch)
         case .performer(let performerId):
             viewModel.fetchPerformerScenes(
                 performerId: performerId,
                 sortBy: selectedSortOption,
                 isInitialLoad: true,
-                filter: selectedFilter,
+                filter: fetchBaseFilter,
                 liveFilter: effectiveSceneLiveFilterForFetch,
                 searchQuery: searchText
             )
@@ -996,7 +1022,7 @@ private struct ScenesViewContent: View {
                 studioId: studioId,
                 sortBy: selectedSortOption,
                 isInitialLoad: true,
-                filter: selectedFilter,
+                filter: fetchBaseFilter,
                 liveFilter: effectiveSceneLiveFilterForFetch,
                 searchQuery: searchText
             )
@@ -1005,7 +1031,7 @@ private struct ScenesViewContent: View {
                 tagId: tagId,
                 sortBy: selectedSortOption,
                 isInitialLoad: true,
-                filter: selectedFilter,
+                filter: fetchBaseFilter,
                 liveFilter: effectiveSceneLiveFilterForFetch,
                 searchQuery: searchText
             )
@@ -1014,7 +1040,7 @@ private struct ScenesViewContent: View {
                 groupId: groupId,
                 sortBy: selectedSortOption,
                 isInitialLoad: true,
-                filter: selectedFilter,
+                filter: fetchBaseFilter,
                 liveFilter: effectiveSceneLiveFilterForFetch,
                 searchQuery: searchText
             )
@@ -1027,13 +1053,13 @@ private struct ScenesViewContent: View {
         switch scope {
         case .catalog:
             viewModel.currentSceneLiveFilter = effectiveSceneLiveFilterForFetch
-            viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: nil, liveFilter: effectiveSceneLiveFilterForFetch)
+            viewModel.fetchScenes(sortBy: selectedSortOption, searchQuery: searchText, filter: fetchBaseFilter, liveFilter: effectiveSceneLiveFilterForFetch)
         case .performer(let performerId):
             viewModel.fetchPerformerScenes(
                 performerId: performerId,
                 sortBy: selectedSortOption,
                 isInitialLoad: true,
-                filter: nil,
+                filter: fetchBaseFilter,
                 liveFilter: effectiveSceneLiveFilterForFetch,
                 searchQuery: searchText
             )
@@ -1042,7 +1068,7 @@ private struct ScenesViewContent: View {
                 studioId: studioId,
                 sortBy: selectedSortOption,
                 isInitialLoad: true,
-                filter: nil,
+                filter: fetchBaseFilter,
                 liveFilter: effectiveSceneLiveFilterForFetch,
                 searchQuery: searchText
             )
@@ -1051,7 +1077,7 @@ private struct ScenesViewContent: View {
                 tagId: tagId,
                 sortBy: selectedSortOption,
                 isInitialLoad: true,
-                filter: nil,
+                filter: fetchBaseFilter,
                 liveFilter: effectiveSceneLiveFilterForFetch,
                 searchQuery: searchText
             )
@@ -1060,7 +1086,7 @@ private struct ScenesViewContent: View {
                 groupId: groupId,
                 sortBy: selectedSortOption,
                 isInitialLoad: true,
-                filter: nil,
+                filter: fetchBaseFilter,
                 liveFilter: effectiveSceneLiveFilterForFetch,
                 searchQuery: searchText
             )
@@ -1126,7 +1152,6 @@ private struct ScenesViewContent: View {
                 localPresets: liveFilterPresets,
                 selectedPresetId: $liveSheetPresetSelection,
                 criteriaDocument: criteriaDocument,
-                liveChipRowsVisible: true,
                 sortOption: selectedSortOption,
                 onSortChange: { changeSortOption(to: $0) },
                 minRating: $liveFilterMinRating,
@@ -1670,8 +1695,6 @@ struct SceneLiveFilterSheet: View {
     var markerLocalPresets: [MarkerLiveFilterPreset] = []
     @Binding var selectedPresetId: String
     @ObservedObject var criteriaDocument: FilterCriteriaDocument
-    /// Kept for call-site compatibility; full editor always shows all criteria.
-    var liveChipRowsVisible: Bool = true
     var sortOption: StashDBViewModel.SceneSortOption
     var onSortChange: (StashDBViewModel.SceneSortOption) -> Void
     @Binding var minRating: Int
@@ -1715,8 +1738,7 @@ struct SceneLiveFilterSheet: View {
     private var hasSelectedPreset: Bool { !selectedPresetId.isEmpty }
 
     var body: some View {
-        // Match FiltersToolsEditorSheet structure so presentation matches Tools → Filters.
-        NavigationView {
+        NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 16) {
                     HStack(alignment: .center, spacing: 12) {
@@ -1767,11 +1789,110 @@ struct SceneLiveFilterSheet: View {
                         FeedsPlaybackSettingsCard()
                     }
 
-                    FilterCriteriaEditorView(
-                        document: criteriaDocument,
-                        onChange: onApply,
-                        embedsInCard: true
-                    )
+
+                VStack(spacing: 0) {
+                        CatalogNamedEntityLiveFilterMultiPickerRow(
+                            title: "Studio",
+                            selectedIds: $studioSelectionIds,
+                            items: studioPickerOptions,
+                            displayName: { $0.name },
+                            isLoading: studioPickerLoading,
+                            onAppearLoad: onStudioPickerSectionAppear,
+                            onSelectionChange: onApply
+                        )
+                        Divider().padding(.leading, 16)
+                        CatalogNamedEntityLiveFilterMultiPickerRow(
+                            title: "Tag",
+                            selectedIds: $tagSelectionIds,
+                            items: tagPickerOptions,
+                            displayName: { $0.name },
+                            isLoading: tagPickerLoading,
+                            onAppearLoad: onTagPickerSectionAppear,
+                            onSelectionChange: onApply
+                        )
+                        Divider().padding(.leading, 16)
+                        CatalogNamedEntityLiveFilterMultiPickerRow(
+                            title: "Group",
+                            selectedIds: $groupSelectionIds,
+                            items: groupPickerOptions,
+                            displayName: { $0.name },
+                            isLoading: groupPickerLoading,
+                            onAppearLoad: onGroupPickerSectionAppear,
+                            onSelectionChange: onApply
+                        )
+                            Divider().padding(.leading, 16)
+                    filterRow(label: "Rating") {
+                        filterChip("Any", isActive: minRating == 0) { minRating = 0; onApply() }
+                        filterChip("None", isActive: minRating == -1) { minRating = -1; onApply() }
+                                ForEach([5, 4, 3, 2, 1], id: \.self) { star in
+                            filterChip("\(star)★", isActive: minRating == star) { minRating = star; onApply() }
+                        }
+                    }
+                    Divider().padding(.leading, 16)
+                    filterRow(label: "Organized") {
+                        filterChip("Any", isActive: organized == nil)   { organized = nil;   onApply() }
+                        filterChip("Yes", isActive: organized == true)  { organized = true;  onApply() }
+                        filterChip("No",  isActive: organized == false) { organized = false; onApply() }
+                    }
+                    Divider().padding(.leading, 16)
+                    filterRow(label: "Interactive") {
+                        filterChip("Any",  isActive: interactive == nil)   { interactive = nil;   onApply() }
+                        filterChip("Yes",  isActive: interactive == true)  { interactive = true;  onApply() }
+                        filterChip("No",   isActive: interactive == false) { interactive = false; onApply() }
+                    }
+                    Divider().padding(.leading, 16)
+                    filterRow(label: "Orientation") {
+                        filterChip("Any",       isActive: orientation == nil)          { orientation = nil;         onApply() }
+                        filterChip("Landscape", isActive: orientation == "LANDSCAPE") { orientation = "LANDSCAPE"; onApply() }
+                        filterChip("Portrait",  isActive: orientation == "PORTRAIT")  { orientation = "PORTRAIT";  onApply() }
+                    }
+                    Divider().padding(.leading, 16)
+                    filterRow(label: "Performers") {
+                        filterChip("Any", isActive: performerCount == nil) { performerCount = nil; onApply() }
+                        filterChip("1",   isActive: performerCount == 1)   { performerCount = 1;   onApply() }
+                        filterChip("2",   isActive: performerCount == 2)   { performerCount = 2;   onApply() }
+                        filterChip("3+",  isActive: performerCount == 3)   { performerCount = 3;   onApply() }
+                    }
+                    Divider().padding(.leading, 16)
+                    filterRow(label: "Resolution") {
+                        filterChip("Any", isActive: resolution == nil) { resolution = nil; onApply() }
+                        // Descending order (high → low)
+                        filterChip("4K",    isActive: resolution == "FOUR_K")      { resolution = "FOUR_K";      onApply() }
+                        filterChip("1440p", isActive: resolution == "QUAD_HD")     { resolution = "QUAD_HD";     onApply() }
+                        filterChip("1080p", isActive: resolution == "FULL_HD")     { resolution = "FULL_HD";     onApply() }
+                        filterChip("720p",  isActive: resolution == "STANDARD_HD") { resolution = "STANDARD_HD"; onApply() }
+                        filterChip("540p",  isActive: resolution == "WEB_HD")      { resolution = "WEB_HD";      onApply() }
+                        filterChip("480p",  isActive: resolution == "STANDARD")    { resolution = "STANDARD";    onApply() }
+                            }
+                            Divider().padding(.leading, 16)
+                            filterRow(label: "Perf. fav.") {
+                                filterChip("Any", isActive: performerFavorite == nil) { performerFavorite = nil; onApply() }
+                                filterChip("Yes", isActive: performerFavorite == true) { performerFavorite = true; onApply() }
+                                filterChip("No",  isActive: performerFavorite == false) { performerFavorite = false; onApply() }
+                            }
+                            Divider().padding(.leading, 16)
+                            filterRow(label: "O Count") {
+                                filterChip("Any", isActive: oCounterTag == nil) { oCounterTag = nil; onApply() }
+                                filterChip("0", isActive: oCounterTag == SceneLiveOCounterChip.equalZero) {
+                                    oCounterTag = SceneLiveOCounterChip.equalZero; onApply()
+                                }
+                                filterChip("1+", isActive: oCounterTag == SceneLiveOCounterChip.greaterThan0) {
+                                    oCounterTag = SceneLiveOCounterChip.greaterThan0; onApply()
+                                }
+                                filterChip("5+", isActive: oCounterTag == SceneLiveOCounterChip.greaterThan4) {
+                                    oCounterTag = SceneLiveOCounterChip.greaterThan4; onApply()
+                                }
+                                filterChip("10+", isActive: oCounterTag == SceneLiveOCounterChip.greaterThan9) {
+                                    oCounterTag = SceneLiveOCounterChip.greaterThan9; onApply()
+                                }
+                            }
+                }
+                .background(Color.secondaryAppBackground)
+                .clipShape(RoundedRectangle(cornerRadius: 12))
+                .padding(.horizontal, 16)
+                    .padding(.bottom, 8)
+
+                    AdvancedCriteriaCard(document: criteriaDocument, onApply: onApply)
                 }
                 .padding(.top, 8)
             }
@@ -1785,38 +1906,12 @@ struct SceneLiveFilterSheet: View {
                 onRequestRename: onRequestRename,
                 onRequestDelete: onRequestDelete
             )
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                HStack {
-                    Button("Close") { dismiss() }
-                        .foregroundColor(.secondary)
-                    Spacer()
-                }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 14)
-                .background(.ultraThinMaterial)
-            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationViewStyle(.stack)
         // iOS 26 insets/floats partial-height sheets; `.large` stays edge-attached like Tools feels.
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Color(UIColor.systemGroupedBackground))
-    }
-
-    /// Shown inside the live-filter card when chip rows are hidden (same copy as standalone notice, without extra chrome).
-    private var serverManagedFilterNoticeInline: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            Text("Server filter")
-                .font(.headline)
-            Text("This saved filter uses criteria stashy cannot edit here—for example tags, exclusions, or combined AND/OR rules. You can still narrow by studio above. Edit it in Stash, or pick a different filter or preset.")
-                .font(.subheadline)
-                .foregroundColor(.secondary)
-                .fixedSize(horizontal: false, vertical: true)
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .presentationBackground(Color.appBackground)
     }
 
     private var markerSortControlsCard: some View {

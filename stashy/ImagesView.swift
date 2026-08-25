@@ -67,7 +67,6 @@ private struct ImagesViewBody: View {
     @EnvironmentObject private var coordinator: NavigationCoordinator
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var tabManager = TabManager.shared
-    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .images)
 
     @State private var lastOpenedImageId: String?
     @State private var searchText: String
@@ -888,9 +887,8 @@ private struct ImagesViewBody: View {
             serverFilters: imageListFilters.sortedServerImageFilters(viewModel: viewModel),
             localPresets: imageListFilters.localCatalogPresets,
             selectedPresetRowId: $imageListFilters.catalogPresetRowSelection,
-            criteriaDocument: criteriaDocument,
+            criteriaDocument: imageListFilters.criteriaDocument,
             filterMenuTitleFallback: imageListFilters.selectedFilter?.name,
-            liveChipRowsVisible: imageListFilters.imageLiveChipRowsVisible,
             showMediaTypeFilter: imageListFilters.showImageMediaTypeFilter,
             sortOption: imageListFilters.selectedSortOption,
             onSortChange: { changeSortOption(to: $0) },
@@ -912,6 +910,7 @@ private struct ImagesViewBody: View {
                 imageListFilters.catalogPresetRowSelection = ""
                 imageListFilters.selectedFilter = nil
                 imageListFilters.clearLiveChipsOnly()
+                imageListFilters.criteriaDocument.clear()
                 imageListFilters.refetchImages(viewModel: viewModel, initial: true)
             },
             onRequestSave: { imageListFilters.savePresetOverwrite(viewModel: viewModel) },

@@ -72,11 +72,28 @@ final class FilterCriteriaDocument: ObservableObject {
         objectFilter = next
     }
 
+    /// Adds an empty criterion. Never overwrites an existing one — `addableFields` already hides present keys.
     func addDefaultCriterion(for field: FilterFieldDescriptor) {
-        guard objectFilter[field.key] == nil || field.kind == .booleanGroup else { return }
+        guard objectFilter[field.key] == nil else { return }
         let value = FilterCriterionKind.defaultValue(for: field.kind, nestedMode: field.nestedMode)
         setCriterion(key: field.key, value: value)
     }
+
+    /// Advanced criteria as the base, quick chips layered on top — an active chip always wins for
+    /// its own key, so tapping a chip is never silently overruled by a criterion of the same name.
+    /// Returns `nil` when nothing is active, matching the `liveFilter:` fetch parameter.
+    func merged(with chipFilter: [String: Any]) -> [String: Any]? {
+        var dict = sanitizedObjectFilter
+        for (key, value) in chipFilter {
+            dict[key] = value
+        }
+        return dict.isEmpty ? nil : dict
+    }
+
+    /// Number of criteria currently set — used for "n active" badges.
+    var activeCriterionCount: Int { sanitizedObjectFilter.count }
+
+    var isEmpty: Bool { sanitizedObjectFilter.isEmpty }
 
     func dictValue(forKey key: String) -> [String: Any] {
         Self.stringKeyedDict(objectFilter[key]) ?? [:]
@@ -89,11 +106,33 @@ final class FilterCriteriaDocument: ObservableObject {
     // MARK: - Sanitize
 
     static func sanitize(_ dict: [String: Any], mode: StashDBViewModel.FilterMode) -> [String: Any] {
-        FilterMapper.sanitize(Self.deepStringKeyed(dict), isMarker: mode == .sceneMarkers)
+        sanitizeNonisolated(dict, mode: mode)
     }
 
     nonisolated static func sanitizeNonisolated(_ dict: [String: Any], mode: StashDBViewModel.FilterMode) -> [String: Any] {
-        FilterMapper.sanitize(deepStringKeyed(dict), isMarker: mode == .sceneMarkers)
+        let mapped = FilterMapper.sanitize(deepStringKeyed(dict), isMarker: mode == .sceneMarkers)
+        return stripEditorScratchKeys(mapped)
+    }
+
+    /// Removes UI-only scratch values (partially typed numbers) so they never reach the server.
+    nonisolated static func stripEditorScratchKeys(_ dict: [String: Any]) -> [String: Any] {
+        var out: [String: Any] = [:]
+        for (key, value) in dict {
+            if key.hasSuffix("_text") { continue }
+            if let nested = stringKeyedDict(value) {
+                let cleaned = stripEditorScratchKeys(nested)
+                if cleaned.isEmpty, !nested.isEmpty { continue }
+                out[key] = cleaned
+            } else if let arr = value as? [Any] {
+                out[key] = arr.map { item -> Any in
+                    if let d = stringKeyedDict(item) { return stripEditorScratchKeys(d) }
+                    return item
+                }
+            } else {
+                out[key] = value
+            }
+        }
+        return out
     }
 
     nonisolated static func stringKeyedDict(_ value: Any?) -> [String: Any]? {

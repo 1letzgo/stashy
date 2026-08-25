@@ -50,8 +50,28 @@ private struct MarkersViewContent: View {
     }
 
     private func performSearch(isInitialLoad: Bool = true) {
-        let live = markerLiveChips.effectiveLiveFilter(for: selectedFilter)
-        viewModel.fetchSceneMarkers(sortBy: selectedSortOption, searchQuery: searchText, filter: selectedFilter, liveFilter: live.isEmpty ? nil : live)
+        let chips = markerLiveChips.effectiveLiveFilter(for: selectedFilter)
+        // The selected filter's criteria live in `criteriaDocument`, so the fetch sends those —
+        // unless the editor is still empty (default filter on appear), then send the filter itself.
+        let live = criteriaDocument.merged(with: chips)
+        let base = criteriaDocument.isEmpty ? selectedFilter : nil
+        viewModel.fetchSceneMarkers(sortBy: selectedSortOption, searchQuery: searchText, filter: base, liveFilter: live)
+    }
+
+    /// Mirrors a selected server filter into the advanced criteria editor so it stays editable.
+    private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter) {
+        if let meta = filter.stashyScenePresetMetadata {
+            var merged: [String: Any] = [:]
+            if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
+                merged = base.criteriaObjectFilter()
+            }
+            for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: true) {
+                merged[key] = value
+            }
+            criteriaDocument.load(merged)
+        } else {
+            criteriaDocument.load(filter.criteriaObjectFilter())
+        }
     }
 
     private var sortedServerMarkerFilters: [StashDBViewModel.SavedFilter] {
@@ -60,12 +80,9 @@ private struct MarkersViewContent: View {
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
-    private var markerLiveChipRowsVisible: Bool {
-        SceneLiveChipFilterSupport.savedFilterSupportsLiveChipEditor(selectedFilter)
-    }
 
     private var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || markerLiveChips.isLiveFilterActive || !liveSheetPresetSelection.isEmpty
+        selectedFilter != nil || markerLiveChips.isLiveFilterActive || !criteriaDocument.isEmpty || !liveSheetPresetSelection.isEmpty
     }
 
     private func loadStudiosForMarkerLivePicker() {
@@ -148,6 +165,7 @@ private struct MarkersViewContent: View {
                 if let flat { applyAuxIdsFromMarkerFragment(flat) }
             }
         }
+        loadCriteriaDocument(from: f)
         applyLiveFilterFromSheet()
     }
 
@@ -370,7 +388,6 @@ private struct MarkersViewContent: View {
             markerLocalPresets: markerLocalPresets,
             selectedPresetId: $liveSheetPresetSelection,
             criteriaDocument: criteriaDocument,
-            liveChipRowsVisible: true,
             sortOption: .dateDesc,
             onSortChange: { _ in },
             minRating: markerLiveMinRating,

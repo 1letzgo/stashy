@@ -116,21 +116,21 @@ enum FilterCriterionKind: String, CaseIterable, Hashable {
         case .orientation:
             return ["value": ["LANDSCAPE"]]
         case .gender:
-            return ["value": ["FEMALE"], "modifier": StashCriterionModifier.includes.rawValue]
+            // `GenderCriterionInput.value` is a single enum — multi-select uses `value_list`.
+            return ["value_list": ["FEMALE"], "modifier": StashCriterionModifier.includes.rawValue]
         case .circumcision:
             return ["value": ["CUT"], "modifier": StashCriterionModifier.includes.rawValue]
         case .hierarchicalMulti:
             return ["value": [] as [String], "modifier": StashCriterionModifier.includes.rawValue, "depth": 0]
         case .multi:
             return ["value": [] as [String], "modifier": StashCriterionModifier.includes.rawValue]
-        case .stashID:
-            return ["modifier": StashCriterionModifier.notNull.rawValue]
-        case .stashIDs:
+        case .stashID, .stashIDs:
             return ["modifier": StashCriterionModifier.notNull.rawValue]
         case .phashDistance:
             return ["value": "", "distance": 0, "modifier": StashCriterionModifier.equals.rawValue]
         case .duplication:
-            return ["phash": true]
+            // `PHashDuplicationCriterionInput { duplicated, distance }`.
+            return ["duplicated": true]
         case .customFields:
             return [["field": "", "value": [] as [Any], "modifier": StashCriterionModifier.equals.rawValue]]
         case .isMissing:

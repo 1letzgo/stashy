@@ -59,13 +59,25 @@ private struct StudiosViewContent: View {
         return dict
     }
 
+    /// Passed to `filter:` only while the advanced editor holds no copy of it. Once the editor has
+    /// the criteria, re-sending the server filter would resurrect criteria the user edited away;
+    /// while it is empty (e.g. a default filter applied on appear) the filter still has to be sent.
+    private var fetchBaseFilter: StashDBViewModel.SavedFilter? {
+        criteriaDocument.isEmpty ? selectedFilter : nil
+    }
+
+    /// Quick chips plus advanced criteria from the editor — what actually gets fetched.
+    private var effectiveLiveFilter: [String: Any]? {
+        criteriaDocument.merged(with: isLiveFilterActive ? activeLiveFilterDict : [:])
+    }
+
     private func applyLiveFilter() {
-        viewModel.currentStudioLiveFilter = activeLiveFilterDict
-        viewModel.fetchStudios(sortBy: selectedSortOption, searchQuery: searchText, filter: selectedFilter, liveFilter: activeLiveFilterDict)
+        viewModel.currentStudioLiveFilter = effectiveLiveFilter ?? [:]
+        viewModel.fetchStudios(sortBy: selectedSortOption, searchQuery: searchText, filter: fetchBaseFilter, liveFilter: effectiveLiveFilter)
     }
 
     private var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     private var sortedServerStudioFilters: [StashDBViewModel.SavedFilter] {
@@ -74,9 +86,6 @@ private struct StudiosViewContent: View {
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
-    private var studioLiveChipRowsVisible: Bool {
-        CatalogLiveChipFilterSupport.studioSavedFilterSupportsLiveEditor(selectedFilter)
-    }
 
     private func refreshStudioLocalPresets() {
         localCatalogPresets = StudioListLiveFilterPresetStore.loadPresets()
@@ -140,6 +149,24 @@ private struct StudiosViewContent: View {
         performSearch()
     }
 
+
+    /// Mirrors a selected server filter into the advanced criteria editor so its criteria stay
+    /// editable in the app; fetches then pass `filter: nil` and send the document instead.
+    private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter) {
+        if let meta = filter.stashyCatalogPresetMetadata {
+            var merged: [String: Any] = [:]
+            if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
+                merged = base.criteriaObjectFilter()
+            }
+            for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
+                merged[key] = value
+            }
+            criteriaDocument.load(merged)
+        } else {
+            criteriaDocument.load(filter.criteriaObjectFilter())
+        }
+    }
+
     private func applyServerStudioSavedFilter(_ f: StashDBViewModel.SavedFilter) {
         if let meta = f.stashyCatalogPresetMetadata {
             if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
@@ -167,6 +194,7 @@ private struct StudiosViewContent: View {
                 clearStudioLiveChipsOnly()
             }
         }
+        loadCriteriaDocument(from: f)
         performSearch()
     }
 
@@ -328,12 +356,12 @@ private struct StudiosViewContent: View {
         TabManager.shared.setSortOption(for: .studios, option: newOption.rawValue)
 
         // Fetch new data immediately
-        viewModel.fetchStudios(sortBy: newOption, searchQuery: searchText, filter: selectedFilter, liveFilter: isLiveFilterActive ? activeLiveFilterDict : nil)
+        viewModel.fetchStudios(sortBy: newOption, searchQuery: searchText, filter: fetchBaseFilter, liveFilter: effectiveLiveFilter)
     }
     
     // Search function with debouncing
     private func performSearch() {
-        viewModel.fetchStudios(sortBy: selectedSortOption, searchQuery: searchText, filter: selectedFilter, liveFilter: isLiveFilterActive ? activeLiveFilterDict : nil)
+        viewModel.fetchStudios(sortBy: selectedSortOption, searchQuery: searchText, filter: fetchBaseFilter, liveFilter: effectiveLiveFilter)
     }
 
     var body: some View {
@@ -451,7 +479,6 @@ private struct StudiosViewContent: View {
             localPresets: localCatalogPresets,
             selectedPresetRowId: $catalogPresetRowSelection,
             criteriaDocument: criteriaDocument,
-            liveChipRowsVisible: studioLiveChipRowsVisible,
             sortOption: selectedSortOption,
             onSortChange: { changeSortOption(to: $0) },
             liveMinRating: $liveFilterMinRating,
@@ -462,6 +489,7 @@ private struct StudiosViewContent: View {
                 catalogPresetRowSelection = ""
                 selectedFilter = nil
                 clearStudioLiveChipsOnly()
+                criteriaDocument.clear()
                 applyLiveFilter()
             },
             onRequestSave: { saveStudioCatalogPresetOverwrite() },
@@ -558,7 +586,7 @@ private struct StudiosViewContent: View {
             searchText = coordinator.activeSearchText
             isSearchVisible = true
             coordinator.activeSearchText = ""
-            viewModel.fetchStudios(sortBy: selectedSortOption, searchQuery: searchText, filter: selectedFilter)
+            viewModel.fetchStudios(sortBy: selectedSortOption, searchQuery: searchText, filter: fetchBaseFilter, liveFilter: effectiveLiveFilter)
             viewModel.fetchSavedFilters()
             return
         }

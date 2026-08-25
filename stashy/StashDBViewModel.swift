@@ -787,6 +787,8 @@ class StashDBViewModel: ObservableObject {
     private var currentGroupSortOption: GroupSortOption = .nameAsc
     private let groupsPerPage = 20
     @Published var currentGroupFilter: SavedFilter? = nil
+    /// Live criteria applied on top of `currentGroupFilter` (criteria editor).
+    var currentGroupLiveFilter: [String: Any]? = nil
     private var currentGroupSearchQuery: String = ""
 
     // Pagination properties for markers
@@ -1707,6 +1709,7 @@ class StashDBViewModel: ObservableObject {
         currentTagDetailFilter = nil
         currentGroupDetailFilter = nil
         currentGroupFilter = nil
+        currentGroupLiveFilter = nil
         
         serverStatus = "Connecting..."
         errorMessage = nil
@@ -2259,7 +2262,10 @@ class StashDBViewModel: ObservableObject {
         }
     }
 
-    /// Saves a full `object_filter` without chip live-fragment merge (full criteria editor / Tools → Filters).
+    /// Saves a full `object_filter` (full criteria editor / Tools → Filters).
+    ///
+    /// `liveFragment` defaults to the fragment already stored on `existingId`, so editing a filter in the
+    /// criteria editor never destroys the chip metadata a filter was created with.
     func saveFullObjectFilter(
         mode: FilterMode,
         existingId: String?,
@@ -2268,6 +2274,7 @@ class StashDBViewModel: ObservableObject {
         sortDirection: String,
         sortRaw: String?,
         objectFilter: [String: Any],
+        liveFragment: [String: Any]? = nil,
         randomSeedKind: RandomSeedKind? = nil,
         completion: @escaping (Result<SavedFilter, Error>) -> Void
     ) {
@@ -2276,9 +2283,11 @@ class StashDBViewModel: ObservableObject {
             completion(.failure(NSError(domain: "stashy", code: -2, userInfo: [NSLocalizedDescriptionKey: "Name is empty"])))
             return
         }
+        let existing = existingId.flatMap { savedFilters[$0] }
         let sanitized = sanitizeFilter(objectFilter, isMarker: mode == .sceneMarkers)
-        var stashy: [String: Any] = [
-            "liveFragment": [String: Any](),
+        let resolvedFragment = liveFragment ?? existing?.stashyLiveFragment ?? [:]
+        let stashy: [String: Any] = [
+            "liveFragment": resolvedFragment,
             "sortRaw": sortRaw ?? "\(sortField)_\(sortDirection.lowercased())"
         ]
         let uiOptions: [String: Any] = ["stashy": stashy]
@@ -2323,13 +2332,48 @@ class StashDBViewModel: ObservableObject {
                         return
                     }
                     self.savedFilters[saved.id] = saved
-                    self.fetchSavedFilters()
                     completion(.success(saved))
                 case .failure(let error):
                     self.handleNetworkError(error)
                     completion(.failure(error))
                 }
             }
+        }
+    }
+
+    /// Renames a saved filter without touching its criteria, sort or stashy metadata.
+    func renameSavedFilter(
+        _ filter: SavedFilter,
+        to name: String,
+        completion: @escaping (Result<SavedFilter, Error>) -> Void
+    ) {
+        let pair = filter.encodedSortPair ?? ("date", "DESC")
+        saveFullObjectFilter(
+            mode: filter.mode,
+            existingId: filter.id,
+            name: name,
+            sortField: pair.field,
+            sortDirection: pair.direction,
+            sortRaw: filter.stashySortRaw,
+            objectFilter: filter.filterDict ?? [:],
+            liveFragment: filter.stashyLiveFragment,
+            randomSeedKind: Self.randomSeedKind(for: filter.mode),
+            completion: completion
+        )
+    }
+
+    /// Random-sort seed bucket matching a filter mode.
+    static func randomSeedKind(for mode: FilterMode) -> RandomSeedKind? {
+        switch mode {
+        case .scenes: return .scenes
+        case .performers: return .performers
+        case .studios: return .studios
+        case .tags: return .tags
+        case .galleries: return .galleries
+        case .images: return .images
+        case .groups: return .groups
+        case .sceneMarkers: return .markers
+        case .unknown: return nil
         }
     }
 
@@ -4981,7 +5025,7 @@ class StashDBViewModel: ObservableObject {
     }
 
     // MARK: - Group Fetching
-    func fetchGroups(sortBy: GroupSortOption = .nameAsc, searchQuery: String = "", isInitialLoad: Bool = true, filter: SavedFilter? = nil) {
+    func fetchGroups(sortBy: GroupSortOption = .nameAsc, searchQuery: String = "", isInitialLoad: Bool = true, filter: SavedFilter? = nil, liveFilter: [String: Any]? = nil) {
         if isInitialLoad {
             currentGroupPage = 1
             groups = []
@@ -4989,18 +5033,19 @@ class StashDBViewModel: ObservableObject {
         currentGroupSortOption = sortBy
         currentGroupSearchQuery = searchQuery
         currentGroupFilter = filter
+        currentGroupLiveFilter = liveFilter
         hasMoreGroups = true
         
-        loadGroupsPage(page: currentGroupPage, sortBy: sortBy, searchQuery: searchQuery, isInitialLoad: isInitialLoad, filter: filter)
+        loadGroupsPage(page: currentGroupPage, sortBy: sortBy, searchQuery: searchQuery, isInitialLoad: isInitialLoad, filter: filter, liveFilter: liveFilter)
     }
     
     func loadMoreGroups() {
         guard !isLoadingMoreGroups && hasMoreGroups else { return }
         currentGroupPage += 1
-        loadGroupsPage(page: currentGroupPage, sortBy: currentGroupSortOption, searchQuery: currentGroupSearchQuery, isInitialLoad: false, filter: currentGroupFilter)
+        loadGroupsPage(page: currentGroupPage, sortBy: currentGroupSortOption, searchQuery: currentGroupSearchQuery, isInitialLoad: false, filter: currentGroupFilter, liveFilter: currentGroupLiveFilter)
     }
     
-    private func loadGroupsPage(page: Int, sortBy: GroupSortOption, searchQuery: String = "", isInitialLoad: Bool = true, filter: SavedFilter? = nil) {
+    private func loadGroupsPage(page: Int, sortBy: GroupSortOption, searchQuery: String = "", isInitialLoad: Bool = true, filter: SavedFilter? = nil, liveFilter: [String: Any]? = nil) {
         if isInitialLoad {
             isLoadingGroups = true
         } else {
@@ -5018,6 +5063,13 @@ class StashDBViewModel: ObservableObject {
             }
         }
         
+        // Live criteria (criteria editor) override the saved filter per key.
+        if let liveFilter, !liveFilter.isEmpty {
+            for (key, value) in sanitizeFilter(liveFilter) {
+                groupFilter[key] = value
+            }
+        }
+
         // Add search query to the filter
         if !searchQuery.isEmpty {
             groupFilter["name"] = [
@@ -7180,15 +7232,18 @@ struct GenerateData: Codable {
         }
     }
 
-    /// Groups with at least one scene — for scene live-filter pickers (no 50-cap; large `per_page` like catalog).
-    /// Top performers for full filter multi-ID pickers.
+    #if !os(tvOS)
+    /// Top performers for the criteria-editor multi-ID pickers (iOS only — `FilterEntityOption`
+    /// lives in the iOS-only Filters module).
     func fetchPerformersForFilterPicker(completion: @escaping ([FilterEntityOption]) -> Void) {
         fetchAllPerformers { list in
             let options = list.map { FilterEntityOption(id: $0.id, name: $0.name) }
             Task { @MainActor in completion(options) }
         }
     }
+    #endif
 
+    /// Groups with at least one scene — for scene live-filter pickers (no 50-cap; large `per_page` like catalog).
     func fetchGroupsForSceneLiveFilterPicker(completion: @escaping ([StashGroup]) -> Void) {
         let query = GraphQLQueries.queryWithFragments("findGroups")
         let variables: [String: Any] = [

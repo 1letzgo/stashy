@@ -43,10 +43,18 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
     @Published var liveFilterMissingField: String?
     @Published var liveFilterOCounterTag: String?
 
+    /// Advanced Stash criteria from the full editor; merged over the quick chips on every fetch.
+    let criteriaDocument = FilterCriteriaDocument(mode: .performers)
+    private var criteriaObserver: AnyCancellable?
+
     init(scope: DetailLinkedPerformersScope, initialSort: StashDBViewModel.PerformerSortOption = .nameAsc) {
         self.scope = scope
         self.selectedSortOption = initialSort
         self.selectedFilter = nil
+        // Nested ObservableObject: forward its changes so FAB state / sheets refresh.
+        criteriaObserver = criteriaDocument.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
     }
 
     private var isLiveFilterActive: Bool {
@@ -56,7 +64,7 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
     }
 
     var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     func sortedServerPerformerFilters(viewModel: StashDBViewModel) -> [StashDBViewModel.SavedFilter] {
@@ -65,9 +73,6 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
-    var performerLiveChipRowsVisible: Bool {
-        CatalogLiveChipFilterSupport.performerSavedFilterSupportsLiveEditor(selectedFilter)
-    }
 
     private var activeLiveFilterDict: [String: Any] {
         var dict: [String: Any] = [:]
@@ -124,15 +129,26 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
         return dict
     }
 
+    /// Passed to `filter:` only while the advanced editor holds no copy of it — otherwise the
+    /// server filter would resurrect criteria the user edited away.
+    var fetchBaseFilter: StashDBViewModel.SavedFilter? {
+        criteriaDocument.isEmpty ? selectedFilter : nil
+    }
+
+    /// Quick chips merged with the advanced criteria editor — advanced criteria win per key.
+    var effectiveLiveFilter: [String: Any]? {
+        criteriaDocument.merged(with: isLiveFilterActive ? activeLiveFilterDict : [:])
+    }
+
     func refetchPerformers(viewModel: StashDBViewModel, initial: Bool) {
-        let live = isLiveFilterActive ? activeLiveFilterDict : nil
+        let live = effectiveLiveFilter
         switch scope {
         case .studio(let id):
-            viewModel.fetchDetailPerformers(studioId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchDetailPerformers(studioId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         case .tag(let id):
-            viewModel.fetchDetailPerformers(tagId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchDetailPerformers(tagId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         case .group(let id):
-            viewModel.fetchDetailPerformers(groupId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchDetailPerformers(groupId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         }
     }
 
@@ -223,6 +239,24 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
         applyLiveFilter(viewModel: viewModel)
     }
 
+
+    /// Mirrors a selected server filter into the advanced criteria editor so its criteria stay
+    /// editable; fetches then pass `filter: nil` and send the document instead.
+    private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
+        if let meta = filter.stashyCatalogPresetMetadata {
+            var merged: [String: Any] = [:]
+            if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
+                merged = base.criteriaObjectFilter()
+            }
+            for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
+                merged[key] = value
+            }
+            criteriaDocument.load(merged)
+        } else {
+            criteriaDocument.load(filter.criteriaObjectFilter())
+        }
+    }
+
     func applyServerSavedFilter(_ f: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
         if let meta = f.stashyCatalogPresetMetadata {
             if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
@@ -249,6 +283,7 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
                 clearLiveChipsOnly()
             }
         }
+        loadCriteriaDocument(from: f, viewModel: viewModel)
         applyLiveFilter(viewModel: viewModel)
     }
 
@@ -257,6 +292,7 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
         if newId.isEmpty {
             selectedFilter = nil
             clearLiveChipsOnly()
+            criteriaDocument.clear()
             applyLiveFilter(viewModel: viewModel)
             return
         }
@@ -436,10 +472,18 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
     @Published var liveFilterFavorite: Bool?
     @Published var liveFilterHasScenes: Bool = false
 
+    /// Advanced Stash criteria from the full editor; merged over the quick chips on every fetch.
+    let criteriaDocument = FilterCriteriaDocument(mode: .tags)
+    private var criteriaObserver: AnyCancellable?
+
     init(scope: DetailLinkedTagsScope, initialSort: StashDBViewModel.TagSortOption = .sceneCountDesc) {
         self.scope = scope
         self.selectedSortOption = initialSort
         self.selectedFilter = nil
+        // Nested ObservableObject: forward its changes so FAB state / sheets refresh.
+        criteriaObserver = criteriaDocument.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
     }
 
     private var isLiveFilterActive: Bool {
@@ -447,7 +491,7 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
     }
 
     var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     func sortedServerTagFilters(viewModel: StashDBViewModel) -> [StashDBViewModel.SavedFilter] {
@@ -456,9 +500,6 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
-    var tagLiveChipRowsVisible: Bool {
-        CatalogLiveChipFilterSupport.tagSavedFilterSupportsLiveEditor(selectedFilter)
-    }
 
     private var activeLiveFilterDict: [String: Any] {
         var dict: [String: Any] = [:]
@@ -467,15 +508,26 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
         return dict
     }
 
+    /// Passed to `filter:` only while the advanced editor holds no copy of it — otherwise the
+    /// server filter would resurrect criteria the user edited away.
+    var fetchBaseFilter: StashDBViewModel.SavedFilter? {
+        criteriaDocument.isEmpty ? selectedFilter : nil
+    }
+
+    /// Quick chips merged with the advanced criteria editor — advanced criteria win per key.
+    var effectiveLiveFilter: [String: Any]? {
+        criteriaDocument.merged(with: isLiveFilterActive ? activeLiveFilterDict : [:])
+    }
+
     func refetchTags(viewModel: StashDBViewModel, initial: Bool) {
-        let live = isLiveFilterActive ? activeLiveFilterDict : nil
+        let live = effectiveLiveFilter
         switch scope {
         case .performer(let id):
-            viewModel.fetchDetailTags(performerId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchDetailTags(performerId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         case .studio(let id):
-            viewModel.fetchDetailTags(studioId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchDetailTags(studioId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         case .group(let id):
-            viewModel.fetchDetailTags(groupId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchDetailTags(groupId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         }
     }
 
@@ -530,6 +582,24 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
         applyLiveFilter(viewModel: viewModel)
     }
 
+
+    /// Mirrors a selected server filter into the advanced criteria editor so its criteria stay
+    /// editable; fetches then pass `filter: nil` and send the document instead.
+    private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
+        if let meta = filter.stashyCatalogPresetMetadata {
+            var merged: [String: Any] = [:]
+            if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
+                merged = base.criteriaObjectFilter()
+            }
+            for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
+                merged[key] = value
+            }
+            criteriaDocument.load(merged)
+        } else {
+            criteriaDocument.load(filter.criteriaObjectFilter())
+        }
+    }
+
     func applyServerSavedFilter(_ f: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
         if let meta = f.stashyCatalogPresetMetadata {
             if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
@@ -556,6 +626,7 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
                 clearLiveChipsOnly()
             }
         }
+        loadCriteriaDocument(from: f, viewModel: viewModel)
         applyLiveFilter(viewModel: viewModel)
     }
 
@@ -564,6 +635,7 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
         if newId.isEmpty {
             selectedFilter = nil
             clearLiveChipsOnly()
+            criteriaDocument.clear()
             applyLiveFilter(viewModel: viewModel)
             return
         }
@@ -745,10 +817,18 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
     @Published var liveFilterMinRating: Int = 0
     @Published var liveFilterScenes: String?
 
+    /// Advanced Stash criteria from the full editor; merged over the quick chips on every fetch.
+    let criteriaDocument = FilterCriteriaDocument(mode: .studios)
+    private var criteriaObserver: AnyCancellable?
+
     init(scope: DetailLinkedStudiosScope, initialSort: StashDBViewModel.StudioSortOption = .nameAsc) {
         self.scope = scope
         self.selectedSortOption = initialSort
         self.selectedFilter = nil
+        // Nested ObservableObject: forward its changes so FAB state / sheets refresh.
+        criteriaObserver = criteriaDocument.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
     }
 
     private var isLiveFilterActive: Bool {
@@ -756,7 +836,7 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
     }
 
     var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     func sortedServerStudioFilters(viewModel: StashDBViewModel) -> [StashDBViewModel.SavedFilter] {
@@ -765,9 +845,6 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
-    var studioLiveChipRowsVisible: Bool {
-        CatalogLiveChipFilterSupport.studioSavedFilterSupportsLiveEditor(selectedFilter)
-    }
 
     private var activeLiveFilterDict: [String: Any] {
         var dict: [String: Any] = [:]
@@ -782,17 +859,28 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
         return dict
     }
 
+    /// Passed to `filter:` only while the advanced editor holds no copy of it — otherwise the
+    /// server filter would resurrect criteria the user edited away.
+    var fetchBaseFilter: StashDBViewModel.SavedFilter? {
+        criteriaDocument.isEmpty ? selectedFilter : nil
+    }
+
+    /// Quick chips merged with the advanced criteria editor — advanced criteria win per key.
+    var effectiveLiveFilter: [String: Any]? {
+        criteriaDocument.merged(with: isLiveFilterActive ? activeLiveFilterDict : [:])
+    }
+
     func refetchStudios(viewModel: StashDBViewModel, initial: Bool) {
-        let live = isLiveFilterActive ? activeLiveFilterDict : nil
+        let live = effectiveLiveFilter
         switch scope {
         case .performer(let id):
-            viewModel.fetchDetailStudios(performerId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchDetailStudios(performerId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         case .tag(let id):
-            viewModel.fetchDetailStudios(tagId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchDetailStudios(tagId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         case .parentStudio(let id):
-            viewModel.fetchDetailStudios(parentStudioId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchDetailStudios(parentStudioId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         case .group(let id):
-            viewModel.fetchDetailStudios(groupId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchDetailStudios(groupId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         }
     }
 
@@ -868,6 +956,24 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
         applyLiveFilter(viewModel: viewModel)
     }
 
+
+    /// Mirrors a selected server filter into the advanced criteria editor so its criteria stay
+    /// editable; fetches then pass `filter: nil` and send the document instead.
+    private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
+        if let meta = filter.stashyCatalogPresetMetadata {
+            var merged: [String: Any] = [:]
+            if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
+                merged = base.criteriaObjectFilter()
+            }
+            for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
+                merged[key] = value
+            }
+            criteriaDocument.load(merged)
+        } else {
+            criteriaDocument.load(filter.criteriaObjectFilter())
+        }
+    }
+
     func applyServerSavedFilter(_ f: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
         if let meta = f.stashyCatalogPresetMetadata {
             if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
@@ -894,6 +1000,7 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
                 clearLiveChipsOnly()
             }
         }
+        loadCriteriaDocument(from: f, viewModel: viewModel)
         applyLiveFilter(viewModel: viewModel)
     }
 
@@ -902,6 +1009,7 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
         if newId.isEmpty {
             selectedFilter = nil
             clearLiveChipsOnly()
+            criteriaDocument.clear()
             applyLiveFilter(viewModel: viewModel)
             return
         }
@@ -1086,10 +1194,18 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
     @Published var studioPickerOptions: [Studio] = []
     @Published var studioPickerLoading = false
 
+    /// Advanced Stash criteria from the full editor; merged over the quick chips on every fetch.
+    let criteriaDocument = FilterCriteriaDocument(mode: .galleries)
+    private var criteriaObserver: AnyCancellable?
+
     init(scope: DetailLinkedGalleriesScope, initialSort: StashDBViewModel.GallerySortOption = .dateDesc) {
         self.scope = scope
         self.selectedSortOption = initialSort
         self.selectedFilter = nil
+        // Nested ObservableObject: forward its changes so FAB state / sheets refresh.
+        criteriaObserver = criteriaDocument.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
     }
 
     private var isLiveFilterActive: Bool {
@@ -1097,7 +1213,7 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
     }
 
     var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     func loadStudioPickerOptions(viewModel: StashDBViewModel) {
@@ -1116,9 +1232,6 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
-    var galleryLiveChipRowsVisible: Bool {
-        CatalogLiveChipFilterSupport.gallerySavedFilterSupportsLiveEditor(selectedFilter)
-    }
 
     private var activeLiveFilterDict: [String: Any] {
         var dict: [String: Any] = [:]
@@ -1136,17 +1249,28 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
         return dict
     }
 
+    /// Passed to `filter:` only while the advanced editor holds no copy of it — otherwise the
+    /// server filter would resurrect criteria the user edited away.
+    var fetchBaseFilter: StashDBViewModel.SavedFilter? {
+        criteriaDocument.isEmpty ? selectedFilter : nil
+    }
+
+    /// Quick chips merged with the advanced criteria editor — advanced criteria win per key.
+    var effectiveLiveFilter: [String: Any]? {
+        criteriaDocument.merged(with: isLiveFilterActive ? activeLiveFilterDict : [:])
+    }
+
     func refetchGalleries(viewModel: StashDBViewModel, initial: Bool) {
-        let live = isLiveFilterActive ? activeLiveFilterDict : nil
+        let live = effectiveLiveFilter
         switch scope {
         case .performer(let id):
-            viewModel.fetchPerformerGalleries(performerId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchPerformerGalleries(performerId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         case .studio(let id):
-            viewModel.fetchStudioGalleries(studioId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchStudioGalleries(studioId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         case .tag(let id):
-            viewModel.fetchTagGalleries(tagId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchTagGalleries(tagId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         case .group(let id):
-            viewModel.fetchGroupGalleries(groupId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchGroupGalleries(groupId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         }
     }
 
@@ -1229,6 +1353,24 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
         applyLiveFilter(viewModel: viewModel)
     }
 
+
+    /// Mirrors a selected server filter into the advanced criteria editor so its criteria stay
+    /// editable; fetches then pass `filter: nil` and send the document instead.
+    private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
+        if let meta = filter.stashyCatalogPresetMetadata {
+            var merged: [String: Any] = [:]
+            if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
+                merged = base.criteriaObjectFilter()
+            }
+            for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
+                merged[key] = value
+            }
+            criteriaDocument.load(merged)
+        } else {
+            criteriaDocument.load(filter.criteriaObjectFilter())
+        }
+    }
+
     func applyServerSavedFilter(_ f: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
         if let meta = f.stashyCatalogPresetMetadata {
             if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
@@ -1255,6 +1397,7 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
                 clearLiveChipsOnly()
             }
         }
+        loadCriteriaDocument(from: f, viewModel: viewModel)
         applyLiveFilter(viewModel: viewModel)
     }
 
@@ -1263,6 +1406,7 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
         if newId.isEmpty {
             selectedFilter = nil
             clearLiveChipsOnly()
+            criteriaDocument.clear()
             applyLiveFilter(viewModel: viewModel)
             return
         }
@@ -1475,10 +1619,18 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
     /// (sheet-open picker sync must not refetch the list).
     private var ignoreNextPresetSelectionChange = false
 
+    /// Advanced Stash criteria from the full editor; merged over the quick chips on every fetch.
+    let criteriaDocument = FilterCriteriaDocument(mode: .images)
+    private var criteriaObserver: AnyCancellable?
+
     init(scope: DetailLinkedImagesScope, initialSort: StashDBViewModel.ImageSortOption = .dateDesc) {
         self.scope = scope
         self.selectedSortOption = initialSort
         self.selectedFilter = nil
+        // Nested ObservableObject: forward its changes so FAB state / sheets refresh.
+        criteriaObserver = criteriaDocument.objectWillChange.sink { [weak self] _ in
+            self?.objectWillChange.send()
+        }
     }
 
     /// After an ImagesView remount, restore chip/filter UI from the shared catalog VM session.
@@ -1516,7 +1668,7 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
     }
 
     var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     /// Clips use a fixed video-style `path` regex in `fetchClips` and ignore live `path`.
@@ -1608,9 +1760,6 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
         }
     }
 
-    var imageLiveChipRowsVisible: Bool {
-        CatalogLiveChipFilterSupport.imageSavedFilterSupportsLiveEditor(selectedFilter)
-    }
 
     private var activeLiveFilterDict: [String: Any] {
         var dict: [String: Any] = [:]
@@ -1639,6 +1788,17 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
         return dict
     }
 
+    /// Passed to `filter:` only while the advanced editor holds no copy of it — otherwise the
+    /// server filter would resurrect criteria the user edited away.
+    var fetchBaseFilter: StashDBViewModel.SavedFilter? {
+        criteriaDocument.isEmpty ? selectedFilter : nil
+    }
+
+    /// Quick chips merged with the advanced criteria editor — advanced criteria win per key.
+    var effectiveLiveFilter: [String: Any]? {
+        criteriaDocument.merged(with: isLiveFilterActive ? activeLiveFilterDict : [:])
+    }
+
     func loadStudioPickerOptions(viewModel: StashDBViewModel) {
         guard !studioPickerLoading else { return }
         studioPickerLoading = true
@@ -1661,31 +1821,31 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
 
     /// Non-nil when any live chip is set; merge into `fetchImages` / `fetchClips`.
     func imageLiveFragmentForFetch() -> [String: Any]? {
-        isLiveFilterActive ? activeLiveFilterDict : nil
+        effectiveLiveFilter
     }
 
     func refetchImages(viewModel: StashDBViewModel, initial: Bool) {
-        let live = isLiveFilterActive ? activeLiveFilterDict : nil
+        let live = effectiveLiveFilter
         switch scope {
         case .catalogRoot:
             viewModel.fetchImages(
                 sortBy: selectedSortOption,
                 isInitialLoad: initial,
-                filter: selectedFilter,
+                filter: fetchBaseFilter,
                 staticPathFilter: viewModel.imageStaticPathFilter,
                 performerId: viewModel.imagePerformerIdFilter,
                 liveFilter: live
             )
         case .performer(let id):
-            viewModel.fetchDetailImages(performerId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchDetailImages(performerId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         case .studio(let id):
-            viewModel.fetchDetailImages(studioId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchDetailImages(studioId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         case .tag(let id):
-            viewModel.fetchDetailImages(tagId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchDetailImages(tagId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         case .group(let id):
-            viewModel.fetchDetailImages(groupId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchDetailImages(groupId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         case .gallery(let id):
-            viewModel.fetchGalleryImages(galleryId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: selectedFilter, liveFilter: live)
+            viewModel.fetchGalleryImages(galleryId: id, sortBy: selectedSortOption, isInitialLoad: initial, filter: fetchBaseFilter, liveFilter: live)
         case .reelsStashLine:
             viewModel.fetchImages(
                 sortBy: selectedSortOption,
@@ -1840,6 +2000,24 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
         applyLiveFilter(viewModel: viewModel)
     }
 
+
+    /// Mirrors a selected server filter into the advanced criteria editor so its criteria stay
+    /// editable; fetches then pass `filter: nil` and send the document instead.
+    private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
+        if let meta = filter.stashyCatalogPresetMetadata {
+            var merged: [String: Any] = [:]
+            if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
+                merged = base.criteriaObjectFilter()
+            }
+            for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
+                merged[key] = value
+            }
+            criteriaDocument.load(merged)
+        } else {
+            criteriaDocument.load(filter.criteriaObjectFilter())
+        }
+    }
+
     func applyServerSavedFilter(_ f: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
         if let meta = f.stashyCatalogPresetMetadata {
             if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
@@ -1864,6 +2042,7 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
             selectedFilter = f
             applyPlainImageSavedFilterToLiveChips(f)
         }
+        loadCriteriaDocument(from: f, viewModel: viewModel)
         applyLiveFilter(viewModel: viewModel)
     }
 
@@ -1874,6 +2053,7 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
         if newId.isEmpty {
             selectedFilter = nil
             clearLiveChipsOnly()
+            criteriaDocument.clear()
             applyLiveFilter(viewModel: viewModel)
             return
         }

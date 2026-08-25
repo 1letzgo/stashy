@@ -53,9 +53,21 @@ private struct TagsViewContent: View {
         return dict
     }
 
+    /// Passed to `filter:` only while the advanced editor holds no copy of it. Once the editor has
+    /// the criteria, re-sending the server filter would resurrect criteria the user edited away;
+    /// while it is empty (e.g. a default filter applied on appear) the filter still has to be sent.
+    private var fetchBaseFilter: StashDBViewModel.SavedFilter? {
+        criteriaDocument.isEmpty ? selectedFilter : nil
+    }
+
+    /// Quick chips plus advanced criteria from the editor — what actually gets fetched.
+    private var effectiveLiveFilter: [String: Any]? {
+        criteriaDocument.merged(with: isLiveFilterActive ? activeLiveFilterDict : [:])
+    }
+
     private func applyLiveFilter() {
-        viewModel.currentTagLiveFilter = activeLiveFilterDict
-        viewModel.fetchTags(sortBy: selectedSortOption, searchQuery: searchText, filter: selectedFilter, liveFilter: activeLiveFilterDict)
+        viewModel.currentTagLiveFilter = effectiveLiveFilter ?? [:]
+        viewModel.fetchTags(sortBy: selectedSortOption, searchQuery: searchText, filter: fetchBaseFilter, liveFilter: effectiveLiveFilter)
     }
 
     @Environment(\.verticalSizeClass) var verticalSizeClass
@@ -71,7 +83,7 @@ private struct TagsViewContent: View {
 
     // Search function
     private func performSearch(isInitialLoad: Bool = true) {
-        viewModel.fetchTags(sortBy: selectedSortOption, searchQuery: searchText, isInitialLoad: isInitialLoad, filter: selectedFilter, liveFilter: isLiveFilterActive ? activeLiveFilterDict : nil)
+        viewModel.fetchTags(sortBy: selectedSortOption, searchQuery: searchText, isInitialLoad: isInitialLoad, filter: fetchBaseFilter, liveFilter: effectiveLiveFilter)
     }
 
     private func changeTagSortOption(to newOption: StashDBViewModel.TagSortOption) {
@@ -84,7 +96,7 @@ private struct TagsViewContent: View {
     }
 
     private var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     private var sortedServerTagFilters: [StashDBViewModel.SavedFilter] {
@@ -93,9 +105,6 @@ private struct TagsViewContent: View {
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
-    private var tagLiveChipRowsVisible: Bool {
-        CatalogLiveChipFilterSupport.tagSavedFilterSupportsLiveEditor(selectedFilter)
-    }
 
     private func refreshTagLocalPresets() {
         localCatalogPresets = TagListLiveFilterPresetStore.loadPresets()
@@ -139,6 +148,24 @@ private struct TagsViewContent: View {
         performSearch()
     }
 
+
+    /// Mirrors a selected server filter into the advanced criteria editor so its criteria stay
+    /// editable in the app; fetches then pass `filter: nil` and send the document instead.
+    private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter) {
+        if let meta = filter.stashyCatalogPresetMetadata {
+            var merged: [String: Any] = [:]
+            if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
+                merged = base.criteriaObjectFilter()
+            }
+            for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
+                merged[key] = value
+            }
+            criteriaDocument.load(merged)
+        } else {
+            criteriaDocument.load(filter.criteriaObjectFilter())
+        }
+    }
+
     private func applyServerTagSavedFilter(_ f: StashDBViewModel.SavedFilter) {
         if let meta = f.stashyCatalogPresetMetadata {
             if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
@@ -166,6 +193,7 @@ private struct TagsViewContent: View {
                 clearTagLiveChipsOnly()
             }
         }
+        loadCriteriaDocument(from: f)
         performSearch()
     }
 
@@ -448,7 +476,6 @@ private struct TagsViewContent: View {
             localPresets: localCatalogPresets,
             selectedPresetRowId: $catalogPresetRowSelection,
             criteriaDocument: criteriaDocument,
-            liveChipRowsVisible: tagLiveChipRowsVisible,
             sortOption: selectedSortOption,
             onSortChange: { changeTagSortOption(to: $0) },
             liveFavorite: $liveFilterFavorite,
@@ -458,6 +485,7 @@ private struct TagsViewContent: View {
                 catalogPresetRowSelection = ""
                 selectedFilter = nil
                 clearTagLiveChipsOnly()
+                criteriaDocument.clear()
                 applyLiveFilter()
             },
             onRequestSave: { saveTagCatalogPresetOverwrite() },
@@ -673,9 +701,6 @@ struct TagDetailView: View {
     @StateObject private var linkedStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
-    @StateObject private var linkedStudiosCriteriaDocument = FilterCriteriaDocument(mode: .studios)
-    @StateObject private var linkedGalleriesCriteriaDocument = FilterCriteriaDocument(mode: .galleries)
-    @StateObject private var linkedImagesCriteriaDocument = FilterCriteriaDocument(mode: .images)
     /// Images 1/row autoplay: parent ScrollView drag/decelerate.
     @State private var imagesFeedScrolling = false
 
@@ -1218,8 +1243,7 @@ struct TagDetailView: View {
             serverFilters: linkedStudios.sortedServerStudioFilters(viewModel: viewModel),
             localPresets: linkedStudios.localCatalogPresets,
             selectedPresetRowId: $linkedStudios.catalogPresetRowSelection,
-           criteriaDocument: linkedStudiosCriteriaDocument,
-            liveChipRowsVisible: linkedStudios.studioLiveChipRowsVisible,
+           criteriaDocument: linkedStudios.criteriaDocument,
             sortOption: linkedStudios.selectedSortOption,
             onSortChange: { linkedStudios.changeSortOption(to: $0, viewModel: viewModel) },
             liveMinRating: $linkedStudios.liveFilterMinRating,
@@ -1230,6 +1254,7 @@ struct TagDetailView: View {
                 linkedStudios.catalogPresetRowSelection = ""
                 linkedStudios.selectedFilter = nil
                 linkedStudios.clearLiveChipsOnly()
+                linkedStudios.criteriaDocument.clear()
                 linkedStudios.applyLiveFilter(viewModel: viewModel)
             },
             onRequestSave: { linkedStudios.savePresetOverwrite(viewModel: viewModel) },
@@ -1265,8 +1290,7 @@ struct TagDetailView: View {
             serverFilters: linkedGalleries.sortedServerGalleryFilters(viewModel: viewModel),
             localPresets: linkedGalleries.localCatalogPresets,
             selectedPresetRowId: $linkedGalleries.catalogPresetRowSelection,
-           criteriaDocument: linkedGalleriesCriteriaDocument,
-            liveChipRowsVisible: linkedGalleries.galleryLiveChipRowsVisible,
+           criteriaDocument: linkedGalleries.criteriaDocument,
             sortOption: linkedGalleries.selectedSortOption,
             onSortChange: { linkedGalleries.changeSortOption(to: $0, viewModel: viewModel) },
             liveMinRating: $linkedGalleries.liveFilterMinRating,
@@ -1281,6 +1305,7 @@ struct TagDetailView: View {
                 linkedGalleries.catalogPresetRowSelection = ""
                 linkedGalleries.selectedFilter = nil
                 linkedGalleries.clearLiveChipsOnly()
+                linkedGalleries.criteriaDocument.clear()
                 linkedGalleries.applyLiveFilter(viewModel: viewModel)
             },
             onRequestSave: { linkedGalleries.savePresetOverwrite(viewModel: viewModel) },
@@ -1318,9 +1343,8 @@ struct TagDetailView: View {
             serverFilters: linkedImages.sortedServerImageFilters(viewModel: viewModel),
             localPresets: linkedImages.localCatalogPresets,
             selectedPresetRowId: $linkedImages.catalogPresetRowSelection,
-           criteriaDocument: linkedImagesCriteriaDocument,
+           criteriaDocument: linkedImages.criteriaDocument,
             filterMenuTitleFallback: linkedImages.selectedFilter?.name,
-            liveChipRowsVisible: linkedImages.imageLiveChipRowsVisible,
             showMediaTypeFilter: linkedImages.showImageMediaTypeFilter,
             sortOption: linkedImages.selectedSortOption,
             onSortChange: { linkedImages.changeSortOption(to: $0, viewModel: viewModel) },
@@ -1342,6 +1366,7 @@ struct TagDetailView: View {
                 linkedImages.catalogPresetRowSelection = ""
                 linkedImages.selectedFilter = nil
                 linkedImages.clearLiveChipsOnly()
+                linkedImages.criteriaDocument.clear()
                 linkedImages.refetchImages(viewModel: viewModel, initial: true)
             },
             onRequestSave: { linkedImages.savePresetOverwrite(viewModel: viewModel) },

@@ -272,7 +272,7 @@ struct ReelsViewBody: View {
     @State private var reelsScenePresetNameInput = ""
     @State private var showReelsSceneSaveAsAlert = false
     @StateObject private var reelsCriteriaDocument = FilterCriteriaDocument(mode: .scenes)
-    @StateObject private var reelsImageCriteriaDocument = FilterCriteriaDocument(mode: .images)
+    @StateObject private var reelsMarkerCriteriaDocument = FilterCriteriaDocument(mode: .sceneMarkers)
     @State private var showReelsSceneRenameAlert = false
     @State private var showReelsSceneDeleteAlert = false
     @State private var isMenuOpen = false
@@ -1588,6 +1588,16 @@ struct ReelsViewBody: View {
         }
     }
 
+    /// Scene-mode chips merged with the advanced criteria editor.
+    private func reelsSceneLive(_ chips: [String: Any]?) -> [String: Any]? {
+        reelsCriteriaDocument.merged(with: chips ?? [:])
+    }
+
+    /// Marker-mode chips merged with the advanced criteria editor.
+    private func reelsMarkerLive(_ chips: [String: Any]?) -> [String: Any]? {
+        reelsMarkerCriteriaDocument.merged(with: chips ?? [:])
+    }
+
     /// Criteria identity for the given mode — used to skip a page-1 refetch when the VM list is still valid.
     private func reelsFeedSignature(for mode: ReelsMode) -> StashDBViewModel.ReelsFeedSignature? {
         guard let kind = reelsFeedKind(for: mode) else { return nil }
@@ -1598,7 +1608,7 @@ struct ReelsViewBody: View {
                 sortField: selectedSortOption.sortField,
                 direction: selectedSortOption.direction,
                 filterId: selectedFilter?.id,
-                liveFilter: reelsSceneLiveChips.effectiveLiveFilter(for: selectedFilter),
+                liveFilter: reelsSceneLive(reelsSceneLiveChips.effectiveLiveFilter(for: selectedFilter)),
                 performerId: selectedPerformer?.id,
                 tagIds: selectedTags.map(\.id),
                 studioId: selectedStudio?.id
@@ -1609,7 +1619,7 @@ struct ReelsViewBody: View {
                 sortField: selectedMarkerSortOption.sortField,
                 direction: selectedMarkerSortOption.direction,
                 filterId: selectedMarkerFilter?.id,
-                liveFilter: reelsMarkerLiveChips.effectiveLiveFilter(for: selectedMarkerFilter),
+                liveFilter: reelsMarkerLive(reelsMarkerLiveChips.effectiveLiveFilter(for: selectedMarkerFilter)),
                 performerId: selectedPerformer?.id,
                 tagIds: selectedTags.map(\.id),
                 studioId: selectedStudio?.id
@@ -1631,7 +1641,7 @@ struct ReelsViewBody: View {
                 sortField: selectedSortOption.sortField,
                 direction: selectedSortOption.direction,
                 filterId: selectedPreviewFilter?.id,
-                liveFilter: reelsPreviewLiveChips.effectiveLiveFilter(for: selectedPreviewFilter),
+                liveFilter: reelsSceneLive(reelsPreviewLiveChips.effectiveLiveFilter(for: selectedPreviewFilter)),
                 performerId: selectedPerformer?.id,
                 tagIds: selectedTags.map(\.id),
                 studioId: selectedStudio?.id
@@ -1884,9 +1894,9 @@ struct ReelsViewBody: View {
         let mergedPreviewFilter = hasCriterionOverlay
             ? viewModel.mergeFilterWithCriteria(filter: resolvedPreviewFilter, performer: performer, tags: tags, studio: studio, mode: .scenes)
             : resolvedPreviewFilter
-        let sceneLiveForScenes = stripLiveChips ? nil : reelsSceneLiveChips.effectiveLiveFilter(for: resolvedSceneFilterEarly)
-        let sceneLiveForMarkers = stripLiveChips ? nil : reelsMarkerLiveChips.effectiveLiveFilter(for: resolvedMarkerFilterEarly)
-        let sceneLiveForPreviews = stripLiveChips ? nil : reelsPreviewLiveChips.effectiveLiveFilter(for: resolvedPreviewFilter)
+        let sceneLiveForScenes = stripLiveChips ? nil : reelsSceneLive(reelsSceneLiveChips.effectiveLiveFilter(for: resolvedSceneFilterEarly))
+        let sceneLiveForMarkers = stripLiveChips ? nil : reelsMarkerLive(reelsMarkerLiveChips.effectiveLiveFilter(for: resolvedMarkerFilterEarly))
+        let sceneLiveForPreviews = stripLiveChips ? nil : reelsSceneLive(reelsPreviewLiveChips.effectiveLiveFilter(for: resolvedPreviewFilter))
 
         if usedFrozenRestore {
             saveSessionState(for: currentMode)
@@ -2385,8 +2395,7 @@ struct ReelsViewBody: View {
             serverSceneFilters: reelsSceneStyleSheetServerFilters,
             localPresets: reelsSceneLivePresets,
             selectedPresetId: reelsActiveSceneStyleSheetPresetSelection,
-            criteriaDocument: reelsCriteriaDocument,
-            liveChipRowsVisible: true,
+            criteriaDocument: reelsMode == .markers ? reelsMarkerCriteriaDocument : reelsCriteriaDocument,
             sortOption: selectedSortOption,
             onSortChange: { changeReelsSceneSortFromSheet($0) },
             minRating: reelChipBinding(\.minRating),
@@ -2413,6 +2422,8 @@ struct ReelsViewBody: View {
             onReset: {
                 reelsSetActiveSheetPresetSelection("")
                 reelsClearActiveLiveChipsOnly()
+                reelsCriteriaDocument.clear()
+                reelsMarkerCriteriaDocument.clear()
                 switch reelsMode {
                 case .scenes:
                     applySettings(sortBy: selectedSortOption, sceneFilter: nil, performer: selectedPerformer, tags: selectedTags, studio: selectedStudio, clearSceneFilter: true, sceneLiveRefresh: true)
@@ -2659,9 +2670,8 @@ struct ReelsViewBody: View {
             serverFilters: reelsClipImageFilters.sortedServerImageFilters(viewModel: viewModel),
             localPresets: reelsClipImageFilters.localCatalogPresets,
             selectedPresetRowId: $reelsClipImageFilters.catalogPresetRowSelection,
-            criteriaDocument: reelsImageCriteriaDocument,
+            criteriaDocument: reelsClipImageFilters.criteriaDocument,
             filterMenuTitleFallback: reelsClipImageFilters.selectedFilter?.name,
-            liveChipRowsVisible: reelsClipImageFilters.imageLiveChipRowsVisible,
             showMediaTypeFilter: reelsClipImageFilters.showImageMediaTypeFilter,
             sortOption: reelsClipImageFilters.selectedSortOption,
             onSortChange: { new in
@@ -2688,6 +2698,8 @@ struct ReelsViewBody: View {
                 reelsClipImageFilters.catalogPresetRowSelection = ""
                 reelsClipImageFilters.selectedFilter = nil
                 reelsClipImageFilters.clearLiveChipsOnly()
+                reelsClearActiveLiveChipsOnly()
+                reelsClipImageFilters.criteriaDocument.clear()
                 refetchReelsClipsFromModel(viewModel)
             },
             onRequestSave: { reelsClipImageFilters.savePresetOverwrite(viewModel: viewModel) },

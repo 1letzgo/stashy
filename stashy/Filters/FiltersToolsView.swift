@@ -7,11 +7,16 @@ struct FiltersToolsView: View {
 
     @State private var searchText = ""
     @State private var editingFilter: StashDBViewModel.SavedFilter?
+    @State private var pendingEditAfterCreate: StashDBViewModel.SavedFilter?
     @State private var isCreating = false
     @State private var createMode: StashDBViewModel.FilterMode = .scenes
     @State private var renameTarget: StashDBViewModel.SavedFilter?
     @State private var renameText = ""
     @State private var deleteTarget: StashDBViewModel.SavedFilter?
+
+    private static let listedModes: [StashDBViewModel.FilterMode] = [
+        .scenes, .sceneMarkers, .performers, .studios, .tags, .galleries, .images, .groups
+    ]
 
     private var filteredFilters: [StashDBViewModel.SavedFilter] {
         var list = Array(viewModel.savedFilters.values)
@@ -23,10 +28,7 @@ struct FiltersToolsView: View {
     }
 
     private var grouped: [(mode: StashDBViewModel.FilterMode, filters: [StashDBViewModel.SavedFilter])] {
-        let modes: [StashDBViewModel.FilterMode] = [
-            .scenes, .sceneMarkers, .performers, .studios, .tags, .galleries, .images, .groups
-        ]
-        return modes.compactMap { mode in
+        Self.listedModes.compactMap { mode in
             let list = filteredFilters.filter { $0.mode == mode }
             guard !list.isEmpty else { return nil }
             return (mode, list)
@@ -34,23 +36,45 @@ struct FiltersToolsView: View {
     }
 
     var body: some View {
-        VStack(spacing: 0) {
-            HStack(spacing: 10) {
-                HStack(spacing: 8) {
+        Group {
+            if viewModel.isLoadingSavedFilters && viewModel.savedFilters.isEmpty {
+                StandardLoadingView(message: "Loading filters…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.appBackground(for: appearance.currentTheme))
+            } else if grouped.isEmpty {
+                emptyState
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                    .background(Color.appBackground(for: appearance.currentTheme))
+            } else {
+                filtersList
+            }
+        }
+        .safeAreaInset(edge: .top, spacing: 0) {
+            HStack(spacing: DesignTokens.Spacing.sm) {
+                HStack(spacing: DesignTokens.Spacing.xs) {
                     Image(systemName: "magnifyingglass")
                         .foregroundColor(.secondary)
                     TextField("Search filters", text: $searchText)
                         .textInputAutocapitalization(.never)
                         .disableAutocorrection(true)
+                    if !searchText.isEmpty {
+                        Button {
+                            searchText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Clear search")
+                    }
                 }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(Color.secondaryAppBackground)
-                .clipShape(RoundedRectangle(cornerRadius: 12))
-
+                .padding(.horizontal, DesignTokens.Spacing.sm)
+                .padding(.vertical, DesignTokens.Spacing.xs + 2)
+                .background(Color.secondaryAppBackground(for: appearance.currentTheme))
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                 Menu {
-                    ForEach(createModes, id: \.self) { mode in
-                        Button(modeTitle(mode)) {
+                    ForEach(Self.listedModes, id: \.self) { mode in
+                        Button(Self.modeTitle(mode)) {
                             createMode = mode
                             isCreating = true
                         }
@@ -66,69 +90,39 @@ struct FiltersToolsView: View {
                 .accessibilityLabel("New filter")
             }
             .padding(.horizontal, DesignTokens.Tools.contentPadding)
-            .padding(.vertical, 10)
-
-            if viewModel.isLoadingSavedFilters && viewModel.savedFilters.isEmpty {
-                StandardLoadingView(message: "Loading filters…")
-                    .frame(maxWidth: .infinity, maxHeight: .infinity)
-            } else if grouped.isEmpty {
-                ContentUnavailableView(
-                    "No filters",
-                    systemImage: "line.3.horizontal.decrease.circle",
-                    description: Text(searchText.isEmpty ? "Create a filter or sync from your Stash server." : "No filters match your search.")
-                )
-            } else {
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 16) {
-                        ForEach(grouped, id: \.mode) { section in
-                            VStack(alignment: .leading, spacing: 8) {
-                                Text(modeTitle(section.mode))
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundColor(.secondary)
-                                    .padding(.horizontal, 4)
-
-                                VStack(spacing: 0) {
-                                    ForEach(Array(section.filters.enumerated()), id: \.element.id) { index, filter in
-                                        filterRow(filter)
-                                        if index < section.filters.count - 1 {
-                                            Divider().padding(.leading, 16)
-                                        }
-                                    }
-                                }
-                                .background(Color.secondaryAppBackground)
-                                .clipShape(RoundedRectangle(cornerRadius: 12))
-                            }
-                        }
-                    }
-                    .padding(.horizontal, DesignTokens.Tools.contentPadding)
-                    .padding(.bottom, 24)
-                }
-            }
+            .padding(.vertical, DesignTokens.Spacing.xs + 2)
+            .background(Color.appBackground(for: appearance.currentTheme))
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.appBackground)
+        .background(Color.appBackground(for: appearance.currentTheme))
         .onAppear { viewModel.fetchSavedFilters() }
         .sheet(item: $editingFilter) { filter in
             FiltersToolsEditorSheet(
                 filter: filter,
-                onSaved: { saved in editingFilter = saved },
+                viewModel: viewModel,
                 onDismiss: { editingFilter = nil }
             )
-            .environmentObject(viewModel)
         }
-        .sheet(isPresented: $isCreating) {
+        .sheet(isPresented: $isCreating, onDismiss: {
+            // Present the editor only after the create sheet is fully gone — chaining both in one
+            // runloop leaves the second sheet unpresented on iOS.
+            if let saved = pendingEditAfterCreate {
+                pendingEditAfterCreate = nil
+                editingFilter = saved
+            }
+        }) {
             FiltersToolsEditorSheet(
                 filter: nil,
                 createMode: createMode,
+                viewModel: viewModel,
                 onSaved: { saved in
+                    pendingEditAfterCreate = saved
                     isCreating = false
-                    editingFilter = saved
                 },
                 onDismiss: { isCreating = false }
             )
-            .environmentObject(viewModel)
         }
-        .alert("Rename", isPresented: Binding(
+        .alert("Rename filter", isPresented: Binding(
             get: { renameTarget != nil },
             set: { if !$0 { renameTarget = nil } }
         )) {
@@ -145,9 +139,7 @@ struct FiltersToolsView: View {
         )) {
             Button("Delete", role: .destructive) {
                 guard let target = deleteTarget else { return }
-                viewModel.destroySavedSceneFilter(id: target.id) { _ in
-                    deleteTarget = nil
-                }
+                delete(filter: target)
             }
             Button("Cancel", role: .cancel) { deleteTarget = nil }
         } message: {
@@ -155,55 +147,88 @@ struct FiltersToolsView: View {
         }
     }
 
-    private func filterRow(_ filter: StashDBViewModel.SavedFilter) -> some View {
-        Button {
-            editingFilter = filter
-        } label: {
-            HStack(spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(filter.name)
-                        .font(.body.weight(.medium))
-                        .foregroundColor(.primary)
-                        .multilineTextAlignment(.leading)
-                    Text(criteriaSummary(filter))
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .lineLimit(1)
-                }
-                Spacer(minLength: 8)
-                Menu {
-                    Button {
-                        renameTarget = filter
-                        renameText = filter.name
-                    } label: {
-                        Label("Rename", systemImage: "pencil")
+    private var emptyState: some View {
+        ContentUnavailableView(
+            searchText.isEmpty ? "No filters" : "No matches",
+            systemImage: searchText.isEmpty ? "line.3.horizontal.decrease.circle" : "magnifyingglass",
+            description: Text(searchText.isEmpty
+                              ? "Create a filter or sync from your Stash server."
+                              : "No filters match your search.")
+        )
+    }
+
+    private var filtersList: some View {
+        List {
+            ForEach(grouped, id: \.mode) { section in
+                Section(Self.modeTitle(section.mode)) {
+                    ForEach(section.filters) { filter in
+                        Button {
+                            editingFilter = filter
+                        } label: {
+                            filterRowLabel(filter)
+                        }
+                        .buttonStyle(.plain)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            Button(role: .destructive) {
+                                deleteTarget = filter
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                            Button {
+                                renameTarget = filter
+                                renameText = filter.name
+                            } label: {
+                                Label("Rename", systemImage: "pencil")
+                            }
+                            .tint(.gray)
+                        }
+                        .contextMenu {
+                            Button {
+                                renameTarget = filter
+                                renameText = filter.name
+                            } label: {
+                                Label("Rename", systemImage: "pencil")
+                            }
+                            Button(role: .destructive) {
+                                deleteTarget = filter
+                            } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                        // List rows default to system colors and would ignore the app theme.
+                        .listRowBackground(Color.secondaryAppBackground(for: appearance.currentTheme))
+                        .listRowSeparatorTint(Color.primary.opacity(0.15))
                     }
-                    Button(role: .destructive) {
-                        deleteTarget = filter
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.body)
-                        .foregroundColor(.secondary)
                 }
-                Image(systemName: "chevron.right")
-                    .font(.caption.weight(.semibold))
-                    .foregroundColor(.secondary)
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Color.appBackground(for: appearance.currentTheme))
+        .refreshable { viewModel.fetchSavedFilters() }
     }
 
-    private var createModes: [StashDBViewModel.FilterMode] {
-        [.scenes, .sceneMarkers, .performers, .studios, .tags, .galleries, .images, .groups]
+    private func filterRowLabel(_ filter: StashDBViewModel.SavedFilter) -> some View {
+        HStack(spacing: DesignTokens.Spacing.sm) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(filter.name)
+                    .font(.body.weight(.medium))
+                    .foregroundColor(.primary)
+                    .multilineTextAlignment(.leading)
+                Text(criteriaSummary(filter))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: DesignTokens.Spacing.xs)
+            Image(systemName: "chevron.right")
+                .font(.caption.weight(.semibold))
+                .foregroundColor(.secondary)
+        }
+        .contentShape(Rectangle())
     }
 
-    private func modeTitle(_ mode: StashDBViewModel.FilterMode) -> String {
+    static func modeTitle(_ mode: StashDBViewModel.FilterMode) -> String {
         switch mode {
         case .scenes: return "Scenes"
         case .sceneMarkers: return "Markers"
@@ -217,67 +242,71 @@ struct FiltersToolsView: View {
         }
     }
 
+    /// Human-readable criteria list ("Tags, Rating, Studio"), not raw GraphQL keys.
     private func criteriaSummary(_ filter: StashDBViewModel.SavedFilter) -> String {
         let keys = filter.criteriaObjectFilter().keys.sorted()
         if keys.isEmpty { return "No criteria" }
-        return keys.prefix(4).joined(separator: ", ") + (keys.count > 4 ? "…" : "")
+        let labels = keys.map { key in
+            FilterFieldCatalog.field(key: key, mode: filter.mode)?.label ?? key
+        }
+        return labels.prefix(4).joined(separator: ", ") + (labels.count > 4 ? "…" : "")
     }
 
     private func rename(filter: StashDBViewModel.SavedFilter, to name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
-        let pair = filter.encodedSortPair ?? ("date", "DESC")
-        viewModel.saveFullObjectFilter(
-            mode: filter.mode,
-            existingId: filter.id,
-            name: trimmed,
-            sortField: pair.field.hasPrefix("random") ? "random" : pair.field,
-            sortDirection: pair.direction,
-            sortRaw: filter.stashySortRaw,
-            objectFilter: filter.criteriaObjectFilter(),
-            randomSeedKind: randomSeedKind(for: filter.mode)
-        ) { _ in
+        viewModel.renameSavedFilter(filter, to: trimmed) { result in
             renameTarget = nil
+            switch result {
+            case .success:
+                HapticManager.success()
+                viewModel.fetchSavedFilters()
+            case .failure(let error):
+                ToastManager.shared.show("Rename failed: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill", style: .error)
+            }
         }
     }
 
-    private func randomSeedKind(for mode: StashDBViewModel.FilterMode) -> StashDBViewModel.RandomSeedKind? {
-        switch mode {
-        case .scenes: return .scenes
-        case .performers: return .performers
-        case .studios: return .studios
-        case .tags: return .tags
-        case .galleries: return .galleries
-        case .images: return .images
-        case .groups: return .groups
-        case .sceneMarkers: return .markers
-        case .unknown: return nil
+    private func delete(filter: StashDBViewModel.SavedFilter) {
+        viewModel.destroySavedSceneFilter(id: filter.id) { result in
+            deleteTarget = nil
+            switch result {
+            case .success:
+                HapticManager.success()
+                viewModel.fetchSavedFilters()
+            case .failure(let error):
+                ToastManager.shared.show("Delete failed: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill", style: .error)
+            }
         }
     }
 }
 
+/// Create / edit one saved filter. One chrome bar, house style — no second action bar.
 private struct FiltersToolsEditorSheet: View {
     var filter: StashDBViewModel.SavedFilter?
     var createMode: StashDBViewModel.FilterMode = .scenes
-    var onSaved: (StashDBViewModel.SavedFilter) -> Void
+    @ObservedObject var viewModel: StashDBViewModel
+    var onSaved: ((StashDBViewModel.SavedFilter) -> Void)? = nil
     var onDismiss: () -> Void
 
-    @EnvironmentObject private var viewModel: StashDBViewModel
     @StateObject private var document: FilterCriteriaDocument
     @State private var name: String
     @State private var showSaveAs = false
     @State private var saveAsName = ""
     @State private var showDelete = false
     @State private var isSaving = false
+    @ObservedObject private var appearance = AppearanceManager.shared
 
     init(
         filter: StashDBViewModel.SavedFilter?,
         createMode: StashDBViewModel.FilterMode = .scenes,
-        onSaved: @escaping (StashDBViewModel.SavedFilter) -> Void,
+        viewModel: StashDBViewModel,
+        onSaved: ((StashDBViewModel.SavedFilter) -> Void)? = nil,
         onDismiss: @escaping () -> Void
     ) {
         self.filter = filter
         self.createMode = createMode
+        self.viewModel = viewModel
         self.onSaved = onSaved
         self.onDismiss = onDismiss
         let mode = filter?.mode ?? createMode
@@ -285,100 +314,106 @@ private struct FiltersToolsEditorSheet: View {
             mode: mode,
             objectFilter: filter?.criteriaObjectFilter() ?? [:]
         ))
-        _name = State(initialValue: filter?.name ?? "New filter")
+        _name = State(initialValue: filter?.name ?? "")
     }
 
     private var mode: StashDBViewModel.FilterMode { filter?.mode ?? createMode }
-    private var hasSelectedPreset: Bool { filter != nil }
+    private var isExisting: Bool { filter != nil }
+    private var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
 
     var body: some View {
-        NavigationView {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    HStack(alignment: .center, spacing: 12) {
-                        Text("Name")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(.secondary)
-                            .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-                        TextField("Filter name", text: $name)
-                            .textFieldStyle(.plain)
-                            .multilineTextAlignment(.trailing)
-                    }
-                    .catalogFilterSortControlCardChrome()
-
-                    FilterCriteriaEditorView(document: document, onChange: {})
-                }
-                .padding(.top, 8)
-            }
-            .background(Color.appBackground)
-            .catalogSettingsSheetChrome(
-                hasSelectedPreset: hasSelectedPreset || !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
-                onReset: {
-                    if let filter {
-                        document.load(filter.criteriaObjectFilter())
-                        name = filter.name
-                    } else {
-                        document.clear()
-                        name = "New filter"
-                    }
-                },
-                onRequestSave: { save(existingId: filter?.id, saveName: name) },
-                onRequestSaveAs: {
-                    saveAsName = name
-                    showSaveAs = true
-                },
-                onRequestRename: {
-                    // Rename = overwrite with current name field when editing existing.
-                    guard filter != nil else { return }
-                    save(existingId: filter?.id, saveName: name)
-                },
-                onRequestDelete: {
-                    guard filter != nil else { return }
-                    showDelete = true
-                }
-            )
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                HStack {
-                    Button("Close") { onDismiss() }
+        ScrollView {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
+                HStack(alignment: .center, spacing: DesignTokens.Spacing.sm) {
+                    Text("Name")
+                        .font(.subheadline.weight(.semibold))
                         .foregroundColor(.secondary)
-                    Spacer()
-                    if isSaving {
-                        ProgressView()
-                    } else {
-                        Button("Save") { save(existingId: filter?.id, saveName: name) }
-                            .font(.body.weight(.semibold))
-                            .disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                    TextField("Filter name", text: $name)
+                        .textFieldStyle(.plain)
+                        .multilineTextAlignment(.trailing)
+                }
+                .catalogFilterSortControlCardChrome()
+
+                Text(FiltersToolsView.modeTitle(mode))
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .padding(.horizontal, DesignTokens.Spacing.md + DesignTokens.Spacing.xxs)
+
+                FilterCriteriaEditorView(document: document)
+            }
+            .padding(.top, DesignTokens.Spacing.xs)
+            .padding(.bottom, DesignTokens.Spacing.xl)
+        }
+        .background(Color.appBackground.ignoresSafeArea())
+        .stashyModalSheetChrome(isExisting ? "Edit filter" : "New filter", onBack: onDismiss) {
+            HStack(spacing: DesignTokens.Spacing.xs) {
+                if isSaving {
+                    ProgressView()
+                        .tint(.white)
+                } else {
+                    Menu {
+                        Button {
+                            save(existingId: filter?.id, saveName: trimmedName)
+                        } label: {
+                            Label("Save", systemImage: "arrow.down.doc")
+                        }
+                        .disabled(trimmedName.isEmpty)
+                        Button {
+                            saveAsName = trimmedName.isEmpty ? "" : trimmedName + " copy"
+                            showSaveAs = true
+                        } label: {
+                            Label("Save as…", systemImage: "doc.badge.plus")
+                        }
+                        if isExisting {
+                            Divider()
+                            Button(role: .destructive) { showDelete = true } label: {
+                                Label("Delete", systemImage: "trash")
+                            }
+                        }
+                    } label: {
+                        Text("Save")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(trimmedName.isEmpty ? .white.opacity(0.4) : .white)
+                            .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
                     }
+                    .disabled(trimmedName.isEmpty && !isExisting)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 14)
-                .background(.ultraThinMaterial)
-            }
-            .alert("Save As", isPresented: $showSaveAs) {
-                TextField("Name", text: $saveAsName)
-                Button("Save") { save(existingId: nil, saveName: saveAsName) }
-                Button("Cancel", role: .cancel) {}
-            }
-            .alert("Delete filter?", isPresented: $showDelete) {
-                Button("Delete", role: .destructive) {
-                    guard let id = filter?.id else { return }
-                    viewModel.destroySavedSceneFilter(id: id) { _ in onDismiss() }
-                }
-                Button("Cancel", role: .cancel) {}
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationViewStyle(.stack)
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
-        .presentationBackground(Color(UIColor.systemGroupedBackground))
+        .presentationBackground(Color.appBackground)
+        .alert("Save as", isPresented: $showSaveAs) {
+            TextField("Name", text: $saveAsName)
+            Button("Save") { save(existingId: nil, saveName: saveAsName) }
+            Button("Cancel", role: .cancel) {}
+        }
+        .alert("Delete filter?", isPresented: $showDelete) {
+            Button("Delete", role: .destructive) {
+                guard let id = filter?.id else { return }
+                viewModel.destroySavedSceneFilter(id: id) { result in
+                    switch result {
+                    case .success:
+                        HapticManager.success()
+                        viewModel.fetchSavedFilters()
+                        onDismiss()
+                    case .failure(let error):
+                        ToastManager.shared.show("Delete failed: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill", style: .error)
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(filter.map { "Delete “\($0.name)” from the server?" } ?? "")
+        }
     }
 
     private func save(existingId: String?, saveName: String) {
         let trimmed = saveName.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         isSaving = true
-        let pair = filter?.encodedSortPair ?? defaultSort(for: mode)
+        let pair = filter?.encodedSortPair ?? Self.defaultSort(for: mode)
         viewModel.saveFullObjectFilter(
             mode: mode,
             existingId: existingId,
@@ -387,28 +422,25 @@ private struct FiltersToolsEditorSheet: View {
             sortDirection: pair.direction,
             sortRaw: filter?.stashySortRaw,
             objectFilter: document.sanitizedObjectFilter,
-            randomSeedKind: {
-                switch mode {
-                case .scenes: return .scenes
-                case .performers: return .performers
-                case .studios: return .studios
-                case .tags: return .tags
-                case .galleries: return .galleries
-                case .images: return .images
-                case .groups: return .groups
-                case .sceneMarkers: return .markers
-                case .unknown: return nil
-                }
-            }()
+            randomSeedKind: StashDBViewModel.randomSeedKind(for: mode)
         ) { result in
             isSaving = false
-            if case .success(let saved) = result {
-                onSaved(saved)
+            switch result {
+            case .success(let saved):
+                HapticManager.success()
+                viewModel.fetchSavedFilters()
+                if let onSaved {
+                    onSaved(saved)
+                } else {
+                    onDismiss()
+                }
+            case .failure(let error):
+                ToastManager.shared.show("Save failed: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill", style: .error)
             }
         }
     }
 
-    private func defaultSort(for mode: StashDBViewModel.FilterMode) -> (field: String, direction: String) {
+    private static func defaultSort(for mode: StashDBViewModel.FilterMode) -> (field: String, direction: String) {
         switch mode {
         case .performers, .tags, .studios: return ("name", "ASC")
         case .sceneMarkers: return ("seconds", "ASC")

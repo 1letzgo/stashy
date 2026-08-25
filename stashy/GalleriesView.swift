@@ -58,8 +58,20 @@ private struct GalleriesViewContent: View {
         return dict
     }
 
+    /// Passed to `filter:` only while the advanced editor holds no copy of it. Once the editor has
+    /// the criteria, re-sending the server filter would resurrect criteria the user edited away;
+    /// while it is empty (e.g. a default filter applied on appear) the filter still has to be sent.
+    private var fetchBaseFilter: StashDBViewModel.SavedFilter? {
+        criteriaDocument.isEmpty ? selectedFilter : nil
+    }
+
+    /// Quick chips plus advanced criteria from the editor — what actually gets fetched.
+    private var effectiveLiveFilter: [String: Any]? {
+        criteriaDocument.merged(with: isLiveFilterActive ? activeLiveFilterDict : [:])
+    }
+
     private var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     private var sortedServerGalleryFilters: [StashDBViewModel.SavedFilter] {
@@ -68,9 +80,6 @@ private struct GalleriesViewContent: View {
             .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
-    private var galleryLiveChipRowsVisible: Bool {
-        CatalogLiveChipFilterSupport.gallerySavedFilterSupportsLiveEditor(selectedFilter)
-    }
 
     private func refreshGalleryLocalPresets() {
         localCatalogPresets = GalleryListLiveFilterPresetStore.loadPresets()
@@ -129,7 +138,7 @@ private struct GalleriesViewContent: View {
     }
 
     private func applyLiveFilter() {
-        viewModel.currentGalleryLiveFilter = activeLiveFilterDict
+        viewModel.currentGalleryLiveFilter = effectiveLiveFilter ?? [:]
         performSearch()
     }
 
@@ -152,6 +161,24 @@ private struct GalleriesViewContent: View {
             clearGalleryLiveChipsOnly()
         }
         performSearch()
+    }
+
+
+    /// Mirrors a selected server filter into the advanced criteria editor so its criteria stay
+    /// editable in the app; fetches then pass `filter: nil` and send the document instead.
+    private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter) {
+        if let meta = filter.stashyCatalogPresetMetadata {
+            var merged: [String: Any] = [:]
+            if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
+                merged = base.criteriaObjectFilter()
+            }
+            for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
+                merged[key] = value
+            }
+            criteriaDocument.load(merged)
+        } else {
+            criteriaDocument.load(filter.criteriaObjectFilter())
+        }
     }
 
     private func applyServerGallerySavedFilter(_ f: StashDBViewModel.SavedFilter) {
@@ -181,6 +208,7 @@ private struct GalleriesViewContent: View {
                 clearGalleryLiveChipsOnly()
             }
         }
+        loadCriteriaDocument(from: f)
         performSearch()
     }
 
@@ -373,8 +401,8 @@ private struct GalleriesViewContent: View {
             sortBy: newOption,
             searchQuery: searchText,
             isInitialLoad: true,
-            filter: selectedFilter,
-            liveFilter: isLiveFilterActive ? activeLiveFilterDict : nil
+            filter: fetchBaseFilter,
+            liveFilter: effectiveLiveFilter
         )
     }
 
@@ -383,8 +411,8 @@ private struct GalleriesViewContent: View {
             sortBy: selectedSortOption,
             searchQuery: searchText,
             isInitialLoad: isInitialLoad,
-            filter: selectedFilter,
-            liveFilter: isLiveFilterActive ? activeLiveFilterDict : nil
+            filter: fetchBaseFilter,
+            liveFilter: effectiveLiveFilter
         )
     }
 
@@ -710,7 +738,6 @@ private struct GalleriesViewContent: View {
             localPresets: localCatalogPresets,
             selectedPresetRowId: $catalogPresetRowSelection,
             criteriaDocument: criteriaDocument,
-            liveChipRowsVisible: galleryLiveChipRowsVisible,
             sortOption: selectedSortOption,
             onSortChange: { changeSortOption(to: $0) },
             liveMinRating: $liveFilterMinRating,
@@ -725,6 +752,7 @@ private struct GalleriesViewContent: View {
                 catalogPresetRowSelection = ""
                 selectedFilter = nil
                 clearGalleryLiveChipsOnly()
+                criteriaDocument.clear()
                 applyLiveFilter()
             },
             onRequestSave: { saveGalleryCatalogPresetOverwrite() },

@@ -108,7 +108,7 @@ enum FilterFieldCatalog {
         .init(key: "tags_filter", label: "Tags filter", kind: .nestedFilter, nestedMode: .tags),
         .init(key: "groups_filter", label: "Groups filter", kind: .nestedFilter, nestedMode: .groups),
         .init(key: "markers_filter", label: "Markers filter", kind: .nestedFilter, nestedMode: .sceneMarkers),
-        .init(key: "files_filter", label: "Files filter", kind: .nestedFilter),
+        .init(key: "files_filter", label: "Files filter", kind: .raw),
         .init(key: "custom_fields", label: "Custom fields", kind: .customFields),
         .init(key: "movies", label: "Movies", kind: .multi, isDeprecated: true),
         .init(key: "phash", label: "PHash", kind: .string, isDeprecated: true),

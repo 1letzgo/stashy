@@ -15,10 +15,6 @@ struct PerformerDetailView: View {
     @ObservedObject var configManager = ServerConfigManager.shared
     @ObservedObject var tabManager = TabManager.shared
     @StateObject private var viewModel = StashDBViewModel()
-    @StateObject private var linkedStudiosCriteriaDocument = FilterCriteriaDocument(mode: .studios)
-    @StateObject private var linkedTagsCriteriaDocument = FilterCriteriaDocument(mode: .tags)
-    @StateObject private var linkedGalleriesCriteriaDocument = FilterCriteriaDocument(mode: .galleries)
-    @StateObject private var linkedImagesCriteriaDocument = FilterCriteriaDocument(mode: .images)
     @EnvironmentObject var coordinator: NavigationCoordinator
     @Environment(\.dismiss) private var dismiss
     @State private var isHeaderExpanded = false
@@ -604,8 +600,7 @@ struct PerformerDetailView: View {
             serverFilters: linkedStudios.sortedServerStudioFilters(viewModel: viewModel),
             localPresets: linkedStudios.localCatalogPresets,
             selectedPresetRowId: $linkedStudios.catalogPresetRowSelection,
-            criteriaDocument: linkedStudiosCriteriaDocument,
-            liveChipRowsVisible: linkedStudios.studioLiveChipRowsVisible,
+            criteriaDocument: linkedStudios.criteriaDocument,
             sortOption: linkedStudios.selectedSortOption,
             onSortChange: { linkedStudios.changeSortOption(to: $0, viewModel: viewModel) },
             liveMinRating: $linkedStudios.liveFilterMinRating,
@@ -616,6 +611,7 @@ struct PerformerDetailView: View {
                 linkedStudios.catalogPresetRowSelection = ""
                 linkedStudios.selectedFilter = nil
                 linkedStudios.clearLiveChipsOnly()
+                linkedStudios.criteriaDocument.clear()
                 linkedStudios.applyLiveFilter(viewModel: viewModel)
             },
             onRequestSave: { linkedStudios.savePresetOverwrite(viewModel: viewModel) },
@@ -651,8 +647,7 @@ struct PerformerDetailView: View {
             serverFilters: linkedTags.sortedServerTagFilters(viewModel: viewModel),
             localPresets: linkedTags.localCatalogPresets,
             selectedPresetRowId: $linkedTags.catalogPresetRowSelection,
-            criteriaDocument: linkedTagsCriteriaDocument,
-            liveChipRowsVisible: linkedTags.tagLiveChipRowsVisible,
+            criteriaDocument: linkedTags.criteriaDocument,
             sortOption: linkedTags.selectedSortOption,
             onSortChange: { linkedTags.changeSortOption(to: $0, viewModel: viewModel) },
             liveFavorite: $linkedTags.liveFilterFavorite,
@@ -662,6 +657,7 @@ struct PerformerDetailView: View {
                 linkedTags.catalogPresetRowSelection = ""
                 linkedTags.selectedFilter = nil
                 linkedTags.clearLiveChipsOnly()
+                linkedTags.criteriaDocument.clear()
                 linkedTags.applyLiveFilter(viewModel: viewModel)
             },
             onRequestSave: { linkedTags.savePresetOverwrite(viewModel: viewModel) },
@@ -697,8 +693,7 @@ struct PerformerDetailView: View {
             serverFilters: linkedGalleries.sortedServerGalleryFilters(viewModel: viewModel),
             localPresets: linkedGalleries.localCatalogPresets,
             selectedPresetRowId: $linkedGalleries.catalogPresetRowSelection,
-            criteriaDocument: linkedGalleriesCriteriaDocument,
-            liveChipRowsVisible: linkedGalleries.galleryLiveChipRowsVisible,
+            criteriaDocument: linkedGalleries.criteriaDocument,
             sortOption: linkedGalleries.selectedSortOption,
             onSortChange: { linkedGalleries.changeSortOption(to: $0, viewModel: viewModel) },
             liveMinRating: $linkedGalleries.liveFilterMinRating,
@@ -713,6 +708,7 @@ struct PerformerDetailView: View {
                 linkedGalleries.catalogPresetRowSelection = ""
                 linkedGalleries.selectedFilter = nil
                 linkedGalleries.clearLiveChipsOnly()
+                linkedGalleries.criteriaDocument.clear()
                 linkedGalleries.applyLiveFilter(viewModel: viewModel)
             },
             onRequestSave: { linkedGalleries.savePresetOverwrite(viewModel: viewModel) },
@@ -750,9 +746,8 @@ struct PerformerDetailView: View {
             serverFilters: linkedImages.sortedServerImageFilters(viewModel: viewModel),
             localPresets: linkedImages.localCatalogPresets,
             selectedPresetRowId: $linkedImages.catalogPresetRowSelection,
-            criteriaDocument: linkedImagesCriteriaDocument,
+            criteriaDocument: linkedImages.criteriaDocument,
             filterMenuTitleFallback: linkedImages.selectedFilter?.name,
-            liveChipRowsVisible: linkedImages.imageLiveChipRowsVisible,
             showMediaTypeFilter: linkedImages.showImageMediaTypeFilter,
             sortOption: linkedImages.selectedSortOption,
             onSortChange: { linkedImages.changeSortOption(to: $0, viewModel: viewModel) },
@@ -774,6 +769,7 @@ struct PerformerDetailView: View {
                 linkedImages.catalogPresetRowSelection = ""
                 linkedImages.selectedFilter = nil
                 linkedImages.clearLiveChipsOnly()
+                linkedImages.criteriaDocument.clear()
                 linkedImages.refetchImages(viewModel: viewModel, initial: true)
             },
             onRequestSave: { linkedImages.savePresetOverwrite(viewModel: viewModel) },

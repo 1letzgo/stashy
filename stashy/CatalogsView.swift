@@ -202,6 +202,10 @@ private struct GroupsViewContent: View {
     @State private var showGroupsFilterSheet = false
     @State private var groupsPresetRowSelection = ""
     @StateObject private var groupsCriteriaDocument = FilterCriteriaDocument(mode: .groups)
+    @State private var showGroupsSaveAsAlert = false
+    @State private var showGroupsRenameAlert = false
+    @State private var showGroupsDeleteAlert = false
+    @State private var groupsFilterNameInput = ""
     @State private var lastOpenedGroupId: String?
     @Environment(\.horizontalSizeClass) var horizontalSizeClass
     var hideTitle: Bool = false
@@ -212,65 +216,101 @@ private struct GroupsViewContent: View {
     }
     
 
-    private func performSearchWithCriteria() {
-        // Encode criteria into a transient selected filter-like fetch: pass via selectedFilter object_filter by saving nothing — use sanitize into fetchGroups if API allows.
-        // For now merge into selectedFilter by creating ephemeral use of filter dict through StashDBViewModel.fetchGroups filter param.
-        if let sid = ListLivePresetTag.parseServerId(groupsPresetRowSelection), let f = viewModel.savedFilters[sid] {
-            selectedFilter = f
-        }
-        // Prefer document as source of truth: temporarily stash into a SavedFilter-like call by clearing selectedFilter and using document via filter overlay when supported.
-        // fetchGroups currently only takes SavedFilter — save is separate; apply by selecting server filter or clearing.
-        performSearch()
+    /// Advanced criteria are sent as `liveFilter`, so edits apply without saving to the server first.
+    private var effectiveLiveFilter: [String: Any]? {
+        groupsCriteriaDocument.merged(with: [:])
     }
 
     private func saveGroupsFilterOverwrite() {
-        guard let sid = ListLivePresetTag.parseServerId(groupsPresetRowSelection) else { return }
-        let name = viewModel.savedFilters[sid]?.name ?? "Filter"
+        guard let sid = ListLivePresetTag.parseServerId(groupsPresetRowSelection),
+              let existing = viewModel.savedFilters[sid] else { return }
         viewModel.saveFullObjectFilter(
             mode: .groups,
             existingId: sid,
-            name: name,
-            sortField: selectedSortOption.sortField == "random" ? "random" : selectedSortOption.sortField,
-            sortDirection: selectedSortOption.direction,
-            sortRaw: selectedSortOption.rawValue,
-            objectFilter: groupsCriteriaDocument.sanitizedObjectFilter,
-            randomSeedKind: .groups
-        ) { _ in }
-    }
-
-    private func saveGroupsFilterAs() {
-        let name = "Groups filter"
-        viewModel.saveFullObjectFilter(
-            mode: .groups,
-            existingId: nil,
-            name: name,
+            name: existing.name,
             sortField: selectedSortOption.sortField == "random" ? "random" : selectedSortOption.sortField,
             sortDirection: selectedSortOption.direction,
             sortRaw: selectedSortOption.rawValue,
             objectFilter: groupsCriteriaDocument.sanitizedObjectFilter,
             randomSeedKind: .groups
         ) { result in
-            if case .success(let saved) = result {
-                groupsPresetRowSelection = ListLivePresetTag.serverRow(saved.id)
-                selectedFilter = saved
+            switch result {
+            case .success:
+                HapticManager.success()
+                viewModel.fetchSavedFilters()
+            case .failure(let error):
+                ToastManager.shared.show("Save failed: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill", style: .error)
             }
         }
     }
 
-    private func renameGroupsFilter() { saveGroupsFilterOverwrite() }
+    private func saveGroupsFilterAs(name: String) {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        viewModel.saveFullObjectFilter(
+            mode: .groups,
+            existingId: nil,
+            name: trimmed,
+            sortField: selectedSortOption.sortField == "random" ? "random" : selectedSortOption.sortField,
+            sortDirection: selectedSortOption.direction,
+            sortRaw: selectedSortOption.rawValue,
+            objectFilter: groupsCriteriaDocument.sanitizedObjectFilter,
+            randomSeedKind: .groups
+        ) { result in
+            switch result {
+            case .success(let saved):
+                HapticManager.success()
+                groupsPresetRowSelection = ListLivePresetTag.serverRow(saved.id)
+                selectedFilter = saved
+                viewModel.fetchSavedFilters()
+            case .failure(let error):
+                ToastManager.shared.show("Save failed: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill", style: .error)
+            }
+        }
+    }
+
+    private func renameGroupsFilter(to name: String) {
+        guard let sid = ListLivePresetTag.parseServerId(groupsPresetRowSelection),
+              let existing = viewModel.savedFilters[sid] else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        viewModel.renameSavedFilter(existing, to: trimmed) { result in
+            switch result {
+            case .success:
+                HapticManager.success()
+                viewModel.fetchSavedFilters()
+            case .failure(let error):
+                ToastManager.shared.show("Rename failed: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill", style: .error)
+            }
+        }
+    }
+
     private func deleteGroupsFilter() {
         guard let sid = ListLivePresetTag.parseServerId(groupsPresetRowSelection) else { return }
-        viewModel.destroySavedSceneFilter(id: sid) { _ in
-            groupsPresetRowSelection = ""
-            selectedFilter = nil
-            groupsCriteriaDocument.clear()
-            performSearch()
+        viewModel.destroySavedSceneFilter(id: sid) { result in
+            switch result {
+            case .success:
+                HapticManager.success()
+                groupsPresetRowSelection = ""
+                selectedFilter = nil
+                groupsCriteriaDocument.clear()
+                viewModel.fetchSavedFilters()
+                performSearch()
+            case .failure(let error):
+                ToastManager.shared.show("Delete failed: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill", style: .error)
+            }
         }
     }
 
     // Search function
     private func performSearch(isInitialLoad: Bool = true) {
-        viewModel.fetchGroups(sortBy: selectedSortOption, searchQuery: searchText, isInitialLoad: isInitialLoad, filter: selectedFilter)
+        viewModel.fetchGroups(
+            sortBy: selectedSortOption,
+            searchQuery: searchText,
+            isInitialLoad: isInitialLoad,
+            filter: selectedFilter,
+            liveFilter: effectiveLiveFilter
+        )
     }
 
     var body: some View {
@@ -438,11 +478,7 @@ private struct GroupsViewContent: View {
                 criteriaDocument: groupsCriteriaDocument,
                 sortOption: selectedSortOption,
                 onSortChange: { changeSortOption(to: $0) },
-                onApply: {
-                    selectedFilter = nil
-                    // Apply full document as temporary filter by using live path: fetch with object filter via selectedFilter workaround
-                    performSearchWithCriteria()
-                },
+                onApply: { performSearch() },
                 onReset: {
                     groupsPresetRowSelection = ""
                     selectedFilter = nil
@@ -450,11 +486,32 @@ private struct GroupsViewContent: View {
                     performSearch()
                 },
                 onRequestSave: { saveGroupsFilterOverwrite() },
-                onRequestSaveAs: { saveGroupsFilterAs() },
-                onRequestRename: { renameGroupsFilter() },
-                onRequestDelete: { deleteGroupsFilter() }
+                onRequestSaveAs: {
+                    groupsFilterNameInput = ""
+                    showGroupsSaveAsAlert = true
+                },
+                onRequestRename: {
+                    guard let sid = ListLivePresetTag.parseServerId(groupsPresetRowSelection) else { return }
+                    groupsFilterNameInput = viewModel.savedFilters[sid]?.name ?? ""
+                    showGroupsRenameAlert = true
+                },
+                onRequestDelete: { showGroupsDeleteAlert = true }
             )
             .environmentObject(viewModel)
+        }
+        .alert("Save filter as", isPresented: $showGroupsSaveAsAlert) {
+            TextField("Name", text: $groupsFilterNameInput)
+            Button("Save") { saveGroupsFilterAs(name: groupsFilterNameInput) }
+            Button("Cancel", role: .cancel) {}
+        }
+        .alert("Rename filter", isPresented: $showGroupsRenameAlert) {
+            TextField("Name", text: $groupsFilterNameInput)
+            Button("Save") { renameGroupsFilter(to: groupsFilterNameInput) }
+            Button("Cancel", role: .cancel) {}
+        }
+        .alert("Delete filter?", isPresented: $showGroupsDeleteAlert) {
+            Button("Delete", role: .destructive) { deleteGroupsFilter() }
+            Button("Cancel", role: .cancel) {}
         }
         .onAppear {
             viewModel.fetchSavedFilters()
@@ -698,11 +755,6 @@ struct GroupDetailView: View {
     @StateObject private var linkedStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
-    @StateObject private var linkedPerformersCriteriaDocument = FilterCriteriaDocument(mode: .performers)
-    @StateObject private var linkedTagsCriteriaDocument = FilterCriteriaDocument(mode: .tags)
-    @StateObject private var linkedStudiosCriteriaDocument = FilterCriteriaDocument(mode: .studios)
-    @StateObject private var linkedGalleriesCriteriaDocument = FilterCriteriaDocument(mode: .galleries)
-    @StateObject private var linkedImagesCriteriaDocument = FilterCriteriaDocument(mode: .images)
 
     private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
     private var navActionGroupSpacing: CGFloat { 7 }
@@ -1171,8 +1223,7 @@ struct GroupDetailView: View {
             serverFilters: linkedPerformers.sortedServerPerformerFilters(viewModel: viewModel),
             localPresets: linkedPerformers.localCatalogPresets,
             selectedPresetRowId: $linkedPerformers.catalogPresetRowSelection,
-            criteriaDocument: linkedPerformersCriteriaDocument,
-            liveChipRowsVisible: linkedPerformers.performerLiveChipRowsVisible,
+            criteriaDocument: linkedPerformers.criteriaDocument,
             sortOption: linkedPerformers.selectedSortOption,
             onSortChange: { linkedPerformers.changeSortOption(to: $0, viewModel: viewModel) },
             liveAgeRange: $linkedPerformers.liveFilterAgeRange,
@@ -1188,6 +1239,7 @@ struct GroupDetailView: View {
                 linkedPerformers.catalogPresetRowSelection = ""
                 linkedPerformers.selectedFilter = nil
                 linkedPerformers.clearLiveChipsOnly()
+                    linkedPerformers.criteriaDocument.clear()
                 linkedPerformers.applyLiveFilter(viewModel: viewModel)
             },
             onRequestSave: { linkedPerformers.savePresetOverwrite(viewModel: viewModel) },
@@ -1223,8 +1275,7 @@ struct GroupDetailView: View {
             serverFilters: linkedTags.sortedServerTagFilters(viewModel: viewModel),
             localPresets: linkedTags.localCatalogPresets,
             selectedPresetRowId: $linkedTags.catalogPresetRowSelection,
-            criteriaDocument: linkedTagsCriteriaDocument,
-            liveChipRowsVisible: linkedTags.tagLiveChipRowsVisible,
+            criteriaDocument: linkedTags.criteriaDocument,
             sortOption: linkedTags.selectedSortOption,
             onSortChange: { linkedTags.changeSortOption(to: $0, viewModel: viewModel) },
             liveFavorite: $linkedTags.liveFilterFavorite,
@@ -1234,6 +1285,7 @@ struct GroupDetailView: View {
                 linkedTags.catalogPresetRowSelection = ""
                 linkedTags.selectedFilter = nil
                 linkedTags.clearLiveChipsOnly()
+                linkedTags.criteriaDocument.clear()
                 linkedTags.applyLiveFilter(viewModel: viewModel)
             },
             onRequestSave: { linkedTags.savePresetOverwrite(viewModel: viewModel) },
@@ -1269,8 +1321,7 @@ struct GroupDetailView: View {
             serverFilters: linkedStudios.sortedServerStudioFilters(viewModel: viewModel),
             localPresets: linkedStudios.localCatalogPresets,
             selectedPresetRowId: $linkedStudios.catalogPresetRowSelection,
-            criteriaDocument: linkedStudiosCriteriaDocument,
-            liveChipRowsVisible: linkedStudios.studioLiveChipRowsVisible,
+            criteriaDocument: linkedStudios.criteriaDocument,
             sortOption: linkedStudios.selectedSortOption,
             onSortChange: { linkedStudios.changeSortOption(to: $0, viewModel: viewModel) },
             liveMinRating: $linkedStudios.liveFilterMinRating,
@@ -1281,6 +1332,7 @@ struct GroupDetailView: View {
                 linkedStudios.catalogPresetRowSelection = ""
                 linkedStudios.selectedFilter = nil
                 linkedStudios.clearLiveChipsOnly()
+                linkedStudios.criteriaDocument.clear()
                 linkedStudios.applyLiveFilter(viewModel: viewModel)
             },
             onRequestSave: { linkedStudios.savePresetOverwrite(viewModel: viewModel) },
@@ -1316,8 +1368,7 @@ struct GroupDetailView: View {
             serverFilters: linkedGalleries.sortedServerGalleryFilters(viewModel: viewModel),
             localPresets: linkedGalleries.localCatalogPresets,
             selectedPresetRowId: $linkedGalleries.catalogPresetRowSelection,
-            criteriaDocument: linkedGalleriesCriteriaDocument,
-            liveChipRowsVisible: linkedGalleries.galleryLiveChipRowsVisible,
+            criteriaDocument: linkedGalleries.criteriaDocument,
             sortOption: linkedGalleries.selectedSortOption,
             onSortChange: { linkedGalleries.changeSortOption(to: $0, viewModel: viewModel) },
             liveMinRating: $linkedGalleries.liveFilterMinRating,
@@ -1332,6 +1383,7 @@ struct GroupDetailView: View {
                 linkedGalleries.catalogPresetRowSelection = ""
                 linkedGalleries.selectedFilter = nil
                 linkedGalleries.clearLiveChipsOnly()
+                linkedGalleries.criteriaDocument.clear()
                 linkedGalleries.applyLiveFilter(viewModel: viewModel)
             },
             onRequestSave: { linkedGalleries.savePresetOverwrite(viewModel: viewModel) },
@@ -1369,9 +1421,8 @@ struct GroupDetailView: View {
             serverFilters: linkedImages.sortedServerImageFilters(viewModel: viewModel),
             localPresets: linkedImages.localCatalogPresets,
             selectedPresetRowId: $linkedImages.catalogPresetRowSelection,
-            criteriaDocument: linkedImagesCriteriaDocument,
+            criteriaDocument: linkedImages.criteriaDocument,
             filterMenuTitleFallback: linkedImages.selectedFilter?.name,
-            liveChipRowsVisible: linkedImages.imageLiveChipRowsVisible,
             showMediaTypeFilter: linkedImages.showImageMediaTypeFilter,
             sortOption: linkedImages.selectedSortOption,
             onSortChange: { linkedImages.changeSortOption(to: $0, viewModel: viewModel) },
@@ -1393,6 +1444,7 @@ struct GroupDetailView: View {
                 linkedImages.catalogPresetRowSelection = ""
                 linkedImages.selectedFilter = nil
                 linkedImages.clearLiveChipsOnly()
+                linkedImages.criteriaDocument.clear()
                 linkedImages.refetchImages(viewModel: viewModel, initial: true)
             },
             onRequestSave: { linkedImages.savePresetOverwrite(viewModel: viewModel) },

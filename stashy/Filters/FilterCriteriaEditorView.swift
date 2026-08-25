@@ -22,8 +22,8 @@ struct FilterCriteriaEditorView: View {
                     .font(.subheadline)
                     .foregroundColor(.secondary)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 14)
+                    .padding(.horizontal, DesignTokens.Spacing.md)
+                    .padding(.vertical, DesignTokens.Spacing.sm + 2)
             } else {
                 ForEach(document.criterionKeys, id: \.self) { key in
                     criterionRow(key: key)
@@ -32,28 +32,29 @@ struct FilterCriteriaEditorView: View {
                     }
                 }
             }
-            Divider().padding(.leading, 16)
+            Divider().padding(.leading, DesignTokens.Spacing.md)
             Menu {
                 ForEach(addableFields) { field in
                     Button(field.label) {
                         document.addDefaultCriterion(for: field)
+                        HapticManager.selection()
                         onChange()
                     }
                 }
             } label: {
-                HStack(spacing: 8) {
+                HStack(spacing: DesignTokens.Spacing.xs) {
                     Image(systemName: "plus.circle.fill")
-                        .foregroundColor(appearance.tintColor)
+                        .foregroundColor(addableFields.isEmpty ? .secondary : appearance.tintColor)
                     Text("Add criterion")
                         .font(.subheadline.weight(.semibold))
-                        .foregroundColor(.primary)
+                        .foregroundColor(addableFields.isEmpty ? .secondary : .primary)
                     Spacer()
                     Image(systemName: "chevron.up.chevron.down")
                         .font(.caption.weight(.semibold))
                         .foregroundColor(.secondary)
                 }
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
+                .padding(.horizontal, DesignTokens.Spacing.md)
+                .padding(.vertical, DesignTokens.Spacing.sm + 2)
                 .contentShape(Rectangle())
             }
             .disabled(addableFields.isEmpty)
@@ -63,9 +64,9 @@ struct FilterCriteriaEditorView: View {
             if embedsInCard {
                 content
                     .background(Color.secondaryAppBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                    .padding(.horizontal, 16)
-                    .padding(.bottom, 8)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                    .padding(.horizontal, DesignTokens.Spacing.md)
+                    .padding(.bottom, DesignTokens.Spacing.xs)
             } else {
                 content
             }
@@ -86,21 +87,22 @@ struct FilterCriteriaEditorView: View {
             ?? FilterFieldDescriptor(key: key, label: key, kind: .raw)
 
         VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .top, spacing: DesignTokens.Spacing.sm) {
                 Text(field.label)
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(.secondary)
                     .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-                    .padding(.top, 12)
+                    .padding(.top, DesignTokens.Spacing.sm)
 
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
                     criterionEditor(field: field)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, 10)
+                .padding(.vertical, DesignTokens.Spacing.xs + 2)
 
                 Button {
                     document.removeCriterion(key: key)
+                    HapticManager.selection()
                     onChange()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
@@ -108,13 +110,12 @@ struct FilterCriteriaEditorView: View {
                         .foregroundColor(.secondary.opacity(0.55))
                 }
                 .buttonStyle(.plain)
-                .padding(.top, 12)
+                .padding(.top, DesignTokens.Spacing.sm)
                 .accessibilityLabel("Remove \(field.label)")
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, DesignTokens.Spacing.md)
         }
     }
-
     @ViewBuilder
     private func criterionEditor(field: FilterFieldDescriptor) -> some View {
         switch field.kind {
@@ -242,59 +243,37 @@ struct FilterCriteriaEditorView: View {
     }
 
     private func nestedEditorSheet(key: String) -> some View {
-        NavigationView {
+        let title = FilterFieldCatalog.field(key: key, mode: document.mode)?.label ?? key
+        return NavigationStack {
             ScrollView {
-                VStack(alignment: .leading, spacing: 16) {
-                    FilterCriteriaEditorView(
-                        document: nestedDocument,
-                        onChange: {},
-                        embedsInCard: true
-                    )
-                    .padding(.top, 8)
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
+                    FilterCriteriaEditorView(document: nestedDocument, onChange: {})
+                        .padding(.top, DesignTokens.Spacing.xs)
                 }
             }
-            .background(Color.appBackground)
-            .catalogSettingsSheetChrome(
-                hasSelectedPreset: true,
-                onReset: { nestedDocument.clear() },
-                onRequestSave: {
-                    document.setDictCriterion(key: key, dict: nestedDocument.sanitizedObjectFilter)
-                    nestedEditorKey = nil
-                    onChange()
-                },
-                onRequestSaveAs: {
-                    document.setDictCriterion(key: key, dict: nestedDocument.sanitizedObjectFilter)
-                    nestedEditorKey = nil
-                    onChange()
-                },
-                onRequestRename: {},
-                onRequestDelete: {
-                    nestedDocument.clear()
-                }
-            )
-            // Override chrome title via empty rename/delete disabled feel — use simple Done bar instead.
-            .safeAreaInset(edge: .bottom, spacing: 0) {
-                HStack {
+            .background(Color.appBackground.ignoresSafeArea())
+            .navigationTitle(title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
                     Button("Cancel") { nestedEditorKey = nil }
-                        .foregroundColor(.secondary)
-                    Spacer()
+                }
+                ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
-                        document.setDictCriterion(key: key, dict: nestedDocument.sanitizedObjectFilter)
+                        let dict = nestedDocument.sanitizedObjectFilter
+                        if dict.isEmpty {
+                            document.removeCriterion(key: key)
+                        } else {
+                            document.setDictCriterion(key: key, dict: dict)
+                        }
                         nestedEditorKey = nil
                         onChange()
                     }
-                    .font(.body.weight(.semibold))
-                    .foregroundColor(appearance.tintColor)
+                    .fontWeight(.semibold)
                 }
-                .padding(.horizontal, 20)
-                .padding(.vertical, 14)
-                .background(.ultraThinMaterial)
             }
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .navigationViewStyle(.stack)
         .presentationDetents([.large])
-        .presentationBackground(Color(UIColor.systemGroupedBackground))
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
     }
@@ -312,20 +291,20 @@ private extension View {
     func filterEditorTextFieldChrome() -> some View {
         self
             .textFieldStyle(.plain)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, DesignTokens.Spacing.xs + 2)
+            .padding(.vertical, DesignTokens.Spacing.xs)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.appBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small - 2))
     }
 
     func filterEditorTextEditorChrome() -> some View {
         self
-            .padding(8)
+            .padding(DesignTokens.Spacing.xs)
             .scrollContentBackground(.hidden)
             .frame(maxWidth: .infinity, minHeight: 80, alignment: .topLeading)
             .background(Color.appBackground)
-            .clipShape(RoundedRectangle(cornerRadius: 8))
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small - 2))
     }
 }
 
@@ -380,6 +359,8 @@ struct FilterStringCriterionRow: View {
     var modifiers: [StashCriterionModifier] = FilterCriterionKind.defaultModifiers(for: .string)
     var onChange: () -> Void
 
+    @FocusState private var isFocused: Bool
+
     private var modifierRaw: String {
         (value["modifier"] as? String) ?? StashCriterionModifier.includes.rawValue
     }
@@ -393,27 +374,32 @@ struct FilterStringCriterionRow: View {
             FilterModifierPicker(
                 modifier: Binding(
                     get: { modifierRaw },
-                    set: { update(["modifier": $0]) }
+                    set: { patch(["modifier": $0], commit: true) }
                 ),
                 options: modifiers,
-                onChange: onChange
+                onChange: {}
             )
             if needsValue {
+                // Text edits only update the document; `onChange` (= refetch) fires on commit.
                 TextField(placeholder, text: Binding(
                     get: { value["value"] as? String ?? "" },
-                    set: { update(["value": $0]) }
+                    set: { patch(["value": $0], commit: false) }
                 ))
                 .filterEditorTextFieldChrome()
+                .focused($isFocused)
                 .onSubmit { onChange() }
+                .onChange(of: isFocused) { _, focused in
+                    if !focused { onChange() }
+                }
             }
         }
     }
 
-    private func update(_ patch: [String: Any]) {
+    private func patch(_ updates: [String: Any], commit: Bool) {
         var next = value
-        for (k, v) in patch { next[k] = v }
+        for (k, v) in updates { next[k] = v }
         value = next
-        onChange()
+        if commit { onChange() }
     }
 }
 
@@ -421,6 +407,8 @@ struct FilterNumericCriterionRow: View {
     @Binding var value: [String: Any]
     var isFloat: Bool
     var onChange: () -> Void
+
+    @FocusState private var focusedField: Int?
 
     private var modifierRaw: String {
         (value["modifier"] as? String) ?? StashCriterionModifier.equals.rawValue
@@ -435,49 +423,66 @@ struct FilterNumericCriterionRow: View {
             FilterModifierPicker(
                 modifier: Binding(
                     get: { modifierRaw },
-                    set: { update(["modifier": $0]) }
+                    set: { patch(["modifier": $0], commit: true) }
                 ),
                 options: FilterCriterionKind.defaultModifiers(for: isFloat ? .float : .int),
-                onChange: onChange
+                onChange: {}
             )
             if mod?.needsValue == true {
                 HStack(spacing: 8) {
                     TextField("Value", text: numberText(key: "value"))
                         .keyboardType(isFloat ? .decimalPad : .numberPad)
                         .filterEditorTextFieldChrome()
+                        .focused($focusedField, equals: 0)
                     if mod?.needsSecondValue == true {
                         TextField("Value 2", text: numberText(key: "value2"))
                             .keyboardType(isFloat ? .decimalPad : .numberPad)
                             .filterEditorTextFieldChrome()
+                            .focused($focusedField, equals: 1)
                     }
+                }
+                .onChange(of: focusedField) { _, new in
+                    if new == nil { onChange() }
                 }
             }
         }
     }
 
+    /// Keeps the raw string so a field can be cleared or hold a partial number ("1.") while typing.
     private func numberText(key: String) -> Binding<String> {
         Binding(
             get: {
+                if let s = value["\(key)_text"] as? String { return s }
                 if let i = value[key] as? Int { return String(i) }
                 if let d = value[key] as? Double { return String(d) }
                 if let n = value[key] as? NSNumber { return n.stringValue }
                 return ""
             },
             set: { raw in
-                if isFloat {
-                    update([key: Double(raw) ?? 0])
+                var next = value
+                if raw.isEmpty {
+                    next.removeValue(forKey: key)
+                    next.removeValue(forKey: "\(key)_text")
+                } else if isFloat, let d = Double(raw) {
+                    next[key] = d
+                    next.removeValue(forKey: "\(key)_text")
+                } else if !isFloat, let i = Int(raw) {
+                    next[key] = i
+                    next.removeValue(forKey: "\(key)_text")
                 } else {
-                    update([key: Int(raw) ?? 0])
+                    // Partial input ("-", "1.") — remember the text, keep the last valid number out of the filter.
+                    next["\(key)_text"] = raw
                 }
+                value = next
             }
         )
     }
 
-    private func update(_ patch: [String: Any]) {
+    private func patch(_ updates: [String: Any], commit: Bool) {
         var next = value
-        for (k, v) in patch { next[k] = v }
+        for (k, v) in updates { next[k] = v }
         value = next
-        onChange()
+        if commit { onChange() }
     }
 }
 
@@ -559,7 +564,9 @@ struct FilterGenderCriterionRow: View {
         (value["modifier"] as? String) ?? StashCriterionModifier.includes.rawValue
     }
 
+    /// `GenderCriterionInput` carries a single `value` and a multi `value_list`; read both, write `value_list`.
     private var selected: Set<String> {
+        if let arr = value["value_list"] as? [String] { return Set(arr) }
         if let arr = value["value"] as? [String] { return Set(arr) }
         if let s = value["value"] as? String { return [s] }
         return []
@@ -587,7 +594,8 @@ struct FilterGenderCriterionRow: View {
                         if next.contains(opt.rawValue) { next.remove(opt.rawValue) }
                         else { next.insert(opt.rawValue) }
                         var d = value
-                        d["value"] = Array(next)
+                        d.removeValue(forKey: "value")
+                        d["value_list"] = Array(next).sorted()
                         value = d
                         onChange()
                     }
@@ -633,7 +641,7 @@ struct FilterIsMissingRow: View {
         VStack(alignment: .leading, spacing: 8) {
             TextField("Property name", text: $value)
                 .filterEditorTextFieldChrome()
-                .onChange(of: value) { _, _ in onChange() }
+                .onSubmit { onChange() }
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                     ForEach(common, id: \.self) { c in
@@ -686,28 +694,22 @@ struct FilterStashIDCriterionRow: View {
                     if $0.isEmpty { d.removeValue(forKey: "endpoint") }
                     else { d["endpoint"] = $0 }
                     value = d
-                    onChange()
                 }
             ))
             .filterEditorTextFieldChrome()
-            if multi {
-                TextField("Stash IDs (comma-separated)", text: Binding(
-                    get: {
-                        if let arr = value["stash_ids"] as? [String] { return arr.joined(separator: ", ") }
-                        return ""
-                    },
+            .onSubmit { onChange() }
+            // `StashIDCriterionInput` only has `endpoint`, `stash_id` and `modifier` — no id list.
+            if StashCriterionModifier(rawValue: modifierRaw)?.needsValue ?? true {
+                TextField("Stash ID", text: Binding(
+                    get: { value["stash_id"] as? String ?? "" },
                     set: {
-                        let parts = $0.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }
-                        patch(["stash_ids": parts])
+                        var d = value
+                        if $0.isEmpty { d.removeValue(forKey: "stash_id") } else { d["stash_id"] = $0 }
+                        value = d
                     }
                 ))
                 .filterEditorTextFieldChrome()
-            } else {
-                TextField("Stash ID", text: Binding(
-                    get: { value["stash_id"] as? String ?? "" },
-                    set: { patch(["stash_id": $0]) }
-                ))
-                .filterEditorTextFieldChrome()
+                .onSubmit { onChange() }
             }
         }
     }
@@ -728,9 +730,14 @@ struct FilterPhashDistanceRow: View {
         VStack(alignment: .leading, spacing: 8) {
             TextField("PHash", text: Binding(
                 get: { value["value"] as? String ?? "" },
-                set: { patch(["value": $0]) }
+                set: {
+                    var d = value
+                    d["value"] = $0
+                    value = d
+                }
             ))
             .filterEditorTextFieldChrome()
+            .onSubmit { onChange() }
             TextField("Distance", text: Binding(
                 get: {
                     if let i = value["distance"] as? Int { return String(i) }
@@ -756,25 +763,41 @@ struct FilterDuplicationRow: View {
     @Binding var value: [String: Any]
     var onChange: () -> Void
 
+    /// `PHashDuplicationCriterionInput { duplicated: Boolean, distance: Int }`.
+    private var duplicated: Bool { value["duplicated"] as? Bool ?? true }
+
+    private var distanceText: String {
+        if let i = value["distance"] as? Int { return String(i) }
+        if let n = value["distance"] as? NSNumber { return n.stringValue }
+        return ""
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            toggle("PHash", key: "phash")
-            toggle("URL", key: "url")
-            toggle("Stash ID", key: "stash_id")
-            toggle("Title", key: "title")
+            HStack(spacing: 8) {
+                CatalogFilterChip(title: "Duplicated", isActive: duplicated) { patch(["duplicated": true]) }
+                CatalogFilterChip(title: "Unique", isActive: !duplicated) { patch(["duplicated": false]) }
+            }
+            TextField("PHash distance (optional)", text: Binding(
+                get: { distanceText },
+                set: { raw in
+                    var d = value
+                    if raw.isEmpty { d.removeValue(forKey: "distance") }
+                    else { d["distance"] = Int(raw) ?? 0 }
+                    value = d
+                }
+            ))
+            .keyboardType(.numberPad)
+            .filterEditorTextFieldChrome()
+            .onSubmit { onChange() }
         }
     }
 
-    private func toggle(_ title: String, key: String) -> some View {
-        Toggle(title, isOn: Binding(
-            get: { value[key] as? Bool ?? false },
-            set: {
-                var d = value
-                d[key] = $0
-                value = d
-                onChange()
-            }
-        ))
+    private func patch(_ updates: [String: Any]) {
+        var d = value
+        for (k, v) in updates { d[k] = v }
+        value = d
+        onChange()
     }
 }
 
@@ -782,22 +805,38 @@ struct FilterCustomFieldsRow: View {
     @Binding var value: [[String: Any]]
     var onChange: () -> Void
 
+    /// Stable identity per row so editing/removing does not rebind neighbouring text fields.
+    private struct Row: Identifiable {
+        let id: Int
+        let index: Int
+    }
+
+    private var rows: [Row] {
+        value.indices.map { idx in
+            let field = value[idx]["field"] as? String ?? ""
+            return Row(id: field.isEmpty ? idx : field.hashValue, index: idx)
+        }
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            ForEach(Array(value.indices), id: \.self) { idx in
+            ForEach(rows) { row in
+                let idx = row.index
                 VStack(alignment: .leading, spacing: 6) {
                     TextField("Field", text: Binding(
-                        get: { value[idx]["field"] as? String ?? "" },
+                        get: { value.indices.contains(idx) ? (value[idx]["field"] as? String ?? "") : "" },
                         set: {
-                            var rows = value
-                            rows[idx]["field"] = $0
-                            value = rows
-                            onChange()
+                            guard value.indices.contains(idx) else { return }
+                            var next = value
+                            next[idx]["field"] = $0
+                            value = next
                         }
                     ))
                     .filterEditorTextFieldChrome()
+                    .onSubmit { onChange() }
                     TextField("Value", text: Binding(
                         get: {
+                            guard value.indices.contains(idx) else { return "" }
                             if let arr = value[idx]["value"] as? [String] { return arr.joined(separator: ", ") }
                             if let arr = value[idx]["value"] as? [Any] {
                                 return arr.map { "\($0)" }.joined(separator: ", ")
@@ -805,31 +844,33 @@ struct FilterCustomFieldsRow: View {
                             return ""
                         },
                         set: {
+                            guard value.indices.contains(idx) else { return }
                             let parts = $0.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
-                            var rows = value
-                            rows[idx]["value"] = parts
-                            value = rows
-                            onChange()
+                            var next = value
+                            next[idx]["value"] = parts
+                            value = next
                         }
                     ))
                     .filterEditorTextFieldChrome()
+                    .onSubmit { onChange() }
                     Button("Remove field", role: .destructive) {
-                        var rows = value
-                        rows.remove(at: idx)
-                        value = rows
+                        guard value.indices.contains(idx) else { return }
+                        var next = value
+                        next.remove(at: idx)
+                        value = next
                         onChange()
                     }
                     .font(.caption)
                 }
             }
             Button("Add custom field") {
-                var rows = value
-                rows.append([
+                var next = value
+                next.append([
                     "field": "",
                     "value": [] as [Any],
                     "modifier": StashCriterionModifier.equals.rawValue
                 ])
-                value = rows
+                value = next
                 onChange()
             }
             .font(.subheadline.weight(.semibold))
@@ -841,18 +882,31 @@ struct FilterRawJSONRow: View {
     @Binding var value: [String: Any]
     var onChange: () -> Void
     @State private var text: String = ""
+    @State private var parseError: String?
 
     var body: some View {
-        TextEditor(text: $text)
-            .filterEditorTextEditorChrome()
-            .onAppear { text = prettyJSON(value) }
-            .onChange(of: text) { _, new in
-                if let data = new.data(using: .utf8),
-                   let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+        VStack(alignment: .leading, spacing: 6) {
+            TextEditor(text: $text)
+                .filterEditorTextEditorChrome()
+                .onAppear { text = prettyJSON(value) }
+                .onChange(of: text) { _, new in
+                    guard let data = new.data(using: .utf8) else {
+                        parseError = "Invalid text encoding"
+                        return
+                    }
+                    guard let obj = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+                        parseError = "Not a valid JSON object"
+                        return
+                    }
+                    parseError = nil
                     value = obj
-                    onChange()
                 }
+            if let parseError {
+                Label(parseError, systemImage: "exclamationmark.triangle.fill")
+                    .font(.caption)
+                    .foregroundColor(.orange)
             }
+        }
     }
 
     private func prettyJSON(_ dict: [String: Any]) -> String {
@@ -863,7 +917,7 @@ struct FilterRawJSONRow: View {
     }
 }
 
-/// Multi-ID criterion with entity picker — owns its own ViewModel so sheets never crash on missing EnvironmentObject.
+/// Multi-ID criterion with entity picker, backed by the shared cached option store.
 struct FilterMultiIdCriterionRow: View {
     @Binding var value: [String: Any]
     var entityKey: String
@@ -871,10 +925,19 @@ struct FilterMultiIdCriterionRow: View {
     var mode: StashDBViewModel.FilterMode
     var onChange: () -> Void
 
-    @StateObject private var pickerViewModel = StashDBViewModel()
-    @State private var options: [FilterEntityOption] = []
-    @State private var loading = false
-    @State private var didLoad = false
+    @ObservedObject private var store = FilterPickerOptionsStore.shared
+
+    private var kind: FilterPickerOptionsStore.Kind? {
+        FilterPickerOptionsStore.kind(forCriterionKey: entityKey, mode: mode)
+    }
+
+    private var options: [FilterEntityOption] {
+        kind.map { store.cached($0) } ?? []
+    }
+
+    private var isLoading: Bool {
+        kind.map { store.isLoading($0) } ?? false
+    }
 
     private var modifierRaw: String {
         (value["modifier"] as? String) ?? StashCriterionModifier.includes.rawValue
@@ -892,7 +955,7 @@ struct FilterMultiIdCriterionRow: View {
                     set: { patch(["modifier": $0]) }
                 ),
                 options: FilterCriterionKind.defaultModifiers(for: hierarchical ? .hierarchicalMulti : .multi),
-                onChange: onChange
+                onChange: {}
             )
             CatalogNamedEntityLiveFilterMultiPickerRow(
                 title: "",
@@ -902,18 +965,12 @@ struct FilterMultiIdCriterionRow: View {
                 ),
                 items: options,
                 displayName: { $0.name },
-                isLoading: loading,
+                isLoading: isLoading,
                 onAppearLoad: loadIfNeeded,
-                onSelectionChange: {
-                    if hierarchical, value["depth"] == nil {
-                        patch(["depth": 0])
-                    } else {
-                        onChange()
-                    }
-                }
+                onSelectionChange: {}
             )
         }
-        .onAppear { loadIfNeeded() }
+        .onAppear(perform: loadIfNeeded)
     }
 
     private func patch(_ updates: [String: Any]) {
@@ -925,46 +982,7 @@ struct FilterMultiIdCriterionRow: View {
     }
 
     private func loadIfNeeded() {
-        guard !didLoad else { return }
-        didLoad = true
-        loading = true
-        let key = entityKey.lowercased()
-        if key.contains("studio") {
-            let studioMode: StashDBViewModel.LiveFilterStudioPickerMode = {
-                switch mode {
-                case .images: return .imagesHasImages
-                case .galleries: return .galleriesHasGalleries
-                default: return .scenesHasScenes
-                }
-            }()
-            pickerViewModel.fetchStudiosForLiveFilterPicker(mode: studioMode) { list in
-                options = list.map { FilterEntityOption(id: $0.id, name: $0.name) }
-                loading = false
-            }
-        } else if key.contains("tag") {
-            if mode == .images {
-                pickerViewModel.fetchTagsForImageLiveFilterPicker { list in
-                    options = list.map { FilterEntityOption(id: $0.id, name: $0.name) }
-                    loading = false
-                }
-            } else {
-                pickerViewModel.fetchTagsForSceneLiveFilterPicker { list in
-                    options = list.map { FilterEntityOption(id: $0.id, name: $0.name) }
-                    loading = false
-                }
-            }
-        } else if key.contains("group") || key.contains("movie") {
-            pickerViewModel.fetchGroupsForSceneLiveFilterPicker { list in
-                options = list.map { FilterEntityOption(id: $0.id, name: $0.name) }
-                loading = false
-            }
-        } else if key.contains("performer") {
-            pickerViewModel.fetchPerformersForFilterPicker { list in
-                options = list
-                loading = false
-            }
-        } else {
-            loading = false
-        }
+        guard let kind else { return }
+        store.load(kind)
     }
 }

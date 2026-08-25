@@ -61,7 +61,9 @@
 		971A00032F999003 /* RateMeToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00042F999004 /* RateMeToolsView.swift */; };
 		821D4E34EE344BBC881B7E2E /* FilterCriterionTypes.swift in Sources */ = {isa = PBXBuildFile; fileRef = D32D9793F36147319D8FF8BF /* FilterCriterionTypes.swift */; };
 		F3FAA876F0564E51BFE25096 /* FilterFieldCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEA1E8DCB9534BA393BDCA09 /* FilterFieldCatalog.swift */; };
+		A1B2C3D40004400180011004 /* AdvancedCriteriaCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40003400180011003 /* AdvancedCriteriaCard.swift */; };
 		4FA2DDB674AB41BC92ACAB15 /* FilterCriteriaDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2195D672B4B04628BD280AA1 /* FilterCriteriaDocument.swift */; };
+		A1B2C3D40002400180011002 /* FilterPickerOptionsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */; };
 		13B8ED271E86457390593F48 /* FilterCriteriaEditorView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0D91ABA114F544C390FD6F8E /* FilterCriteriaEditorView.swift */; };
 		B981A60AAA104A77A56B0923 /* FiltersToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 130472FFD9E64071BF78EDAE /* FiltersToolsView.swift */; };
 		971A00052F999005 /* TopListsToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 971A00062F999006 /* TopListsToolsView.swift */; };
@@ -205,7 +207,9 @@
 		971A00042F999004 /* RateMeToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RateMeToolsView.swift; sourceTree = "<group>"; };
 		D32D9793F36147319D8FF8BF /* FilterCriterionTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterCriterionTypes.swift; sourceTree = "<group>"; };
 		FEA1E8DCB9534BA393BDCA09 /* FilterFieldCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterFieldCatalog.swift; sourceTree = "<group>"; };
+		A1B2C3D40003400180011003 /* AdvancedCriteriaCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvancedCriteriaCard.swift; sourceTree = "<group>"; };
 		2195D672B4B04628BD280AA1 /* FilterCriteriaDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterCriteriaDocument.swift; sourceTree = "<group>"; };
+		A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterPickerOptionsStore.swift; sourceTree = "<group>"; };
 		0D91ABA114F544C390FD6F8E /* FilterCriteriaEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterCriteriaEditorView.swift; sourceTree = "<group>"; };
 		130472FFD9E64071BF78EDAE /* FiltersToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FiltersToolsView.swift; sourceTree = "<group>"; };
 		971A00062F999006 /* TopListsToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopListsToolsView.swift; sourceTree = "<group>"; };
@@ -493,7 +497,9 @@
 			children = (
 				D32D9793F36147319D8FF8BF /* FilterCriterionTypes.swift */,
 				FEA1E8DCB9534BA393BDCA09 /* FilterFieldCatalog.swift */,
+				A1B2C3D40003400180011003 /* AdvancedCriteriaCard.swift */,
 				2195D672B4B04628BD280AA1 /* FilterCriteriaDocument.swift */,
+				A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */,
 				0D91ABA114F544C390FD6F8E /* FilterCriteriaEditorView.swift */,
 				130472FFD9E64071BF78EDAE /* FiltersToolsView.swift */
 			);
@@ -706,7 +712,9 @@
 				971A00032F999003 /* RateMeToolsView.swift in Sources */,
 				821D4E34EE344BBC881B7E2E /* FilterCriterionTypes.swift in Sources */,
 				F3FAA876F0564E51BFE25096 /* FilterFieldCatalog.swift in Sources */,
+				A1B2C3D40004400180011004 /* AdvancedCriteriaCard.swift in Sources */,
 				4FA2DDB674AB41BC92ACAB15 /* FilterCriteriaDocument.swift in Sources */,
+				A1B2C3D40002400180011002 /* FilterPickerOptionsStore.swift in Sources */,
 				13B8ED271E86457390593F48 /* FilterCriteriaEditorView.swift in Sources */,
 				B981A60AAA104A77A56B0923 /* FiltersToolsView.swift in Sources */,
 				971A00052F999005 /* TopListsToolsView.swift in Sources */,
