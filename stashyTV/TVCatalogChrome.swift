@@ -184,6 +184,9 @@ struct TVCatalogGrid<Item: Identifiable, Card: View, Header: View>: View where I
                 .foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity)
+        // `TVScenesView` wird vom Dashboard aus gepusht — ohne fokussierbares
+        // Element erreicht die Menu-Taste `tvExitDismissable` nicht.
+        .focusable()
         Spacer()
     }
 

@@ -249,6 +249,10 @@ struct TVStashyPlusSettingsView: View {
                 }
 
                 featureRow(icon: "sparkles.tv.fill", text: "Channels")
+                    // Wer stashy+ bereits besitzt, bekommt weder Kauf- noch
+                    // Restore-Button — dann ist diese Zeile das einzige
+                    // fokussierbare Element und damit der Weg zurück.
+                    .focusable(!stashyPlus.shouldOfferPurchases)
             } header: {
                 Text("stashy+")
             } footer: {

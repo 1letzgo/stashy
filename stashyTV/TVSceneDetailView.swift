@@ -64,6 +64,8 @@ struct TVSceneDetailView: View {
                         Spacer(minLength: 400)
                     }
                     .frame(maxWidth: .infinity)
+                    // Fokus-Ziel für die Menu-Taste während des Ladens.
+                    .focusable()
                 } else if let scene = sceneDetail {
                     VStack(alignment: .leading, spacing: 50) {
                         

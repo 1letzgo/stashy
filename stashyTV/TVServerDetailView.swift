@@ -31,6 +31,7 @@ struct TVServerDetailView: View {
                         .font(.title3)
                         .foregroundStyle(.secondary)
                         .padding(.top, 60)
+                        .focusable()
                 }
                 Spacer(minLength: 80)
             }

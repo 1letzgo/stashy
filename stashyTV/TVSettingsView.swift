@@ -404,6 +404,7 @@ private struct TVPlaybackSettingsView: View {
                 } else {
                     Text("Connect to a server to configure quality.")
                         .foregroundStyle(.secondary)
+                        .focusable()
                 }
             } header: {
                 Text("Playback")
@@ -598,6 +599,7 @@ private struct TVAboutSettingsView: View {
                     Text(buildNumber)
                         .foregroundStyle(.secondary)
                 }
+                .focusable()
             } header: {
                 Text("About")
             }

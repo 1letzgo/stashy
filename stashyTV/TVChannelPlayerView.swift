@@ -362,6 +362,9 @@ struct TVChannelPlayerView: View {
                 }
             }
         }
+        // Im Ladezweig gibt es nur Spinner auf Schwarz — ohne Fokus-Ziel
+        // erreicht die Menu-Taste `onExitCommand` nicht.
+        .focusable()
         .onAppear { session.start() }
         .onDisappear { session.teardown() }
         .onExitCommand { close() }

@@ -172,6 +172,8 @@ struct TVGalleryDetailView: View {
                         Spacer()
                     }
                     .padding(.vertical, 60)
+                    // Gegenstück zum `emptyFocus`-Anker im Leer-Zweig.
+                    .focusable()
                 } else if viewModel.galleryImages.isEmpty || displayImages.isEmpty {
                     HStack {
                         Spacer()

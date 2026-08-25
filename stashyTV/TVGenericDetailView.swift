@@ -11,6 +11,12 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
 
     @State private var playingChannel: TVChannel?
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
+    @FocusState private var emptyFocus: Bool
+    @Environment(\.dismiss) private var dismiss
+
+    /// Der Kanal-Button ist im Leer-Zustand oft das einzige fokussierbare
+    /// Element — fehlt er, muss der Zurück-Button den Fokus übernehmen.
+    private var showsChannelButton: Bool { channel != nil && stashyPlus.isUnlocked }
 
     // Scenes related
     let scenes: [Scene]
@@ -140,6 +146,10 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                             Spacer()
                         }
                         .padding(.vertical, 60)
+                        // Fokussierbar, damit die Menu-Taste auch während des
+                        // Ladens ein Ziel hat — sonst hängt man bei einem
+                        // nicht antwortenden Server in der gepushten View fest.
+                        .focusable()
                     } else if scenes.isEmpty {
                         HStack {
                             Spacer()
@@ -150,10 +160,25 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                                 Text("No scenes found")
                                     .font(.title3)
                                     .foregroundStyle(.secondary)
+
+                                // Fokus-Anker. Ohne ihn hat die Detailseite einer
+                                // leeren Group/Tag/Studio gar kein fokussierbares
+                                // Element, die Menu-Taste erreicht
+                                // `tvExitDismissable` nicht und man kommt nicht
+                                // mehr heraus. Gleiches Muster wie in
+                                // `TVGalleryDetailView`.
+                                Button("Back") { dismiss() }
+                                    .font(.title3)
+                                    .focused($emptyFocus)
+                                    .padding(.top, 8)
                             }
                             Spacer()
                         }
                         .padding(.vertical, 60)
+                        .onAppear {
+                            guard !showsChannelButton else { return }
+                            emptyFocus = true
+                        }
                     } else {
                         LazyVGrid(columns: sceneColumns, spacing: 40) {
                             ForEach(scenes) { scene in
