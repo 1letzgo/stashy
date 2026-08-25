@@ -124,6 +124,9 @@ struct TVTabStack<Content: View>: View {
                 .withTVDestinations()
         }
         .environment(\.tvNavigationPath, path)
+        // Einmal pro Stack: liefert `tvContentWidth` an Root-View und alle
+        // gepushten Ziele. Deckt damit sämtliche Grids ab.
+        .measuringTVContentWidth()
     }
 }
 

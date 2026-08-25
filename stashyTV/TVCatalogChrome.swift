@@ -121,8 +121,11 @@ struct TVCatalogGrid<Item: Identifiable, Card: View, Header: View>: View where I
     let isLoadingMore: Bool
     let hasMore: Bool
     let columnWidth: CGFloat
+    /// **Maximum**, nicht Fixwert — die tatsächliche Spaltenzahl richtet sich
+    /// nach der verfügbaren Breite (Sidebar!) und wird nie größer als dieser Wert.
     var columnCount: Int = 4
     var columnSpacing: CGFloat = 40
+    var minColumns: Int = 2
     let emptySystemImage: String
     let emptyTitle: String
     let loadingText: String
@@ -138,9 +141,19 @@ struct TVCatalogGrid<Item: Identifiable, Card: View, Header: View>: View where I
     @ViewBuilder let card: (Item) -> Card
 
     @State private var pendingFocusReset = false
+    @Environment(\.tvContentWidth) private var contentWidth
+
+    private var gridSpec: TVGridSpec {
+        TVGridSpec(
+            columnWidth: columnWidth,
+            spacing: columnSpacing,
+            maxColumns: columnCount,
+            minColumns: min(minColumns, columnCount)
+        )
+    }
 
     private var columns: [GridItem] {
-        Array(repeating: GridItem(.fixed(columnWidth), spacing: columnSpacing), count: columnCount)
+        gridSpec.columns(for: contentWidth)
     }
 
     var body: some View {
