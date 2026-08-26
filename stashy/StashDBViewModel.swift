@@ -8163,6 +8163,27 @@ struct Scene: Codable, Identifiable, Equatable {
     let captions: [VideoCaption]?
     let customFields: [String: StashJSONValue]?
 
+    /// Title, falling back to the file name. Stash leaves `title` empty for anything that was
+    /// never tagged, and the file name is then the only label a user recognises.
+    /// `nil` only when neither exists, so call sites keep their own placeholder.
+    var displayTitle: String? {
+        if let title = title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
+            return title
+        }
+        if let name = Self.fileName(from: files?.first?.path) { return name }
+        return Self.fileName(from: paths?.stream)
+    }
+
+    /// Last path component without query string — works for local paths and stream URLs alike.
+    private static func fileName(from path: String?) -> String? {
+        guard let path = path?.trimmingCharacters(in: .whitespacesAndNewlines), !path.isEmpty else {
+            return nil
+        }
+        let clean = path.components(separatedBy: "?").first ?? path
+        let name = URL(fileURLWithPath: clean).lastPathComponent
+        return name.isEmpty ? nil : name
+    }
+
     /// True when the scene already has at least one Stash-Box ID.
     var hasStashID: Bool {
         guard let stashIds else { return false }

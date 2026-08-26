@@ -385,7 +385,7 @@ struct SceneDetailMetadataCard: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .top) {
-                    Text(activeScene.title ?? "Unbekannter Titel")
+                    Text(activeScene.displayTitle ?? "Unbekannter Titel")
                         .font(.title2)
                         .fontWeight(.bold)
                         .foregroundColor(.primary)

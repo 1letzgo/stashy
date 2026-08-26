@@ -88,7 +88,7 @@ struct HomeSceneCardView: View {
                     }
                 }
                 Spacer()
-                Text(scene.title ?? "Untitled Scene")
+                Text(scene.displayTitle ?? "Untitled Scene")
                     .font(isLarge ? .subheadline : .caption)
                     .fontWeight(.bold)
                     .foregroundColor(.white)

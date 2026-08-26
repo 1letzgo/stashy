@@ -132,7 +132,7 @@ struct SceneCardView: View {
             VStack(alignment: .leading, spacing: 4) {
                 HStack(alignment: .bottom, spacing: 8) {
                     // Title
-                    Text(scene.title ?? "Unknown Title")
+                    Text(scene.displayTitle ?? "Unknown Title")
                         .font(.headline)
                         .fontWeight(.medium)
                         .lineLimit(2)

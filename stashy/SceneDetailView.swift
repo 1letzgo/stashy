@@ -494,7 +494,7 @@ struct SceneDetailView: View {
             .modifier(SceneDetailAlertModifier(
                 showDeleteConfirmation: $showDeleteWithFilesConfirmation,
                 showingAddMarkerSheet: $showingAddMarkerSheet,
-                title: activeScene.title ?? "Unknown Title",
+                title: activeScene.displayTitle ?? "Unknown Title",
                 capturedMarkerTime: capturedMarkerTime,
                 sceneId: activeScene.id,
                 sceneTagIds: Set((activeScene.tags ?? []).map(\.id)),
