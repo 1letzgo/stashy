@@ -476,7 +476,9 @@ struct SceneDetailMetadataCard: View {
         .sheet(isPresented: $showingEditTitleSheet) {
             EditSceneTitleSheet(
                 sceneId: activeScene.id,
-                currentTitle: activeScene.title,
+                // Pre-fills the file-name fallback so an untitled scene can be named
+                // by editing the name it already shows, rather than an empty field.
+                currentTitle: activeScene.displayTitle,
                 currentDetails: activeScene.details,
                 viewModel: viewModel
             ) { newTitle, newDetails in
