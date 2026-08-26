@@ -18,6 +18,11 @@ final class FilterPickerOptionsStore: ObservableObject {
 
     @Published private(set) var options: [String: [FilterEntityOption]] = [:]
     @Published private(set) var loading: Set<String> = []
+    /// Name-search hits merged on top of the cached "most used" list, so a picked long-tail
+    /// entry still resolves to a name after the search text is cleared.
+    @Published private(set) var searchResults: [String: [FilterEntityOption]] = [:]
+    @Published private(set) var searching: Set<String> = []
+    private var searchTokens: [String: UUID] = [:]
 
     private lazy var viewModel = StashDBViewModel()
     private var pending: [String: [([FilterEntityOption]) -> Void]] = [:]
@@ -36,10 +41,59 @@ final class FilterPickerOptionsStore: ObservableObject {
         options = [:]
         loading = []
         pending = [:]
+        searchResults = [:]
+        searching = []
+        searchTokens = [:]
     }
 
     func cached(_ kind: Kind) -> [FilterEntityOption] { options[kind.rawValue] ?? [] }
     func isLoading(_ kind: Kind) -> Bool { loading.contains(kind.rawValue) }
+    func isSearching(_ kind: Kind) -> Bool { searching.contains(kind.rawValue) }
+    /// Name-search hits collected this session for `kind`.
+    func searchHits(_ kind: Kind) -> [FilterEntityOption] { searchResults[kind.rawValue] ?? [] }
+
+    /// Cached most-used list plus every search hit seen this session, de-duplicated by id.
+    func availableOptions(_ kind: Kind) -> [FilterEntityOption] {
+        let base = cached(kind)
+        let extra = searchResults[kind.rawValue] ?? []
+        guard !extra.isEmpty else { return base }
+        var seen = Set(base.map(\.id))
+        var merged = base
+        for option in extra where !seen.contains(option.id) {
+            seen.insert(option.id)
+            merged.append(option)
+        }
+        return merged
+    }
+
+    /// Queries the server by name. Results are merged into ``availableOptions`` rather than
+    /// replacing the cached list, so previously picked entries never lose their label.
+    /// Only the newest call per kind is applied — earlier keystrokes are discarded.
+    func search(_ kind: Kind, query: String) {
+        let key = kind.rawValue
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard term.count >= 2 else {
+            searchTokens[key] = UUID()
+            searching.remove(key)
+            return
+        }
+        let token = UUID()
+        searchTokens[key] = token
+        searching.insert(key)
+        viewModel.searchFilterPickerOptions(kind: kind, query: term) { [weak self] results in
+            Task { @MainActor in
+                guard let self, self.searchTokens[key] == token else { return }
+                self.searching.remove(key)
+                var merged = self.searchResults[key] ?? []
+                var seen = Set(merged.map(\.id))
+                for option in results where !seen.contains(option.id) {
+                    seen.insert(option.id)
+                    merged.append(option)
+                }
+                self.searchResults[key] = merged
+            }
+        }
+    }
 
     /// Resolves the entity kind a criterion key refers to, e.g. `performer_tags` → tags.
     static func kind(forCriterionKey key: String, mode: StashDBViewModel.FilterMode) -> Kind? {

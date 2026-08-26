@@ -1079,6 +1079,8 @@ struct AnimatedWebView: UIViewRepresentable {
         
         let base64 = data.base64EncodedString()
         let objectFit = fillMode ? "cover" : "contain"
+        // Cover crops off the bottom, not both edges — matches the Pics feed.
+        let objectPosition = fillMode ? "center top" : "center center"
         let verticalInset = top + bottom
         
         let html = """
@@ -1102,6 +1104,7 @@ struct AnimatedWebView: UIViewRepresentable {
                     width: 100vw;
                     height: calc(100vh - \(verticalInset)px);
                     object-fit: \(objectFit);
+                    object-position: \(objectPosition);
                     display: block;
                 }
             </style>

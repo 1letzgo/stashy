@@ -4994,6 +4994,8 @@ extension ReelItemView {
                                 img
                                     .resizable()
                                     .aspectRatio(contentMode: shouldFill ? .fill : .fit)
+                                    // Fill crops off the bottom, not both edges (matches Pics).
+                                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: shouldFill ? .top : .center)
                                     // Visual-only inset; outer frame stays full-bleed for paging.
                                     .padding(.bottom, bottomInset)
                                     .clipped()
@@ -5020,6 +5022,7 @@ extension ReelItemView {
                                 player: player,
                                 videoGravity: shouldFill ? .resizeAspectFill : .resizeAspect,
                                 bottomContentInset: bottomInset,
+                                topAlignAspectFill: shouldFill,
                                 onLayerReady: { layer in
                                     videoSurfaceReadiness.bind(layer: layer)
                                 }

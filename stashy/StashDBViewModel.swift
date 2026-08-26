@@ -2286,10 +2286,12 @@ class StashDBViewModel: ObservableObject {
         let existing = existingId.flatMap { savedFilters[$0] }
         let sanitized = sanitizeFilter(objectFilter, isMarker: mode == .sceneMarkers)
         let resolvedFragment = liveFragment ?? existing?.stashyLiveFragment ?? [:]
-        let stashy: [String: Any] = [
-            "liveFragment": resolvedFragment,
-            "sortRaw": sortRaw ?? "\(sortField)_\(sortDirection.lowercased())"
-        ]
+        var stashy: [String: Any] = ["liveFragment": resolvedFragment]
+        // Only a real `*SortOption` raw value belongs here. The old "date_desc" style fallback
+        // matched no enum case, so `resolvedSceneSort` silently fell through to `find_filter`.
+        if let sortRaw, !sortRaw.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            stashy["sortRaw"] = sortRaw
+        }
         let uiOptions: [String: Any] = ["stashy": stashy]
         let sortResolved: String
         if sortField == "random", let kind = randomSeedKind {
@@ -7235,6 +7237,63 @@ struct GenerateData: Codable {
     #if !os(tvOS)
     /// Top performers for the criteria-editor multi-ID pickers (iOS only — `FilterEntityOption`
     /// lives in the iOS-only Filters module).
+    /// Server-side name search for the criteria-editor pickers.
+    ///
+    /// The cached option lists are the *most used* entries (sorted by usage count, capped per_page),
+    /// so anything in the long tail is simply absent. This queries Stash by name instead, letting the
+    /// picker reach entries the cached list never contained.
+    func searchFilterPickerOptions(
+        kind: FilterPickerOptionsStore.Kind,
+        query rawQuery: String,
+        limit: Int = 60,
+        completion: @escaping ([FilterEntityOption]) -> Void
+    ) {
+        let term = rawQuery.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !term.isEmpty else {
+            Task { @MainActor in completion([]) }
+            return
+        }
+
+        let findFilter: [String: Any] = ["page": 1, "per_page": limit, "q": term]
+
+        func run<R: Decodable>(_ queryName: String, _ extract: @escaping (R) -> [FilterEntityOption]) {
+            let query = GraphQLQueries.queryWithFragments(queryName)
+            guard let bodyData = try? JSONSerialization.data(
+                    withJSONObject: ["query": query, "variables": ["filter": findFilter]]),
+                  let bodyString = String(data: bodyData, encoding: .utf8) else {
+                Task { @MainActor in completion([]) }
+                return
+            }
+            performGraphQLQuery(
+                query: bodyString,
+                clearsGlobalErrorMessageOnStart: false,
+                setsGlobalLoading: false
+            ) { (response: R?) in
+                let list = response.map(extract) ?? []
+                Task { @MainActor in completion(list) }
+            }
+        }
+
+        switch kind {
+        case .tags, .imageTags:
+            run("findTags") { (r: TagsResponse) in
+                (r.data?.findTags.tags ?? []).map { FilterEntityOption(id: $0.id, name: $0.name) }
+            }
+        case .studios, .imageStudios, .galleryStudios:
+            run("findStudios") { (r: StudiosResponse) in
+                (r.data?.findStudios.studios ?? []).map { FilterEntityOption(id: $0.id, name: $0.name) }
+            }
+        case .groups:
+            run("findGroups") { (r: GroupsResponse) in
+                (r.data?.findGroups.groups ?? []).map { FilterEntityOption(id: $0.id, name: $0.name) }
+            }
+        case .performers:
+            run("findPerformers") { (r: PerformersResponse) in
+                (r.data?.findPerformers.performers ?? []).map { FilterEntityOption(id: $0.id, name: $0.name) }
+            }
+        }
+    }
+
     func fetchPerformersForFilterPicker(completion: @escaping ([FilterEntityOption]) -> Void) {
         fetchAllPerformers { list in
             let options = list.map { FilterEntityOption(id: $0.id, name: $0.name) }

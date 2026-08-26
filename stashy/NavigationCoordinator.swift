@@ -350,6 +350,9 @@ struct FullScreenVideoPlayer: UIViewRepresentable {
     /// When `videoGravity == .resizeAspect`, pin letterboxed content to the top of the draw rect
     /// instead of centering (portrait Feeds with immersive off).
     var topAlignAspectFit: Bool = false
+    /// When `videoGravity == .resizeAspectFill`, crop off the bottom instead of both edges —
+    /// keeps the subject in frame the way the Pics feed already does.
+    var topAlignAspectFill: Bool = false
     /// Optionaler Hook: erhält den frisch erzeugten `AVPlayerLayer` (für KVO auf `isReadyForDisplay`).
     /// Wird bspw. von `ReelItemVideoSurfaceReadiness` verwendet, um die Thumbnail-Überblendung
     /// erst beim **echten ersten Frame** zu starten — nicht schon bei `AVPlayerItem.status == .readyToPlay`.
@@ -364,6 +367,7 @@ struct FullScreenVideoPlayer: UIViewRepresentable {
         view.topContentInset = topContentInset
         view.bottomContentInset = bottomContentInset
         view.topAlignAspectFit = topAlignAspectFit
+        view.topAlignAspectFill = topAlignAspectFill
         // Deferred: the callback mutates ObservableObject state (`videoSurfaceReadiness`).
         // Calling it synchronously from makeUIView triggers "Modifying state during view
         // update", which invalidates the surrounding SwiftUI transaction.
@@ -387,6 +391,7 @@ struct FullScreenVideoPlayer: UIViewRepresentable {
         let topInsetChanged = uiView.topContentInset != topContentInset
         let bottomInsetChanged = uiView.bottomContentInset != bottomContentInset
         let topAlignChanged = uiView.topAlignAspectFit != topAlignAspectFit
+            || uiView.topAlignAspectFill != topAlignAspectFill
 
         uiView.intendedGravity = videoGravity
         uiView.intelligentZoomFactor = intelligentZoomFactor
@@ -396,6 +401,7 @@ struct FullScreenVideoPlayer: UIViewRepresentable {
         uiView.topContentInset = topContentInset
         uiView.bottomContentInset = bottomContentInset
         uiView.topAlignAspectFit = topAlignAspectFit
+        uiView.topAlignAspectFill = topAlignAspectFill
 
         // Avoid synchronous layout on every SwiftUI body pass (Feeds chrome / VM publishes).
         if playerChanged || gravityChanged || zoomChanged || sizeChanged
@@ -450,6 +456,13 @@ class PlayerView: UIView {
     var topAlignAspectFit: Bool = false {
         didSet {
             if oldValue != topAlignAspectFit {
+                setNeedsLayout()
+            }
+        }
+    }
+    var topAlignAspectFill: Bool = false {
+        didSet {
+            if oldValue != topAlignAspectFill {
                 setNeedsLayout()
             }
         }
@@ -545,6 +558,20 @@ class PlayerView: UIView {
                 let videoSize = resolvedVideoSize()
                 if videoSize.width > 1, videoSize.height > 1 {
                     let scale = min(drawBounds.width / videoSize.width, drawBounds.height / videoSize.height)
+                    let w = videoSize.width * scale
+                    let h = videoSize.height * scale
+                    let x = drawBounds.minX + (drawBounds.width - w) / 2
+                    avLayer.videoGravity = .resize
+                    avLayer.frame = CGRect(x: x, y: drawBounds.minY, width: w, height: h)
+                    return
+                }
+            }
+            // Aspect-fill pinned to the top: oversize the layer and let `clipsToBounds`
+            // trim the bottom, instead of the centred crop that eats both edges.
+            if topAlignAspectFill, intendedGravity == .resizeAspectFill {
+                let videoSize = resolvedVideoSize()
+                if videoSize.width > 1, videoSize.height > 1 {
+                    let scale = max(drawBounds.width / videoSize.width, drawBounds.height / videoSize.height)
                     let w = videoSize.width * scale
                     let h = videoSize.height * scale
                     let x = drawBounds.minX + (drawBounds.width - w) / 2

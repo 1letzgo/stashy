@@ -932,7 +932,7 @@ struct FilterMultiIdCriterionRow: View {
     }
 
     private var options: [FilterEntityOption] {
-        kind.map { store.cached($0) } ?? []
+        kind.map { store.availableOptions($0) } ?? []
     }
 
     private var isLoading: Bool {
@@ -967,7 +967,8 @@ struct FilterMultiIdCriterionRow: View {
                 displayName: { $0.name },
                 isLoading: isLoading,
                 onAppearLoad: loadIfNeeded,
-                onSelectionChange: {}
+                onSelectionChange: {},
+                searchKind: kind
             )
         }
         .onAppear(perform: loadIfNeeded)

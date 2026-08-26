@@ -89,7 +89,9 @@ struct HomeSceneCardView: View {
                 }
                 Spacer()
                 Text(scene.displayTitle ?? "Untitled Scene")
-                    .font(isLarge ? .subheadline : .caption)
+                    // Small cards match the Channels card titles (12pt bold); the hero row
+                    // keeps its larger type.
+                    .font(isLarge ? .subheadline : .system(size: 12, weight: .bold))
                     .fontWeight(.bold)
                     .foregroundColor(.white)
                     .lineLimit(2)

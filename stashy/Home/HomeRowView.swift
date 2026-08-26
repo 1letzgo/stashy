@@ -424,7 +424,7 @@ struct HomePerformerCardView: View {
                 }
                 Spacer()
                 Text(performer.name)
-                    .font(.system(size: isLarge ? 12 : 10, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.white)
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .bottomLeading)
@@ -463,7 +463,7 @@ struct HomeStudioCardView: View {
 
             HStack(spacing: 8) {
                 Text(studio.name)
-                    .font(.system(size: isLarge ? 12 : 10, weight: .bold))
+                    .font(.system(size: 12, weight: .bold))
                     .foregroundColor(.primary)
                     .lineLimit(1)
                 Spacer()

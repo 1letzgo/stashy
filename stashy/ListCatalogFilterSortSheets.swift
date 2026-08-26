@@ -263,15 +263,53 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
     let isLoading: Bool
     var onAppearLoad: () -> Void
     var onSelectionChange: () -> Void
+    /// Set to enable name search. `items` only ever holds the *most used* entries (the pickers fetch
+    /// them sorted by usage count), so anything in the long tail is missing. With a kind set, the row
+    /// queries the server and appends the hits to its own list.
+    var searchKind: FilterPickerOptionsStore.Kind? = nil
 
     @ObservedObject private var appearance = AppearanceManager.shared
+    @ObservedObject private var pickerStore = FilterPickerOptionsStore.shared
     @State private var isExpanded = false
+    @State private var searchText = ""
+
+    /// Flattened id/name pairs — lets server hits (`FilterEntityOption`) sit next to the caller's
+    /// own `Item` type without either side knowing about the other.
+    fileprivate struct PickerEntry: Identifiable, Equatable {
+        let id: String
+        let name: String
+    }
+
+    private var entries: [PickerEntry] {
+        var out = items.map { PickerEntry(id: $0.id, name: displayName($0)) }
+        guard let searchKind else { return out }
+        var seen = Set(out.map(\.id))
+        for hit in pickerStore.searchHits(searchKind) where !seen.contains(hit.id) {
+            seen.insert(hit.id)
+            out.append(PickerEntry(id: hit.id, name: hit.name))
+        }
+        return out
+    }
+
+    /// Local narrowing of the merged list. Selected entries always stay visible, otherwise ticking
+    /// one and typing on would make it vanish.
+    private var visibleEntries: [PickerEntry] {
+        let term = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !term.isEmpty else { return entries }
+        return entries.filter {
+            selectedIds.contains($0.id) || $0.name.localizedCaseInsensitiveContains(term)
+        }
+    }
+
+    private var isSearching: Bool {
+        searchKind.map { pickerStore.isSearching($0) } ?? false
+    }
 
     private var selectedSummary: String {
         guard !selectedIds.isEmpty else { return "Any" }
-        let selectedNames = items
+        let selectedNames = entries
             .filter { selectedIds.contains($0.id) }
-            .map(displayName)
+            .map(\.name)
         if selectedNames.isEmpty { return "\(selectedIds.count) selected" }
         if selectedNames.count <= 2 { return selectedNames.joined(separator: ", ") }
         return "\(selectedNames[0]), \(selectedNames[1]) +\(selectedNames.count - 2)"
@@ -313,6 +351,9 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
 
             if isExpanded {
                 VStack(spacing: 0) {
+                    if searchKind != nil {
+                        searchField
+                    }
                     Button {
                         guard !selectedIds.isEmpty else { return }
                         selectedIds = []
@@ -322,12 +363,12 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
                     }
                     .buttonStyle(.plain)
 
-                    ForEach(items) { item in
+                    ForEach(visibleEntries) { entry in
                         Divider().padding(.leading, CatalogFilterSortSheetLayout.labelColumnWidth + 28)
                         Button {
-                            toggle(item.id)
+                            toggle(entry.id)
                         } label: {
-                            multiPickerOptionRow(title: displayName(item), isSelected: selectedIds.contains(item.id))
+                            multiPickerOptionRow(title: entry.name, isSelected: selectedIds.contains(entry.id))
                         }
                         .buttonStyle(.plain)
                     }
@@ -336,6 +377,41 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
             }
         }
         .onAppear { onAppearLoad() }
+    }
+
+    /// Narrows the loaded list as you type and asks the server for anything the cached
+    /// "most used" list never contained.
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            if !title.isEmpty {
+                Spacer().frame(width: CatalogFilterSortSheetLayout.labelColumnWidth)
+            }
+            Image(systemName: "magnifyingglass")
+                .font(.caption)
+                .foregroundColor(.secondary)
+            TextField("Search", text: $searchText)
+                .textFieldStyle(.plain)
+                .autocorrectionDisabled()
+                .textInputAutocapitalization(.never)
+                .onChange(of: searchText) { _, newValue in
+                    guard let searchKind else { return }
+                    pickerStore.search(searchKind, query: newValue)
+                }
+            if isSearching {
+                ProgressView().controlSize(.small)
+            } else if !searchText.isEmpty {
+                Button {
+                    searchText = ""
+                    if let searchKind { pickerStore.search(searchKind, query: "") }
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
     }
 
     private func multiPickerOptionRow(title optionTitle: String, isSelected: Bool) -> some View {
@@ -1647,7 +1723,8 @@ struct ImagesCatalogFilterSortSheet: View {
                 displayName: { $0.name },
                 isLoading: studioPickerLoading,
                 onAppearLoad: onStudioPickerSectionAppear,
-                onSelectionChange: onApply
+                onSelectionChange: onApply,
+                searchKind: .imageStudios
             )
             Divider().padding(.leading, 16)
             CatalogNamedEntityLiveFilterMultiPickerRow(
@@ -1657,7 +1734,8 @@ struct ImagesCatalogFilterSortSheet: View {
                 displayName: { $0.name },
                 isLoading: tagPickerLoading,
                 onAppearLoad: onTagPickerSectionAppear,
-                onSelectionChange: onApply
+                onSelectionChange: onApply,
+                searchKind: .imageTags
             )
             Divider().padding(.leading, 16)
             CatalogFilterRow(label: "Perf. fav.") {

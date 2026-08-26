@@ -1798,7 +1798,8 @@ struct SceneLiveFilterSheet: View {
                             displayName: { $0.name },
                             isLoading: studioPickerLoading,
                             onAppearLoad: onStudioPickerSectionAppear,
-                            onSelectionChange: onApply
+                            onSelectionChange: onApply,
+                            searchKind: .studios
                         )
                         Divider().padding(.leading, 16)
                         CatalogNamedEntityLiveFilterMultiPickerRow(
@@ -1808,7 +1809,8 @@ struct SceneLiveFilterSheet: View {
                             displayName: { $0.name },
                             isLoading: tagPickerLoading,
                             onAppearLoad: onTagPickerSectionAppear,
-                            onSelectionChange: onApply
+                            onSelectionChange: onApply,
+                            searchKind: .tags
                         )
                         Divider().padding(.leading, 16)
                         CatalogNamedEntityLiveFilterMultiPickerRow(
@@ -1818,7 +1820,8 @@ struct SceneLiveFilterSheet: View {
                             displayName: { $0.name },
                             isLoading: groupPickerLoading,
                             onAppearLoad: onGroupPickerSectionAppear,
-                            onSelectionChange: onApply
+                            onSelectionChange: onApply,
+                            searchKind: .groups
                         )
                             Divider().padding(.leading, 16)
                     filterRow(label: "Rating") {

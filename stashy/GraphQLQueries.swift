@@ -247,6 +247,7 @@ class GraphQLQueries {
             filter
             object_filter
             ui_options
+            find_filter { sort direction }
           }
         }
         """
@@ -260,6 +261,7 @@ class GraphQLQueries {
             filter
             object_filter
             ui_options
+            find_filter { sort direction }
           }
         }
         """
