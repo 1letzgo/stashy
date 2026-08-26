@@ -371,6 +371,11 @@ struct TVSceneDetailView: View {
                         if let current = sceneDetail {
                             sceneDetail = current.withOCounter(count)
                         }
+                        NotificationCenter.default.post(
+                            name: NSNotification.Name("SceneOCounterUpdated"),
+                            object: nil,
+                            userInfo: ["sceneId": scene.id, "oCounter": count]
+                        )
                     }
                 } label: {
                     heroActionLabel(icon: "heart.circle.fill", title: "\(scene.oCounter ?? 0)")
@@ -389,6 +394,11 @@ struct TVSceneDetailView: View {
                                 if let current = sceneDetail {
                                     sceneDetail = current.withRating(value)
                                 }
+                                NotificationCenter.default.post(
+                                    name: NSNotification.Name("SceneRatingUpdated"),
+                                    object: nil,
+                                    userInfo: ["sceneId": scene.id, "rating100": value as Any]
+                                )
                             }
                         }
                     }
@@ -479,8 +489,8 @@ struct TVSceneDetailView: View {
 
     private func startPlayback(for scene: Scene, at timestamp: Double? = nil) {
         let startTime = timestamp ?? scene.resumeTime ?? 0
-        print("🎬 TV: Starting playback for scene: \(scene.title ?? "Untitled") (ID: \(scene.id)) at \(startTime)s")
-        
+        AppLog.debug("🎬 TV: Starting playback for scene \(scene.id) at \(startTime)s")
+
         if !hasAddedPlay {
             viewModel.addScenePlay(sceneId: scene.id) { newCount in
                 if let count = newCount {
@@ -493,6 +503,13 @@ struct TVSceneDetailView: View {
                 }
             }
             hasAddedPlay = true
+            // Damit Listen und Dashboard das mitbekommen — iOS postet das an
+            // derselben Stelle (`SceneDetailView.registerScenePlay`).
+            NotificationCenter.default.post(
+                name: NSNotification.Name("ScenePlayAdded"),
+                object: nil,
+                userInfo: ["sceneId": scene.id]
+            )
         }
         
         let quality = selectedQuality ?? ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original

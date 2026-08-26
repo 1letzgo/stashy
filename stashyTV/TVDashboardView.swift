@@ -28,6 +28,7 @@ struct TVDashboardView: View {
     @State private var isLoadingChannelPreviews = false
     @State private var playingChannel: TVChannel?
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         Group {
@@ -78,23 +79,89 @@ struct TVDashboardView: View {
         .onReceive(NotificationCenter.default.publisher(for: .stashyPlusUnlocked)) { _ in
             fetchChannels()
         }
-        .sceneLiveUpdates(using: viewModel)
+        // `sceneLiveUpdates(using:)` patcht `viewModel.scenes` — die Reihen hier
+        // liegen aber in lokalem State, deshalb eigene Handler.
+        // Neue Szenen auf dem Server kann keine Notification melden. Statt eines
+        // Refresh-Buttons: nachladen, wenn die App aus dem Hintergrund zurückkommt.
+        .onChange(of: scenePhase) { oldPhase, newPhase in
+            guard newPhase == .active, oldPhase == .background else { return }
+            guard playingChannel == nil else { return }
+            loadData(forceRefresh: true)
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneDeleted"))) { note in
+            guard let id = note.userInfo?["sceneId"] as? String else { return }
+            mutateRows { $0.removeAll { $0.id == id } }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneUpdated"))) { note in
+            guard let updated = Scene.fromListMetadataNotification(note) else { return }
+            patchScene(id: updated.id) { $0.mergingListMetadata(from: updated) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneOCounterUpdated"))) { note in
+            guard let id = note.userInfo?["sceneId"] as? String,
+                  let count = note.userInfo?["oCounter"] as? Int else { return }
+            patchScene(id: id) { $0.withOCounter(count) }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneRatingUpdated"))) { note in
+            guard let id = note.userInfo?["sceneId"] as? String else { return }
+            let rating = note.userInfo?["rating100"] as? Int
+            patchScene(id: id) { $0.withRating(rating) }
+            // „Top Rated" ist nach Bewertung sortiert — die Reihenfolge kann sich
+            // geändert haben, das lässt sich nicht in-place patchen.
+            refreshTopRated()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ScenePlayAdded"))) { note in
+            guard let id = note.userInfo?["sceneId"] as? String else { return }
+            patchScene(id: id) { $0.withPlayCount(($0.playCount ?? 0) + 1) }
+            // „Continue Watching" ist nach `lastPlayedAt` sortiert.
+            guard playingChannel == nil else { return }
+            refreshContinueWatching()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("SceneCoverUpdated"))) { note in
+            guard let id = note.userInfo?["sceneId"] as? String,
+                  let updatedAt = note.userInfo?["updatedAt"] as? String else { return }
+            patchScene(id: id) { $0.withUpdatedAt(Scene.newerUpdatedAt($0.updatedAt, updatedAt)) }
+        }
+    }
+
+    // MARK: - Live-Updates der Reihen
+
+    /// Wendet eine Änderung auf alle fünf Reihen an.
+    private func mutateRows(_ transform: (inout [Scene]) -> Void) {
+        transform(&recentlyPlayedScenes)
+        transform(&recentlyReleasedScenes)
+        transform(&recentlyAddedScenes)
+        transform(&topRatedScenes)
+        transform(&randomScenes)
+    }
+
+    /// Ersetzt eine Szene in allen Reihen, in denen sie vorkommt.
+    private func patchScene(id: String, _ transform: @escaping (Scene) -> Scene) {
+        mutateRows { list in
+            guard let idx = list.firstIndex(where: { $0.id == id }) else { return }
+            let updated = transform(list[idx])
+            guard updated != list[idx] else { return }
+            list[idx] = updated
+        }
+    }
+
+    private func refreshTopRated() {
+        guard hasValidConfig else { return }
+        let topRatedConfig = HomeRowConfig(
+            id: UUID(),
+            title: "Top Rated",
+            isEnabled: true,
+            sortOrder: 3,
+            type: .topRating3Min
+        )
+        viewModel.fetchScenesForHomeRow(config: topRatedConfig, limit: 15, forceRefresh: true) { scenes in
+            topRatedScenes = scenes
+        }
     }
     
     // MARK: - Content Rows
     
     private var contentRows: some View {
         VStack(alignment: .leading, spacing: 50) {
-            HStack {
-                Spacer()
-                Button {
-                    loadData(forceRefresh: true)
-                } label: {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                }
-            }
-            .padding(.horizontal, 50)
-
             if isLoadingPlayed || isLoadingReleased || isLoadingAdded || isLoadingTopRated || isLoadingRandom {
                 if recentContentIsEmpty {
                     HStack {
