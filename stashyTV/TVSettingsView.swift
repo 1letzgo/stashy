@@ -380,8 +380,6 @@ private struct TVAppearanceSettingsView: View {
                         .padding(.vertical, 8)
                     }
                 }
-            } header: {
-                Text("Appearance")
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -448,8 +446,6 @@ private struct TVSecuritySettingsView: View {
                         securityManager.removePin()
                     }
                 }
-            } header: {
-                Text("Security")
             } footer: {
                 Text("The app will require your PIN each time it is opened and whenever it returns from the background.")
             }
@@ -493,8 +489,6 @@ private struct TVPlaybackSettingsView: View {
                         .foregroundStyle(.secondary)
                         .focusable()
                 }
-            } header: {
-                Text("Playback")
             } footer: {
                 Text("\"Original\" streams MP4 files directly for best seeking performance. Lower qualities use HLS transcoding.")
             }
@@ -520,8 +514,6 @@ private struct TVDefaultSortSettingsView: View {
                 sortRow(label: "Studios", tab: .studios, type: StashDBViewModel.StudioSortOption.self, fallback: .nameAsc)
                 sortRow(label: "Tags", tab: .tags, type: StashDBViewModel.TagSortOption.self, fallback: .nameAsc)
                 sortRow(label: "Groups", tab: .groups, type: StashDBViewModel.GroupSortOption.self, fallback: .nameAsc)
-            } header: {
-                Text("Default Sorting")
             } footer: {
                 Text("The sort order used when opening each tab.")
             }
@@ -570,8 +562,6 @@ private struct TVDefaultFilterSettingsView: View {
                 tvFilterRow(label: "Studios", icon: "building.2", tab: .studios, mode: .studios)
                 tvFilterRow(label: "Tags", icon: "tag", tab: .tags, mode: .tags)
                 tvFilterRow(label: "Groups", icon: "rectangle.stack", tab: .groups, mode: .groups)
-            } header: {
-                Text("Default Filters")
             } footer: {
                 Text("Saved filters from your Stash server that will be applied automatically when opening each tab.")
             }
@@ -629,8 +619,6 @@ private struct TVTabVisibilitySettingsView: View {
                 tabVisibilityRow(.groups, label: "Groups", icon: "rectangle.stack.fill")
                 tabVisibilityRow(.galleries, label: "Galleries", icon: "photo.stack.fill")
                 tabVisibilityRow(.images, label: "Images", icon: "photo.fill")
-            } header: {
-                Text("Visible Tabs")
             } footer: {
                 Text("Choose which tabs appear in the top navigation bar.")
             }
@@ -687,8 +675,6 @@ private struct TVAboutSettingsView: View {
                         .foregroundStyle(.secondary)
                 }
                 .focusable()
-            } header: {
-                Text("About")
             }
         }
         .safeAreaInset(edge: .bottom) {

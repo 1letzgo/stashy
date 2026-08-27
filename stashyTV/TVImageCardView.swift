@@ -19,6 +19,27 @@ struct TVImageCardView: View {
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
+            // Performer oben rechts — gleiche Pille wie das Studio auf Szenenkarten.
+            if let performer = image.performerPillText {
+                VStack {
+                    HStack {
+                        Spacer()
+                        Text(performer.uppercased())
+                            .font(.caption.weight(.bold))
+                            .foregroundColor(.white)
+                            .tracking(1)
+                            .lineLimit(1)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 6)
+                            .background(Color.black.opacity(0.6))
+                            .clipShape(RoundedRectangle(cornerRadius: 8))
+                            .frame(maxWidth: width - 24, alignment: .trailing)
+                    }
+                    .padding(12)
+                    Spacer()
+                }
+            }
+
             if let rating = image.rating100, rating > 0 {
                 HStack(spacing: 3) {
                     Image(systemName: "star.fill")
@@ -68,7 +89,8 @@ struct TVImageCardView: View {
     }
 }
 
-/// Beschriftung unter der Bildkarte — Titel und Performer, wie bei Szenen.
+/// Beschriftung unter der Bildkarte. Nur der Titel — der Performer sitzt als
+/// Pille auf der Karte selbst.
 struct TVImageCardTitleView: View {
     let image: StashImage
 
@@ -78,12 +100,6 @@ struct TVImageCardTitleView: View {
                 Text(title)
                     .font(.caption)
                     .foregroundStyle(.primary)
-                    .lineLimit(1)
-            }
-            if let performers = image.performerSummary {
-                Text(performers)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
         }

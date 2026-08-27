@@ -10125,6 +10125,15 @@ extension StashImage {
         guard let performers, !performers.isEmpty else { return nil }
         return performers.prefix(3).map(\.name).joined(separator: ", ")
     }
+
+    /// Kurzform für eine Karten-Pille: erster Name, weitere als „+N".
+    /// Eine kommagetrennte Liste würde auf einer 300pt-Karte mitten im zweiten
+    /// Namen abgeschnitten.
+    var performerPillText: String? {
+        guard let performers, let first = performers.first else { return nil }
+        let extra = performers.count - 1
+        return extra > 0 ? "\(first.name) +\(extra)" : first.name
+    }
 }
 
 struct ImagePaths: Codable, Equatable {

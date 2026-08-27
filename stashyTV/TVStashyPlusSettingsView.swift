@@ -253,8 +253,6 @@ struct TVStashyPlusSettingsView: View {
                     // Restore-Button — dann ist diese Zeile das einzige
                     // fokussierbare Element und damit der Weg zurück.
                     .focusable(!stashyPlus.shouldOfferPurchases)
-            } header: {
-                Text("stashy+")
             } footer: {
                 Text("stashy+ unlocks premium features across stashy for iPhone and Apple TV with one purchase.")
             }
