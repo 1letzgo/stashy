@@ -8,112 +8,181 @@
 import SwiftUI
 import UIKit
 
+/// Ein Eintrag der Settings-Übersicht.
+///
+/// Der Beschreibungstext füttert die rechte Spalte — tvOS-Einstellungen sind
+/// konventionell zweispaltig: schmale Liste links, Kontext zum fokussierten
+/// Eintrag rechts. Deshalb braucht die Liste auch nie die volle Breite.
+private enum TVSettingsEntry: Hashable {
+    case servers, appearance, security, playback, stashyPlus
+    case defaultSort, defaultFilters, visibleTabs
+    case sidebar
+    case about
+
+    var title: String {
+        switch self {
+        case .servers: return "Servers"
+        case .appearance: return "Appearance"
+        case .security: return "Security"
+        case .playback: return "Playback"
+        case .stashyPlus: return "stashy+"
+        case .defaultSort: return "Default Sorting"
+        case .defaultFilters: return "Default Filters"
+        case .visibleTabs: return "Visible Tabs"
+        case .sidebar: return "Sidebar Navigation"
+        case .about: return "About"
+        }
+    }
+
+    var icon: String {
+        switch self {
+        case .servers: return "server.rack"
+        case .appearance: return "paintbrush.fill"
+        case .security: return "lock.fill"
+        case .playback: return "play.rectangle.fill"
+        case .stashyPlus: return "sparkles.tv.fill"
+        case .defaultSort: return "arrow.up.arrow.down"
+        case .defaultFilters: return "line.3.horizontal.decrease.circle"
+        case .visibleTabs: return "rectangle.3.group.fill"
+        case .sidebar: return "sidebar.leading"
+        case .about: return "info.circle"
+        }
+    }
+
+    var summary: String {
+        switch self {
+        case .servers:
+            return "Add Stash servers, switch between them, and edit or remove saved ones."
+        case .appearance:
+            return "Pick the accent color used for focus highlights and icons throughout the app."
+        case .security:
+            return "Require a PIN before the app opens."
+        case .playback:
+            return "Choose the streaming quality. \"Original\" plays the file directly for the best seeking; lower qualities transcode."
+        case .stashyPlus:
+            return "Premium features, including Channels — continuous playback of a performer, studio, tag or saved filter."
+        case .defaultSort:
+            return "The sort order each section opens with."
+        case .defaultFilters:
+            return "A saved server filter to apply automatically when a section opens."
+        case .visibleTabs:
+            return "Hide sections you do not use. They disappear from the sidebar."
+        case .sidebar:
+            return "The left sidebar is the standard for Apple TV. Turn it off to go back to the classic tab bar along the top."
+        case .about:
+            return "Version and build number."
+        }
+    }
+}
+
 struct TVSettingsView: View {
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @AppStorage("tvUseSidebar") private var useSidebar = true
+    @FocusState private var focusedEntry: TVSettingsEntry?
+
+    /// Liste links schmal halten — eine Einstellungszeile über die volle
+    /// 1920pt-Breite ist der Hauptgrund, warum das vorher nach iOS aussah.
+    private static let listWidth: CGFloat = 720
 
     var body: some View {
+        HStack(alignment: .top, spacing: 80) {
+            entryList
+                .frame(width: Self.listWidth)
+                .focusSection()
+
+            detailPane
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.top, 60)
+        }
+        .padding(.trailing, 80)
+        .background(Color.appBackground)
+    }
+
+    private var entryList: some View {
         List {
-            // Erste Zeile muss fokussierbar sein, damit der Fokus von hier aus
-            // die Navigation erreicht (früher die obere Leiste, jetzt die Sidebar).
             Section {
-                NavigationLink {
-                    TVServersSettingsView().tvExitDismissable()
-                } label: {
-                    settingsRow(title: "Servers", icon: "server.rack", subtitle: "Active & saved servers")
-                }
-
-                NavigationLink {
-                    TVAppearanceSettingsView().tvExitDismissable()
-                } label: {
-                    settingsRow(title: "Appearance", icon: "paintbrush.fill", subtitle: "Accent color")
-                }
-
-                NavigationLink {
-                    TVSecuritySettingsView().tvExitDismissable()
-                } label: {
-                    settingsRow(title: "Security", icon: "lock.fill", subtitle: "PIN lock")
-                }
-
-                NavigationLink {
-                    TVPlaybackSettingsView().tvExitDismissable()
-                } label: {
-                    settingsRow(title: "Playback", icon: "play.rectangle.fill", subtitle: "Streaming quality")
-                }
-
-                NavigationLink {
-                    TVStashyPlusSettingsView().tvExitDismissable()
-                } label: {
-                    settingsRow(title: "stashy+", icon: "sparkles.tv.fill", subtitle: "Premium features & Channels")
-                }
+                link(.servers) { TVServersSettingsView() }
+                link(.appearance) { TVAppearanceSettingsView() }
+                link(.security) { TVSecuritySettingsView() }
+                link(.playback) { TVPlaybackSettingsView() }
+                link(.stashyPlus) { TVStashyPlusSettingsView() }
             } header: {
                 Text("General")
             }
 
             Section {
-                NavigationLink {
-                    TVDefaultSortSettingsView().tvExitDismissable()
-                } label: {
-                    settingsRow(title: "Default Sorting", icon: "arrow.up.arrow.down", subtitle: "Per-tab sort order")
-                }
-
-                NavigationLink {
-                    TVDefaultFilterSettingsView().tvExitDismissable()
-                } label: {
-                    settingsRow(title: "Default Filters", icon: "line.3.horizontal.decrease.circle", subtitle: "Saved filters per tab")
-                }
-
-                NavigationLink {
-                    TVTabVisibilitySettingsView().tvExitDismissable()
-                } label: {
-                    settingsRow(title: "Visible Tabs", icon: "rectangle.3.group.fill", subtitle: "Sidebar entries")
-                }
+                link(.defaultSort) { TVDefaultSortSettingsView() }
+                link(.defaultFilters) { TVDefaultFilterSettingsView() }
+                link(.visibleTabs) { TVTabVisibilitySettingsView() }
             } header: {
                 Text("Content")
             }
 
             Section {
                 Toggle(isOn: $useSidebar) {
-                    settingsRow(
-                        title: "Sidebar Navigation",
-                        icon: "sidebar.leading",
-                        subtitle: useSidebar ? "Left sidebar" : "Top tab bar"
-                    )
+                    row(.sidebar, value: useSidebar ? "On" : "Off")
                 }
+                .focused($focusedEntry, equals: .sidebar)
             } header: {
                 Text("Navigation")
-            } footer: {
-                Text("Turn off to go back to the classic tab bar along the top.")
             }
 
             Section {
-                NavigationLink {
-                    TVAboutSettingsView().tvExitDismissable()
-                } label: {
-                    settingsRow(title: "About", icon: "info.circle", subtitle: "Version & build")
-                }
+                link(.about) { TVAboutSettingsView() }
             }
         }
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 80).focusable(false)
         }
-        .background(Color.appBackground)
     }
 
-    private func settingsRow(title: String, icon: String, subtitle: String) -> some View {
-        HStack(spacing: 20) {
-            Image(systemName: icon)
-                .font(.title2)
-                .foregroundColor(appearanceManager.tintColor)
-                .frame(width: 44)
+    @ViewBuilder
+    private func link<Destination: View>(
+        _ entry: TVSettingsEntry,
+        @ViewBuilder destination: @escaping () -> Destination
+    ) -> some View {
+        NavigationLink {
+            destination().tvExitDismissable()
+        } label: {
+            row(entry)
+        }
+        .focused($focusedEntry, equals: entry)
+    }
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(title)
-                    .font(.headline)
-                Text(subtitle)
-                    .font(.subheadline)
+    /// Nur Text, Wert rechtsbündig — die tvOS-Form. Icons und Untertitel in
+    /// jeder Zeile waren aus der iOS-Settings-Welt übernommen.
+    private func row(_ entry: TVSettingsEntry, value: String? = nil) -> some View {
+        HStack {
+            Text(entry.title)
+            if let value {
+                Spacer()
+                Text(value)
                     .foregroundStyle(.secondary)
             }
+        }
+    }
+
+    @ViewBuilder
+    private var detailPane: some View {
+        if let entry = focusedEntry {
+            VStack(alignment: .leading, spacing: 28) {
+                Image(systemName: entry.icon)
+                    .font(.system(size: 72))
+                    .foregroundColor(appearanceManager.tintColor)
+
+                Text(entry.title)
+                    .font(.title)
+                    .fontWeight(.semibold)
+
+                Text(entry.summary)
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: 620, alignment: .leading)
+            .transition(.opacity)
+        } else {
+            Color.clear
         }
     }
 }
@@ -224,6 +293,7 @@ private struct TVServersSettingsView: View {
                 }
             }
         }
+        .tvSettingsPageWidth()
         .background(Color.appBackground)
         .navigationTitle("Servers")
     }
@@ -316,6 +386,7 @@ private struct TVAppearanceSettingsView: View {
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 80).focusable(false)
         }
+        .tvSettingsPageWidth()
         .background(Color.appBackground)
         .navigationTitle("Appearance")
     }
@@ -390,6 +461,7 @@ private struct TVSecuritySettingsView: View {
             TVPasscodeSetupView(isPresented: $showingSetPasscode)
                 .presentationBackground(Color.black)
         }
+        .tvSettingsPageWidth()
         .background(Color.appBackground)
         .navigationTitle("Security")
     }
@@ -431,6 +503,7 @@ private struct TVPlaybackSettingsView: View {
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 80).focusable(false)
         }
+        .tvSettingsPageWidth()
         .background(Color.appBackground)
         .navigationTitle("Playback")
     }
@@ -458,6 +531,7 @@ private struct TVDefaultSortSettingsView: View {
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 80).focusable(false)
         }
+        .tvSettingsPageWidth()
         .background(Color.appBackground)
         .navigationTitle("Default Sorting")
     }
@@ -511,6 +585,7 @@ private struct TVDefaultFilterSettingsView: View {
         .onAppear {
             filterViewModel.fetchSavedFilters()
         }
+        .tvSettingsPageWidth()
         .background(Color.appBackground)
         .navigationTitle("Default Filters")
     }
@@ -567,6 +642,7 @@ private struct TVTabVisibilitySettingsView: View {
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 80).focusable(false)
         }
+        .tvSettingsPageWidth()
         .background(Color.appBackground)
         .navigationTitle("Visible Tabs")
     }
@@ -623,6 +699,7 @@ private struct TVAboutSettingsView: View {
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 80).focusable(false)
         }
+        .tvSettingsPageWidth()
         .background(Color.appBackground)
         .navigationTitle("About")
     }
@@ -885,5 +962,21 @@ struct TVColorPresetButton: View {
         .padding(16) // Padding to avoid clipping the scale effect
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isFocused)
         .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isSelected)
+    }
+}
+
+// MARK: - Seitenbreite
+
+extension View {
+    /// Hält Einstellungsseiten schmal und linksbündig.
+    ///
+    /// Eine Einstellungsliste über die vollen 1920pt ist der Hauptgrund, warum
+    /// das Menü nach iOS aussah — auf tvOS sitzt sie in einer schmalen Spalte,
+    /// der Rest der Fläche bleibt frei.
+    func tvSettingsPageWidth() -> some View {
+        HStack(alignment: .top, spacing: 0) {
+            self.frame(width: 900)
+            Spacer(minLength: 0)
+        }
     }
 }

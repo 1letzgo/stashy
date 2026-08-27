@@ -333,6 +333,7 @@ struct TVStashyPlusSettingsView: View {
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 80).focusable(false)
         }
+        .tvSettingsPageWidth()
         .background(Color.appBackground)
         .navigationTitle("stashy+")
         .task {
