@@ -362,9 +362,14 @@ struct TVChannelPlayerView: View {
                 }
             }
         }
-        // Im Ladezweig gibt es nur Spinner auf Schwarz — ohne Fokus-Ziel
-        // erreicht die Menu-Taste `onExitCommand` nicht.
-        .focusable()
+        // Nur solange kein Player läuft: der Ladezweig ist nur ein Spinner auf
+        // Schwarz, ohne Fokus-Ziel erreicht die Menu-Taste `onExitCommand` nicht.
+        //
+        // Sobald der Player da ist, **muss** der Fokus bei ihm liegen — ein
+        // fokussierbarer Container darüber nimmt ihm die Transport-Steuerung,
+        // also Pause, Scrubbing und „Up Next". Im Fehlerzweig übernimmt der
+        // Close-Button die Rolle des Ankers.
+        .focusable(session.player.player == nil && session.errorMessage == nil)
         .onAppear { session.start() }
         .onDisappear { session.teardown() }
         .onExitCommand { close() }
