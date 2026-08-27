@@ -20,6 +20,12 @@ struct TVChannel: Identifiable, Hashable {
         case tag = "tags"
         case group = "groups"
 
+        /// Stash-Seite: alles außer `performers` ist ein
+        /// `HierarchicalMultiCriterionInput`.
+        var isHierarchical: Bool {
+            self != .performer
+        }
+
         var label: String {
             switch self {
             case .performer: return "Performer"
@@ -89,17 +95,24 @@ struct TVChannel: Identifiable, Hashable {
     var sceneFilter: StashDBViewModel.SavedFilter? {
         switch kind {
         case .scoped(let scope, let entityID):
+            var criterion: [String: StashJSONValue] = [
+                "modifier": .string("INCLUDES"),
+                "value": .array([.string(entityID)])
+            ]
+            // `studios`, `tags` und `groups` sind in Stash
+            // `HierarchicalMultiCriterionInput` und brauchen `depth`; nur
+            // `performers` ist ein einfaches `MultiCriterionInput`.
+            // Der Rest der App setzt das überall (siehe `FilterFieldCatalog`
+            // und die Scope-Filter im StashDBViewModel) — hier fehlte es.
+            if scope.isHierarchical {
+                criterion["depth"] = .int(0)
+            }
             return StashDBViewModel.SavedFilter(
                 id: id,
                 name: title,
                 mode: .scenes,
                 filter: nil,
-                object_filter: .object([
-                    scope.rawValue: .object([
-                        "modifier": .string("INCLUDES"),
-                        "value": .array([.string(entityID)])
-                    ])
-                ]),
+                object_filter: .object([scope.rawValue: .object(criterion)]),
                 ui_options: nil
             )
         default:
