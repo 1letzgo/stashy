@@ -9,34 +9,44 @@ final class FilterCriteriaDocument: ObservableObject {
         didSet { syncKeyOrder() }
     }
 
-    /// Anzeige-Reihenfolge der Kriterien. Neu hinzugefügte hängen **hinten** an, damit ein
-    /// frisch hinzugefügtes Modul im Editor unter den bestehenden erscheint statt alphabetisch
-    /// dazwischen zu springen. Mehrere auf einmal (Laden eines Filters) werden stabil vorsortiert.
-    private var keyOrder: [String] = []
+    /// Anzeige-Reihenfolge der Kriterien **je Ebene** (Schlüssel: der Gruppenpfad, "" = Wurzel).
+    /// Neu hinzugefügte hängen **hinten** an, damit ein frisch hinzugefügtes Modul im Editor unter
+    /// den bestehenden erscheint statt alphabetisch dazwischen zu springen. Mehrere auf einmal
+    /// (Laden eines Filters) werden stabil vorsortiert.
+    private var keyOrders: [String: [String]] = [:]
+
+    private var keyOrder: [String] {
+        get { keyOrders[""] ?? [] }
+        set { keyOrders[""] = newValue }
+    }
 
     init(mode: StashDBViewModel.FilterMode, objectFilter: [String: Any] = [:]) {
         self.mode = mode
         self.objectFilter = Self.sanitize(objectFilter, mode: mode)
-        self.keyOrder = Self.defaultSortedKeys(Array(self.objectFilter.keys), mode: mode)
+        self.keyOrders = ["": Self.defaultSortedKeys(Array(self.objectFilter.keys), mode: mode)]
     }
 
     /// Reconfigure for nested editors (AND/OR/NOT / `*_filter`) without allocating a new object.
     func reconfigure(mode: StashDBViewModel.FilterMode, objectFilter: [String: Any]) {
         self.mode = mode
         // Anderer Modus = andere Felder: Reihenfolge komplett neu aufbauen.
-        keyOrder = []
+        keyOrders = [:]
         self.objectFilter = Self.sanitize(objectFilter, mode: mode)
         objectWillChange.send()
     }
 
     /// Entfernte Keys raus, neue hinten anhängen. Ein einzelner neuer Key (``addDefaultCriterion``)
     /// landet damit immer zuletzt; ein ganzer Satz (``load``) wird stabil vorsortiert.
+    /// Nur die Wurzel — verschachtelte Ebenen pflegt ``noteInsertion`` beim Schreiben.
     private func syncKeyOrder() {
         let present = Set(objectFilter.keys)
-        keyOrder.removeAll { !present.contains($0) }
-        let missing = present.subtracting(keyOrder)
-        guard !missing.isEmpty else { return }
-        keyOrder.append(contentsOf: Self.defaultSortedKeys(Array(missing), mode: mode))
+        var order = keyOrder
+        order.removeAll { !present.contains($0) }
+        let missing = present.subtracting(order)
+        if !missing.isEmpty {
+            order.append(contentsOf: Self.defaultSortedKeys(Array(missing), mode: mode))
+        }
+        keyOrder = order
     }
 
     /// Ausgangsordnung für Keys ohne Einfüge-Historie: AND/OR/NOT zuerst, dann nach Label.
@@ -72,12 +82,12 @@ final class FilterCriteriaDocument: ObservableObject {
 
     func load(_ dict: [String: Any]?) {
         // Fremd geladenes Dictionary hat keine Einfüge-Historie — Ordnung neu aufbauen.
-        keyOrder = []
+        keyOrders = [:]
         objectFilter = Self.sanitize(dict ?? [:], mode: mode)
     }
 
     func replaceObjectFilter(_ dict: [String: Any]) {
-        keyOrder = []
+        keyOrders = [:]
         objectFilter = Self.sanitize(dict, mode: mode)
     }
 
@@ -110,6 +120,133 @@ final class FilterCriteriaDocument: ObservableObject {
         guard objectFilter[field.key] == nil else { return }
         let value = FilterCriterionKind.defaultValue(for: field.kind, nestedMode: field.nestedMode)
         setCriterion(key: field.key, value: value)
+    }
+
+    // MARK: - Group tree
+    //
+    // Stash nests boolean groups inside `object_filter`: keys other than AND/OR/NOT are plain
+    // criteria and implicitly ANDed, while `AND` / `OR` / `NOT` hold a nested filter of the same
+    // shape. A path is the chain of group keys from the root, e.g. `["OR", "NOT"]`.
+
+    static let groupKeys = ["AND", "OR", "NOT"]
+
+    static func isGroupKey(_ key: String) -> Bool { groupKeys.contains(key) }
+
+    /// Dictionary at `path`, or an empty one when the path does not exist (yet).
+    func node(at path: [String]) -> [String: Any] {
+        var current = objectFilter
+        for step in path {
+            guard let next = Self.stringKeyedDict(current[step]) else { return [:] }
+            current = next
+        }
+        return current
+    }
+
+    /// Plain criteria at `path`, in display order.
+    func criterionKeys(at path: [String]) -> [String] {
+        let dict = node(at: path)
+        let present = Set(dict.keys).subtracting(Self.groupKeys)
+        let order = keyOrders[Self.orderKey(path)] ?? []
+        var out = order.filter { present.contains($0) }
+        out.append(contentsOf: Self.defaultSortedKeys(Array(present.subtracting(out)), mode: mode))
+        return out
+    }
+
+    /// Nested groups at `path`, always in AND / OR / NOT order so the tree never reshuffles.
+    func groupKeys(at path: [String]) -> [String] {
+        let dict = node(at: path)
+        return Self.groupKeys.filter { dict[$0] != nil }
+    }
+
+    func value(forKey key: String, at path: [String]) -> Any? {
+        node(at: path)[key]
+    }
+
+    func setCriterion(key: String, value: Any?, at path: [String]) {
+        guard !path.isEmpty else {
+            setCriterion(key: key, value: value)
+            return
+        }
+        var root = objectFilter
+        Self.mutate(&root, path: path) { node in
+            if let value { node[key] = value } else { node.removeValue(forKey: key) }
+        }
+        if value != nil { noteInsertion(of: key, at: path) }
+        objectFilter = root
+    }
+
+    /// Adds an empty criterion at `path`. Never overwrites an existing one.
+    func addDefaultCriterion(for field: FilterFieldDescriptor, at path: [String]) {
+        guard node(at: path)[field.key] == nil else { return }
+        let value = FilterCriterionKind.defaultValue(for: field.kind, nestedMode: field.nestedMode)
+        setCriterion(key: field.key, value: value, at: path)
+    }
+
+    /// Creates an empty group. No-op when that group already exists at `path`.
+    func addGroup(_ group: String, at path: [String]) {
+        guard Self.isGroupKey(group), node(at: path)[group] == nil else { return }
+        var root = objectFilter
+        if path.isEmpty {
+            root[group] = [String: Any]()
+        } else {
+            Self.mutate(&root, path: path) { $0[group] = [String: Any]() }
+        }
+        objectFilter = root
+    }
+
+    /// Removes a group **and everything inside it**.
+    func removeGroup(_ group: String, at path: [String]) {
+        var root = objectFilter
+        if path.isEmpty {
+            root.removeValue(forKey: group)
+        } else {
+            Self.mutate(&root, path: path) { $0.removeValue(forKey: group) }
+        }
+        objectFilter = root
+    }
+
+    /// Retypes a group in place (AND ⇄ OR ⇄ NOT), keeping its contents.
+    /// No-op when the target type already exists at that path — merging two groups would
+    /// silently drop criteria.
+    func changeGroupType(at path: [String], from oldGroup: String, to newGroup: String) {
+        guard oldGroup != newGroup, Self.isGroupKey(newGroup) else { return }
+        let parent = node(at: path)
+        guard let contents = Self.stringKeyedDict(parent[oldGroup]), parent[newGroup] == nil else { return }
+        var root = objectFilter
+        let apply: (inout [String: Any]) -> Void = { node in
+            node.removeValue(forKey: oldGroup)
+            node[newGroup] = contents
+        }
+        if path.isEmpty { apply(&root) } else { Self.mutate(&root, path: path, apply) }
+        // Display order lives under the old path — move it so the group keeps its layout.
+        let oldOrder = keyOrders.removeValue(forKey: Self.orderKey(path + [oldGroup]))
+        keyOrders[Self.orderKey(path + [newGroup])] = oldOrder
+        objectFilter = root
+    }
+
+    /// Walks `path`, creating missing levels, and applies `body` to the node it lands on.
+    private static func mutate(
+        _ dict: inout [String: Any],
+        path: [String],
+        _ body: (inout [String: Any]) -> Void
+    ) {
+        guard let step = path.first else {
+            body(&dict)
+            return
+        }
+        var child = stringKeyedDict(dict[step]) ?? [:]
+        mutate(&child, path: Array(path.dropFirst()), body)
+        dict[step] = child
+    }
+
+    private static func orderKey(_ path: [String]) -> String { path.joined(separator: "/") }
+
+    private func noteInsertion(of key: String, at path: [String]) {
+        let orderKey = Self.orderKey(path)
+        var order = keyOrders[orderKey] ?? []
+        order.removeAll { $0 == key }
+        order.append(key)
+        keyOrders[orderKey] = order
     }
 
     /// Advanced criteria as the base, quick chips layered on top — an active chip always wins for

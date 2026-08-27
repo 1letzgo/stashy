@@ -1172,12 +1172,15 @@ struct EditPerformerSheet: View {
                 Section("Body") {
                     TextField("Height (cm)", text: $heightText)
                         .keyboardType(.numberPad)
+                        .numericKeyboardDoneBar()
                     TextField("Weight (kg)", text: $weightText)
                         .keyboardType(.numberPad)
+                        .numericKeyboardDoneBar()
                     TextField("Measurements", text: $measurements)
                     TextField("Fake tits", text: $fakeTits)
                     TextField("Penis length (cm)", text: $penisLengthText)
                         .keyboardType(.decimalPad)
+                        .numericKeyboardDoneBar()
                 }
                 .listRowBackground(Color.secondaryAppBackground)
 
@@ -1187,6 +1190,7 @@ struct EditPerformerSheet: View {
                     TextField("Piercings", text: $piercings)
                     TextField("Rating (0–100)", text: $ratingText)
                         .keyboardType(.numberPad)
+                        .numericKeyboardDoneBar()
                 }
                 .listRowBackground(Color.secondaryAppBackground)
             }

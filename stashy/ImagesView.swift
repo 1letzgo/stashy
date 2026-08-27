@@ -1860,6 +1860,7 @@ struct EditGallerySheet: View {
                     TextField("Date (YYYY-MM-DD)", text: $date)
                         .textInputAutocapitalization(.never)
                         .keyboardType(.numbersAndPunctuation)
+                        .numericKeyboardDoneBar()
                 }
                 .listRowBackground(Color.secondaryAppBackground)
 

@@ -2318,7 +2318,11 @@ class StashDBViewModel: ObservableObject {
             "mode": mode.rawValue,
             "name": trimmedName,
             "find_filter": findFilter,
-            "object_filter": sanitized,
+            // Persist in the web UI's storage shape, not our query shape — see `uiObjectFilter`.
+            "object_filter": FilterMapper.uiObjectFilter(
+                from: sanitized,
+                labels: FilterPickerOptionsStore.shared.knownLabels()
+            ),
             "ui_options": uiOptions
         ]
         if let existingId {

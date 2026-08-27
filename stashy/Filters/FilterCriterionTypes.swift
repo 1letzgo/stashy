@@ -90,7 +90,9 @@ enum FilterCriterionKind: String, CaseIterable, Hashable {
         case .orientation, .gender, .circumcision:
             return [.includes, .excludes, .equals, .notEquals]
         case .hierarchicalMulti, .multi:
-            return [.includes, .includesAll, .excludes, .isNull, .notNull]
+            // No `.excludes` — the picker's red state writes the `excludes` list instead, and
+            // combining both would mean "not not".
+            return [.includes, .includesAll, .isNull, .notNull]
         case .stashID, .stashIDs:
             return [.equals, .notEquals, .includes, .excludes, .isNull, .notNull]
         case .phashDistance:

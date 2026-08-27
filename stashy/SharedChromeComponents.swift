@@ -785,4 +785,46 @@ struct InlineEmptyStateView: View {
     }
 }
 
+// MARK: - Keyboard dismissal
+
+extension View {
+    /// Adds a "Done" bar above the keyboard.
+    ///
+    /// `numberPad` / `decimalPad` have no Return key, and SwiftUI does not resign the first
+    /// responder when the user taps elsewhere — without this the keyboard simply stays up and
+    /// covers the view. Attach it to the text field itself; the bar is hosted by the field's
+    /// input accessory, so it works inside sheets that have no navigation container.
+    func numericKeyboardDoneBar() -> some View {
+        toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("Done") {
+                    UIApplication.shared.sendAction(
+                        #selector(UIResponder.resignFirstResponder),
+                        to: nil,
+                        from: nil,
+                        for: nil
+                    )
+                }
+                .fontWeight(.semibold)
+            }
+        }
+    }
+
+    /// Closes the keyboard when the user taps anywhere in this subtree. Uses a *simultaneous*
+    /// gesture so buttons and rows underneath keep working.
+    func dismissesKeyboardOnTap() -> some View {
+        simultaneousGesture(
+            TapGesture().onEnded {
+                UIApplication.shared.sendAction(
+                    #selector(UIResponder.resignFirstResponder),
+                    to: nil,
+                    from: nil,
+                    for: nil
+                )
+            }
+        )
+    }
+}
+
 #endif

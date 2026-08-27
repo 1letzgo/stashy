@@ -1711,12 +1711,15 @@ public struct FilterMapper {
         return newDict
     }
 
-    /// `INCLUDES` with no ids is Stash UI "Any" — omit the criterion instead of persisting an empty filter.
+    /// `INCLUDES` with no ids is Stash UI "Any" — omit the criterion instead of persisting an empty
+    /// filter. A criterion that only *excludes* ids is still meaningful ("everything but these"),
+    /// so it must survive an empty `value`.
     private static func omitEmptyMultiIdCriteria(_ dict: inout [String: Any]) {
         let keys = ["tags", "studios", "groups", "performers", "galleries", "scenes", "movies"]
         for key in keys {
             guard let criterion = dict[key] as? [String: Any] else { continue }
-            if idStrings(from: criterion["value"]).isEmpty {
+            if idStrings(from: criterion["value"]).isEmpty,
+               idStrings(from: criterion["excludes"]).isEmpty {
                 dict.removeValue(forKey: key)
             }
         }
@@ -1739,6 +1742,59 @@ public struct FilterMapper {
         return keys.contains(key)
     }
     
+    /// Multi-id fields that the Stash web UI stores as `value: { items, excluded, depth }`.
+    static let uiMultiSelectFields: Set<String> = [
+        "performers", "studios", "tags", "galleries", "scenes", "groups", "movies"
+    ]
+    private static let uiHierarchicalFields: Set<String> = ["tags", "studios", "groups", "movies"]
+
+    /// Rewrites a GraphQL-shaped `object_filter` into the web UI's own storage format.
+    ///
+    /// `SavedFilter.object_filter` is an opaque JSON column — the server never validates it against
+    /// `HierarchicalMultiCriterionInput`. The web UI writes and reads
+    /// `value: { items: [{id,label}], excluded: [{id,label}], depth }`, so a filter saved in our
+    /// query format loads back as empty over there. Query paths keep using the GraphQL shape;
+    /// only what we persist goes through here.
+    ///
+    /// `labels` maps entity id → display name. Missing names fall back to the id, which the web UI
+    /// re-resolves on load.
+    public static func uiObjectFilter(from dict: [String: Any], labels: [String: String] = [:]) -> [String: Any] {
+        var out: [String: Any] = [:]
+        for (key, value) in dict {
+            guard let criterion = value as? [String: Any] else {
+                out[key] = value
+                continue
+            }
+            // Nested boolean groups / sub-filters keep the same treatment one level down.
+            if ["AND", "OR", "NOT"].contains(key) || key.hasSuffix("_filter") {
+                out[key] = uiObjectFilter(from: criterion, labels: labels)
+                continue
+            }
+            guard uiMultiSelectFields.contains(key) else {
+                out[key] = criterion
+                continue
+            }
+
+            func entries(_ raw: Any?) -> [[String: Any]] {
+                idStrings(from: raw).map { id in
+                    ["id": id, "label": labels[id] ?? id]
+                }
+            }
+
+            var uiValue: [String: Any] = [
+                "items": entries(criterion["value"]),
+                "excluded": entries(criterion["excludes"])
+            ]
+            if uiHierarchicalFields.contains(key) {
+                uiValue["depth"] = criterion["depth"] ?? 0
+            }
+            var rewritten: [String: Any] = ["value": uiValue]
+            if let modifier = criterion["modifier"] { rewritten["modifier"] = modifier }
+            out[key] = rewritten
+        }
+        return out
+    }
+
     private static func processCriterion(key: String, dict: [String: Any]) -> Any {
         var subDict = dict
         
@@ -1756,6 +1812,15 @@ public struct FilterMapper {
                 if !items.isEmpty {
                     subDict["value"] = items
                     if let depth = valueDict["depth"] { subDict["depth"] = depth }
+                }
+                // The web UI nests its exclusions inside `value` as `excluded`; lift them to the
+                // GraphQL-level `excludes` or they are lost on load.
+                let excluded = jsonArray(valueDict["excluded"])
+                if !excluded.isEmpty {
+                    subDict["excludes"] = excluded
+                    if subDict["depth"] == nil, let depth = valueDict["depth"] {
+                        subDict["depth"] = depth
+                    }
                 }
             }
         }

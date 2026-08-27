@@ -29,16 +29,13 @@ enum FilterFieldCatalog {
         fields(for: mode).first { $0.key == key }
     }
 
-    /// Fields the user can still add (one of each leaf key; boolean groups always available if missing).
+    /// Fields the user can still add. Boolean groups are excluded: AND/OR/NOT are structure, not
+    /// fields, and listing them next to "Rating" was the main source of confusion. The editor
+    /// offers them through its own "Add group" control instead.
     static func addableFields(for mode: StashDBViewModel.FilterMode, excludingKeys: Set<String>) -> [FilterFieldDescriptor] {
         fields(for: mode).filter { field in
             if field.isDeprecated { return false }
-            if field.kind == .booleanGroup {
-                return !excludingKeys.contains(field.key)
-            }
-            if field.kind == .customFields {
-                return !excludingKeys.contains(field.key)
-            }
+            if field.kind == .booleanGroup { return false }
             return !excludingKeys.contains(field.key)
         }
     }

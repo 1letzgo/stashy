@@ -382,12 +382,11 @@ private struct FiltersToolsEditorSheet: View {
                     .catalogFilterSortControlCardChrome()
                 }
 
-                Text(FiltersToolsView.modeTitle(mode))
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .padding(.horizontal, DesignTokens.Spacing.md + DesignTokens.Spacing.xxs)
-
-                FilterCriteriaEditorView(document: document)
+                // Title now lives in the editor's header row, sharing it with "Add group".
+                FilterCriteriaEditorView(
+                    document: document,
+                    levelTitle: FiltersToolsView.modeTitle(mode)
+                )
             }
             .padding(.top, DesignTokens.Spacing.xs)
             .padding(.bottom, DesignTokens.Spacing.xl)

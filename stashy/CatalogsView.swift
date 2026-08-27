@@ -1719,8 +1719,10 @@ struct EditGroupSheet: View {
                     TextField("Date (YYYY-MM-DD)", text: $date)
                         .textInputAutocapitalization(.never)
                         .keyboardType(.numbersAndPunctuation)
+                        .numericKeyboardDoneBar()
                     TextField("Rating (0–100)", text: $ratingText)
                         .keyboardType(.numberPad)
+                        .numericKeyboardDoneBar()
                 }
                 .listRowBackground(Color.secondaryAppBackground)
 

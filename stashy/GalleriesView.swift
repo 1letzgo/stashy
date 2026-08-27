@@ -1611,11 +1611,13 @@ struct FullScreenImageView: View {
     @ViewBuilder
     private func feedsStyleScrubberBar(currentImage: StashImage?) -> some View {
         if let image = currentImage {
-            if image.isAnimated || !image.isVideo {
-                EmptyView()
-            } else {
-                IsolatedScrubberBar(state: scrubberState, isUIVisible: showUI)
-            }
+            // Stills and animations have nothing to scrub, but the bar still has to occupy its
+            // height — dropping it shortens the bottom inset and pushes the info row down, so the
+            // chrome would jump every time the feed moves between a photo and a video.
+            let scrubbable = image.isVideo && !image.isAnimated
+            IsolatedScrubberBar(state: scrubberState, isUIVisible: showUI)
+                .opacity(scrubbable ? 1 : 0)
+                .allowsHitTesting(scrubbable)
         }
     }
 

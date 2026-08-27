@@ -6,37 +6,127 @@ struct FilterCriteriaEditorView: View {
     @ObservedObject var document: FilterCriteriaDocument
     var onChange: () -> Void = {}
     var embedsInCard: Bool = true
+    /// Shown in the header row next to "Add group" (e.g. the filter mode). Root level only.
+    var levelTitle: String? = nil
+    /// Chain of group keys from the root, e.g. `["OR", "NOT"]`. Empty = top level.
+    var path: [String] = []
 
     @State private var nestedEditorKey: String?
     @StateObject private var nestedDocument = FilterCriteriaDocument(mode: .scenes)
     @ObservedObject private var appearance = AppearanceManager.shared
 
+    private var levelKeys: [String] { document.criterionKeys(at: path) }
+    private var groupKeys: [String] { document.groupKeys(at: path) }
+
     private var addableFields: [FilterFieldDescriptor] {
-        FilterFieldCatalog.addableFields(for: document.mode, excludingKeys: document.presentKeys)
+        FilterFieldCatalog.addableFields(
+            for: document.mode,
+            excludingKeys: Set(document.node(at: path).keys)
+        )
+    }
+
+    /// Explains what this level does. The old UI showed AND/OR/NOT as if they were fields,
+    /// which hid the fact that criteria on one level are always ANDed.
+    private var levelExplanation: String {
+        switch path.last {
+        case "OR": return "Matches when at least one condition below is true."
+        case "NOT": return "Excludes everything matching the conditions below."
+        case "AND": return "All conditions below must be true."
+        default: return "All conditions must be true."
+        }
     }
 
     var body: some View {
-        let content = VStack(spacing: 0) {
-            if document.criterionKeys.isEmpty {
-                Text("No criteria — use Add below.")
-                    .font(.subheadline)
-                    .foregroundColor(.secondary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, DesignTokens.Spacing.md)
-                    .padding(.vertical, DesignTokens.Spacing.sm + 2)
+        // One card per level: this level's own conditions, then a separate card per group.
+        // Nesting used to be an indent inside a single card, which read as "more of the same list".
+        VStack(spacing: DesignTokens.Spacing.sm) {
+            if path.isEmpty {
+                headerRow
+            }
+            levelExplanationLine
+            if levelKeys.isEmpty {
+                emptyStateCard
             } else {
-                ForEach(document.criterionKeys, id: \.self) { key in
-                    criterionRow(key: key)
-                    if key != document.criterionKeys.last {
-                        Divider().padding(.leading, CatalogFilterSortSheetLayout.labelColumnWidth + 28)
-                    }
+                ForEach(levelKeys, id: \.self) { key in
+                    criterionCard(key: key)
                 }
             }
-            Divider().padding(.leading, DesignTokens.Spacing.md)
+            addBarCard
+            ForEach(groupKeys, id: \.self) { group in
+                groupCard(group)
+            }
+        }
+        .padding(.horizontal, embedsInCard ? DesignTokens.Spacing.md : 0)
+        .padding(.bottom, embedsInCard ? DesignTokens.Spacing.xs : 0)
+        // Tapping another row closes an open number pad instead of leaving it covering the sheet.
+        .dismissesKeyboardOnTap()
+        .sheet(item: Binding(
+            get: { nestedEditorKey.map { NestedEditorIdentity(key: $0) } },
+            set: { nestedEditorKey = $0?.key }
+        )) { identity in
+            nestedEditorSheet(key: identity.key)
+        }
+    }
+
+    /// This level's own conditions. Also the drop target for the level — the group cards carry
+    /// their own, so a drop always lands on exactly the level it was released over.
+    /// Says how the conditions on this level combine. Sits above the cards, not inside one,
+    /// because it describes the whole level rather than any single condition.
+    private var levelExplanationLine: some View {
+        Text(levelExplanation)
+            .font(.caption)
+            .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, DesignTokens.Spacing.xs + 2)
+    }
+
+    /// One condition per card — a shared card made every criterion look like a row of the same
+    /// list, which hid where one condition ends and the next begins.
+    private func criterionCard(key: String) -> some View {
+        criterionRow(key: key)
+            .padding(.vertical, DesignTokens.Spacing.xxs)
+            .background(Color.secondaryAppBackground)
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+    }
+
+    private var emptyStateCard: some View {
+        Text(groupKeys.isEmpty ? "No conditions yet — use Add below." : "No direct conditions.")
+            .font(.subheadline)
+            .foregroundColor(.secondary)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, DesignTokens.Spacing.md)
+            .padding(.vertical, DesignTokens.Spacing.sm + 2)
+            .background(Color.secondaryAppBackground)
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+    }
+
+    private var addBarCard: some View {
+        addBar
+            .background(Color.secondaryAppBackground)
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+    }
+
+    // MARK: - Level chrome
+
+    private var headerRow: some View {
+        HStack(spacing: DesignTokens.Spacing.xs) {
+            if let levelTitle, !levelTitle.isEmpty {
+                Text(levelTitle)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, DesignTokens.Spacing.xs + 2)
+    }
+
+    private var addBar: some View {
+        HStack(spacing: DesignTokens.Spacing.sm) {
+            Spacer(minLength: 0)
             Menu {
                 ForEach(addableFields) { field in
                     Button(field.label) {
-                        document.addDefaultCriterion(for: field)
+                        document.addDefaultCriterion(for: field, at: path)
                         HapticManager.selection()
                         onChange()
                     }
@@ -45,37 +135,96 @@ struct FilterCriteriaEditorView: View {
                 HStack(spacing: DesignTokens.Spacing.xs) {
                     Image(systemName: "plus.circle.fill")
                         .foregroundColor(addableFields.isEmpty ? .secondary : appearance.tintColor)
-                    Text("Add criterion")
+                    Text("Add condition")
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(addableFields.isEmpty ? .secondary : .primary)
-                    Spacer()
-                    Image(systemName: "chevron.up.chevron.down")
-                        .font(.caption.weight(.semibold))
-                        .foregroundColor(.secondary)
                 }
-                .padding(.horizontal, DesignTokens.Spacing.md)
-                .padding(.vertical, DesignTokens.Spacing.sm + 2)
                 .contentShape(Rectangle())
             }
             .disabled(addableFields.isEmpty)
         }
+        .padding(.horizontal, DesignTokens.Spacing.md)
+        .padding(.vertical, DesignTokens.Spacing.sm + 2)
+    }
 
-        Group {
-            if embedsInCard {
-                content
-                    .background(Color.secondaryAppBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-                    .padding(.horizontal, DesignTokens.Spacing.md)
-                    .padding(.bottom, DesignTokens.Spacing.xs)
-            } else {
-                content
+    /// One nested AND/OR/NOT group as its own card.
+    ///
+    /// New groups can no longer be created — include/exclude on a single criterion covers what
+    /// they were used for. Existing ones (typically written by the Stash web UI) are still shown
+    /// so they can be inspected or deleted, instead of silently riding along in every save.
+    @ViewBuilder
+    private func groupCard(_ group: String) -> some View {
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+            HStack(spacing: DesignTokens.Spacing.xs) {
+                Menu {
+                    ForEach(FilterCriteriaDocument.groupKeys, id: \.self) { candidate in
+                        Button {
+                            document.changeGroupType(at: path, from: group, to: candidate)
+                            HapticManager.selection()
+                            onChange()
+                        } label: {
+                            if candidate == group {
+                                Label(Self.groupTitle(candidate), systemImage: "checkmark")
+                            } else {
+                                Text(Self.groupTitle(candidate))
+                            }
+                        }
+                        // Merging into an existing group of that type would drop criteria.
+                        .disabled(candidate != group && document.groupKeys(at: path).contains(candidate))
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Text(Self.groupTitle(group).uppercased())
+                            .font(.caption.weight(.bold))
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(Capsule().fill(appearance.tintColor))
+                }
+
+                Spacer(minLength: 0)
+
+                Button {
+                    document.removeGroup(group, at: path)
+                    HapticManager.selection()
+                    onChange()
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .font(.body)
+                        .foregroundColor(.secondary.opacity(0.55))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Remove \(Self.groupTitle(group)) group")
             }
+            .padding(.horizontal, DesignTokens.Spacing.sm)
+            .padding(.top, DesignTokens.Spacing.sm)
+
+            FilterCriteriaEditorView(
+                document: document,
+                onChange: onChange,
+                embedsInCard: false,
+                path: path + [group]
+            )
+            .padding(.horizontal, DesignTokens.Spacing.xs)
+            .padding(.bottom, DesignTokens.Spacing.xs)
         }
-        .sheet(item: Binding(
-            get: { nestedEditorKey.map { NestedEditorIdentity(key: $0) } },
-            set: { nestedEditorKey = $0?.key }
-        )) { identity in
-            nestedEditorSheet(key: identity.key)
+        .background(Color.appBackground)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .overlay(
+            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
+                .stroke(appearance.tintColor.opacity(0.35), lineWidth: 1)
+        )
+    }
+
+    static func groupTitle(_ group: String) -> String {
+        switch group {
+        case "AND": return "All of"
+        case "OR": return "Any of"
+        case "NOT": return "None of"
+        default: return group
         }
     }
 
@@ -86,35 +235,40 @@ struct FilterCriteriaEditorView: View {
         let field = FilterFieldCatalog.field(key: key, mode: document.mode)
             ?? FilterFieldDescriptor(key: key, label: key, kind: .raw)
 
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(alignment: .top, spacing: DesignTokens.Spacing.sm) {
+        // Name as the card's heading, controls on their own line below — a fixed label column
+        // left the value side barely half the width on an iPhone.
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
+            HStack(alignment: .firstTextBaseline, spacing: DesignTokens.Spacing.sm) {
                 Text(field.label)
                     .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.secondary)
-                    .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-                    .padding(.top, DesignTokens.Spacing.sm)
-
-                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-                    criterionEditor(field: field)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, DesignTokens.Spacing.xs + 2)
-
+                    .foregroundColor(.primary)
+                Spacer(minLength: 0)
                 Button {
-                    document.removeCriterion(key: key)
+                    document.setCriterion(key: key, value: nil, at: path)
                     HapticManager.selection()
                     onChange()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.body)
                         .foregroundColor(.secondary.opacity(0.55))
+                        // Keeps the delete target clear of the expand chevron on the row below,
+                        // which sits only a few points away on a collapsed card.
+                        .padding(.leading, DesignTokens.Spacing.sm)
+                        .padding(.bottom, DesignTokens.Spacing.xs)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .padding(.top, DesignTokens.Spacing.sm)
                 .accessibilityLabel("Remove \(field.label)")
             }
-            .padding(.horizontal, DesignTokens.Spacing.md)
+            .padding(.top, DesignTokens.Spacing.sm)
+
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                criterionEditor(field: field)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.bottom, DesignTokens.Spacing.xs + 2)
         }
+        .padding(.horizontal, DesignTokens.Spacing.md)
     }
     @ViewBuilder
     private func criterionEditor(field: FilterFieldDescriptor) -> some View {
@@ -174,11 +328,14 @@ struct FilterCriteriaEditorView: View {
             FilterDuplicationRow(value: dictBinding(for: field.key), onChange: onChange)
         case .customFields:
             FilterCustomFieldsRow(value: customFieldsBinding(for: field.key), onChange: onChange)
-        case .booleanGroup, .nestedFilter:
+        case .booleanGroup:
+            // AND/OR/NOT are rendered as inset group blocks, never as a criterion row.
+            EmptyView()
+        case .nestedFilter:
             Button {
                 openNestedEditor(key: field.key, nestedMode: field.nestedMode ?? document.mode)
             } label: {
-                let count = document.dictValue(forKey: field.key).count
+                let count = (FilterCriteriaDocument.stringKeyedDict(document.value(forKey: field.key, at: path)) ?? [:]).count
                 HStack(spacing: 6) {
                     Text(count == 0 ? "Edit…" : "\(count) criterion(s)")
                         .font(.subheadline)
@@ -197,48 +354,49 @@ struct FilterCriteriaEditorView: View {
 
     private func dictBinding(for key: String) -> Binding<[String: Any]> {
         Binding(
-            get: { document.dictValue(forKey: key) },
-            set: { document.setDictCriterion(key: key, dict: $0) }
+            get: { FilterCriteriaDocument.stringKeyedDict(document.value(forKey: key, at: path)) ?? [:] },
+            set: { document.setCriterion(key: key, value: $0, at: path) }
         )
     }
 
     private func boolBinding(for key: String) -> Binding<Bool> {
         Binding(
             get: {
-                if let b = document.value(forKey: key) as? Bool { return b }
+                if let b = document.value(forKey: key, at: path) as? Bool { return b }
                 return true
             },
-            set: { document.setCriterion(key: key, value: $0) }
+            set: { document.setCriterion(key: key, value: $0, at: path) }
         )
     }
 
     private func stringBinding(for key: String) -> Binding<String> {
         Binding(
             get: {
-                if let s = document.value(forKey: key) as? String { return s }
+                if let s = document.value(forKey: key, at: path) as? String { return s }
                 return ""
             },
-            set: { document.setCriterion(key: key, value: $0) }
+            set: { document.setCriterion(key: key, value: $0, at: path) }
         )
     }
 
     private func customFieldsBinding(for key: String) -> Binding<[[String: Any]]> {
         Binding(
             get: {
-                if let arr = document.value(forKey: key) as? [[String: Any]] { return arr }
-                if let arr = document.value(forKey: key) as? [Any] {
+                if let arr = document.value(forKey: key, at: path) as? [[String: Any]] { return arr }
+                if let arr = document.value(forKey: key, at: path) as? [Any] {
                     return arr.compactMap { FilterCriteriaDocument.stringKeyedDict($0) }
                 }
                 return []
             },
-            set: { document.setCriterion(key: key, value: $0) }
+            set: { document.setCriterion(key: key, value: $0, at: path) }
         )
     }
 
     // MARK: - Nested
 
     private func openNestedEditor(key: String, nestedMode: StashDBViewModel.FilterMode) {
-        nestedDocument.reconfigure(mode: nestedMode, objectFilter: document.dictValue(forKey: key))
+        let current = FilterCriteriaDocument.stringKeyedDict(document.value(forKey: key, at: path)) ?? [:]
+        nestedDocument.reconfigure(mode: nestedMode, objectFilter: current)
         nestedEditorKey = key
     }
 
@@ -261,11 +419,7 @@ struct FilterCriteriaEditorView: View {
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Done") {
                         let dict = nestedDocument.sanitizedObjectFilter
-                        if dict.isEmpty {
-                            document.removeCriterion(key: key)
-                        } else {
-                            document.setDictCriterion(key: key, dict: dict)
-                        }
+                        document.setCriterion(key: key, value: dict.isEmpty ? nil : dict, at: path)
                         nestedEditorKey = nil
                         onChange()
                     }
@@ -326,9 +480,18 @@ struct FilterModifierPicker: View {
     var onChange: () -> Void
     @ObservedObject private var appearance = AppearanceManager.shared
 
+    /// Keeps a stored modifier visible even when it is no longer offered (e.g. an older filter
+    /// still on `EXCLUDES`), so the picker never renders blank.
+    private var resolvedOptions: [StashCriterionModifier] {
+        guard !modifier.isEmpty,
+              !options.contains(where: { $0.rawValue == modifier }),
+              let current = StashCriterionModifier(rawValue: modifier) else { return options }
+        return options + [current]
+    }
+
     var body: some View {
         Picker("Modifier", selection: $modifier) {
-            ForEach(options) { m in
+            ForEach(resolvedOptions) { m in
                 Text(m.label).tag(m.rawValue)
             }
         }
@@ -432,11 +595,13 @@ struct FilterNumericCriterionRow: View {
                 HStack(spacing: 8) {
                     TextField("Value", text: numberText(key: "value"))
                         .keyboardType(isFloat ? .decimalPad : .numberPad)
+                        .numericKeyboardDoneBar()
                         .filterEditorTextFieldChrome()
                         .focused($focusedField, equals: 0)
                     if mod?.needsSecondValue == true {
                         TextField("Value 2", text: numberText(key: "value2"))
                             .keyboardType(isFloat ? .decimalPad : .numberPad)
+                            .numericKeyboardDoneBar()
                             .filterEditorTextFieldChrome()
                             .focused($focusedField, equals: 1)
                     }
@@ -747,6 +912,7 @@ struct FilterPhashDistanceRow: View {
                 set: { patch(["distance": Int($0) ?? 0]) }
             ))
             .keyboardType(.numberPad)
+            .numericKeyboardDoneBar()
             .filterEditorTextFieldChrome()
         }
     }
@@ -788,6 +954,7 @@ struct FilterDuplicationRow: View {
                 }
             ))
             .keyboardType(.numberPad)
+            .numericKeyboardDoneBar()
             .filterEditorTextFieldChrome()
             .onSubmit { onChange() }
         }
@@ -947,21 +1114,32 @@ struct FilterMultiIdCriterionRow: View {
         FilterMapper.idStrings(from: value["value"])
     }
 
+    private var excludedIds: [String] {
+        FilterMapper.idStrings(from: value["excludes"])
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            FilterModifierPicker(
-                modifier: Binding(
-                    get: { modifierRaw },
-                    set: { patch(["modifier": $0]) }
-                ),
-                options: FilterCriterionKind.defaultModifiers(for: hierarchical ? .hierarchicalMulti : .multi),
-                onChange: {}
-            )
             CatalogNamedEntityLiveFilterMultiPickerRow(
                 title: "",
                 selectedIds: Binding(
                     get: { selectedIds },
                     set: { patch(["value": $0]) }
+                ),
+                // Mirrors the web UI: one criterion carries both the included and the excluded
+                // ids, so "tag A but not tag B" needs no NOT group at all.
+                excludedIds: Binding(
+                    get: { excludedIds },
+                    set: { patch(["excludes": $0]) }
+                ),
+                // Match mode lives inside the list, not in a dropdown beside it — with per-value
+                // yes/no the plain "Includes" case is the default and needs no control of its own.
+                matchMode: Binding(
+                    get: { modifierRaw },
+                    set: { patch(["modifier": $0]) }
+                ),
+                matchModeOptions: FilterCriterionKind.defaultModifiers(
+                    for: hierarchical ? .hierarchicalMulti : .multi
                 ),
                 items: options,
                 displayName: { $0.name },
@@ -978,6 +1156,11 @@ struct FilterMultiIdCriterionRow: View {
         var d = value
         for (k, v) in updates { d[k] = v }
         if hierarchical, d["depth"] == nil { d["depth"] = 0 }
+        // Never ship an empty `excludes` — Stash treats the key as present and it shows up in
+        // saved filters as noise.
+        if let excludes = d["excludes"] as? [String], excludes.isEmpty {
+            d.removeValue(forKey: "excludes")
+        }
         value = d
         onChange()
     }

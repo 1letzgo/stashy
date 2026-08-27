@@ -258,6 +258,13 @@ struct CatalogNamedEntityLiveFilterPickerRow<Item: Identifiable & Equatable>: Vi
 struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable>: View where Item.ID == String {
     let title: String
     @Binding var selectedIds: [String]
+    /// When bound, each row cycles none → include → exclude, mirroring the Stash web UI's green
+    /// check / red cross. Left `nil` the picker stays a plain include-only list.
+    var excludedIds: Binding<[String]>? = nil
+    /// When bound, the match mode is offered as the first entry of the expanded list (like the
+    /// web UI's "(Any of)") instead of as a separate dropdown next to the criterion.
+    var matchMode: Binding<String>? = nil
+    var matchModeOptions: [StashCriterionModifier] = []
     let items: [Item]
     let displayName: (Item) -> String
     let isLoading: Bool
@@ -272,6 +279,9 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
     @ObservedObject private var pickerStore = FilterPickerOptionsStore.shared
     @State private var isExpanded = false
     @State private var searchText = ""
+    /// Ids that were already chosen when the list was opened. Sorting by *live* selection would
+    /// make rows jump under the finger on every tap, so the order is frozen per expansion.
+    @State private var pinnedIds: [String] = []
 
     /// Flattened id/name pairs — lets server hits (`FilterEntityOption`) sit next to the caller's
     /// own `Item` type without either side knowing about the other.
@@ -282,13 +292,26 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
 
     private var entries: [PickerEntry] {
         var out = items.map { PickerEntry(id: $0.id, name: displayName($0)) }
-        guard let searchKind else { return out }
-        var seen = Set(out.map(\.id))
-        for hit in pickerStore.searchHits(searchKind) where !seen.contains(hit.id) {
-            seen.insert(hit.id)
-            out.append(PickerEntry(id: hit.id, name: hit.name))
+        if let searchKind {
+            var seen = Set(out.map(\.id))
+            for hit in pickerStore.searchHits(searchKind) where !seen.contains(hit.id) {
+                seen.insert(hit.id)
+                out.append(PickerEntry(id: hit.id, name: hit.name))
+            }
         }
-        return out
+        guard !pinnedIds.isEmpty else { return out }
+        // Anything already in the filter floats to the top, in the order it was pinned.
+        let rank = Dictionary(uniqueKeysWithValues: pinnedIds.enumerated().map { ($0.element, $0.offset) })
+        return out.enumerated().sorted { lhs, rhs in
+            let l = rank[lhs.element.id]
+            let r = rank[rhs.element.id]
+            switch (l, r) {
+            case let (l?, r?): return l < r
+            case (_?, nil): return true
+            case (nil, _?): return false
+            default: return lhs.offset < rhs.offset
+            }
+        }.map(\.element)
     }
 
     /// Local narrowing of the merged list. Selected entries always stay visible, otherwise ticking
@@ -305,19 +328,36 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
         searchKind.map { pickerStore.isSearching($0) } ?? false
     }
 
+    private var excluded: [String] { excludedIds?.wrappedValue ?? [] }
+
     private var selectedSummary: String {
-        guard !selectedIds.isEmpty else { return "Any" }
-        let selectedNames = entries
-            .filter { selectedIds.contains($0.id) }
-            .map(\.name)
-        if selectedNames.isEmpty { return "\(selectedIds.count) selected" }
-        if selectedNames.count <= 2 { return selectedNames.joined(separator: ", ") }
-        return "\(selectedNames[0]), \(selectedNames[1]) +\(selectedNames.count - 2)"
+        guard !selectedIds.isEmpty || !excluded.isEmpty else { return "Any" }
+        let names = entries.filter { selectedIds.contains($0.id) }.map(\.name)
+        var summary: String
+        if names.isEmpty {
+            summary = selectedIds.isEmpty ? "" : "\(selectedIds.count) selected"
+        } else if names.count <= 2 {
+            summary = names.joined(separator: ", ")
+        } else {
+            summary = "\(names[0]), \(names[1]) +\(names.count - 2)"
+        }
+        if !excluded.isEmpty {
+            let excludedNames = entries.filter { excluded.contains($0.id) }.map(\.name)
+            let listed = excludedNames.count <= 2
+                ? excludedNames.joined(separator: ", ")
+                : "\(excludedNames[0]) +\(excludedNames.count - 1)"
+            let suffix = "− \(listed.isEmpty ? "\(excluded.count)" : listed)"
+            summary = summary.isEmpty ? suffix : "\(summary) · \(suffix)"
+        }
+        return summary
     }
 
     var body: some View {
         VStack(spacing: 0) {
             Button {
+                if !isExpanded {
+                    pinnedIds = selectedIds + excluded.filter { !selectedIds.contains($0) }
+                }
                 withAnimation(DesignTokens.Animation.quick) {
                     isExpanded.toggle()
                 }
@@ -354,21 +394,32 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
                     if searchKind != nil {
                         searchField
                     }
+                    if excludedIds != nil {
+                        tristateLegend
+                    }
+                    if let matchMode, !matchModeOptions.isEmpty {
+                        matchModeRow(matchMode)
+                        Divider().padding(.leading, title.isEmpty ? 4 : CatalogFilterSortSheetLayout.labelColumnWidth + 28)
+                    }
                     Button {
-                        guard !selectedIds.isEmpty else { return }
+                        guard !selectedIds.isEmpty || !excluded.isEmpty else { return }
                         selectedIds = []
+                        excludedIds?.wrappedValue = []
                         onSelectionChange()
                     } label: {
-                        multiPickerOptionRow(title: "Any", isSelected: selectedIds.isEmpty)
+                        multiPickerOptionRow(
+                            title: "Any",
+                            state: selectedIds.isEmpty && excluded.isEmpty ? .included : .none
+                        )
                     }
                     .buttonStyle(.plain)
 
                     ForEach(visibleEntries) { entry in
-                        Divider().padding(.leading, CatalogFilterSortSheetLayout.labelColumnWidth + 28)
+                        Divider().padding(.leading, title.isEmpty ? 4 : CatalogFilterSortSheetLayout.labelColumnWidth + 28)
                         Button {
-                            toggle(entry.id)
+                            cycle(entry.id)
                         } label: {
-                            multiPickerOptionRow(title: entry.name, isSelected: selectedIds.contains(entry.id))
+                            multiPickerOptionRow(title: entry.name, state: state(of: entry.id))
                         }
                         .buttonStyle(.plain)
                     }
@@ -383,9 +434,6 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
     /// "most used" list never contained.
     private var searchField: some View {
         HStack(spacing: 8) {
-            if !title.isEmpty {
-                Spacer().frame(width: CatalogFilterSortSheetLayout.labelColumnWidth)
-            }
             Image(systemName: "magnifyingglass")
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -410,17 +458,91 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
                 .buttonStyle(.plain)
             }
         }
+        // Page colour reads as a recess against the card surface the picker sits on.
         .padding(.horizontal, 12)
         .padding(.vertical, 8)
+        .background(Color.appBackground)
+        .clipShape(Capsule(style: .continuous))
+        .padding(.vertical, 4)
     }
 
-    private func multiPickerOptionRow(title optionTitle: String, isSelected: Bool) -> some View {
+    /// Without this nobody finds the third state — the rows look like ordinary checkboxes.
+    private var tristateLegend: some View {
+        HStack(spacing: 10) {
+            Label {
+                Text("include")
+            } icon: {
+                Image(systemName: "checkmark.circle.fill").foregroundColor(appearance.tintColor)
+            }
+            Label {
+                Text("excluded")
+            } icon: {
+                Image(systemName: "xmark.circle.fill").foregroundColor(.red)
+            }
+            Spacer(minLength: 0)
+        }
+        .font(.caption2)
+        .foregroundColor(.secondary)
+        .padding(.horizontal, 4)
+        .padding(.bottom, 6)
+    }
+
+    /// Match mode as the first list entry, the way the Stash web UI shows "(Any of)".
+    private func matchModeRow(_ binding: Binding<String>) -> some View {
         HStack(spacing: 12) {
             if !title.isEmpty {
                 Spacer().frame(width: CatalogFilterSortSheetLayout.labelColumnWidth)
             }
-            Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                .foregroundColor(isSelected ? appearance.tintColor : .secondary)
+            Menu {
+                ForEach(matchModeOptions) { option in
+                    Button {
+                        binding.wrappedValue = option.rawValue
+                        onSelectionChange()
+                    } label: {
+                        if option.rawValue == binding.wrappedValue {
+                            Label(option.label, systemImage: "checkmark")
+                        } else {
+                            Text(option.label)
+                        }
+                    }
+                }
+            } label: {
+                HStack(spacing: 4) {
+                    Text("(\(currentMatchModeLabel(binding.wrappedValue)))")
+                        .font(.subheadline)
+                        .italic()
+                    Image(systemName: "chevron.up.chevron.down")
+                        .font(.caption2.weight(.semibold))
+                }
+                .foregroundColor(appearance.tintColor)
+            }
+            Spacer()
+        }
+        .padding(.horizontal, title.isEmpty ? 0 : 16)
+        .padding(.vertical, 9)
+    }
+
+    private func currentMatchModeLabel(_ raw: String) -> String {
+        StashCriterionModifier(rawValue: raw)?.label ?? raw
+    }
+
+    fileprivate enum PickerEntryState {
+        case none, included, excluded
+    }
+
+    private func state(of id: String) -> PickerEntryState {
+        if selectedIds.contains(id) { return .included }
+        if excluded.contains(id) { return .excluded }
+        return .none
+    }
+
+    private func multiPickerOptionRow(title optionTitle: String, state: PickerEntryState) -> some View {
+        HStack(spacing: 12) {
+            if !title.isEmpty {
+                Spacer().frame(width: CatalogFilterSortSheetLayout.labelColumnWidth)
+            }
+            Image(systemName: symbol(for: state))
+                .foregroundColor(color(for: state))
             Text(optionTitle)
                 .font(.subheadline)
                 .foregroundColor(.primary)
@@ -432,11 +554,41 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
         .contentShape(Rectangle())
     }
 
-    private func toggle(_ id: String) {
-        if selectedIds.contains(id) {
-            selectedIds.removeAll { $0 == id }
-        } else {
+    private func symbol(for state: PickerEntryState) -> String {
+        switch state {
+        case .none: return "circle"
+        case .included: return "checkmark.circle.fill"
+        case .excluded: return "xmark.circle.fill"
+        }
+    }
+
+    private func color(for state: PickerEntryState) -> Color {
+        switch state {
+        case .none: return .secondary
+        case .included: return appearance.tintColor
+        case .excluded: return .red
+        }
+    }
+
+    /// none → include → exclude → none. Without an `excludedIds` binding it stays a plain toggle.
+    private func cycle(_ id: String) {
+        guard let excludedBinding = excludedIds else {
+            if selectedIds.contains(id) {
+                selectedIds.removeAll { $0 == id }
+            } else {
+                selectedIds.append(id)
+            }
+            onSelectionChange()
+            return
+        }
+        switch state(of: id) {
+        case .none:
             selectedIds.append(id)
+        case .included:
+            selectedIds.removeAll { $0 == id }
+            excludedBinding.wrappedValue.append(id)
+        case .excluded:
+            excludedBinding.wrappedValue.removeAll { $0 == id }
         }
         onSelectionChange()
     }

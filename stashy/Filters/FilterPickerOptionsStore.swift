@@ -52,6 +52,20 @@ final class FilterPickerOptionsStore: ObservableObject {
     /// Name-search hits collected this session for `kind`.
     func searchHits(_ kind: Kind) -> [FilterEntityOption] { searchResults[kind.rawValue] ?? [] }
 
+    /// entity id → display name across every cached kind, for writing the web UI's `{id,label}`
+    /// pairs into a saved filter. Ids are unique per entity type; a collision across types would
+    /// only mislabel, never mis-filter.
+    func knownLabels() -> [String: String] {
+        var out: [String: String] = [:]
+        for list in options.values {
+            for option in list { out[option.id] = option.name }
+        }
+        for list in searchResults.values {
+            for option in list { out[option.id] = option.name }
+        }
+        return out
+    }
+
     /// Cached most-used list plus every search hit seen this session, de-duplicated by id.
     func availableOptions(_ kind: Kind) -> [FilterEntityOption] {
         let base = cached(kind)

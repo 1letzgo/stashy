@@ -1172,6 +1172,7 @@ struct EditStudioSheet: View {
                         .keyboardType(.URL)
                     TextField("Rating (0–100)", text: $ratingText)
                         .keyboardType(.numberPad)
+                        .numericKeyboardDoneBar()
                 }
                 .listRowBackground(Color.secondaryAppBackground)
 

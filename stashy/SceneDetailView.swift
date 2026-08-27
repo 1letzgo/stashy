@@ -259,6 +259,9 @@ struct SceneDetailView: View {
 
     // Extracted main content to use modular components
     private var mainContentView: some View {
+        // The reader sits *outside* the ScrollView, so it reports the space available to the
+        // view rather than the width its own content ended up needing.
+        GeometryReader { proxy in
         ScrollView {
             VStack(spacing: 12) {
                 VStack(spacing: 0) {
@@ -476,8 +479,10 @@ struct SceneDetailView: View {
             // Pins the content to the viewport width. Without this a single unbreakable
             // string (long file-name title, URL in the details) grows the scroll content
             // sideways, and the horizontal drag then pans the cards instead of triggering
-            // the interactive back gesture.
-            .containerRelativeFrame(.horizontal)
+            // the interactive back gesture. `containerRelativeFrame` looked right but
+            // reported half the width in landscape, where the size class turns regular.
+            .frame(width: proxy.size.width)
+        }
         }
     }
 
@@ -1122,6 +1127,7 @@ struct AddMarkerSheet: View {
                         TextField("Seconds or MM:SS", text: $endTimeString)
                             .multilineTextAlignment(.trailing)
                             .keyboardType(.numbersAndPunctuation)
+                            .numericKeyboardDoneBar()
                     }
                 }
                 .listRowBackground(Color.secondaryAppBackground)
