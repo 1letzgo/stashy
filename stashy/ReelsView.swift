@@ -140,6 +140,15 @@ enum ReelsPlayerRegistry {
         lock.unlock()
     }
 
+    /// True while any registered player is actually running — used to tell "the feed never
+    /// started" apart from "the user paused it".
+    static var hasPlayingPlayer: Bool {
+        lock.lock()
+        let all = players.allObjects
+        lock.unlock()
+        return all.contains { $0.timeControlStatus == .playing }
+    }
+
     /// Safe play entry point for Reel rows — no-op while Feeds is backgrounded/suspended.
     static func playIfAllowed(_ player: AVPlayer?) {
         guard let player else { return }
@@ -1675,13 +1684,16 @@ struct ReelsViewBody: View {
         let generation = feedActivationGeneration
         let kick = {
             guard generation == self.feedActivationGeneration else { return }
-            // Die drei gestaffelten Kicks sind Retries, falls der erste vor dem Layout
-            // läuft — nicht drei Aktivierungen. Ohne diesen Guard würden 0.55s/1.25s
-            // später `isPlaying`/`isUserScrolling` überschrieben und eine zwischenzeitliche
-            // User-Pause (oder ein Scroll) wieder aufgehoben.
-            guard self.pendingFeedActivation else { return }
             guard self.coordinator.selectedTab == .reels, self.reelsMode != .pics else { return }
             guard !self.isFeedLoading, !self.isListEmpty else { return }
+            // Die drei gestaffelten Kicks sind Retries, falls der erste vor dem Layout läuft —
+            // nicht drei Aktivierungen. Sie müssen feuern, solange der Feed *nicht* angelaufen
+            // ist (sonst bleibt der Tab schwarz); sobald etwas spielt, würden sie nur noch eine
+            // frisch getippte User-Pause überschreiben.
+            guard !ReelsPlayerRegistry.hasPlayingPlayer else {
+                self.pendingFeedActivation = false
+                return
+            }
             self.isUserScrollingReels = false
             self.currentItemIsPlaying = true
             self.reelsWasPlayingBeforeScrollGesture = true
@@ -2341,6 +2353,22 @@ struct ReelsViewBody: View {
                 } else if oldTab == .reels {
                     reelsStopPlaybackAndAccessories()
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
+                // iOS pauses every AVPlayer on backgrounding but never tells SwiftUI, so
+                // `currentItemIsPlaying` would stay `true` over a paused player. Pausing here
+                // keeps the play button and the player in the same state.
+                guard coordinator.selectedTab == .reels, reelsMode != .pics else { return }
+                reelsPausePlaybackForLocalTeardown()
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+                // Same path the tab switch uses — re-arms the audio session, restores the
+                // checkpoint and re-asserts play intent. Without it Feeds came back paused
+                // while the button still read "playing", so the first tap only flipped the
+                // flag and a second one was needed to actually resume.
+                guard coordinator.selectedTab == .reels else { return }
+                guard isInitialized else { return }
+                reelsResumePlaybackAfterReturn()
             }
             .onChange(of: coordinator.reelsNavigationToken) { _, _ in
                 // Ignore token updates while Feeds is not visible — otherwise an
@@ -5228,18 +5256,25 @@ extension ReelItemView {
             // NOTE: deliberately not gated on `isUserScrolling` — that flag can strand
             // `true` after initial programmatic scrolling, and this row is active
             // (never an off-screen flasher), so recovery is always safe here.
-            // `isPlaying` = User-Intent. Ohne diesen Guard hebt der Watchdog eine
-            // Pause auf, die innerhalb von 2.5s nach dem Item-Wechsel getippt wurde.
+            // Also NOT gated on `isPlaying`: a missing player renders the row black, and
+            // that has to be repaired whether or not the user wants playback running.
             guard self.isActive,
-                  self.isPlaying,
                   !ReelsPlayerRegistry.isPlaybackSuspended else { return }
 
             if self.player == nil {
                 AppLog.error("🎬 Reel watchdog: active row has no player — recovering (scrolling=\(self.isUserScrolling) playing=\(self.isPlaying))")
-                self.setupPlayer(forcePlay: true)
-                ReelsPlayerRegistry.playIfAllowed(self.player)
+                // Build the player either way so a frame appears; only start it when the
+                // user actually wants playback.
+                self.setupPlayer(forcePlay: self.isPlaying)
+                if self.isPlaying {
+                    ReelsPlayerRegistry.playIfAllowed(self.player)
+                }
                 return
             }
+
+            // From here on the row has a player — the remaining checks are about *playback*,
+            // so they must respect a pause the user tapped in the last 2.5s.
+            guard self.isPlaying else { return }
 
             guard self.player?.timeControlStatus != .playing else {
                 // Playing but no decoded frame surfaced yet — force the readiness fallback.

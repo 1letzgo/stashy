@@ -10103,6 +10103,30 @@ struct StashImage: Codable, Identifiable, Equatable {
 
 
 
+extension StashImage {
+    /// Titel für die Anzeige — fällt auf den Dateinamen zurück, analog zu
+    /// `Scene.displayTitle`. Viele Bilder in Stash haben keinen gesetzten Titel.
+    var displayTitle: String? {
+        if let title = title?.trimmingCharacters(in: .whitespacesAndNewlines), !title.isEmpty {
+            return title
+        }
+        if let basename = visual_files?.first?.basename?.trimmingCharacters(in: .whitespacesAndNewlines),
+           !basename.isEmpty {
+            return basename
+        }
+        guard let path = visual_files?.first?.path ?? paths?.image else { return nil }
+        let clean = path.components(separatedBy: "?").first ?? path
+        let name = URL(fileURLWithPath: clean).lastPathComponent
+        return name.isEmpty ? nil : name
+    }
+
+    /// Bis zu drei Performer-Namen, kommagetrennt.
+    var performerSummary: String? {
+        guard let performers, !performers.isEmpty else { return nil }
+        return performers.prefix(3).map(\.name).joined(separator: ", ")
+    }
+}
+
 struct ImagePaths: Codable, Equatable {
     let thumbnail: String?
     let preview: String?

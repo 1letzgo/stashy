@@ -69,12 +69,19 @@ struct TVImagesView: View {
                 )
             },
             card: { image in
-                Button {
-                    presentedImage = TVImageLink(id: image.id, title: image.title ?? "Untitled")
-                } label: {
-                    TVImageCardView(image: image)
+                VStack(alignment: .leading, spacing: 10) {
+                    Button {
+                        presentedImage = TVImageLink(
+                            id: image.id,
+                            title: image.displayTitle ?? "Untitled"
+                        )
+                    } label: {
+                        TVImageCardView(image: image)
+                    }
+                    .buttonStyle(.card)
+
+                    TVImageCardTitleView(image: image)
                 }
-                .buttonStyle(.card)
             }
         )
         .fullScreenCover(item: $presentedImage) { link in

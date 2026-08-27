@@ -67,3 +67,26 @@ struct TVImageCardView: View {
             )
     }
 }
+
+/// Beschriftung unter der Bildkarte — Titel und Performer, wie bei Szenen.
+struct TVImageCardTitleView: View {
+    let image: StashImage
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            if let title = image.displayTitle {
+                Text(title)
+                    .font(.caption)
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+            }
+            if let performers = image.performerSummary {
+                Text(performers)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}

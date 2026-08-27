@@ -199,16 +199,21 @@ struct TVGalleryDetailView: View {
                 } else {
                     LazyVGrid(columns: imageSpec.columns(for: contentWidth), alignment: .leading, spacing: imageSpec.spacing) {
                         ForEach(displayImages) { image in
-                            Button {
-                                presentedImage = TVImageLink(
-                                    id: image.id,
-                                    title: image.title ?? "Untitled",
-                                    galleryId: galleryId
-                                )
-                            } label: {
-                                TVImageCardView(image: image)
+                            VStack(alignment: .leading, spacing: 10) {
+                                Button {
+                                    presentedImage = TVImageLink(
+                                        id: image.id,
+                                        title: image.displayTitle ?? "Untitled",
+                                        galleryId: galleryId
+                                    )
+                                } label: {
+                                    TVImageCardView(image: image)
+                                }
+                                .buttonStyle(.card)
+
+                                TVImageCardTitleView(image: image)
                             }
-                            .buttonStyle(.card)
+                            .frame(width: imageSpec.columnWidth)
                             .onAppear {
                                 if image.id == displayImages.last?.id && viewModel.hasMoreGalleryImages {
                                     viewModel.fetchGalleryImages(galleryId: galleryId, isInitialLoad: false)
