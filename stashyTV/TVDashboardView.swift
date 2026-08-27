@@ -29,6 +29,14 @@ struct TVDashboardView: View {
     @State private var playingChannel: TVChannel?
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
     @Environment(\.scenePhase) private var scenePhase
+    @Environment(\.tabBarPlacement) private var tabBarPlacement
+
+    /// Der 60pt-Abstand oben stammt aus der Zeit der oberen Tab-Leiste. Mit der
+    /// Sidebar ist oben nichts mehr — und seit der Refresh-Button weg ist, stand
+    /// die erste Reihe deutlich zu tief.
+    private var topInset: CGFloat {
+        tabBarPlacement == .topBar ? 60 : 16
+    }
 
     var body: some View {
         Group {
@@ -38,7 +46,7 @@ struct TVDashboardView: View {
                 ScrollView([.vertical], showsIndicators: false) {
                     VStack(alignment: .leading, spacing: 0) {
                         Spacer()
-                            .frame(height: 60)
+                            .frame(height: topInset)
 
                         // MARK: Content Rows
                         contentRows

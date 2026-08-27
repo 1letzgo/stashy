@@ -156,6 +156,20 @@ struct TVCatalogGrid<Item: Identifiable, Card: View, Header: View>: View where I
         gridSpec.columns(for: contentWidth)
     }
 
+    /// Lädt nach, sobald eines der letzten beiden Reihen sichtbar wird.
+    ///
+    /// Vorher hing das ausschließlich am allerletzten Element. Das feuert pro
+    /// Element genau einmal — und wenn eine nachgeladene Serverseite komplett
+    /// weggefiltert wird (Images blenden GIFs und Videos aus), bleibt dasselbe
+    /// letzte Element stehen und es wird nie wieder nachgeladen.
+    private func prefetchIfNeeded(reaching item: Item) {
+        guard hasMore, !isLoadingMore else { return }
+        guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
+        let threshold = max(1, columns.count * 2)
+        guard index >= items.count - threshold else { return }
+        loadMore()
+    }
+
     var body: some View {
         VStack(spacing: 0) {
             if !hasValidConfig {
@@ -238,11 +252,7 @@ struct TVCatalogGrid<Item: Identifiable, Card: View, Header: View>: View where I
                         card(item)
                             .focused($focusedID, equals: item.id)
                             .frame(width: columnWidth)
-                            .onAppear {
-                                if item.id == items.last?.id && hasMore {
-                                    loadMore()
-                                }
-                            }
+                            .onAppear { prefetchIfNeeded(reaching: item) }
                     }
 
                     if isLoadingMore {

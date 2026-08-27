@@ -124,7 +124,7 @@ struct TVTabStack<Content: View>: View {
         let path = store.binding(for: tab)
         NavigationStack(path: path) {
             content()
-                .withTVDestinations()
+                .withTVDestinations(path: path)
         }
         .environment(\.tvNavigationPath, path)
         // Einmal pro Stack: liefert `tvContentWidth` an Root-View und alle
@@ -202,44 +202,59 @@ extension View {
 
 // MARK: - Centralised Navigation Destinations
 
-/// Optional typed destinations (kept for path-based pushes). Browse grids use
-/// `NavigationLink(destination:)` — value-based links are unreliable in tvOS LazyVGrid.
+/// Registriert alle typisierten Ziele des Stacks.
+///
+/// Jedes Ziel bekommt `\.tvNavigationPath` **explizit** mit. Der Wert außen am
+/// `NavigationStack` erreicht zwar den Wurzel-Inhalt, aber nicht verlässlich die
+/// über `navigationDestination` präsentierten Views. Fehlt er dort, tut
+/// `TVNavButton` beim Select stillschweigend nichts — genau das ließ Tag-,
+/// Performer- und Studio-Links auf der Szenenseite und das Starten einer Szene
+/// aus Performer-/Studio-/Tag-/Group-Detail ins Leere laufen.
 struct TVNavigationDestinations: ViewModifier {
+    let path: Binding<NavigationPath>
+
     func body(content: Content) -> some View {
         content
             .navigationDestination(for: TVSceneLink.self) { link in
                 TVSceneDetailView(sceneId: link.sceneId)
                     .tvExitDismissable()
+                    .environment(\.tvNavigationPath, path)
             }
             .navigationDestination(for: TVPerformerLink.self) { link in
                 TVPerformerDetailView(performerId: link.id, performerName: link.name)
                     .tvExitDismissable()
+                    .environment(\.tvNavigationPath, path)
             }
             .navigationDestination(for: TVStudioLink.self) { link in
                 TVStudioDetailView(studioId: link.id, studioName: link.name)
                     .tvExitDismissable()
+                    .environment(\.tvNavigationPath, path)
             }
             .navigationDestination(for: TVTagLink.self) { link in
                 TVTagDetailView(tagId: link.id, tagName: link.name)
                     .tvExitDismissable()
+                    .environment(\.tvNavigationPath, path)
             }
             .navigationDestination(for: TVGroupLink.self) { link in
                 TVGroupDetailView(groupId: link.id, groupName: link.name)
                     .tvExitDismissable()
+                    .environment(\.tvNavigationPath, path)
             }
             .navigationDestination(for: TVGalleryLink.self) { link in
                 TVGalleryDetailView(galleryId: link.id, galleryTitle: link.title)
                     .tvExitDismissable()
+                    .environment(\.tvNavigationPath, path)
             }
             .navigationDestination(for: TVSceneListLink.self) { link in
                 TVScenesView(sortBy: link.sortBy)
                     .tvExitDismissable()
+                    .environment(\.tvNavigationPath, path)
             }
     }
 }
 
 extension View {
-    func withTVDestinations() -> some View {
-        modifier(TVNavigationDestinations())
+    func withTVDestinations(path: Binding<NavigationPath>) -> some View {
+        modifier(TVNavigationDestinations(path: path))
     }
 }
