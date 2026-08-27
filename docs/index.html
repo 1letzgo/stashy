@@ -5,148 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>stashy — Stash for iOS</title>
   <meta name="description" content="A native Stash client for iOS. Fast, private, connected to your server.">
-  <link rel="icon" href="icon.png" type="image/png">
-  <style>
-    :root {
-      --bg: #1E293B;
-      --card: #334155;
-      --text: rgba(255, 255, 255, 0.92);
-      --muted: rgba(255, 255, 255, 0.55);
-      --line: rgba(255, 255, 255, 0.10);
-      --radius: 12px;
-    }
-
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-
-    html, body {
-      min-height: 100%;
-      background: var(--bg);
-      color: var(--text);
-      font: 17px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", sans-serif;
-      -webkit-font-smoothing: antialiased;
-    }
-
-    body {
-      max-width: 720px;
-      margin: 0 auto;
-      padding: 64px 24px 48px;
-      text-align: center;
-    }
-
-    .logo {
-      width: 88px;
-      height: 88px;
-      border-radius: 22px;
-      margin-bottom: 24px;
-    }
-
-    h1 {
-      font-size: 32px;
-      font-weight: 650;
-      letter-spacing: -0.03em;
-    }
-
-    .lead {
-      color: var(--muted);
-      margin: 10px 0 32px;
-      max-width: 28em;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    .actions {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 12px;
-      margin-bottom: 56px;
-    }
-
-    a.btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 8px;
-      padding: 12px 18px;
-      border-radius: 14px;
-      text-decoration: none;
-      font-size: 15px;
-      font-weight: 560;
-      color: var(--text);
-      background: var(--card);
-      border: 1px solid var(--line);
-    }
-
-    a.btn.primary {
-      background: #fff;
-      color: #1E293B;
-      border-color: transparent;
-    }
-
-    .shots {
-      display: flex;
-      justify-content: center;
-      flex-wrap: wrap;
-      gap: 16px;
-      margin-bottom: 48px;
-    }
-
-    .shots img {
-      width: 168px;
-      height: auto;
-      border-radius: 20px;
-      border: 1px solid var(--line);
-      background: var(--card);
-    }
-
-    .store-copy {
-      text-align: left;
-      color: var(--muted);
-      font-size: 15px;
-      line-height: 1.55;
-      margin: 0 auto 56px;
-    }
-
-    .store-copy p + p,
-    .store-copy p + h2,
-    .store-copy ul + p,
-    .store-copy ul + h2 {
-      margin-top: 16px;
-    }
-
-    .store-copy h2 {
-      color: var(--text);
-      font-size: 17px;
-      font-weight: 620;
-      margin-top: 28px;
-    }
-
-    .store-copy ul {
-      margin: 10px 0 0 1.1em;
-    }
-
-    .store-copy li + li {
-      margin-top: 6px;
-    }
-
-    .store-copy a {
-      color: var(--text);
-    }
-
-    footer {
-      color: var(--muted);
-      font-size: 13px;
-    }
-
-    footer a {
-      color: var(--muted);
-      text-decoration: none;
-    }
-
-    footer a:hover { color: var(--text); }
-  </style>
+  <link rel="icon" href="icons/stashy.png" type="image/png">
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <img class="logo" src="icon.png" alt="stashy">
+  <nav class="switcher">
+    <a href="index.html" aria-current="page"><img src="icons/stashy.png" alt="">stashy</a>
+    <a href="abstand.html"><img src="icons/abstand.png" alt="">abstand</a>
+    <a href="tasmoty.html"><img src="icons/tasmoty.png" alt="">tasmoty</a>
+    <a href="loog.html"><img src="icons/loog.png" alt="">loog</a>
+  </nav>
+
+  <img class="logo" src="icons/stashy.png" alt="stashy">
   <h1>stashy</h1>
   <p class="lead">Native Stash client for iPhone. Fast, no tracking, wired to your server.</p>
 

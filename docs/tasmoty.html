@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>tasmoty — Local network device scanner</title>
+  <meta name="description" content="Discover and control the devices on your local network from your iPhone. Tasmota, Shelly, lights, NAS, printers and more.">
+  <link rel="icon" href="icons/tasmoty.png" type="image/png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <nav class="switcher">
+    <a href="index.html"><img src="icons/stashy.png" alt="">stashy</a>
+    <a href="abstand.html"><img src="icons/abstand.png" alt="">abstand</a>
+    <a href="tasmoty.html" aria-current="page"><img src="icons/tasmoty.png" alt="">tasmoty</a>
+    <a href="loog.html"><img src="icons/loog.png" alt="">loog</a>
+  </nav>
+
+  <img class="logo" src="icons/tasmoty.png" alt="tasmoty">
+  <h1>tasmoty</h1>
+  <p class="lead">Scans your local network, tells you what is on it, and switches what can be switched.</p>
+
+  <div class="actions">
+    <a class="btn primary" href="https://apps.apple.com/de/app/tasmoty/id6761857043">App Store</a>
+  </div>
+
+  <div class="store-copy">
+    <p>tasmoty sweeps your Wi-Fi network, identifies every host it finds and shows you a clean list — with status, and a switch where the device supports one. Everything happens on the device, straight to your LAN. No cloud account, no bridge, no analytics.</p>
+
+    <h2>What it finds</h2>
+    <ul>
+      <li>Switches and plugs: Tasmota and Shelly, with power relays you can toggle right from the list.</li>
+      <li>Lights: Yeelight, WLED, Philips Hue.</li>
+      <li>Infrastructure: NAS boxes, self-hosted services, cameras, printers, wallboxes.</li>
+      <li>Everything else: unknown hosts are still listed with what could be identified about them.</li>
+    </ul>
+
+    <h2>How it works</h2>
+    <ul>
+      <li>Parallel scan: probes the whole subnet concurrently, so a sweep takes seconds instead of minutes.</li>
+      <li>Local only: talks to your LAN directly — self-signed certificates are accepted for local addresses only.</li>
+      <li>Saved devices: found devices stick around between launches, no re-scan needed to flip a switch.</li>
+    </ul>
+
+    <p>Requirements: iPhone on the same Wi-Fi network as the devices you want to see.</p>
+  </div>
+
+  <footer>
+    <a href="mailto:stashy@letzgo.me">stashy@letzgo.me</a>
+    · no analytics, no tracking
+  </footer>
+</body>
+</html>
