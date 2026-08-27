@@ -27,8 +27,18 @@ class ImageCache {
     
     private init() {
         // Memory Cache Config
-        memoryCache.countLimit = 300 // Increased
+        //
+        // Apple TV hat ein deutlich engeres Speicherbudget als ein iPhone, und
+        // die tvOS-Grids zeigen viele große Karten gleichzeitig. Ein 300-MB-
+        // Bildcache allein reicht dort, um beim Tiefer-Navigieren in den Jetsam
+        // zu laufen.
+        #if os(tvOS)
+        memoryCache.countLimit = 150
+        memoryCache.totalCostLimit = 1024 * 1024 * 120 // 120 MB
+        #else
+        memoryCache.countLimit = 300
         memoryCache.totalCostLimit = 1024 * 1024 * 300 // 300 MB
+        #endif
         
         // Disk Cache Config
         let paths = fileManager.urls(for: .cachesDirectory, in: .userDomainMask)

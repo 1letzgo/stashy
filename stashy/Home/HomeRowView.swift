@@ -24,6 +24,10 @@ func homeHeroCardWidth(screenWidth: CGFloat) -> CGFloat {
     return homeHeroCardFixedWidth
 }
 
+/// Edge length of the square dashboard cards (Channels, Statistics) — one source so the two
+/// rows cannot drift apart.
+let homeSquareCardSide: CGFloat = 125
+
 func homeCardWidth(for config: HomeRowConfig, isLarge: Bool, screenWidth: CGFloat) -> CGFloat {
     if isLarge { return homeHeroCardWidth(screenWidth: screenWidth) }
     switch config.type {
@@ -33,7 +37,7 @@ func homeCardWidth(for config: HomeRowConfig, isLarge: Bool, screenWidth: CGFloa
         return 125
     case .channels:
         // Channels show a category logo, not a thumbnail — square card.
-        return 125
+        return homeSquareCardSide
     default:
         return 125 * 16 / 9
     }

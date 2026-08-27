@@ -40,7 +40,7 @@ struct HomeStatisticsRowView: View {
                         ForEach(0..<6, id: \.self) { _ in
                             RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
                                 .fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
-                                .frame(width: 80, height: 90)
+                                .frame(width: homeSquareCardSide, height: homeSquareCardSide)
                         }
                     }
                     .padding(.horizontal, 12)
@@ -183,17 +183,17 @@ struct StatCard: View {
     let color: Color
 
     var body: some View {
-        VStack(alignment: .center, spacing: 6) {
-            Image(systemName: icon).font(.system(size: 22, weight: .bold)).foregroundColor(.white)
-            Text(value).font(.system(size: 16, weight: .bold)).foregroundColor(.white)
+        VStack(alignment: .center, spacing: 8) {
+            Image(systemName: icon).font(.system(size: 28, weight: .bold)).foregroundColor(.white)
+            Text(value).font(.system(size: 20, weight: .bold)).foregroundColor(.white)
             Text(title.uppercased())
-                .font(.system(size: 10, weight: .bold))
+                .font(.system(size: 11, weight: .bold))
                 .foregroundColor(.white.opacity(0.8))
                 .multilineTextAlignment(.center)
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 12)
-        .frame(width: 80, height: 90)
+        .frame(width: homeSquareCardSide, height: homeSquareCardSide)
         .background(
             LinearGradient(colors: [color, color.opacity(0.6)], startPoint: .topLeading, endPoint: .bottomTrailing)
         )

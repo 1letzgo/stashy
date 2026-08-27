@@ -349,6 +349,8 @@ class StashDBViewModel: ObservableObject {
     private var imageOCounterUpdatedObserver: NSObjectProtocol?
     private var sceneOCounterUpdatedObserver: NSObjectProtocol?
     private var sceneUpdatedObserver: NSObjectProtocol?
+    private var tagImageUpdatedObserver: NSObjectProtocol?
+    private var sceneCoverUpdatedObserver: NSObjectProtocol?
 
     init() {
         NotificationCenter.default.addObserver(self, selector: #selector(handleServerChange), name: NSNotification.Name("ServerConfigChanged"), object: nil)
@@ -366,7 +368,7 @@ class StashDBViewModel: ObservableObject {
             }
         }
 
-        NotificationCenter.default.addObserver(
+        tagImageUpdatedObserver = NotificationCenter.default.addObserver(
             forName: NSNotification.Name("TagImageUpdated"),
             object: nil,
             queue: .main
@@ -380,7 +382,7 @@ class StashDBViewModel: ObservableObject {
             }
         }
 
-        NotificationCenter.default.addObserver(
+        sceneCoverUpdatedObserver = NotificationCenter.default.addObserver(
             forName: NSNotification.Name("SceneCoverUpdated"),
             object: nil,
             queue: .main
@@ -466,6 +468,15 @@ class StashDBViewModel: ObservableObject {
         }
         if let sceneUpdatedObserver {
             NotificationCenter.default.removeObserver(sceneUpdatedObserver)
+        }
+        // Diese beiden hingen vorher ohne Token in der NotificationCenter —
+        // `removeObserver(self)` erwischt block-basierte Observer nicht, sie
+        // blieben also pro erzeugtem ViewModel dauerhaft stehen.
+        if let tagImageUpdatedObserver {
+            NotificationCenter.default.removeObserver(tagImageUpdatedObserver)
+        }
+        if let sceneCoverUpdatedObserver {
+            NotificationCenter.default.removeObserver(sceneCoverUpdatedObserver)
         }
         NotificationCenter.default.removeObserver(self)
     }
