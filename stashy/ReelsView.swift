@@ -4144,6 +4144,29 @@ struct ReelsViewBody: View {
         let isVideo = currentItem.map { $0.videoURL != nil && !$0.isAnimated } ?? false
         VStack(alignment: .leading, spacing: 0) {
             if let item = currentItem {
+                // Own row above the performer line — the circles used to sit inside it and
+                // squeezed the title/tag column on narrow screens.
+                HStack(spacing: 8) {
+                    Spacer(minLength: 0)
+                    ChromeCircleButton(
+                        systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                        enabled: isVideo,
+                        accessibilityLabel: isMuted ? "Ton an" : "Stumm"
+                    ) {
+                        if isVideo { isMuted.toggle() }
+                    }
+
+                    ChromeCircleButton(
+                        systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
+                        enabled: isVideo,
+                        accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
+                    ) {
+                        if isVideo { currentItemIsPlaying.toggle() }
+                    }
+                }
+                .padding(.horizontal, StashyExpandingDock.edgePadding)
+                .padding(.bottom, 8)
+
                 HStack(alignment: .center, spacing: 10) {
                     if let performer = item.performers.first {
                         NavigationLink(
@@ -4226,25 +4249,6 @@ struct ReelsViewBody: View {
                         .frame(height: 20)
                     }
 
-                    // Circular mute / play spanning title + hashtag rows
-                    HStack(spacing: 8) {
-                        ChromeCircleButton(
-                            systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                            enabled: isVideo,
-                            accessibilityLabel: isMuted ? "Ton an" : "Stumm"
-                        ) {
-                            if isVideo { isMuted.toggle() }
-                        }
-
-                        ChromeCircleButton(
-                            systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
-                            enabled: isVideo,
-                            accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
-                        ) {
-                            if isVideo { currentItemIsPlaying.toggle() }
-                        }
-                    }
-                    .fixedSize()
                 }
                 .padding(.horizontal, StashyExpandingDock.edgePadding)
             }

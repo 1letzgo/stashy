@@ -1506,6 +1506,28 @@ struct FullScreenImageView: View {
         let isVideo = currentImage.map { $0.isVideo && !$0.isAnimated } ?? false
         VStack(alignment: .leading, spacing: 0) {
             if let image = currentImage {
+                // Own row above the performer line — mirrors `ReelsView.reelsInfoOverlay`.
+                HStack(spacing: 8) {
+                    Spacer(minLength: 0)
+                    ChromeCircleButton(
+                        systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                        enabled: isVideo,
+                        accessibilityLabel: isMuted ? "Ton an" : "Stumm"
+                    ) {
+                        if isVideo { isMuted.toggle() }
+                    }
+
+                    ChromeCircleButton(
+                        systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
+                        enabled: isVideo,
+                        accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
+                    ) {
+                        if isVideo { currentItemIsPlaying.toggle() }
+                    }
+                }
+                .padding(.horizontal, StashyExpandingDock.edgePadding)
+                .padding(.bottom, 8)
+
                 HStack(alignment: .center, spacing: 10) {
                     if let performer = image.performers?.first {
                         NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer())) {
@@ -1575,24 +1597,6 @@ struct FullScreenImageView: View {
                         .frame(height: 20)
                     }
 
-                    HStack(spacing: 8) {
-                        ChromeCircleButton(
-                            systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                            enabled: isVideo,
-                            accessibilityLabel: isMuted ? "Ton an" : "Stumm"
-                        ) {
-                            if isVideo { isMuted.toggle() }
-                        }
-
-                        ChromeCircleButton(
-                            systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
-                            enabled: isVideo,
-                            accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
-                        ) {
-                            if isVideo { currentItemIsPlaying.toggle() }
-                        }
-                    }
-                    .fixedSize()
                 }
                 .padding(.horizontal, StashyExpandingDock.edgePadding)
             }
