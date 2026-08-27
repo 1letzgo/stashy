@@ -119,8 +119,10 @@ struct TVSettingsView: View {
             }
 
             Section {
+                // Kein eigener Wert-Text: tvOS zeichnet den Toggle-Zustand
+                // rechts selbst an, sonst steht dort zweimal „On".
                 Toggle(isOn: $useSidebar) {
-                    row(.sidebar, value: useSidebar ? "On" : "Off")
+                    row(.sidebar)
                 }
                 .focused($focusedEntry, equals: .sidebar)
             } header: {
@@ -293,7 +295,6 @@ private struct TVServersSettingsView: View {
                 }
             }
         }
-        .tvSettingsPageWidth()
         .background(Color.appBackground)
         .navigationTitle("Servers")
     }
@@ -386,7 +387,6 @@ private struct TVAppearanceSettingsView: View {
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 80).focusable(false)
         }
-        .tvSettingsPageWidth()
         .background(Color.appBackground)
         .navigationTitle("Appearance")
     }
@@ -461,7 +461,6 @@ private struct TVSecuritySettingsView: View {
             TVPasscodeSetupView(isPresented: $showingSetPasscode)
                 .presentationBackground(Color.black)
         }
-        .tvSettingsPageWidth()
         .background(Color.appBackground)
         .navigationTitle("Security")
     }
@@ -503,7 +502,6 @@ private struct TVPlaybackSettingsView: View {
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 80).focusable(false)
         }
-        .tvSettingsPageWidth()
         .background(Color.appBackground)
         .navigationTitle("Playback")
     }
@@ -531,7 +529,6 @@ private struct TVDefaultSortSettingsView: View {
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 80).focusable(false)
         }
-        .tvSettingsPageWidth()
         .background(Color.appBackground)
         .navigationTitle("Default Sorting")
     }
@@ -585,7 +582,6 @@ private struct TVDefaultFilterSettingsView: View {
         .onAppear {
             filterViewModel.fetchSavedFilters()
         }
-        .tvSettingsPageWidth()
         .background(Color.appBackground)
         .navigationTitle("Default Filters")
     }
@@ -642,7 +638,6 @@ private struct TVTabVisibilitySettingsView: View {
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 80).focusable(false)
         }
-        .tvSettingsPageWidth()
         .background(Color.appBackground)
         .navigationTitle("Visible Tabs")
     }
@@ -699,7 +694,6 @@ private struct TVAboutSettingsView: View {
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 80).focusable(false)
         }
-        .tvSettingsPageWidth()
         .background(Color.appBackground)
         .navigationTitle("About")
     }
@@ -965,18 +959,3 @@ struct TVColorPresetButton: View {
     }
 }
 
-// MARK: - Seitenbreite
-
-extension View {
-    /// Hält Einstellungsseiten schmal und linksbündig.
-    ///
-    /// Eine Einstellungsliste über die vollen 1920pt ist der Hauptgrund, warum
-    /// das Menü nach iOS aussah — auf tvOS sitzt sie in einer schmalen Spalte,
-    /// der Rest der Fläche bleibt frei.
-    func tvSettingsPageWidth() -> some View {
-        HStack(alignment: .top, spacing: 0) {
-            self.frame(width: 900)
-            Spacer(minLength: 0)
-        }
-    }
-}
