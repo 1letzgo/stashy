@@ -179,21 +179,32 @@ final class StashyPlusManager: ObservableObject {
 
     // MARK: - Freischaltung beim lokalen Entwickeln
 
-    /// In Debug-Builds immer true, sonst nie.
+    /// True beim lokalen Entwickeln, sonst nie.
     ///
-    /// Bewusst zur Compile-Zeit statt über `AppTransaction`: der StoreKit-Aufruf
-    /// verlangt einen angemeldeten App-Store-Account, zeigte beim lokalen Start
-    /// einen Anmeldedialog und schaltete ohne Anmeldung gar nicht frei. Debug
-    /// entsteht ohnehin nur lokal — TestFlight- und App-Store-Archive sind
-    /// Release, dort ist der Wert hart `false` und gar nicht erst erreichbar.
+    /// Zwei Wege, weil das `stashyTV`-Schema seine **LaunchAction in Release**
+    /// hat (das iOS-Schema in Debug) — ein `#if DEBUG` allein greift auf der
+    /// Apple TV also gar nicht.
     ///
-    /// Wird nirgends gespeichert, kann also nicht in eine verteilte Installation
-    /// mitwandern.
+    /// Der Debugger-Test trägt den Release-Fall: Xcode hängt sich beim Start
+    /// standardmäßig an, und eine über TestFlight oder den App Store verteilte
+    /// Build lässt sich nicht tracen — dort ist `get-task-allow` false.
+    ///
+    /// Wird nirgends gespeichert, kann also nicht in eine verteilte
+    /// Installation mitwandern.
     #if DEBUG
-    nonisolated(unsafe) private(set) static var localUnlockActive = true
+    nonisolated static let localUnlockActive = true
     #else
-    nonisolated(unsafe) private(set) static var localUnlockActive = false
+    nonisolated static let localUnlockActive = isDebuggerAttached
     #endif
+
+    /// `P_TRACED` im eigenen Prozess — true, solange ein Debugger angehängt ist.
+    nonisolated private static var isDebuggerAttached: Bool {
+        var info = kinfo_proc()
+        var size = MemoryLayout<kinfo_proc>.stride
+        var mib: [Int32] = [CTL_KERN, KERN_PROC, KERN_PROC_PID, getpid()]
+        guard sysctl(&mib, UInt32(mib.count), &info, &size, nil, 0) == 0 else { return false }
+        return (info.kp_proc.p_flag & P_TRACED) != 0
+    }
 
     /// Thread-safe read for non-`MainActor` call sites.
     nonisolated static var isUnlockedNow: Bool {
