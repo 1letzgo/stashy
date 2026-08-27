@@ -54,13 +54,14 @@ enum StashyPlusSource: String, Equatable {
     case legacyPaidApp
     /// Stored by older builds that unlocked from tips — treated as locked.
     case legacyTip
-    /// TestFlight/Sandbox only. Never written to disk — siehe `StashyPlusManager.betaUnlockActive`.
-    case testFlightBeta
+    /// Nur bei lokalem Start aus Xcode. Wird nie gespeichert — siehe
+    /// `StashyPlusManager.localUnlockActive`.
+    case localDevelopment
 
     var statusTitle: String {
         switch self {
         case .none, .legacyTip: return "Not unlocked"
-        case .testFlightBeta: return "stashy+ (Beta)"
+        case .localDevelopment: return "stashy+ (Local Build)"
         case .subscription: return "stashy+ active"
         case .lifetime: return "stashy+ Lifetime"
         case .legacyPaidApp: return "stashy+ Lifetime"
@@ -71,8 +72,8 @@ enum StashyPlusSource: String, Equatable {
         switch self {
         case .none, .legacyTip:
             return "Subscribe or buy Lifetime to unlock premium features."
-        case .testFlightBeta:
-            return "Unlocked automatically for this TestFlight build. Not active in the App Store version."
+        case .localDevelopment:
+            return "Unlocked automatically because the app was launched from Xcode. Not active in any distributed build."
         case .subscription:
             return "Thanks for supporting stashy."
         case .lifetime:
@@ -163,8 +164,8 @@ final class StashyPlusManager: ObservableObject {
     /// Whether the paywall / plan list should be shown.
     var shouldOfferPurchases: Bool {
         if UserDefaults.standard.bool(forKey: Self.debugForceLockedKey) { return true }
-        // Beta-Tester sollen den Kaufweg trotzdem durchspielen können.
-        if source == .testFlightBeta { return true }
+        // Der Kaufweg muss lokal weiterhin testbar bleiben.
+        if source == .localDevelopment { return true }
         if !isUnlocked { return true }
         // Subscribers can still buy Lifetime.
         return source == .subscription
@@ -176,42 +177,43 @@ final class StashyPlusManager: ObservableObject {
         return stored == .lifetime || stored == .legacyPaidApp
     }
 
-    // MARK: - TestFlight-Freischaltung
+    // MARK: - Freischaltung beim lokalen Entwickeln
 
-    /// Nur in TestFlight/Sandbox true.
+    /// Nur true, wenn die App aus Xcode heraus gestartet wurde.
     ///
-    /// Bewusst **nur im Speicher** und niemals in `UserDefaults`: der Container
-    /// überlebt eine Installation der App-Store-Version über die TestFlight-
-    /// Version hinweg, ein persistiertes Flag würde dort weiter freischalten.
+    /// Bewusst **nur im Speicher** und niemals in `UserDefaults` — ein
+    /// persistiertes Flag würde die Freischaltung in eine später installierte
+    /// verteilte Version mitnehmen, da der Container erhalten bleibt.
     /// Wird einmal beim Start gesetzt (MainActor), danach nur noch gelesen.
-    nonisolated(unsafe) private(set) static var betaUnlockActive = false
+    nonisolated(unsafe) private(set) static var localUnlockActive = false
 
-    /// Prüft die signierte `AppTransaction` und schaltet in Sandbox-Umgebungen frei.
+    /// Prüft die signierte `AppTransaction` und schaltet nur beim lokalen
+    /// Entwickeln frei.
     ///
-    /// `.production` schaltet nie frei. `.xcode` (lokaler Start aus Xcode)
-    /// ebenfalls nicht — gewollt ist ausschließlich TestFlight, das sich als
-    /// `.sandbox` meldet.
-    func detectBetaEnvironment() async {
+    /// `.xcode` meldet ausschließlich, was Xcode selbst startet — eine über
+    /// TestFlight oder den App Store verteilte Build kann das nicht melden.
+    /// `.sandbox` (TestFlight) und `.production` schalten nicht frei.
+    func detectLocalDevelopmentEnvironment() async {
         do {
             let result = try await AppTransaction.shared
             guard case .verified(let appTransaction) = result else { return }
-            guard appTransaction.environment == .sandbox else { return }
-            guard !Self.betaUnlockActive else { return }
+            guard appTransaction.environment == .xcode else { return }
+            guard !Self.localUnlockActive else { return }
 
-            Self.betaUnlockActive = true
-            AppLog.debug("🧪 stashy+ für TestFlight-Build automatisch freigeschaltet")
+            Self.localUnlockActive = true
+            AppLog.debug("🧪 stashy+ für lokalen Xcode-Start automatisch freigeschaltet")
 
             let wasUnlocked = isUnlocked
             isUnlocked = true
             if source == .none || source == .legacyTip {
-                source = .testFlightBeta
+                source = .localDevelopment
             }
             objectWillChange.send()
             if !wasUnlocked {
                 NotificationCenter.default.post(name: .stashyPlusUnlocked, object: nil)
             }
         } catch {
-            AppLog.debug("AppTransaction check for beta unlock failed: \(error)")
+            AppLog.debug("AppTransaction check for local unlock failed: \(error)")
         }
     }
 
@@ -219,7 +221,7 @@ final class StashyPlusManager: ObservableObject {
     nonisolated static var isUnlockedNow: Bool {
         let defaults = UserDefaults.standard
         if defaults.bool(forKey: debugForceLockedKey) { return false }
-        if betaUnlockActive { return true }
+        if localUnlockActive { return true }
         let stored = StashyPlusSource(rawValue: defaults.string(forKey: sourceKey) ?? "") ?? .none
         if defaults.bool(forKey: lifetimeKey), stored == .lifetime || stored == .legacyPaidApp {
             return true
@@ -245,7 +247,7 @@ final class StashyPlusManager: ObservableObject {
         }
 
         Task { [weak self] in
-            await self?.detectBetaEnvironment()
+            await self?.detectLocalDevelopmentEnvironment()
         }
     }
 
@@ -327,10 +329,10 @@ final class StashyPlusManager: ObservableObject {
             ? (hasLifetimePurchase ? StashyPlusProduct.lifetime : activeProductID)
             : (subActive ? subscriptionProductID : nil)
         self.subscriptionExpiration = subActive ? subscriptionExpiration : nil
-        isUnlocked = permanent || subActive || Self.betaUnlockActive
-        if Self.betaUnlockActive, newSource == .none {
+        isUnlocked = permanent || subActive || Self.localUnlockActive
+        if Self.localUnlockActive, newSource == .none {
             // Anzeige-Quelle; in `defaults` steht weiterhin `newSource`.
-            source = .testFlightBeta
+            source = .localDevelopment
         }
         objectWillChange.send()
 
