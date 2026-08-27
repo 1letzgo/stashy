@@ -179,43 +179,21 @@ final class StashyPlusManager: ObservableObject {
 
     // MARK: - Freischaltung beim lokalen Entwickeln
 
-    /// Nur true, wenn die App aus Xcode heraus gestartet wurde.
+    /// In Debug-Builds immer true, sonst nie.
     ///
-    /// Bewusst **nur im Speicher** und niemals in `UserDefaults` — ein
-    /// persistiertes Flag würde die Freischaltung in eine später installierte
-    /// verteilte Version mitnehmen, da der Container erhalten bleibt.
-    /// Wird einmal beim Start gesetzt (MainActor), danach nur noch gelesen.
+    /// Bewusst zur Compile-Zeit statt über `AppTransaction`: der StoreKit-Aufruf
+    /// verlangt einen angemeldeten App-Store-Account, zeigte beim lokalen Start
+    /// einen Anmeldedialog und schaltete ohne Anmeldung gar nicht frei. Debug
+    /// entsteht ohnehin nur lokal — TestFlight- und App-Store-Archive sind
+    /// Release, dort ist der Wert hart `false` und gar nicht erst erreichbar.
+    ///
+    /// Wird nirgends gespeichert, kann also nicht in eine verteilte Installation
+    /// mitwandern.
+    #if DEBUG
+    nonisolated(unsafe) private(set) static var localUnlockActive = true
+    #else
     nonisolated(unsafe) private(set) static var localUnlockActive = false
-
-    /// Prüft die signierte `AppTransaction` und schaltet nur beim lokalen
-    /// Entwickeln frei.
-    ///
-    /// `.xcode` meldet ausschließlich, was Xcode selbst startet — eine über
-    /// TestFlight oder den App Store verteilte Build kann das nicht melden.
-    /// `.sandbox` (TestFlight) und `.production` schalten nicht frei.
-    func detectLocalDevelopmentEnvironment() async {
-        do {
-            let result = try await AppTransaction.shared
-            guard case .verified(let appTransaction) = result else { return }
-            guard appTransaction.environment == .xcode else { return }
-            guard !Self.localUnlockActive else { return }
-
-            Self.localUnlockActive = true
-            AppLog.debug("🧪 stashy+ für lokalen Xcode-Start automatisch freigeschaltet")
-
-            let wasUnlocked = isUnlocked
-            isUnlocked = true
-            if source == .none || source == .legacyTip {
-                source = .localDevelopment
-            }
-            objectWillChange.send()
-            if !wasUnlocked {
-                NotificationCenter.default.post(name: .stashyPlusUnlocked, object: nil)
-            }
-        } catch {
-            AppLog.debug("AppTransaction check for local unlock failed: \(error)")
-        }
-    }
+    #endif
 
     /// Thread-safe read for non-`MainActor` call sites.
     nonisolated static var isUnlockedNow: Bool {
@@ -244,10 +222,9 @@ final class StashyPlusManager: ObservableObject {
             self.isUnlocked = false
         } else {
             self.isUnlocked = Self.isUnlockedNow
-        }
-
-        Task { [weak self] in
-            await self?.detectLocalDevelopmentEnvironment()
+            if Self.localUnlockActive, self.source == .none || self.source == .legacyTip {
+                self.source = .localDevelopment
+            }
         }
     }
 

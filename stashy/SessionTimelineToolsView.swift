@@ -43,6 +43,11 @@ struct SessionTimelineToolsView: View {
     private var timelineList: some View {
         ScrollView {
             LazyVStack(alignment: horizontalSizeClass == .regular ? .center : .leading, spacing: 28) {
+                // Scrolls with the content (same as the Charts tool) instead of floating in a
+                // `safeAreaInset` above it.
+                TimelineFilterChipRow(enabled: $enabledKinds)
+                    .padding(.top, DesignTokens.Tools.menuTopPadding)
+
                 if loader.isLoading && loader.sessions.isEmpty {
                     StandardLoadingView(message: "Loading timeline...")
                         .frame(maxWidth: .infinity)
@@ -84,15 +89,6 @@ struct SessionTimelineToolsView: View {
             .frame(maxWidth: DesignTokens.Tools.regularMaxContentWidth)
             .frame(maxWidth: .infinity)
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            TimelineFilterChipRow(enabled: $enabledKinds)
-                .toolsHorizontalPadding(horizontalSizeClass)
-                .padding(.top, DesignTokens.Tools.menuTopPadding)
-                .padding(.bottom, 10)
-                .frame(maxWidth: DesignTokens.Tools.regularMaxContentWidth)
-                .frame(maxWidth: .infinity)
-                .background(TimelineFilterBarBackground())
-        }
         .refreshable {
             await loader.reload()
         }
@@ -118,14 +114,6 @@ private struct TimelineDayGroup: Identifiable {
     let day: Date
     let sessions: [TimelineSession]
     var id: Date { day }
-}
-
-private struct TimelineFilterBarBackground: View {
-    @ObservedObject private var appearance = AppearanceManager.shared
-
-    var body: some View {
-        Color.appBackground(for: appearance.currentTheme)
-    }
 }
 
 private struct TimelineFilterChipRow: View {
