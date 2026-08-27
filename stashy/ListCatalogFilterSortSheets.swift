@@ -330,7 +330,13 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
 
     private var excluded: [String] { excludedIds?.wrappedValue ?? [] }
 
+    /// "None" = the criterion matches items that have no such entity at all (`IS_NULL`).
+    private var isNoneSelected: Bool {
+        matchMode?.wrappedValue == StashCriterionModifier.isNull.rawValue
+    }
+
     private var selectedSummary: String {
+        if isNoneSelected { return "None" }
         guard !selectedIds.isEmpty || !excluded.isEmpty else { return "Any" }
         let names = entries.filter { selectedIds.contains($0.id) }.map(\.name)
         var summary: String
@@ -391,30 +397,46 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
 
             if isExpanded {
                 VStack(spacing: 0) {
-                    if searchKind != nil {
+                    // With IS_NULL active there is nothing to pick — the criterion is "has none".
+                    if searchKind != nil, !isNoneSelected {
                         searchField
                     }
-                    if excludedIds != nil {
+                    if excludedIds != nil, !isNoneSelected {
                         tristateLegend
                     }
-                    if let matchMode, !matchModeOptions.isEmpty {
+                    if let matchMode, !matchModeOptions.isEmpty, !isNoneSelected {
                         matchModeRow(matchMode)
                         Divider().padding(.leading, title.isEmpty ? 4 : CatalogFilterSortSheetLayout.labelColumnWidth + 28)
                     }
                     Button {
-                        guard !selectedIds.isEmpty || !excluded.isEmpty else { return }
                         selectedIds = []
                         excludedIds?.wrappedValue = []
+                        if isNoneSelected { matchMode?.wrappedValue = StashCriterionModifier.includes.rawValue }
                         onSelectionChange()
                     } label: {
                         multiPickerOptionRow(
                             title: "Any",
-                            state: selectedIds.isEmpty && excluded.isEmpty ? .included : .none
+                            state: selectedIds.isEmpty && excluded.isEmpty && !isNoneSelected ? .included : .none
                         )
                     }
                     .buttonStyle(.plain)
 
-                    ForEach(visibleEntries) { entry in
+                    // Counterpart to "Any": IS_NULL was only reachable through the match-mode menu
+                    // under the name "Is null", which nobody reads as "has none at all".
+                    if matchMode != nil {
+                        Divider().padding(.leading, title.isEmpty ? 4 : CatalogFilterSortSheetLayout.labelColumnWidth + 28)
+                        Button {
+                            selectedIds = []
+                            excludedIds?.wrappedValue = []
+                            matchMode?.wrappedValue = StashCriterionModifier.isNull.rawValue
+                            onSelectionChange()
+                        } label: {
+                            multiPickerOptionRow(title: "None", state: isNoneSelected ? .included : .none)
+                        }
+                        .buttonStyle(.plain)
+                    }
+
+                    ForEach(isNoneSelected ? [] : visibleEntries) { entry in
                         Divider().padding(.leading, title.isEmpty ? 4 : CatalogFilterSortSheetLayout.labelColumnWidth + 28)
                         Button {
                             cycle(entry.id)
@@ -470,7 +492,7 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
     private var tristateLegend: some View {
         HStack(spacing: 10) {
             Label {
-                Text("include")
+                Text("included")
             } icon: {
                 Image(systemName: "checkmark.circle.fill").foregroundColor(appearance.tintColor)
             }

@@ -277,7 +277,8 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
             }
         } else {
             selectedFilter = f
-            if CatalogLiveChipFilterSupport.performerSavedFilterSupportsLiveEditor(f), let raw = f.filterDict {
+            let raw = CatalogLiveChipFilterSupport.criteriaForLiveChipUI(from: f)
+            if CatalogLiveChipFilterSupport.performerSavedFilterSupportsLiveEditor(f), !raw.isEmpty {
                 mapLiveFragmentToChips(raw)
             } else {
                 clearLiveChipsOnly()
@@ -620,7 +621,8 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
             }
         } else {
             selectedFilter = f
-            if CatalogLiveChipFilterSupport.tagSavedFilterSupportsLiveEditor(f), let raw = f.filterDict {
+            let raw = CatalogLiveChipFilterSupport.criteriaForLiveChipUI(from: f)
+            if CatalogLiveChipFilterSupport.tagSavedFilterSupportsLiveEditor(f), !raw.isEmpty {
                 mapLiveFragmentToChips(raw)
             } else {
                 clearLiveChipsOnly()
@@ -994,7 +996,8 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
             }
         } else {
             selectedFilter = f
-            if CatalogLiveChipFilterSupport.studioSavedFilterSupportsLiveEditor(f), let raw = f.filterDict {
+            let raw = CatalogLiveChipFilterSupport.criteriaForLiveChipUI(from: f)
+            if CatalogLiveChipFilterSupport.studioSavedFilterSupportsLiveEditor(f), !raw.isEmpty {
                 mapLiveFragmentToChips(raw)
             } else {
                 clearLiveChipsOnly()
@@ -1391,7 +1394,8 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
             }
         } else {
             selectedFilter = f
-            if CatalogLiveChipFilterSupport.gallerySavedFilterSupportsLiveEditor(f), let raw = f.filterDict {
+            let raw = CatalogLiveChipFilterSupport.criteriaForLiveChipUI(from: f)
+            if CatalogLiveChipFilterSupport.gallerySavedFilterSupportsLiveEditor(f), !raw.isEmpty {
                 mapLiveFragmentToChips(raw)
             } else {
                 clearLiveChipsOnly()
@@ -1948,7 +1952,7 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
             clearLiveChipsOnly()
             return
         }
-        if let meta = f.stashyCatalogPresetMetadata {
+        if let meta = f.stashyCatalogPresetMetadata, !meta.liveFragment.isEmpty {
             let base: StashDBViewModel.SavedFilter?
             if let bid = meta.baseSavedFilterId, let b = viewModel.savedFilters[bid] {
                 base = b
@@ -1964,6 +1968,9 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
             }
             return
         }
+        // Empty (or missing) chip fragment: read the chips off the filter's own criteria. Without
+        // this a filter whose tags live only in `object_filter` shows blank chips — and saving
+        // from that state wrote the blank back over the tags.
         applyPlainImageSavedFilterToLiveChips(f)
     }
 

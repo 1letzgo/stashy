@@ -2064,7 +2064,14 @@ class StashDBViewModel: ObservableObject {
 
     /// Merges a base scene saved filter with live chip criteria (same rules as `findScenes`).
     /// Sanitize the base first so an empty UI `c` tags-criterion cannot overwrite live tags.
-    func mergedSceneObjectFilterForSave(base: SavedFilter?, live: [String: Any]) -> [String: Any] {
+    /// - Parameter previousLive: the chip fragment stored on the filter being overwritten. Keys that
+    ///   were chips last time but are absent now are the ones the user set back to "Any"; anything
+    ///   else in the base filter came from the advanced editor and must survive.
+    func mergedSceneObjectFilterForSave(
+        base: SavedFilter?,
+        live: [String: Any],
+        previousLive: [String: Any] = [:]
+    ) -> [String: Any] {
         var merged: [String: Any] = [:]
         if let base {
             if let dict = base.filterDict, !dict.isEmpty {
@@ -2077,11 +2084,16 @@ class StashDBViewModel: ObservableObject {
         for (k, v) in liveSan {
             merged[k] = v
         }
-        // Live chips: "Any" means omit the criterion. Do not keep a leftover tags/studios/groups
-        // filter from the base saved filter (Stash UI would show that as "Any").
-        for key in ["tags", "studios", "groups"] where liveSan[key] == nil {
+        // "Any" means omit the criterion — but only for keys the chips actually owned before.
+        // Clearing every chip-capable key would also wipe criteria the user set in the advanced
+        // editor (an `o_counter NOT_NULL` filter emptied itself that way).
+        for key in previousLive.keys where liveSan[key] == nil {
             merged.removeValue(forKey: key)
         }
+        // NOTE: there used to be an unconditional wipe of tags/studios/groups whenever no chip
+        // supplied them. That destroyed criteria that only ever lived in the saved filter itself —
+        // saving such a filter from the popup silently dropped its tags. `previousLive` above
+        // already covers the case it was meant for: a chip that the user set back to "Any".
         return merged
     }
 
@@ -2146,7 +2158,12 @@ class StashDBViewModel: ObservableObject {
             completion(.failure(NSError(domain: "stashy", code: -2, userInfo: [NSLocalizedDescriptionKey: "Name is empty"])))
             return
         }
-        let merged = mergedSceneObjectFilterForSave(base: baseFilter, live: liveFragment)
+        let previousLive = existingId.flatMap { savedFilters[$0]?.stashyLiveFragment } ?? [:]
+        let merged = mergedSceneObjectFilterForSave(
+            base: baseFilter,
+            live: liveFragment,
+            previousLive: previousLive
+        )
         var stashy: [String: Any] = [
             "liveFragment": liveFragment,
             "sortRaw": sort.rawValue
@@ -2164,7 +2181,11 @@ class StashDBViewModel: ObservableObject {
             "mode": FilterMode.scenes.rawValue,
             "name": trimmedName,
             "find_filter": findFilter,
-            "object_filter": merged,
+            // Web UI storage shape, same as the other save paths.
+            "object_filter": FilterMapper.uiObjectFilter(
+                from: merged,
+                labels: FilterPickerOptionsStore.shared.knownLabels()
+            ),
             "ui_options": uiOptions
         ]
         if let existingId = existingId {
@@ -2218,9 +2239,10 @@ class StashDBViewModel: ObservableObject {
             completion(.failure(NSError(domain: "stashy", code: -2, userInfo: [NSLocalizedDescriptionKey: "Name is empty"])))
             return
         }
+        let previousLive = existingId.flatMap { savedFilters[$0]?.stashyLiveFragment } ?? [:]
         let merged = (mode == .sceneMarkers)
             ? mergedMarkerObjectFilterForSave(base: baseFilter, live: liveFragment)
-            : mergedSceneObjectFilterForSave(base: baseFilter, live: liveFragment)
+            : mergedSceneObjectFilterForSave(base: baseFilter, live: liveFragment, previousLive: previousLive)
         var stashy: [String: Any] = [
             "liveFragment": liveFragment,
             "sortRaw": sortRaw
@@ -2238,7 +2260,11 @@ class StashDBViewModel: ObservableObject {
             "mode": mode.rawValue,
             "name": trimmedName,
             "find_filter": findFilter,
-            "object_filter": merged,
+            // Same storage shape as `saveFullObjectFilter` — the web UI cannot read our query format.
+            "object_filter": FilterMapper.uiObjectFilter(
+                from: merged,
+                labels: FilterPickerOptionsStore.shared.knownLabels()
+            ),
             "ui_options": uiOptions
         ]
         if let existingId = existingId {

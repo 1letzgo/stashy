@@ -1718,6 +1718,10 @@ public struct FilterMapper {
         let keys = ["tags", "studios", "groups", "performers", "galleries", "scenes", "movies"]
         for key in keys {
             guard let criterion = dict[key] as? [String: Any] else { continue }
+            // IS_NULL / NOT_NULL ask about the *absence* of any entity — they carry no ids by
+            // definition and must not be mistaken for an empty "Any" criterion.
+            let modifier = (criterion["modifier"] as? String)?.uppercased() ?? ""
+            if modifier == "IS_NULL" || modifier == "NOT_NULL" { continue }
             if idStrings(from: criterion["value"]).isEmpty,
                idStrings(from: criterion["excludes"]).isEmpty {
                 dict.removeValue(forKey: key)

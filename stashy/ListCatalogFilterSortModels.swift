@@ -432,6 +432,23 @@ enum CatalogLiveChipFilterSupport {
         includesIds(fromCriterion: value).first
     }
 
+    /// Criteria of any saved filter, in the shape the live chips expect.
+    ///
+    /// `filter_dict` comes from Stash's legacy `filter` string, which modern servers leave empty —
+    /// reading only that made chips come up blank for every server-side filter. `object_filter` is
+    /// the real source and may be in the web UI's `value: { items: [...] }` shape, which
+    /// `FilterMapper.sanitize` unwraps.
+    static func criteriaForLiveChipUI(from filter: StashDBViewModel.SavedFilter?) -> [String: Any] {
+        guard let filter else { return [:] }
+        if let d = filter.filterDict, !d.isEmpty {
+            return FilterMapper.sanitize(d, isMarker: false)
+        }
+        if let obj = filter.object_filter, let od = obj.value as? [String: Any], !od.isEmpty {
+            return FilterMapper.sanitize(od, isMarker: false)
+        }
+        return [:]
+    }
+
     /// Criteria dict for image live chips: prefers `filter_dict`, else `object_filter`, unwraps nested `image_filter`.
     static func imageFilterCriteriaForLiveChipUI(from filter: StashDBViewModel.SavedFilter?) -> [String: Any] {
         guard let filter else { return [:] }

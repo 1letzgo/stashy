@@ -304,6 +304,8 @@ struct CatalogSettingsSheetChromeBar: View {
     var onRequestRename: () -> Void
     var onRequestDelete: () -> Void
 
+    @Environment(\.dismiss) private var dismiss
+
     var body: some View {
         StashySectionChromeBar(isOpaque: true) {
             HStack(spacing: 8) {
@@ -322,36 +324,45 @@ struct CatalogSettingsSheetChromeBar: View {
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
+                // Save / Save As / Rename / Delete behind one pill, matching Tools → Filters.
+                // Three separate circles crowded the bar and put Delete next to Save.
                 Menu {
                     Button { onRequestSave() } label: {
                         Label("Save", systemImage: "arrow.down.doc")
                     }
                     .disabled(!hasSelectedPreset)
                     Button { onRequestSaveAs() } label: {
-                        Label("Save As", systemImage: "doc.badge.plus")
+                        Label("Save as…", systemImage: "doc.badge.plus")
+                    }
+                    if hasSelectedPreset {
+                        Button { onRequestRename() } label: {
+                            Label("Rename", systemImage: "pencil")
+                        }
+                        Divider()
+                        Button(role: .destructive) { onRequestDelete() } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
                     }
                 } label: {
-                    Image(systemName: "arrow.down.doc")
-                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                        .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
-                        .background(StashyExpandingDock.inactiveBackground)
-                        .clipShape(Circle())
+                    Text("Save")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white)
+                        .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
                 }
-                .accessibilityLabel("Save")
+                .accessibilityLabel("Save filter")
 
-                ChromeCircleButton(
-                    systemImage: "pencil",
-                    enabled: hasSelectedPreset,
-                    accessibilityLabel: "Rename",
-                    action: onRequestRename
-                )
-                ChromeCircleButton(
-                    systemImage: "trash",
-                    enabled: hasSelectedPreset,
-                    accessibilityLabel: "Delete",
-                    action: onRequestDelete
-                )
+                // Closing the sheet was swipe-only, which is awkward right after tapping Done in
+                // the advanced editor one level up.
+                Button {
+                    dismiss()
+                } label: {
+                    Text("Done")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white)
+                        .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Close filters")
             }
             .frame(minHeight: StashyExpandingDock.activeHeight)
             .padding(.horizontal, StashyExpandingDock.edgePadding)

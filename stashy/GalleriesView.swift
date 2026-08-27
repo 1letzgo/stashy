@@ -1631,7 +1631,10 @@ struct FullScreenImageView: View {
                 if let url = performer.thumbnailURL {
                     CustomAsyncImage(url: url) { loader in
                         if let img = loader.image {
-                            img.resizable().scaledToFill()
+                            img.resizable()
+                                .scaledToFill()
+                                // Head-and-shoulders shots lose the face to a centred crop.
+                                .frame(width: size, height: size, alignment: .top)
                         } else {
                             Image(systemName: "person.fill")
                                 .foregroundColor(.white.opacity(0.7))
