@@ -174,11 +174,18 @@ struct TVImageDetailView: View {
             if !isLoading { loadFailed = true }
             return
         }
-        let previousId = images.indices.contains(currentIndex) ? images[currentIndex].id : imageId
+        let anchorId = images.indices.contains(currentIndex) ? images[currentIndex].id : imageId
         images = viewable
         isLoading = false
         loadFailed = false
-        currentIndex = max(0, images.firstIndex(where: { $0.id == previousId || $0.id == imageId }) ?? 0)
+        // Erst das aktuell gezeigte Bild suchen, **dann** erst das ursprünglich
+        // geöffnete. Eine gemeinsame `||`-Bedingung nahm den ersten Treffer von
+        // beidem — und das war ab Seite 2 fast immer das Startbild, weil es weiter
+        // vorne steht. Genau das ließ den Betrachter nach 100 Bildern zurück-
+        // springen.
+        currentIndex = images.firstIndex(where: { $0.id == anchorId })
+            ?? images.firstIndex(where: { $0.id == imageId })
+            ?? 0
     }
 
     private func maybeLoadMoreIfNeeded() {

@@ -590,7 +590,7 @@ struct TVSceneDetailView: View {
     @ViewBuilder
     private func performersSection(performers: [ScenePerformer]) -> some View {
         VStack(alignment: .leading, spacing: 16) {
-            sectionHeading(icon: "person.2.fill", title: "Cast", count: performers.count)
+            sectionHeading(icon: "person.2.fill", title: "Performers", count: performers.count)
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 30) {

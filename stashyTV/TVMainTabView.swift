@@ -21,7 +21,12 @@ private struct TVContentTab: Identifiable {
 
 struct TVMainTabView: View {
     @ObservedObject private var tabManager = TabManager.shared
-    @StateObject private var navigationStore = TVNavigationStore()
+    /// Bewusst `@State`, nicht `@StateObject`: die View soll den Store **besitzen**,
+    /// ihn aber nicht beobachten. Als `@StateObject` löste jeder Navigations-Push
+    /// ein Neuzeichnen der gesamten TabView samt Sidebar aus — Pushes kamen dann
+    /// gar nicht erst an. Beobachtet wird er nur dort, wo er gebraucht wird:
+    /// im jeweiligen `TVTabStack`.
+    @State private var navigationStore = TVNavigationStore()
     @State private var selectedTab: TVRootTab = .home
 
     /// Rückfalltür auf die alte obere Leiste. Das Sidebar-Verhalten lässt sich
