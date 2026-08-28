@@ -2184,7 +2184,7 @@ class StashDBViewModel: ObservableObject {
             // Web UI storage shape, same as the other save paths.
             "object_filter": FilterMapper.uiObjectFilter(
                 from: merged,
-                labels: FilterPickerOptionsStore.shared.knownLabels()
+                labels: filterPickerLabels
             ),
             "ui_options": uiOptions
         ]
@@ -2263,7 +2263,7 @@ class StashDBViewModel: ObservableObject {
             // Same storage shape as `saveFullObjectFilter` — the web UI cannot read our query format.
             "object_filter": FilterMapper.uiObjectFilter(
                 from: merged,
-                labels: FilterPickerOptionsStore.shared.knownLabels()
+                labels: filterPickerLabels
             ),
             "ui_options": uiOptions
         ]
@@ -2297,6 +2297,20 @@ class StashDBViewModel: ObservableObject {
                 }
             }
         }
+    }
+
+    /// Label-Map für `FilterMapper.uiObjectFilter`.
+    ///
+    /// `FilterPickerOptionsStore` lebt hinter `#if !os(tvOS)` — es hängt an
+    /// ViewModel-Methoden, die dort ebenfalls geguarded sind. tvOS speichert
+    /// keine Filter, es wählt nur gespeicherte aus; ohne Labels fehlen dort
+    /// höchstens die Klartextnamen in `ui_options`.
+    private var filterPickerLabels: [String: String] {
+        #if os(tvOS)
+        return [:]
+        #else
+        return FilterPickerOptionsStore.shared.knownLabels()
+        #endif
     }
 
     /// Saves a full `object_filter` (full criteria editor / Tools → Filters).
@@ -2347,7 +2361,7 @@ class StashDBViewModel: ObservableObject {
             // Persist in the web UI's storage shape, not our query shape — see `uiObjectFilter`.
             "object_filter": FilterMapper.uiObjectFilter(
                 from: sanitized,
-                labels: FilterPickerOptionsStore.shared.knownLabels()
+                labels: filterPickerLabels
             ),
             "ui_options": uiOptions
         ]
