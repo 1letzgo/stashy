@@ -578,17 +578,15 @@ private struct GroupsViewContent: View {
         )
     }
 
+    @State private var gridWidth: CGFloat = 0
+
     private var columns: [GridItem] {
-        if horizontalSizeClass == .regular {
-            // iPad: 4 columns
-            return Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
-        } else {
-            // iPhone: 2 columns
-            return [
-                GridItem(.flexible(), spacing: 12),
-                GridItem(.flexible(), spacing: 12)
-            ]
-        }
+        DesignTokens.Grid.adaptiveColumns(
+            width: gridWidth,
+            ideal: DesignTokens.Grid.idealPosterCardWidth,
+            minimum: 2,
+            maximum: 8
+        )
     }
 
     private var groupsGrid: some View {
@@ -620,6 +618,7 @@ private struct GroupsViewContent: View {
                             .id("pagination-trigger")
                     }
                 }
+                .measuresGridWidth($gridWidth)
                 .padding(16)
             }
             .refreshable { performSearch() }
@@ -797,15 +796,15 @@ struct GroupDetailView: View {
         max(viewModel.totalGroupScenes, selectedGroup.scene_count ?? 0)
     }
 
+    @State private var galleryGridWidth: CGFloat = 0
+
     private var galleryColumns: [GridItem] {
-        if horizontalSizeClass == .regular {
-             return Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
-        } else {
-            return [
-                GridItem(.flexible(), spacing: 12),
-                GridItem(.flexible(), spacing: 12)
-            ]
-        }
+        DesignTokens.Grid.adaptiveColumns(
+            width: galleryGridWidth,
+            ideal: DesignTokens.Grid.idealPosterCardWidth,
+            minimum: 2,
+            maximum: 8
+        )
     }
 
     private var effectiveGalleries: Int {
@@ -1485,6 +1484,7 @@ struct GroupDetailView: View {
                 Color.clear.onAppear { linkedPerformers.refetchPerformers(viewModel: viewModel, initial: false) }
             }
         }
+        .measuresGridWidth($galleryGridWidth)
         .padding(.horizontal, 16)
         .padding(.bottom, 32)
     }
@@ -1502,6 +1502,7 @@ struct GroupDetailView: View {
                 Color.clear.onAppear { linkedStudios.refetchStudios(viewModel: viewModel, initial: false) }
             }
         }
+        .measuresGridWidth($galleryGridWidth)
         .padding(.horizontal, 16)
         .padding(.bottom, 32)
     }
@@ -1519,6 +1520,7 @@ struct GroupDetailView: View {
                 Color.clear.onAppear { linkedTags.refetchTags(viewModel: viewModel, initial: false) }
             }
         }
+        .measuresGridWidth($galleryGridWidth)
         .padding(.horizontal, 16)
         .padding(.bottom, 32)
     }
@@ -1536,6 +1538,7 @@ struct GroupDetailView: View {
                 Color.clear.onAppear { linkedImages.refetchImages(viewModel: viewModel, initial: false) }
             }
         }
+        .measuresGridWidth($galleryGridWidth)
         .padding(.horizontal, 16)
         .padding(.bottom, 32)
     }
@@ -1557,6 +1560,7 @@ struct GroupDetailView: View {
                  Color.clear.frame(height: 1).onAppear { viewModel.loadMoreGroupGalleries(groupId: selectedGroup.id) }
              }
         }
+        .measuresGridWidth($galleryGridWidth)
         .padding(.horizontal, 16)
         .padding(.bottom, 32)
     }

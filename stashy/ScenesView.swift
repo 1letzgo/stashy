@@ -949,8 +949,11 @@ private struct ScenesViewContent: View {
 
     @ObservedObject private var tabManager = TabManager.shared
 
+    @State private var cardGridWidth: CGFloat = 0
+
+
     private var columns: [GridItem] {
-        tabManager.catalogCardColumns(for: CatalogCardColumnScope.scenes).gridItems()
+        tabManager.catalogCardColumns(for: CatalogCardColumnScope.scenes).gridItems(width: cardGridWidth)
     }
 
     // Safe sort change function
@@ -1462,6 +1465,7 @@ private struct ScenesViewContent: View {
                             }
                         }
                     }
+                    .measuresGridWidth($cardGridWidth)
                     // Force cell rebuild — LazyVGrid otherwise keeps stale square/16:9 sizes.
                     .id(cardColumns)
                     .padding(.horizontal, 16)

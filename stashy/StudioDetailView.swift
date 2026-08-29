@@ -115,15 +115,15 @@ struct StudioDetailView: View {
         )
     }
 
+    @State private var galleryGridWidth: CGFloat = 0
+
     private var galleryColumns: [GridItem] {
-        if horizontalSizeClass == .regular {
-            return Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
-        } else {
-            return [
-                GridItem(.flexible(), spacing: 12),
-                GridItem(.flexible(), spacing: 12)
-            ]
-        }
+        DesignTokens.Grid.adaptiveColumns(
+            width: galleryGridWidth,
+            ideal: DesignTokens.Grid.idealPosterCardWidth,
+            minimum: 2,
+            maximum: 8
+        )
     }
 
     @ViewBuilder
@@ -1034,6 +1034,7 @@ struct StudioDetailView: View {
                 Color.clear.frame(height: 1).onAppear { viewModel.loadMoreStudioGalleries(studioId: studio.id) }
             }
         }
+        .measuresGridWidth($galleryGridWidth)
     }
     
     private func loadingView(message: String) -> some View {
@@ -1077,6 +1078,7 @@ struct StudioDetailView: View {
                 Color.clear.onAppear { linkedChildStudios.refetchStudios(viewModel: viewModel, initial: false) }
             }
         }
+        .measuresGridWidth($galleryGridWidth)
     }
     
     private var performerGrid: some View {
@@ -1098,6 +1100,7 @@ struct StudioDetailView: View {
                 }
             }
         }
+        .measuresGridWidth($galleryGridWidth)
     }
     
     private var tagGrid: some View {
@@ -1113,6 +1116,7 @@ struct StudioDetailView: View {
                 Color.clear.onAppear { linkedTags.refetchTags(viewModel: viewModel, initial: false) }
             }
         }
+        .measuresGridWidth($galleryGridWidth)
     }
     
     private var groupGrid: some View {
@@ -1128,6 +1132,7 @@ struct StudioDetailView: View {
                 Color.clear.onAppear { viewModel.fetchDetailGroups(studioId: studio.id, isInitialLoad: false) }
             }
         }
+        .measuresGridWidth($galleryGridWidth)
     }
     
     private var imageGrid: some View {
@@ -1143,6 +1148,7 @@ struct StudioDetailView: View {
                 Color.clear.onAppear { linkedImages.refetchImages(viewModel: viewModel, initial: false) }
             }
         }
+        .measuresGridWidth($galleryGridWidth)
     }
 }
 

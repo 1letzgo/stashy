@@ -407,17 +407,16 @@ private struct PerformersViewContent: View {
         _selectedSortOption = State(initialValue: initialSort ?? savedSort ?? .sceneCountDesc)
     }
     
+    @State private var gridWidth: CGFloat = 0
+
+    /// Spalten aus der gemessenen Breite: iPhone bleibt bei 2, iPad/Querformat füllen die Fläche.
     private var columns: [GridItem] {
-        if horizontalSizeClass == .regular {
-            // iPad: 4 columns
-            return Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
-        } else {
-            // iPhone: 2 columns
-            return [
-                GridItem(.flexible(), spacing: 12),
-                GridItem(.flexible(), spacing: 12)
-            ]
-        }
+        DesignTokens.Grid.adaptiveColumns(
+            width: gridWidth,
+            ideal: DesignTokens.Grid.idealPosterCardWidth,
+            minimum: 2,
+            maximum: 8
+        )
     }
 
     // Safe sort change function
@@ -733,6 +732,7 @@ private struct PerformersViewContent: View {
                             .id("pagination-trigger")
                     }
                 }
+                .measuresGridWidth($gridWidth)
                 .padding(16)
             }
             .refreshable { performSearch() }

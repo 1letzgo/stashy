@@ -233,11 +233,14 @@ private struct NavigationPopToRootOnChange: UIViewControllerRepresentable {
     }
 }
 
-/// iPad places custom chrome above the tab bar; iPhone keeps it under the status bar.
+/// Custom chrome sits under the status bar on every idiom.
+///
+/// Bis iPadOS 17 saß die Tab-Bar unten, deshalb lag die Chrome auf iPad darüber.
+/// Seit iPadOS 18 (Deployment-Target) schwebt die Tab-Bar oben; die untere Platzierung
+/// war damit nicht nur optisch getrennt, sondern per `safeAreaInset` auch nicht mehr
+/// antippbar (Back/Edit/FAB fielen auf den Inhalt darunter durch).
 enum StashyChromePlacement {
-    static var prefersBottom: Bool {
-        UIDevice.current.userInterfaceIdiom == .pad
-    }
+    static var prefersBottom: Bool { false }
 
     static var edge: VerticalEdge {
         prefersBottom ? .bottom : .top

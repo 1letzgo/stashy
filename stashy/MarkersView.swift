@@ -41,12 +41,15 @@ private struct MarkersViewContent: View {
     @Environment(\.verticalSizeClass) var verticalSizeClass
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
+    @State private var gridWidth: CGFloat = 0
+
     private var columns: [GridItem] {
-        if horizontalSizeClass == .regular {
-            return Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
-        } else {
-            return [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
-        }
+        DesignTokens.Grid.adaptiveColumns(
+            width: gridWidth,
+            ideal: DesignTokens.Grid.idealPosterCardWidth,
+            minimum: 2,
+            maximum: 8
+        )
     }
 
     private func performSearch(isInitialLoad: Bool = true) {
@@ -678,6 +681,7 @@ private struct MarkersViewContent: View {
                         }
                 }
             }
+            .measuresGridWidth($gridWidth)
             .padding(16)
         }
         .refreshable { performSearch() }
