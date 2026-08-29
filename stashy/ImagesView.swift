@@ -67,6 +67,8 @@ private struct ImagesViewBody: View {
     @EnvironmentObject private var coordinator: NavigationCoordinator
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var tabManager = TabManager.shared
+    @ObservedObject private var downloadManager = DownloadManager.shared
+    @State private var showingGalleryDownloadOptions = false
 
     @State private var lastOpenedImageId: String?
     @State private var searchText: String
@@ -611,6 +613,11 @@ private struct ImagesViewBody: View {
                         imageListFilters.showFilterSortSheet = true
                     }
                     .frame(maxWidth: .infinity)
+
+                    if let gallery {
+                        galleryDownloadButton(gallery)
+                            .frame(maxWidth: .infinity)
+                    }
                 }
             }
         }
@@ -821,6 +828,61 @@ private struct ImagesViewBody: View {
 
     private var imagesFilterMenuActive: Bool {
         imageListFilters.selectedFilter != nil || !imageListFilters.catalogPresetRowSelection.isEmpty
+    }
+
+    /// Download / sync control for the gallery currently being browsed.
+    @ViewBuilder
+    private func galleryDownloadButton(_ gallery: Gallery) -> some View {
+        let isDownloading = downloadManager.activeDownloads[gallery.id] != nil
+        let stored = downloadManager.downloadedGallery(id: gallery.id)
+
+        if isDownloading {
+            // Tapping while it runs cancels — a long gallery is otherwise unstoppable.
+            CatalogFABIconButton(
+                systemImage: "stop.circle",
+                isActive: true,
+                accessibilityLabel: "Cancel download"
+            ) {
+                HapticManager.light()
+                downloadManager.cancelGalleryDownload(id: gallery.id)
+            }
+        } else {
+            CatalogFABIconButton(
+                systemImage: stored == nil ? "arrow.down.doc" : "checkmark.circle.fill",
+                isActive: stored != nil,
+                accessibilityLabel: stored == nil ? "Download gallery" : "Downloaded"
+            ) {
+                HapticManager.light()
+                showingGalleryDownloadOptions = true
+            }
+            .confirmationDialog("Gallery", isPresented: $showingGalleryDownloadOptions, titleVisibility: .visible) {
+                if stored != nil {
+                    Button("Sync newest") {
+                        downloadManager.syncGallery(id: gallery.id)
+                    }
+                    Button("Sync newest \(DownloadManager.galleryNewestBatchSize)") {
+                        downloadManager.syncGallery(id: gallery.id, limit: DownloadManager.galleryNewestBatchSize)
+                    }
+                    Button("Remove download", role: .destructive) {
+                        downloadManager.deleteGalleryDownload(id: gallery.id)
+                    }
+                } else {
+                    Button("Newest \(DownloadManager.galleryNewestBatchSize) images") {
+                        downloadManager.downloadGallery(gallery, limit: DownloadManager.galleryNewestBatchSize)
+                    }
+                    Button("All images") {
+                        downloadManager.downloadGallery(gallery, limit: nil)
+                    }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                if let stored, let total = stored.serverImageCount {
+                    Text("\(stored.images.count) of \(total) downloaded")
+                } else if let count = gallery.imageCount {
+                    Text("\(count) images in this gallery")
+                }
+            }
+        }
     }
 
     @ViewBuilder

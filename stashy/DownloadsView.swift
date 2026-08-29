@@ -26,7 +26,7 @@ struct DownloadsView: View {
         ZStack {
             Color.appBackground.ignoresSafeArea()
 
-            if downloadManager.downloads.isEmpty && downloadManager.activeDownloads.isEmpty {
+            if downloadManager.downloads.isEmpty && downloadManager.galleryDownloads.isEmpty && downloadManager.activeDownloads.isEmpty {
                 VStack(spacing: 20) {
                     Spacer()
                     Image(systemName: "square.and.arrow.down")
@@ -91,11 +91,9 @@ struct DownloadsView: View {
                         // Completed Downloads Section
                         if !downloadManager.downloads.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
-                                if !downloadManager.activeDownloads.isEmpty {
-                                    Text("Completed")
-                                        .font(.headline)
-                                        .padding(.horizontal, DesignTokens.Tools.contentPadding)
-                                }
+                                Text("Scenes")
+                                    .font(.headline)
+                                    .padding(.horizontal, DesignTokens.Tools.contentPadding)
                                 
                                 LazyVStack(spacing: 12) {
                                     ForEach(downloadManager.downloads) { downloaded in
@@ -108,6 +106,16 @@ struct DownloadsView: View {
                                 .padding(.horizontal, DesignTokens.Tools.contentPadding)
                             }
                             .padding(.top, downloadManager.activeDownloads.isEmpty ? DesignTokens.Tools.menuTopPadding : 0)
+                        }
+
+                        let galleryEntries = downloadManager.galleryDownloads.filter { $0.resolvedKind != .tag }
+                        let tagEntries = downloadManager.galleryDownloads.filter { $0.resolvedKind == .tag }
+
+                        if !galleryEntries.isEmpty {
+                            downloadSection("Galleries & Images", entries: galleryEntries)
+                        }
+                        if !tagEntries.isEmpty {
+                            downloadSection("Tags", entries: tagEntries)
                         }
                     }
                 }
@@ -596,4 +604,662 @@ struct OfflineWrappedHStack<Data: RandomAccessCollection, Content: View>: View w
         }
     }
 }
+
+extension DownloadsView {
+    @ViewBuilder
+    func downloadSection(_ title: String, entries: [DownloadedGallery]) -> some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+                .padding(.horizontal, DesignTokens.Tools.contentPadding)
+
+            LazyVStack(spacing: 12) {
+                ForEach(entries) { entry in
+                    NavigationLink(destination: DownloadedGalleryDetailView(entryId: entry.id)) {
+                        DownloadedGalleryCard(entry: entry)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(.horizontal, DesignTokens.Tools.contentPadding)
+        }
+        .padding(.top, DesignTokens.Tools.menuTopPadding)
+    }
+}
+
+/// Row for a downloaded gallery or single image, with sync / delete actions.
+struct DownloadedGalleryCard: View {
+    let entry: DownloadedGallery
+    @ObservedObject private var downloadManager = DownloadManager.shared
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    private var isSyncing: Bool { downloadManager.activeDownloads[entry.id] != nil }
+
+    var body: some View {
+        HStack(spacing: DesignTokens.Spacing.sm) {
+            cover
+            VStack(alignment: .leading, spacing: 4) {
+                Text(entry.displayTitle)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 0)
+            if isSyncing {
+                Button {
+                    downloadManager.cancelGalleryDownload(id: entry.id)
+                } label: {
+                    Image(systemName: "stop.circle")
+                        .font(.title3)
+                        .foregroundColor(.red)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Cancel download")
+            } else {
+                Menu {
+                    if !entry.isSingleImage {
+                        Button {
+                            sync(limit: nil)
+                        } label: {
+                            Label("Sync newest", systemImage: "arrow.triangle.2.circlepath")
+                        }
+                        Button {
+                            sync(limit: DownloadManager.galleryNewestBatchSize)
+                        } label: {
+                            Label("Sync newest \(DownloadManager.galleryNewestBatchSize)", systemImage: "arrow.down.to.line")
+                        }
+                        Divider()
+                    }
+                    Button(role: .destructive) {
+                        downloadManager.deleteGalleryDownload(id: entry.id)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                        .font(.title3)
+                        .foregroundColor(.secondary)
+                }
+            }
+        }
+        .padding(DesignTokens.Spacing.sm)
+        .background(Color.secondaryAppBackground)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+    }
+
+    private func sync(limit: Int?) {
+        if entry.resolvedKind == .tag {
+            downloadManager.syncTagImages(entryId: entry.id, limit: limit)
+        } else {
+            downloadManager.syncGallery(id: entry.id, limit: limit)
+        }
+    }
+
+    private var subtitle: String {
+        var parts: [String] = []
+        if entry.isSingleImage {
+            parts.append("Single image")
+        } else if let total = entry.serverImageCount, total > entry.images.count {
+            parts.append("\(entry.images.count) of \(total) images")
+        } else {
+            parts.append("\(entry.images.count) image(s)")
+        }
+        if let studio = entry.studioName, !studio.isEmpty { parts.append(studio) }
+        return parts.joined(separator: " · ")
+    }
+
+    @ViewBuilder
+    private var cover: some View {
+        let size: CGFloat = 56
+        Group {
+            if let url = downloadManager.localCoverURL(for: entry),
+               let data = try? Data(contentsOf: url),
+               let image = UIImage(data: data) {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+            } else {
+                Rectangle()
+                    .fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+                    .overlay {
+                        Image(systemName: {
+                            switch entry.resolvedKind {
+                            case .image: return "photo"
+                            case .tag: return "tag"
+                            case .gallery: return "photo.stack"
+                            }
+                        }())
+                            .foregroundColor(.secondary)
+                    }
+            }
+        }
+        .frame(width: size, height: size)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
+    }
+}
+
+
+/// Offline viewer for a downloaded gallery (or single image). Reads straight from disk, so it
+/// works with no server connection.
+struct DownloadedGalleryDetailView: View {
+    let entryId: String
+    @ObservedObject private var downloadManager = DownloadManager.shared
+    @ObservedObject private var appearance = AppearanceManager.shared
+    private var entry: DownloadedGallery? {
+        downloadManager.downloadedGallery(id: entryId)
+    }
+
+    /// Square cells, matching the two-column grid in `ImagesView`.
+    private let columns = [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)]
+
+    var body: some View {
+        Group {
+            if let entry {
+                ScrollView {
+                    LazyVGrid(columns: columns, spacing: 6) {
+                        ForEach(Array(entry.images.enumerated()), id: \.element.id) { index, image in
+                            NavigationLink {
+                                DownloadedGalleryFullScreenView(images: entry.images, startIndex: index)
+                            } label: {
+                                thumbnail(image)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                    .padding(DesignTokens.Tools.contentPadding)
+                }
+                .navigationTitle(entry.displayTitle)
+            } else {
+                VStack(spacing: 12) {
+                    Image(systemName: "photo.on.rectangle.angled")
+                        .font(.system(size: 40))
+                        .foregroundColor(.secondary)
+                    Text("Download no longer available")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+            }
+        }
+        .background(Color.appBackground.ignoresSafeArea())
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    /// Same construction as `GalleryCardView`: image, 40%-height gradient, title in `.headline`.
+    @ViewBuilder
+    private func thumbnail(_ image: DownloadedGalleryImage) -> some View {
+        let url = downloadManager.thumbnailURL(for: image)
+        Color.clear
+            .aspectRatio(1, contentMode: .fit)
+            .overlay(
+                GeometryReader { geometry in
+                    ZStack(alignment: .bottomLeading) {
+                        ZStack {
+                            Color.gray.opacity(0.2)
+                            if let data = try? Data(contentsOf: url), let ui = UIImage(data: data) {
+                                Image(uiImage: ui)
+                                    .resizable()
+                                    .scaledToFill()
+                            } else {
+                                Image(systemName: image.isVideo ? "film" : "photo.on.rectangle")
+                                    .font(.system(size: 40))
+                                    .foregroundColor(.secondary)
+                            }
+                        }
+                        .frame(width: geometry.size.width, height: geometry.size.height)
+                        .clipped()
+
+                        LinearGradient(
+                            gradient: Gradient(colors: [.clear, .black.opacity(0.8)]),
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                        .frame(height: geometry.size.height * 0.4)
+
+                        VStack {
+                            HStack {
+                                Spacer()
+                                if image.isVideo {
+                                    Image(systemName: "play.circle.fill")
+                                        .font(.caption)
+                                        .foregroundColor(.white)
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
+                                        .clipShape(Capsule())
+                                }
+                            }
+                            .padding(8)
+
+                            Spacer()
+
+                            HStack(alignment: .bottom) {
+                                Text(image.title?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+                                     ? image.title! : "Untitled")
+                                    .font(.headline)
+                                    .fontWeight(.medium)
+                                    .foregroundColor(.white)
+                                    .lineLimit(2)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .padding(12)
+                        }
+                    }
+                }
+            )
+            .background(Color.secondaryAppBackground)
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .cardShadow()
+    }
+}
+
+/// Offline counterpart to `FullScreenImageView`. Mirrors it deliberately: vertical paging,
+/// zoom, tap-to-hide chrome, top nav bar and a bottom info row — only the data comes from disk.
+struct DownloadedGalleryFullScreenView: View {
+    let images: [DownloadedGalleryImage]
+    let startIndex: Int
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var navigationBackTrigger: UUID?
+    @ObservedObject private var downloadManager = DownloadManager.shared
+    @ObservedObject private var appearance = AppearanceManager.shared
+    @State private var currentVisibleId: String?
+    @State private var showUI = true
+    @State private var isZoomed = false
+    @State private var isMuted: Bool = ScenePlayerMute.initialValue()
+    @State private var isPlaying = true
+    @State private var scrubberState = ScrubberState()
+
+    private var activeId: String {
+        currentVisibleId ?? (images.indices.contains(startIndex) ? images[startIndex].id : (images.first?.id ?? ""))
+    }
+
+    private var currentImage: DownloadedGalleryImage? {
+        images.first { $0.id == activeId }
+    }
+
+    private var currentIndex: Int {
+        images.firstIndex { $0.id == activeId } ?? 0
+    }
+
+    private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ZStack {
+                Color.black.ignoresSafeArea()
+
+                ScrollView(.vertical, showsIndicators: false) {
+                    LazyVStack(spacing: 0) {
+                        ForEach(images) { image in
+                            page(image)
+                                .scrollDisabled(isZoomed)
+                                .containerRelativeFrame([.horizontal, .vertical])
+                                .background(Color.black)
+                                .id(image.id)
+                        }
+                    }
+                    .scrollTargetLayout()
+                }
+                .scrollDisabled(isZoomed)
+                .scrollTargetBehavior(.paging)
+                .scrollPosition(id: $currentVisibleId)
+                .scrollContentBackground(.hidden)
+                .background(Color.black)
+                .ignoresSafeArea()
+            }
+            .background(Color.black.ignoresSafeArea())
+            .ignoresSafeArea()
+            .statusBarHidden(!showUI)
+            .navigationBarHidden(true)
+            .navigationBarBackButtonHidden(true)
+            .toolbar(.hidden, for: .navigationBar)
+            // Custom chrome hides the nav bar, which also kills the edge swipe — restore it.
+            .enableSwipeBackWhenNavBarHidden()
+            .background {
+                StashyNavigationBackTrigger(trigger: $navigationBackTrigger) {
+                    dismiss()
+                }
+            }
+            .safeAreaInset(edge: .top, spacing: 0) {
+                if showUI, !StashyChromePlacement.prefersBottom {
+                    navBar.transition(.opacity)
+                }
+            }
+            .safeAreaInset(edge: .bottom, spacing: 0) {
+                VStack(spacing: 0) {
+                    if showUI, StashyChromePlacement.prefersBottom {
+                        navBar.transition(.opacity)
+                    }
+                    playbackControls
+                    infoOverlay
+                    scrubberBar
+                }
+                .allowsHitTesting(showUI)
+            }
+            .onChange(of: currentVisibleId) { _, _ in
+                // New page starts playing and resets the scrubber, like the online viewer.
+                isPlaying = true
+                scrubberState.time = 0
+                scrubberState.duration = 1
+                scrubberState.seeking = false
+                scrubberState.seekTarget = nil
+            }
+            .animation(.easeInOut(duration: 0.2), value: showUI)
+            .task {
+                guard currentVisibleId == nil else { return }
+                currentVisibleId = activeId
+                try? await Task.sleep(for: .milliseconds(50))
+                proxy.scrollTo(activeId, anchor: .top)
+            }
+        }
+    }
+
+    private var navBar: some View {
+        StashySectionChromeBar {
+            HStack(spacing: 8) {
+                Button { navigationBackTrigger = UUID() } label: {
+                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        Text("Back")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                    .modifier(StashyChromePillStyle(height: chromePillHeight))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Back")
+
+                Spacer(minLength: 8)
+
+                Text("\(currentIndex + 1) / \(images.count)")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                    .modifier(StashyChromePillStyle(height: chromePillHeight))
+            }
+            .frame(minHeight: chromePillHeight)
+            .padding(.horizontal, StashyExpandingDock.edgePadding)
+            .padding(.vertical, 8)
+        }
+    }
+
+    private static func initials(for name: String) -> String {
+        let parts = name.split(separator: " ").prefix(2)
+        let letters = parts.compactMap { $0.first.map(String.init) }
+        return letters.isEmpty ? "?" : letters.joined().uppercased()
+    }
+
+    /// Mute and play/pause, in their own row above the caption — same arrangement as Feeds.
+    @ViewBuilder
+    private var playbackControls: some View {
+        let isVideo = currentImage?.isVideo ?? false
+        HStack(spacing: 8) {
+            Spacer(minLength: 0)
+            ChromeCircleButton(
+                systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                enabled: isVideo,
+                accessibilityLabel: isMuted ? "Ton an" : "Stumm"
+            ) {
+                if isVideo {
+                    isMuted.toggle()
+                    ScenePlayerMute.persist(isMuted)
+                }
+            }
+            ChromeCircleButton(
+                systemImage: isPlaying ? "pause.fill" : "play.fill",
+                enabled: isVideo,
+                accessibilityLabel: isPlaying ? "Pause" : "Play"
+            ) {
+                if isVideo { isPlaying.toggle() }
+            }
+        }
+        .padding(.horizontal, StashyExpandingDock.edgePadding)
+        .padding(.bottom, 8)
+        .colorScheme(.dark)
+        .opacity(showUI ? 1 : 0)
+        .animation(.easeInOut(duration: 0.2), value: showUI)
+    }
+
+    /// Only videos have something to scrub; stills keep the height so the chrome does not jump.
+    @ViewBuilder
+    private var scrubberBar: some View {
+        IsolatedScrubberBar(state: scrubberState, isUIVisible: showUI)
+            .opacity((currentImage?.isVideo ?? false) ? 1 : 0)
+            .allowsHitTesting(currentImage?.isVideo ?? false)
+    }
+
+    /// Performer · title line plus tag chips — same layout and typography as the online viewer's
+    /// `feedsStyleInfoOverlay`, fed from the metadata stored at download time.
+    @ViewBuilder
+    private var infoOverlay: some View {
+        if let image = currentImage {
+            let performers = image.performerNames ?? []
+            let tags = image.tagNames ?? []
+            let title = image.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+            if !performers.isEmpty || !title.isEmpty || !tags.isEmpty {
+                HStack(alignment: .center, spacing: 10) {
+                    if let performer = performers.first {
+                        // No cached profile picture offline — initials stand in for the round
+                        // thumbnail the online viewer shows.
+                        Circle()
+                            .fill(appearance.tintColor.opacity(0.2))
+                            .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
+                            .overlay {
+                                Text(Self.initials(for: performer))
+                                    .font(.system(size: 14, weight: .bold))
+                                    .foregroundColor(.white.opacity(0.9))
+                            }
+                            .overlay(Circle().stroke(appearance.tintColor, lineWidth: 2))
+                    }
+
+                    VStack(alignment: .leading, spacing: 4) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        if let performer = performers.first {
+                            Text(performer)
+                                .font(.system(size: 15, weight: .bold))
+                                .foregroundColor(.white)
+                            if !title.isEmpty {
+                                Text("-")
+                                    .font(.system(size: 15, weight: .medium))
+                                    .foregroundColor(.white.opacity(0.6))
+                            }
+                        }
+                        if !title.isEmpty {
+                            Text(title)
+                                .font(.system(size: 15, weight: .medium))
+                                .foregroundColor(.white.opacity(0.85))
+                                .lineLimit(1)
+                        }
+                        Spacer(minLength: 0)
+                    }
+
+                    if !tags.isEmpty {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                ForEach(tags, id: \.self) { tag in
+                                    Text("#\(tag)")
+                                        .font(.system(size: 11, weight: .semibold))
+                                        .foregroundColor(.white.opacity(0.8))
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 3)
+                                        .background(Color.black.opacity(0.3))
+                                        .clipShape(Capsule())
+                                        .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                                }
+                            }
+                        }
+                        .frame(height: 20)
+                    }
+                    }
+                }
+                .padding(.horizontal, StashyExpandingDock.edgePadding)
+                .padding(.bottom, 2)
+                .colorScheme(.dark)
+                .opacity(showUI ? 1 : 0)
+                .animation(.easeInOut(duration: 0.2), value: showUI)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func page(_ image: DownloadedGalleryImage) -> some View {
+        DownloadedGalleryItemView(
+            image: image,
+            currentVisibleId: $currentVisibleId,
+            fallbackActiveId: activeId,
+            showUI: $showUI,
+            isZoomed: $isZoomed,
+            isMuted: $isMuted,
+            isPlaying: $isPlaying,
+            scrubberState: scrubberState
+        )
+    }
+}
+
+/// Offline counterpart to `GalleryItemView`: same player embedding (`FullScreenVideoPlayer` over
+/// `AVPlayerLayer`, not AVKit's `VideoPlayer`), same autoplay rule — only the active page plays.
+struct DownloadedGalleryItemView: View {
+    let image: DownloadedGalleryImage
+    @Binding var currentVisibleId: String?
+    let fallbackActiveId: String
+    @Binding var showUI: Bool
+    @Binding var isZoomed: Bool
+    @Binding var isMuted: Bool
+    @Binding var isPlaying: Bool
+    let scrubberState: ScrubberState
+
+    @ObservedObject private var downloadManager = DownloadManager.shared
+    @State private var player: AVPlayer?
+    @State private var timeObserver: Any?
+    /// The player the observer belongs to — removing it from another instance raises a fatal
+    /// AVFoundation exception.
+    @State private var timeObserverPlayer: AVPlayer?
+    @State private var endObserver: NSObjectProtocol?
+
+    private var isActiveItem: Bool {
+        image.id == (currentVisibleId ?? fallbackActiveId)
+    }
+
+    /// Local file extension — the metadata only flags video, animation has to come from the path.
+    private var isAnimated: Bool {
+        let ext = (image.localPath as NSString).pathExtension.uppercased()
+        return ext == "GIF" || ext == "WEBP"
+    }
+
+    private var url: URL { downloadManager.localURL(for: image) }
+
+    var body: some View {
+        ZoomableScrollView(isZoomed: $isZoomed, onTap: { _ in
+            withAnimation(.easeInOut(duration: 0.4)) { showUI.toggle() }
+        }) {
+            content
+        }
+        .onAppear {
+            if image.isVideo, isActiveItem { setupPlayer() }
+        }
+        .onDisappear {
+            teardownPlayer()
+        }
+        .onChange(of: currentVisibleId) { _, _ in
+            guard image.isVideo else { return }
+            if isActiveItem {
+                if player == nil { setupPlayer() }
+                if isPlaying { player?.play() }
+            } else {
+                player?.pause()
+            }
+        }
+        .onChange(of: isMuted) { _, muted in
+            player?.isMuted = muted
+        }
+        .onChange(of: isPlaying) { _, playing in
+            guard isActiveItem else { return }
+            if playing { player?.play() } else { player?.pause() }
+        }
+        .onChange(of: scrubberState.seekTarget) { _, target in
+            guard isActiveItem, let target else { return }
+            player?.seek(to: CMTime(seconds: target, preferredTimescale: 600))
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        if isAnimated, let data = try? Data(contentsOf: url) {
+            AnimatedWebView(data: data, fillMode: false)
+        } else if image.isVideo {
+            if let player {
+                FullScreenVideoPlayer(player: player, videoGravity: .resizeAspect)
+            } else {
+                Color.black
+            }
+        } else if let data = try? Data(contentsOf: url), let ui = UIImage(data: data) {
+            Image(uiImage: ui)
+                .resizable()
+                .scaledToFit()
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            VStack(spacing: 12) {
+                Image(systemName: "exclamationmark.triangle")
+                Text("File missing")
+            }
+            .foregroundColor(.white)
+        }
+    }
+
+    private func setupPlayer() {
+        teardownPlayer()
+        let newPlayer = AVPlayer(url: url)
+        newPlayer.isMuted = isMuted
+        newPlayer.actionAtItemEnd = .none
+        player = newPlayer
+        if isActiveItem, isPlaying { newPlayer.play() }
+
+        // Loop, matching the online viewer's continuous playback. The token is kept so the
+        // observer can actually be removed later — block observers ignore `removeObserver(self:)`.
+        endObserver = NotificationCenter.default.addObserver(
+            forName: .AVPlayerItemDidPlayToEndTime,
+            object: newPlayer.currentItem,
+            queue: .main
+        ) { [weak newPlayer] _ in
+            newPlayer?.seek(to: .zero)
+            newPlayer?.play()
+        }
+
+        timeObserverPlayer = newPlayer
+        timeObserver = newPlayer.addPeriodicTimeObserver(
+            forInterval: CMTime(seconds: 0.1, preferredTimescale: 600),
+            queue: .main
+        ) { [weak newPlayer] time in
+            guard let newPlayer, isActiveItem else { return }
+            if !scrubberState.seeking {
+                scrubberState.time = time.seconds
+            }
+            if let duration = newPlayer.currentItem?.duration.seconds, duration > 0, !duration.isNaN {
+                scrubberState.duration = duration
+            }
+        }
+    }
+
+    private func teardownPlayer() {
+        if let timeObserver {
+            timeObserverPlayer?.removeTimeObserver(timeObserver)
+        }
+        timeObserver = nil
+        timeObserverPlayer = nil
+        if let endObserver {
+            NotificationCenter.default.removeObserver(endObserver)
+        }
+        endObserver = nil
+        player?.pause()
+        player = nil
+    }
+}
+
 #endif

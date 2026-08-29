@@ -4722,6 +4722,10 @@ struct ReelItemView: View {
     var playTrigger: Int
     @Environment(\.verticalSizeClass) var verticalSizeClass
     @State private var timeObserver: Any?
+    /// The player the periodic observer was registered on. AVFoundation raises an
+    /// `NSInvalidArgumentException` — fatal, not catchable in Swift — when a time observer is
+    /// removed from a *different* `AVPlayer` than the one that added it.
+    @State private var timeObserverPlayer: AVPlayer?
     /// Token des `AVPlayerItemDidPlayToEndTime`-Block-Observers. Muss gemerkt werden:
     /// `removeObserver(self, name:object:)` entfernt **keine** Block-Observer (und `self`
     /// ist hier ein View-Struct, das bei jedem Call neu geboxt würde). Ohne Token blieben
@@ -5413,10 +5417,7 @@ extension ReelItemView {
             let currentTime = existingPlayer.currentTime()
             
             // Reuse existing player for smoothness and to prevent VideoPlayer re-renders
-            if let observer = timeObserver {
-                existingPlayer.removeTimeObserver(observer)
-                self.timeObserver = nil
-            }
+            removeTimeObserverIfNeeded()
             removeEndObserver()
 
             existingPlayer.replaceCurrentItem(with: newItem)
@@ -5553,10 +5554,7 @@ extension ReelItemView {
         reelsWatchedSeconds = 0
         heldReelsPlayDuration = 0
         player?.pause()
-        if let timeObserver = timeObserver {
-            player?.removeTimeObserver(timeObserver)
-            self.timeObserver = nil
-        }
+        removeTimeObserverIfNeeded()
         
         // Remove end of time observer
         removeEndObserver()
@@ -5575,10 +5573,7 @@ extension ReelItemView {
     /// item becomes the active (visible) one after already having a player.
     func refreshTimeObserver() {
         guard let player = player else {
-            if let old = timeObserver {
-                self.player?.removeTimeObserver(old)
-                timeObserver = nil
-            }
+            removeTimeObserverIfNeeded()
             return
         }
         installTimeObserver(on: player)
@@ -5586,12 +5581,19 @@ extension ReelItemView {
 
     /// Einzige Quelle für den periodischen Time-Observer (vorher doppelt in
     /// `initPlayer` und `refreshTimeObserver`). Ersetzt einen ggf. vorhandenen.
-    private func installTimeObserver(on player: AVPlayer) {
+    /// Removes the periodic observer from the player that actually owns it.
+    private func removeTimeObserverIfNeeded() {
         if let old = timeObserver {
-            player.removeTimeObserver(old)
-            timeObserver = nil
+            timeObserverPlayer?.removeTimeObserver(old)
         }
+        timeObserver = nil
+        timeObserverPlayer = nil
+    }
+
+    private func installTimeObserver(on player: AVPlayer) {
+        removeTimeObserverIfNeeded()
         let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
+        timeObserverPlayer = player
         timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak player] time in
             guard let player = player else { return }
             if self.isActive && !self.scrubberState.seeking {

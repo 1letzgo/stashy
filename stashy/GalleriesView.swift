@@ -1329,6 +1329,7 @@ struct FullScreenImageView: View {
     let selectedImageId: String
     var onLoadMore: (() -> Void)?
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    @ObservedObject private var downloadManager = DownloadManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @Environment(\.dismiss) var dismiss
     @State private var isMediaZoomed = false
@@ -1677,30 +1678,45 @@ struct FullScreenImageView: View {
                 Spacer(minLength: 8)
 
                 HStack(spacing: 6) {
-                    Button {
-                        shareCurrentImage()
+                    // Share / download / performer image behind one menu — as separate pills they
+                    // squeezed the Back button into two lines.
+                    Menu {
+                        Button {
+                            shareCurrentImage()
+                        } label: {
+                            Label("Share", systemImage: "square.and.arrow.up")
+                        }
+
+                        if let image = currentImage {
+                            let entryId = "image-" + image.id
+                            let isDownloaded = downloadManager.isGalleryDownloaded(id: entryId)
+                            let isDownloading = downloadManager.activeDownloads[entryId] != nil
+                            Button {
+                                downloadManager.downloadImage(image)
+                            } label: {
+                                Label(
+                                    isDownloaded ? "Downloaded" : (isDownloading ? "Downloading…" : "Download"),
+                                    systemImage: isDownloaded ? "checkmark.circle.fill" : "arrow.down.doc"
+                                )
+                            }
+                            .disabled(isDownloaded || isDownloading)
+                        }
+
+                        if !performers.isEmpty {
+                            Button {
+                                performerImageTargetPerformers = performers
+                                showingSetPerformerImagePicker = true
+                            } label: {
+                                Label("Set as performer image", systemImage: "person.crop.circle.badge.plus")
+                            }
+                        }
                     } label: {
-                        Image(systemName: "square.and.arrow.up")
+                        Image(systemName: "ellipsis")
                             .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
                             .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
                             .modifier(StashyChromePillStyle(height: chromePillHeight, iconOnly: true))
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Share")
-
-                    if !performers.isEmpty {
-                        Button {
-                            performerImageTargetPerformers = performers
-                            showingSetPerformerImagePicker = true
-                        } label: {
-                            Image(systemName: "person.crop.circle.badge.plus")
-                                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                                .modifier(StashyChromePillStyle(height: chromePillHeight, iconOnly: true))
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Set as performer image")
-                    }
+                    .accessibilityLabel("More actions")
 
                     Button {
                         showingDeleteConfirmation = true

@@ -701,6 +701,8 @@ struct TagDetailView: View {
     @StateObject private var linkedStudios: DetailLinkedStudiosFilterModel
     @StateObject private var linkedGalleries: DetailLinkedGalleriesFilterModel
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
+    @ObservedObject private var downloadManager = DownloadManager.shared
+    @State private var showingTagDownloadOptions = false
     /// Images 1/row autoplay: parent ScrollView drag/decelerate.
     @State private var imagesFeedScrolling = false
 
@@ -1192,6 +1194,32 @@ struct TagDetailView: View {
                 selectedTag = updated
             }
         }
+        .confirmationDialog("Tag images", isPresented: $showingTagDownloadOptions, titleVisibility: .visible) {
+            let entryId = "tag-" + selectedTag.id
+            if downloadManager.downloadedGallery(id: entryId) != nil {
+                Button("Sync newest") {
+                    downloadManager.syncTagImages(entryId: entryId)
+                }
+                Button("Sync newest \(DownloadManager.galleryNewestBatchSize)") {
+                    downloadManager.syncTagImages(entryId: entryId, limit: DownloadManager.galleryNewestBatchSize)
+                }
+                Button("Remove download", role: .destructive) {
+                    downloadManager.deleteGalleryDownload(id: entryId)
+                }
+            } else {
+                Button("Newest \(DownloadManager.galleryNewestBatchSize) images") {
+                    downloadManager.downloadTagImages(
+                        tagId: selectedTag.id,
+                        tagName: selectedTag.name,
+                        limit: DownloadManager.galleryNewestBatchSize
+                    )
+                }
+                Button("All images") {
+                    downloadManager.downloadTagImages(tagId: selectedTag.id, tagName: selectedTag.name, limit: nil)
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        }
         .floatingActionBar(
             isPresented: selectedDetailTab != .groups,
             catalogChrome: catalogFloatingChromeForFooter
@@ -1232,7 +1260,44 @@ struct TagDetailView: View {
                         linkedImages.showFilterSortSheet = true
                     }
                     .frame(maxWidth: .infinity)
+
+                    tagImagesDownloadFABButton
+                        .frame(maxWidth: .infinity)
                 }
+            }
+        }
+    }
+
+    /// Downloads the tag's images for offline use. Mirrors the gallery control: pick a batch size
+    /// first, then sync or remove once something is stored.
+    @ViewBuilder
+    private var tagImagesDownloadFABButton: some View {
+        let entryId = "tag-" + selectedTag.id
+        let isDownloading = downloadManager.activeDownloads[entryId] != nil
+        let stored = downloadManager.downloadedGallery(id: entryId)
+
+        if isDownloading {
+            CatalogFABIconButton(
+                systemImage: "stop.circle",
+                isActive: true,
+                accessibilityLabel: "Cancel download"
+            ) {
+                HapticManager.light()
+                downloadManager.cancelGalleryDownload(id: entryId)
+            }
+        } else if stored != nil {
+            CatalogFABIconButton(
+                systemImage: "checkmark.circle.fill",
+                isActive: true,
+                accessibilityLabel: "Downloaded"
+            ) {
+                HapticManager.light()
+                showingTagDownloadOptions = true
+            }
+        } else {
+            CatalogFABIconButton(systemImage: "arrow.down.doc", accessibilityLabel: "Download images") {
+                HapticManager.light()
+                showingTagDownloadOptions = true
             }
         }
     }

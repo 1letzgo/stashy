@@ -10,6 +10,8 @@ import Combine
 import AVFoundation
 import AVKit
 import Foundation
+import ImageIO
+import UniformTypeIdentifiers
 import CoreBluetooth
 import Synchronization
 
@@ -10234,6 +10236,67 @@ struct DownloadedScene: Codable, Identifiable {
     var id_uuid: String { id }
 }
 
+/// A downloaded gallery, or a single downloaded image (`isSingleImage`).
+///
+/// Kept in its own metadata file next to the scene downloads so the existing
+/// `downloads_metadata.json` keeps decoding unchanged.
+struct DownloadedGallery: Codable, Identifiable {
+    let id: String
+    let title: String?
+    let studioName: String?
+    let performerNames: [String]
+    var downloadDate: Date
+    var localCoverPath: String?
+    var images: [DownloadedGalleryImage]
+    var isSingleImage: Bool
+    /// "gallery" | "image" | "tag". Optional so entries written before tag downloads existed still
+    /// decode; `resolvedKind` derives the old behaviour for them.
+    var sourceKind: String?
+    /// Total image count on the server at download time — lets the UI say "50 of 400".
+    var serverImageCount: Int?
+
+    enum Kind: String {
+        case gallery, image, tag
+    }
+
+    var resolvedKind: Kind {
+        if let sourceKind, let kind = Kind(rawValue: sourceKind) { return kind }
+        return isSingleImage ? .image : .gallery
+    }
+
+    var displayTitle: String {
+        let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if !trimmed.isEmpty { return trimmed }
+        switch resolvedKind {
+        case .image: return "Untitled image"
+        case .tag: return "Untitled tag"
+        case .gallery: return "Untitled gallery"
+        }
+    }
+
+    /// True when the server holds more images than were downloaded.
+    var mayHaveMore: Bool {
+        guard let serverImageCount else { return false }
+        return serverImageCount > images.count
+    }
+}
+
+struct DownloadedGalleryImage: Codable, Identifiable, Equatable {
+    let id: String
+    let localPath: String
+    let title: String?
+    /// Server `created_at`; the sync uses it to spot images added since the last run.
+    let createdAt: String?
+    let isVideo: Bool
+    /// Downscaled preview generated at download time. The grid would otherwise decode full-size
+    /// files — several megabytes each — for every cell. Optional so older entries still decode.
+    var thumbnailPath: String?
+    /// Captions for the offline viewer — the online one shows performer and tags, and without
+    /// these the downloaded copy would lose them entirely. Optional so older entries still decode.
+    var performerNames: [String]?
+    var tagNames: [String]?
+}
+
 struct ActiveDownload {
     let id: String
     let title: String
@@ -10261,7 +10324,10 @@ final class DownloadTaskMap: Sendable {
 
     nonisolated func taskIds(matching id: String) -> [Int] {
         tasks.withLock { map in
-            map.filter { $0.value.0 == id || $0.value.0 == "\(id)_thumb" }.map(\.key)
+            // Gallery/tag downloads register one task per image as `<id>_img_<imageId>`.
+            map.filter {
+                $0.value.0 == id || $0.value.0 == "\(id)_thumb" || $0.value.0.hasPrefix("\(id)_img_")
+            }.map(\.key)
         }
     }
 }
@@ -10271,10 +10337,12 @@ class DownloadManager: NSObject, ObservableObject {
     static let shared = DownloadManager()
     
     @Published var downloads: [DownloadedScene] = []
+    @Published var galleryDownloads: [DownloadedGallery] = []
     @Published var activeDownloads: [String: ActiveDownload] = [:] // id: info
     
     private let downloadsFolder: URL
     private let metadataFile = "downloads_metadata.json"
+    private let galleryMetadataFile = "gallery_downloads_metadata.json"
     
     nonisolated private let taskMap = DownloadTaskMap()
     private var progressHandlers: [String: (Double, Int64, Int64) -> Void] = [:]
@@ -10302,6 +10370,11 @@ class DownloadManager: NSObject, ObservableObject {
     }
     
     private func loadMetadata() {
+        let galleryFile = downloadsFolder.appendingPathComponent(galleryMetadataFile)
+        if let data = try? Data(contentsOf: galleryFile),
+           let decoded = try? JSONDecoder().decode([DownloadedGallery].self, from: data) {
+            self.galleryDownloads = decoded
+        }
         let file = downloadsFolder.appendingPathComponent(metadataFile)
         guard let data = try? Data(contentsOf: file) else { return }
         if let decoded = try? JSONDecoder().decode([DownloadedScene].self, from: data) {
@@ -10309,12 +10382,20 @@ class DownloadManager: NSObject, ObservableObject {
             cleanupIncompleteDownloads()
         }
     }
+
+    private func saveGalleryMetadata() {
+        let file = downloadsFolder.appendingPathComponent(galleryMetadataFile)
+        if let data = try? JSONEncoder().encode(galleryDownloads) {
+            try? data.write(to: file)
+        }
+    }
     
     private func cleanupIncompleteDownloads() {
         let fileManager = FileManager.default
         guard let contents = try? fileManager.contentsOfDirectory(at: downloadsFolder, includingPropertiesForKeys: nil) else { return }
         
-        let completedIds = Set(downloads.map { $0.id })
+        var completedIds = Set(downloads.map { $0.id })
+        completedIds.formUnion(galleryDownloads.map { Self.galleryFolderName(for: $0.id) })
         
         for item in contents {
             let itemName = item.lastPathComponent
@@ -10477,6 +10558,496 @@ class DownloadManager: NSObject, ObservableObject {
         AppLog.debug("📥 DownloadManager: Cancelling download \(id) (\(taskIds.count) task(s))")
     }
     
+    // MARK: - Gallery & image downloads
+
+    /// Folder name for a gallery download. Prefixed so it can never collide with a scene id.
+    static func galleryFolderName(for id: String) -> String { "gallery-" + id }
+
+    /// Default cap for a "newest images only" gallery download.
+    static let galleryNewestBatchSize = 50
+
+    /// Entries the user cancelled. The sequential image loop checks this between files — cancelling
+    /// the URLSession tasks alone would not stop it from starting the next one.
+    private var cancelledEntries: Set<String> = []
+
+    /// Stops a running gallery / tag / image download and discards what was fetched so far.
+    func cancelGalleryDownload(id: String) {
+        guard activeDownloads[id] != nil else { return }
+        cancelledEntries.insert(id)
+
+        let taskIds = Set(taskMap.taskIds(matching: id))
+        if !taskIds.isEmpty {
+            session.getAllTasks { tasks in
+                for task in tasks where taskIds.contains(task.taskIdentifier) {
+                    task.cancel()
+                }
+            }
+        }
+        activeDownloads.removeValue(forKey: id)
+        // Nothing was committed to metadata yet, so the partial folder is throwaway.
+        if !isGalleryDownloaded(id: id) {
+            let folder = downloadsFolder.appendingPathComponent(Self.galleryFolderName(for: id), isDirectory: true)
+            try? FileManager.default.removeItem(at: folder)
+        }
+        notifyDownload("Download cancelled", icon: "xmark.circle")
+    }
+
+    func isGalleryDownloaded(id: String) -> Bool {
+        galleryDownloads.contains { $0.id == id }
+    }
+
+    func downloadedGallery(id: String) -> DownloadedGallery? {
+        galleryDownloads.first { $0.id == id }
+    }
+
+    func localURL(for image: DownloadedGalleryImage) -> URL {
+        downloadsFolder.appendingPathComponent(image.localPath)
+    }
+
+    /// Grid-sized preview, falling back to the full file for entries downloaded before thumbnails
+    /// existed.
+    func thumbnailURL(for image: DownloadedGalleryImage) -> URL {
+        if let path = image.thumbnailPath {
+            let url = downloadsFolder.appendingPathComponent(path)
+            if FileManager.default.fileExists(atPath: url.path) { return url }
+        }
+        return localURL(for: image)
+    }
+
+    /// Longest edge of a generated preview.
+    private static let thumbnailMaxPixel: CGFloat = 400
+
+    /// Writes a downscaled JPEG next to the original. Uses ImageIO / AVAssetImageGenerator so a
+    /// full-resolution bitmap never has to be held in memory.
+    @discardableResult
+    private static func makeThumbnail(from source: URL, isVideo: Bool, to destination: URL) -> Bool {
+        let cgImage: CGImage?
+        if isVideo {
+            let asset = AVURLAsset(url: source)
+            let generator = AVAssetImageGenerator(asset: asset)
+            generator.appliesPreferredTrackTransform = true
+            generator.maximumSize = CGSize(width: thumbnailMaxPixel, height: thumbnailMaxPixel)
+            cgImage = try? generator.copyCGImage(at: CMTime(seconds: 0.5, preferredTimescale: 600), actualTime: nil)
+        } else {
+            guard let imageSource = CGImageSourceCreateWithURL(source as CFURL, nil) else { return false }
+            let options: [CFString: Any] = [
+                kCGImageSourceCreateThumbnailFromImageAlways: true,
+                kCGImageSourceCreateThumbnailWithTransform: true,
+                kCGImageSourceThumbnailMaxPixelSize: thumbnailMaxPixel
+            ]
+            cgImage = CGImageSourceCreateThumbnailAtIndex(imageSource, 0, options as CFDictionary)
+        }
+        guard let cgImage,
+              let out = CGImageDestinationCreateWithURL(destination as CFURL, UTType.jpeg.identifier as CFString, 1, nil) else {
+            return false
+        }
+        CGImageDestinationAddImage(out, cgImage, [kCGImageDestinationLossyCompressionQuality: 0.8] as CFDictionary)
+        return CGImageDestinationFinalize(out)
+    }
+
+    func localCoverURL(for gallery: DownloadedGallery) -> URL? {
+        gallery.localCoverPath.map { downloadsFolder.appendingPathComponent($0) }
+    }
+
+    func deleteGalleryDownload(id: String) {
+        guard let index = galleryDownloads.firstIndex(where: { $0.id == id }) else { return }
+        galleryDownloads.remove(at: index)
+        saveGalleryMetadata()
+        let folder = downloadsFolder.appendingPathComponent(Self.galleryFolderName(for: id), isDirectory: true)
+        try? FileManager.default.removeItem(at: folder)
+    }
+
+    /// Downloads a single image as its own entry.
+    func downloadImage(_ image: StashImage) {
+        guard requireDownloadEntitlement() else { return }
+        let entryId = "image-" + image.id
+        guard !isGalleryDownloaded(id: entryId), activeDownloads[entryId] == nil else { return }
+
+        let title = image.title ?? "Image"
+        activeDownloads[entryId] = ActiveDownload(id: entryId, title: title, progress: 0.05, totalSize: 0, downloadedSize: 0)
+
+        let folder = downloadsFolder.appendingPathComponent(Self.galleryFolderName(for: entryId), isDirectory: true)
+        try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+
+        downloadImages([image], into: folder, entryId: entryId, existing: []) { [weak self] stored in
+            guard let self else { return }
+            Task { @MainActor in
+                self.activeDownloads.removeValue(forKey: entryId)
+                guard !stored.isEmpty else {
+                    try? FileManager.default.removeItem(at: folder)
+                    self.notifyDownload("Download failed", icon: "exclamationmark.triangle.fill", isError: true)
+                    return
+                }
+                let entry = DownloadedGallery(
+                    id: entryId,
+                    title: image.title,
+                    studioName: image.studio?.name,
+                    performerNames: (image.performers ?? []).map(\.name),
+                    downloadDate: Date(),
+                    localCoverPath: stored.first?.thumbnailPath ?? stored.first?.localPath,
+                    images: stored,
+                    isSingleImage: true,
+                    sourceKind: DownloadedGallery.Kind.image.rawValue,
+                    serverImageCount: 1
+                )
+                self.galleryDownloads.append(entry)
+                self.saveGalleryMetadata()
+                self.notifyDownload("Image downloaded", icon: "checkmark.circle.fill")
+            }
+        }
+    }
+
+    /// Downloads a gallery. `limit` caps it to the newest N images; `nil` fetches everything.
+    func downloadGallery(_ gallery: Gallery, limit: Int?) {
+        guard requireDownloadEntitlement() else { return }
+        let galleryId = gallery.id
+        guard !isGalleryDownloaded(id: galleryId), activeDownloads[galleryId] == nil else { return }
+
+        let title = gallery.title ?? "Gallery"
+        activeDownloads[galleryId] = ActiveDownload(id: galleryId, title: title, progress: 0.02, totalSize: 0, downloadedSize: 0)
+
+        fetchGalleryImagesForDownload(galleryId: galleryId, limit: limit) { [weak self] images, total in
+            guard let self else { return }
+            guard !images.isEmpty else {
+                Task { @MainActor in
+                    self.activeDownloads.removeValue(forKey: galleryId)
+                    self.notifyDownload("Gallery has no images", icon: "exclamationmark.triangle.fill", isError: true)
+                }
+                return
+            }
+            let folder = self.downloadsFolder.appendingPathComponent(Self.galleryFolderName(for: galleryId), isDirectory: true)
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+
+            self.downloadImages(images, into: folder, entryId: galleryId, existing: []) { stored in
+                Task { @MainActor in
+                    self.activeDownloads.removeValue(forKey: galleryId)
+                    guard !stored.isEmpty else {
+                        try? FileManager.default.removeItem(at: folder)
+                        self.notifyDownload("Download failed", icon: "exclamationmark.triangle.fill", isError: true)
+                        return
+                    }
+                    let entry = DownloadedGallery(
+                        id: galleryId,
+                        title: gallery.title,
+                        studioName: gallery.studio?.name,
+                        performerNames: (gallery.performers ?? []).map(\.name),
+                        downloadDate: Date(),
+                        localCoverPath: stored.first?.thumbnailPath ?? stored.first?.localPath,
+                        images: stored,
+                        isSingleImage: false,
+                        sourceKind: DownloadedGallery.Kind.gallery.rawValue,
+                        serverImageCount: total
+                    )
+                    self.galleryDownloads.append(entry)
+                    self.saveGalleryMetadata()
+                    self.notifyDownload("Downloaded \(stored.count) image(s)", icon: "checkmark.circle.fill")
+                }
+            }
+        }
+    }
+
+    /// Downloads the newest images carrying a tag. Stored like a gallery, but flagged as `.tag`
+    /// so Downloads can list it separately.
+    func downloadTagImages(tagId: String, tagName: String, limit: Int?) {
+        guard requireDownloadEntitlement() else { return }
+        let entryId = "tag-" + tagId
+        guard !isGalleryDownloaded(id: entryId), activeDownloads[entryId] == nil else { return }
+
+        activeDownloads[entryId] = ActiveDownload(id: entryId, title: tagName, progress: 0.02, totalSize: 0, downloadedSize: 0)
+
+        fetchTagImagesForDownload(tagId: tagId, limit: limit) { [weak self] images, total in
+            guard let self else { return }
+            guard !images.isEmpty else {
+                Task { @MainActor in
+                    self.activeDownloads.removeValue(forKey: entryId)
+                    self.notifyDownload("No images for this tag", icon: "exclamationmark.triangle.fill", isError: true)
+                }
+                return
+            }
+            let folder = self.downloadsFolder.appendingPathComponent(Self.galleryFolderName(for: entryId), isDirectory: true)
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+
+            self.downloadImages(images, into: folder, entryId: entryId, existing: []) { stored in
+                Task { @MainActor in
+                    self.activeDownloads.removeValue(forKey: entryId)
+                    guard !stored.isEmpty else {
+                        try? FileManager.default.removeItem(at: folder)
+                        self.notifyDownload("Download failed", icon: "exclamationmark.triangle.fill", isError: true)
+                        return
+                    }
+                    let entry = DownloadedGallery(
+                        id: entryId,
+                        title: tagName,
+                        studioName: nil,
+                        performerNames: [],
+                        downloadDate: Date(),
+                        localCoverPath: stored.first?.thumbnailPath ?? stored.first?.localPath,
+                        images: stored,
+                        isSingleImage: false,
+                        sourceKind: DownloadedGallery.Kind.tag.rawValue,
+                        serverImageCount: total
+                    )
+                    self.galleryDownloads.append(entry)
+                    self.saveGalleryMetadata()
+                    self.notifyDownload("Downloaded \(stored.count) image(s)", icon: "checkmark.circle.fill")
+                }
+            }
+        }
+    }
+
+    /// Sync for a downloaded tag — same "only what is new" rule as galleries.
+    func syncTagImages(entryId: String, limit: Int? = nil) {
+        guard requireDownloadEntitlement() else { return }
+        guard let existing = downloadedGallery(id: entryId), existing.resolvedKind == .tag else { return }
+        guard activeDownloads[entryId] == nil else { return }
+        let tagId = String(entryId.dropFirst("tag-".count))
+
+        activeDownloads[entryId] = ActiveDownload(id: entryId, title: existing.displayTitle, progress: 0.02, totalSize: 0, downloadedSize: 0)
+        let knownIds = Set(existing.images.map(\.id))
+
+        fetchTagImagesForDownload(tagId: tagId, limit: limit) { [weak self] images, total in
+            guard let self else { return }
+            let fresh = images.filter { !knownIds.contains($0.id) }
+            guard !fresh.isEmpty else {
+                Task { @MainActor in
+                    self.activeDownloads.removeValue(forKey: entryId)
+                    if let index = self.galleryDownloads.firstIndex(where: { $0.id == entryId }) {
+                        self.galleryDownloads[index].serverImageCount = total
+                        self.saveGalleryMetadata()
+                    }
+                    self.notifyDownload("Already up to date", icon: "checkmark.circle")
+                }
+                return
+            }
+            let folder = self.downloadsFolder.appendingPathComponent(Self.galleryFolderName(for: entryId), isDirectory: true)
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+
+            self.downloadImages(fresh, into: folder, entryId: entryId, existing: existing.images) { stored in
+                Task { @MainActor in
+                    self.activeDownloads.removeValue(forKey: entryId)
+                    guard let index = self.galleryDownloads.firstIndex(where: { $0.id == entryId }) else { return }
+                    self.galleryDownloads[index].images = stored + self.galleryDownloads[index].images
+                    self.galleryDownloads[index].downloadDate = Date()
+                    self.galleryDownloads[index].serverImageCount = total
+                    self.saveGalleryMetadata()
+                    self.notifyDownload("Added \(stored.count) new image(s)", icon: "checkmark.circle.fill")
+                }
+            }
+        }
+    }
+
+    /// Newest-first images for a tag, paged like the gallery variant.
+    private func fetchTagImagesForDownload(
+        tagId: String,
+        limit: Int?,
+        completion: @escaping ([StashImage], Int) -> Void
+    ) {
+        Task {
+            let query = GraphQLQueries.queryWithFragments("findImages")
+            var collected: [StashImage] = []
+            var total = 0
+            var page = 1
+            let perPage = min(limit ?? 200, 200)
+            while true {
+                let variables: [String: Any] = [
+                    "filter": ["page": page, "per_page": perPage, "sort": "date", "direction": "DESC"],
+                    "image_filter": ["tags": ["value": [tagId], "modifier": "INCLUDES", "depth": 0]]
+                ]
+                do {
+                    let response: GalleryImagesResponse = try await GraphQLClient.shared.execute(
+                        query: query,
+                        variables: variables
+                    )
+                    let images = response.data?.findImages.images ?? []
+                    total = response.data?.findImages.count ?? total
+                    collected.append(contentsOf: images)
+                    if let limit, collected.count >= limit {
+                        collected = Array(collected.prefix(limit))
+                        break
+                    }
+                    if images.count < perPage || collected.count >= total { break }
+                    page += 1
+                    if page > 50 { break }
+                } catch {
+                    AppLog.error("📥 Tag image fetch failed: \(error)")
+                    break
+                }
+            }
+            completion(collected, total)
+        }
+    }
+
+    /// Fetches the newest images of an already downloaded gallery and stores the ones that are new.
+    func syncGallery(id: String, limit: Int? = nil) {
+        guard requireDownloadEntitlement() else { return }
+        guard let existing = downloadedGallery(id: id), !existing.isSingleImage else { return }
+        guard activeDownloads[id] == nil else { return }
+
+        activeDownloads[id] = ActiveDownload(id: id, title: existing.displayTitle, progress: 0.02, totalSize: 0, downloadedSize: 0)
+        let knownIds = Set(existing.images.map(\.id))
+
+        fetchGalleryImagesForDownload(galleryId: id, limit: limit) { [weak self] images, total in
+            guard let self else { return }
+            let fresh = images.filter { !knownIds.contains($0.id) }
+            guard !fresh.isEmpty else {
+                Task { @MainActor in
+                    self.activeDownloads.removeValue(forKey: id)
+                    if let index = self.galleryDownloads.firstIndex(where: { $0.id == id }) {
+                        self.galleryDownloads[index].serverImageCount = total
+                        self.saveGalleryMetadata()
+                    }
+                    self.notifyDownload("Already up to date", icon: "checkmark.circle")
+                }
+                return
+            }
+            let folder = self.downloadsFolder.appendingPathComponent(Self.galleryFolderName(for: id), isDirectory: true)
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+
+            self.downloadImages(fresh, into: folder, entryId: id, existing: existing.images) { stored in
+                Task { @MainActor in
+                    self.activeDownloads.removeValue(forKey: id)
+                    guard let index = self.galleryDownloads.firstIndex(where: { $0.id == id }) else { return }
+                    // Newest first, matching the fetch order.
+                    self.galleryDownloads[index].images = stored + self.galleryDownloads[index].images
+                    self.galleryDownloads[index].downloadDate = Date()
+                    self.galleryDownloads[index].serverImageCount = total
+                    self.saveGalleryMetadata()
+                    self.notifyDownload("Added \(stored.count) new image(s)", icon: "checkmark.circle.fill")
+                }
+            }
+        }
+    }
+
+    /// Toasts are an iOS-only surface; tvOS has no `ToastManager`.
+    private func notifyDownload(_ message: String, icon: String, isError: Bool = false) {
+        #if !os(tvOS)
+        ToastManager.shared.show(message, icon: icon, style: isError ? .error : .success)
+        #else
+        AppLog.debug("📥 \(message)")
+        #endif
+    }
+
+    #if !os(tvOS)
+    private func requireDownloadEntitlement() -> Bool {
+        guard StashyPlusManager.isUnlockedNow else {
+            ToastManager.shared.show(
+                "Downloads are part of stashy+ — unlock in Settings",
+                icon: "sparkles",
+                style: .error
+            )
+            return false
+        }
+        return true
+    }
+    #else
+    private func requireDownloadEntitlement() -> Bool { true }
+    #endif
+
+    /// Newest-first page(s) of gallery images. `limit` nil = everything.
+    private func fetchGalleryImagesForDownload(
+        galleryId: String,
+        limit: Int?,
+        completion: @escaping ([StashImage], Int) -> Void
+    ) {
+        Task {
+            let repo = GalleryRepository()
+            var collected: [StashImage] = []
+            var total = 0
+            var page = 1
+            let perPage = min(limit ?? 200, 200)
+            while true {
+                do {
+                    let result = try await repo.fetchGalleryImages(
+                        galleryId: galleryId,
+                        page: page,
+                        perPage: perPage,
+                        sortBy: .dateDesc
+                    )
+                    total = result.total
+                    collected.append(contentsOf: result.images)
+                    if let limit, collected.count >= limit {
+                        collected = Array(collected.prefix(limit))
+                        break
+                    }
+                    if result.images.count < perPage || collected.count >= total { break }
+                    page += 1
+                    // Safety valve for very large galleries.
+                    if page > 50 { break }
+                } catch {
+                    AppLog.error("📥 Gallery image fetch failed: \(error)")
+                    break
+                }
+            }
+            completion(collected, total)
+        }
+    }
+
+    /// Downloads each image sequentially into `folder`. Sequential on purpose: a gallery can hold
+    /// hundreds of files and parallel requests would swamp the Stash server.
+    private func downloadImages(
+        _ images: [StashImage],
+        into folder: URL,
+        entryId: String,
+        existing: [DownloadedGalleryImage],
+        completion: @escaping ([DownloadedGalleryImage]) -> Void
+    ) {
+        var stored: [DownloadedGalleryImage] = []
+        let total = images.count
+
+        func next(_ index: Int) {
+            if cancelledEntries.contains(entryId) {
+                cancelledEntries.remove(entryId)
+                completion([])
+                return
+            }
+            guard index < images.count else {
+                completion(stored)
+                return
+            }
+            let image = images[index]
+            guard let remote = image.imageURL else {
+                next(index + 1)
+                return
+            }
+            let ext = (image.fileExtension?.lowercased()).flatMap { $0.isEmpty ? nil : $0 } ?? "jpg"
+            let fileName = "\(image.id).\(ext)"
+            let destination = folder.appendingPathComponent(fileName)
+            let relativePath = Self.galleryFolderName(for: entryId) + "/" + fileName
+
+            downloadFile(id: entryId + "_img_" + image.id, from: remote, to: destination) { _, _, _ in
+            } completion: { success in
+                if success {
+                    let thumbName = "\(image.id)_thumb.jpg"
+                    let thumbDestination = folder.appendingPathComponent(thumbName)
+                    let thumbRelative = Self.makeThumbnail(
+                        from: destination,
+                        isVideo: image.isVideo,
+                        to: thumbDestination
+                    ) ? Self.galleryFolderName(for: entryId) + "/" + thumbName : nil
+
+                    stored.append(DownloadedGalleryImage(
+                        id: image.id,
+                        localPath: relativePath,
+                        title: image.title,
+                        createdAt: image.createdAt,
+                        isVideo: image.isVideo,
+                        thumbnailPath: thumbRelative,
+                        performerNames: (image.performers ?? []).map(\.name),
+                        tagNames: (image.tags ?? []).map(\.name)
+                    ))
+                }
+                Task { @MainActor in
+                    if var active = self.activeDownloads[entryId] {
+                        active.progress = max(0.02, Double(index + 1) / Double(max(total, 1)))
+                        self.activeDownloads[entryId] = active
+                    }
+                }
+                next(index + 1)
+            }
+        }
+        next(0)
+    }
+
     func getLocalVideoURL(for scene: DownloadedScene) -> URL {
         return downloadsFolder.appendingPathComponent(scene.localVideoPath)
     }
