@@ -42,8 +42,26 @@ enum CatalogCardColumns: Int, CaseIterable, Codable, Hashable {
         }
     }
 
-    func gridItems(spacing: CGFloat = 12) -> [GridItem] {
-        Array(repeating: GridItem(.flexible(), spacing: spacing), count: rawValue)
+    /// Ideale Kartenbreite je Modus — 1/Reihe zeigt 16:9-Karten, 2/Reihe quadratische.
+    /// Bewusst hier und nicht in `DesignTokens`: die Datei gehört nur zum iOS-Target.
+    var idealCardWidth: CGFloat {
+        switch self {
+        case .one: return 480
+        case .two: return 260
+        }
+    }
+
+    /// Der Toggle wählt die Kartengröße; die Spaltenzahl ergibt sich aus der Breite.
+    /// Auf dem iPhone bleibt es bei 1 bzw. 2, auf iPad/Querformat füllen die Karten die Fläche.
+    /// `width == 0` (noch nicht gemessen) fällt auf den Toggle-Wert zurück.
+    func gridItems(width: CGFloat, spacing: CGFloat = 12) -> [GridItem] {
+        let count: Int
+        if width > 0 {
+            count = max(rawValue, min(rawValue * 3, Int((width / idealCardWidth).rounded())))
+        } else {
+            count = rawValue
+        }
+        return Array(repeating: GridItem(.flexible(), spacing: spacing), count: count)
     }
 }
 

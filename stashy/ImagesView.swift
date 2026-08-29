@@ -151,8 +151,11 @@ private struct ImagesViewBody: View {
         return tabManager.catalogCardColumns(for: cardColumnScope)
     }
 
+    @State private var cardGridWidth: CGFloat = 0
+
+
     private var columns: [GridItem] {
-        effectiveCardColumns.gridItems()
+        effectiveCardColumns.gridItems(width: cardGridWidth)
     }
 
     /// Instagram/Feeds-style 1/row layout (header above image; optional set grouping).
@@ -984,6 +987,7 @@ private struct ImagesViewBody: View {
                     .padding()
             }
         }
+        .measuresGridWidth($cardGridWidth)
         // Force cell rebuild — LazyVGrid otherwise keeps stale square/16:9 sizes.
         .id(effectiveCardColumns)
     }

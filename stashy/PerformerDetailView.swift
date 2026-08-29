@@ -78,15 +78,15 @@ struct PerformerDetailView: View {
         _linkedImages = StateObject(wrappedValue: DetailLinkedImagesFilterModel(scope: .performer(performer.id)))
     }
 
+    @State private var galleryGridWidth: CGFloat = 0
+
     private var galleryColumns: [GridItem] {
-        if horizontalSizeClass == .regular {
-             return Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
-        } else {
-             return [
-                 GridItem(.flexible(), spacing: 12),
-                 GridItem(.flexible(), spacing: 12)
-             ]
-        }
+        DesignTokens.Grid.adaptiveColumns(
+            width: galleryGridWidth,
+            ideal: DesignTokens.Grid.idealPosterCardWidth,
+            minimum: 2,
+            maximum: 8
+        )
     }
 
     private var displayPerformer: Performer {
@@ -845,6 +845,7 @@ struct PerformerDetailView: View {
                  Color.clear.frame(height: 1).onAppear { viewModel.loadMorePerformerGalleries(performerId: performer.id) }
              }
         }
+        .measuresGridWidth($galleryGridWidth)
     }
     
     private var studioGrid: some View {
@@ -860,6 +861,7 @@ struct PerformerDetailView: View {
                 Color.clear.onAppear { linkedStudios.refetchStudios(viewModel: viewModel, initial: false) }
             }
         }
+        .measuresGridWidth($galleryGridWidth)
     }
     
     private var tagGrid: some View {
@@ -875,6 +877,7 @@ struct PerformerDetailView: View {
                 Color.clear.onAppear { linkedTags.refetchTags(viewModel: viewModel, initial: false) }
             }
         }
+        .measuresGridWidth($galleryGridWidth)
     }
     
     private var groupGrid: some View {
@@ -890,6 +893,7 @@ struct PerformerDetailView: View {
                 Color.clear.onAppear { viewModel.fetchDetailGroups(performerId: performer.id, isInitialLoad: false) }
             }
         }
+        .measuresGridWidth($galleryGridWidth)
     }
     
     private var imageGrid: some View {

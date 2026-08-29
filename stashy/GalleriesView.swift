@@ -380,8 +380,11 @@ private struct GalleriesViewContent: View {
     
     @ObservedObject private var tabManager = TabManager.shared
 
+    @State private var cardGridWidth: CGFloat = 0
+
+
     private var columns: [GridItem] {
-        tabManager.catalogCardColumns(for: CatalogCardColumnScope.galleries).gridItems()
+        tabManager.catalogCardColumns(for: CatalogCardColumnScope.galleries).gridItems(width: cardGridWidth)
     }
 
     // Safe sort change function
@@ -489,6 +492,7 @@ private struct GalleriesViewContent: View {
                         }
                 }
             }
+            .measuresGridWidth($cardGridWidth)
             .id(cardColumns)
             .padding(16)
         }

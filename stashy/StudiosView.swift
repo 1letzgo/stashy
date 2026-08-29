@@ -629,20 +629,15 @@ private struct StudiosViewContent: View {
 
     @Environment(\.verticalSizeClass) var verticalSizeClass
 
+    @State private var gridWidth: CGFloat = 0
+
     private var columns: [GridItem] {
-        if horizontalSizeClass == .regular {
-            return Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
-        } else if verticalSizeClass == .compact {
-             return [
-                 GridItem(.flexible(), spacing: 12),
-                 GridItem(.flexible(), spacing: 12)
-             ]
-        } else {
-            return [
-                GridItem(.flexible(), spacing: 12),
-                GridItem(.flexible(), spacing: 12)
-            ]
-        }
+        DesignTokens.Grid.adaptiveColumns(
+            width: gridWidth,
+            ideal: DesignTokens.Grid.idealPosterCardWidth,
+            minimum: 2,
+            maximum: 8
+        )
     }
 
     private var studiosList: some View {
@@ -660,6 +655,7 @@ private struct StudiosViewContent: View {
                         })
                     }
                 }
+                .measuresGridWidth($gridWidth)
                 .padding(16)
             }
             .refreshable { performSearch() }

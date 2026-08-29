@@ -14,12 +14,15 @@ struct DownloadsView: View {
     @StateObject private var downloadManager = DownloadManager.shared
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     
+    @State private var gridWidth: CGFloat = 0
+
     private var columns: [GridItem] {
-        if horizontalSizeClass == .regular {
-            return Array(repeating: GridItem(.flexible(), spacing: 12), count: 3)
-        } else {
-            return [GridItem(.flexible(), spacing: 12)]
-        }
+        DesignTokens.Grid.adaptiveColumns(
+            width: gridWidth,
+            ideal: 360,
+            minimum: 1,
+            maximum: 6
+        )
     }
     
     var body: some View {

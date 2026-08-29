@@ -120,6 +120,34 @@ enum DesignTokens {
         static let spacing: CGFloat = 12
         /// Content padding around grids
         static let contentPadding: CGFloat = 16
+
+        /// Ideale Kartenbreiten für die adaptiven Grids (iPad/Querformat).
+        static let idealPosterCardWidth: CGFloat = 220
+
+        /// Spaltenzahl aus der verfügbaren Breite statt aus der Size-Class.
+        /// `width == 0` (Breite noch nicht gemessen) fällt auf `minimum` zurück.
+        static func adaptiveColumnCount(
+            width: CGFloat,
+            ideal: CGFloat,
+            minimum: Int,
+            maximum: Int
+        ) -> Int {
+            guard width > 0, ideal > 0 else { return minimum }
+            let raw = Int((width / ideal).rounded())
+            return max(minimum, min(maximum, raw))
+        }
+
+        /// `adaptiveColumnCount` als fertige `GridItem`-Liste.
+        static func adaptiveColumns(
+            width: CGFloat,
+            ideal: CGFloat,
+            minimum: Int,
+            maximum: Int,
+            spacing: CGFloat = Spacing.sm
+        ) -> [GridItem] {
+            let count = adaptiveColumnCount(width: width, ideal: ideal, minimum: minimum, maximum: maximum)
+            return Array(repeating: GridItem(.flexible(), spacing: spacing), count: count)
+        }
     }
 
     // MARK: - Animation
@@ -161,5 +189,17 @@ extension View {
 
     func toolsHorizontalPadding(_ sizeClass: UserInterfaceSizeClass?) -> some View {
         padding(.horizontal, DesignTokens.Tools.horizontalPadding(for: sizeClass))
+    }
+
+    /// Misst die Containerbreite für `DesignTokens.Grid.adaptiveColumns`.
+    /// `onGeometryChange` statt `GeometryReader`, damit das Layout im ScrollView unberührt bleibt.
+    func measuresGridWidth(_ width: Binding<CGFloat>) -> some View {
+        onGeometryChange(for: CGFloat.self) { proxy in
+            proxy.size.width
+        } action: { newValue in
+            if abs(newValue - width.wrappedValue) > 0.5 {
+                width.wrappedValue = newValue
+            }
+        }
     }
 }

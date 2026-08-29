@@ -73,12 +73,15 @@ private struct TagsViewContent: View {
     @Environment(\.verticalSizeClass) var verticalSizeClass
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
 
+    @State private var gridWidth: CGFloat = 0
+
     private var columns: [GridItem] {
-        if horizontalSizeClass == .regular {
-            return Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
-        } else {
-            return [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
-        }
+        DesignTokens.Grid.adaptiveColumns(
+            width: gridWidth,
+            ideal: DesignTokens.Grid.idealPosterCardWidth,
+            minimum: 2,
+            maximum: 8
+        )
     }
 
     // Search function
@@ -588,6 +591,7 @@ private struct TagsViewContent: View {
                             }
                     }
                 }
+                .measuresGridWidth($gridWidth)
                 .padding(16)
             }
             .refreshable { performSearch() }
@@ -754,21 +758,16 @@ struct TagDetailView: View {
         _linkedImages = StateObject(wrappedValue: DetailLinkedImagesFilterModel(scope: .tag(selectedTag.id)))
     }
 
+    @State private var gridWidth: CGFloat = 0
+
+    /// Breite Karten: eine pro Zeile auf dem iPhone, mehr sobald Platz da ist.
     private var columns: [GridItem] {
-        if verticalSizeClass == .compact {
-             return [
-                 GridItem(.flexible(), spacing: 12),
-                 GridItem(.flexible(), spacing: 12)
-             ]
-        } else if horizontalSizeClass == .regular {
-            // iPad: 4 columns
-            return Array(repeating: GridItem(.flexible(), spacing: 12), count: 4)
-        } else {
-            // iPhone: 1 column
-            return [
-                GridItem(.flexible(), spacing: 12)
-            ]
-        }
+        DesignTokens.Grid.adaptiveColumns(
+            width: gridWidth,
+            ideal: 420,
+            minimum: 1,
+            maximum: 4
+        )
     }
 
     private var galleryColumns: [GridItem] {
@@ -1595,6 +1594,7 @@ struct TagDetailView: View {
                 Color.clear.onAppear { linkedStudios.refetchStudios(viewModel: viewModel, initial: false) }
             }
         }
+        .measuresGridWidth($gridWidth)
     }
     
     private var groupGrid: some View {
@@ -1610,6 +1610,7 @@ struct TagDetailView: View {
                 Color.clear.onAppear { viewModel.fetchDetailGroups(tagId: selectedTag.id, isInitialLoad: false) }
             }
         }
+        .measuresGridWidth($gridWidth)
     }
     
     private var imageGrid: some View {
