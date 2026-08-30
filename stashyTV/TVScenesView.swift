@@ -56,8 +56,7 @@ struct TVScenesView: View {
                     },
                     filterMenu: {
                         TVFilterPickerButton(filters: savedFilters, selection: $selectedFilter)
-                    },
-                    onRefresh: { reload() }
+                    }
                 )
             },
             card: { scene in

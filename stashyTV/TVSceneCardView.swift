@@ -62,18 +62,13 @@ struct TVSceneCardView: View {
                 Spacer()
             }
 
-            // Bottom Metadata Bar (inside thumbnail)
+            // Bottom Metadata Bar (inside thumbnail) — nur noch das Rating.
+            // Der Titel steht unter der Karte, siehe `TVSceneCardTitleView`.
             VStack {
                 Spacer()
                 HStack(alignment: .bottom) {
-                    Text(scene.title ?? "Untitled Scene")
-                        .font(.body)
-                        .fontWeight(.bold)
-                        .foregroundColor(.white)
-                        .lineLimit(1)
-                    
-                    Spacer(minLength: 12)
-                    
+                    Spacer(minLength: 0)
+
                     if let rating = scene.rating100, rating > 0 {
                         HStack(spacing: 3) {
                             Image(systemName: "star.fill")
@@ -167,6 +162,14 @@ struct TVSceneCardTitleView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 2) {
+            // `displayTitle` fällt auf den Dateinamen zurück — dasselbe
+            // Verhalten wie auf iOS (`SceneCardView`, `HomeSceneCardView`).
+            Text(scene.displayTitle ?? "Untitled Scene")
+                .font(.body)
+                .fontWeight(.semibold)
+                .foregroundColor(.white)
+                .lineLimit(1)
+
             if let date = scene.date, !date.isEmpty {
                 Text(date)
                     .font(.caption)

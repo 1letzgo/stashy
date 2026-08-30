@@ -253,7 +253,7 @@ struct TVSceneDetailView: View {
             }
 
             // 2. Main Title
-            Text(scene.title ?? "Untitled Scene")
+            Text(scene.displayTitle ?? "Untitled Scene")
                 .font(.system(size: 80, weight: .bold))
                 .foregroundColor(.white)
                 .lineLimit(2)

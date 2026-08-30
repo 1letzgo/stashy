@@ -349,7 +349,7 @@ struct TVChannelPlayerView: View {
                     player: player,
                     session: session,
                     sceneID: session.currentScene?.id,
-                    title: session.currentScene?.title ?? "Untitled",
+                    title: session.currentScene?.displayTitle ?? "Untitled",
                     subtitle: subtitle,
                     canGoPrevious: session.canGoPrevious,
                     canGoNext: session.canGoNext,

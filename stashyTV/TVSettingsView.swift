@@ -17,6 +17,7 @@ private enum TVSettingsEntry: Hashable {
     case servers, appearance, security, playback, stashyPlus
     case defaultSort, defaultFilters, visibleTabs
     case sidebar
+    case maintenance
     case about
 
     var title: String {
@@ -30,6 +31,7 @@ private enum TVSettingsEntry: Hashable {
         case .defaultFilters: return "Default Filters"
         case .visibleTabs: return "Visible Tabs"
         case .sidebar: return "Sidebar Navigation"
+        case .maintenance: return "Maintenance"
         case .about: return "About"
         }
     }
@@ -45,6 +47,7 @@ private enum TVSettingsEntry: Hashable {
         case .defaultFilters: return "line.3.horizontal.decrease.circle"
         case .visibleTabs: return "rectangle.3.group.fill"
         case .sidebar: return "sidebar.leading"
+        case .maintenance: return "internaldrive"
         case .about: return "info.circle"
         }
     }
@@ -69,6 +72,8 @@ private enum TVSettingsEntry: Hashable {
             return "Hide sections you do not use. They disappear from the sidebar."
         case .sidebar:
             return "The left sidebar is the standard for Apple TV. Turn it off to go back to the classic tab bar along the top."
+        case .maintenance:
+            return "Clear the cached artwork for the active server. Images are re-downloaded as they are shown again."
         case .about:
             return "Version and build number."
         }
@@ -130,6 +135,7 @@ struct TVSettingsView: View {
             }
 
             Section {
+                link(.maintenance) { TVMaintenanceSettingsView() }
                 link(.about) { TVAboutSettingsView() }
             }
         }
@@ -303,6 +309,10 @@ private struct TVServersSettingsView: View {
 /// Eigene View, damit der Aktions-Dialog **auf der Zeile** liegt und nicht auf
 /// der `List` — dort würde er mit dem Form-Sheet um dieselbe Presentation
 /// konkurrieren.
+/// Eine Zeile, ein Button. Ein zweiter Button daneben (vorher „•••") teilt sich
+/// in einer tvOS-List-Zeile den Select mit dem Aktivieren-Button — dann öffnete
+/// beim Serverwechsel jedes Mal der Bearbeiten-Dialog. Bearbeiten und Löschen
+/// liegen deshalb wieder auf dem Kontextmenü (langes Select).
 private struct TVSavedServerRow: View {
     let server: ServerConfig
     let isActive: Bool
@@ -311,42 +321,29 @@ private struct TVSavedServerRow: View {
     let onDelete: () -> Void
 
     @ObservedObject private var appearanceManager = AppearanceManager.shared
-    @State private var showingActions = false
 
     var body: some View {
-        HStack(spacing: 24) {
-            Button(action: onActivate) {
-                HStack(spacing: 16) {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(server.name)
-                            .font(.headline)
-                        Text(server.baseURL)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
+        Button(action: onActivate) {
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(server.name)
+                        .font(.headline)
+                    Text(server.baseURL)
+                        .font(.subheadline)
+                        .foregroundStyle(.secondary)
+                }
 
-                    Spacer()
+                Spacer()
 
-                    if isActive {
-                        Image(systemName: "checkmark")
-                            .foregroundColor(appearanceManager.tintColor)
-                    }
+                if isActive {
+                    Image(systemName: "checkmark")
+                        .foregroundColor(appearanceManager.tintColor)
                 }
             }
-
-            // Sichtbare Affordance für Bearbeiten/Löschen — vorher nur über ein
-            // unsichtbares contextMenu (Long-Press auf Select) erreichbar.
-            Button {
-                showingActions = true
-            } label: {
-                Image(systemName: "ellipsis.circle")
-                    .accessibilityLabel("Manage \(server.name)")
-            }
         }
-        .confirmationDialog(server.name, isPresented: $showingActions, titleVisibility: .visible) {
+        .contextMenu {
             Button("Edit", action: onEdit)
             Button("Delete", role: .destructive, action: onDelete)
-            Button("Cancel", role: .cancel) {}
         }
     }
 }
@@ -645,6 +642,43 @@ private struct TVTabVisibilitySettingsView: View {
             }
         }
         .tint(appearanceManager.tintColor)
+    }
+}
+
+// MARK: - Maintenance
+
+private struct TVMaintenanceSettingsView: View {
+    @ObservedObject private var configManager = ServerConfigManager.shared
+    @State private var didClear = false
+
+    var body: some View {
+        List {
+            Section {
+                Button {
+                    // Gegenstück zu „Clear Image Cache" auf iOS
+                    // (`MainTabView`, Wartungsaufgaben).
+                    ImageCache.shared.clearCurrentServerCache()
+                    didClear = true
+                } label: {
+                    HStack {
+                        Text("Clear Image Cache")
+                        if didClear {
+                            Spacer()
+                            Text("Cleared")
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+                .disabled(configManager.activeConfig == nil)
+            } footer: {
+                Text("Removes the cached artwork for the active server. Images are downloaded again as they appear.")
+            }
+        }
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 80).focusable(false)
+        }
+        .background(Color.appBackground)
+        .navigationTitle("Maintenance")
     }
 }
 

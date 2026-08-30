@@ -64,8 +64,7 @@ struct TVImagesView: View {
                     },
                     filterMenu: {
                         TVFilterPickerButton(filters: savedFilters, selection: $selectedFilter)
-                    },
-                    onRefresh: { reload() }
+                    }
                 )
             },
             card: { image in

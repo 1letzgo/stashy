@@ -62,8 +62,7 @@ struct TVTagsView: View {
                     },
                     filterMenu: {
                         TVFilterPickerButton(filters: savedTagFilters, selection: $selectedFilter)
-                    },
-                    onRefresh: { reload() }
+                    }
                 )
             },
             card: { tag in
