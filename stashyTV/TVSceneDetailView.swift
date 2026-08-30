@@ -135,6 +135,13 @@ struct TVSceneDetailView: View {
                     // Failsafe — save progress falls fullScreenCover ohne `onDismiss` weggeht.
                     playerViewModel.saveProgress()
                 }
+            } else if playerViewModel.isPreparing {
+                // Direct Play is opening the source — no player yet, but this
+                // is not a failure, so the error view must not flash here.
+                ZStack {
+                    Color.black.ignoresSafeArea()
+                    ProgressView()
+                }
             } else {
                 // Fallback, wenn der Player nicht erzeugt werden konnte oder fehlschlägt.
                 TVPlayerErrorView(error: playerViewModel.error) {
@@ -514,7 +521,11 @@ struct TVSceneDetailView: View {
         
         let quality = selectedQuality ?? ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original
         if let streamURL = tvPlaybackURL(for: scene, streams: sceneStreams, quality: quality) {
-            playerViewModel.setupPlayer(url: streamURL, sceneId: scene.id, viewModel: viewModel, startAt: startTime)
+            playerViewModel.setupPlayer(url: streamURL, sceneId: scene.id, viewModel: viewModel, startAt: startTime, scene: scene)
+        } else if DirectPlayPolicy.route(for: scene) == .engine {
+            // No transcoded stream the native chain could use — Direct Play is
+            // the only way this scene plays at all.
+            playerViewModel.setupPlayer(url: nil, sceneId: scene.id, viewModel: viewModel, startAt: startTime, scene: scene)
         }
     }
 
@@ -744,10 +755,16 @@ struct TVSceneDetailView: View {
 class TVPlayerViewModel: ObservableObject {
     @Published var player: AVPlayer?
     @Published var isShowingPlayer = false
+    /// True while Direct Play is opening the source. The full-screen cover
+    /// shows a spinner instead of the error view during that window.
+    @Published var isPreparing = false
     @Published var error: Error?
     /// Called when the current item finishes. Used by channel continuous play.
     var onPlaybackEnded: (() -> Void)?
 
+    /// True when `player` is driven by the stashy+ Direct Play engine, which
+    /// owns its items — never swap or nil them out from here.
+    private var isDirectPlayBacked = false
     private var statusObserver: NSKeyValueObservation?
     private var progressTimer: AnyCancellable?
     /// Nach System-Spulen bleibt der Player oft bei rate 0; Apple-TV+-ähnlich wieder anspielen.
@@ -798,22 +815,74 @@ class TVPlayerViewModel: ObservableObject {
         scrubSettleWorkItem = nil
     }
 
-    func setupPlayer(url: URL, sceneId: String, viewModel: StashDBViewModel, startAt timestamp: Double = 0) {
-        AppLog.debug("🚀 TV PLAYER VM: Setting up player for URL: \(redactedURLString(url)) at \(timestamp)s")
+    /// - Parameters:
+    ///   - url: the server-provided stream, or nil when only Direct Play can serve this scene.
+    ///   - scene: needed to classify the source for stashy+ Direct Play; nil keeps the native path.
+    func setupPlayer(url: URL?, sceneId: String, viewModel: StashDBViewModel, startAt timestamp: Double = 0, scene: Scene? = nil) {
         self.sceneId = sceneId
         self.viewModel = viewModel
         self.didApplyInitialPlayback = false
 
+        if let scene, DirectPlayPolicy.route(for: scene) == .engine,
+           let directURL = DirectPlayPolicy.directStreamURL(for: scene) {
+            startDirectPlay(directURL: directURL, scene: scene, fallbackURL: url, startAt: timestamp)
+            return
+        }
+
+        guard let url else { return }
+        startNativePlayback(url: url, startAt: timestamp)
+    }
+
+    /// stashy+ Direct Play. Falls back to the native chain on any failure.
+    private func startDirectPlay(directURL: URL, scene: Scene, fallbackURL: URL?, startAt timestamp: Double) {
+        let startSeconds = max(0, timestamp)
+        self.isPreparing = true
+        self.isShowingPlayer = true
+        Task { @MainActor in
+            defer { self.isPreparing = false }
+            do {
+                let enginePlayer = try await DirectPlaySession.shared.makePlayer(
+                    url: directURL,
+                    startPosition: startSeconds > 0 ? startSeconds : nil,
+                    muted: false
+                )
+                guard self.sceneId == scene.id else {
+                    DirectPlaySession.shared.teardown(owning: enginePlayer)
+                    return
+                }
+                self.isDirectPlayBacked = true
+                // `startPosition` already placed the playhead.
+                self.attach(player: enginePlayer, startSeconds: 0)
+            } catch {
+                AppLog.error("🚀 TV PLAYER VM: Direct Play failed, using native path: \(error.localizedDescription)")
+                DirectPlayPolicy.rememberFailure(sceneID: scene.id)
+                guard self.sceneId == scene.id else { return }
+                self.isDirectPlayBacked = false
+                guard let fallbackURL else {
+                    self.error = error
+                    return
+                }
+                self.startNativePlayback(url: fallbackURL, startAt: timestamp)
+            }
+        }
+    }
+
+    private func startNativePlayback(url: URL, startAt timestamp: Double) {
+        AppLog.debug("🚀 TV PLAYER VM: Setting up player for URL: \(redactedURLString(url)) at \(timestamp)s")
+        isDirectPlayBacked = false
         // Never gated on headphones: on Apple TV the set's speakers are the normal output, so the
         // rule would start every playback silent.
-        let newPlayer = createPlayer(for: url, muted: false)
+        attach(player: createPlayer(for: url, muted: false), startSeconds: max(0, timestamp))
+    }
+
+    /// Publishes `newPlayer` and installs every observer the view model owns.
+    /// Shared by the native and the Direct Play chain.
+    private func attach(player newPlayer: AVPlayer, startSeconds: Double) {
         let previousPlayer = self.player
         self.player = newPlayer
         self.isShowingPlayer = true
         previousPlayer?.pause()
-        previousPlayer?.replaceCurrentItem(with: nil)
-
-        let startSeconds = max(0, timestamp)
+        if !isDirectPlayBacked { previousPlayer?.replaceCurrentItem(with: nil) }
 
         statusObserver = newPlayer.currentItem?.observe(\.status, options: [.new, .initial]) { [weak self, weak newPlayer] item, _ in
             guard let self, let newPlayer else { return }
@@ -991,7 +1060,14 @@ class TVPlayerViewModel: ObservableObject {
         sceneId = nil
         viewModel = nil
         p?.pause()
-        p?.replaceCurrentItem(with: nil)
+        if isDirectPlayBacked {
+            // Releases the demuxer, the loopback server and the segment cache —
+            // but only if this view model's player is still the live one.
+            DirectPlaySession.shared.teardown(owning: p)
+            isDirectPlayBacked = false
+        } else {
+            p?.replaceCurrentItem(with: nil)
+        }
     }
 }
 
