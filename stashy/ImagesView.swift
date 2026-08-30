@@ -858,7 +858,7 @@ private struct ImagesViewBody: View {
                 HapticManager.light()
                 showingGalleryDownloadOptions = true
             }
-            .confirmationDialog("Gallery", isPresented: $showingGalleryDownloadOptions, titleVisibility: .visible) {
+            .alert("Gallery", isPresented: $showingGalleryDownloadOptions) {
                 if stored != nil {
                     Button("Sync newest") {
                         downloadManager.syncGallery(id: gallery.id)

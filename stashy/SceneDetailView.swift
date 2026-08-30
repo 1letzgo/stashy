@@ -780,8 +780,10 @@ struct SceneDetailView: View {
 
         if player == nil {
             AppLog.debug("🎬 Player initializing with URL: \(redactedURLString(videoURL))")
-            player = createPlayer(for: videoURL)
-            player?.isMuted = isMuted
+            // Re-read here, not at `@State` init: only now is the playback audio session active,
+            // so only now does the route report connected headphones.
+            isMuted = ScenePlayerMute.initialValueForPlayback()
+            player = createPlayer(for: videoURL, muted: isMuted)
             addTimeObserverIfNeeded()
             configureSubtitles()
 
@@ -1397,8 +1399,16 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
             .onAppear { onAppear() }
             .onDisappear { onDisappear() }
             .onChange(of: isMuted) { _, v in
+                // No persist: this view has no mute button, so the handler only ever sees
+                // programmatic writes. Storing those leaked AVKit's resets into the shared key.
                 player?.isMuted = v
-                ScenePlayerMute.persist(v)
+            }
+            // Without a mute button here the route is the only control the user has: plugging
+            // headphones in mid-playback must turn the sound on, unplugging must mute again.
+            .onReceive(NotificationCenter.default.publisher(for: AVAudioSession.routeChangeNotification)
+                .receive(on: DispatchQueue.main)) { _ in
+                let muted = ScenePlayerMute.initialValue()
+                if muted != isMuted { isMuted = muted }
             }
             .onReceive(Timer.publish(every: 10, on: .main, in: .common).autoconnect()) { _ in onPeriodicSync() }
             // The 0.5s fallback timer was removed — `addPeriodicTimeObserver`
@@ -1411,6 +1421,10 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
     private var playerOverlay: some View {
         if let player {
             Color.clear
+                // Follows the player, never fights it: AVKit's own mute control in the transport
+                // bar writes straight to `player.isMuted`, so re-asserting our state here would
+                // make that button dead. Harmless because this view never persists — AVKit's
+                // reset on fullscreen in/out stays inside the session.
                 .onReceive(player.publisher(for: \.isMuted)) { muted in
                     if muted != isMuted {
                         isMuted = muted

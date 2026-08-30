@@ -849,7 +849,10 @@ struct StudioCardView: View {
             Color.studioHeaderGray(for: appearance.currentTheme)
                 .aspectRatio(2.2, contentMode: .fit)
                 .overlay(
+                    // Logos ran edge to edge; wordmarks in particular need breathing room.
                     StudioImageView(studio: studio)
+                        .padding(.horizontal, 14)
+                        .padding(.top, 12)
                 )
                 .clipped()
             

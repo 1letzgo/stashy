@@ -324,17 +324,32 @@ func isHeadphonesConnected() -> Bool {
     })
 }
 
-/// Last scene-player mute choice. Missing key → mute unless headphones are connected.
+/// Start-up mute state for every player embed.
 enum ScenePlayerMute {
     private static let key = "stashy_scene_player_muted"
 
+    /// Without headphones playback always starts muted — the stored choice only applies while
+    /// headphones are connected. Gating before the lookup also neutralises a `false` that an
+    /// earlier build persisted from AVKit's own mute resets.
     static func initialValue() -> Bool {
+        guard isHeadphonesConnected() else { return true }
         if UserDefaults.standard.object(forKey: key) == nil {
-            return !isHeadphonesConnected()
+            return false
         }
         return UserDefaults.standard.bool(forKey: key)
     }
 
+    /// Same rule, but read *after* the playback session is live. `AVAudioSession.currentRoute`
+    /// only lists the headphone/Bluetooth output once the session is configured and active;
+    /// a `@State` initialiser runs long before that and would report the built-in speaker,
+    /// muting even with headphones connected.
+    static func initialValueForPlayback() -> Bool {
+        applyPlaybackAudioSession()
+        return initialValue()
+    }
+
+    /// Call only from an explicit user action. Never from an `onChange`, which also sees
+    /// programmatic writes — that is how AVKit's resets used to leak into the stored choice.
     static func persist(_ muted: Bool) {
         UserDefaults.standard.set(muted, forKey: key)
     }
@@ -460,7 +475,9 @@ func applyAmbientMixingAudioSession() {
     }
 }
 
-func createPlayer(for url: URL, takesAudioSession: Bool = true) -> AVPlayer {
+/// - Parameter muted: deliberately has no default — the compiler then forces every call site to
+///   make a conscious choice instead of silently inheriting AVPlayer's unmuted default.
+func createPlayer(for url: URL, takesAudioSession: Bool = true, muted: Bool) -> AVPlayer {
     if takesAudioSession {
         applyPlaybackAudioSession()
     }
@@ -477,6 +494,8 @@ func createPlayer(for url: URL, takesAudioSession: Bool = true) -> AVPlayer {
     player.automaticallyWaitsToMinimizeStalling = false
     player.allowsExternalPlayback = true
     player.preventsDisplaySleepDuringVideoPlayback = true
+    // Set here, not by the caller: otherwise the player briefly exists unmuted.
+    player.isMuted = muted
     applyBackgroundPlaybackPolicy(to: player)
     return player
 }

@@ -804,7 +804,9 @@ class TVPlayerViewModel: ObservableObject {
         self.viewModel = viewModel
         self.didApplyInitialPlayback = false
 
-        let newPlayer = createPlayer(for: url)
+        // Never gated on headphones: on Apple TV the set's speakers are the normal output, so the
+        // rule would start every playback silent.
+        let newPlayer = createPlayer(for: url, muted: false)
         let previousPlayer = self.player
         self.player = newPlayer
         self.isShowingPlayer = true

@@ -863,13 +863,16 @@ struct FilterStashIDCriterionRow: View {
             ))
             .filterEditorTextFieldChrome()
             .onSubmit { onChange() }
-            // `StashIDCriterionInput` only has `endpoint`, `stash_id` and `modifier` — no id list.
+            // Two different input types: `stash_id_endpoint` is a `StashIDCriterionInput` (key
+            // `stash_id`), `stash_ids_endpoint` a `StashIDsCriterionInput` (key `stash_ids`).
+            // Writing the singular key into the plural type made the server reject the filter.
             if StashCriterionModifier(rawValue: modifierRaw)?.needsValue ?? true {
+                let valueKey = multi ? "stash_ids" : "stash_id"
                 TextField("Stash ID", text: Binding(
-                    get: { value["stash_id"] as? String ?? "" },
+                    get: { value[valueKey] as? String ?? "" },
                     set: {
                         var d = value
-                        if $0.isEmpty { d.removeValue(forKey: "stash_id") } else { d["stash_id"] = $0 }
+                        if $0.isEmpty { d.removeValue(forKey: valueKey) } else { d[valueKey] = $0 }
                         value = d
                     }
                 ))

@@ -131,7 +131,8 @@ enum FilterCriterionKind: String, CaseIterable, Hashable {
         case .phashDistance:
             return ["value": "", "distance": 0, "modifier": StashCriterionModifier.equals.rawValue]
         case .duplication:
-            // `PHashDuplicationCriterionInput { duplicated, distance }`.
+            // `DuplicationCriterionInput { duplicated, distance, phash, url, stash_id, title }` —
+            // the type was renamed from `PHashDuplication…`; only `duplicated` is sent by default.
             return ["duplicated": true]
         case .customFields:
             return [["field": "", "value": [] as [Any], "modifier": StashCriterionModifier.equals.rawValue]]

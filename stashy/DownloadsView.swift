@@ -12,7 +12,6 @@ import AVKit
 struct DownloadsView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @StateObject private var downloadManager = DownloadManager.shared
-    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     
     @State private var gridWidth: CGFloat = 0
 
@@ -43,7 +42,7 @@ struct DownloadsView: View {
                     Text("Downloaded scenes will appear here for offline viewing.")
                         .foregroundColor(.secondary)
                         .multilineTextAlignment(.center)
-                        .padding(.horizontal)
+                        .padding(.horizontal, DesignTokens.Tools.contentPadding)
                     Spacer()
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -55,38 +54,41 @@ struct DownloadsView: View {
                             VStack(alignment: .leading, spacing: 12) {
                                 Text("Active Downloads")
                                     .font(.headline)
-                                    .padding(.horizontal)
-                                
-                                ForEach(Array(downloadManager.activeDownloads.values).sorted { $0.title < $1.title }, id: \.id) { download in
-                                    VStack(alignment: .leading, spacing: 6) {
-                                        Text(download.title)
-                                            .font(.subheadline)
-                                            .fontWeight(.medium)
-                                            .lineLimit(1)
-                                        
-                                        if download.totalSize > 0 {
-                                            ProgressView(value: download.progress)
-                                                .tint(appearanceManager.tintColor)
-                                            
-                                            Text("\(Int(download.progress * 100))%")
-                                                .font(.caption2)
-                                                .foregroundColor(.secondary)
-                                        } else {
-                                            ProgressView()
-                                                .progressViewStyle(.linear)
-                                                .tint(appearanceManager.tintColor)
-                                            
-                                            Text("\(ByteCountFormatter.string(fromByteCount: download.downloadedSize, countStyle: .file)) downloaded")
-                                                .font(.caption2)
-                                                .foregroundColor(.secondary)
-                                        }
-                                    }
-                                    .padding()
-                                    .background(Color.secondaryAppBackground)
-                                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-                                    .subtleShadow()
                                     .padding(.horizontal, DesignTokens.Tools.contentPadding)
+
+                                LazyVGrid(columns: columns, spacing: 12) {
+                                    ForEach(Array(downloadManager.activeDownloads.values).sorted { $0.title < $1.title }, id: \.id) { download in
+                                        VStack(alignment: .leading, spacing: 6) {
+                                            Text(download.title)
+                                                .font(.subheadline)
+                                                .fontWeight(.medium)
+                                                .lineLimit(1)
+                                        
+                                            if download.totalSize > 0 {
+                                                ProgressView(value: download.progress)
+                                                    .tint(appearanceManager.tintColor)
+                                            
+                                                Text("\(Int(download.progress * 100))%")
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
+                                            } else {
+                                                ProgressView()
+                                                    .progressViewStyle(.linear)
+                                                    .tint(appearanceManager.tintColor)
+                                            
+                                                Text("\(ByteCountFormatter.string(fromByteCount: download.downloadedSize, countStyle: .file)) downloaded")
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
+                                            }
+                                        }
+                                        .padding()
+                                        .background(Color.secondaryAppBackground)
+                                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                                        .subtleShadow()
+                                    }
                                 }
+                                .measuresGridWidth($gridWidth)
+                                .padding(.horizontal, DesignTokens.Tools.contentPadding)
                             }
                             .padding(.top, DesignTokens.Tools.menuTopPadding)
                         }
@@ -98,7 +100,7 @@ struct DownloadsView: View {
                                     .font(.headline)
                                     .padding(.horizontal, DesignTokens.Tools.contentPadding)
                                 
-                                LazyVStack(spacing: 12) {
+                                LazyVGrid(columns: columns, spacing: 12) {
                                     ForEach(downloadManager.downloads) { downloaded in
                                         NavigationLink(destination: DownloadDetailView(downloaded: downloaded)) {
                                             DownloadedSceneCard(downloaded: downloaded)
@@ -106,6 +108,7 @@ struct DownloadsView: View {
                                         .buttonStyle(.plain)
                                     }
                                 }
+                                .measuresGridWidth($gridWidth)
                                 .padding(.horizontal, DesignTokens.Tools.contentPadding)
                             }
                             .padding(.top, downloadManager.activeDownloads.isEmpty ? DesignTokens.Tools.menuTopPadding : 0)
@@ -121,6 +124,7 @@ struct DownloadsView: View {
                             downloadSection("Tags", entries: tagEntries)
                         }
                     }
+                    .padding(.bottom, DesignTokens.Tools.menuBottomPadding)
                 }
             }
         }
@@ -258,7 +262,7 @@ struct DownloadDetailView: View {
     @State private var isPlaybackStarted = false
     @State private var isFullScreen = false
     @State private var isHeaderExpanded = false
-    @State private var isMuted = !isHeadphonesConnected()
+    @State private var isMuted = ScenePlayerMute.initialValue()
     @Environment(\.dismiss) var dismiss
 
     private var chromePillHeight: CGFloat { StashyExpandingDock.activeHeight }
@@ -356,8 +360,7 @@ struct DownloadDetailView: View {
                         .onTapGesture {
                             if player == nil {
                                 let videoURL = downloadManager.getLocalVideoURL(for: downloaded)
-                                player = createPlayer(for: videoURL)
-                                player?.isMuted = isMuted
+                                player = createPlayer(for: videoURL, muted: isMuted)
                             }
                             withAnimation {
                                 isPlaybackStarted = true
@@ -616,7 +619,7 @@ extension DownloadsView {
                 .font(.headline)
                 .padding(.horizontal, DesignTokens.Tools.contentPadding)
 
-            LazyVStack(spacing: 12) {
+            LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(entries) { entry in
                     NavigationLink(destination: DownloadedGalleryDetailView(entryId: entry.id)) {
                         DownloadedGalleryCard(entry: entry)
@@ -756,14 +759,26 @@ struct DownloadedGalleryDetailView: View {
         downloadManager.downloadedGallery(id: entryId)
     }
 
-    /// Square cells, matching the two-column grid in `ImagesView`.
-    private let columns = [GridItem(.flexible(), spacing: 6), GridItem(.flexible(), spacing: 6)]
+    @State private var gridWidth: CGFloat = 0
+    @Environment(\.dismiss) private var dismiss
+
+    private var isSyncing: Bool { downloadManager.activeDownloads[entryId] != nil }
+
+    /// Square cells; same 12pt spacing and width-based column count as `ImagesView`.
+    private var columns: [GridItem] {
+        DesignTokens.Grid.adaptiveColumns(
+            width: gridWidth,
+            ideal: 180,
+            minimum: 2,
+            maximum: 6
+        )
+    }
 
     var body: some View {
         Group {
             if let entry {
                 ScrollView {
-                    LazyVGrid(columns: columns, spacing: 6) {
+                    LazyVGrid(columns: columns, spacing: 12) {
                         ForEach(Array(entry.images.enumerated()), id: \.element.id) { index, image in
                             NavigationLink {
                                 DownloadedGalleryFullScreenView(images: entry.images, startIndex: index)
@@ -773,9 +788,9 @@ struct DownloadedGalleryDetailView: View {
                             .buttonStyle(.plain)
                         }
                     }
+                    .measuresGridWidth($gridWidth)
                     .padding(DesignTokens.Tools.contentPadding)
                 }
-                .navigationTitle(entry.displayTitle)
             } else {
                 VStack(spacing: 12) {
                     Image(systemName: "photo.on.rectangle.angled")
@@ -789,7 +804,103 @@ struct DownloadedGalleryDetailView: View {
             }
         }
         .background(Color.appBackground.ignoresSafeArea())
-        .navigationBarTitleDisplayMode(.inline)
+        .hideSystemNavigationBarForCustomChrome()
+        .enableSwipeBackWhenNavBarHidden()
+        .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
+            galleryDetailNavBar
+        }
+    }
+
+    /// Custom top chrome: Back · title · Sync newest / Sync newest 50 / Delete.
+    @ViewBuilder
+    private var galleryDetailNavBar: some View {
+        StashySectionChromeBar {
+            HStack(spacing: 8) {
+                StashyChromeBackButton { dismiss() }
+
+                Text(entry?.displayTitle ?? "Download")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(.white)
+                    .lineLimit(1)
+                    .truncationMode(.middle)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                if isSyncing {
+                    chromeCircleButton(
+                        systemImage: "stop.circle",
+                        label: "Cancel download",
+                        tint: .red
+                    ) {
+                        HapticManager.light()
+                        downloadManager.cancelGalleryDownload(id: entryId)
+                    }
+                } else {
+                    if entry?.isSingleImage == false {
+                        chromeCircleButton(
+                            systemImage: "arrow.triangle.2.circlepath",
+                            label: "Sync newest"
+                        ) {
+                            HapticManager.light()
+                            sync(limit: nil)
+                        }
+
+                        chromeCircleButton(
+                            systemImage: "arrow.down.to.line",
+                            label: "Sync newest \(DownloadManager.galleryNewestBatchSize)"
+                        ) {
+                            HapticManager.light()
+                            sync(limit: DownloadManager.galleryNewestBatchSize)
+                        }
+                    }
+
+                    chromeCircleButton(
+                        systemImage: "trash",
+                        label: "Delete",
+                        tint: .red
+                    ) {
+                        HapticManager.light()
+                        downloadManager.deleteGalleryDownload(id: entryId)
+                        dismiss()
+                    }
+                }
+            }
+            .frame(minHeight: StashyExpandingDock.activeHeight)
+            .padding(.horizontal, StashyExpandingDock.edgePadding)
+            .padding(.vertical, 8)
+        }
+    }
+
+    /// Circular chrome action button, same metrics as the Share button in `DownloadDetailView`.
+    @ViewBuilder
+    private func chromeCircleButton(
+        systemImage: String,
+        label: String,
+        tint: Color? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                .foregroundColor(tint ?? .white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                .frame(
+                    width: StashyExpandingDock.circleSize,
+                    height: StashyExpandingDock.circleSize
+                )
+                .background(StashyExpandingDock.inactiveBackground)
+                .clipShape(Capsule(style: .continuous))
+                .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+    }
+
+    private func sync(limit: Int?) {
+        guard let entry else { return }
+        if entry.resolvedKind == .tag {
+            downloadManager.syncTagImages(entryId: entryId, limit: limit)
+        } else {
+            downloadManager.syncGallery(id: entryId, limit: limit)
+        }
     }
 
     /// Same construction as `GalleryCardView`: image, 40%-height gradient, title in `.headline`.

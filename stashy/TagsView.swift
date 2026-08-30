@@ -1193,7 +1193,7 @@ struct TagDetailView: View {
                 selectedTag = updated
             }
         }
-        .confirmationDialog("Tag images", isPresented: $showingTagDownloadOptions, titleVisibility: .visible) {
+        .alert("Tag images", isPresented: $showingTagDownloadOptions) {
             let entryId = "tag-" + selectedTag.id
             if downloadManager.downloadedGallery(id: entryId) != nil {
                 Button("Sync newest") {

@@ -243,7 +243,8 @@ struct ReelsViewBody: View {
     @State private var selectedPerformer: ScenePerformer?
     @State private var selectedTags: [Tag] = []
     @State private var selectedStudio: SceneStudio?
-    @State private var isMuted = !isHeadphonesConnected() // Shared mute state for Reels
+    // Same source as every other embed: headphone gate first, stored choice second.
+    @State private var isMuted = ScenePlayerMute.initialValue()
     @State private var currentVisibleSceneId: String?
     @State private var showDeleteConfirmation = false
     @State private var sceneToDelete: Scene?
@@ -4153,7 +4154,10 @@ struct ReelsViewBody: View {
                         enabled: isVideo,
                         accessibilityLabel: isMuted ? "Ton an" : "Stumm"
                     ) {
-                        if isVideo { isMuted.toggle() }
+                        if isVideo {
+                            isMuted.toggle()
+                            ScenePlayerMute.persist(isMuted)
+                        }
                     }
 
                     ChromeCircleButton(
@@ -5432,7 +5436,7 @@ extension ReelItemView {
             }
         } else {
             // First time player creation
-            self.player = createPlayer(for: streamURL) // createPlayer handles AVAudioSession
+            self.player = createPlayer(for: streamURL, muted: isMuted) // createPlayer handles AVAudioSession
         }
         
         guard let player = self.player else { return }

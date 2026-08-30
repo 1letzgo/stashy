@@ -1145,8 +1145,9 @@ struct GalleryItemView: View {
             }
         }
         .onChange(of: isMuted) { _, newValue in
+            // Persisting happens in the mute button, not here — this also fires for programmatic
+            // writes, which is how AVKit's resets used to reach the stored choice.
             player?.isMuted = newValue
-            ScenePlayerMute.persist(newValue)
             if newValue {
                 applyAmbientMixingAudioSession()
             } else {
@@ -1277,7 +1278,7 @@ struct GalleryItemView: View {
             }
             existingPlayer.replaceCurrentItem(with: newItem)
         } else {
-            self.player = createPlayer(for: streamURL, takesAudioSession: !isMuted)
+            self.player = createPlayer(for: streamURL, takesAudioSession: !isMuted, muted: isMuted)
         }
 
         guard let player = self.player else { return }
@@ -1519,7 +1520,10 @@ struct FullScreenImageView: View {
                         enabled: isVideo,
                         accessibilityLabel: isMuted ? "Ton an" : "Stumm"
                     ) {
-                        if isVideo { isMuted.toggle() }
+                        if isVideo {
+                            isMuted.toggle()
+                            ScenePlayerMute.persist(isMuted)
+                        }
                     }
 
                     ChromeCircleButton(
