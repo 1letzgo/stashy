@@ -14,6 +14,9 @@ final class FilterPickerOptionsStore: ObservableObject {
     enum Kind: String {
         case studios, tags, groups, performers
         case imageTags, imageStudios, galleryStudios
+        /// Tag pickers scoped to the entity the criterion refers to — `performer_tags` lists the
+        /// tags on performers, not the tags on scenes.
+        case performerTags, studioTags, galleryTags, markerTags, allTags
     }
 
     @Published private(set) var options: [String: [FilterEntityOption]] = [:]
@@ -109,12 +112,28 @@ final class FilterPickerOptionsStore: ObservableObject {
         }
     }
 
-    /// Resolves the entity kind a criterion key refers to, e.g. `performer_tags` → tags.
+    /// Resolves the entity kind a criterion key refers to, e.g. `performer_tags` → performer tags.
     static func kind(forCriterionKey key: String, mode: StashDBViewModel.FilterMode) -> Kind? {
         let k = key.lowercased()
-        // Tag checks come first: `performer_tags` / `scene_tags` are tag pickers, not performer pickers.
+        // Tag checks come first: `performer_tags` / `scene_tags` are tag pickers, not performer
+        // pickers. Which *entity's* tags is decided by the key, and only then by the mode —
+        // matching on "tag" alone used to hand every criterion the scene-tag list.
+        switch k {
+        case "performer_tags": return .performerTags
+        case "scene_tags": return .tags
+        // Tag hierarchy (`FilterMode.tags` only); a parent tag need not be attached to anything.
+        case "parents", "children": return .allTags
+        default: break
+        }
         if k.contains("tag") {
-            return mode == .images ? .imageTags : .tags
+            switch mode {
+            case .performers: return .performerTags
+            case .studios: return .studioTags
+            case .galleries: return .galleryTags
+            case .images: return .imageTags
+            case .sceneMarkers: return .markerTags
+            default: return .tags
+            }
         }
         if k.contains("studio") {
             switch mode {
@@ -164,6 +183,26 @@ final class FilterPickerOptionsStore: ObservableObject {
             }
         case .imageTags:
             viewModel.fetchTagsForImageLiveFilterPicker { list in
+                Task { @MainActor in finish(list.map { FilterEntityOption(id: $0.id, name: $0.name) }) }
+            }
+        case .performerTags:
+            viewModel.fetchTagsForPerformerFilterPicker { list in
+                Task { @MainActor in finish(list.map { FilterEntityOption(id: $0.id, name: $0.name) }) }
+            }
+        case .studioTags:
+            viewModel.fetchTagsForStudioFilterPicker { list in
+                Task { @MainActor in finish(list.map { FilterEntityOption(id: $0.id, name: $0.name) }) }
+            }
+        case .galleryTags:
+            viewModel.fetchTagsForGalleryFilterPicker { list in
+                Task { @MainActor in finish(list.map { FilterEntityOption(id: $0.id, name: $0.name) }) }
+            }
+        case .markerTags:
+            viewModel.fetchTagsForMarkerFilterPicker { list in
+                Task { @MainActor in finish(list.map { FilterEntityOption(id: $0.id, name: $0.name) }) }
+            }
+        case .allTags:
+            viewModel.fetchAllTagsForFilterPicker { list in
                 Task { @MainActor in finish(list.map { FilterEntityOption(id: $0.id, name: $0.name) }) }
             }
         case .groups:

@@ -7291,6 +7291,88 @@ struct GenerateData: Codable {
         }
     }
 
+    /// Tags hanging off at least one entity of a given kind — for the criteria-editor pickers.
+    /// `countField` is a `TagFilterType` count (`performer_count`, …); `nil` fetches every tag.
+    private func fetchTagsForFilterPicker(
+        countField: String?,
+        sortField: String,
+        direction: String = "DESC",
+        completion: @escaping ([Tag]) -> Void
+    ) {
+        let query = GraphQLQueries.queryWithFragments("findTags")
+        var variables: [String: Any] = [
+            "filter": [
+                "page": 1,
+                "per_page": Self.sceneLiveFilterPickerMaxResults,
+                "sort": sortField,
+                "direction": direction
+            ]
+        ]
+        if let countField {
+            variables["tag_filter"] = sanitizeFilter([
+                countField: ["value": 0, "modifier": "GREATER_THAN"]
+            ])
+        }
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": query, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            Task { @MainActor in completion([]) }
+            return
+        }
+        performGraphQLQuery(query: bodyString) { (response: TagsResponse?) in
+            let list = response?.data?.findTags.tags ?? []
+            Task { @MainActor in completion(list) }
+        }
+    }
+
+    /// Tags that appear on at least one performer — for `performer_tags` and the performers catalog.
+    func fetchTagsForPerformerFilterPicker(completion: @escaping ([Tag]) -> Void) {
+        fetchTagsForFilterPicker(
+            countField: "performer_count",
+            sortField: "performers_count",
+            completion: completion
+        )
+    }
+
+    /// Tags that appear on at least one gallery.
+    func fetchTagsForGalleryFilterPicker(completion: @escaping ([Tag]) -> Void) {
+        fetchTagsForFilterPicker(
+            countField: "gallery_count",
+            sortField: "galleries_count",
+            completion: completion
+        )
+    }
+
+    /// Tags that appear on at least one scene marker.
+    func fetchTagsForMarkerFilterPicker(completion: @escaping ([Tag]) -> Void) {
+        fetchTagsForFilterPicker(
+            countField: "marker_count",
+            sortField: "scene_markers_count",
+            completion: completion
+        )
+    }
+
+    /// Tags that appear on at least one studio. Sorted by name — `findTags` has no
+    /// `studios_count` sort key, and `studio_count` is not in `TagFields`.
+    func fetchTagsForStudioFilterPicker(completion: @escaping ([Tag]) -> Void) {
+        fetchTagsForFilterPicker(
+            countField: "studio_count",
+            sortField: "name",
+            direction: "ASC",
+            completion: completion
+        )
+    }
+
+    /// Every tag, name-sorted — for the tag hierarchy pickers (`parents` / `children`), where a
+    /// parent tag may well be attached to nothing itself.
+    func fetchAllTagsForFilterPicker(completion: @escaping ([Tag]) -> Void) {
+        fetchTagsForFilterPicker(
+            countField: nil,
+            sortField: "name",
+            direction: "ASC",
+            completion: completion
+        )
+    }
+
     #if !os(tvOS)
     /// Top performers for the criteria-editor multi-ID pickers (iOS only — `FilterEntityOption`
     /// lives in the iOS-only Filters module).
@@ -7332,7 +7414,10 @@ struct GenerateData: Codable {
         }
 
         switch kind {
-        case .tags, .imageTags:
+        // Every tag picker searches the full tag list: the cached lists are per-entity "most used"
+        // slices, and re-applying that filter here would hide exactly the long-tail hits the
+        // search exists for.
+        case .tags, .imageTags, .performerTags, .studioTags, .galleryTags, .markerTags, .allTags:
             run("findTags") { (r: TagsResponse) in
                 (r.data?.findTags.tags ?? []).map { FilterEntityOption(id: $0.id, name: $0.name) }
             }
