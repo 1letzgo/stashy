@@ -176,6 +176,8 @@ class StashSyncManager: ObservableObject {
 
         if enabled {
             StashVideoSyncManager.shared.isVideoSyncEnabled = true
+            // Toggled mid-playback: the tap is only installed on demand, so ask for it now.
+            StashVideoSyncManager.shared.refreshAudioTap()
         }
 
         HandyManager.shared.isStashSyncMode = enabled

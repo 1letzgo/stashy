@@ -57,7 +57,26 @@ final class SceneAudioTrackController: ObservableObject {
     private var tracksObservation: NSKeyValueObservation?
     private var currentItemObservation: NSKeyValueObservation?
     private var selectionObserver: NSObjectProtocol?
+    private var audioTapObserver: NSObjectProtocol?
     private var syncingFromPlayer = false
+
+    init() {
+        // The analysis tap owns `item.audioMix` while it runs; when it releases it, a muxed
+        // multi-track file needs our exclusive mix back.
+        audioTapObserver = NotificationCenter.default.addObserver(
+            forName: .sceneAudioTapChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.applySelection() }
+        }
+    }
+
+    deinit {
+        if let audioTapObserver {
+            NotificationCenter.default.removeObserver(audioTapObserver)
+        }
+    }
 
     func attach(player: AVPlayer?) {
         detachObservers()
@@ -272,7 +291,9 @@ final class SceneAudioTrackController: ObservableObject {
         player?.appliesMediaSelectionCriteriaAutomatically = true
 
         if usesNativeAudioMenu, let group = mediaGroup, let option = mediaOptions[selectedID] {
-            if item.audioMix != nil, StashVideoSyncManager.shared.currentItem !== item {
+            // Any leftover mix keeps AVKit's Audio menu collapsed — drop it unless the
+            // analysis tap is actively using it.
+            if item.audioMix != nil, !StashVideoSyncManager.shared.hasAudioTapInstalled {
                 item.audioMix = nil
             }
             syncingFromPlayer = true
@@ -295,7 +316,7 @@ final class SceneAudioTrackController: ObservableObject {
         if !usesNativeAudioMenu,
            item.tracks.filter({ $0.assetTrack?.mediaType == .audio }).count <= 1,
            mixTracks.count > 1,
-           StashVideoSyncManager.shared.currentItem !== item {
+           !StashVideoSyncManager.shared.hasAudioTapInstalled {
             item.audioMix = SceneExclusiveAudio.makeMix(
                 tracks: mixTracks,
                 selectedTrackID: selectedTrackID

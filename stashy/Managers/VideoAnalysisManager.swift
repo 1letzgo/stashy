@@ -45,6 +45,12 @@ enum SexPosition: String, Equatable {
     }
 }
 
+extension Notification.Name {
+    /// Posted when the analysis audio tap releases the item's `audioMix`, so the audio-track
+    /// controller can re-apply its own exclusive mix.
+    static let sceneAudioTapChanged = Notification.Name("SceneAudioTapChanged")
+}
+
 class StashVideoSyncManager: ObservableObject {
     static let shared = StashVideoSyncManager()
 
@@ -133,9 +139,13 @@ class StashVideoSyncManager: ObservableObject {
             transcriptionHandlerLock.lock()
             _transcriptionPCMHandler = newValue
             transcriptionHandlerLock.unlock()
+            DispatchQueue.main.async { [weak self] in self?.refreshAudioTap() }
         }
     }
     var hasAudioTapInstalled: Bool { audioTap != nil }
+    /// True while the `audioMix` on `currentPlayerItem` belongs to the tap, so `SceneAudioTrackController`
+    /// can take it back once the tap goes away.
+    private var tapOwnsAudioMix = false
 
     private var cancellables = Set<AnyCancellable>()
     private let analysisQueue = DispatchQueue(label: "com.stashko.videoanalysis", qos: .userInteractive)
@@ -188,13 +198,39 @@ class StashVideoSyncManager: ObservableObject {
         videoOutput = AVPlayerItemVideoOutput(pixelBufferAttributes: settings)
         if let output = videoOutput { playerItem.add(output) }
 
-        setupAudioTap(for: playerItem)
+        refreshAudioTap()
 
         displayLink = CADisplayLink(target: self, selector: #selector(updateDisplayLink))
         displayLink?.add(to: .main, forMode: .common)
     }
 
     // MARK: - Audio Tap (MTAudioProcessingTap + AGC)
+
+    /// The tap can only be reached through an `audioMix`, and a non-nil `audioMix` collapses AVKit's
+    /// native Audio menu to Enhance Dialogue — no track/language rows at all. So install it only while
+    /// something actually consumes the samples (AI Motion or live transcription); otherwise leave the
+    /// mix to `SceneAudioTrackController` so audio tracks stay selectable in the player.
+    func refreshAudioTap() {
+        let needsTap = isVideoSyncEnabled || transcriptionPCMHandler != nil
+        if needsTap {
+            guard audioTap == nil, let item = currentPlayerItem else { return }
+            setupAudioTap(for: item)
+        } else {
+            removeAudioTap()
+        }
+    }
+
+    private func removeAudioTap() {
+        guard audioTap != nil || tapOwnsAudioMix else { return }
+        audioTap = nil
+        tapASBD = nil
+        if tapOwnsAudioMix {
+            currentPlayerItem?.audioMix = nil
+            tapOwnsAudioMix = false
+        }
+        // Muxed multi-track files still need an exclusive mix — let the audio controller re-apply it.
+        NotificationCenter.default.post(name: .sceneAudioTapChanged, object: nil)
+    }
 
     private func setupAudioTap(for playerItem: AVPlayerItem) {
         let asset = playerItem.asset
@@ -214,6 +250,8 @@ class StashVideoSyncManager: ObservableObject {
     }
 
     private func installAudioTap(on playerItem: AVPlayerItem, audioTrack: AVAssetTrack, allAudioTracks: [AVAssetTrack]) {
+        // Track loading is async — the consumer may have gone away in the meantime.
+        guard isVideoSyncEnabled || transcriptionPCMHandler != nil else { return }
         var callbacks = MTAudioProcessingTapCallbacks(
             version: kMTAudioProcessingTapCallbacksVersion_0,
             clientInfo: UnsafeMutableRawPointer(Unmanaged.passRetained(self).toOpaque()),
@@ -280,6 +318,7 @@ class StashVideoSyncManager: ObservableObject {
             selectedTrackID: selectedID,
             tap: tap
         )
+        tapOwnsAudioMix = true
     }
 
     // Called from audio real-time thread — only touches audioAGCMax (audio-thread-only) + dispatches to main
@@ -1049,6 +1088,10 @@ class StashVideoSyncManager: ObservableObject {
         displayLink = nil
         if let output = videoOutput, let item = currentPlayerItem { item.remove(output) }
         videoOutput = nil
+        if tapOwnsAudioMix {
+            currentPlayerItem?.audioMix = nil
+            tapOwnsAudioMix = false
+        }
         currentPlayerItem = nil
         audioTap = nil
         tapASBD = nil
