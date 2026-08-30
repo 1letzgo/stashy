@@ -68,48 +68,95 @@ enum OpenSourceNotices {
         ),
     ]
 }
-
 /// Acknowledgements screen. Shared by the iOS and tvOS settings surfaces —
-/// the license obligation applies to both builds.
+/// the license obligation applies to both builds. The chrome is per platform:
+/// iOS uses the grouped Settings cards and the custom detail bar, tvOS the
+/// plain focusable list every TV settings screen uses.
 struct OpenSourceNoticesView: View {
+
+    private static let intro = "stashy uses the open-source components below. Each is distributed under its own license; the linked source is the exact build shipped in this app."
+
+    #if os(tvOS)
     var body: some View {
         List {
             Section {
-                Text("stashy uses the open-source components below. Each is distributed under its own license; the linked source is the exact build shipped in this app.")
-                    .font(.footnote)
-                    .foregroundColor(.secondary)
+                Text(Self.intro)
+                    .font(.callout)
+                    .foregroundStyle(.secondary)
+                    .focusable()
             }
 
             ForEach(OpenSourceNotices.all) { notice in
                 Section {
-                    VStack(alignment: .leading, spacing: 6) {
-                        Text(notice.name)
-                            .font(.headline)
+                    VStack(alignment: .leading, spacing: 8) {
                         Text(notice.license)
-                            .font(.subheadline)
-                            .foregroundColor(.secondary)
                         Text(notice.note)
-                            .font(.footnote)
-                            .foregroundColor(.secondary)
-                        sourceLabel(notice.source)
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                        Text(notice.source)
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
                     }
-                    .padding(.vertical, 4)
+                    .padding(.vertical, 8)
+                    .focusable()
+                } header: {
+                    Text(notice.name)
                 }
             }
         }
+        .safeAreaInset(edge: .bottom) {
+            Color.clear.frame(height: 80).focusable(false)
+        }
+        .background(Color.appBackground)
         .navigationTitle("Acknowledgements")
     }
+    #else
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
 
-    /// tvOS has no text selection; there it is a plain, copy-free line.
-    @ViewBuilder
-    private func sourceLabel(_ source: String) -> some View {
-        let text = Text(source)
-            .font(.caption)
-            .foregroundColor(.secondary)
-        #if os(tvOS)
-        text
-        #else
-        text.textSelection(.enabled)
-        #endif
+    var body: some View {
+        List {
+            Section {
+                stashyScrollingSectionFooter(Self.intro)
+            }
+
+            ForEach(OpenSourceNotices.all) { notice in
+                Section {
+                    stashyScrollingSectionHeader(notice.name)
+
+                    HStack(alignment: .firstTextBaseline) {
+                        Label("License", systemImage: "checkmark.seal")
+                        Spacer(minLength: 12)
+                        Text(notice.license)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.trailing)
+                    }
+                    .stashyGroupedBlockRow(index: 0, count: 2)
+
+                    if let url = URL(string: notice.source) {
+                        Link(destination: url) {
+                            HStack {
+                                Label("Source", systemImage: "arrow.up.right.square")
+                                Spacer(minLength: 12)
+                                Image(systemName: "chevron.right")
+                                    .font(.footnote.weight(.semibold))
+                                    .foregroundStyle(.tertiary)
+                            }
+                        }
+                        .foregroundColor(appearanceManager.tintColor)
+                        .stashyGroupedBlockRow(index: 1, count: 2)
+                    } else {
+                        Text(notice.source)
+                            .foregroundStyle(.secondary)
+                            .stashyGroupedBlockRow(index: 1, count: 2)
+                    }
+
+                    stashyScrollingSectionFooter(notice.note)
+                }
+            }
+        }
+        .stashySettingsList()
+        .applyAppBackground()
+        .stashySettingsDetailChrome("Acknowledgements")
     }
+    #endif
 }
