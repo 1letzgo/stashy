@@ -221,11 +221,6 @@ struct SettingsView: View {
             }
 
             Section {
-                stashyScrollingSectionHeader("Direct Play", isBeta: true)
-                StashyPlusDirectPlaySettings()
-            }
-
-            Section {
                 stashyScrollingSectionHeader(AIMotionCopy.name, isBeta: true)
                 NavigationLink(destination: StashSyncSettingsView()) {
                     Label(AIMotionCopy.name, systemImage: "bolt.fill")
@@ -648,19 +643,12 @@ struct SettingsView: View {
                     Label("GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
                         .foregroundColor(appearanceManager.tintColor)
                 }
-                .stashyGroupedBlockRow(index: 0, count: 3)
+                .stashyGroupedBlockRow(index: 0, count: 2)
                 Link(destination: URL(string: "https://discord.gg/DMxEFaVzUM")!) {
                     Label("Discord", systemImage: "bubble.left.and.bubble.right.fill")
                         .foregroundColor(appearanceManager.tintColor)
                 }
-                .stashyGroupedBlockRow(index: 1, count: 3)
-                NavigationLink {
-                    OpenSourceNoticesView()
-                } label: {
-                    Label("Acknowledgements", systemImage: "doc.text")
-                        .foregroundColor(appearanceManager.tintColor)
-                }
-                .stashyGroupedBlockRow(index: 2, count: 3)
+                .stashyGroupedBlockRow(index: 1, count: 2)
             }
             
         }

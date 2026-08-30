@@ -7,14 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		AEDP0000000000000000B005 /* OpenSourceNotices.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEDP0000000000000000F003 /* OpenSourceNotices.swift */; };
-		AEDP0000000000000000B006 /* OpenSourceNotices.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEDP0000000000000000F003 /* OpenSourceNotices.swift */; };
-		AEDP0000000000000000B001 /* DirectPlayPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEDP0000000000000000F001 /* DirectPlayPolicy.swift */; };
-		AEDP0000000000000000B002 /* DirectPlaySession.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEDP0000000000000000F002 /* DirectPlaySession.swift */; };
-		AEDP0000000000000000B003 /* DirectPlayPolicy.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEDP0000000000000000F001 /* DirectPlayPolicy.swift */; };
-		AEDP0000000000000000B004 /* DirectPlaySession.swift in Sources */ = {isa = PBXBuildFile; fileRef = AEDP0000000000000000F002 /* DirectPlaySession.swift */; };
-		AEDP0000000000000000K001 /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = AEDP0000000000000000P002 /* AetherEngine */; };
-		AEDP0000000000000000K002 /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = AEDP0000000000000000P002 /* AetherEngine */; };
 		02B19A59AAFE4A16B45A861F /* DownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB172F16743C007C2090 /* DownloadsView.swift */; };
 		08FB7793FE84155DC02AAC07 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7794FE84155DC02AAC07 /* App.swift */; };
 		08FB7797FE84155DC02AAC07 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7798FE84155DC02AAC07 /* MainTabView.swift */; };
@@ -192,9 +184,6 @@
 /* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFileReference section */
-		AEDP0000000000000000F003 /* OpenSourceNotices.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OpenSourceNotices.swift; sourceTree = "<group>"; };
-		AEDP0000000000000000F001 /* DirectPlayPolicy.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectPlayPolicy.swift; sourceTree = "<group>"; };
-		AEDP0000000000000000F002 /* DirectPlaySession.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DirectPlaySession.swift; sourceTree = "<group>"; };
 		08FB7794FE84155DC02AAC07 /* App.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = App.swift; sourceTree = "<group>"; };
 		08FB7798FE84155DC02AAC07 /* MainTabView.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = MainTabView.swift; sourceTree = "<group>"; };
 		08FB779EFE84155DC02AAC07 /* ServerConfig.swift */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.swift; path = ServerConfig.swift; sourceTree = "<group>"; };
@@ -311,7 +300,6 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AEDP0000000000000000K001 /* AetherEngine in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -320,23 +308,12 @@
 			buildActionMask = 2147483647;
 			files = (
 				F0A11E1B0B0B0B0B0B0B0B01 /* PocketSVG in Frameworks */,
-				AEDP0000000000000000K002 /* AetherEngine in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
-		AEDP0000000000000000G001 /* Playback */ = {
-			isa = PBXGroup;
-			children = (
-				AEDP0000000000000000F001 /* DirectPlayPolicy.swift */,
-				AEDP0000000000000000F002 /* DirectPlaySession.swift */,
-				AEDP0000000000000000F003 /* OpenSourceNotices.swift */,
-			);
-			path = Playback;
-			sourceTree = "<group>";
-		};
 		08FB778CFE84155DC02AAC07 = {
 			isa = PBXGroup;
 			children = (
@@ -366,7 +343,6 @@
 				DF675E6C2F2A6386004CA019 /* Repositories */,
 				DFGQ000022F28A0000000002 /* GraphQLClient.swift */,
 				DF675E792F2A6392004CA019 /* SceneDetail */,
-				AEDP0000000000000000G001 /* Playback */,
 				DFSEC0072F2A000100000007 /* Components */,
 				DFGQ000042F28A0000000004 /* GraphQLQueries.swift */,
 				DF22BB192F16743C007C2090 /* HomeView.swift */,
@@ -548,7 +524,6 @@
 			);
 			name = stashy;
 			packageProductDependencies = (
-				AEDP0000000000000000P002 /* AetherEngine */,
 			);
 			productName = stashy;
 			productReference = DFE504602E8A8E6F00323FF0 /* stashy.app */;
@@ -573,7 +548,6 @@
 			name = stashyTV;
 			packageProductDependencies = (
 				1A2B3C4D5E6F708192A3B4C5 /* PocketSVG */,
-				AEDP0000000000000000P002 /* AetherEngine */,
 			);
 			productName = stashyTV;
 			productReference = 37D3E24E2F3932C400AB8FAD /* stashyTV.app */;
@@ -605,7 +579,6 @@
 			mainGroup = 08FB778CFE84155DC02AAC07;
 			packageReferences = (
 				0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "PocketSVG" */,
-				AEDP0000000000000000P001 /* XCRemoteSwiftPackageReference "AetherEngine" */,
 			);
 			productRefGroup = 08FB778CFE84155DC02AAC07;
 			projectDirPath = "";
@@ -664,9 +637,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AEDP0000000000000000B001 /* DirectPlayPolicy.swift in Sources */,
-				AEDP0000000000000000B002 /* DirectPlaySession.swift in Sources */,
-				AEDP0000000000000000B005 /* OpenSourceNotices.swift in Sources */,
 				DF675E7A2F2A6392004CA019 /* SceneGalleriesCard.swift in Sources */,
 				DF675E7B2F2A6392004CA019 /* SceneVideoPlayerCard.swift in Sources */,
 				DF675E7C2F2A6392004CA019 /* SceneStudioCard.swift in Sources */,
@@ -773,9 +743,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AEDP0000000000000000B003 /* DirectPlayPolicy.swift in Sources */,
-				AEDP0000000000000000B004 /* DirectPlaySession.swift in Sources */,
-				AEDP0000000000000000B006 /* OpenSourceNotices.swift in Sources */,
 				FDFEA639517B4DF2B8490448 /* App.swift in Sources */,
 				AAB8EA012D744BBCB254F7D6 /* MainTabView.swift in Sources */,
 				4641A386019F4F5F81B587A8 /* StashDBViewModel.swift in Sources */,
@@ -1134,14 +1101,6 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
-		AEDP0000000000000000P001 /* XCRemoteSwiftPackageReference "AetherEngine" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/superuser404notfound/AetherEngine";
-			requirement = {
-				kind = exactVersion;
-				version = 6.56.5;
-			};
-		};
 		0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "PocketSVG" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/pocketsvg/PocketSVG.git";
@@ -1153,11 +1112,6 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
-		AEDP0000000000000000P002 /* AetherEngine */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = AEDP0000000000000000P001 /* XCRemoteSwiftPackageReference "AetherEngine" */;
-			productName = AetherEngine;
-		};
 		1A2B3C4D5E6F708192A3B4C5 /* PocketSVG */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "PocketSVG" */;

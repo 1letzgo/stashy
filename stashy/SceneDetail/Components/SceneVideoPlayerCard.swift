@@ -740,13 +740,6 @@ struct SceneDetailMetadataCard: View {
 
     private func switchPlayerStream(to url: URL) {
         guard let player = player else { return }
-        // Direct Play serves the original file; there are no quality renditions
-        // to switch to, and replacing the item would tear down the engine's
-        // loopback session underneath it.
-        if DirectPlaySession.shared.isEngineBacked {
-            AppLog.debug("🎬 Quality switch ignored: Direct Play plays the original file")
-            return
-        }
         let currentTime = player.currentTime()
         let wasPlaying = (player.rate > 0) || (player.timeControlStatus == .playing)
 

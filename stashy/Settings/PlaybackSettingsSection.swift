@@ -70,38 +70,6 @@ struct PlaybackSettingsSection: View {
     }
 }
 
-/// stashy+ Direct Play toggle shown under Settings → stashy+.
-///
-/// Ships **off**. Direct Play plays the untouched file through the bundled
-/// FFmpeg engine instead of asking the server to transcode; it is new, so it
-/// is opted into per user rather than switched on for everyone at once.
-struct StashyPlusDirectPlaySettings: View {
-    @ObservedObject var appearanceManager = AppearanceManager.shared
-    /// UserDefaults alone does not refresh the toggle, so mirror it locally.
-    @State private var isEnabled: Bool = DirectPlayPolicy.isEnabledBySetting
-
-    var body: some View {
-        Toggle(isOn: Binding(
-            get: { isEnabled },
-            set: { newValue in
-                isEnabled = newValue
-                DirectPlayPolicy.isEnabledBySetting = newValue
-                // A re-enable should retry sources that failed under the old build.
-                if newValue { DirectPlayPolicy.clearFailureMemory() }
-            }
-        )) {
-            Label("Direct Play", systemImage: "film.stack")
-        }
-        .tint(appearanceManager.tintColor)
-        .stashyGroupedBlockRow(index: 0, count: 2)
-
-        Text("Plays formats the system cannot open — MKV, AVI, TS and friends — straight from the original file, without asking the server to transcode. Needs the full file bitrate over the network, so it works best on a local connection.")
-            .font(.caption)
-            .foregroundColor(.secondary)
-            .stashyGroupedBlockRow(index: 1, count: 2)
-    }
-}
-
 #if !os(tvOS)
 /// AI subtitle and translation controls shown under Settings → stashy+.
 struct StashyPlusAISubtitlesSettings: View {

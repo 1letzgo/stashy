@@ -37,13 +37,6 @@ struct SceneDetailView: View {
         _activeScene = State(initialValue: scene)
     }
     @State private var player: AVPlayer?
-    /// True when `player` is driven by the stashy+ Direct Play engine.
-    /// Engine-owned players must never have their item swapped from here.
-    @State private var isDirectPlayBacked = false
-    /// Guards against a second engine open while the first is still running —
-    /// `player` is still nil in that window, so the `player == nil` check alone
-    /// would let a second attempt through.
-    @State private var isDirectPlayStarting = false
     @State private var showDeleteWithFilesConfirmation = false
     @State private var isDeleting = false
     @State private var isDownloading = false
@@ -690,13 +683,6 @@ struct SceneDetailView: View {
         audioTrackController.detach()
         captionTranslator.deactivate()
         Task { await transcriptionController.disable() }
-        if isDirectPlayBacked {
-            // Releases the demuxer, the loopback server and the segment cache —
-            // but only if this view's player is still the live one.
-            DirectPlaySession.shared.teardown(owning: player)
-            isDirectPlayBacked = false
-            player = nil
-        }
     }
 
     private func persistPlaybackActivity(stopTracking: Bool) {
@@ -790,88 +776,26 @@ struct SceneDetailView: View {
     }
 
     private func startPlayback(resume: Bool) {
+        guard let videoURL = activeScene.videoURL else { return }
+
         if player == nil {
+            AppLog.debug("🎬 Player initializing with URL: \(redactedURLString(videoURL))")
             // Re-read here, not at `@State` init: only now is the playback audio session active,
             // so only now does the route report connected headphones.
             isMuted = ScenePlayerMute.initialValueForPlayback()
-
-            // An engine open is already in flight; `player` stays nil until it
-            // lands, so without this a second call would start a second one.
-            if isDirectPlayStarting { return }
-
-            // stashy+ Direct Play: formats AVFoundation refuses go through the
-            // engine on the untouched file instead of a server transcode. Any
-            // failure falls back to the path below, so this can only add sources.
-            if DirectPlayPolicy.route(for: activeScene) == .engine,
-               let directURL = DirectPlayPolicy.directStreamURL(for: activeScene) {
-                startDirectPlay(directURL: directURL, resume: resume)
-                return
-            }
-
-            guard let videoURL = activeScene.videoURL else { return }
-            AppLog.debug("🎬 Player initializing with URL: \(redactedURLString(videoURL))")
-            isDirectPlayBacked = false
             player = createPlayer(for: videoURL, muted: isMuted)
-            finishStartPlayback(resume: resume, isFreshPlayer: true)
-            return
-        }
-
-        finishStartPlayback(resume: resume, isFreshPlayer: false)
-    }
-
-    /// Opens the scene through the Direct Play engine and, on any failure,
-    /// falls back to the native chain with the server-provided stream.
-    private func startDirectPlay(directURL: URL, resume: Bool) {
-        let sceneID = activeScene.id
-        let muted = isMuted
-        let resumeTime: Double? = {
-            guard resume, let t = activeScene.resumeTime, t > 0 else { return nil }
-            return t
-        }()
-
-        isDirectPlayStarting = true
-        Task { @MainActor in
-            defer { isDirectPlayStarting = false }
-            do {
-                let enginePlayer = try await DirectPlaySession.shared.makePlayer(
-                    url: directURL,
-                    startPosition: resumeTime,
-                    muted: muted
-                )
-                // The user may have navigated on while the engine was opening.
-                guard activeScene.id == sceneID, player == nil else {
-                    DirectPlaySession.shared.teardown(owning: enginePlayer)
-                    return
-                }
-                isDirectPlayBacked = true
-                player = enginePlayer
-                // `startPosition` already placed the playhead; no resume seek.
-                finishStartPlayback(resume: false, isFreshPlayer: true)
-            } catch {
-                AppLog.error("🎬 Direct Play failed, using native path: \(error.localizedDescription)")
-                DirectPlayPolicy.rememberFailure(sceneID: sceneID)
-                guard activeScene.id == sceneID, player == nil else { return }
-                isDirectPlayBacked = false
-                guard let videoURL = activeScene.videoURL else { return }
-                player = createPlayer(for: videoURL, muted: muted)
-                finishStartPlayback(resume: resume, isFreshPlayer: true)
-            }
-        }
-    }
-
-    /// Everything `startPlayback` does once a player exists — identical for
-    /// the native and the Direct Play chain.
-    private func finishStartPlayback(resume: Bool, isFreshPlayer: Bool) {
-        if isFreshPlayer {
             addTimeObserverIfNeeded()
             configureSubtitles()
-        }
 
-        if resume, let resumeTime = activeScene.resumeTime, resumeTime > 0 {
-            let targetTime = CMTime(seconds: resumeTime, preferredTimescale: 600)
-            player?.seek(to: targetTime)
+            if resume, let resumeTime = activeScene.resumeTime, resumeTime > 0 {
+                let targetTime = CMTime(seconds: resumeTime, preferredTimescale: 600)
+                player?.seek(to: targetTime)
+            }
+        } else if resume, let resumeTime = activeScene.resumeTime, resumeTime > 0 {
+             let targetTime = CMTime(seconds: resumeTime, preferredTimescale: 600)
+             player?.seek(to: targetTime)
         }
-
+        
         withAnimation {
             isPlaybackStarted = true
         }
@@ -1059,9 +983,6 @@ struct SceneDetailView: View {
     /// Updates the player if a better stream becomes available (e.g. replacing an incompatible MKV fallback with a transcoded MP4).
     /// Uses the central `makeVODPlayerItem` helper so buffering, headers and apikey-signing stay consistent with `qualityMenu` switches.
     private func updatePlayerStream() {
-        // The Direct Play engine owns its player's items; swapping one from
-        // here would tear the loopback session out from under it.
-        guard !isDirectPlayBacked else { return }
         guard let currentAsset = player?.currentItem?.asset as? AVURLAsset else { return }
         guard let newURL = activeScene.videoURL else { return }
 

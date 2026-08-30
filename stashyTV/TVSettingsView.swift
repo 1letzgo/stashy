@@ -676,14 +676,6 @@ private struct TVAboutSettingsView: View {
                 }
                 .focusable()
             }
-
-            Section {
-                NavigationLink {
-                    OpenSourceNoticesView().tvExitDismissable()
-                } label: {
-                    Text("Acknowledgements")
-                }
-            }
         }
         .safeAreaInset(edge: .bottom) {
             Color.clear.frame(height: 80).focusable(false)
