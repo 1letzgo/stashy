@@ -654,7 +654,10 @@ private struct TVMaintenanceSettingsView: View {
     var body: some View {
         List {
             Section {
+                // Nicht `.disabled` ohne Server — das ist der einzige Button
+                // der Seite, deaktiviert wäre sie eine Sackgasse.
                 Button {
+                    guard configManager.activeConfig != nil else { return }
                     // Gegenstück zu „Clear Image Cache" auf iOS
                     // (`MainTabView`, Wartungsaufgaben).
                     ImageCache.shared.clearCurrentServerCache()
@@ -669,7 +672,6 @@ private struct TVMaintenanceSettingsView: View {
                         }
                     }
                 }
-                .disabled(configManager.activeConfig == nil)
             } footer: {
                 Text("Removes the cached artwork for the active server. Images are downloaded again as they appear.")
             }

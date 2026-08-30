@@ -98,7 +98,12 @@ struct TVServerDetailView: View {
 
     private func actionsSection(config: ServerConfig) -> some View {
         HStack(spacing: 18) {
+            // Bewusst **nicht** `.disabled` während des Tests: der Button ist das
+            // einzige fokussierbare Element dieser Seite. Deaktiviert man ihn,
+            // hat die Menu-Taste kein Ziel mehr und man kommt aus der Seite
+            // nicht wieder heraus.
             Button {
+                guard !isTesting else { return }
                 isTesting = true
                 viewModel.testConnection()
             } label: {
@@ -110,7 +115,6 @@ struct TVServerDetailView: View {
                 .padding(.vertical, 8)
             }
             .buttonStyle(.card)
-            .disabled(isTesting)
         }
     }
 

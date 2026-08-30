@@ -250,9 +250,14 @@ struct TVStashyPlusSettingsView: View {
 
                 featureRow(icon: "sparkles.tv.fill", text: "Channels")
                     // Wer stashy+ bereits besitzt, bekommt weder Kauf- noch
-                    // Restore-Button — dann ist diese Zeile das einzige
-                    // fokussierbare Element und damit der Weg zurück.
-                    .focusable(!stashyPlus.shouldOfferPurchases)
+                    // Restore-Button; während eines Kaufs oder Restores sind sie
+                    // alle deaktiviert. In beiden Fällen ist diese Zeile das
+                    // einzige fokussierbare Element und damit der Weg zurück.
+                    .focusable(
+                        !stashyPlus.shouldOfferPurchases
+                            || store.isPurchasing
+                            || store.isRestoringPurchases
+                    )
             } footer: {
                 Text("stashy+ unlocks premium features across stashy for iPhone and Apple TV with one purchase.")
             }
