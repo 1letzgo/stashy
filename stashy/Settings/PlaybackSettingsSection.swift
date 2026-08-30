@@ -93,9 +93,12 @@ struct StashyPlusDirectPlaySettings: View {
             Label("Direct Play", systemImage: "film.stack")
         }
         .tint(appearanceManager.tintColor)
-        .stashyGroupedSettingsRow()
+        .stashyGroupedBlockRow(index: 0, count: 2)
 
-        stashyScrollingSectionFooter("Plays formats the system cannot open — MKV, AVI, TS and friends — straight from the original file, without asking the server to transcode. Needs the full file bitrate over the network, so it works best on a local connection.")
+        Text("Plays formats the system cannot open — MKV, AVI, TS and friends — straight from the original file, without asking the server to transcode. Needs the full file bitrate over the network, so it works best on a local connection.")
+            .font(.caption)
+            .foregroundColor(.secondary)
+            .stashyGroupedBlockRow(index: 1, count: 2)
     }
 }
 
