@@ -155,6 +155,9 @@ private struct ImagesViewBody: View {
 
     @State private var cardGridWidth: CGFloat = 0
 
+    /// Drives the fullscreen push. Held by the list, not by a cell, so deleting the open image
+    /// from `FullScreenImageView` does not tear the pushed view down with its row.
+    @State private var fullscreenImageId: String?
 
     private var columns: [GridItem] {
         effectiveCardColumns.gridItems(width: cardGridWidth)
@@ -260,6 +263,14 @@ private struct ImagesViewBody: View {
 
     var body: some View {
         imagesCoreChrome
+            // Owned by the list, so the viewer survives the open image being deleted.
+            .navigationDestination(item: $fullscreenImageId) { imageId in
+                FullScreenImageView(
+                    images: fullScreenFeedBinding(),
+                    selectedImageId: imageId,
+                    onLoadMore: { loadMoreImagesIfNeeded() }
+                )
+            }
             .sheet(isPresented: $imageListFilters.showFilterSortSheet, content: imagesFilterSortSheet)
             .onChange(of: imageListFilters.catalogPresetRowSelection) { _, newId in
                 imageListFilters.handlePresetSelection(newId, viewModel: viewModel)
@@ -1098,12 +1109,10 @@ private struct ImagesViewBody: View {
         ImageGroupCatalogCell(
             images: images,
             currentGalleryId: gallery?.id,
-            // Fullscreen must page through the whole feed, not only this set/group.
-            imagesBinding: fullScreenFeedBinding(),
             autoplayVideoImageId: feedAutoplayGateOpen ? autoplayVideoImageId : nil,
             reportsFeedVideoFrame: feedAutoplayGateOpen,
             onLoadMore: { loadMoreImagesIfNeeded() },
-            onOpened: { rememberOpenedImage(id: $0) }
+            onOpened: { openFullscreen(id: $0) }
         )
         .id(images[0].id)
     }
@@ -1135,20 +1144,15 @@ private struct ImagesViewBody: View {
                 }
                 .buttonStyle(.plain)
             } else {
-                NavigationLink(destination: FullScreenImageView(
-                    images: fullScreenFeedBinding(),
-                    selectedImageId: image.id,
-                    onLoadMore: {
-                        loadMoreImagesIfNeeded()
-                    }
-                )) {
+                // No per-row `NavigationLink`: it would be torn down when the image is deleted
+                // from fullscreen, popping the viewer. The push lives on the list itself.
+                Button {
+                    openFullscreen(id: image.id)
+                } label: {
                     ImageThumbnailCard(image: image, aspectRatio: imageCardAspectRatio)
                 }
                 .buttonStyle(.plain)
                 .id(image.id)
-                .simultaneousGesture(TapGesture().onEnded {
-                    rememberOpenedImage(id: image.id)
-                })
             }
         }
     }
@@ -1158,6 +1162,11 @@ private struct ImagesViewBody: View {
         if gallery == nil {
             imageListFilters.sessionLastOpenedImageId = id
         }
+    }
+
+    private func openFullscreen(id: String) {
+        rememberOpenedImage(id: id)
+        fullscreenImageId = id
     }
     
     // MARK: - Multi-Select Logic
@@ -1241,13 +1250,12 @@ struct ImageGroupCatalogCell: View {
     let images: [StashImage]
     /// When already inside a gallery detail, skip linking back to the same gallery.
     var currentGalleryId: String? = nil
-    /// Full feed for fullscreen paging (not limited to this group).
-    let imagesBinding: Binding<[StashImage]>
     /// Only the image with this id may autoplay (most centered video).
     var autoplayVideoImageId: String? = nil
     /// Disable while scrolling — PreferenceKey geometry probes cause scroll jank.
     var reportsFeedVideoFrame: Bool = false
     let onLoadMore: () -> Void
+    /// Tapped to open fullscreen — the parent owns the push.
     let onOpened: (String) -> Void
 
     @State private var visibleImageId: String
@@ -1255,7 +1263,6 @@ struct ImageGroupCatalogCell: View {
     init(
         images: [StashImage],
         currentGalleryId: String? = nil,
-        imagesBinding: Binding<[StashImage]>,
         autoplayVideoImageId: String? = nil,
         reportsFeedVideoFrame: Bool = false,
         onLoadMore: @escaping () -> Void,
@@ -1263,7 +1270,6 @@ struct ImageGroupCatalogCell: View {
     ) {
         self.images = images
         self.currentGalleryId = currentGalleryId
-        self.imagesBinding = imagesBinding
         self.autoplayVideoImageId = autoplayVideoImageId
         self.reportsFeedVideoFrame = reportsFeedVideoFrame
         self.onLoadMore = onLoadMore
@@ -1286,11 +1292,12 @@ struct ImageGroupCatalogCell: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             ZStack(alignment: .top) {
-                NavigationLink(destination: FullScreenImageView(
-                    images: imagesBinding,
-                    selectedImageId: visibleImageId,
-                    onLoadMore: onLoadMore
-                )) {
+                // The push is owned by the parent's `navigationDestination`, not by this row:
+                // a `NavigationLink` here dies with its cell, so deleting the open image from
+                // fullscreen would pop the viewer.
+                Button {
+                    onOpened(visibleImageId)
+                } label: {
                     ImageThumbnailCard(
                         image: visibleImage,
                         aspectRatio: visibleImage.oneColumnFeedAspectRatio,
@@ -1302,9 +1309,6 @@ struct ImageGroupCatalogCell: View {
                     .id(visibleImage.id)
                 }
                 .buttonStyle(.plain)
-                .simultaneousGesture(TapGesture().onEnded {
-                    onOpened(visibleImageId)
-                })
 
                 ImageCatalogFeedHeader(image: visibleImage, currentGalleryId: currentGalleryId)
 
