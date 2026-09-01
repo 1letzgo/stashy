@@ -40,16 +40,18 @@ private struct TagsViewContent: View {
 
     // Live filter (chips)
     @State private var liveFilterFavorite: Bool? = nil
-    @State private var liveFilterHasScenes: Bool = false
+    /// "has" / "none"; nil = any.
+    @State private var liveFilterScenes: String?
 
     private var isLiveFilterActive: Bool {
-        liveFilterFavorite != nil || liveFilterHasScenes
+        liveFilterFavorite != nil || liveFilterScenes != nil
     }
 
     private var activeLiveFilterDict: [String: Any] {
         var dict: [String: Any] = [:]
         if let fav = liveFilterFavorite { dict["favorite"] = fav }
-        if liveFilterHasScenes { dict["scene_count"] = ["value": 0, "modifier": "GREATER_THAN"] }
+        if liveFilterScenes == "has" { dict["scene_count"] = ["value": 0, "modifier": "GREATER_THAN"] }
+        if liveFilterScenes == "none" { dict["scene_count"] = ["value": 0, "modifier": "EQUALS"] }
         return dict
     }
 
@@ -115,7 +117,7 @@ private struct TagsViewContent: View {
 
     private func clearTagLiveChipsOnly() {
         liveFilterFavorite = nil
-        liveFilterHasScenes = false
+        liveFilterScenes = nil
     }
 
     private func mapTagLiveFragmentToChips(_ frag: [String: Any]) {
@@ -124,9 +126,9 @@ private struct TagsViewContent: View {
             liveFilterFavorite = fav
         }
         if let sc = frag["scene_count"] as? [String: Any],
-           let mod = sc["modifier"] as? String,
-           mod == "GREATER_THAN" {
-            liveFilterHasScenes = true
+           let mod = sc["modifier"] as? String {
+            if mod == "GREATER_THAN" { liveFilterScenes = "has" }
+            if mod == "EQUALS", (sc["value"] as? Int) == 0 { liveFilterScenes = "none" }
         }
     }
 
@@ -482,7 +484,7 @@ private struct TagsViewContent: View {
             sortOption: selectedSortOption,
             onSortChange: { changeTagSortOption(to: $0) },
             liveFavorite: $liveFilterFavorite,
-            liveHasScenes: $liveFilterHasScenes,
+            liveScenes: $liveFilterScenes,
             onApply: { applyLiveFilter() },
             onReset: {
                 catalogPresetRowSelection = ""

@@ -1278,7 +1278,7 @@ struct GroupDetailView: View {
             sortOption: linkedTags.selectedSortOption,
             onSortChange: { linkedTags.changeSortOption(to: $0, viewModel: viewModel) },
             liveFavorite: $linkedTags.liveFilterFavorite,
-            liveHasScenes: $linkedTags.liveFilterHasScenes,
+            liveScenes: $linkedTags.liveFilterScenes,
             onApply: { linkedTags.applyLiveFilter(viewModel: viewModel) },
             onReset: {
                 linkedTags.catalogPresetRowSelection = ""

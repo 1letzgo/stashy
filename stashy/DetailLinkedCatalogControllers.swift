@@ -38,7 +38,8 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
     @Published var liveFilterHairColor: String?
     @Published var liveFilterGender: String?
     @Published var liveFilterCountry: String?
-    @Published var liveFilterImplants: Bool?
+    /// "FAKE" / "NATURAL" / `CatalogLiveChipFilterSupport.noneChipValue`; nil = any.
+    @Published var liveFilterImplants: String?
     @Published var liveFilterFavorite: Bool?
     @Published var liveFilterMissingField: String?
     @Published var liveFilterOCounterTag: String?
@@ -76,7 +77,9 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
 
     private var activeLiveFilterDict: [String: Any] {
         var dict: [String: Any] = [:]
-        if let age = liveFilterAgeRange {
+        if liveFilterAgeRange == CatalogLiveChipFilterSupport.noneChipValue {
+            dict["birthdate"] = CatalogLiveChipFilterSupport.isNullCriterion
+        } else if let age = liveFilterAgeRange {
             let cal = Calendar.current
             let now = Date()
             let fmt = DateFormatter()
@@ -101,20 +104,28 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
             }
         }
         if let hair = liveFilterHairColor {
-            dict["hair_color"] = ["value": hair, "modifier": "EQUALS"]
+            dict["hair_color"] = hair == CatalogLiveChipFilterSupport.noneChipValue
+                ? CatalogLiveChipFilterSupport.isNullCriterion
+                : ["value": hair, "modifier": "EQUALS"]
         }
         if let gender = liveFilterGender {
-            dict["gender"] = ["value": gender, "modifier": "EQUALS"]
+            dict["gender"] = gender == CatalogLiveChipFilterSupport.noneChipValue
+                ? CatalogLiveChipFilterSupport.isNullCriterion
+                : ["value": gender, "modifier": "EQUALS"]
         }
         if let country = liveFilterCountry {
-            if country == "NOT_US" {
+            if country == CatalogLiveChipFilterSupport.noneChipValue {
+                dict["country"] = CatalogLiveChipFilterSupport.isNullCriterion
+            } else if country == "NOT_US" {
                 dict["country"] = ["value": "US", "modifier": "NOT_EQUALS"]
             } else {
                 dict["country"] = ["value": country, "modifier": "EQUALS"]
             }
         }
         if let implants = liveFilterImplants {
-            dict["fake_tits"] = ["value": implants ? "FAKE" : "NATURAL", "modifier": "EQUALS"]
+            dict["fake_tits"] = implants == CatalogLiveChipFilterSupport.noneChipValue
+                ? CatalogLiveChipFilterSupport.isNullCriterion
+                : ["value": implants, "modifier": "EQUALS"]
         }
         if let favorite = liveFilterFavorite {
             dict["filter_favorites"] = favorite
@@ -176,22 +187,42 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
         if let fav = frag["filter_favorites"] as? Bool {
             liveFilterFavorite = fav
         }
-        if let hair = frag["hair_color"] as? [String: Any], let v = hair["value"] as? String {
-            liveFilterHairColor = v
-        }
-        if let g = frag["gender"] as? [String: Any], let v = g["value"] as? String {
-            liveFilterGender = v
-        }
-        if let c = frag["country"] as? [String: Any] {
-            let mod = (c["modifier"] as? String) ?? ""
-            if mod == "NOT_EQUALS", (c["value"] as? String) == "US" {
-                liveFilterCountry = "NOT_US"
-            } else if let v = c["value"] as? String {
-                liveFilterCountry = v
+        let none = CatalogLiveChipFilterSupport.noneChipValue
+        if let hair = frag["hair_color"] {
+            if CatalogLiveChipFilterSupport.isNullCriterion(hair) {
+                liveFilterHairColor = none
+            } else if let v = (hair as? [String: Any])?["value"] as? String {
+                liveFilterHairColor = v
             }
         }
-        if let ft = frag["fake_tits"] as? [String: Any], let v = ft["value"] as? String {
-            liveFilterImplants = (v == "FAKE")
+        if let g = frag["gender"] {
+            if CatalogLiveChipFilterSupport.isNullCriterion(g) {
+                liveFilterGender = none
+            } else if let v = (g as? [String: Any])?["value"] as? String {
+                liveFilterGender = v
+            }
+        }
+        if let c = frag["country"] {
+            if CatalogLiveChipFilterSupport.isNullCriterion(c) {
+                liveFilterCountry = none
+            } else if let d = c as? [String: Any] {
+                let mod = (d["modifier"] as? String) ?? ""
+                if mod == "NOT_EQUALS", (d["value"] as? String) == "US" {
+                    liveFilterCountry = "NOT_US"
+                } else if let v = d["value"] as? String {
+                    liveFilterCountry = v
+                }
+            }
+        }
+        if let ft = frag["fake_tits"] {
+            if CatalogLiveChipFilterSupport.isNullCriterion(ft) {
+                liveFilterImplants = none
+            } else if let v = (ft as? [String: Any])?["value"] as? String {
+                liveFilterImplants = v
+            }
+        }
+        if CatalogLiveChipFilterSupport.isNullCriterion(frag["birthdate"]) {
+            liveFilterAgeRange = none
         }
         if let m = frag["is_missing"] as? String {
             liveFilterMissingField = m
@@ -471,7 +502,8 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
     @Published var selectedSortOption: StashDBViewModel.TagSortOption
     @Published var selectedFilter: StashDBViewModel.SavedFilter?
     @Published var liveFilterFavorite: Bool?
-    @Published var liveFilterHasScenes: Bool = false
+    /// "has" / "none"; nil = any. Mirrors the Studios sheet's Scenes row.
+    @Published var liveFilterScenes: String?
 
     /// Advanced Stash criteria from the full editor; merged over the quick chips on every fetch.
     let criteriaDocument = FilterCriteriaDocument(mode: .tags)
@@ -488,7 +520,7 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
     }
 
     private var isLiveFilterActive: Bool {
-        liveFilterFavorite != nil || liveFilterHasScenes
+        liveFilterFavorite != nil || liveFilterScenes != nil
     }
 
     var catalogFilterSortFABActive: Bool {
@@ -505,7 +537,8 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
     private var activeLiveFilterDict: [String: Any] {
         var dict: [String: Any] = [:]
         if let fav = liveFilterFavorite { dict["favorite"] = fav }
-        if liveFilterHasScenes { dict["scene_count"] = ["value": 0, "modifier": "GREATER_THAN"] }
+        if liveFilterScenes == "has" { dict["scene_count"] = ["value": 0, "modifier": "GREATER_THAN"] }
+        if liveFilterScenes == "none" { dict["scene_count"] = ["value": 0, "modifier": "EQUALS"] }
         return dict
     }
 
@@ -542,7 +575,7 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
 
     func clearLiveChipsOnly() {
         liveFilterFavorite = nil
-        liveFilterHasScenes = false
+        liveFilterScenes = nil
     }
 
     func mapLiveFragmentToChips(_ frag: [String: Any]) {
@@ -550,8 +583,9 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
         if let fav = frag["favorite"] as? Bool {
             liveFilterFavorite = fav
         }
-        if let sc = frag["scene_count"] as? [String: Any], let mod = sc["modifier"] as? String, mod == "GREATER_THAN" {
-            liveFilterHasScenes = true
+        if let sc = frag["scene_count"] as? [String: Any], let mod = sc["modifier"] as? String {
+            if mod == "GREATER_THAN" { liveFilterScenes = "has" }
+            if mod == "EQUALS", (sc["value"] as? Int) == 0 { liveFilterScenes = "none" }
         }
     }
 
@@ -1247,7 +1281,9 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
         if liveFilterFiles == "has" { dict["file_count"] = ["value": 0, "modifier": "GREATER_THAN"] }
         if liveFilterFiles == "none" { dict["file_count"] = ["value": 0, "modifier": "EQUALS"] }
         if let sid = liveFilterStudioId {
-            dict["studios"] = ["modifier": "INCLUDES", "value": [sid]]
+            dict["studios"] = sid == CatalogLiveChipFilterSupport.noneChipValue
+                ? CatalogLiveChipFilterSupport.isNullCriterion
+                : ["modifier": "INCLUDES", "value": [sid]]
         }
         return dict
     }
@@ -1320,7 +1356,9 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
                 liveFilterFiles = "none"
             }
         }
-        if let st = frag["studios"] as? [String: Any],
+        if CatalogLiveChipFilterSupport.isNullCriterion(frag["studios"]) {
+            liveFilterStudioId = CatalogLiveChipFilterSupport.noneChipValue
+        } else if let st = frag["studios"] as? [String: Any],
            (st["modifier"] as? String) == "INCLUDES",
            let vals = st["value"] as? [Any] {
             let ids = vals.compactMap { $0 as? String }

@@ -189,6 +189,8 @@ struct CatalogStudioLiveFilterPickerRow: View {
                     }
                 )) {
                     Text("Any").tag("")
+                    // Counterpart to "Any", same meaning as the multi-picker's None row.
+                    Text("None").tag(CatalogLiveChipFilterSupport.noneChipValue)
                     ForEach(studios) { s in
                         Text(s.name).tag(s.id)
                     }
@@ -237,6 +239,7 @@ struct CatalogNamedEntityLiveFilterPickerRow<Item: Identifiable & Equatable>: Vi
                     }
                 )) {
                     Text("Any").tag("")
+                    Text("None").tag(CatalogLiveChipFilterSupport.noneChipValue)
                     ForEach(items) { item in
                         Text(displayName(item)).tag(item.id)
                     }
@@ -858,7 +861,7 @@ struct PerformersCatalogFilterSortSheet: View {
     @Binding var liveHairColor: String?
     @Binding var liveGender: String?
     @Binding var liveCountry: String?
-    @Binding var liveImplants: Bool?
+    @Binding var liveImplants: String?
     @Binding var liveFavorite: Bool?
     @Binding var liveMissingField: String?
     @Binding var liveOCounterTag: String?
@@ -873,6 +876,8 @@ struct PerformersCatalogFilterSortSheet: View {
     @ObservedObject private var appearance = AppearanceManager.shared
 
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
+    /// Chip value for "field is not set" — see `CatalogLiveChipFilterSupport.noneChipValue`.
+    private let noneChip = CatalogLiveChipFilterSupport.noneChipValue
 
     var body: some View {
         NavigationStack {
@@ -1006,6 +1011,7 @@ struct PerformersCatalogFilterSortSheet: View {
             Divider().padding(.leading, 16)
             CatalogFilterRow(label: "Gender") {
                 CatalogFilterChip(title: "Any", isActive: liveGender == nil) { liveGender = nil; onApply() }
+                CatalogFilterChip(title: "None", isActive: liveGender == noneChip) { liveGender = noneChip; onApply() }
                 CatalogFilterChip(title: "Female", isActive: liveGender == "FEMALE") { liveGender = "FEMALE"; onApply() }
                 CatalogFilterChip(title: "Male", isActive: liveGender == "MALE") { liveGender = "MALE"; onApply() }
                 CatalogFilterChip(title: "Trans (M)", isActive: liveGender == "TRANSGENDER_MALE") { liveGender = "TRANSGENDER_MALE"; onApply() }
@@ -1016,6 +1022,7 @@ struct PerformersCatalogFilterSortSheet: View {
             Divider().padding(.leading, 16)
             CatalogFilterRow(label: "Age") {
                 CatalogFilterChip(title: "Any", isActive: liveAgeRange == nil) { liveAgeRange = nil; onApply() }
+                CatalogFilterChip(title: "None", isActive: liveAgeRange == noneChip) { liveAgeRange = noneChip; onApply() }
                 CatalogFilterChip(title: "18–21", isActive: liveAgeRange == "18-21") { liveAgeRange = "18-21"; onApply() }
                 CatalogFilterChip(title: "22–26", isActive: liveAgeRange == "22-26") { liveAgeRange = "22-26"; onApply() }
                 CatalogFilterChip(title: "26–30", isActive: liveAgeRange == "26-30") { liveAgeRange = "26-30"; onApply() }
@@ -1024,6 +1031,7 @@ struct PerformersCatalogFilterSortSheet: View {
             Divider().padding(.leading, 16)
             CatalogFilterRow(label: "Hair") {
                 CatalogFilterChip(title: "Any", isActive: liveHairColor == nil) { liveHairColor = nil; onApply() }
+                CatalogFilterChip(title: "None", isActive: liveHairColor == noneChip) { liveHairColor = noneChip; onApply() }
                 CatalogFilterChip(title: "Blonde", isActive: liveHairColor == "BLONDE") { liveHairColor = "BLONDE"; onApply() }
                 CatalogFilterChip(title: "Brunette", isActive: liveHairColor == "BRUNETTE") { liveHairColor = "BRUNETTE"; onApply() }
                 CatalogFilterChip(title: "Red", isActive: liveHairColor == "RED") { liveHairColor = "RED"; onApply() }
@@ -1032,14 +1040,16 @@ struct PerformersCatalogFilterSortSheet: View {
             Divider().padding(.leading, 16)
             CatalogFilterRow(label: "Country") {
                 CatalogFilterChip(title: "Any", isActive: liveCountry == nil) { liveCountry = nil; onApply() }
+                CatalogFilterChip(title: "None", isActive: liveCountry == noneChip) { liveCountry = noneChip; onApply() }
                 CatalogFilterChip(title: "US", isActive: liveCountry == "US") { liveCountry = "US"; onApply() }
                 CatalogFilterChip(title: "Non-US", isActive: liveCountry == "NOT_US") { liveCountry = "NOT_US"; onApply() }
             }
             Divider().padding(.leading, 16)
             CatalogFilterRow(label: "Tits") {
                 CatalogFilterChip(title: "Any", isActive: liveImplants == nil) { liveImplants = nil; onApply() }
-                CatalogFilterChip(title: "Fake", isActive: liveImplants == true) { liveImplants = true; onApply() }
-                CatalogFilterChip(title: "Natural", isActive: liveImplants == false) { liveImplants = false; onApply() }
+                CatalogFilterChip(title: "None", isActive: liveImplants == noneChip) { liveImplants = noneChip; onApply() }
+                CatalogFilterChip(title: "Fake", isActive: liveImplants == "FAKE") { liveImplants = "FAKE"; onApply() }
+                CatalogFilterChip(title: "Natural", isActive: liveImplants == "NATURAL") { liveImplants = "NATURAL"; onApply() }
             }
             Divider().padding(.leading, 16)
             CatalogFilterRow(label: "O Count") {
@@ -1075,7 +1085,7 @@ struct TagsCatalogFilterSortSheet: View {
     var sortOption: StashDBViewModel.TagSortOption
     var onSortChange: (StashDBViewModel.TagSortOption) -> Void
     @Binding var liveFavorite: Bool?
-    @Binding var liveHasScenes: Bool
+    @Binding var liveScenes: String?
     var onApply: () -> Void
     var onReset: () -> Void
     var onRequestSave: () -> Void
@@ -1205,8 +1215,9 @@ struct TagsCatalogFilterSortSheet: View {
             }
             Divider().padding(.leading, 16)
             CatalogFilterRow(label: "Scenes") {
-                CatalogFilterChip(title: "Any", isActive: !liveHasScenes) { liveHasScenes = false; onApply() }
-                CatalogFilterChip(title: "Has scenes", isActive: liveHasScenes) { liveHasScenes = true; onApply() }
+                CatalogFilterChip(title: "Any", isActive: liveScenes == nil) { liveScenes = nil; onApply() }
+                CatalogFilterChip(title: "Has", isActive: liveScenes == "has") { liveScenes = "has"; onApply() }
+                CatalogFilterChip(title: "None", isActive: liveScenes == "none") { liveScenes = "none"; onApply() }
             }
         }
         .background(Color.secondaryAppBackground)

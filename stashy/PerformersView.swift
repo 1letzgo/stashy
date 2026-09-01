@@ -39,7 +39,8 @@ private struct PerformersViewContent: View {
     @State private var liveFilterHairColor: String? = nil  // "BLONDE" / "BRUNETTE" / "RED" / "BLACK"
     @State private var liveFilterGender: String? = nil     // "FEMALE" / "MALE" / "TRANSGENDER_FEMALE" / "TRANSGENDER_MALE" / "NON_BINARY"
     @State private var liveFilterCountry: String? = nil    // "US" / "NOT_US"
-    @State private var liveFilterImplants: Bool? = nil     // nil=any, true=has, false=none
+    /// "FAKE" / "NATURAL" / `CatalogLiveChipFilterSupport.noneChipValue`; nil = any.
+    @State private var liveFilterImplants: String?
     @State private var liveFilterFavorite: Bool? = nil     // nil=any, true=yes, false=no
     @State private var liveFilterMissingField: String? = nil // nil=any, "image" / "gender" / "hair_color"
     @State private var liveFilterOCounterTag: String? = nil
@@ -52,7 +53,9 @@ private struct PerformersViewContent: View {
 
     private var activeLiveFilterDict: [String: Any] {
         var dict: [String: Any] = [:]
-        if let age = liveFilterAgeRange {
+        if liveFilterAgeRange == CatalogLiveChipFilterSupport.noneChipValue {
+            dict["birthdate"] = CatalogLiveChipFilterSupport.isNullCriterion
+        } else if let age = liveFilterAgeRange {
             let cal = Calendar.current
             let now = Date()
             let fmt = DateFormatter()
@@ -77,20 +80,28 @@ private struct PerformersViewContent: View {
             }
         }
         if let hair = liveFilterHairColor {
-            dict["hair_color"] = ["value": hair, "modifier": "EQUALS"]
+            dict["hair_color"] = hair == CatalogLiveChipFilterSupport.noneChipValue
+                ? CatalogLiveChipFilterSupport.isNullCriterion
+                : ["value": hair, "modifier": "EQUALS"]
         }
         if let gender = liveFilterGender {
-            dict["gender"] = ["value": gender, "modifier": "EQUALS"]
+            dict["gender"] = gender == CatalogLiveChipFilterSupport.noneChipValue
+                ? CatalogLiveChipFilterSupport.isNullCriterion
+                : ["value": gender, "modifier": "EQUALS"]
         }
         if let country = liveFilterCountry {
-            if country == "NOT_US" {
+            if country == CatalogLiveChipFilterSupport.noneChipValue {
+                dict["country"] = CatalogLiveChipFilterSupport.isNullCriterion
+            } else if country == "NOT_US" {
                 dict["country"] = ["value": "US", "modifier": "NOT_EQUALS"]
             } else {
                 dict["country"] = ["value": country, "modifier": "EQUALS"]
             }
         }
         if let implants = liveFilterImplants {
-            dict["fake_tits"] = ["value": implants ? "FAKE" : "NATURAL", "modifier": "EQUALS"]
+            dict["fake_tits"] = implants == CatalogLiveChipFilterSupport.noneChipValue
+                ? CatalogLiveChipFilterSupport.isNullCriterion
+                : ["value": implants, "modifier": "EQUALS"]
         }
         if let favorite = liveFilterFavorite {
             dict["filter_favorites"] = favorite
@@ -155,22 +166,42 @@ private struct PerformersViewContent: View {
         if let fav = frag["filter_favorites"] as? Bool {
             liveFilterFavorite = fav
         }
-        if let hair = frag["hair_color"] as? [String: Any], let v = hair["value"] as? String {
-            liveFilterHairColor = v
-        }
-        if let g = frag["gender"] as? [String: Any], let v = g["value"] as? String {
-            liveFilterGender = v
-        }
-        if let c = frag["country"] as? [String: Any] {
-            let mod = (c["modifier"] as? String) ?? ""
-            if mod == "NOT_EQUALS", (c["value"] as? String) == "US" {
-                liveFilterCountry = "NOT_US"
-            } else if let v = c["value"] as? String {
-                liveFilterCountry = v
+        let none = CatalogLiveChipFilterSupport.noneChipValue
+        if let hair = frag["hair_color"] {
+            if CatalogLiveChipFilterSupport.isNullCriterion(hair) {
+                liveFilterHairColor = none
+            } else if let v = (hair as? [String: Any])?["value"] as? String {
+                liveFilterHairColor = v
             }
         }
-        if let ft = frag["fake_tits"] as? [String: Any], let v = ft["value"] as? String {
-            liveFilterImplants = (v == "FAKE")
+        if let g = frag["gender"] {
+            if CatalogLiveChipFilterSupport.isNullCriterion(g) {
+                liveFilterGender = none
+            } else if let v = (g as? [String: Any])?["value"] as? String {
+                liveFilterGender = v
+            }
+        }
+        if let c = frag["country"] {
+            if CatalogLiveChipFilterSupport.isNullCriterion(c) {
+                liveFilterCountry = none
+            } else if let d = c as? [String: Any] {
+                let mod = (d["modifier"] as? String) ?? ""
+                if mod == "NOT_EQUALS", (d["value"] as? String) == "US" {
+                    liveFilterCountry = "NOT_US"
+                } else if let v = d["value"] as? String {
+                    liveFilterCountry = v
+                }
+            }
+        }
+        if let ft = frag["fake_tits"] {
+            if CatalogLiveChipFilterSupport.isNullCriterion(ft) {
+                liveFilterImplants = none
+            } else if let v = (ft as? [String: Any])?["value"] as? String {
+                liveFilterImplants = v
+            }
+        }
+        if CatalogLiveChipFilterSupport.isNullCriterion(frag["birthdate"]) {
+            liveFilterAgeRange = none
         }
         if let m = frag["is_missing"] as? String {
             liveFilterMissingField = m
