@@ -23,7 +23,7 @@ private struct GalleriesViewContent: View {
     var hideTitle: Bool = false
 
     @State private var showFilterSortSheet = false
-    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .galleries)
+    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .galleries, pinsDefaults: true)
     @State private var catalogPresetRowSelection = ""
     @State private var localCatalogPresets: [GalleryListLiveFilterPreset] = GalleryListLiveFilterPresetStore.loadPresets()
     @State private var showSaveAsCatalogPresetAlert = false
@@ -38,27 +38,9 @@ private struct GalleriesViewContent: View {
     @State private var studioPickerOptions: [Studio] = []
     @State private var studioPickerLoading = false
 
-    private var isLiveFilterActive: Bool {
-        liveFilterFavorite != nil || liveFilterMinRating != 0 || liveFilterFiles != nil || liveFilterStudioId != nil
-    }
+    private var isLiveFilterActive: Bool { false }
 
-    private var activeLiveFilterDict: [String: Any] {
-        var dict: [String: Any] = [:]
-        if let fav = liveFilterFavorite { dict["favorite"] = fav }
-        if liveFilterMinRating == -1 {
-            dict["rating100"] = ["modifier": "IS_NULL"]
-        } else if liveFilterMinRating > 0 {
-            dict["rating100"] = ["value": (liveFilterMinRating * 20), "modifier": "EQUALS"]
-        }
-        if liveFilterFiles == "has" { dict["file_count"] = ["value": 0, "modifier": "GREATER_THAN"] }
-        if liveFilterFiles == "none" { dict["file_count"] = ["value": 0, "modifier": "EQUALS"] }
-        if let sid = liveFilterStudioId {
-            dict["studios"] = sid == CatalogLiveChipFilterSupport.noneChipValue
-                ? CatalogLiveChipFilterSupport.isNullCriterion
-                : ["modifier": "INCLUDES", "value": [sid]]
-        }
-        return dict
-    }
+    private var activeLiveFilterDict: [String: Any] { [:] }
 
     /// Passed to `filter:` only while the advanced editor holds no copy of it. Once the editor has
     /// the criteria, re-sending the server filter would resurrect criteria the user edited away;
@@ -73,7 +55,7 @@ private struct GalleriesViewContent: View {
     }
 
     private var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     private var sortedServerGalleryFilters: [StashDBViewModel.SavedFilter] {
@@ -164,6 +146,11 @@ private struct GalleriesViewContent: View {
         } else {
             clearGalleryLiveChipsOnly()
         }
+        // Ein lokales Preset speichert seine Kriterien im `liveFragment` — die legt der Editor
+        // über die Kriterien des Basisfilters, damit die Sheet zeigt, was wirklich gefiltert wird.
+        var mergedPresetCriteria: [String: Any] = selectedFilter?.criteriaObjectFilter() ?? [:]
+        for (key, value) in preset.liveFragment { mergedPresetCriteria[key] = value }
+        criteriaDocument.load(mergedPresetCriteria)
         performSearch()
     }
 
@@ -262,7 +249,7 @@ private struct GalleriesViewContent: View {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { _ in }
             return
         }
@@ -276,7 +263,7 @@ private struct GalleriesViewContent: View {
             createdAt: old.createdAt,
             sort: selectedSortOption,
             baseSavedFilterId: selectedFilter?.id,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         )
         GalleryListLiveFilterPresetStore.upsert(updated)
         refreshGalleryLocalPresets()
@@ -294,7 +281,7 @@ private struct GalleriesViewContent: View {
             sortField: selectedSortOption.sortField,
             sortDirection: selectedSortOption.direction,
             baseFilter: selectedFilter,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         ) { result in
             if case .success(let saved) = result {
                 catalogPresetRowSelection = ListLivePresetTag.serverRow(saved.id)
@@ -317,7 +304,7 @@ private struct GalleriesViewContent: View {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { result in
                 if case .success = result {
                     showRenameCatalogPresetAlert = false
@@ -748,13 +735,6 @@ private struct GalleriesViewContent: View {
             criteriaDocument: criteriaDocument,
             sortOption: selectedSortOption,
             onSortChange: { changeSortOption(to: $0) },
-            liveMinRating: $liveFilterMinRating,
-            liveFavorite: $liveFilterFavorite,
-            liveFiles: $liveFilterFiles,
-            liveStudioId: $liveFilterStudioId,
-            studioPickerOptions: studioPickerOptions,
-            studioPickerLoading: studioPickerLoading,
-            onStudioPickerSectionAppear: { loadGalleryStudioPickerOptions() },
             onApply: { applyLiveFilter() },
             onReset: {
                 catalogPresetRowSelection = ""

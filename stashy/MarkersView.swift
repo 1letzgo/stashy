@@ -19,7 +19,7 @@ private struct MarkersViewContent: View {
     @State private var showFilterSortSheet = false
     @State private var markerLiveChips = SceneLiveChipRowState()
     @State private var liveSheetPresetSelection = ""
-    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .sceneMarkers)
+    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .sceneMarkers, pinsDefaults: true)
     @State private var markerLocalPresets: [MarkerLiveFilterPreset] = MarkerLiveFilterPresetStore.loadPresets()
     @State private var showSaveAsPresetAlert = false
     @State private var presetNameInput = ""
@@ -85,7 +85,7 @@ private struct MarkersViewContent: View {
 
 
     private var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || markerLiveChips.isLiveFilterActive || !criteriaDocument.isEmpty || !liveSheetPresetSelection.isEmpty
+        selectedFilter != nil || !criteriaDocument.isEmpty || !liveSheetPresetSelection.isEmpty
     }
 
     private func loadStudiosForMarkerLivePicker() {
@@ -199,6 +199,11 @@ private struct MarkersViewContent: View {
             clearMarkerLiveChipsOnly()
             applyAuxIdsFromMarkerFragment(preset.liveFragment)
         }
+        // Ein lokales Preset speichert seine Kriterien im `liveFragment` — die legt der Editor
+        // über die Kriterien des Basisfilters, damit die Sheet zeigt, was wirklich gefiltert wird.
+        var mergedPresetCriteria: [String: Any] = selectedFilter?.criteriaObjectFilter() ?? [:]
+        for (key, value) in preset.liveFragment { mergedPresetCriteria[key] = value }
+        criteriaDocument.load(mergedPresetCriteria)
         applyLiveFilterFromSheet()
     }
 
@@ -237,7 +242,7 @@ private struct MarkersViewContent: View {
 
     private func saveMarkerPresetOverwrite() {
         let sel = liveSheetPresetSelection
-        let liveDict = markerLiveChips.activeLiveFilterDict()
+        let liveDict = (criteriaDocument.merged(with: [:]) ?? [:])
         if let sid = SceneLivePresetTag.parseServerId(sel) {
             let currentName = viewModel.savedFilters[sid]?.name ?? "Filter"
             viewModel.saveCatalogSavedFilter(
@@ -281,7 +286,7 @@ private struct MarkersViewContent: View {
             sortField: selectedSortOption.sortField,
             sortDirection: selectedSortOption.direction,
             baseFilter: selectedFilter,
-            liveFragment: markerLiveChips.activeLiveFilterDict()
+            liveFragment: (criteriaDocument.merged(with: [:]) ?? [:])
         ) { result in
             if case .success(let saved) = result {
                 liveSheetPresetSelection = SceneLivePresetTag.serverRow(saved.id)
@@ -304,7 +309,7 @@ private struct MarkersViewContent: View {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: markerLiveChips.activeLiveFilterDict()
+                liveFragment: (criteriaDocument.merged(with: [:]) ?? [:])
             ) { result in
                 if case .success = result { showRenamePresetAlert = false }
             }
@@ -393,26 +398,6 @@ private struct MarkersViewContent: View {
             criteriaDocument: criteriaDocument,
             sortOption: .dateDesc,
             onSortChange: { _ in },
-            minRating: markerLiveMinRating,
-            organized: markerLiveOrganized,
-            interactive: markerLiveInteractive,
-            orientation: markerLiveOrientation,
-            performerCount: markerLivePerformerCount,
-            resolution: markerLiveResolution,
-            performerFavorite: markerLivePerformerFavorite,
-            oCounterTag: markerLiveOCounterTag,
-            studioSelectionIds: markerLiveStudioIds,
-            studioPickerOptions: studioPickerOptions,
-            studioPickerLoading: studioPickerLoading,
-            onStudioPickerSectionAppear: { loadStudiosForMarkerLivePicker() },
-            tagSelectionIds: markerLiveTagIds,
-            tagPickerOptions: tagPickerOptions,
-            tagPickerLoading: tagPickerLoading,
-            onTagPickerSectionAppear: { loadTagsForMarkerLivePicker() },
-            groupSelectionIds: markerLiveGroupIds,
-            groupPickerOptions: groupPickerOptions,
-            groupPickerLoading: groupPickerLoading,
-            onGroupPickerSectionAppear: { loadGroupsForMarkerLivePicker() },
             onApply: { applyLiveFilterFromSheet() },
             onReset: {
                 liveSheetPresetSelection = ""

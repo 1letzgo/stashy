@@ -68,7 +68,6 @@
 		9AA0A05BF61443C2B087A163 /* SharedUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1C2F16743C007C2090 /* SharedUtilities.swift */; };
 		9BA6D13B444E433980610D36 /* SceneGroupsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA617C2A62174FFFB0912B44 /* SceneGroupsCard.swift */; };
 		A1B2C3D40002400180011002 /* FilterPickerOptionsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */; };
-		A1B2C3D40004400180011004 /* AdvancedCriteriaCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40003400180011003 /* AdvancedCriteriaCard.swift */; };
 		A1ED4C0012345678901234AB /* EditModeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ED4C0112345678901234AB /* EditModeSettingsView.swift */; };
 		A1ED4C0212345678901234AB /* EditModeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ED4C0112345678901234AB /* EditModeSettingsView.swift */; };
 		A1ICON012F30B00000000001 /* AppIconManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ICON022F30B00000000002 /* AppIconManager.swift */; };
@@ -216,7 +215,6 @@
 		971A00072F999007 /* SessionTimelineToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTimelineToolsView.swift; sourceTree = "<group>"; };
 		971A00092F999009 /* SessionTimelineLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTimelineLoader.swift; sourceTree = "<group>"; };
 		A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterPickerOptionsStore.swift; sourceTree = "<group>"; };
-		A1B2C3D40003400180011003 /* AdvancedCriteriaCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvancedCriteriaCard.swift; sourceTree = "<group>"; };
 		A1ED4C0112345678901234AB /* EditModeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditModeSettingsView.swift; sourceTree = "<group>"; };
 		A1ICON022F30B00000000002 /* AppIconManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconManager.swift; sourceTree = "<group>"; };
 		A1IMGDS022345678901234AB /* StashImageDateSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashImageDateSort.swift; sourceTree = "<group>"; };
@@ -433,7 +431,6 @@
 			children = (
 				D32D9793F36147319D8FF8BF /* FilterCriterionTypes.swift */,
 				FEA1E8DCB9534BA393BDCA09 /* FilterFieldCatalog.swift */,
-				A1B2C3D40003400180011003 /* AdvancedCriteriaCard.swift */,
 				2195D672B4B04628BD280AA1 /* FilterCriteriaDocument.swift */,
 				A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */,
 				0D91ABA114F544C390FD6F8E /* FilterCriteriaEditorView.swift */,
@@ -724,7 +721,6 @@
 				971A00032F999003 /* RateMeToolsView.swift in Sources */,
 				821D4E34EE344BBC881B7E2E /* FilterCriterionTypes.swift in Sources */,
 				F3FAA876F0564E51BFE25096 /* FilterFieldCatalog.swift in Sources */,
-				A1B2C3D40004400180011004 /* AdvancedCriteriaCard.swift in Sources */,
 				4FA2DDB674AB41BC92ACAB15 /* FilterCriteriaDocument.swift in Sources */,
 				A1B2C3D40002400180011002 /* FilterPickerOptionsStore.swift in Sources */,
 				13B8ED271E86457390593F48 /* FilterCriteriaEditorView.swift in Sources */,

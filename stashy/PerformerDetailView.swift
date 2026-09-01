@@ -603,9 +603,6 @@ struct PerformerDetailView: View {
             criteriaDocument: linkedStudios.criteriaDocument,
             sortOption: linkedStudios.selectedSortOption,
             onSortChange: { linkedStudios.changeSortOption(to: $0, viewModel: viewModel) },
-            liveMinRating: $linkedStudios.liveFilterMinRating,
-            liveFavorite: $linkedStudios.liveFilterFavorite,
-            liveScenes: $linkedStudios.liveFilterScenes,
             onApply: { linkedStudios.applyLiveFilter(viewModel: viewModel) },
             onReset: {
                 linkedStudios.catalogPresetRowSelection = ""
@@ -650,8 +647,6 @@ struct PerformerDetailView: View {
             criteriaDocument: linkedTags.criteriaDocument,
             sortOption: linkedTags.selectedSortOption,
             onSortChange: { linkedTags.changeSortOption(to: $0, viewModel: viewModel) },
-            liveFavorite: $linkedTags.liveFilterFavorite,
-            liveScenes: $linkedTags.liveFilterScenes,
             onApply: { linkedTags.applyLiveFilter(viewModel: viewModel) },
             onReset: {
                 linkedTags.catalogPresetRowSelection = ""
@@ -696,13 +691,6 @@ struct PerformerDetailView: View {
             criteriaDocument: linkedGalleries.criteriaDocument,
             sortOption: linkedGalleries.selectedSortOption,
             onSortChange: { linkedGalleries.changeSortOption(to: $0, viewModel: viewModel) },
-            liveMinRating: $linkedGalleries.liveFilterMinRating,
-            liveFavorite: $linkedGalleries.liveFilterFavorite,
-            liveFiles: $linkedGalleries.liveFilterFiles,
-            liveStudioId: $linkedGalleries.liveFilterStudioId,
-            studioPickerOptions: linkedGalleries.studioPickerOptions,
-            studioPickerLoading: linkedGalleries.studioPickerLoading,
-            onStudioPickerSectionAppear: { linkedGalleries.loadStudioPickerOptions(viewModel: viewModel) },
             onApply: { linkedGalleries.applyLiveFilter(viewModel: viewModel) },
             onReset: {
                 linkedGalleries.catalogPresetRowSelection = ""
@@ -751,19 +739,7 @@ struct PerformerDetailView: View {
             showMediaTypeFilter: linkedImages.showImageMediaTypeFilter,
             sortOption: linkedImages.selectedSortOption,
             onSortChange: { linkedImages.changeSortOption(to: $0, viewModel: viewModel) },
-            liveMinRating: $linkedImages.liveFilterMinRating,
-            livePerformerFavorite: $linkedImages.liveFilterPerformerFavorite,
-            liveOrganized: $linkedImages.liveFilterOrganized,
-            liveOCounterTag: $linkedImages.liveFilterOCounterTag,
-            liveStudioIds: $linkedImages.liveFilterStudioIds,
-            liveTagIds: $linkedImages.liveFilterTagIds,
             liveMediaKind: $linkedImages.liveFilterMediaKind,
-            studioPickerOptions: linkedImages.studioPickerOptions,
-            studioPickerLoading: linkedImages.studioPickerLoading,
-            onStudioPickerSectionAppear: { linkedImages.loadStudioPickerOptions(viewModel: viewModel) },
-            tagPickerOptions: linkedImages.tagPickerOptions,
-            tagPickerLoading: linkedImages.tagPickerLoading,
-            onTagPickerSectionAppear: { linkedImages.loadTagPickerOptions(viewModel: viewModel) },
             onApply: { linkedImages.applyLiveFilter(viewModel: viewModel) },
             onReset: {
                 linkedImages.catalogPresetRowSelection = ""

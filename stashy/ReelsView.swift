@@ -282,8 +282,8 @@ struct ReelsViewBody: View {
     @State private var reelsSceneLivePresets: [SceneLiveFilterPreset] = SceneLiveFilterPresetStore.loadPresets()
     @State private var reelsScenePresetNameInput = ""
     @State private var showReelsSceneSaveAsAlert = false
-    @StateObject private var reelsCriteriaDocument = FilterCriteriaDocument(mode: .scenes)
-    @StateObject private var reelsMarkerCriteriaDocument = FilterCriteriaDocument(mode: .sceneMarkers)
+    @StateObject private var reelsCriteriaDocument = FilterCriteriaDocument(mode: .scenes, pinsDefaults: true)
+    @StateObject private var reelsMarkerCriteriaDocument = FilterCriteriaDocument(mode: .sceneMarkers, pinsDefaults: true)
     @State private var showReelsSceneRenameAlert = false
     @State private var showReelsSceneDeleteAlert = false
     @State private var isMenuOpen = false
@@ -672,12 +672,11 @@ struct ReelsViewBody: View {
         }
     }
 
-    private func reelsActiveLiveChipsActiveLiveFilterDict() -> [String: Any] {
+    /// What a preset stores for the active mode: the criteria document of that mode.
+    private func reelsActivePresetLiveFragment() -> [String: Any] {
         switch reelsMode {
-        case .scenes: return reelsSceneLiveChips.activeLiveFilterDict()
-        case .markers: return reelsMarkerLiveChips.activeLiveFilterDict()
-        case .previews: return reelsPreviewLiveChips.activeLiveFilterDict()
-        default: return reelsSceneLiveChips.activeLiveFilterDict()
+        case .markers: return reelsMarkerCriteriaDocument.sanitizedObjectFilter
+        default: return reelsCriteriaDocument.sanitizedObjectFilter
         }
     }
 
@@ -866,7 +865,22 @@ struct ReelsViewBody: View {
             reelsClearActiveLiveChipsOnly()
             reelsApplyAuxIdsFromLiveFragment(preset.liveFragment)
         }
+        // Preset-Kriterien in das Dokument des aktiven Modus — das ist die einzige Filterfläche.
+        reelsLoadPresetCriteria(preset.liveFragment)
         reelsApplySceneLiveFromSheet()
+    }
+
+    /// Lädt das Kriterien-Fragment eines Presets in das Dokument des aktiven Modus.
+    ///
+    /// Bewusst **ohne** die Kriterien des gewählten Server-Filters: Feeds schicken den Filter
+    /// weiterhin als `filter:` mit, sein Inhalt würde sonst doppelt greifen und ließe sich im
+    /// Editor scheinbar wegräumen, ohne dass sich die Liste ändert.
+    private func reelsLoadPresetCriteria(_ fragment: [String: Any]) {
+        if reelsMode == .markers {
+            reelsMarkerCriteriaDocument.load(fragment)
+        } else {
+            reelsCriteriaDocument.load(fragment)
+        }
     }
 
     private func reelsApplyServerSceneSavedFilterForReels(_ f: StashDBViewModel.SavedFilter) {
@@ -902,12 +916,15 @@ struct ReelsViewBody: View {
                 if let flat { reelsApplyAuxIdsFromLiveFragment(flat) }
             }
         }
+        // Nur der stashy-Zusatz des Presets kommt in den Editor — der Server-Filter selbst
+        // fährt als `filter:` mit und bleibt unangetastet.
+        reelsLoadPresetCriteria(f.stashyScenePresetMetadata?.liveFragment ?? [:])
         reelsApplySceneLiveFromSheet()
     }
 
     private func reelsSaveSceneLivePresetOverwrite() {
         let sel = reelsActiveSheetPresetIdForRead
-        let liveDict = reelsActiveLiveChipsActiveLiveFilterDict()
+        let liveDict = reelsActivePresetLiveFragment()
         if let sid = SceneLivePresetTag.parseServerId(sel) {
             let currentName = viewModel.savedFilters[sid]?.name ?? "Filter"
             viewModel.saveSceneSavedFilter(
@@ -943,7 +960,7 @@ struct ReelsViewBody: View {
             name: trimmed,
             sort: selectedSortOption,
             baseFilter: reelsLiveChipTargetFilter,
-            liveFragment: reelsActiveLiveChipsActiveLiveFilterDict()
+            liveFragment: reelsActivePresetLiveFragment()
         ) { result in
             if case .success(let saved) = result {
                 reelsSetActiveSheetPresetSelection(SceneLivePresetTag.serverRow(saved.id))
@@ -962,7 +979,7 @@ struct ReelsViewBody: View {
                 name: trimmed,
                 sort: selectedSortOption,
                 baseFilter: reelsLiveChipTargetFilter,
-                liveFragment: reelsActiveLiveChipsActiveLiveFilterDict()
+                liveFragment: reelsActivePresetLiveFragment()
             ) { result in
                 if case .success = result {
                     showReelsSceneRenameAlert = false
@@ -2431,26 +2448,6 @@ struct ReelsViewBody: View {
             criteriaDocument: reelsMode == .markers ? reelsMarkerCriteriaDocument : reelsCriteriaDocument,
             sortOption: selectedSortOption,
             onSortChange: { changeReelsSceneSortFromSheet($0) },
-            minRating: reelChipBinding(\.minRating),
-            organized: reelChipBinding(\.organized),
-            interactive: reelChipBinding(\.interactive),
-            orientation: reelChipBinding(\.orientation),
-            performerCount: reelChipBinding(\.performerCount),
-            resolution: reelChipBinding(\.resolution),
-            performerFavorite: reelChipBinding(\.performerFavorite),
-            oCounterTag: reelChipBinding(\.oCounterTag),
-            studioSelectionIds: reelChipBinding(\.studioIds),
-            studioPickerOptions: reelsStudioPickerOptions,
-            studioPickerLoading: reelsStudioPickerLoading,
-            onStudioPickerSectionAppear: { reelsLoadStudioPickerOptions() },
-            tagSelectionIds: reelChipBinding(\.tagIds),
-            tagPickerOptions: reelsTagPickerOptions,
-            tagPickerLoading: reelsTagPickerLoading,
-            onTagPickerSectionAppear: { reelsLoadTagPickerOptions() },
-            groupSelectionIds: reelChipBinding(\.groupIds),
-            groupPickerOptions: reelsGroupPickerOptions,
-            groupPickerLoading: reelsGroupPickerLoading,
-            onGroupPickerSectionAppear: { reelsLoadGroupPickerOptions() },
             onApply: { reelsApplySceneLiveFromSheet() },
             onReset: {
                 reelsSetActiveSheetPresetSelection("")
@@ -2721,19 +2718,7 @@ struct ReelsViewBody: View {
                 reelsClipImageFilters.changeSortOption(to: new, viewModel: viewModel)
                 refetchReelsClipsFromModel(viewModel)
             },
-            liveMinRating: $reelsClipImageFilters.liveFilterMinRating,
-            livePerformerFavorite: $reelsClipImageFilters.liveFilterPerformerFavorite,
-            liveOrganized: $reelsClipImageFilters.liveFilterOrganized,
-            liveOCounterTag: $reelsClipImageFilters.liveFilterOCounterTag,
-            liveStudioIds: $reelsClipImageFilters.liveFilterStudioIds,
-            liveTagIds: $reelsClipImageFilters.liveFilterTagIds,
             liveMediaKind: $reelsClipImageFilters.liveFilterMediaKind,
-            studioPickerOptions: reelsClipImageFilters.studioPickerOptions,
-            studioPickerLoading: reelsClipImageFilters.studioPickerLoading,
-            onStudioPickerSectionAppear: { reelsClipImageFilters.loadStudioPickerOptions(viewModel: viewModel) },
-            tagPickerOptions: reelsClipImageFilters.tagPickerOptions,
-            tagPickerLoading: reelsClipImageFilters.tagPickerLoading,
-            onTagPickerSectionAppear: { reelsClipImageFilters.loadTagPickerOptions(viewModel: viewModel) },
             onApply: {
                 refetchReelsClipsFromModel(viewModel)
             },
@@ -2903,11 +2888,11 @@ struct ReelsViewBody: View {
             case .clips:
                 return !reelsClipImageFilters.catalogFilterSortFABActive
             case .scenes:
-                return !reelsSceneLiveChips.isLiveFilterActive
+                return reelsCriteriaDocument.isEmpty
             case .markers:
-                return !reelsMarkerLiveChips.isLiveFilterActive
+                return reelsMarkerCriteriaDocument.isEmpty
             case .previews:
-                return !reelsPreviewLiveChips.isLiveFilterActive
+                return reelsCriteriaDocument.isEmpty
             case .pics:
                 return !reelsPicsFilters.catalogFilterSortFABActive
             }

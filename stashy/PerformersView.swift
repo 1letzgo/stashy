@@ -25,7 +25,7 @@ private struct PerformersViewContent: View {
 
     // Filter & sort sheet (unified)
     @State private var showFilterSortSheet = false
-    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .performers)
+    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .performers, pinsDefaults: true)
     @State private var catalogPresetRowSelection = ""
     @State private var localCatalogPresets: [PerformerListLiveFilterPreset] = PerformerListLiveFilterPresetStore.loadPresets()
     @State private var showSaveAsCatalogPresetAlert = false
@@ -45,78 +45,9 @@ private struct PerformersViewContent: View {
     @State private var liveFilterMissingField: String? = nil // nil=any, "image" / "gender" / "hair_color"
     @State private var liveFilterOCounterTag: String? = nil
 
-    private var isLiveFilterActive: Bool {
-        liveFilterAgeRange != nil || liveFilterHairColor != nil || liveFilterGender != nil
-        || liveFilterCountry != nil || liveFilterImplants != nil || liveFilterFavorite != nil
-        || liveFilterMissingField != nil || liveFilterOCounterTag != nil
-    }
+    private var isLiveFilterActive: Bool { false }
 
-    private var activeLiveFilterDict: [String: Any] {
-        var dict: [String: Any] = [:]
-        if liveFilterAgeRange == CatalogLiveChipFilterSupport.noneChipValue {
-            dict["birthdate"] = CatalogLiveChipFilterSupport.isNullCriterion
-        } else if let age = liveFilterAgeRange {
-            let cal = Calendar.current
-            let now = Date()
-            let fmt = DateFormatter()
-            fmt.dateFormat = "yyyy-MM-dd"
-            switch age {
-            case "18-21":
-                let lo = fmt.string(from: cal.date(byAdding: .year, value: -21, to: now)!)
-                let hi = fmt.string(from: cal.date(byAdding: .year, value: -18, to: now)!)
-                dict["birthdate"] = ["value": lo, "value2": hi, "modifier": "BETWEEN"]
-            case "22-26":
-                let lo = fmt.string(from: cal.date(byAdding: .year, value: -26, to: now)!)
-                let hi = fmt.string(from: cal.date(byAdding: .year, value: -22, to: now)!)
-                dict["birthdate"] = ["value": lo, "value2": hi, "modifier": "BETWEEN"]
-            case "26-30":
-                let lo = fmt.string(from: cal.date(byAdding: .year, value: -30, to: now)!)
-                let hi = fmt.string(from: cal.date(byAdding: .year, value: -26, to: now)!)
-                dict["birthdate"] = ["value": lo, "value2": hi, "modifier": "BETWEEN"]
-            case "30+":
-                let lo = fmt.string(from: cal.date(byAdding: .year, value: -30, to: now)!)
-                dict["birthdate"] = ["value": lo, "modifier": "LESS_THAN"]
-            default: break
-            }
-        }
-        if let hair = liveFilterHairColor {
-            dict["hair_color"] = hair == CatalogLiveChipFilterSupport.noneChipValue
-                ? CatalogLiveChipFilterSupport.isNullCriterion
-                : ["value": hair, "modifier": "EQUALS"]
-        }
-        if let gender = liveFilterGender {
-            dict["gender"] = gender == CatalogLiveChipFilterSupport.noneChipValue
-                ? CatalogLiveChipFilterSupport.isNullCriterion
-                : ["value": gender, "modifier": "EQUALS"]
-        }
-        if let country = liveFilterCountry {
-            if country == CatalogLiveChipFilterSupport.noneChipValue {
-                dict["country"] = CatalogLiveChipFilterSupport.isNullCriterion
-            } else if country == "NOT_US" {
-                dict["country"] = ["value": "US", "modifier": "NOT_EQUALS"]
-            } else {
-                dict["country"] = ["value": country, "modifier": "EQUALS"]
-            }
-        }
-        if let implants = liveFilterImplants {
-            dict["fake_tits"] = implants == CatalogLiveChipFilterSupport.noneChipValue
-                ? CatalogLiveChipFilterSupport.isNullCriterion
-                : ["value": implants, "modifier": "EQUALS"]
-        }
-        if let favorite = liveFilterFavorite {
-            dict["filter_favorites"] = favorite
-        }
-        // Missing-field filter uses Stash's `is_missing: "<field>"` convention.
-        // If explicitly set, it wins over `has_image` to avoid contradictory filters.
-        if let missingField = liveFilterMissingField, !missingField.isEmpty {
-            dict.removeValue(forKey: "has_image")
-            dict["is_missing"] = missingField
-        }
-        if let tag = liveFilterOCounterTag, let oc = sceneLiveOCounterCriterion(from: tag) {
-            dict["o_counter"] = oc
-        }
-        return dict
-    }
+    private var activeLiveFilterDict: [String: Any] { [:] }
 
     /// Passed to `filter:` only while the advanced editor holds no copy of it. Once the editor has
     /// the criteria, re-sending the server filter would resurrect criteria the user edited away;
@@ -136,7 +67,7 @@ private struct PerformersViewContent: View {
     }
 
     private var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     private var sortedServerPerformerFilters: [StashDBViewModel.SavedFilter] {
@@ -239,6 +170,11 @@ private struct PerformersViewContent: View {
         } else {
             clearPerformerLiveChipsOnly()
         }
+        // Ein lokales Preset speichert seine Kriterien im `liveFragment` — die legt der Editor
+        // über die Kriterien des Basisfilters, damit die Sheet zeigt, was wirklich gefiltert wird.
+        var mergedPresetCriteria: [String: Any] = selectedFilter?.criteriaObjectFilter() ?? [:]
+        for (key, value) in preset.liveFragment { mergedPresetCriteria[key] = value }
+        criteriaDocument.load(mergedPresetCriteria)
         applyLiveFilter()
     }
 
@@ -337,7 +273,7 @@ private struct PerformersViewContent: View {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { _ in }
             return
         }
@@ -351,7 +287,7 @@ private struct PerformersViewContent: View {
             createdAt: old.createdAt,
             sort: selectedSortOption,
             baseSavedFilterId: selectedFilter?.id,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         )
         PerformerListLiveFilterPresetStore.upsert(updated)
         refreshPerformerLocalPresets()
@@ -369,7 +305,7 @@ private struct PerformersViewContent: View {
             sortField: selectedSortOption.sortField,
             sortDirection: selectedSortOption.direction,
             baseFilter: selectedFilter,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         ) { result in
             if case .success(let saved) = result {
                 catalogPresetRowSelection = ListLivePresetTag.serverRow(saved.id)
@@ -392,7 +328,7 @@ private struct PerformersViewContent: View {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { result in
                 if case .success = result {
                     showRenameCatalogPresetAlert = false
@@ -626,14 +562,6 @@ private struct PerformersViewContent: View {
             criteriaDocument: criteriaDocument,
             sortOption: selectedSortOption,
             onSortChange: { changeSortOption(to: $0) },
-            liveAgeRange: $liveFilterAgeRange,
-            liveHairColor: $liveFilterHairColor,
-            liveGender: $liveFilterGender,
-            liveCountry: $liveFilterCountry,
-            liveImplants: $liveFilterImplants,
-            liveFavorite: $liveFilterFavorite,
-            liveMissingField: $liveFilterMissingField,
-            liveOCounterTag: $liveFilterOCounterTag,
             onApply: { applyLiveFilter() },
             onReset: {
                 catalogPresetRowSelection = ""

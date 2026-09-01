@@ -15,14 +15,42 @@ struct FilterCriteriaEditorView: View {
     @StateObject private var nestedDocument = FilterCriteriaDocument(mode: .scenes)
     @ObservedObject private var appearance = AppearanceManager.shared
 
-    private var levelKeys: [String] { document.criterionKeys(at: path) }
+    /// Rows the user opened this session. A row added via "Add condition" starts expanded;
+    /// everything that arrives with a value starts collapsed and shows its summary.
+    @State private var expandedKeys: Set<String> = []
+    /// Rows that stay visible after their value was cleared ("Any"), so clearing a condition does
+    /// not make the row jump out from under the finger.
+    @State private var stickyKeys: Set<String> = []
+
+    private var isRoot: Bool { path.isEmpty }
+
+    /// Root: pinned defaults first, then set criteria, then rows kept visible after clearing.
+    private var levelKeys: [String] {
+        var keys = isRoot ? document.displayedCriterionKeys() : document.criterionKeys(at: path)
+        for key in stickyKeys where !keys.contains(key) && !FilterCriteriaDocument.isGroupKey(key) {
+            keys.append(key)
+        }
+        return keys
+    }
+
     private var groupKeys: [String] { document.groupKeys(at: path) }
 
     private var addableFields: [FilterFieldDescriptor] {
         FilterFieldCatalog.addableFields(
             for: document.mode,
-            excludingKeys: Set(document.node(at: path).keys)
+            excludingKeys: Set(levelKeys)
         )
+    }
+
+    private func isExpanded(_ key: String) -> Bool { expandedKeys.contains(key) }
+
+    private func toggleExpanded(_ key: String) {
+        if expandedKeys.contains(key) {
+            expandedKeys.remove(key)
+        } else {
+            expandedKeys.insert(key)
+            stickyKeys.insert(key)
+        }
     }
 
     /// Explains what this level does. The old UI showed AND/OR/NOT as if they were fields,
@@ -84,7 +112,6 @@ struct FilterCriteriaEditorView: View {
     /// list, which hid where one condition ends and the next begins.
     private func criterionCard(key: String) -> some View {
         criterionRow(key: key)
-            .padding(.vertical, DesignTokens.Spacing.xxs)
             .background(Color.secondaryAppBackground)
             .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
     }
@@ -126,9 +153,11 @@ struct FilterCriteriaEditorView: View {
             Menu {
                 ForEach(addableFields) { field in
                     Button(field.label) {
-                        document.addDefaultCriterion(for: field, at: path)
+                        // Empty shell only: the row opens with nothing set, so adding a condition
+                        // never silently filters (a default gender/resolution would).
+                        stickyKeys.insert(field.key)
+                        expandedKeys.insert(field.key)
                         HapticManager.selection()
-                        onChange()
                     }
                 }
             } label: {
@@ -234,39 +263,73 @@ struct FilterCriteriaEditorView: View {
     private func criterionRow(key: String) -> some View {
         let field = FilterFieldCatalog.field(key: key, mode: document.mode)
             ?? FilterFieldDescriptor(key: key, label: key, kind: .raw)
+        let value = document.value(forKey: key, at: path)
+        let isSet = value != nil
+        let expanded = isExpanded(key)
+        // A pinned default is part of the sheet's furniture — it can be cleared, never removed.
+        let isPinned = isRoot && document.pinnedKeys.contains(key)
 
         // Name as the card's heading, controls on their own line below — a fixed label column
         // left the value side barely half the width on an iPhone.
-        VStack(alignment: .leading, spacing: DesignTokens.Spacing.sm) {
-            HStack(alignment: .firstTextBaseline, spacing: DesignTokens.Spacing.sm) {
-                Text(field.label)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundColor(.primary)
-                Spacer(minLength: 0)
+        // Collapsed, the card is exactly a Filter/Sort control card: same height, same insets —
+        // a criterion row must not read as a different kind of control than "Immersive".
+        VStack(alignment: .leading, spacing: 0) {
+            HStack(alignment: .center, spacing: DesignTokens.Spacing.sm) {
                 Button {
-                    document.setCriterion(key: key, value: nil, at: path)
-                    HapticManager.selection()
-                    onChange()
+                    withAnimation(.easeInOut(duration: 0.18)) { toggleExpanded(key) }
                 } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.body)
-                        .foregroundColor(.secondary.opacity(0.55))
-                        // Keeps the delete target clear of the expand chevron on the row below,
-                        // which sits only a few points away on a collapsed card.
-                        .padding(.leading, DesignTokens.Spacing.sm)
-                        .padding(.bottom, DesignTokens.Spacing.xs)
-                        .contentShape(Rectangle())
+                    HStack(alignment: .center, spacing: DesignTokens.Spacing.sm) {
+                        Text(field.label)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(.primary)
+                        Text(FilterCriterionSummary.text(for: field, value: value))
+                            .font(.subheadline)
+                            .foregroundColor(isSet ? appearance.tintColor : .secondary)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
+                        Spacer(minLength: 0)
+                        Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                            .font(.caption.weight(.semibold))
+                            .foregroundColor(.secondary)
+                    }
+                    .contentShape(Rectangle())
                 }
                 .buttonStyle(.plain)
-                .accessibilityLabel("Remove \(field.label)")
-            }
-            .padding(.top, DesignTokens.Spacing.sm)
 
-            VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-                criterionEditor(field: field)
+                if isSet || !isPinned {
+                    Button {
+                        document.setCriterion(key: key, value: nil, at: path)
+                        if isPinned || isSet {
+                            stickyKeys.insert(key)
+                        }
+                        if !isPinned && !isSet {
+                            stickyKeys.remove(key)
+                            expandedKeys.remove(key)
+                        }
+                        HapticManager.selection()
+                        onChange()
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.body)
+                            .foregroundColor(.secondary.opacity(0.55))
+                            // Keeps the delete target clear of the expand chevron next to it.
+                            .padding(.leading, DesignTokens.Spacing.sm)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel(isPinned ? "Clear \(field.label)" : "Remove \(field.label)")
+                }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.bottom, DesignTokens.Spacing.xs + 2)
+            .padding(.vertical, 10)
+            .frame(minHeight: CatalogFilterSortSheetLayout.controlCardMinHeight)
+
+            if expanded {
+                VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                    criterionEditor(field: field)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.bottom, DesignTokens.Spacing.sm + 2)
+            }
         }
         .padding(.horizontal, DesignTokens.Spacing.md)
     }
@@ -274,7 +337,7 @@ struct FilterCriteriaEditorView: View {
     private func criterionEditor(field: FilterFieldDescriptor) -> some View {
         switch field.kind {
         case .boolean:
-            FilterBoolCriterionRow(value: boolBinding(for: field.key), onChange: onChange)
+            FilterBoolCriterionRow(value: optionalBoolBinding(for: field.key), onChange: onChange)
         case .string:
             FilterStringCriterionRow(value: dictBinding(for: field.key), onChange: onChange)
         case .int, .hierarchicalCount:
@@ -359,12 +422,11 @@ struct FilterCriteriaEditorView: View {
         )
     }
 
-    private func boolBinding(for key: String) -> Binding<Bool> {
+    /// Three-state: `nil` = criterion not set at all ("Any"), so a boolean row can be cleared
+    /// without deleting it from the list.
+    private func optionalBoolBinding(for key: String) -> Binding<Bool?> {
         Binding(
-            get: {
-                if let b = document.value(forKey: key, at: path) as? Bool { return b }
-                return true
-            },
+            get: { document.value(forKey: key, at: path) as? Bool },
             set: { document.setCriterion(key: key, value: $0, at: path) }
         )
     }
@@ -505,13 +567,15 @@ struct FilterModifierPicker: View {
 // MARK: - Criterion rows
 
 struct FilterBoolCriterionRow: View {
-    @Binding var value: Bool
+    /// `nil` = not filtered.
+    @Binding var value: Bool?
     var onChange: () -> Void
 
     var body: some View {
         HStack(spacing: 8) {
-            CatalogFilterChip(title: "Yes", isActive: value) { value = true; onChange() }
-            CatalogFilterChip(title: "No", isActive: !value) { value = false; onChange() }
+            CatalogFilterChip(title: "Any", isActive: value == nil) { value = nil; onChange() }
+            CatalogFilterChip(title: "Yes", isActive: value == true) { value = true; onChange() }
+            CatalogFilterChip(title: "No", isActive: value == false) { value = false; onChange() }
         }
     }
 }

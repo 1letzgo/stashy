@@ -582,14 +582,6 @@ struct StudioDetailView: View {
             criteriaDocument: linkedPerformers.criteriaDocument,
             sortOption: linkedPerformers.selectedSortOption,
             onSortChange: { linkedPerformers.changeSortOption(to: $0, viewModel: viewModel) },
-            liveAgeRange: $linkedPerformers.liveFilterAgeRange,
-            liveHairColor: $linkedPerformers.liveFilterHairColor,
-            liveGender: $linkedPerformers.liveFilterGender,
-            liveCountry: $linkedPerformers.liveFilterCountry,
-            liveImplants: $linkedPerformers.liveFilterImplants,
-            liveFavorite: $linkedPerformers.liveFilterFavorite,
-            liveMissingField: $linkedPerformers.liveFilterMissingField,
-            liveOCounterTag: $linkedPerformers.liveFilterOCounterTag,
             onApply: { linkedPerformers.applyLiveFilter(viewModel: viewModel) },
             onReset: {
                 linkedPerformers.catalogPresetRowSelection = ""
@@ -634,8 +626,6 @@ struct StudioDetailView: View {
             criteriaDocument: linkedTags.criteriaDocument,
             sortOption: linkedTags.selectedSortOption,
             onSortChange: { linkedTags.changeSortOption(to: $0, viewModel: viewModel) },
-            liveFavorite: $linkedTags.liveFilterFavorite,
-            liveScenes: $linkedTags.liveFilterScenes,
             onApply: { linkedTags.applyLiveFilter(viewModel: viewModel) },
             onReset: {
                 linkedTags.catalogPresetRowSelection = ""
@@ -680,9 +670,6 @@ struct StudioDetailView: View {
             criteriaDocument: linkedChildStudios.criteriaDocument,
             sortOption: linkedChildStudios.selectedSortOption,
             onSortChange: { linkedChildStudios.changeSortOption(to: $0, viewModel: viewModel) },
-            liveMinRating: $linkedChildStudios.liveFilterMinRating,
-            liveFavorite: $linkedChildStudios.liveFilterFavorite,
-            liveScenes: $linkedChildStudios.liveFilterScenes,
             onApply: { linkedChildStudios.applyLiveFilter(viewModel: viewModel) },
             onReset: {
                 linkedChildStudios.catalogPresetRowSelection = ""
@@ -727,13 +714,6 @@ struct StudioDetailView: View {
             criteriaDocument: linkedGalleries.criteriaDocument,
             sortOption: linkedGalleries.selectedSortOption,
             onSortChange: { linkedGalleries.changeSortOption(to: $0, viewModel: viewModel) },
-            liveMinRating: $linkedGalleries.liveFilterMinRating,
-            liveFavorite: $linkedGalleries.liveFilterFavorite,
-            liveFiles: $linkedGalleries.liveFilterFiles,
-            liveStudioId: $linkedGalleries.liveFilterStudioId,
-            studioPickerOptions: linkedGalleries.studioPickerOptions,
-            studioPickerLoading: linkedGalleries.studioPickerLoading,
-            onStudioPickerSectionAppear: { linkedGalleries.loadStudioPickerOptions(viewModel: viewModel) },
             onApply: { linkedGalleries.applyLiveFilter(viewModel: viewModel) },
             onReset: {
                 linkedGalleries.catalogPresetRowSelection = ""
@@ -782,19 +762,7 @@ struct StudioDetailView: View {
             showMediaTypeFilter: linkedImages.showImageMediaTypeFilter,
             sortOption: linkedImages.selectedSortOption,
             onSortChange: { linkedImages.changeSortOption(to: $0, viewModel: viewModel) },
-            liveMinRating: $linkedImages.liveFilterMinRating,
-            livePerformerFavorite: $linkedImages.liveFilterPerformerFavorite,
-            liveOrganized: $linkedImages.liveFilterOrganized,
-            liveOCounterTag: $linkedImages.liveFilterOCounterTag,
-            liveStudioIds: $linkedImages.liveFilterStudioIds,
-            liveTagIds: $linkedImages.liveFilterTagIds,
             liveMediaKind: $linkedImages.liveFilterMediaKind,
-            studioPickerOptions: linkedImages.studioPickerOptions,
-            studioPickerLoading: linkedImages.studioPickerLoading,
-            onStudioPickerSectionAppear: { linkedImages.loadStudioPickerOptions(viewModel: viewModel) },
-            tagPickerOptions: linkedImages.tagPickerOptions,
-            tagPickerLoading: linkedImages.tagPickerLoading,
-            onTagPickerSectionAppear: { linkedImages.loadTagPickerOptions(viewModel: viewModel) },
             onApply: { linkedImages.applyLiveFilter(viewModel: viewModel) },
             onReset: {
                 linkedImages.catalogPresetRowSelection = ""

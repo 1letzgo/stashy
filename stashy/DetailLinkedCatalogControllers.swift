@@ -45,7 +45,7 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
     @Published var liveFilterOCounterTag: String?
 
     /// Advanced Stash criteria from the full editor; merged over the quick chips on every fetch.
-    let criteriaDocument = FilterCriteriaDocument(mode: .performers)
+    let criteriaDocument = FilterCriteriaDocument(mode: .performers, pinsDefaults: true)
     private var criteriaObserver: AnyCancellable?
 
     init(scope: DetailLinkedPerformersScope, initialSort: StashDBViewModel.PerformerSortOption = .nameAsc) {
@@ -58,14 +58,10 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
         }
     }
 
-    private var isLiveFilterActive: Bool {
-        liveFilterAgeRange != nil || liveFilterHairColor != nil || liveFilterGender != nil
-            || liveFilterCountry != nil || liveFilterImplants != nil || liveFilterFavorite != nil
-            || liveFilterMissingField != nil || liveFilterOCounterTag != nil
-    }
+    private var isLiveFilterActive: Bool { false }
 
     var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     func sortedServerPerformerFilters(viewModel: StashDBViewModel) -> [StashDBViewModel.SavedFilter] {
@@ -75,70 +71,7 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
     }
 
 
-    private var activeLiveFilterDict: [String: Any] {
-        var dict: [String: Any] = [:]
-        if liveFilterAgeRange == CatalogLiveChipFilterSupport.noneChipValue {
-            dict["birthdate"] = CatalogLiveChipFilterSupport.isNullCriterion
-        } else if let age = liveFilterAgeRange {
-            let cal = Calendar.current
-            let now = Date()
-            let fmt = DateFormatter()
-            fmt.dateFormat = "yyyy-MM-dd"
-            switch age {
-            case "18-21":
-                let lo = fmt.string(from: cal.date(byAdding: .year, value: -21, to: now)!)
-                let hi = fmt.string(from: cal.date(byAdding: .year, value: -18, to: now)!)
-                dict["birthdate"] = ["value": lo, "value2": hi, "modifier": "BETWEEN"]
-            case "22-26":
-                let lo = fmt.string(from: cal.date(byAdding: .year, value: -26, to: now)!)
-                let hi = fmt.string(from: cal.date(byAdding: .year, value: -22, to: now)!)
-                dict["birthdate"] = ["value": lo, "value2": hi, "modifier": "BETWEEN"]
-            case "26-30":
-                let lo = fmt.string(from: cal.date(byAdding: .year, value: -30, to: now)!)
-                let hi = fmt.string(from: cal.date(byAdding: .year, value: -26, to: now)!)
-                dict["birthdate"] = ["value": lo, "value2": hi, "modifier": "BETWEEN"]
-            case "30+":
-                let lo = fmt.string(from: cal.date(byAdding: .year, value: -30, to: now)!)
-                dict["birthdate"] = ["value": lo, "modifier": "LESS_THAN"]
-            default: break
-            }
-        }
-        if let hair = liveFilterHairColor {
-            dict["hair_color"] = hair == CatalogLiveChipFilterSupport.noneChipValue
-                ? CatalogLiveChipFilterSupport.isNullCriterion
-                : ["value": hair, "modifier": "EQUALS"]
-        }
-        if let gender = liveFilterGender {
-            dict["gender"] = gender == CatalogLiveChipFilterSupport.noneChipValue
-                ? CatalogLiveChipFilterSupport.isNullCriterion
-                : ["value": gender, "modifier": "EQUALS"]
-        }
-        if let country = liveFilterCountry {
-            if country == CatalogLiveChipFilterSupport.noneChipValue {
-                dict["country"] = CatalogLiveChipFilterSupport.isNullCriterion
-            } else if country == "NOT_US" {
-                dict["country"] = ["value": "US", "modifier": "NOT_EQUALS"]
-            } else {
-                dict["country"] = ["value": country, "modifier": "EQUALS"]
-            }
-        }
-        if let implants = liveFilterImplants {
-            dict["fake_tits"] = implants == CatalogLiveChipFilterSupport.noneChipValue
-                ? CatalogLiveChipFilterSupport.isNullCriterion
-                : ["value": implants, "modifier": "EQUALS"]
-        }
-        if let favorite = liveFilterFavorite {
-            dict["filter_favorites"] = favorite
-        }
-        if let missingField = liveFilterMissingField, !missingField.isEmpty {
-            dict.removeValue(forKey: "has_image")
-            dict["is_missing"] = missingField
-        }
-        if let tag = liveFilterOCounterTag, let oc = sceneLiveOCounterCriterion(from: tag) {
-            dict["o_counter"] = oc
-        }
-        return dict
-    }
+    private var activeLiveFilterDict: [String: Any] { [:] }
 
     /// Passed to `filter:` only while the advanced editor holds no copy of it — otherwise the
     /// server filter would resurrect criteria the user edited away.
@@ -171,69 +104,9 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
         localCatalogPresets = PerformerListLiveFilterPresetStore.loadPresets()
     }
 
-    func clearLiveChipsOnly() {
-        liveFilterAgeRange = nil
-        liveFilterHairColor = nil
-        liveFilterGender = nil
-        liveFilterCountry = nil
-        liveFilterImplants = nil
-        liveFilterFavorite = nil
-        liveFilterMissingField = nil
-        liveFilterOCounterTag = nil
-    }
+    func clearLiveChipsOnly() {}
 
-    func mapLiveFragmentToChips(_ frag: [String: Any]) {
-        clearLiveChipsOnly()
-        if let fav = frag["filter_favorites"] as? Bool {
-            liveFilterFavorite = fav
-        }
-        let none = CatalogLiveChipFilterSupport.noneChipValue
-        if let hair = frag["hair_color"] {
-            if CatalogLiveChipFilterSupport.isNullCriterion(hair) {
-                liveFilterHairColor = none
-            } else if let v = (hair as? [String: Any])?["value"] as? String {
-                liveFilterHairColor = v
-            }
-        }
-        if let g = frag["gender"] {
-            if CatalogLiveChipFilterSupport.isNullCriterion(g) {
-                liveFilterGender = none
-            } else if let v = (g as? [String: Any])?["value"] as? String {
-                liveFilterGender = v
-            }
-        }
-        if let c = frag["country"] {
-            if CatalogLiveChipFilterSupport.isNullCriterion(c) {
-                liveFilterCountry = none
-            } else if let d = c as? [String: Any] {
-                let mod = (d["modifier"] as? String) ?? ""
-                if mod == "NOT_EQUALS", (d["value"] as? String) == "US" {
-                    liveFilterCountry = "NOT_US"
-                } else if let v = d["value"] as? String {
-                    liveFilterCountry = v
-                }
-            }
-        }
-        if let ft = frag["fake_tits"] {
-            if CatalogLiveChipFilterSupport.isNullCriterion(ft) {
-                liveFilterImplants = none
-            } else if let v = (ft as? [String: Any])?["value"] as? String {
-                liveFilterImplants = v
-            }
-        }
-        if CatalogLiveChipFilterSupport.isNullCriterion(frag["birthdate"]) {
-            liveFilterAgeRange = none
-        }
-        if let m = frag["is_missing"] as? String {
-            liveFilterMissingField = m
-        }
-        if let oc = frag["o_counter"] as? [String: Any],
-           let mod = oc["modifier"] as? String,
-           let raw = oc["value"],
-           let v = Self.intFromLiveFragmentJSON(raw) {
-            liveFilterOCounterTag = "\(mod):\(v)"
-        }
-    }
+    func mapLiveFragmentToChips(_ frag: [String: Any]) {}
 
     func changeSortOption(to newOption: StashDBViewModel.PerformerSortOption, viewModel: StashDBViewModel) {
         if newOption == .random && selectedSortOption == .random {
@@ -267,6 +140,11 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
         } else {
             clearLiveChipsOnly()
         }
+        // Ein lokales Preset speichert seine Kriterien im `liveFragment` — die legt der Editor
+        // über die Kriterien des Basisfilters, damit die Sheet zeigt, was wirklich gefiltert wird.
+        var mergedPresetCriteria: [String: Any] = selectedFilter?.criteriaObjectFilter() ?? [:]
+        for (key, value) in preset.liveFragment { mergedPresetCriteria[key] = value }
+        criteriaDocument.load(mergedPresetCriteria)
         applyLiveFilter(viewModel: viewModel)
     }
 
@@ -385,7 +263,7 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { _ in }
             return
         }
@@ -399,7 +277,7 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
             createdAt: old.createdAt,
             sort: selectedSortOption,
             baseSavedFilterId: selectedFilter?.id,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         )
         PerformerListLiveFilterPresetStore.upsert(updated)
         refreshLocalPresets()
@@ -417,7 +295,7 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
             sortField: selectedSortOption.sortField,
             sortDirection: selectedSortOption.direction,
             baseFilter: selectedFilter,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         ) { [weak self] result in
             guard let self else { return }
             if case .success(let saved) = result {
@@ -441,7 +319,7 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { [weak self] result in
                 if case .success = result { self?.showRenameCatalogPresetAlert = false }
             }
@@ -506,7 +384,7 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
     @Published var liveFilterScenes: String?
 
     /// Advanced Stash criteria from the full editor; merged over the quick chips on every fetch.
-    let criteriaDocument = FilterCriteriaDocument(mode: .tags)
+    let criteriaDocument = FilterCriteriaDocument(mode: .tags, pinsDefaults: true)
     private var criteriaObserver: AnyCancellable?
 
     init(scope: DetailLinkedTagsScope, initialSort: StashDBViewModel.TagSortOption = .sceneCountDesc) {
@@ -519,12 +397,10 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
         }
     }
 
-    private var isLiveFilterActive: Bool {
-        liveFilterFavorite != nil || liveFilterScenes != nil
-    }
+    private var isLiveFilterActive: Bool { false }
 
     var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     func sortedServerTagFilters(viewModel: StashDBViewModel) -> [StashDBViewModel.SavedFilter] {
@@ -534,13 +410,7 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
     }
 
 
-    private var activeLiveFilterDict: [String: Any] {
-        var dict: [String: Any] = [:]
-        if let fav = liveFilterFavorite { dict["favorite"] = fav }
-        if liveFilterScenes == "has" { dict["scene_count"] = ["value": 0, "modifier": "GREATER_THAN"] }
-        if liveFilterScenes == "none" { dict["scene_count"] = ["value": 0, "modifier": "EQUALS"] }
-        return dict
-    }
+    private var activeLiveFilterDict: [String: Any] { [:] }
 
     /// Passed to `filter:` only while the advanced editor holds no copy of it — otherwise the
     /// server filter would resurrect criteria the user edited away.
@@ -573,21 +443,9 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
         localCatalogPresets = TagListLiveFilterPresetStore.loadPresets()
     }
 
-    func clearLiveChipsOnly() {
-        liveFilterFavorite = nil
-        liveFilterScenes = nil
-    }
+    func clearLiveChipsOnly() {}
 
-    func mapLiveFragmentToChips(_ frag: [String: Any]) {
-        clearLiveChipsOnly()
-        if let fav = frag["favorite"] as? Bool {
-            liveFilterFavorite = fav
-        }
-        if let sc = frag["scene_count"] as? [String: Any], let mod = sc["modifier"] as? String {
-            if mod == "GREATER_THAN" { liveFilterScenes = "has" }
-            if mod == "EQUALS", (sc["value"] as? Int) == 0 { liveFilterScenes = "none" }
-        }
-    }
+    func mapLiveFragmentToChips(_ frag: [String: Any]) {}
 
     func changeSortOption(to newOption: StashDBViewModel.TagSortOption, viewModel: StashDBViewModel) {
         if newOption == .random && selectedSortOption == .random {
@@ -614,6 +472,11 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
         } else {
             clearLiveChipsOnly()
         }
+        // Ein lokales Preset speichert seine Kriterien im `liveFragment` — die legt der Editor
+        // über die Kriterien des Basisfilters, damit die Sheet zeigt, was wirklich gefiltert wird.
+        var mergedPresetCriteria: [String: Any] = selectedFilter?.criteriaObjectFilter() ?? [:]
+        for (key, value) in preset.liveFragment { mergedPresetCriteria[key] = value }
+        criteriaDocument.load(mergedPresetCriteria)
         applyLiveFilter(viewModel: viewModel)
     }
 
@@ -732,7 +595,7 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { _ in }
             return
         }
@@ -746,7 +609,7 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
             createdAt: old.createdAt,
             sort: selectedSortOption,
             baseSavedFilterId: selectedFilter?.id,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         )
         TagListLiveFilterPresetStore.upsert(updated)
         refreshLocalPresets()
@@ -764,7 +627,7 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
             sortField: selectedSortOption.sortField,
             sortDirection: selectedSortOption.direction,
             baseFilter: selectedFilter,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         ) { [weak self] result in
             guard let self else { return }
             if case .success(let saved) = result {
@@ -788,7 +651,7 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { [weak self] result in
                 if case .success = result { self?.showRenameCatalogPresetAlert = false }
             }
@@ -854,7 +717,7 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
     @Published var liveFilterScenes: String?
 
     /// Advanced Stash criteria from the full editor; merged over the quick chips on every fetch.
-    let criteriaDocument = FilterCriteriaDocument(mode: .studios)
+    let criteriaDocument = FilterCriteriaDocument(mode: .studios, pinsDefaults: true)
     private var criteriaObserver: AnyCancellable?
 
     init(scope: DetailLinkedStudiosScope, initialSort: StashDBViewModel.StudioSortOption = .nameAsc) {
@@ -867,12 +730,10 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
         }
     }
 
-    private var isLiveFilterActive: Bool {
-        liveFilterFavorite != nil || liveFilterMinRating != 0 || liveFilterScenes != nil
-    }
+    private var isLiveFilterActive: Bool { false }
 
     var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     func sortedServerStudioFilters(viewModel: StashDBViewModel) -> [StashDBViewModel.SavedFilter] {
@@ -882,18 +743,7 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
     }
 
 
-    private var activeLiveFilterDict: [String: Any] {
-        var dict: [String: Any] = [:]
-        if let fav = liveFilterFavorite { dict["favorite"] = fav }
-        if liveFilterMinRating == -1 {
-            dict["rating100"] = ["modifier": "IS_NULL"]
-        } else if liveFilterMinRating > 0 {
-            dict["rating100"] = ["value": (liveFilterMinRating * 20), "modifier": "EQUALS"]
-        }
-        if liveFilterScenes == "has" { dict["scene_count"] = ["value": 0, "modifier": "GREATER_THAN"] }
-        if liveFilterScenes == "none" { dict["scene_count"] = ["value": 0, "modifier": "EQUALS"] }
-        return dict
-    }
+    private var activeLiveFilterDict: [String: Any] { [:] }
 
     /// Passed to `filter:` only while the advanced editor holds no copy of it — otherwise the
     /// server filter would resurrect criteria the user edited away.
@@ -928,41 +778,9 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
         localCatalogPresets = StudioListLiveFilterPresetStore.loadPresets()
     }
 
-    func clearLiveChipsOnly() {
-        liveFilterFavorite = nil
-        liveFilterMinRating = 0
-        liveFilterScenes = nil
-    }
+    func clearLiveChipsOnly() {}
 
-    func mapLiveFragmentToChips(_ frag: [String: Any]) {
-        clearLiveChipsOnly()
-        if let fav = frag["favorite"] as? Bool {
-            liveFilterFavorite = fav
-        }
-        if let r = frag["rating100"] as? [String: Any] {
-            let mod = (r["modifier"] as? String) ?? ""
-            if mod == "IS_NULL" {
-                liveFilterMinRating = -1
-            } else if let raw = r["value"] {
-                let v: Int? = {
-                    if let i = raw as? Int { return i }
-                    if let d = raw as? Double { return Int(d) }
-                    if let n = raw as? NSNumber { return n.intValue }
-                    return nil
-                }()
-                if let v {
-                    liveFilterMinRating = max(0, min(5, v / 20))
-                }
-            }
-        }
-        if let sc = frag["scene_count"] as? [String: Any], let mod = sc["modifier"] as? String {
-            if mod == "GREATER_THAN" {
-                liveFilterScenes = "has"
-            } else if mod == "EQUALS" {
-                liveFilterScenes = "none"
-            }
-        }
-    }
+    func mapLiveFragmentToChips(_ frag: [String: Any]) {}
 
     func changeSortOption(to newOption: StashDBViewModel.StudioSortOption, viewModel: StashDBViewModel) {
         if newOption == .random && selectedSortOption == .random {
@@ -989,6 +807,11 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
         } else {
             clearLiveChipsOnly()
         }
+        // Ein lokales Preset speichert seine Kriterien im `liveFragment` — die legt der Editor
+        // über die Kriterien des Basisfilters, damit die Sheet zeigt, was wirklich gefiltert wird.
+        var mergedPresetCriteria: [String: Any] = selectedFilter?.criteriaObjectFilter() ?? [:]
+        for (key, value) in preset.liveFragment { mergedPresetCriteria[key] = value }
+        criteriaDocument.load(mergedPresetCriteria)
         applyLiveFilter(viewModel: viewModel)
     }
 
@@ -1107,7 +930,7 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { _ in }
             return
         }
@@ -1121,7 +944,7 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
             createdAt: old.createdAt,
             sort: selectedSortOption,
             baseSavedFilterId: selectedFilter?.id,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         )
         StudioListLiveFilterPresetStore.upsert(updated)
         refreshLocalPresets()
@@ -1139,7 +962,7 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
             sortField: selectedSortOption.sortField,
             sortDirection: selectedSortOption.direction,
             baseFilter: selectedFilter,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         ) { [weak self] result in
             guard let self else { return }
             if case .success(let saved) = result {
@@ -1163,7 +986,7 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { [weak self] result in
                 if case .success = result { self?.showRenameCatalogPresetAlert = false }
             }
@@ -1232,7 +1055,7 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
     @Published var studioPickerLoading = false
 
     /// Advanced Stash criteria from the full editor; merged over the quick chips on every fetch.
-    let criteriaDocument = FilterCriteriaDocument(mode: .galleries)
+    let criteriaDocument = FilterCriteriaDocument(mode: .galleries, pinsDefaults: true)
     private var criteriaObserver: AnyCancellable?
 
     init(scope: DetailLinkedGalleriesScope, initialSort: StashDBViewModel.GallerySortOption = .dateDesc) {
@@ -1245,12 +1068,10 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
         }
     }
 
-    private var isLiveFilterActive: Bool {
-        liveFilterFavorite != nil || liveFilterMinRating != 0 || liveFilterFiles != nil || liveFilterStudioId != nil
-    }
+    private var isLiveFilterActive: Bool { false }
 
     var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     func loadStudioPickerOptions(viewModel: StashDBViewModel) {
@@ -1270,23 +1091,7 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
     }
 
 
-    private var activeLiveFilterDict: [String: Any] {
-        var dict: [String: Any] = [:]
-        if let fav = liveFilterFavorite { dict["favorite"] = fav }
-        if liveFilterMinRating == -1 {
-            dict["rating100"] = ["modifier": "IS_NULL"]
-        } else if liveFilterMinRating > 0 {
-            dict["rating100"] = ["value": (liveFilterMinRating * 20), "modifier": "EQUALS"]
-        }
-        if liveFilterFiles == "has" { dict["file_count"] = ["value": 0, "modifier": "GREATER_THAN"] }
-        if liveFilterFiles == "none" { dict["file_count"] = ["value": 0, "modifier": "EQUALS"] }
-        if let sid = liveFilterStudioId {
-            dict["studios"] = sid == CatalogLiveChipFilterSupport.noneChipValue
-                ? CatalogLiveChipFilterSupport.isNullCriterion
-                : ["modifier": "INCLUDES", "value": [sid]]
-        }
-        return dict
-    }
+    private var activeLiveFilterDict: [String: Any] { [:] }
 
     /// Passed to `filter:` only while the advanced editor holds no copy of it — otherwise the
     /// server filter would resurrect criteria the user edited away.
@@ -1321,50 +1126,9 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
         localCatalogPresets = GalleryListLiveFilterPresetStore.loadPresets()
     }
 
-    func clearLiveChipsOnly() {
-        liveFilterFavorite = nil
-        liveFilterMinRating = 0
-        liveFilterFiles = nil
-        liveFilterStudioId = nil
-    }
+    func clearLiveChipsOnly() {}
 
-    func mapLiveFragmentToChips(_ frag: [String: Any]) {
-        clearLiveChipsOnly()
-        if let fav = frag["favorite"] as? Bool {
-            liveFilterFavorite = fav
-        }
-        if let r = frag["rating100"] as? [String: Any] {
-            let mod = (r["modifier"] as? String) ?? ""
-            if mod == "IS_NULL" {
-                liveFilterMinRating = -1
-            } else if let raw = r["value"] {
-                let v: Int? = {
-                    if let i = raw as? Int { return i }
-                    if let d = raw as? Double { return Int(d) }
-                    if let n = raw as? NSNumber { return n.intValue }
-                    return nil
-                }()
-                if let v {
-                    liveFilterMinRating = max(0, min(5, v / 20))
-                }
-            }
-        }
-        if let fc = frag["file_count"] as? [String: Any], let mod = fc["modifier"] as? String {
-            if mod == "GREATER_THAN" {
-                liveFilterFiles = "has"
-            } else if mod == "EQUALS" {
-                liveFilterFiles = "none"
-            }
-        }
-        if CatalogLiveChipFilterSupport.isNullCriterion(frag["studios"]) {
-            liveFilterStudioId = CatalogLiveChipFilterSupport.noneChipValue
-        } else if let st = frag["studios"] as? [String: Any],
-           (st["modifier"] as? String) == "INCLUDES",
-           let vals = st["value"] as? [Any] {
-            let ids = vals.compactMap { $0 as? String }
-            liveFilterStudioId = ids.first
-        }
-    }
+    func mapLiveFragmentToChips(_ frag: [String: Any]) {}
 
     func changeSortOption(to newOption: StashDBViewModel.GallerySortOption, viewModel: StashDBViewModel) {
         if newOption == .random && selectedSortOption == .random {
@@ -1391,6 +1155,11 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
         } else {
             clearLiveChipsOnly()
         }
+        // Ein lokales Preset speichert seine Kriterien im `liveFragment` — die legt der Editor
+        // über die Kriterien des Basisfilters, damit die Sheet zeigt, was wirklich gefiltert wird.
+        var mergedPresetCriteria: [String: Any] = selectedFilter?.criteriaObjectFilter() ?? [:]
+        for (key, value) in preset.liveFragment { mergedPresetCriteria[key] = value }
+        criteriaDocument.load(mergedPresetCriteria)
         applyLiveFilter(viewModel: viewModel)
     }
 
@@ -1509,7 +1278,7 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { _ in }
             return
         }
@@ -1523,7 +1292,7 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
             createdAt: old.createdAt,
             sort: selectedSortOption,
             baseSavedFilterId: selectedFilter?.id,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         )
         GalleryListLiveFilterPresetStore.upsert(updated)
         refreshLocalPresets()
@@ -1541,7 +1310,7 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
             sortField: selectedSortOption.sortField,
             sortDirection: selectedSortOption.direction,
             baseFilter: selectedFilter,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         ) { [weak self] result in
             guard let self else { return }
             if case .success(let saved) = result {
@@ -1565,7 +1334,7 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { [weak self] result in
                 if case .success = result { self?.showRenameCatalogPresetAlert = false }
             }
@@ -1662,7 +1431,7 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
     private var ignoreNextPresetSelectionChange = false
 
     /// Advanced Stash criteria from the full editor; merged over the quick chips on every fetch.
-    let criteriaDocument = FilterCriteriaDocument(mode: .images)
+    let criteriaDocument = FilterCriteriaDocument(mode: .images, pinsDefaults: true)
     private var criteriaObserver: AnyCancellable?
 
     init(scope: DetailLinkedImagesScope, initialSort: StashDBViewModel.ImageSortOption = .dateDesc) {
@@ -1681,7 +1450,7 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
         let hasLocalFilter =
             selectedFilter != nil
             || !catalogPresetRowSelection.isEmpty
-            || isLiveFilterActive
+
         guard !hasLocalFilter else { return }
 
         if let f = viewModel.currentImageFilter {
@@ -1700,17 +1469,12 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
     }
 
     private var isLiveFilterActive: Bool {
-        let mediaKindActive: Bool = {
-            if case .reelsStashLine = scope { return false }
-            return liveFilterMediaKind != .all
-        }()
-        return liveFilterPerformerFavorite != nil || liveFilterMinRating != 0 || liveFilterOrganized != nil
-            || liveFilterOCounterTag != nil || !liveFilterStudioIds.isEmpty || !liveFilterTagIds.isEmpty
-            || mediaKindActive
+        if case .reelsStashLine = scope { return false }
+        return liveFilterMediaKind != .all
     }
 
     var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     /// Clips use a fixed video-style `path` regex in `fetchClips` and ignore live `path`.
@@ -1803,31 +1567,11 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
     }
 
 
+    /// Nur noch der Medientyp (Bilder/Videos) — alle anderen Kriterien leben im Kriterien-Dokument.
     private var activeLiveFilterDict: [String: Any] {
-        var dict: [String: Any] = [:]
-        if let fav = liveFilterPerformerFavorite { dict["performer_favorite"] = fav }
-        if liveFilterMinRating == -1 {
-            dict["rating100"] = ["modifier": "IS_NULL"]
-        } else if liveFilterMinRating > 0 {
-            dict["rating100"] = ["value": (liveFilterMinRating * 20), "modifier": "EQUALS"]
-        }
-        if liveFilterOrganized == "true" { dict["organized"] = true }
-        if liveFilterOrganized == "false" { dict["organized"] = false }
-        if let tag = liveFilterOCounterTag, let oc = sceneLiveOCounterCriterion(from: tag) {
-            dict["o_counter"] = oc
-        }
-        if !liveFilterStudioIds.isEmpty {
-            dict["studios"] = ["modifier": "INCLUDES", "value": liveFilterStudioIds, "depth": 0]
-        }
-        if !liveFilterTagIds.isEmpty {
-            dict["tags"] = ["modifier": "INCLUDES", "value": liveFilterTagIds, "depth": 0]
-        }
-        if let pathCrit = liveFilterMediaKind.pathCriterion {
-            if case .reelsStashLine = scope { /* images-only feed; ignore preset path */ } else {
-                dict["path"] = pathCrit
-            }
-        }
-        return dict
+        guard let pathCrit = liveFilterMediaKind.pathCriterion else { return [:] }
+        if case .reelsStashLine = scope { return [:] }
+        return ["path": pathCrit]
     }
 
     /// Passed to `filter:` only while the advanced editor holds no copy of it — otherwise the
@@ -1915,57 +1659,12 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
     }
 
     func clearLiveChipsOnly() {
-        liveFilterPerformerFavorite = nil
-        liveFilterMinRating = 0
-        liveFilterOrganized = nil
-        liveFilterOCounterTag = nil
-        liveFilterStudioIds = []
-        liveFilterTagIds = []
         liveFilterMediaKind = .all
     }
 
+    /// Restores only the media-type chip; every other key is loaded into the criteria document.
     func mapLiveFragmentToChips(_ frag: [String: Any]) {
-        clearLiveChipsOnly()
-        if let media = ImageListMediaKind.fromPathFragment(frag["path"]) {
-            liveFilterMediaKind = media
-        }
-        if let fav = frag["performer_favorite"] as? Bool {
-            liveFilterPerformerFavorite = fav
-        }
-        if let r = frag["rating100"] as? [String: Any] {
-            let mod = (r["modifier"] as? String) ?? ""
-            if mod == "IS_NULL" {
-                liveFilterMinRating = -1
-            } else if let raw = r["value"] {
-                let v: Int? = {
-                    if let i = raw as? Int { return i }
-                    if let d = raw as? Double { return Int(d) }
-                    if let n = raw as? NSNumber { return n.intValue }
-                    return nil
-                }()
-                if let v {
-                    liveFilterMinRating = max(0, min(5, v / 20))
-                }
-            }
-        }
-        if let o = frag["organized"] as? Bool {
-            liveFilterOrganized = o ? "true" : "false"
-        }
-        if let oc = frag["o_counter"] as? [String: Any],
-           let mod = oc["modifier"] as? String,
-           let raw = oc["value"] {
-            let v: Int? = {
-                if let i = raw as? Int { return i }
-                if let d = raw as? Double { return Int(d) }
-                if let n = raw as? NSNumber { return n.intValue }
-                return nil
-            }()
-            if let v {
-                liveFilterOCounterTag = "\(mod):\(v)"
-            }
-        }
-        liveFilterStudioIds = CatalogLiveChipFilterSupport.includesIds(fromCriterion: frag["studios"])
-        liveFilterTagIds = CatalogLiveChipFilterSupport.includesIds(fromCriterion: frag["tags"])
+        liveFilterMediaKind = ImageListMediaKind.fromPathFragment(frag["path"]) ?? .all
     }
 
     /// Applies chip state from a normal Stash saved image filter (`filter_dict` and/or `object_filter`).
@@ -2042,6 +1741,11 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
             liveFilterStudioIds = CatalogLiveChipFilterSupport.includesIds(fromCriterion: preset.liveFragment["studios"])
             liveFilterTagIds = CatalogLiveChipFilterSupport.includesIds(fromCriterion: preset.liveFragment["tags"])
         }
+        // Ein lokales Preset speichert seine Kriterien im `liveFragment` — die legt der Editor
+        // über die Kriterien des Basisfilters, damit die Sheet zeigt, was wirklich gefiltert wird.
+        var mergedPresetCriteria: [String: Any] = selectedFilter?.criteriaObjectFilter() ?? [:]
+        for (key, value) in preset.liveFragment { mergedPresetCriteria[key] = value }
+        criteriaDocument.load(mergedPresetCriteria)
         applyLiveFilter(viewModel: viewModel)
     }
 
@@ -2159,7 +1863,7 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { _ in }
             return
         }
@@ -2173,7 +1877,7 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
             createdAt: old.createdAt,
             sort: selectedSortOption,
             baseSavedFilterId: selectedFilter?.id,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         )
         ImageListLiveFilterPresetStore.upsert(updated)
         refreshLocalPresets()
@@ -2191,7 +1895,7 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
             sortField: selectedSortOption.sortField,
             sortDirection: selectedSortOption.direction,
             baseFilter: selectedFilter,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         ) { [weak self] result in
             guard let self else { return }
             if case .success(let saved) = result {
@@ -2215,7 +1919,7 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { [weak self] result in
                 if case .success = result { self?.showRenameCatalogPresetAlert = false }
             }

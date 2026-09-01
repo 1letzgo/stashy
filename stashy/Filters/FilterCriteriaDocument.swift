@@ -20,15 +20,33 @@ final class FilterCriteriaDocument: ObservableObject {
         set { keyOrders[""] = newValue }
     }
 
-    init(mode: StashDBViewModel.FilterMode, objectFilter: [String: Any] = [:]) {
+    /// Keys the editor always shows on the root level, even without a value — the "wichtigste
+    /// Kriterien" of a mode. Replaces the old quick-chip card: one list instead of chips plus a
+    /// separate advanced editor.
+    private(set) var pinnedKeys: [String] = []
+
+    init(mode: StashDBViewModel.FilterMode, objectFilter: [String: Any] = [:], pinsDefaults: Bool = false) {
         self.mode = mode
         self.objectFilter = Self.sanitize(objectFilter, mode: mode)
         self.keyOrders = ["": Self.defaultSortedKeys(Array(self.objectFilter.keys), mode: mode)]
+        if pinsDefaults {
+            self.pinnedKeys = FilterFieldCatalog.defaultCriterionKeys(for: mode)
+        }
+    }
+
+    /// Root-level display order: pinned first (catalog order), then everything else as inserted.
+    func displayedCriterionKeys() -> [String] {
+        let present = criterionKeys(at: [])
+        var out = pinnedKeys
+        out.append(contentsOf: present.filter { !pinnedKeys.contains($0) })
+        return out
     }
 
     /// Reconfigure for nested editors (AND/OR/NOT / `*_filter`) without allocating a new object.
     func reconfigure(mode: StashDBViewModel.FilterMode, objectFilter: [String: Any]) {
         self.mode = mode
+        // Nested editors (AND/OR/NOT, `*_filter`) pin nothing — pins are a root-sheet affordance.
+        pinnedKeys = []
         // Anderer Modus = andere Felder: Reihenfolge komplett neu aufbauen.
         keyOrders = [:]
         self.objectFilter = Self.sanitize(objectFilter, mode: mode)

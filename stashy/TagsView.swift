@@ -28,7 +28,7 @@ private struct TagsViewContent: View {
 
     // Filter & sort sheet
     @State private var showFilterSortSheet = false
-    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .tags)
+    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .tags, pinsDefaults: true)
 
     @State private var catalogPresetRowSelection = ""
     @State private var localCatalogPresets: [TagListLiveFilterPreset] = TagListLiveFilterPresetStore.loadPresets()
@@ -43,17 +43,9 @@ private struct TagsViewContent: View {
     /// "has" / "none"; nil = any.
     @State private var liveFilterScenes: String?
 
-    private var isLiveFilterActive: Bool {
-        liveFilterFavorite != nil || liveFilterScenes != nil
-    }
+    private var isLiveFilterActive: Bool { false }
 
-    private var activeLiveFilterDict: [String: Any] {
-        var dict: [String: Any] = [:]
-        if let fav = liveFilterFavorite { dict["favorite"] = fav }
-        if liveFilterScenes == "has" { dict["scene_count"] = ["value": 0, "modifier": "GREATER_THAN"] }
-        if liveFilterScenes == "none" { dict["scene_count"] = ["value": 0, "modifier": "EQUALS"] }
-        return dict
-    }
+    private var activeLiveFilterDict: [String: Any] { [:] }
 
     /// Passed to `filter:` only while the advanced editor holds no copy of it. Once the editor has
     /// the criteria, re-sending the server filter would resurrect criteria the user edited away;
@@ -101,7 +93,7 @@ private struct TagsViewContent: View {
     }
 
     private var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     private var sortedServerTagFilters: [StashDBViewModel.SavedFilter] {
@@ -150,6 +142,11 @@ private struct TagsViewContent: View {
         } else {
             clearTagLiveChipsOnly()
         }
+        // Ein lokales Preset speichert seine Kriterien im `liveFragment` — die legt der Editor
+        // über die Kriterien des Basisfilters, damit die Sheet zeigt, was wirklich gefiltert wird.
+        var mergedPresetCriteria: [String: Any] = selectedFilter?.criteriaObjectFilter() ?? [:]
+        for (key, value) in preset.liveFragment { mergedPresetCriteria[key] = value }
+        criteriaDocument.load(mergedPresetCriteria)
         performSearch()
     }
 
@@ -248,7 +245,7 @@ private struct TagsViewContent: View {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { _ in }
             return
         }
@@ -262,7 +259,7 @@ private struct TagsViewContent: View {
             createdAt: old.createdAt,
             sort: selectedSortOption,
             baseSavedFilterId: selectedFilter?.id,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         )
         TagListLiveFilterPresetStore.upsert(updated)
         refreshTagLocalPresets()
@@ -280,7 +277,7 @@ private struct TagsViewContent: View {
             sortField: selectedSortOption.sortField,
             sortDirection: selectedSortOption.direction,
             baseFilter: selectedFilter,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         ) { result in
             if case .success(let saved) = result {
                 catalogPresetRowSelection = ListLivePresetTag.serverRow(saved.id)
@@ -303,7 +300,7 @@ private struct TagsViewContent: View {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { result in
                 if case .success = result {
                     showRenameCatalogPresetAlert = false
@@ -483,8 +480,6 @@ private struct TagsViewContent: View {
             criteriaDocument: criteriaDocument,
             sortOption: selectedSortOption,
             onSortChange: { changeTagSortOption(to: $0) },
-            liveFavorite: $liveFilterFavorite,
-            liveScenes: $liveFilterScenes,
             onApply: { applyLiveFilter() },
             onReset: {
                 catalogPresetRowSelection = ""
@@ -1312,9 +1307,6 @@ struct TagDetailView: View {
            criteriaDocument: linkedStudios.criteriaDocument,
             sortOption: linkedStudios.selectedSortOption,
             onSortChange: { linkedStudios.changeSortOption(to: $0, viewModel: viewModel) },
-            liveMinRating: $linkedStudios.liveFilterMinRating,
-            liveFavorite: $linkedStudios.liveFilterFavorite,
-            liveScenes: $linkedStudios.liveFilterScenes,
             onApply: { linkedStudios.applyLiveFilter(viewModel: viewModel) },
             onReset: {
                 linkedStudios.catalogPresetRowSelection = ""
@@ -1359,13 +1351,6 @@ struct TagDetailView: View {
            criteriaDocument: linkedGalleries.criteriaDocument,
             sortOption: linkedGalleries.selectedSortOption,
             onSortChange: { linkedGalleries.changeSortOption(to: $0, viewModel: viewModel) },
-            liveMinRating: $linkedGalleries.liveFilterMinRating,
-            liveFavorite: $linkedGalleries.liveFilterFavorite,
-            liveFiles: $linkedGalleries.liveFilterFiles,
-            liveStudioId: $linkedGalleries.liveFilterStudioId,
-            studioPickerOptions: linkedGalleries.studioPickerOptions,
-            studioPickerLoading: linkedGalleries.studioPickerLoading,
-            onStudioPickerSectionAppear: { linkedGalleries.loadStudioPickerOptions(viewModel: viewModel) },
             onApply: { linkedGalleries.applyLiveFilter(viewModel: viewModel) },
             onReset: {
                 linkedGalleries.catalogPresetRowSelection = ""
@@ -1414,19 +1399,7 @@ struct TagDetailView: View {
             showMediaTypeFilter: linkedImages.showImageMediaTypeFilter,
             sortOption: linkedImages.selectedSortOption,
             onSortChange: { linkedImages.changeSortOption(to: $0, viewModel: viewModel) },
-            liveMinRating: $linkedImages.liveFilterMinRating,
-            livePerformerFavorite: $linkedImages.liveFilterPerformerFavorite,
-            liveOrganized: $linkedImages.liveFilterOrganized,
-            liveOCounterTag: $linkedImages.liveFilterOCounterTag,
-            liveStudioIds: $linkedImages.liveFilterStudioIds,
-            liveTagIds: $linkedImages.liveFilterTagIds,
             liveMediaKind: $linkedImages.liveFilterMediaKind,
-            studioPickerOptions: linkedImages.studioPickerOptions,
-            studioPickerLoading: linkedImages.studioPickerLoading,
-            onStudioPickerSectionAppear: { linkedImages.loadStudioPickerOptions(viewModel: viewModel) },
-            tagPickerOptions: linkedImages.tagPickerOptions,
-            tagPickerLoading: linkedImages.tagPickerLoading,
-            onTagPickerSectionAppear: { linkedImages.loadTagPickerOptions(viewModel: viewModel) },
             onApply: { linkedImages.applyLiveFilter(viewModel: viewModel) },
             onReset: {
                 linkedImages.catalogPresetRowSelection = ""
