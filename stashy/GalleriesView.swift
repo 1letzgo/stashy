@@ -1206,6 +1206,10 @@ struct GalleryItemView: View {
             return
         }
         if image.isVideo {
+            // A row can become active without a fresh `onAppear` — e.g. when the image above it
+            // is deleted and this one slides into the active slot. Without this the player stays
+            // nil and `mediaLayer` falls back to the still thumbnail.
+            if player == nil { setupPlayer() }
             // Seed duration from metadata so the bar isn't stuck at 0/1 before the first tick.
             if let metaDuration = image.visual_files?.first?.duration, metaDuration > 0 {
                 scrubberState.duration = metaDuration
@@ -1876,16 +1880,41 @@ struct FullScreenImageView: View {
         guard let currentIndex = images.firstIndex(where: { $0.id == targetId }) else { return }
         let imageToDelete = images[currentIndex]
 
+        // Next image, or the previous one when the last entry goes. Resolved *now*: `deleteImage`
+        // posts "ImageDeleted" and the list view prunes its array on that notification, so by the
+        // time the completion runs the deleted id and its position are already gone.
+        let successorId: String? = {
+            if currentIndex + 1 < images.count { return images[currentIndex + 1].id }
+            if currentIndex > 0 { return images[currentIndex - 1].id }
+            return nil
+        }()
+
+        // Move before deleting — `scrollPosition` is bound to `currentVisibleId`, which must never
+        // point at an id that has left the array.
+        if let successorId {
+            currentVisibleId = successorId
+        }
+
         viewModel.deleteImage(imageId: imageToDelete.id) { success in
             DispatchQueue.main.async {
-                if success {
-                    ToastManager.shared.show("Image deleted", icon: "trash", style: .success)
-                    // Update the bound array so parent views (e.g. StashLine / Images grid)
-                    // can immediately remove the deleted item without a full reload.
-                    self.images.removeAll(where: { $0.id == imageToDelete.id })
-                    self.goBack()
-                } else {
+                guard success else {
+                    self.currentVisibleId = targetId
                     ToastManager.shared.show("Failed to delete image", icon: "exclamationmark.triangle", style: .error)
+                    return
+                }
+                ToastManager.shared.show("Image deleted", icon: "trash", style: .success)
+
+                // Usually already pruned via "ImageDeleted"; this covers the bindings that don't
+                // observe it (detail grids, StashLine).
+                if self.images.contains(where: { $0.id == imageToDelete.id }) {
+                    self.images.removeAll(where: { $0.id == imageToDelete.id })
+                }
+
+                if successorId == nil {
+                    // Nothing left to show.
+                    self.goBack()
+                } else if currentIndex + 1 >= self.images.count {
+                    self.onLoadMore?()
                 }
             }
         }

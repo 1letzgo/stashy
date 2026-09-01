@@ -29,6 +29,9 @@ struct LinkedImagesCatalogGrid: View {
     /// Only updated while idle — avoids SwiftUI invalidation on every scroll frame.
     @State private var videoCardFrames: [String: CGRect] = [:]
     @State private var autoplayVideoImageId: String?
+    /// Held by the grid, not by a cell: a per-row `NavigationLink` dies with its row, so
+    /// deleting the open image from fullscreen would pop the viewer.
+    @State private var fullscreenImageId: String?
 
     private var cardColumns: CatalogCardColumns {
         tabManager.catalogCardColumns(for: CatalogCardColumnScope.images)
@@ -126,11 +129,10 @@ struct LinkedImagesCatalogGrid: View {
                 ForEach(posts, id: \.id) { post in
                     ImageGroupCatalogCell(
                         images: post.images,
-                        imagesBinding: imagesBinding,
                         autoplayVideoImageId: feedAutoplayGateOpen ? autoplayVideoImageId : nil,
                         reportsFeedVideoFrame: shouldProbeVideoFrames,
                         onLoadMore: onLoadMore,
-                        onOpened: { _ in }
+                        onOpened: { fullscreenImageId = $0 }
                     )
                     .onAppear {
                         if post.id == posts.last?.id {
@@ -140,13 +142,9 @@ struct LinkedImagesCatalogGrid: View {
                 }
             } else {
                 ForEach(images) { image in
-                    NavigationLink(
-                        destination: FullScreenImageView(
-                            images: imagesBinding,
-                            selectedImageId: image.id,
-                            onLoadMore: onLoadMore
-                        )
-                    ) {
+                    Button {
+                        fullscreenImageId = image.id
+                    } label: {
                         ImageThumbnailCard(image: image)
                     }
                     .buttonStyle(.plain)
@@ -168,6 +166,13 @@ struct LinkedImagesCatalogGrid: View {
             }
         }
         .id(cardColumns)
+        .navigationDestination(item: $fullscreenImageId) { imageId in
+            FullScreenImageView(
+                images: imagesBinding,
+                selectedImageId: imageId,
+                onLoadMore: onLoadMore
+            )
+        }
         .onPreferenceChange(ImagesFeedVideoFrameKey.self) { frames in
             // Ignore mid-scroll probes (also disabled via reportsFeedVideoFrame).
             guard !isFeedScrolling else { return }
