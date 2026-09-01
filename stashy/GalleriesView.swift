@@ -53,7 +53,9 @@ private struct GalleriesViewContent: View {
         if liveFilterFiles == "has" { dict["file_count"] = ["value": 0, "modifier": "GREATER_THAN"] }
         if liveFilterFiles == "none" { dict["file_count"] = ["value": 0, "modifier": "EQUALS"] }
         if let sid = liveFilterStudioId {
-            dict["studios"] = ["modifier": "INCLUDES", "value": [sid]]
+            dict["studios"] = sid == CatalogLiveChipFilterSupport.noneChipValue
+                ? CatalogLiveChipFilterSupport.isNullCriterion
+                : ["modifier": "INCLUDES", "value": [sid]]
         }
         return dict
     }
@@ -129,7 +131,9 @@ private struct GalleriesViewContent: View {
                 liveFilterFiles = "none"
             }
         }
-        if let st = frag["studios"] as? [String: Any],
+        if CatalogLiveChipFilterSupport.isNullCriterion(frag["studios"]) {
+            liveFilterStudioId = CatalogLiveChipFilterSupport.noneChipValue
+        } else if let st = frag["studios"] as? [String: Any],
            (st["modifier"] as? String) == "INCLUDES",
            let vals = st["value"] as? [Any] {
             let ids = vals.compactMap { $0 as? String }
@@ -1349,6 +1353,7 @@ struct FullScreenImageView: View {
     @State private var shareItems: [Any] = []
     @State private var showingShare = false
     @State private var showingSetPerformerImagePicker = false
+    @State private var tagEditorImage: StashImage?
     @State private var performerImageTargetPerformers: [GalleryPerformer] = []
     @State private var currentItemIsPlaying = true
     @State private var scrubberState = ScrubberState()
@@ -1489,6 +1494,17 @@ struct FullScreenImageView: View {
             .sheet(isPresented: $showingShare) {
                 ShareSheet(items: shareItems)
             }
+            .sheet(item: $tagEditorImage) { target in
+                AddTagToImageSheet(
+                    imageId: target.id,
+                    currentTags: target.tags ?? [],
+                    viewModel: viewModel
+                ) { updated in
+                    if let position = images.firstIndex(where: { $0.id == target.id }) {
+                        images[position] = images[position].withTags(updated)
+                    }
+                }
+            }
             .alert("Set as Performer Image?", isPresented: $showingSetPerformerImagePicker) {
                 ForEach(performerImageTargetPerformers) { performer in
                     Button("Okay") {
@@ -1587,9 +1603,11 @@ struct FullScreenImageView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                         let tags = image.tags ?? []
-                        // AI Tags suggestions (stashy+, off by default) share this row, so
-                        // it also has to exist for an untagged item.
-                        let showsTagRow = !tags.isEmpty || AITagSuggestionManager.shared.isActive
+                        // AI Tags suggestions (stashy+, off by default) and the manual "+"
+                        // share this row, so it also has to exist for an untagged item.
+                        let showsTagRow = !tags.isEmpty
+                            || appearanceManager.isEditModeEnabled
+                            || AITagSuggestionManager.shared.isActive
                         Group {
                             if showsTagRow {
                                 ScrollView(.horizontal, showsIndicators: false) {
@@ -1603,6 +1621,27 @@ struct FullScreenImageView: View {
                                                 .background(Color.black.opacity(0.3))
                                                 .clipShape(Capsule())
                                                 .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                                        }
+
+                                        if appearanceManager.isEditModeEnabled {
+                                            Button {
+                                                tagEditorImage = image
+                                            } label: {
+                                                // A bare symbol is shorter than a line of
+                                                // text, which made this pill smaller than
+                                                // the tag chips beside it.
+                                                Image(systemName: "plus")
+                                                    .font(.system(size: 11, weight: .bold))
+                                                    .frame(height: tagChipGlyphHeight)
+                                                    .foregroundColor(.white.opacity(0.8))
+                                                    .padding(.horizontal, 8)
+                                                    .padding(.vertical, 3)
+                                                    .background(Color.black.opacity(0.3))
+                                                    .clipShape(Capsule())
+                                                    .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                                            }
+                                            .buttonStyle(.plain)
+                                            .accessibilityLabel("Add tags")
                                         }
 
                                         AITagSuggestionBar(image: image) { newTags in

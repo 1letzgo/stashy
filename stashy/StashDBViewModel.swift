@@ -7537,6 +7537,35 @@ struct GenerateData: Codable {
         }
     }
 
+    func updateImageTags(imageId: String, tagIds: [String], completion: @escaping (Bool) -> Void) {
+        let mutation = GraphQLQueries.imageUpdateTagsMutation
+        let variables: [String: Any] = ["input": ["id": imageId, "tag_ids": tagIds]]
+        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
+              let bodyString = String(data: bodyData, encoding: .utf8) else {
+            completion(false); return
+        }
+        struct Resp: Codable {
+            struct RData: Codable {
+                struct Updated: Codable { let id: String; let tags: [Tag]? }
+                let imageUpdate: Updated?
+            }
+            let data: RData?
+        }
+        performGraphQLQuery(query: bodyString) { (response: Resp?) in
+            guard let updated = response?.data?.imageUpdate else {
+                completion(false); return
+            }
+            // Same broadcast the AI Tags path uses, so every list holding this image
+            // picks the change up without a refetch.
+            NotificationCenter.default.post(
+                name: NSNotification.Name("ImageTagsUpdated"),
+                object: nil,
+                userInfo: ["imageId": imageId, "tags": updated.tags ?? []]
+            )
+            completion(true)
+        }
+    }
+
     func fetchAllGroupsForScene(completion: @escaping ([StashGroup]) -> Void) {
         let query = GraphQLQueries.findGroupsForSceneQuery
         let variables: [String: Any] = ["filter": ["per_page": -1, "sort": "name", "direction": "ASC"]]

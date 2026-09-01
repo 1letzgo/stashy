@@ -260,6 +260,7 @@ struct ReelsViewBody: View {
         initialSort: StashDBViewModel.ImageSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .pics) ?? "") ?? .dateDesc
     )
     @StateObject private var reelsPicsViewModel = StashDBViewModel()
+    @State private var tagEditorClip: StashImage?
     @State private var selectedPreviewFilter: StashDBViewModel.SavedFilter?
     @State private var showReelsSceneFilterSheet = false
     /// While the scene-style filter sheet hydrates UI (migration / saved-filter list), ignore preset `onChange` so we do not refetch the Reels timeline.
@@ -2695,6 +2696,16 @@ struct ReelsViewBody: View {
             .sheet(isPresented: $reelsClipImageFilters.showFilterSortSheet) {
                 reelsClipFilterSortSheet
             }
+            .sheet(item: $tagEditorClip) { clip in
+                AddTagToImageSheet(
+                    imageId: clip.id,
+                    currentTags: clip.tags ?? [],
+                    viewModel: viewModel
+                ) { updated in
+                    // Lists patch themselves through the "ImageTagsUpdated" broadcast.
+                    viewModel.patchImageTagsInLists(imageId: clip.id, tags: updated)
+                }
+            }
     }
 
     private var reelsClipFilterSortSheet: some View {
@@ -4227,7 +4238,8 @@ struct ReelsViewBody: View {
                         // AI Tags suggestions (stashy+, off by default) share this row, so
                         // it also has to exist for an untagged clip.
                         let showsTagRow = !tags.isEmpty
-                            || (item.isClip && AITagSuggestionManager.shared.isActive)
+                            || (item.isClip && (appearanceManager.isEditModeEnabled
+                                                || AITagSuggestionManager.shared.isActive))
                         Group {
                             if showsTagRow {
                                 ScrollView(.horizontal, showsIndicators: false) {
@@ -4256,6 +4268,27 @@ struct ReelsViewBody: View {
 
                                         // AI Tags (stashy+, off by default) — Clips only.
                                         if case .clip(let clipImage) = item {
+                                            if appearanceManager.isEditModeEnabled {
+                                                Button {
+                                                    tagEditorClip = clipImage
+                                                } label: {
+                                                    // A bare symbol is shorter than a line
+                                                    // of text, which made this pill smaller
+                                                    // than the tag chips beside it.
+                                                    Image(systemName: "plus")
+                                                        .font(.system(size: 11, weight: .bold))
+                                                        .frame(height: tagChipGlyphHeight)
+                                                        .foregroundColor(.white.opacity(0.8))
+                                                        .padding(.horizontal, 8)
+                                                        .padding(.vertical, 3)
+                                                        .background(Color.black.opacity(0.3))
+                                                        .clipShape(Capsule())
+                                                        .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                                                }
+                                                .buttonStyle(.plain)
+                                                .accessibilityLabel("Add tags")
+                                            }
+
                                             AITagSuggestionBar(image: clipImage) { _ in }
                                         }
                                     }

@@ -20,7 +20,6 @@ struct AITagSuggestionBar: View {
     @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     @State private var suggestions: [AITagSuggestion] = []
-    @State private var isAnalyzing = false
     @State private var didRun = false
     @State private var acceptingTagId: String?
 
@@ -36,36 +35,15 @@ struct AITagSuggestionBar: View {
     @ViewBuilder
     private var content: some View {
         HStack(spacing: 6) {
-            if isAnalyzing {
-                HStack(spacing: 4) {
-                    // scaleEffect alone keeps the spinner's 20pt intrinsic size, which made
-                    // this pill taller than every tag chip next to it.
-                    ProgressView()
-                        .scaleEffect(0.5)
-                        .tint(.white)
-                        .frame(width: 10, height: 10)
-                    Text("Analyzing…")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(.white.opacity(0.7))
-                }
-                .padding(.horizontal, 8)
-                .padding(.vertical, 3)
-                .background(Color.black.opacity(0.3))
-                .clipShape(Capsule())
-                .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
-            } else if suggestions.isEmpty {
+            if suggestions.isEmpty {
                 // Only worth saying on an untagged item — where a missing suggestion is the
                 // whole story. On an already tagged one it is just noise under the tag row.
                 if didRun, (image.tags ?? []).isEmpty {
-                    Text("No tag suggestions")
+                    Text(manager.hasModel ? "No tag suggestions" : "AI Tags needs statistics first")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.white.opacity(0.45))
                 }
             } else {
-                Image(systemName: "sparkles")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundColor(appearanceManager.tintColor)
-
                 ForEach(suggestions) { suggestion in
                     chip(for: suggestion)
                 }
@@ -84,7 +62,9 @@ struct AITagSuggestionBar: View {
                         .tint(.white)
                         .frame(width: 9, height: 9)
                 } else {
-                    Image(systemName: "plus")
+                    // The sparkles mark each chip as a suggestion, so the row needs no
+                    // separate marker in front of them.
+                    Image(systemName: "sparkles")
                         .font(.system(size: 9, weight: .bold))
                 }
                 Text("#\(suggestion.tag.name)")
@@ -105,9 +85,11 @@ struct AITagSuggestionBar: View {
         .disabled(acceptingTagId != nil)
         .contextMenu {
             Button(role: .destructive) {
+                manager.dismiss(suggestion, on: image)
+                HapticManager.light()
                 withAnimation { suggestions.removeAll { $0.id == suggestion.id } }
             } label: {
-                Label("Dismiss suggestion", systemImage: "xmark")
+                Label("Not this one", systemImage: "xmark")
             }
         }
         .accessibilityLabel("Add tag \(suggestion.tag.name)")
@@ -118,7 +100,6 @@ struct AITagSuggestionBar: View {
     private func prepare() async {
         suggestions = []
         didRun = false
-        isAnalyzing = false
         acceptingTagId = nil
 
         if let cached = manager.cachedSuggestions(for: image) {
@@ -126,19 +107,12 @@ struct AITagSuggestionBar: View {
             didRun = true
             return
         }
-
-        // Let a fast scroll pass by before spending Vision on an item nobody stopped at —
-        // the task is cancelled the moment the feed moves to the next id.
-        try? await Task.sleep(for: .milliseconds(350))
-        guard !Task.isCancelled else { return }
-        await analyze(force: false)
+        await lookUp()
     }
 
-    private func analyze(force: Bool) async {
-        guard !isAnalyzing else { return }
-        isAnalyzing = true
-        let result = await manager.suggestions(for: image, forceRefresh: force)
-        // The feed may have moved on while Vision was running.
+    private func lookUp() async {
+        let result = await manager.suggestions(for: image)
+        // The feed may have moved on while the model was still loading.
         guard !Task.isCancelled else { return }
         let existing = Set((image.tags ?? []).map(\.id))
         var pending = result.filter { !existing.contains($0.tag.id) }
@@ -163,7 +137,6 @@ struct AITagSuggestionBar: View {
         withAnimation(.easeInOut(duration: 0.2)) {
             suggestions = pending
         }
-        isAnalyzing = false
         didRun = true
     }
 
