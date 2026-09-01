@@ -221,6 +221,14 @@ struct SettingsView: View {
             }
 
             Section {
+                stashyScrollingSectionHeader("AI Tags", isBeta: true)
+                NavigationLink(destination: AITagsSettingsView()) {
+                    Label("AI Tags", systemImage: "sparkles")
+                }
+                .stashyGroupedSettingsRow()
+            }
+
+            Section {
                 stashyScrollingSectionHeader(AIMotionCopy.name, isBeta: true)
                 NavigationLink(destination: StashSyncSettingsView()) {
                     Label(AIMotionCopy.name, systemImage: "bolt.fill")

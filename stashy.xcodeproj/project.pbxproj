@@ -136,6 +136,9 @@
 		DFGQGRAPHQLBUILD001 /* graphql in Resources */ = {isa = PBXBuildFile; fileRef = DFGQGRAPHQLREF001 /* graphql */; };
 		DFSEC0012F2A000100000001 /* SecurityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSEC0022F2A000100000002 /* SecurityManager.swift */; };
 		DFSEC0032F2A000100000003 /* PasscodeEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSEC0042F2A000100000004 /* PasscodeEntryView.swift */; };
+		AITAG00012F70A00000000001 /* AITagSuggestionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00022F70A00000000002 /* AITagSuggestionManager.swift */; };
+		AITAG00032F70A00000000003 /* AITagSuggestionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00042F70A00000000004 /* AITagSuggestionBar.swift */; };
+		AITAG00052F70A00000000005 /* AITagsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00062F70A00000000006 /* AITagsSettingsView.swift */; };
 		DFSEC0052F2A000100000005 /* SecuritySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSEC0062F2A000100000006 /* SecuritySettingsView.swift */; };
 		DFSM000012F2NEWFILE001 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSM000022F2NEWFILE002 /* KeychainManager.swift */; };
 		DFSM000052F2NEWFILE005 /* ServerFormViewNew.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSM000062F2NEWFILE006 /* ServerFormViewNew.swift */; };
@@ -268,6 +271,9 @@
 		DFGQGRAPHQLREF001 /* graphql */ = {isa = PBXFileReference; lastKnownFileType = folder; path = graphql; sourceTree = "<group>"; };
 		DFSEC0022F2A000100000002 /* SecurityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityManager.swift; sourceTree = "<group>"; };
 		DFSEC0042F2A000100000004 /* PasscodeEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasscodeEntryView.swift; sourceTree = "<group>"; };
+		AITAG00022F70A00000000002 /* AITagSuggestionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagSuggestionManager.swift; sourceTree = "<group>"; };
+		AITAG00042F70A00000000004 /* AITagSuggestionBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagSuggestionBar.swift; sourceTree = "<group>"; };
+		AITAG00062F70A00000000006 /* AITagsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagsSettingsView.swift; sourceTree = "<group>"; };
 		DFSEC0062F2A000100000006 /* SecuritySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecuritySettingsView.swift; sourceTree = "<group>"; };
 		DFSM000022F2NEWFILE002 /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
 		DFSM000062F2NEWFILE006 /* ServerFormViewNew.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerFormViewNew.swift; sourceTree = "<group>"; };
@@ -406,6 +412,7 @@
 		37BE5B4D2F51718500107960 /* Managers */ = {
 			isa = PBXGroup;
 			children = (
+				AITAG00022F70A00000000002 /* AITagSuggestionManager.swift */,
 				372E2D982F64272300603361 /* VideoAnalysisManager.swift */,
 				372E2D9A2F64425000603361 /* StashSyncManager.swift */,
 				A1PLUS022F30B00000000002 /* StashyPlusManager.swift */,
@@ -481,6 +488,7 @@
 		DFSEC0072F2A000100000007 /* Components */ = {
 			isa = PBXGroup;
 			children = (
+				AITAG00042F70A00000000004 /* AITagSuggestionBar.swift */,
 				DFSEC0042F2A000100000004 /* PasscodeEntryView.swift */,
 			);
 			path = Components;
@@ -489,6 +497,7 @@
 		DFST000012F30A0000000001 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				AITAG00062F70A00000000006 /* AITagsSettingsView.swift */,
 				DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */,
 				A1ED4C0112345678901234AB /* EditModeSettingsView.swift */,
 				DFSEC0062F2A000100000006 /* SecuritySettingsView.swift */,
@@ -735,6 +744,9 @@
 				DFUI000052F3AUDIT005 /* ToastManager.swift in Sources */,
 				DFSEC0012F2A000100000001 /* SecurityManager.swift in Sources */,
 				DFSEC0032F2A000100000003 /* PasscodeEntryView.swift in Sources */,
+				AITAG00012F70A00000000001 /* AITagSuggestionManager.swift in Sources */,
+				AITAG00032F70A00000000003 /* AITagSuggestionBar.swift in Sources */,
+				AITAG00052F70A00000000005 /* AITagsSettingsView.swift in Sources */,
 				DFSEC0052F2A000100000005 /* SecuritySettingsView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;

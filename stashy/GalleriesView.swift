@@ -1587,8 +1587,11 @@ struct FullScreenImageView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                         let tags = image.tags ?? []
+                        // AI Tags suggestions (stashy+, off by default) share this row, so
+                        // it also has to exist for an untagged item.
+                        let showsTagRow = !tags.isEmpty || AITagSuggestionManager.shared.isActive
                         Group {
-                            if !tags.isEmpty {
+                            if showsTagRow {
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 6) {
                                         ForEach(tags) { tag in
@@ -1601,13 +1604,19 @@ struct FullScreenImageView: View {
                                                 .clipShape(Capsule())
                                                 .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
                                         }
+
+                                        AITagSuggestionBar(image: image) { newTags in
+                                            if let position = images.firstIndex(where: { $0.id == image.id }) {
+                                                images[position] = images[position].withTags(newTags)
+                                            }
+                                        }
                                     }
                                 }
                             } else {
                                 Color.clear.opacity(0)
                             }
                         }
-                        .frame(height: 20)
+                        .frame(height: 22)
                     }
 
                 }

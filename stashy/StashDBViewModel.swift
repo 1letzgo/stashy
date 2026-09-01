@@ -349,6 +349,7 @@ class StashDBViewModel: ObservableObject {
     private var performerImageUpdatedObserver: NSObjectProtocol?
     private var imageRatingUpdatedObserver: NSObjectProtocol?
     private var imageOCounterUpdatedObserver: NSObjectProtocol?
+    private var imageTagsUpdatedObserver: NSObjectProtocol?
     private var sceneOCounterUpdatedObserver: NSObjectProtocol?
     private var sceneUpdatedObserver: NSObjectProtocol?
     private var tagImageUpdatedObserver: NSObjectProtocol?
@@ -436,6 +437,19 @@ class StashDBViewModel: ObservableObject {
             }
         }
 
+        imageTagsUpdatedObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("ImageTagsUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let imageId = notification.userInfo?["imageId"] as? String,
+                  let tags = notification.userInfo?["tags"] as? [Tag] else { return }
+            let viewModel = self
+            Task { @MainActor in
+                viewModel?.patchImageTagsInLists(imageId: imageId, tags: tags)
+            }
+        }
+
         sceneUpdatedObserver = NotificationCenter.default.addObserver(
             forName: NSNotification.Name("SceneUpdated"),
             object: nil,
@@ -470,6 +484,9 @@ class StashDBViewModel: ObservableObject {
         }
         if let sceneUpdatedObserver {
             NotificationCenter.default.removeObserver(sceneUpdatedObserver)
+        }
+        if let imageTagsUpdatedObserver {
+            NotificationCenter.default.removeObserver(imageTagsUpdatedObserver)
         }
         // Diese beiden hingen vorher ohne Token in der NotificationCenter —
         // `removeObserver(self)` erwischt block-basierte Observer nicht, sie
@@ -1900,6 +1917,18 @@ class StashDBViewModel: ObservableObject {
     }
 
     /// Live-listener: patch `o_counter` across in-memory scene lists.
+    /// Keeps image lists in sync after a tag change (AI Tags accept, tag editor, …)
+    /// without refetching a whole feed.
+    func patchImageTagsInLists(imageId: String, tags: [Tag]) {
+        func patch(_ list: inout [StashImage]) {
+            guard let index = list.firstIndex(where: { $0.id == imageId }) else { return }
+            list[index] = list[index].withTags(tags)
+        }
+        patch(&clips)
+        patch(&allImages)
+        patch(&detailImages)
+    }
+
     func patchSceneOCounterInLists(sceneId: String, oCounter: Int) {
         func patch(_ list: inout [Scene]) {
             guard let idx = list.firstIndex(where: { $0.id == sceneId }) else { return }
@@ -10168,6 +10197,25 @@ struct StashImage: Codable, Identifiable, Equatable {
             studio: studio,
             galleries: galleries,
             tags: tags
+        )
+    }
+
+    func withTags(_ newTags: [Tag]) -> StashImage {
+        return StashImage(
+            id: id,
+            title: title,
+            rating100: rating100,
+            o_counter: o_counter,
+            organized: organized,
+            date: date,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            paths: paths,
+            visual_files: visual_files,
+            performers: performers,
+            studio: studio,
+            galleries: galleries,
+            tags: newTags
         )
     }
 

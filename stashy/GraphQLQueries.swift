@@ -337,6 +337,32 @@ class GraphQLQueries {
         }
         """
 
+    /// Compact tag census for one performer — only ids and names, so a 200-item page
+    /// stays small enough to fetch on demand while browsing.
+    static let performerImageTagsQuery = """
+        query PerformerImageTags($filter: FindFilterType, $image_filter: ImageFilterType) {
+            findImages(filter: $filter, image_filter: $image_filter) {
+                count
+                images { id tags { id name } }
+            }
+        }
+        """
+
+    static let performerSceneTagsQuery = """
+        query PerformerSceneTags($filter: FindFilterType, $scene_filter: SceneFilterType) {
+            findScenes(filter: $filter, scene_filter: $scene_filter) {
+                count
+                scenes { id tags { id name } }
+            }
+        }
+        """
+
+    static let imageUpdateTagsMutation = """
+        mutation ImageUpdate($input: ImageUpdateInput!) {
+            imageUpdate(input: $input) { id tags { id name } }
+        }
+        """
+
     static let sceneUpdateGroupsMutation = """
         mutation SceneUpdate($input: SceneUpdateInput!) {
             sceneUpdate(input: $input) { id groups { group { id name updated_at front_image_path } scene_index } }

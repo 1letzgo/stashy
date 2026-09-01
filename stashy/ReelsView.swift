@@ -1329,6 +1329,11 @@ struct ReelsViewBody: View {
             }
         }
         
+        var isClip: Bool {
+            if case .clip = self { return true }
+            return false
+        }
+
         var tags: [Tag] {
             switch self {
             case .scene(let s): return s.tags ?? []
@@ -4219,8 +4224,12 @@ struct ReelsViewBody: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                         let tags = item.tags
+                        // AI Tags suggestions (stashy+, off by default) share this row, so
+                        // it also has to exist for an untagged clip.
+                        let showsTagRow = !tags.isEmpty
+                            || (item.isClip && AITagSuggestionManager.shared.isActive)
                         Group {
-                            if !tags.isEmpty {
+                            if showsTagRow {
                                 ScrollView(.horizontal, showsIndicators: false) {
                                     HStack(spacing: 6) {
                                         ForEach(tags) { tag in
@@ -4244,13 +4253,18 @@ struct ReelsViewBody: View {
                                             }
                                             .buttonStyle(.plain)
                                         }
+
+                                        // AI Tags (stashy+, off by default) — Clips only.
+                                        if case .clip(let clipImage) = item {
+                                            AITagSuggestionBar(image: clipImage) { _ in }
+                                        }
                                     }
                                 }
                             } else {
                                 Color.clear.opacity(0)
                             }
                         }
-                        .frame(height: 20)
+                        .frame(height: 22)
                     }
 
                 }
