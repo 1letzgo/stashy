@@ -278,6 +278,19 @@ final class FilterCriteriaDocument: ObservableObject {
         return dict.isEmpty ? nil : dict
     }
 
+    /// Inverse of ``merged(with:)``: `base` first, this document's criteria on top.
+    ///
+    /// Feeds still derive a base fragment from the selected saved filter (studios / tags / groups),
+    /// but the editor is the surface the user actually sees — so an edited criterion must win over
+    /// the mirrored one, otherwise clearing it in the sheet would have no effect.
+    func layered(over base: [String: Any]) -> [String: Any]? {
+        var dict = base
+        for (key, value) in sanitizedObjectFilter {
+            dict[key] = value
+        }
+        return dict.isEmpty ? nil : dict
+    }
+
     /// Number of criteria currently set — used for "n active" badges.
     var activeCriterionCount: Int { sanitizedObjectFilter.count }
 

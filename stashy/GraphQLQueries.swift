@@ -357,6 +357,12 @@ class GraphQLQueries {
         }
         """
 
+    static let sceneMarkerUpdateTagsMutation = """
+        mutation SceneMarkerUpdate($input: SceneMarkerUpdateInput!) {
+            sceneMarkerUpdate(input: $input) { id tags { id name } primary_tag { id name } }
+        }
+        """
+
     static let imageUpdateTagsMutation = """
         mutation ImageUpdate($input: ImageUpdateInput!) {
             imageUpdate(input: $input) { id tags { id name } }

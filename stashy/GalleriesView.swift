@@ -1474,13 +1474,9 @@ struct FullScreenImageView: View {
             .sheet(isPresented: $showingShare) {
                 ShareSheet(items: shareItems)
             }
-            .sheet(item: $tagEditorImage) { target in
-                AddTagToImageSheet(
-                    imageId: target.id,
-                    currentTags: target.tags ?? [],
-                    viewModel: viewModel
-                ) { updated in
-                    if let position = images.firstIndex(where: { $0.id == target.id }) {
+            .sheet(item: $tagEditorImage) { image in
+                AddTagsSheet(target: .image(image), viewModel: viewModel) { updated in
+                    if let position = images.firstIndex(where: { $0.id == image.id }) {
                         images[position] = images[position].withTags(updated)
                     }
                 }
@@ -1624,7 +1620,7 @@ struct FullScreenImageView: View {
                                             .accessibilityLabel("Add tags")
                                         }
 
-                                        AITagSuggestionBar(image: image) { newTags in
+                                        AITagSuggestionBar(target: .image(image)) { newTags in
                                             if let position = images.firstIndex(where: { $0.id == image.id }) {
                                                 images[position] = images[position].withTags(newTags)
                                             }

@@ -1,21 +1,22 @@
 //
-//  AddTagToImageSheet.swift
+//  AddTagsSheet.swift
 //  stashy
 //
-//  Image counterpart to `AddTagToSceneSheet`: search, multi-select, create a missing
-//  tag, save in one mutation. Reached from the "+" chip in the tag row of Feeds
-//  (Clips) and the fullscreen image viewer.
+//  Search, multi-select, create a missing tag, save in one mutation — for whatever
+//  the tag row belongs to: a scene, a marker, a clip or a picture. Reached from the
+//  "+" chip in Feeds and the fullscreen image viewer.
 //
 
 #if !os(tvOS)
 
 import SwiftUI
 
-struct AddTagToImageSheet: View {
-    let imageId: String
-    let currentTags: [Tag]
+struct AddTagsSheet: View {
+    let target: AITagTarget
     @ObservedObject var viewModel: StashDBViewModel
     var onComplete: ([Tag]) -> Void
+
+    private var currentTags: [Tag] { target.tags }
 
     @Environment(\.dismiss) var dismiss
     @ObservedObject var appearanceManager = AppearanceManager.shared
@@ -44,9 +45,9 @@ struct AddTagToImageSheet: View {
                         ForEach(filtered.prefix(30)) { tag in
                             HStack {
                                 Text(tag.name)
-                                if let count = tag.imageCount {
+                                if let count = usageCount(for: tag) {
                                     Spacer()
-                                    Text("\(count) images").font(.caption).foregroundColor(.secondary)
+                                    Text(count).font(.caption).foregroundColor(.secondary)
                                 }
                                 if selectedIds.contains(tag.id) {
                                     Spacer()
@@ -122,18 +123,32 @@ struct AddTagToImageSheet: View {
         }
     }
 
+    private func usageCount(for tag: Tag) -> String? {
+        switch target.kind {
+        case .image:
+            return tag.imageCount.map { "\($0) images" }
+        case .scene, .marker:
+            return tag.sceneCount.map { "\($0) scenes" }
+        }
+    }
+
     private func save() {
         isSaving = true
-        viewModel.updateImageTags(imageId: imageId, tagIds: Array(selectedIds)) { success in
-            DispatchQueue.main.async {
-                isSaving = false
-                guard success else {
-                    ToastManager.shared.show("Failed to update tags", icon: "exclamationmark.triangle", style: .error)
-                    return
-                }
-                onComplete(allTags.filter { selectedIds.contains($0.id) })
-                dismiss()
+        // A marker's primary tag cannot be unselected here — it is a separate field in
+        // Stash, so it stays whatever it was.
+        var ids = selectedIds
+        if let primary = target.primaryTagId { ids.insert(primary) }
+        let updated = allTags.filter { ids.contains($0.id) }
+
+        Task {
+            let success = await AITagSuggestionManager.write(tags: updated, to: target)
+            isSaving = false
+            guard success else {
+                ToastManager.shared.show("Failed to update tags", icon: "exclamationmark.triangle", style: .error)
+                return
             }
+            onComplete(updated)
+            dismiss()
         }
     }
 }

@@ -41,6 +41,71 @@ struct AITagSuggestion: Identifiable, Equatable {
     var id: String { tag.id }
 }
 
+/// What a suggestion is made for. Scenes, markers, clips and pictures all reach the
+/// same statistics; only the write path and the metadata they can offer differ.
+struct AITagTarget: Identifiable, Equatable {
+    enum Kind: String, Equatable {
+        case image
+        case scene
+        case marker
+    }
+
+    let kind: Kind
+    let entityId: String
+    /// Everything the item carries, primary tag included — used for co-occurrence and
+    /// to keep a tag from being suggested twice.
+    let tags: [Tag]
+    /// A marker's primary tag is set separately in Stash and must stay out of `tag_ids`.
+    let primaryTagId: String?
+    let performerIds: [String]
+    let studioId: String?
+    let galleryIds: [String]
+
+    var id: String { "\(kind.rawValue)-\(entityId)" }
+
+    static func image(_ image: StashImage) -> AITagTarget {
+        AITagTarget(
+            kind: .image,
+            entityId: image.id,
+            tags: image.tags ?? [],
+            primaryTagId: nil,
+            performerIds: (image.performers ?? []).map(\.id),
+            studioId: image.studio?.id,
+            galleryIds: (image.galleries ?? []).map(\.id)
+        )
+    }
+
+    static func scene(_ scene: Scene) -> AITagTarget {
+        AITagTarget(
+            kind: .scene,
+            entityId: scene.id,
+            tags: scene.tags ?? [],
+            primaryTagId: nil,
+            performerIds: scene.performers.map(\.id),
+            studioId: scene.studio?.id,
+            galleryIds: (scene.galleries ?? []).map(\.id)
+        )
+    }
+
+    /// Markers carry their own tags, so they are tagged as themselves — not as their
+    /// scene. Their scene still supplies the performers the statistics need.
+    static func marker(_ marker: SceneMarker) -> AITagTarget {
+        var tags = marker.tags ?? []
+        if let primary = marker.primaryTag, !tags.contains(where: { $0.id == primary.id }) {
+            tags.insert(primary, at: 0)
+        }
+        return AITagTarget(
+            kind: .marker,
+            entityId: marker.id,
+            tags: tags,
+            primaryTagId: marker.primaryTag?.id,
+            performerIds: (marker.scene?.performers ?? []).map(\.id),
+            studioId: nil,
+            galleryIds: []
+        )
+    }
+}
+
 /// Everything counted from the library, persisted per server.
 struct AITagStatsModel: Codable {
     var version: Int
@@ -392,25 +457,24 @@ final class AITagSuggestionManager: ObservableObject {
 
     private var suggestionCache: [String: [AITagSuggestion]] = [:]
 
-    /// Cached suggestions for an image. Tags it meanwhile carries are dropped — a tag
+    /// Cached suggestions for a target. Tags it meanwhile carries are dropped — a tag
     /// is never suggested twice.
-    func cachedSuggestions(for image: StashImage) -> [AITagSuggestion]? {
-        guard let cached = suggestionCache[image.id] else { return nil }
-        let existing = Set((image.tags ?? []).map(\.id))
+    func cachedSuggestions(for target: AITagTarget) -> [AITagSuggestion]? {
+        guard let cached = suggestionCache[target.id] else { return nil }
+        let existing = Set(target.tags.map(\.id))
         return cached.filter { !existing.contains($0.tag.id) }
     }
 
     /// Ranked suggestions for one item, excluding tags it already has. Pure lookups in
     /// the local model — no request while browsing.
     @discardableResult
-    func suggestions(for image: StashImage, forceRefresh: Bool = false) async -> [AITagSuggestion] {
+    func suggestions(for target: AITagTarget, forceRefresh: Bool = false) async -> [AITagSuggestion] {
         guard isActive else { return [] }
-        if !forceRefresh, let cached = cachedSuggestions(for: image) { return cached }
+        if !forceRefresh, let cached = cachedSuggestions(for: target) { return cached }
         await loadIfNeeded()
         guard let model else { return [] }
 
-        let existing = (image.tags ?? []).map(\.id)
-        let existingSet = Set(existing)
+        let existingSet = Set(target.tags.map(\.id))
         var scores: [String: (score: Double, source: AITagSuggestion.Source)] = [:]
 
         func offer(_ tagId: String, _ score: Double, _ source: AITagSuggestion.Source) {
@@ -427,55 +491,63 @@ final class AITagSuggestionManager: ObservableObject {
             )
         }
 
-        // 1. What this performer is usually tagged with.
-        for performer in image.performers ?? [] {
-            guard let counts = model.performerCounts[performer.id],
-                  let total = model.performerTotals[performer.id], total > 0 else { continue }
+        func absorb(
+            _ counts: [String: Int]?,
+            _ total: Int?,
+            weight: Double,
+            source: AITagSuggestion.Source
+        ) {
+            guard let counts, let total, total > 0 else { return }
             let denominator = Double(total) + Self.smoothing
             for (tagId, count) in counts {
-                offer(tagId, Double(count) / denominator, .performer)
+                offer(tagId, weight * Double(count) / denominator, source)
             }
         }
 
-        // 2. The gallery an image belongs to — usually one shoot, so its tags carry over
-        //    to its siblings more reliably than anything else here.
-        for gallery in image.galleries ?? [] {
-            guard let counts = model.galleryCounts[gallery.id],
-                  let total = model.galleryTotals[gallery.id], total > 0 else { continue }
-            let denominator = Double(total) + Self.smoothing
-            for (tagId, count) in counts {
-                offer(tagId, 0.95 * Double(count) / denominator, .gallery)
-            }
+        // 1. What this item's performers are usually tagged with.
+        for performerId in target.performerIds {
+            absorb(
+                model.performerCounts[performerId],
+                model.performerTotals[performerId],
+                weight: 1.0,
+                source: .performer
+            )
         }
 
-        // 3. The same for the studio — real, but less specific, hence discounted.
-        if let studioId = image.studio?.id,
-           let counts = model.studioCounts[studioId],
-           let total = model.studioTotals[studioId], total > 0 {
-            let denominator = Double(total) + Self.smoothing
-            for (tagId, count) in counts {
-                offer(tagId, 0.8 * Double(count) / denominator, .studio)
-            }
+        // 2. The gallery — usually one shoot, so its tags carry over to its siblings
+        //    more reliably than anything else here.
+        for galleryId in target.galleryIds {
+            absorb(
+                model.galleryCounts[galleryId],
+                model.galleryTotals[galleryId],
+                weight: 0.95,
+                source: .gallery
+            )
+        }
+
+        // 3. The studio — real, but less specific, hence discounted.
+        if let studioId = target.studioId {
+            absorb(
+                model.studioCounts[studioId],
+                model.studioTotals[studioId],
+                weight: 0.8,
+                source: .studio
+            )
         }
 
         // 4. The library as a whole. Only tags you put on nearly everything survive the
         //    minimum share here, which is exactly what this scope is good for.
-        if model.itemCount > 0 {
-            let denominator = Double(model.itemCount) + Self.smoothing
-            for (tagId, count) in model.tagTotals {
-                offer(tagId, 0.6 * Double(count) / denominator, .library)
-            }
-        }
+        absorb(model.tagTotals, model.itemCount, weight: 0.6, source: .library)
 
         // 5. Tags that travel with the ones this item already has. The only signal here
         //    that is about the item itself rather than about who is in it.
-        for tagId in existing {
-            guard let partners = model.pairCounts[tagId],
-                  let total = model.tagTotals[tagId], total > 0 else { continue }
-            let denominator = Double(total) + Self.smoothing
-            for (partnerId, count) in partners {
-                offer(partnerId, Double(count) / denominator, .related)
-            }
+        for tag in target.tags {
+            absorb(
+                model.pairCounts[tag.id],
+                model.tagTotals[tag.id],
+                weight: 1.0,
+                source: .related
+            )
         }
 
         let result = scores
@@ -487,7 +559,7 @@ final class AITagSuggestionManager: ObservableObject {
             .prefix(max(1, maxSuggestions))
 
         let suggestions = Array(result)
-        suggestionCache[image.id] = suggestions
+        suggestionCache[target.id] = suggestions
         return suggestions
     }
 
@@ -501,12 +573,12 @@ final class AITagSuggestionManager: ObservableObject {
 
     /// Records that the user rejected this tag. Accepting it anywhere clears the record,
     /// so a single misfire never buries a tag for good.
-    func dismiss(_ suggestion: AITagSuggestion, on image: StashImage) {
+    func dismiss(_ suggestion: AITagSuggestion, on target: AITagTarget) {
         dismissals[suggestion.tag.id, default: 0] += 1
         UserDefaults.standard.set(dismissals, forKey: Keys.dismissed)
-        if var cached = suggestionCache[image.id] {
+        if var cached = suggestionCache[target.id] {
             cached.removeAll { $0.tag.id == suggestion.tag.id }
-            suggestionCache[image.id] = cached
+            suggestionCache[target.id] = cached
         }
     }
 
@@ -522,32 +594,18 @@ final class AITagSuggestionManager: ObservableObject {
 
     // MARK: - Accepting
 
-    /// Adds the tag to the image on the server. Returns the image's new tag list.
-    func accept(_ suggestion: AITagSuggestion, on image: StashImage) async -> [Tag]? {
-        await accept([suggestion], on: image)
+    func accept(_ suggestion: AITagSuggestion, on target: AITagTarget) async -> [Tag]? {
+        await accept([suggestion], on: target)
     }
 
-    /// Adds several tags in one mutation — auto-accept would otherwise fire a request per tag.
-    func accept(_ accepted: [AITagSuggestion], on image: StashImage) async -> [Tag]? {
-        let existing = image.tags ?? []
-        let existingIds = Set(existing.map(\.id))
+    /// Adds tags in one mutation — auto-accept would otherwise fire a request per tag.
+    func accept(_ accepted: [AITagSuggestion], on target: AITagTarget) async -> [Tag]? {
+        let existingIds = Set(target.tags.map(\.id))
         let additions = accepted.map(\.tag).filter { !existingIds.contains($0.id) }
-        guard !additions.isEmpty else { return existing }
-        let newTags = existing + additions
+        guard !additions.isEmpty else { return target.tags }
+        let newTags = target.tags + additions
 
-        let mutation = GraphQLQueries.imageUpdateTagsMutation
-        let variables: [String: Any] = ["input": ["id": image.id, "tag_ids": newTags.map(\.id)]]
-
-        do {
-            let response: ImageUpdateResponse = try await GraphQLClient.shared.execute(
-                query: mutation,
-                variables: variables
-            )
-            guard response.data?.imageUpdate?.id != nil else { return nil }
-        } catch {
-            AppLog.error("AITags: imageUpdate failed — \(error.localizedDescription)")
-            return nil
-        }
+        guard await Self.write(tags: newTags, to: target) else { return nil }
 
         let acceptedIds = Set(additions.map(\.id))
         for tagId in acceptedIds where dismissals[tagId] != nil {
@@ -555,17 +613,59 @@ final class AITagSuggestionManager: ObservableObject {
         }
         UserDefaults.standard.set(dismissals, forKey: Keys.dismissed)
 
-        if var cached = suggestionCache[image.id] {
+        if var cached = suggestionCache[target.id] {
             cached.removeAll { acceptedIds.contains($0.tag.id) }
-            suggestionCache[image.id] = cached
+            suggestionCache[target.id] = cached
+        }
+        return newTags
+    }
+
+    /// Writes a tag list to whichever entity the target stands for and broadcasts the
+    /// change so open lists patch themselves without a refetch.
+    static func write(tags: [Tag], to target: AITagTarget) async -> Bool {
+        var input: [String: Any] = ["id": target.entityId]
+        let mutation: String
+        let notification: String
+        let idKey: String
+
+        switch target.kind {
+        case .image:
+            mutation = GraphQLQueries.imageUpdateTagsMutation
+            notification = "ImageTagsUpdated"
+            idKey = "imageId"
+            input["tag_ids"] = tags.map(\.id)
+        case .scene:
+            mutation = GraphQLQueries.sceneUpdateTagsMutation
+            notification = "SceneTagsUpdated"
+            idKey = "sceneId"
+            input["tag_ids"] = tags.map(\.id)
+        case .marker:
+            mutation = GraphQLQueries.sceneMarkerUpdateTagsMutation
+            notification = "MarkerTagsUpdated"
+            idKey = "markerId"
+            // The primary tag lives in its own field; repeating it in tag_ids would
+            // duplicate it on the marker.
+            input["tag_ids"] = tags.map(\.id).filter { $0 != target.primaryTagId }
         }
 
-        NotificationCenter.default.post(
-            name: NSNotification.Name("ImageTagsUpdated"),
-            object: nil,
-            userInfo: ["imageId": image.id, "tags": newTags]
-        )
-        return newTags
+        do {
+            _ = try await GraphQLClient.shared.performMutation(
+                mutation: mutation,
+                variables: ["input": input]
+            )
+        } catch {
+            AppLog.error("AITags: tag update failed — \(error.localizedDescription)")
+            return false
+        }
+
+        await MainActor.run {
+            NotificationCenter.default.post(
+                name: NSNotification.Name(notification),
+                object: nil,
+                userInfo: [idKey: target.entityId, "tags": tags]
+            )
+        }
+        return true
     }
 
     // MARK: - GraphQL
@@ -615,14 +715,6 @@ final class AITagSuggestionManager: ObservableObject {
         struct DataBlock: Decodable {
             struct FindTags: Decodable { let tags: [Tag] }
             let findTags: FindTags
-        }
-        let data: DataBlock?
-    }
-
-    private struct ImageUpdateResponse: Decodable {
-        struct DataBlock: Decodable {
-            struct Updated: Decodable { let id: String }
-            let imageUpdate: Updated?
         }
         let data: DataBlock?
     }

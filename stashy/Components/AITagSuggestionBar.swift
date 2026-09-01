@@ -2,7 +2,7 @@
 //  AITagSuggestionBar.swift
 //  stashy
 //
-//  Chip row with on-device tag suggestions for a single image (clip or pic).
+//  Chip row with tag suggestions for one item — scene, marker, clip or picture.
 //  Renders nothing at all unless AI Tags is unlocked *and* switched on, so the
 //  Reels / fullscreen chrome stays byte-identical for everyone else.
 //
@@ -12,8 +12,8 @@
 import SwiftUI
 
 struct AITagSuggestionBar: View {
-    let image: StashImage
-    /// Called with the image's new tag list after a suggestion was accepted.
+    let target: AITagTarget
+    /// Called with the item's new tag list after a suggestion was accepted.
     var onTagsChanged: ([Tag]) -> Void
 
     @ObservedObject private var manager = AITagSuggestionManager.shared
@@ -28,7 +28,7 @@ struct AITagSuggestionBar: View {
     var body: some View {
         if manager.isActive {
             content
-                .task(id: image.id) { await prepare() }
+                .task(id: target.id) { await prepare() }
         }
     }
 
@@ -38,7 +38,7 @@ struct AITagSuggestionBar: View {
             if suggestions.isEmpty {
                 // Only worth saying on an untagged item — where a missing suggestion is the
                 // whole story. On an already tagged one it is just noise under the tag row.
-                if didRun, (image.tags ?? []).isEmpty {
+                if didRun, target.tags.isEmpty {
                     Text(manager.hasModel ? "No tag suggestions" : "AI Tags needs statistics first")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.white.opacity(0.45))
@@ -85,7 +85,7 @@ struct AITagSuggestionBar: View {
         .disabled(acceptingTagId != nil)
         .contextMenu {
             Button(role: .destructive) {
-                manager.dismiss(suggestion, on: image)
+                manager.dismiss(suggestion, on: target)
                 HapticManager.light()
                 withAnimation { suggestions.removeAll { $0.id == suggestion.id } }
             } label: {
@@ -102,7 +102,7 @@ struct AITagSuggestionBar: View {
         didRun = false
         acceptingTagId = nil
 
-        if let cached = manager.cachedSuggestions(for: image) {
+        if let cached = manager.cachedSuggestions(for: target) {
             suggestions = cached
             didRun = true
             return
@@ -111,10 +111,10 @@ struct AITagSuggestionBar: View {
     }
 
     private func lookUp() async {
-        let result = await manager.suggestions(for: image)
+        let result = await manager.suggestions(for: target)
         // The feed may have moved on while the model was still loading.
         guard !Task.isCancelled else { return }
-        let existing = Set((image.tags ?? []).map(\.id))
+        let existing = Set(target.tags.map(\.id))
         var pending = result.filter { !existing.contains($0.tag.id) }
 
         // Auto-accept takes the confident ones straight to the server; whatever stays
@@ -125,7 +125,7 @@ struct AITagSuggestionBar: View {
                 pending.removeAll { suggestion in
                     confident.contains { $0.tag.id == suggestion.tag.id }
                 }
-                if let newTags = await manager.accept(confident, on: image) {
+                if let newTags = await manager.accept(confident, on: target) {
                     HapticManager.success()
                     let names = confident.map { "#\($0.tag.name)" }.joined(separator: " ")
                     ToastManager.shared.show("Auto-added \(names)")
@@ -145,7 +145,7 @@ struct AITagSuggestionBar: View {
         acceptingTagId = suggestion.tag.id
         HapticManager.light()
         Task {
-            let newTags = await manager.accept(suggestion, on: image)
+            let newTags = await manager.accept(suggestion, on: target)
             acceptingTagId = nil
             guard let newTags else {
                 HapticManager.error()

@@ -1717,18 +1717,179 @@ struct SceneLiveChipRowState: Equatable {
     /// Group ids for `groups` `INCLUDES`; empty = any.
     var groupIds: [String] = []
 
-    var isLiveFilterActive: Bool { false }
+    var isLiveFilterActive: Bool {
+        minRating != 0 || organized != nil || interactive != nil || orientation != nil
+            || performerCount != nil || resolution != nil || performerFavorite != nil || oCounterTag != nil
+            || !studioIds.isEmpty || !tagIds.isEmpty || !groupIds.isEmpty
+    }
 
-    func activeLiveFilterDict() -> [String: Any] { [:] }
+    func activeLiveFilterDict() -> [String: Any] {
+        var dict: [String: Any] = [:]
+        if minRating == -1 {
+            dict["rating100"] = ["modifier": "IS_NULL"]
+        } else if minRating > 0 {
+            dict["rating100"] = ["value": (minRating * 20), "modifier": "EQUALS"]
+        }
+        if let org = organized { dict["organized"] = org }
+        if let interactive { dict["interactive"] = interactive }
+        if let orientation {
+            dict["orientation"] = ["value": [orientation]]
+        }
+        if let count = performerCount {
+            if count == 3 {
+                dict["performer_count"] = ["value": 2, "modifier": "GREATER_THAN"]
+            } else {
+                dict["performer_count"] = ["value": count, "modifier": "EQUALS"]
+            }
+        }
+        if let resolution {
+            dict["resolution"] = ["value": resolution, "modifier": "EQUALS"]
+        }
+        if let fav = performerFavorite { dict["performer_favorite"] = fav }
+        if let tag = oCounterTag, let oc = sceneLiveOCounterCriterion(from: tag) {
+            dict["o_counter"] = oc
+        }
+        if !studioIds.isEmpty {
+            dict["studios"] = ["modifier": "INCLUDES", "value": studioIds, "depth": 0]
+        }
+        if !tagIds.isEmpty {
+            dict["tags"] = ["modifier": "INCLUDES", "value": tagIds, "depth": 0]
+        }
+        if !groupIds.isEmpty {
+            dict["groups"] = ["modifier": "INCLUDES", "value": groupIds, "depth": 0]
+        }
+        return dict
+    }
 
-    /// Quick chips are gone — the criteria document is the only filter surface now.
-    func effectiveLiveFilter(for selectedFilter: StashDBViewModel.SavedFilter?) -> [String: Any] { [:] }
+    func effectiveLiveFilter(for selectedFilter: StashDBViewModel.SavedFilter?) -> [String: Any] {
+        var dict: [String: Any] = SceneLiveChipFilterSupport.savedFilterSupportsLiveChipEditor(selectedFilter)
+            ? activeLiveFilterDict()
+            : [:]
+        if !studioIds.isEmpty {
+            dict["studios"] = ["modifier": "INCLUDES", "value": studioIds, "depth": 0]
+        }
+        if !tagIds.isEmpty {
+            dict["tags"] = ["modifier": "INCLUDES", "value": tagIds, "depth": 0]
+        }
+        if !groupIds.isEmpty {
+            dict["groups"] = ["modifier": "INCLUDES", "value": groupIds, "depth": 0]
+        }
+        if minRating == -1 {
+            dict["rating100"] = ["modifier": "IS_NULL"]
+        } else if minRating > 0, dict["rating100"] == nil {
+            dict["rating100"] = ["value": (minRating * 20), "modifier": "EQUALS"]
+        }
+        return dict
+    }
 
-    mutating func clearChipsOnly() {}
+    mutating func clearChipsOnly() {
+        minRating = 0
+        organized = nil
+        interactive = nil
+        orientation = nil
+        performerCount = nil
+        resolution = nil
+        performerFavorite = nil
+        oCounterTag = nil
+        studioIds = []
+        tagIds = []
+        groupIds = []
+    }
 
-    mutating func mapLiveFragmentToChips(_ frag: [String: Any]) {}
+    mutating func mapLiveFragmentToChips(_ frag: [String: Any]) {
+        let frag = FilterMapper.sanitize(frag, isMarker: false)
+        if let rating = frag["rating100"] as? [String: Any] {
+            let mod = (rating["modifier"] as? String) ?? ""
+            if mod == "IS_NULL" {
+                minRating = -1
+            } else if let raw = rating["value"], let v = Self.intFromLiveJSON(raw) {
+                minRating = max(0, min(5, v / 20))
+            } else {
+                minRating = 0
+            }
+        } else {
+            minRating = 0
+        }
+        organized = Self.boolFromLiveJSON(frag["organized"])
+        interactive = Self.boolFromLiveJSON(frag["interactive"])
+        if let orient = frag["orientation"] as? [String: Any], let vals = orient["value"] as? [String], let first = vals.first {
+            orientation = first
+        } else if let orient = frag["orientation"] as? [String: Any], let vals = orient["value"] as? [Any] {
+            orientation = vals.compactMap { $0 as? String }.first
+        } else {
+            orientation = nil
+        }
+        if let pc = frag["performer_count"] as? [String: Any], let raw = pc["value"], let v = Self.intFromLiveJSON(raw) {
+            let mod = (pc["modifier"] as? String) ?? "EQUALS"
+            if mod == "GREATER_THAN", v == 2 {
+                performerCount = 3
+            } else {
+                performerCount = v
+            }
+        } else {
+            performerCount = nil
+        }
+        if let res = frag["resolution"] as? [String: Any], let s = res["value"] as? String {
+            resolution = s
+        } else {
+            resolution = nil
+        }
+        performerFavorite = Self.boolFromLiveJSON(frag["performer_favorite"])
+        if let oc = frag["o_counter"] as? [String: Any],
+           let mod = oc["modifier"] as? String,
+           let raw = oc["value"],
+           let v = Self.intFromLiveJSON(raw) {
+            oCounterTag = "\(mod):\(v)"
+        } else {
+            oCounterTag = nil
+        }
+        studioIds = SceneLiveChipFilterSupport.includesIds(fromCriterion: frag["studios"])
+        tagIds = SceneLiveChipFilterSupport.includesIds(fromCriterion: frag["tags"])
+        groupIds = SceneLiveChipFilterSupport.includesIds(fromCriterion: frag["groups"])
+    }
 
-    mutating func syncLiveChipsToMatchSelectedFilter(_ selectedFilter: StashDBViewModel.SavedFilter?, savedFilters: [String: StashDBViewModel.SavedFilter]) {}
+    mutating func syncLiveChipsToMatchSelectedFilter(_ selectedFilter: StashDBViewModel.SavedFilter?, savedFilters: [String: StashDBViewModel.SavedFilter]) {
+        guard let f = selectedFilter else {
+            clearChipsOnly()
+            return
+        }
+        if let meta = f.stashyScenePresetMetadata {
+            let base: StashDBViewModel.SavedFilter?
+            if let bid = meta.baseSavedFilterId, let b = savedFilters[bid] {
+                base = b
+            } else {
+                base = nil
+            }
+            if SceneLiveChipFilterSupport.savedFilterSupportsLiveChipEditor(base) {
+                mapLiveFragmentToChips(meta.liveFragment)
+            } else {
+                clearChipsOnly()
+                studioIds = SceneLiveChipFilterSupport.includesIds(fromCriterion: meta.liveFragment["studios"])
+                tagIds = SceneLiveChipFilterSupport.includesIds(fromCriterion: meta.liveFragment["tags"])
+                groupIds = SceneLiveChipFilterSupport.includesIds(fromCriterion: meta.liveFragment["groups"])
+            }
+        } else if SceneLiveChipFilterSupport.savedFilterSupportsLiveChipEditor(f) {
+            if let raw = f.filterDict {
+                mapLiveFragmentToChips(raw)
+            } else {
+                clearChipsOnly()
+            }
+        } else {
+            clearChipsOnly()
+            let flat: [String: Any]? = {
+                if let raw = f.filterDict { return FilterMapper.sanitize(raw, isMarker: false) }
+                if let obj = f.object_filter, let objDict = obj.value as? [String: Any] {
+                    return FilterMapper.sanitize(objDict, isMarker: false)
+                }
+                return nil
+            }()
+            if let flat {
+                studioIds = SceneLiveChipFilterSupport.includesIds(fromCriterion: flat["studios"])
+                tagIds = SceneLiveChipFilterSupport.includesIds(fromCriterion: flat["tags"])
+                groupIds = SceneLiveChipFilterSupport.includesIds(fromCriterion: flat["groups"])
+            }
+        }
+    }
 
     private static func boolFromLiveJSON(_ value: Any?) -> Bool? {
         guard let value else { return nil }

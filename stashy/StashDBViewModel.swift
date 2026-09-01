@@ -350,6 +350,8 @@ class StashDBViewModel: ObservableObject {
     private var imageRatingUpdatedObserver: NSObjectProtocol?
     private var imageOCounterUpdatedObserver: NSObjectProtocol?
     private var imageTagsUpdatedObserver: NSObjectProtocol?
+    private var sceneTagsUpdatedObserver: NSObjectProtocol?
+    private var markerTagsUpdatedObserver: NSObjectProtocol?
     private var sceneOCounterUpdatedObserver: NSObjectProtocol?
     private var sceneUpdatedObserver: NSObjectProtocol?
     private var tagImageUpdatedObserver: NSObjectProtocol?
@@ -437,6 +439,32 @@ class StashDBViewModel: ObservableObject {
             }
         }
 
+        sceneTagsUpdatedObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SceneTagsUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let sceneId = notification.userInfo?["sceneId"] as? String,
+                  let tags = notification.userInfo?["tags"] as? [Tag] else { return }
+            let viewModel = self
+            Task { @MainActor in
+                viewModel?.patchSceneTagsInLists(sceneId: sceneId, tags: tags)
+            }
+        }
+
+        markerTagsUpdatedObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("MarkerTagsUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let markerId = notification.userInfo?["markerId"] as? String,
+                  let tags = notification.userInfo?["tags"] as? [Tag] else { return }
+            let viewModel = self
+            Task { @MainActor in
+                viewModel?.patchMarkerTagsInLists(markerId: markerId, tags: tags)
+            }
+        }
+
         imageTagsUpdatedObserver = NotificationCenter.default.addObserver(
             forName: NSNotification.Name("ImageTagsUpdated"),
             object: nil,
@@ -487,6 +515,12 @@ class StashDBViewModel: ObservableObject {
         }
         if let imageTagsUpdatedObserver {
             NotificationCenter.default.removeObserver(imageTagsUpdatedObserver)
+        }
+        if let sceneTagsUpdatedObserver {
+            NotificationCenter.default.removeObserver(sceneTagsUpdatedObserver)
+        }
+        if let markerTagsUpdatedObserver {
+            NotificationCenter.default.removeObserver(markerTagsUpdatedObserver)
         }
         // Diese beiden hingen vorher ohne Token in der NotificationCenter —
         // `removeObserver(self)` erwischt block-basierte Observer nicht, sie
@@ -1917,6 +1951,24 @@ class StashDBViewModel: ObservableObject {
     }
 
     /// Live-listener: patch `o_counter` across in-memory scene lists.
+    /// Same for scene lists — Feeds (Scenes/Previews) and any pushed scene list.
+    func patchSceneTagsInLists(sceneId: String, tags: [Tag]) {
+        func patch(_ list: inout [Scene]) {
+            guard let index = list.firstIndex(where: { $0.id == sceneId }) else { return }
+            list[index] = list[index].withTags(tags)
+        }
+        patch(&scenes)
+        patch(&previews)
+    }
+
+    /// Markers carry their own tags; the primary tag is untouched by this path.
+    func patchMarkerTagsInLists(markerId: String, tags: [Tag]) {
+        guard let index = sceneMarkers.firstIndex(where: { $0.id == markerId }) else { return }
+        let marker = sceneMarkers[index]
+        let primaryId = marker.primaryTag?.id
+        sceneMarkers[index] = marker.withTags(tags.filter { $0.id != primaryId })
+    }
+
     /// Keeps image lists in sync after a tag change (AI Tags accept, tag editor, …)
     /// without refetching a whole feed.
     func patchImageTagsInLists(imageId: String, tags: [Tag]) {
@@ -7537,35 +7589,6 @@ struct GenerateData: Codable {
         }
     }
 
-    func updateImageTags(imageId: String, tagIds: [String], completion: @escaping (Bool) -> Void) {
-        let mutation = GraphQLQueries.imageUpdateTagsMutation
-        let variables: [String: Any] = ["input": ["id": imageId, "tag_ids": tagIds]]
-        guard let bodyData = try? JSONSerialization.data(withJSONObject: ["query": mutation, "variables": variables]),
-              let bodyString = String(data: bodyData, encoding: .utf8) else {
-            completion(false); return
-        }
-        struct Resp: Codable {
-            struct RData: Codable {
-                struct Updated: Codable { let id: String; let tags: [Tag]? }
-                let imageUpdate: Updated?
-            }
-            let data: RData?
-        }
-        performGraphQLQuery(query: bodyString) { (response: Resp?) in
-            guard let updated = response?.data?.imageUpdate else {
-                completion(false); return
-            }
-            // Same broadcast the AI Tags path uses, so every list holding this image
-            // picks the change up without a refetch.
-            NotificationCenter.default.post(
-                name: NSNotification.Name("ImageTagsUpdated"),
-                object: nil,
-                userInfo: ["imageId": imageId, "tags": updated.tags ?? []]
-            )
-            completion(true)
-        }
-    }
-
     func fetchAllGroupsForScene(completion: @escaping ([StashGroup]) -> Void) {
         let query = GraphQLQueries.findGroupsForSceneQuery
         let variables: [String: Any] = ["filter": ["per_page": -1, "sort": "name", "direction": "ASC"]]
@@ -8866,6 +8889,19 @@ struct Scene: Codable, Identifiable, Equatable {
         )
     }
 
+    /// Creates a copy with a new tag list
+    func withTags(_ newTags: [Tag]) -> Scene {
+        return Scene(
+            id: id, title: title, details: details, director: director, date: date, duration: duration,
+            studio: studio, performers: performers, files: files, tags: newTags,
+            galleries: galleries, groups: groups, organized: organized,
+            resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
+            rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields,
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt
+        )
+    }
+
     /// Creates a copy with updated rating
     func withRating(_ newRating: Int?) -> Scene {
         return Scene(
@@ -9283,6 +9319,10 @@ struct SceneMarker: Codable, Identifiable, Equatable {
 
     func withScene(_ newScene: MarkerScene?) -> SceneMarker {
         SceneMarker(id: id, title: title, seconds: seconds, endSeconds: endSeconds, primaryTag: primaryTag, tags: tags, screenshot: screenshot, preview: preview, stream: stream, playCount: playCount, scene: newScene)
+    }
+
+    func withTags(_ newTags: [Tag]) -> SceneMarker {
+        SceneMarker(id: id, title: title, seconds: seconds, endSeconds: endSeconds, primaryTag: primaryTag, tags: newTags, screenshot: screenshot, preview: preview, stream: stream, playCount: playCount, scene: scene)
     }
 
     func withPlayCount(_ newCount: Int?) -> SceneMarker {
