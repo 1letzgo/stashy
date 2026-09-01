@@ -1007,7 +1007,7 @@ private struct ScenesViewContent: View {
                 } else if showsBlockingInitialLoad {
                     StandardLoadingView(message: "Loading scenes...")
                 } else if primarySceneListIsEmpty && viewModel.errorMessage != nil {
-                    ConnectionErrorView { performSearch() }
+                    ConnectionErrorView(title: viewModel.errorMessage ?? "Server not reachable") { performSearch() }
                 } else if primarySceneListIsEmpty {
                     scenesEmptyContent
                 } else {

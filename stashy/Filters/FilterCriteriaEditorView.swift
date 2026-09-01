@@ -42,6 +42,15 @@ struct FilterCriteriaEditorView: View {
         )
     }
 
+    /// Debounces the refetch. Every row edit used to hit the server directly — on a large library
+    /// three taps in the tag list meant three overlapping `find*` queries, and the list ended up
+    /// empty with a connection error instead of the result of the last edit.
+    @StateObject private var applyScheduler = FilterCriteriaApplyScheduler()
+
+    private func applyChange() {
+        applyScheduler.schedule(onChange)
+    }
+
     private func isExpanded(_ key: String) -> Bool { expandedKeys.contains(key) }
 
     private func toggleExpanded(_ key: String) {
@@ -190,7 +199,7 @@ struct FilterCriteriaEditorView: View {
                         Button {
                             document.changeGroupType(at: path, from: group, to: candidate)
                             HapticManager.selection()
-                            onChange()
+                            applyChange()
                         } label: {
                             if candidate == group {
                                 Label(Self.groupTitle(candidate), systemImage: "checkmark")
@@ -219,7 +228,7 @@ struct FilterCriteriaEditorView: View {
                 Button {
                     document.removeGroup(group, at: path)
                     HapticManager.selection()
-                    onChange()
+                    applyChange()
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.body)
@@ -307,7 +316,7 @@ struct FilterCriteriaEditorView: View {
                             expandedKeys.remove(key)
                         }
                         HapticManager.selection()
-                        onChange()
+                        applyChange()
                     } label: {
                         Image(systemName: "xmark.circle.fill")
                             .font(.body)
@@ -337,35 +346,35 @@ struct FilterCriteriaEditorView: View {
     private func criterionEditor(field: FilterFieldDescriptor) -> some View {
         switch field.kind {
         case .boolean:
-            FilterBoolCriterionRow(value: optionalBoolBinding(for: field.key), onChange: onChange)
+            FilterBoolCriterionRow(value: optionalBoolBinding(for: field.key), onChange: applyChange)
         case .string:
-            FilterStringCriterionRow(value: dictBinding(for: field.key), onChange: onChange)
+            FilterStringCriterionRow(value: dictBinding(for: field.key), onChange: applyChange)
         case .int, .hierarchicalCount:
-            FilterNumericCriterionRow(value: dictBinding(for: field.key), isFloat: false, onChange: onChange)
+            FilterNumericCriterionRow(value: dictBinding(for: field.key), isFloat: false, onChange: applyChange)
         case .float:
-            FilterNumericCriterionRow(value: dictBinding(for: field.key), isFloat: true, onChange: onChange)
+            FilterNumericCriterionRow(value: dictBinding(for: field.key), isFloat: true, onChange: applyChange)
         case .date, .timestamp:
             FilterStringCriterionRow(
                 value: dictBinding(for: field.key),
                 placeholder: field.kind == .date ? "YYYY-MM-DD" : "Timestamp / relative",
                 modifiers: FilterCriterionKind.defaultModifiers(for: field.kind),
-                onChange: onChange
+                onChange: applyChange
             )
         case .resolution:
-            FilterResolutionCriterionRow(value: dictBinding(for: field.key), onChange: onChange)
+            FilterResolutionCriterionRow(value: dictBinding(for: field.key), onChange: applyChange)
         case .orientation:
-            FilterOrientationCriterionRow(value: dictBinding(for: field.key), onChange: onChange)
+            FilterOrientationCriterionRow(value: dictBinding(for: field.key), onChange: applyChange)
         case .gender:
-            FilterGenderCriterionRow(value: dictBinding(for: field.key), onChange: onChange)
+            FilterGenderCriterionRow(value: dictBinding(for: field.key), onChange: applyChange)
         case .circumcision:
-            FilterCircumcisionCriterionRow(value: dictBinding(for: field.key), onChange: onChange)
+            FilterCircumcisionCriterionRow(value: dictBinding(for: field.key), onChange: applyChange)
         case .hierarchicalMulti:
             FilterMultiIdCriterionRow(
                 value: dictBinding(for: field.key),
                 entityKey: field.key,
                 hierarchical: true,
                 mode: document.mode,
-                onChange: onChange
+                onChange: applyChange
             )
         case .multi:
             FilterMultiIdCriterionRow(
@@ -373,24 +382,24 @@ struct FilterCriteriaEditorView: View {
                 entityKey: field.key,
                 hierarchical: false,
                 mode: document.mode,
-                onChange: onChange
+                onChange: applyChange
             )
         case .isMissing:
-            FilterIsMissingRow(value: stringBinding(for: field.key), onChange: onChange)
+            FilterIsMissingRow(value: stringBinding(for: field.key), onChange: applyChange)
         case .hasMarkers, .hasChapters:
-            FilterTrueFalseStringRow(value: stringBinding(for: field.key), onChange: onChange)
+            FilterTrueFalseStringRow(value: stringBinding(for: field.key), onChange: applyChange)
         case .stashID, .stashIDs:
             FilterStashIDCriterionRow(
                 value: dictBinding(for: field.key),
                 multi: field.kind == .stashIDs,
-                onChange: onChange
+                onChange: applyChange
             )
         case .phashDistance:
-            FilterPhashDistanceRow(value: dictBinding(for: field.key), onChange: onChange)
+            FilterPhashDistanceRow(value: dictBinding(for: field.key), onChange: applyChange)
         case .duplication:
-            FilterDuplicationRow(value: dictBinding(for: field.key), onChange: onChange)
+            FilterDuplicationRow(value: dictBinding(for: field.key), onChange: applyChange)
         case .customFields:
-            FilterCustomFieldsRow(value: customFieldsBinding(for: field.key), onChange: onChange)
+            FilterCustomFieldsRow(value: customFieldsBinding(for: field.key), onChange: applyChange)
         case .booleanGroup:
             // AND/OR/NOT are rendered as inset group blocks, never as a criterion row.
             EmptyView()
@@ -409,7 +418,7 @@ struct FilterCriteriaEditorView: View {
             }
             .buttonStyle(.plain)
         case .raw:
-            FilterRawJSONRow(value: dictBinding(for: field.key), onChange: onChange)
+            FilterRawJSONRow(value: dictBinding(for: field.key), onChange: applyChange)
         }
     }
 
@@ -493,6 +502,31 @@ struct FilterCriteriaEditorView: View {
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
     }
+}
+
+/// Collapses a burst of criterion edits into one refetch.
+///
+/// The criteria list is the primary filter surface now, so it applies live — but a tap in a
+/// multi-select list is one edit among several the user is still making. Firing a query per tap
+/// puts several heavy `find*` requests in flight at once; the loser of that race decides what the
+/// list shows.
+@MainActor
+final class FilterCriteriaApplyScheduler: ObservableObject {
+    /// Long enough to swallow a run of taps, short enough to still feel immediate.
+    static let delay: Duration = .milliseconds(450)
+
+    private var pending: Task<Void, Never>?
+
+    func schedule(_ work: @escaping () -> Void) {
+        pending?.cancel()
+        pending = Task { @MainActor in
+            try? await Task.sleep(for: Self.delay)
+            guard !Task.isCancelled else { return }
+            work()
+        }
+    }
+
+    deinit { pending?.cancel() }
 }
 
 private struct NestedEditorIdentity: Identifiable {
