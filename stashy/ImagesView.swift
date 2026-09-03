@@ -257,8 +257,11 @@ private struct ImagesViewBody: View {
     }
 
     /// Verbindungs- bzw. Ladefehler für die Bildliste (`imageFindListError` ist gegen Races mit `fetchSavedFilters` stabil).
+    /// Only the image list's *own* failure counts. `errorMessage` is the view model's global slot —
+    /// any unrelated request that failed (saved filters, picker options) used to turn an empty
+    /// result into "Server not reachable", so a filter with no hits read as a broken server.
     private var imagesListShowsConnectionError: Bool {
-        displayedImages.isEmpty && (viewModel.imageFindListError != nil || viewModel.errorMessage != nil)
+        displayedImages.isEmpty && viewModel.imageFindListError != nil
     }
 
     var body: some View {
@@ -312,7 +315,8 @@ private struct ImagesViewBody: View {
                     StandardLoadingView(message: "Loading images...")
                 }
             } else if imagesListShowsConnectionError {
-                ConnectionErrorView {
+                // Show what actually failed — a timeout and a rejected query need different fixes.
+                ConnectionErrorView(title: viewModel.imageFindListError ?? "Server not reachable") {
                     imageListFilters.refetchImages(viewModel: viewModel, initial: true)
                 }
             } else if displayedImages.isEmpty {
@@ -968,19 +972,7 @@ private struct ImagesViewBody: View {
             showMediaTypeFilter: imageListFilters.showImageMediaTypeFilter,
             sortOption: imageListFilters.selectedSortOption,
             onSortChange: { changeSortOption(to: $0) },
-            liveMinRating: $imageListFilters.liveFilterMinRating,
-            livePerformerFavorite: $imageListFilters.liveFilterPerformerFavorite,
-            liveOrganized: $imageListFilters.liveFilterOrganized,
-            liveOCounterTag: $imageListFilters.liveFilterOCounterTag,
-            liveStudioIds: $imageListFilters.liveFilterStudioIds,
-            liveTagIds: $imageListFilters.liveFilterTagIds,
             liveMediaKind: $imageListFilters.liveFilterMediaKind,
-            studioPickerOptions: imageListFilters.studioPickerOptions,
-            studioPickerLoading: imageListFilters.studioPickerLoading,
-            onStudioPickerSectionAppear: { imageListFilters.loadStudioPickerOptions(viewModel: viewModel) },
-            tagPickerOptions: imageListFilters.tagPickerOptions,
-            tagPickerLoading: imageListFilters.tagPickerLoading,
-            onTagPickerSectionAppear: { imageListFilters.loadTagPickerOptions(viewModel: viewModel) },
             onApply: { imageListFilters.applyLiveFilter(viewModel: viewModel) },
             onReset: {
                 imageListFilters.catalogPresetRowSelection = ""

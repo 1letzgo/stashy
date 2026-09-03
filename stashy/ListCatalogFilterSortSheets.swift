@@ -189,6 +189,8 @@ struct CatalogStudioLiveFilterPickerRow: View {
                     }
                 )) {
                     Text("Any").tag("")
+                    // Counterpart to "Any", same meaning as the multi-picker's None row.
+                    Text("None").tag(CatalogLiveChipFilterSupport.noneChipValue)
                     ForEach(studios) { s in
                         Text(s.name).tag(s.id)
                     }
@@ -237,6 +239,7 @@ struct CatalogNamedEntityLiveFilterPickerRow<Item: Identifiable & Equatable>: Vi
                     }
                 )) {
                     Text("Any").tag("")
+                    Text("None").tag(CatalogLiveChipFilterSupport.noneChipValue)
                     ForEach(items) { item in
                         Text(displayName(item)).tag(item.id)
                     }
@@ -854,14 +857,6 @@ struct PerformersCatalogFilterSortSheet: View {
     var sortOption: StashDBViewModel.PerformerSortOption
     var onSortChange: (StashDBViewModel.PerformerSortOption) -> Void
 
-    @Binding var liveAgeRange: String?
-    @Binding var liveHairColor: String?
-    @Binding var liveGender: String?
-    @Binding var liveCountry: String?
-    @Binding var liveImplants: Bool?
-    @Binding var liveFavorite: Bool?
-    @Binding var liveMissingField: String?
-    @Binding var liveOCounterTag: String?
 
     var onApply: () -> Void
     var onReset: () -> Void
@@ -873,6 +868,8 @@ struct PerformersCatalogFilterSortSheet: View {
     @ObservedObject private var appearance = AppearanceManager.shared
 
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
+    /// Chip value for "field is not set" — see `CatalogLiveChipFilterSupport.noneChipValue`.
+    private let noneChip = CatalogLiveChipFilterSupport.noneChipValue
 
     var body: some View {
         NavigationStack {
@@ -880,8 +877,7 @@ struct PerformersCatalogFilterSortSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     filterPickerCard
                     performerSortCard
-                    performerLiveChipsCard
-                    AdvancedCriteriaCard(document: criteriaDocument, onApply: onApply)
+                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
                 }
             }
             .background(Color.appBackground.ignoresSafeArea())
@@ -989,80 +985,6 @@ struct PerformersCatalogFilterSortSheet: View {
         .catalogFilterSortControlCardChrome()
     }
 
-    private var performerLiveChipsCard: some View {
-        VStack(spacing: 0) {
-            CatalogFilterRow(label: "Favorite") {
-                CatalogFilterChip(title: "Any", isActive: liveFavorite == nil) { liveFavorite = nil; onApply() }
-                CatalogFilterChip(title: "Yes", isActive: liveFavorite == true) { liveFavorite = true; onApply() }
-                CatalogFilterChip(title: "No", isActive: liveFavorite == false) { liveFavorite = false; onApply() }
-            }
-            Divider().padding(.leading, 16)
-            CatalogFilterRow(label: "Missing") {
-                CatalogFilterChip(title: "Any", isActive: liveMissingField == nil) { liveMissingField = nil; onApply() }
-                CatalogFilterChip(title: "Image", isActive: liveMissingField == "image") { liveMissingField = "image"; onApply() }
-                CatalogFilterChip(title: "Gender", isActive: liveMissingField == "gender") { liveMissingField = "gender"; onApply() }
-                CatalogFilterChip(title: "Hair", isActive: liveMissingField == "hair_color") { liveMissingField = "hair_color"; onApply() }
-            }
-            Divider().padding(.leading, 16)
-            CatalogFilterRow(label: "Gender") {
-                CatalogFilterChip(title: "Any", isActive: liveGender == nil) { liveGender = nil; onApply() }
-                CatalogFilterChip(title: "Female", isActive: liveGender == "FEMALE") { liveGender = "FEMALE"; onApply() }
-                CatalogFilterChip(title: "Male", isActive: liveGender == "MALE") { liveGender = "MALE"; onApply() }
-                CatalogFilterChip(title: "Trans (M)", isActive: liveGender == "TRANSGENDER_MALE") { liveGender = "TRANSGENDER_MALE"; onApply() }
-                CatalogFilterChip(title: "Trans (F)", isActive: liveGender == "TRANSGENDER_FEMALE") { liveGender = "TRANSGENDER_FEMALE"; onApply() }
-                CatalogFilterChip(title: "Intersex", isActive: liveGender == "INTERSEX") { liveGender = "INTERSEX"; onApply() }
-                CatalogFilterChip(title: "Non-binary", isActive: liveGender == "NON_BINARY") { liveGender = "NON_BINARY"; onApply() }
-            }
-            Divider().padding(.leading, 16)
-            CatalogFilterRow(label: "Age") {
-                CatalogFilterChip(title: "Any", isActive: liveAgeRange == nil) { liveAgeRange = nil; onApply() }
-                CatalogFilterChip(title: "18–21", isActive: liveAgeRange == "18-21") { liveAgeRange = "18-21"; onApply() }
-                CatalogFilterChip(title: "22–26", isActive: liveAgeRange == "22-26") { liveAgeRange = "22-26"; onApply() }
-                CatalogFilterChip(title: "26–30", isActive: liveAgeRange == "26-30") { liveAgeRange = "26-30"; onApply() }
-                CatalogFilterChip(title: "30+", isActive: liveAgeRange == "30+") { liveAgeRange = "30+"; onApply() }
-            }
-            Divider().padding(.leading, 16)
-            CatalogFilterRow(label: "Hair") {
-                CatalogFilterChip(title: "Any", isActive: liveHairColor == nil) { liveHairColor = nil; onApply() }
-                CatalogFilterChip(title: "Blonde", isActive: liveHairColor == "BLONDE") { liveHairColor = "BLONDE"; onApply() }
-                CatalogFilterChip(title: "Brunette", isActive: liveHairColor == "BRUNETTE") { liveHairColor = "BRUNETTE"; onApply() }
-                CatalogFilterChip(title: "Red", isActive: liveHairColor == "RED") { liveHairColor = "RED"; onApply() }
-                CatalogFilterChip(title: "Black", isActive: liveHairColor == "BLACK") { liveHairColor = "BLACK"; onApply() }
-            }
-            Divider().padding(.leading, 16)
-            CatalogFilterRow(label: "Country") {
-                CatalogFilterChip(title: "Any", isActive: liveCountry == nil) { liveCountry = nil; onApply() }
-                CatalogFilterChip(title: "US", isActive: liveCountry == "US") { liveCountry = "US"; onApply() }
-                CatalogFilterChip(title: "Non-US", isActive: liveCountry == "NOT_US") { liveCountry = "NOT_US"; onApply() }
-            }
-            Divider().padding(.leading, 16)
-            CatalogFilterRow(label: "Tits") {
-                CatalogFilterChip(title: "Any", isActive: liveImplants == nil) { liveImplants = nil; onApply() }
-                CatalogFilterChip(title: "Fake", isActive: liveImplants == true) { liveImplants = true; onApply() }
-                CatalogFilterChip(title: "Natural", isActive: liveImplants == false) { liveImplants = false; onApply() }
-            }
-            Divider().padding(.leading, 16)
-            CatalogFilterRow(label: "O Count") {
-                CatalogFilterChip(title: "Any", isActive: liveOCounterTag == nil) { liveOCounterTag = nil; onApply() }
-                CatalogFilterChip(title: "0", isActive: liveOCounterTag == SceneLiveOCounterChip.equalZero) {
-                    liveOCounterTag = SceneLiveOCounterChip.equalZero; onApply()
-                }
-                CatalogFilterChip(title: "1+", isActive: liveOCounterTag == SceneLiveOCounterChip.greaterThan0) {
-                    liveOCounterTag = SceneLiveOCounterChip.greaterThan0; onApply()
-                }
-                CatalogFilterChip(title: "5+", isActive: liveOCounterTag == SceneLiveOCounterChip.greaterThan4) {
-                    liveOCounterTag = SceneLiveOCounterChip.greaterThan4; onApply()
-                }
-                CatalogFilterChip(title: "10+", isActive: liveOCounterTag == SceneLiveOCounterChip.greaterThan9) {
-                    liveOCounterTag = SceneLiveOCounterChip.greaterThan9; onApply()
-                }
-            }
-        }
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
-    }
 }
 
 // MARK: - Tags sheet
@@ -1074,8 +996,6 @@ struct TagsCatalogFilterSortSheet: View {
     @ObservedObject var criteriaDocument: FilterCriteriaDocument
     var sortOption: StashDBViewModel.TagSortOption
     var onSortChange: (StashDBViewModel.TagSortOption) -> Void
-    @Binding var liveFavorite: Bool?
-    @Binding var liveHasScenes: Bool
     var onApply: () -> Void
     var onReset: () -> Void
     var onRequestSave: () -> Void
@@ -1092,8 +1012,7 @@ struct TagsCatalogFilterSortSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     filterPickerCard
                     tagSortCard
-                    tagLiveChipsCard
-                    AdvancedCriteriaCard(document: criteriaDocument, onApply: onApply)
+                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
                 }
             }
             .background(Color.appBackground.ignoresSafeArea())
@@ -1196,24 +1115,6 @@ struct TagsCatalogFilterSortSheet: View {
         .catalogFilterSortControlCardChrome()
     }
 
-    private var tagLiveChipsCard: some View {
-        VStack(spacing: 0) {
-            CatalogFilterRow(label: "Favorite") {
-                CatalogFilterChip(title: "Any", isActive: liveFavorite == nil) { liveFavorite = nil; onApply() }
-                CatalogFilterChip(title: "Yes", isActive: liveFavorite == true) { liveFavorite = true; onApply() }
-                CatalogFilterChip(title: "No", isActive: liveFavorite == false) { liveFavorite = false; onApply() }
-            }
-            Divider().padding(.leading, 16)
-            CatalogFilterRow(label: "Scenes") {
-                CatalogFilterChip(title: "Any", isActive: !liveHasScenes) { liveHasScenes = false; onApply() }
-                CatalogFilterChip(title: "Has scenes", isActive: liveHasScenes) { liveHasScenes = true; onApply() }
-            }
-        }
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
-    }
 }
 
 // MARK: - Studios sheet
@@ -1225,9 +1126,6 @@ struct StudiosCatalogFilterSortSheet: View {
     @ObservedObject var criteriaDocument: FilterCriteriaDocument
     var sortOption: StashDBViewModel.StudioSortOption
     var onSortChange: (StashDBViewModel.StudioSortOption) -> Void
-    @Binding var liveMinRating: Int
-    @Binding var liveFavorite: Bool?
-    @Binding var liveScenes: String?
     var onApply: () -> Void
     var onReset: () -> Void
     var onRequestSave: () -> Void
@@ -1244,8 +1142,7 @@ struct StudiosCatalogFilterSortSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     filterPickerCard
                     studioSortCard
-                    studioLiveChipsCard
-                    AdvancedCriteriaCard(document: criteriaDocument, onApply: onApply)
+                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
                 }
             }
             .background(Color.appBackground.ignoresSafeArea())
@@ -1348,36 +1245,6 @@ struct StudiosCatalogFilterSortSheet: View {
         .catalogFilterSortControlCardChrome()
     }
 
-    private var studioLiveChipsCard: some View {
-        VStack(spacing: 0) {
-            CatalogFilterRow(label: "Favorite") {
-                CatalogFilterChip(title: "Any", isActive: liveFavorite == nil) { liveFavorite = nil; onApply() }
-                CatalogFilterChip(title: "Yes", isActive: liveFavorite == true) { liveFavorite = true; onApply() }
-                CatalogFilterChip(title: "No", isActive: liveFavorite == false) { liveFavorite = false; onApply() }
-            }
-            Divider().padding(.leading, 16)
-            CatalogFilterRow(label: "Rating") {
-                CatalogFilterChip(title: "Any", isActive: liveMinRating == 0) { liveMinRating = 0; onApply() }
-                CatalogFilterChip(title: "None", isActive: liveMinRating == -1) { liveMinRating = -1; onApply() }
-                ForEach([5, 4, 3, 2, 1], id: \.self) { star in
-                    CatalogFilterChip(title: "\(star)★", isActive: liveMinRating == star) {
-                        liveMinRating = star
-                        onApply()
-                    }
-                }
-            }
-            Divider().padding(.leading, 16)
-            CatalogFilterRow(label: "Scenes") {
-                CatalogFilterChip(title: "Any", isActive: liveScenes == nil) { liveScenes = nil; onApply() }
-                CatalogFilterChip(title: "Has", isActive: liveScenes == "has") { liveScenes = "has"; onApply() }
-                CatalogFilterChip(title: "None", isActive: liveScenes == "none") { liveScenes = "none"; onApply() }
-            }
-        }
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
-    }
 }
 
 // MARK: - Gallery sort
@@ -1458,13 +1325,6 @@ struct GalleriesCatalogFilterSortSheet: View {
     @ObservedObject var criteriaDocument: FilterCriteriaDocument
     var sortOption: StashDBViewModel.GallerySortOption
     var onSortChange: (StashDBViewModel.GallerySortOption) -> Void
-    @Binding var liveMinRating: Int
-    @Binding var liveFavorite: Bool?
-    @Binding var liveFiles: String?
-    @Binding var liveStudioId: String?
-    var studioPickerOptions: [Studio]
-    var studioPickerLoading: Bool
-    var onStudioPickerSectionAppear: () -> Void
     var onApply: () -> Void
     var onReset: () -> Void
     var onRequestSave: () -> Void
@@ -1481,8 +1341,7 @@ struct GalleriesCatalogFilterSortSheet: View {
                 VStack(alignment: .leading, spacing: 16) {
                     filterPickerCard
                     gallerySortCard
-                    galleryLiveChipsCard
-                    AdvancedCriteriaCard(document: criteriaDocument, onApply: onApply)
+                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
                 }
             }
             .background(Color.appBackground.ignoresSafeArea())
@@ -1585,44 +1444,6 @@ struct GalleriesCatalogFilterSortSheet: View {
         .catalogFilterSortControlCardChrome()
     }
 
-    private var galleryLiveChipsCard: some View {
-        VStack(spacing: 0) {
-            CatalogStudioLiveFilterPickerRow(
-                selectedStudioId: $liveStudioId,
-                studios: studioPickerOptions,
-                isLoading: studioPickerLoading,
-                onAppearLoad: onStudioPickerSectionAppear,
-                onSelectionChange: onApply
-            )
-            Divider().padding(.leading, 16)
-            CatalogFilterRow(label: "Favorite") {
-                CatalogFilterChip(title: "Any", isActive: liveFavorite == nil) { liveFavorite = nil; onApply() }
-                CatalogFilterChip(title: "Yes", isActive: liveFavorite == true) { liveFavorite = true; onApply() }
-                CatalogFilterChip(title: "No", isActive: liveFavorite == false) { liveFavorite = false; onApply() }
-            }
-            Divider().padding(.leading, 16)
-            CatalogFilterRow(label: "Rating") {
-                CatalogFilterChip(title: "Any", isActive: liveMinRating == 0) { liveMinRating = 0; onApply() }
-                CatalogFilterChip(title: "None", isActive: liveMinRating == -1) { liveMinRating = -1; onApply() }
-                ForEach([5, 4, 3, 2, 1], id: \.self) { star in
-                    CatalogFilterChip(title: "\(star)★", isActive: liveMinRating == star) {
-                        liveMinRating = star
-                        onApply()
-                    }
-                }
-            }
-            Divider().padding(.leading, 16)
-            CatalogFilterRow(label: "Files") {
-                CatalogFilterChip(title: "Any", isActive: liveFiles == nil) { liveFiles = nil; onApply() }
-                CatalogFilterChip(title: "Has", isActive: liveFiles == "has") { liveFiles = "has"; onApply() }
-                CatalogFilterChip(title: "None", isActive: liveFiles == "none") { liveFiles = "none"; onApply() }
-            }
-        }
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
-    }
 }
 
 // MARK: - Image sort
@@ -1703,19 +1524,7 @@ struct ImagesCatalogFilterSortSheet: View {
     var showMediaTypeFilter: Bool = true
     var sortOption: StashDBViewModel.ImageSortOption
     var onSortChange: (StashDBViewModel.ImageSortOption) -> Void
-    @Binding var liveMinRating: Int
-    @Binding var livePerformerFavorite: Bool?
-    @Binding var liveOrganized: String?
-    @Binding var liveOCounterTag: String?
-    @Binding var liveStudioIds: [String]
-    @Binding var liveTagIds: [String]
     @Binding var liveMediaKind: ImageListMediaKind
-    var studioPickerOptions: [Studio]
-    var studioPickerLoading: Bool
-    var onStudioPickerSectionAppear: () -> Void
-    var tagPickerOptions: [Tag]
-    var tagPickerLoading: Bool
-    var onTagPickerSectionAppear: () -> Void
     var onApply: () -> Void
     var onReset: () -> Void
     var onRequestSave: () -> Void
@@ -1762,8 +1571,7 @@ struct ImagesCatalogFilterSortSheet: View {
                     if showsImagesFeedAutoplaySetting {
                         ImagesFeedAutoplaySettingsCard()
                     }
-                    imageLiveChipsCard
-                    AdvancedCriteriaCard(document: criteriaDocument, onApply: onApply)
+                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
                 }
             }
             .background(Color.appBackground.ignoresSafeArea())
@@ -1888,74 +1696,6 @@ struct ImagesCatalogFilterSortSheet: View {
         .catalogFilterSortControlCardChrome()
     }
 
-    private var imageLiveChipsCard: some View {
-        VStack(spacing: 0) {
-            CatalogNamedEntityLiveFilterMultiPickerRow(
-                title: "Studio",
-                selectedIds: $liveStudioIds,
-                items: studioPickerOptions,
-                displayName: { $0.name },
-                isLoading: studioPickerLoading,
-                onAppearLoad: onStudioPickerSectionAppear,
-                onSelectionChange: onApply,
-                searchKind: .imageStudios
-            )
-            Divider().padding(.leading, 16)
-            CatalogNamedEntityLiveFilterMultiPickerRow(
-                title: "Tag",
-                selectedIds: $liveTagIds,
-                items: tagPickerOptions,
-                displayName: { $0.name },
-                isLoading: tagPickerLoading,
-                onAppearLoad: onTagPickerSectionAppear,
-                onSelectionChange: onApply,
-                searchKind: .imageTags
-            )
-            Divider().padding(.leading, 16)
-            CatalogFilterRow(label: "Perf. fav.") {
-                CatalogFilterChip(title: "Any", isActive: livePerformerFavorite == nil) { livePerformerFavorite = nil; onApply() }
-                CatalogFilterChip(title: "Yes", isActive: livePerformerFavorite == true) { livePerformerFavorite = true; onApply() }
-                CatalogFilterChip(title: "No", isActive: livePerformerFavorite == false) { livePerformerFavorite = false; onApply() }
-            }
-            Divider().padding(.leading, 16)
-            CatalogFilterRow(label: "Rating") {
-                CatalogFilterChip(title: "Any", isActive: liveMinRating == 0) { liveMinRating = 0; onApply() }
-                CatalogFilterChip(title: "None", isActive: liveMinRating == -1) { liveMinRating = -1; onApply() }
-                ForEach([5, 4, 3, 2, 1], id: \.self) { star in
-                    CatalogFilterChip(title: "\(star)★", isActive: liveMinRating == star) {
-                        liveMinRating = star
-                        onApply()
-                    }
-                }
-            }
-            Divider().padding(.leading, 16)
-            CatalogFilterRow(label: "Organized") {
-                CatalogFilterChip(title: "Any", isActive: liveOrganized == nil) { liveOrganized = nil; onApply() }
-                CatalogFilterChip(title: "Yes", isActive: liveOrganized == "true") { liveOrganized = "true"; onApply() }
-                CatalogFilterChip(title: "No", isActive: liveOrganized == "false") { liveOrganized = "false"; onApply() }
-            }
-            Divider().padding(.leading, 16)
-            CatalogFilterRow(label: "O Count") {
-                CatalogFilterChip(title: "Any", isActive: liveOCounterTag == nil) { liveOCounterTag = nil; onApply() }
-                CatalogFilterChip(title: "0", isActive: liveOCounterTag == SceneLiveOCounterChip.equalZero) {
-                    liveOCounterTag = SceneLiveOCounterChip.equalZero; onApply()
-                }
-                CatalogFilterChip(title: "1+", isActive: liveOCounterTag == SceneLiveOCounterChip.greaterThan0) {
-                    liveOCounterTag = SceneLiveOCounterChip.greaterThan0; onApply()
-                }
-                CatalogFilterChip(title: "5+", isActive: liveOCounterTag == SceneLiveOCounterChip.greaterThan4) {
-                    liveOCounterTag = SceneLiveOCounterChip.greaterThan4; onApply()
-                }
-                CatalogFilterChip(title: "10+", isActive: liveOCounterTag == SceneLiveOCounterChip.greaterThan9) {
-                    liveOCounterTag = SceneLiveOCounterChip.greaterThan9; onApply()
-                }
-            }
-        }
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
-        .padding(.bottom, 8)
-    }
 }
 
 // MARK: - Scene live chips (shared by Reels + catalog-style callers)
@@ -2230,7 +1970,7 @@ struct GroupsCatalogFilterSortSheet: View {
                     .pickerStyle(.menu)
                     .padding(.horizontal, 16)
 
-                    AdvancedCriteriaCard(document: criteriaDocument, onApply: onApply)
+                    FilterCriteriaEditorView(document: criteriaDocument, onChange: onApply)
                 }
             }
             .background(Color.appBackground.ignoresSafeArea())

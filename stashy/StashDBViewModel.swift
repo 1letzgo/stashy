@@ -350,6 +350,9 @@ class StashDBViewModel: ObservableObject {
     private var imageRatingUpdatedObserver: NSObjectProtocol?
     private var imageOCounterUpdatedObserver: NSObjectProtocol?
     private var imageTagsUpdatedObserver: NSObjectProtocol?
+    private var sceneTagsUpdatedObserver: NSObjectProtocol?
+    private var markerTagsUpdatedObserver: NSObjectProtocol?
+    private var bulkTagsAppliedObserver: NSObjectProtocol?
     private var sceneOCounterUpdatedObserver: NSObjectProtocol?
     private var sceneUpdatedObserver: NSObjectProtocol?
     private var tagImageUpdatedObserver: NSObjectProtocol?
@@ -437,6 +440,46 @@ class StashDBViewModel: ObservableObject {
             }
         }
 
+        sceneTagsUpdatedObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("SceneTagsUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let sceneId = notification.userInfo?["sceneId"] as? String,
+                  let tags = notification.userInfo?["tags"] as? [Tag] else { return }
+            let viewModel = self
+            Task { @MainActor in
+                viewModel?.patchSceneTagsInLists(sceneId: sceneId, tags: tags)
+            }
+        }
+
+        bulkTagsAppliedObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("BulkTagsApplied"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let tag = notification.userInfo?["tag"] as? Tag else { return }
+            let imageIds = Set(notification.userInfo?["imageIds"] as? [String] ?? [])
+            let sceneIds = Set(notification.userInfo?["sceneIds"] as? [String] ?? [])
+            let viewModel = self
+            Task { @MainActor in
+                viewModel?.patchBulkAppliedTag(tag, imageIds: imageIds, sceneIds: sceneIds)
+            }
+        }
+
+        markerTagsUpdatedObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("MarkerTagsUpdated"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let markerId = notification.userInfo?["markerId"] as? String,
+                  let tags = notification.userInfo?["tags"] as? [Tag] else { return }
+            let viewModel = self
+            Task { @MainActor in
+                viewModel?.patchMarkerTagsInLists(markerId: markerId, tags: tags)
+            }
+        }
+
         imageTagsUpdatedObserver = NotificationCenter.default.addObserver(
             forName: NSNotification.Name("ImageTagsUpdated"),
             object: nil,
@@ -487,6 +530,15 @@ class StashDBViewModel: ObservableObject {
         }
         if let imageTagsUpdatedObserver {
             NotificationCenter.default.removeObserver(imageTagsUpdatedObserver)
+        }
+        if let sceneTagsUpdatedObserver {
+            NotificationCenter.default.removeObserver(sceneTagsUpdatedObserver)
+        }
+        if let markerTagsUpdatedObserver {
+            NotificationCenter.default.removeObserver(markerTagsUpdatedObserver)
+        }
+        if let bulkTagsAppliedObserver {
+            NotificationCenter.default.removeObserver(bulkTagsAppliedObserver)
         }
         // Diese beiden hingen vorher ohne Token in der NotificationCenter —
         // `removeObserver(self)` erwischt block-basierte Observer nicht, sie
@@ -1917,6 +1969,51 @@ class StashDBViewModel: ObservableObject {
     }
 
     /// Live-listener: patch `o_counter` across in-memory scene lists.
+    /// A bulk tag action touched many items at once; add the tag to every one of them
+    /// that is currently in memory.
+    func patchBulkAppliedTag(_ tag: Tag, imageIds: Set<String>, sceneIds: Set<String>) {
+        guard !imageIds.isEmpty || !sceneIds.isEmpty else { return }
+
+        func patchImages(_ list: inout [StashImage]) {
+            for index in list.indices where imageIds.contains(list[index].id) {
+                let tags = list[index].tags ?? []
+                guard !tags.contains(where: { $0.id == tag.id }) else { continue }
+                list[index] = list[index].withTags(tags + [tag])
+            }
+        }
+        func patchScenes(_ list: inout [Scene]) {
+            for index in list.indices where sceneIds.contains(list[index].id) {
+                let tags = list[index].tags ?? []
+                guard !tags.contains(where: { $0.id == tag.id }) else { continue }
+                list[index] = list[index].withTags(tags + [tag])
+            }
+        }
+
+        patchImages(&clips)
+        patchImages(&allImages)
+        patchImages(&detailImages)
+        patchScenes(&scenes)
+        patchScenes(&previews)
+    }
+
+    /// Same for scene lists — Feeds (Scenes/Previews) and any pushed scene list.
+    func patchSceneTagsInLists(sceneId: String, tags: [Tag]) {
+        func patch(_ list: inout [Scene]) {
+            guard let index = list.firstIndex(where: { $0.id == sceneId }) else { return }
+            list[index] = list[index].withTags(tags)
+        }
+        patch(&scenes)
+        patch(&previews)
+    }
+
+    /// Markers carry their own tags; the primary tag is untouched by this path.
+    func patchMarkerTagsInLists(markerId: String, tags: [Tag]) {
+        guard let index = sceneMarkers.firstIndex(where: { $0.id == markerId }) else { return }
+        let marker = sceneMarkers[index]
+        let primaryId = marker.primaryTag?.id
+        sceneMarkers[index] = marker.withTags(tags.filter { $0.id != primaryId })
+    }
+
     /// Keeps image lists in sync after a tag change (AI Tags accept, tag editor, …)
     /// without refetching a whole feed.
     func patchImageTagsInLists(imageId: String, tags: [Tag]) {
@@ -7702,13 +7799,16 @@ struct GenerateData: Codable {
         }
     }
 
-    func fetchAllTags(completion: @escaping ([Tag]) -> Void) {
+    /// `sortField` decides which usage the 1000-tag cut favours — pass `images_count`
+    /// when the picker is for an image, or a tag heavy on images but absent from scenes
+    /// falls outside the page.
+    func fetchAllTags(sortField: String = "scenes_count", completion: @escaping ([Tag]) -> Void) {
         let query = GraphQLQueries.queryWithFragments("findTags")
         
         let variables: [String: Any] = [
             "filter": [
                 "per_page": 1000,
-                "sort": "scenes_count",
+                "sort": sortField,
                 "direction": "DESC"
             ],
             "tag_filter": [:]
@@ -8837,6 +8937,19 @@ struct Scene: Codable, Identifiable, Equatable {
         )
     }
 
+    /// Creates a copy with a new tag list
+    func withTags(_ newTags: [Tag]) -> Scene {
+        return Scene(
+            id: id, title: title, details: details, director: director, date: date, duration: duration,
+            studio: studio, performers: performers, files: files, tags: newTags,
+            galleries: galleries, groups: groups, organized: organized,
+            resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
+            rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields,
+            playDuration: playDuration, lastPlayedAt: lastPlayedAt
+        )
+    }
+
     /// Creates a copy with updated rating
     func withRating(_ newRating: Int?) -> Scene {
         return Scene(
@@ -9254,6 +9367,10 @@ struct SceneMarker: Codable, Identifiable, Equatable {
 
     func withScene(_ newScene: MarkerScene?) -> SceneMarker {
         SceneMarker(id: id, title: title, seconds: seconds, endSeconds: endSeconds, primaryTag: primaryTag, tags: tags, screenshot: screenshot, preview: preview, stream: stream, playCount: playCount, scene: newScene)
+    }
+
+    func withTags(_ newTags: [Tag]) -> SceneMarker {
+        SceneMarker(id: id, title: title, seconds: seconds, endSeconds: endSeconds, primaryTag: primaryTag, tags: newTags, screenshot: screenshot, preview: preview, stream: stream, playCount: playCount, scene: scene)
     }
 
     func withPlayCount(_ newCount: Int?) -> SceneMarker {

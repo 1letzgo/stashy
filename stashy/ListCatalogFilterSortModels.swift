@@ -418,6 +418,20 @@ enum StudioListLiveFilterPresetStore {
 // MARK: - When to show live chip rows vs. server-only notice
 
 enum CatalogLiveChipFilterSupport {
+    /// Chip value standing for "field is not set" — serialized as `IS_NULL`, the same meaning the
+    /// entity multi-picker gives its own "None" row. Kept out of the real value space of every
+    /// field that uses it (gender, hair colour, country, age, fake_tits).
+    static let noneChipValue = "NONE"
+
+    /// `IS_NULL` criterion for the "None" chips.
+    static let isNullCriterion: [String: Any] = ["modifier": StashCriterionModifier.isNull.rawValue]
+
+    /// True when a criterion from a saved filter / preset is an `IS_NULL` one.
+    static func isNullCriterion(_ value: Any?) -> Bool {
+        guard let d = value as? [String: Any] else { return false }
+        return (d["modifier"] as? String) == StashCriterionModifier.isNull.rawValue
+    }
+
     // MARK: Studio criterion parsing (saved filters / JSON may use Int ids or a single string `value`)
 
     /// Ids for `studios` / `tags` with modifier `INCLUDES` (catalog live filters).

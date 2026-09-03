@@ -68,7 +68,6 @@
 		9AA0A05BF61443C2B087A163 /* SharedUtilities.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1C2F16743C007C2090 /* SharedUtilities.swift */; };
 		9BA6D13B444E433980610D36 /* SceneGroupsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA617C2A62174FFFB0912B44 /* SceneGroupsCard.swift */; };
 		A1B2C3D40002400180011002 /* FilterPickerOptionsStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */; };
-		A1B2C3D40004400180011004 /* AdvancedCriteriaCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1B2C3D40003400180011003 /* AdvancedCriteriaCard.swift */; };
 		A1ED4C0012345678901234AB /* EditModeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ED4C0112345678901234AB /* EditModeSettingsView.swift */; };
 		A1ED4C0212345678901234AB /* EditModeSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ED4C0112345678901234AB /* EditModeSettingsView.swift */; };
 		A1ICON012F30B00000000001 /* AppIconManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = A1ICON022F30B00000000002 /* AppIconManager.swift */; };
@@ -138,6 +137,7 @@
 		DFSEC0032F2A000100000003 /* PasscodeEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSEC0042F2A000100000004 /* PasscodeEntryView.swift */; };
 		AITAG00012F70A00000000001 /* AITagSuggestionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00022F70A00000000002 /* AITagSuggestionManager.swift */; };
 		AITAG00032F70A00000000003 /* AITagSuggestionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00042F70A00000000004 /* AITagSuggestionBar.swift */; };
+		AITAG00092F70A00000000009 /* AddTagsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG000A2F70A0000000000A /* AddTagsSheet.swift */; };
 		AITAG00052F70A00000000005 /* AITagsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00062F70A00000000006 /* AITagsSettingsView.swift */; };
 		DFSEC0052F2A000100000005 /* SecuritySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSEC0062F2A000100000006 /* SecuritySettingsView.swift */; };
 		DFSM000012F2NEWFILE001 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSM000022F2NEWFILE002 /* KeychainManager.swift */; };
@@ -215,7 +215,6 @@
 		971A00072F999007 /* SessionTimelineToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTimelineToolsView.swift; sourceTree = "<group>"; };
 		971A00092F999009 /* SessionTimelineLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SessionTimelineLoader.swift; sourceTree = "<group>"; };
 		A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterPickerOptionsStore.swift; sourceTree = "<group>"; };
-		A1B2C3D40003400180011003 /* AdvancedCriteriaCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AdvancedCriteriaCard.swift; sourceTree = "<group>"; };
 		A1ED4C0112345678901234AB /* EditModeSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EditModeSettingsView.swift; sourceTree = "<group>"; };
 		A1ICON022F30B00000000002 /* AppIconManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIconManager.swift; sourceTree = "<group>"; };
 		A1IMGDS022345678901234AB /* StashImageDateSort.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashImageDateSort.swift; sourceTree = "<group>"; };
@@ -273,6 +272,7 @@
 		DFSEC0042F2A000100000004 /* PasscodeEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasscodeEntryView.swift; sourceTree = "<group>"; };
 		AITAG00022F70A00000000002 /* AITagSuggestionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagSuggestionManager.swift; sourceTree = "<group>"; };
 		AITAG00042F70A00000000004 /* AITagSuggestionBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagSuggestionBar.swift; sourceTree = "<group>"; };
+		AITAG000A2F70A0000000000A /* AddTagsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTagsSheet.swift; sourceTree = "<group>"; };
 		AITAG00062F70A00000000006 /* AITagsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagsSettingsView.swift; sourceTree = "<group>"; };
 		DFSEC0062F2A000100000006 /* SecuritySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecuritySettingsView.swift; sourceTree = "<group>"; };
 		DFSM000022F2NEWFILE002 /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
@@ -431,7 +431,6 @@
 			children = (
 				D32D9793F36147319D8FF8BF /* FilterCriterionTypes.swift */,
 				FEA1E8DCB9534BA393BDCA09 /* FilterFieldCatalog.swift */,
-				A1B2C3D40003400180011003 /* AdvancedCriteriaCard.swift */,
 				2195D672B4B04628BD280AA1 /* FilterCriteriaDocument.swift */,
 				A1B2C3D40001400180011001 /* FilterPickerOptionsStore.swift */,
 				0D91ABA114F544C390FD6F8E /* FilterCriteriaEditorView.swift */,
@@ -489,6 +488,7 @@
 			isa = PBXGroup;
 			children = (
 				AITAG00042F70A00000000004 /* AITagSuggestionBar.swift */,
+				AITAG000A2F70A0000000000A /* AddTagsSheet.swift */,
 				DFSEC0042F2A000100000004 /* PasscodeEntryView.swift */,
 			);
 			path = Components;
@@ -721,7 +721,6 @@
 				971A00032F999003 /* RateMeToolsView.swift in Sources */,
 				821D4E34EE344BBC881B7E2E /* FilterCriterionTypes.swift in Sources */,
 				F3FAA876F0564E51BFE25096 /* FilterFieldCatalog.swift in Sources */,
-				A1B2C3D40004400180011004 /* AdvancedCriteriaCard.swift in Sources */,
 				4FA2DDB674AB41BC92ACAB15 /* FilterCriteriaDocument.swift in Sources */,
 				A1B2C3D40002400180011002 /* FilterPickerOptionsStore.swift in Sources */,
 				13B8ED271E86457390593F48 /* FilterCriteriaEditorView.swift in Sources */,
@@ -746,6 +745,7 @@
 				DFSEC0032F2A000100000003 /* PasscodeEntryView.swift in Sources */,
 				AITAG00012F70A00000000001 /* AITagSuggestionManager.swift in Sources */,
 				AITAG00032F70A00000000003 /* AITagSuggestionBar.swift in Sources */,
+				AITAG00092F70A00000000009 /* AddTagsSheet.swift in Sources */,
 				AITAG00052F70A00000000005 /* AITagsSettingsView.swift in Sources */,
 				DFSEC0052F2A000100000005 /* SecuritySettingsView.swift in Sources */,
 			);
@@ -945,7 +945,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 317;
+				CURRENT_PROJECT_VERSION = 322;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -975,7 +975,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 317;
+				CURRENT_PROJECT_VERSION = 322;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1009,7 +1009,7 @@
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 310;
+				CURRENT_PROJECT_VERSION = 311;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -1051,7 +1051,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 310;
+				CURRENT_PROJECT_VERSION = 311;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;

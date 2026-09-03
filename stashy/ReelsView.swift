@@ -260,6 +260,9 @@ struct ReelsViewBody: View {
         initialSort: StashDBViewModel.ImageSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .pics) ?? "") ?? .dateDesc
     )
     @StateObject private var reelsPicsViewModel = StashDBViewModel()
+    @State private var tagEditorTarget: AITagTarget?
+    /// Play state to hand back when the tag editor closes.
+    @State private var wasPlayingBeforeTagEditor = false
     @State private var selectedPreviewFilter: StashDBViewModel.SavedFilter?
     @State private var showReelsSceneFilterSheet = false
     /// While the scene-style filter sheet hydrates UI (migration / saved-filter list), ignore preset `onChange` so we do not refetch the Reels timeline.
@@ -281,8 +284,8 @@ struct ReelsViewBody: View {
     @State private var reelsSceneLivePresets: [SceneLiveFilterPreset] = SceneLiveFilterPresetStore.loadPresets()
     @State private var reelsScenePresetNameInput = ""
     @State private var showReelsSceneSaveAsAlert = false
-    @StateObject private var reelsCriteriaDocument = FilterCriteriaDocument(mode: .scenes)
-    @StateObject private var reelsMarkerCriteriaDocument = FilterCriteriaDocument(mode: .sceneMarkers)
+    @StateObject private var reelsCriteriaDocument = FilterCriteriaDocument(mode: .scenes, pinsDefaults: true)
+    @StateObject private var reelsMarkerCriteriaDocument = FilterCriteriaDocument(mode: .sceneMarkers, pinsDefaults: true)
     @State private var showReelsSceneRenameAlert = false
     @State private var showReelsSceneDeleteAlert = false
     @State private var isMenuOpen = false
@@ -671,12 +674,11 @@ struct ReelsViewBody: View {
         }
     }
 
-    private func reelsActiveLiveChipsActiveLiveFilterDict() -> [String: Any] {
+    /// What a preset stores for the active mode: the criteria document of that mode.
+    private func reelsActivePresetLiveFragment() -> [String: Any] {
         switch reelsMode {
-        case .scenes: return reelsSceneLiveChips.activeLiveFilterDict()
-        case .markers: return reelsMarkerLiveChips.activeLiveFilterDict()
-        case .previews: return reelsPreviewLiveChips.activeLiveFilterDict()
-        default: return reelsSceneLiveChips.activeLiveFilterDict()
+        case .markers: return reelsMarkerCriteriaDocument.sanitizedObjectFilter
+        default: return reelsCriteriaDocument.sanitizedObjectFilter
         }
     }
 
@@ -829,6 +831,9 @@ struct ReelsViewBody: View {
         if newId.isEmpty {
             reelsSetPrimarySceneishSavedFilter(nil)
             reelsClearActiveLiveChipsOnly()
+            // "None" must also empty the editor — otherwise the criteria of the filter just
+            // deselected keep filtering the feed from the document.
+            reelsLoadPresetCriteria([:], base: nil)
             reelsApplySceneLiveFromSheet()
             return
         }
@@ -865,7 +870,24 @@ struct ReelsViewBody: View {
             reelsClearActiveLiveChipsOnly()
             reelsApplyAuxIdsFromLiveFragment(preset.liveFragment)
         }
+        // Preset-Kriterien in das Dokument des aktiven Modus — das ist die einzige Filterfläche.
+        reelsLoadPresetCriteria(preset.liveFragment, base: reelsLiveChipTargetFilter)
         reelsApplySceneLiveFromSheet()
+    }
+
+    /// Spiegelt den gewählten Filter in das Kriterien-Dokument des aktiven Modus: erst die
+    /// Kriterien des Server-Filters, darüber das stashy-Fragment des Presets.
+    ///
+    /// Ohne diese Spiegelung stünde die Sheet leer da, obwohl der Feed gefiltert ist — die
+    /// Studios/Tags eines Filters tauchten in ihren Karten nicht auf.
+    private func reelsLoadPresetCriteria(_ fragment: [String: Any], base: StashDBViewModel.SavedFilter?) {
+        var merged: [String: Any] = base?.criteriaObjectFilter() ?? [:]
+        for (key, value) in fragment { merged[key] = value }
+        if reelsMode == .markers {
+            reelsMarkerCriteriaDocument.load(merged)
+        } else {
+            reelsCriteriaDocument.load(merged)
+        }
     }
 
     private func reelsApplyServerSceneSavedFilterForReels(_ f: StashDBViewModel.SavedFilter) {
@@ -901,12 +923,13 @@ struct ReelsViewBody: View {
                 if let flat { reelsApplyAuxIdsFromLiveFragment(flat) }
             }
         }
+        reelsLoadPresetCriteria(f.stashyScenePresetMetadata?.liveFragment ?? [:], base: reelsLiveChipTargetFilter)
         reelsApplySceneLiveFromSheet()
     }
 
     private func reelsSaveSceneLivePresetOverwrite() {
         let sel = reelsActiveSheetPresetIdForRead
-        let liveDict = reelsActiveLiveChipsActiveLiveFilterDict()
+        let liveDict = reelsActivePresetLiveFragment()
         if let sid = SceneLivePresetTag.parseServerId(sel) {
             let currentName = viewModel.savedFilters[sid]?.name ?? "Filter"
             viewModel.saveSceneSavedFilter(
@@ -942,7 +965,7 @@ struct ReelsViewBody: View {
             name: trimmed,
             sort: selectedSortOption,
             baseFilter: reelsLiveChipTargetFilter,
-            liveFragment: reelsActiveLiveChipsActiveLiveFilterDict()
+            liveFragment: reelsActivePresetLiveFragment()
         ) { result in
             if case .success(let saved) = result {
                 reelsSetActiveSheetPresetSelection(SceneLivePresetTag.serverRow(saved.id))
@@ -961,7 +984,7 @@ struct ReelsViewBody: View {
                 name: trimmed,
                 sort: selectedSortOption,
                 baseFilter: reelsLiveChipTargetFilter,
-                liveFragment: reelsActiveLiveChipsActiveLiveFilterDict()
+                liveFragment: reelsActivePresetLiveFragment()
             ) { result in
                 if case .success = result {
                     showReelsSceneRenameAlert = false
@@ -1144,6 +1167,13 @@ struct ReelsViewBody: View {
 
     private func beginPagedRestoreIfNeeded() {
         guard let targetId = pendingRestoreId ?? currentVisibleSceneId else {
+            pendingRestoreId = nil
+            return
+        }
+        // The fallback can hand us the *previous* mode's id (switching markers → clips
+        // leaves "marker-…" in `currentVisibleSceneId`). Chasing it pages the new feed
+        // forever for something that can never appear in it.
+        if let expected = expectedPrefix(for: reelsMode), !targetId.hasPrefix(expected + "-") {
             pendingRestoreId = nil
             return
         }
@@ -1334,6 +1364,16 @@ struct ReelsViewBody: View {
             return false
         }
 
+        /// What AI Tags and the manual "+" act on. Markers are tagged as themselves —
+        /// they carry their own tags in Stash — while previews are just scenes.
+        var aiTagTarget: AITagTarget {
+            switch self {
+            case .scene(let s), .preview(let s): return .scene(s)
+            case .marker(let m): return .marker(m)
+            case .clip(let c): return .image(c)
+            }
+        }
+
         var tags: [Tag] {
             switch self {
             case .scene(let s): return s.tags ?? []
@@ -1518,6 +1558,23 @@ struct ReelsViewBody: View {
         }
     }
 
+    /// Takes a tag off the item itself (not off the filter). A marker's primary tag is
+    /// a separate field in Stash and is left alone.
+    private func removeTag(_ tag: Tag, from target: AITagTarget) {
+        guard tag.id != target.primaryTagId else { return }
+        let remaining = target.tags.filter { $0.id != tag.id }
+        Task {
+            let success = await AITagSuggestionManager.shared.write(tags: remaining, to: target)
+            if success {
+                HapticManager.success()
+                ToastManager.shared.show("Removed #\(tag.name)")
+            } else {
+                HapticManager.error()
+                ToastManager.shared.show("Could not remove tag", icon: "exclamationmark.triangle.fill", style: .error)
+            }
+        }
+    }
+
     private func applyTagsChange(_ newTags: [Tag]) {
         switch reelsMode {
         case .scenes:
@@ -1596,14 +1653,14 @@ struct ReelsViewBody: View {
         }
     }
 
-    /// Scene-mode chips merged with the advanced criteria editor.
-    private func reelsSceneLive(_ chips: [String: Any]?) -> [String: Any]? {
-        reelsCriteriaDocument.merged(with: chips ?? [:])
+    /// Fragment mirrored from the selected saved filter, with the criteria editor on top.
+    private func reelsSceneLive(_ base: [String: Any]?) -> [String: Any]? {
+        reelsCriteriaDocument.layered(over: base ?? [:])
     }
 
-    /// Marker-mode chips merged with the advanced criteria editor.
-    private func reelsMarkerLive(_ chips: [String: Any]?) -> [String: Any]? {
-        reelsMarkerCriteriaDocument.merged(with: chips ?? [:])
+    /// Marker counterpart of ``reelsSceneLive(_:)``.
+    private func reelsMarkerLive(_ base: [String: Any]?) -> [String: Any]? {
+        reelsMarkerCriteriaDocument.layered(over: base ?? [:])
     }
 
     /// Criteria identity for the given mode — used to skip a page-1 refetch when the VM list is still valid.
@@ -1696,7 +1753,17 @@ struct ReelsViewBody: View {
             // nicht drei Aktivierungen. Sie müssen feuern, solange der Feed *nicht* angelaufen
             // ist (sonst bleibt der Tab schwarz); sobald etwas spielt, würden sie nur noch eine
             // frisch getippte User-Pause überschreiben.
-            guard !ReelsPlayerRegistry.hasPlayingPlayer else {
+            // "Something is already playing" is only a reason to stand down when that
+            // something belongs to the mode we are activating. Coming from another feed
+            // (pics → previews → clips) a player of the *previous* mode can still report
+            // .playing, and taking the shortcut there left the new feed's first item
+            // black and unselected.
+            let visibleBelongsToMode: Bool = {
+                guard let id = self.currentVisibleSceneId,
+                      let prefix = self.expectedPrefix(for: self.reelsMode) else { return false }
+                return id.hasPrefix(prefix + "-")
+            }()
+            guard !(ReelsPlayerRegistry.hasPlayingPlayer && visibleBelongsToMode) else {
                 self.pendingFeedActivation = false
                 return
             }
@@ -2430,26 +2497,6 @@ struct ReelsViewBody: View {
             criteriaDocument: reelsMode == .markers ? reelsMarkerCriteriaDocument : reelsCriteriaDocument,
             sortOption: selectedSortOption,
             onSortChange: { changeReelsSceneSortFromSheet($0) },
-            minRating: reelChipBinding(\.minRating),
-            organized: reelChipBinding(\.organized),
-            interactive: reelChipBinding(\.interactive),
-            orientation: reelChipBinding(\.orientation),
-            performerCount: reelChipBinding(\.performerCount),
-            resolution: reelChipBinding(\.resolution),
-            performerFavorite: reelChipBinding(\.performerFavorite),
-            oCounterTag: reelChipBinding(\.oCounterTag),
-            studioSelectionIds: reelChipBinding(\.studioIds),
-            studioPickerOptions: reelsStudioPickerOptions,
-            studioPickerLoading: reelsStudioPickerLoading,
-            onStudioPickerSectionAppear: { reelsLoadStudioPickerOptions() },
-            tagSelectionIds: reelChipBinding(\.tagIds),
-            tagPickerOptions: reelsTagPickerOptions,
-            tagPickerLoading: reelsTagPickerLoading,
-            onTagPickerSectionAppear: { reelsLoadTagPickerOptions() },
-            groupSelectionIds: reelChipBinding(\.groupIds),
-            groupPickerOptions: reelsGroupPickerOptions,
-            groupPickerLoading: reelsGroupPickerLoading,
-            onGroupPickerSectionAppear: { reelsLoadGroupPickerOptions() },
             onApply: { reelsApplySceneLiveFromSheet() },
             onReset: {
                 reelsSetActiveSheetPresetSelection("")
@@ -2695,6 +2742,24 @@ struct ReelsViewBody: View {
             .sheet(isPresented: $reelsClipImageFilters.showFilterSortSheet) {
                 reelsClipFilterSortSheet
             }
+            .sheet(item: $tagEditorTarget) { target in
+                // Lists patch themselves through the *TagsUpdated broadcasts.
+                AddTagsSheet(target: target, viewModel: viewModel) { _ in }
+            }
+            .onChange(of: tagEditorTarget?.id) { _, newValue in
+                // Nobody wants a clip looping with sound behind the tag picker.
+                if newValue != nil {
+                    wasPlayingBeforeTagEditor = currentItemIsPlaying
+                    currentItemIsPlaying = false
+                    ReelsPlayerRegistry.pauseAll()
+                    NotificationCenter.default.post(name: .reelsPauseAllPlayers, object: nil)
+                } else if wasPlayingBeforeTagEditor {
+                    wasPlayingBeforeTagEditor = false
+                    currentItemIsPlaying = true
+                    ReelsPlayerRegistry.resumePlayback()
+                    playTrigger += 1
+                }
+            }
     }
 
     private var reelsClipFilterSortSheet: some View {
@@ -2710,19 +2775,7 @@ struct ReelsViewBody: View {
                 reelsClipImageFilters.changeSortOption(to: new, viewModel: viewModel)
                 refetchReelsClipsFromModel(viewModel)
             },
-            liveMinRating: $reelsClipImageFilters.liveFilterMinRating,
-            livePerformerFavorite: $reelsClipImageFilters.liveFilterPerformerFavorite,
-            liveOrganized: $reelsClipImageFilters.liveFilterOrganized,
-            liveOCounterTag: $reelsClipImageFilters.liveFilterOCounterTag,
-            liveStudioIds: $reelsClipImageFilters.liveFilterStudioIds,
-            liveTagIds: $reelsClipImageFilters.liveFilterTagIds,
             liveMediaKind: $reelsClipImageFilters.liveFilterMediaKind,
-            studioPickerOptions: reelsClipImageFilters.studioPickerOptions,
-            studioPickerLoading: reelsClipImageFilters.studioPickerLoading,
-            onStudioPickerSectionAppear: { reelsClipImageFilters.loadStudioPickerOptions(viewModel: viewModel) },
-            tagPickerOptions: reelsClipImageFilters.tagPickerOptions,
-            tagPickerLoading: reelsClipImageFilters.tagPickerLoading,
-            onTagPickerSectionAppear: { reelsClipImageFilters.loadTagPickerOptions(viewModel: viewModel) },
             onApply: {
                 refetchReelsClipsFromModel(viewModel)
             },
@@ -2892,11 +2945,11 @@ struct ReelsViewBody: View {
             case .clips:
                 return !reelsClipImageFilters.catalogFilterSortFABActive
             case .scenes:
-                return !reelsSceneLiveChips.isLiveFilterActive
+                return !reelsSceneLiveChips.isLiveFilterActive && reelsCriteriaDocument.isEmpty
             case .markers:
-                return !reelsMarkerLiveChips.isLiveFilterActive
+                return !reelsMarkerLiveChips.isLiveFilterActive && reelsMarkerCriteriaDocument.isEmpty
             case .previews:
-                return !reelsPreviewLiveChips.isLiveFilterActive
+                return !reelsPreviewLiveChips.isLiveFilterActive && reelsCriteriaDocument.isEmpty
             case .pics:
                 return !reelsPicsFilters.catalogFilterSortFABActive
             }
@@ -3600,6 +3653,17 @@ struct ReelsViewBody: View {
         }
 
         restorePositionIfAvailable(for: newValue, forceIfPrefixMismatch: true)
+
+        // An id from the old feed must not survive into the new one: `.scrollPosition(id:)`
+        // stalls on a target that is not in the list, which is the black first item that
+        // only recovers once the user scrolls. `autoSelectFirstItem` picks the new feed's
+        // first item as soon as its data is in.
+        if let expected = expectedPrefix(for: newValue),
+           let current = currentVisibleSceneId,
+           !current.hasPrefix(expected + "-") {
+            currentVisibleSceneId = nil
+        }
+
         beginPagedRestoreIfNeeded()
 
         // Restore session sort/filter (prefer session over defaults)
@@ -4224,10 +4288,11 @@ struct ReelsViewBody: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                         let tags = item.tags
-                        // AI Tags suggestions (stashy+, off by default) share this row, so
+                        // Tag Suggestion (stashy+, off by default) shares this row, so
                         // it also has to exist for an untagged clip.
                         let showsTagRow = !tags.isEmpty
-                            || (item.isClip && AITagSuggestionManager.shared.isActive)
+                            || appearanceManager.isEditModeEnabled
+                            || AITagSuggestionManager.shared.isActive
                         Group {
                             if showsTagRow {
                                 ScrollView(.horizontal, showsIndicators: false) {
@@ -4252,12 +4317,42 @@ struct ReelsViewBody: View {
                                                     .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
                                             }
                                             .buttonStyle(.plain)
+                                            .contextMenu {
+                                                let target = item.aiTagTarget
+                                                if appearanceManager.isEditModeEnabled,
+                                                   tag.id != target.primaryTagId {
+                                                    Button(role: .destructive) {
+                                                        removeTag(tag, from: target)
+                                                    } label: {
+                                                        Label("Remove tag", systemImage: "trash")
+                                                    }
+                                                }
+                                            }
                                         }
 
-                                        // AI Tags (stashy+, off by default) — Clips only.
-                                        if case .clip(let clipImage) = item {
-                                            AITagSuggestionBar(image: clipImage) { _ in }
+                                        if appearanceManager.isEditModeEnabled {
+                                            Button {
+                                                tagEditorTarget = item.aiTagTarget
+                                            } label: {
+                                                // A bare symbol is shorter than a line
+                                                // of text, which made this pill smaller
+                                                // than the tag chips beside it.
+                                                Image(systemName: "plus")
+                                                    .font(.system(size: 11, weight: .bold))
+                                                    .frame(height: tagChipGlyphHeight)
+                                                    .foregroundColor(.white.opacity(0.8))
+                                                    .padding(.horizontal, 8)
+                                                    .padding(.vertical, 3)
+                                                    .background(Color.black.opacity(0.3))
+                                                    .clipShape(Capsule())
+                                                    .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                                            }
+                                            .buttonStyle(.plain)
+                                            .accessibilityLabel("Add tags")
                                         }
+
+                                        // Tag Suggestion (stashy+, off by default).
+                                        AITagSuggestionBar(target: item.aiTagTarget) { _ in }
                                     }
                                 }
                             } else {

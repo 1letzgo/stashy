@@ -3,6 +3,10 @@ import SwiftUI
 import UIKit
 import ObjectiveC
 
+/// Line height of a tag chip's label. A symbol-only pill (the "+" in the tag rows)
+/// would otherwise render shorter than the chips it sits next to.
+let tagChipGlyphHeight: CGFloat = UIFont.systemFont(ofSize: 11, weight: .semibold).lineHeight
+
 // MARK: - Swipe-back with hidden system navigation bar
 
 /// Long-lived pop-gesture delegate on the `UINavigationController` itself.

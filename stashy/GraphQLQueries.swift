@@ -337,23 +337,54 @@ class GraphQLQueries {
         }
         """
 
-    /// Compact tag census for one performer — only ids and names, so a 200-item page
-    /// stays small enough to fetch on demand while browsing.
-    static let performerImageTagsQuery = """
-        query PerformerImageTags($filter: FindFilterType, $image_filter: ImageFilterType) {
-            findImages(filter: $filter, image_filter: $image_filter) {
+    /// Compact census queries for the AI Tags statistics model — ids only, so a
+    /// 250-item page stays small even across a whole library.
+    static let statsScenesQuery = """
+        query StatsScenes($filter: FindFilterType, $scene_filter: SceneFilterType) {
+            findScenes(filter: $filter, scene_filter: $scene_filter) {
                 count
-                images { id tags { id name } }
+                scenes { id tags { id name } performers { id } studio { id } galleries { id } }
             }
         }
         """
 
-    static let performerSceneTagsQuery = """
-        query PerformerSceneTags($filter: FindFilterType, $scene_filter: SceneFilterType) {
-            findScenes(filter: $filter, scene_filter: $scene_filter) {
+    static let statsImagesQuery = """
+        query StatsImages($filter: FindFilterType, $image_filter: ImageFilterType) {
+            findImages(filter: $filter, image_filter: $image_filter) {
                 count
-                scenes { id tags { id name } }
+                images { id tags { id name } performers { id } studio { id } galleries { id } }
             }
+        }
+        """
+
+    /// Id-only lookups for the bulk tag actions.
+    static let idsImagesQuery = """
+        query BulkImageIds($filter: FindFilterType, $image_filter: ImageFilterType) {
+            findImages(filter: $filter, image_filter: $image_filter) { count images { id } }
+        }
+        """
+
+    static let idsScenesQuery = """
+        query BulkSceneIds($filter: FindFilterType, $scene_filter: SceneFilterType) {
+            findScenes(filter: $filter, scene_filter: $scene_filter) { count scenes { id } }
+        }
+        """
+
+    static let bulkImageAddTagsMutation = """
+        mutation BulkImageUpdate($input: BulkImageUpdateInput!) {
+            bulkImageUpdate(input: $input) { id }
+        }
+        """
+
+    static let bulkSceneAddTagsMutation = """
+        mutation BulkSceneUpdate($input: BulkSceneUpdateInput!) {
+            bulkSceneUpdate(input: $input) { id }
+        }
+        """
+
+    static let sceneMarkerUpdateTagsMutation = """
+        mutation SceneMarkerUpdate($input: SceneMarkerUpdateInput!) {
+            sceneMarkerUpdate(input: $input) { id tags { id name } primary_tag { id name } }
         }
         """
 

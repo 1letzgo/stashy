@@ -426,3 +426,139 @@ enum FilterSortCatalog {
         }
     }
 }
+
+// MARK: - Default (pinned) criteria per mode
+
+extension FilterFieldCatalog {
+    /// Kriterien, die eine Filter-Sheet **immer** zeigt — auch ohne gesetzten Wert.
+    /// Ersetzt die früheren Quick-Chips: eine Liste statt Chips + Advanced-Editor nebeneinander.
+    /// Reihenfolge = Anzeigereihenfolge ganz oben; alles Weitere kommt über „Add condition“ darunter.
+    static func defaultCriterionKeys(for mode: StashDBViewModel.FilterMode) -> [String] {
+        let keys: [String]
+        switch mode {
+        case .scenes:
+            keys = ["tags", "performers", "studios", "rating100", "o_counter", "organized", "resolution"]
+        case .performers:
+            keys = ["filter_favorites", "gender", "age", "hair_color", "country", "fake_tits", "o_counter", "tags"]
+        case .studios:
+            keys = ["favorite", "rating100", "scene_count", "tags"]
+        case .tags:
+            keys = ["favorite", "scene_count", "image_count", "parents"]
+        case .galleries:
+            keys = ["tags", "performers", "studios", "rating100", "performer_favorite", "image_count"]
+        case .images:
+            keys = ["tags", "performers", "studios", "rating100", "o_counter", "organized"]
+        case .groups:
+            keys = ["studios", "tags", "performers", "rating100", "date"]
+        case .sceneMarkers:
+            keys = ["tags", "scene_tags", "performers", "duration"]
+        case .unknown:
+            keys = []
+        }
+        // Nie ein Feld anbieten, das der Modus gar nicht kennt.
+        let known = Set(fields(for: mode).map(\.key))
+        return keys.filter { known.contains($0) }
+    }
+}
+
+// MARK: - Collapsed row summaries
+
+/// Einzeiler für eingeklappte Kriterien-Karten ("≥ 5", "3 selected", "Female").
+enum FilterCriterionSummary {
+    static let anyText = "Any"
+
+    static func text(for field: FilterFieldDescriptor, value: Any?) -> String {
+        guard let value else { return anyText }
+        switch field.kind {
+        case .boolean:
+            guard let b = value as? Bool else { return anyText }
+            return b ? "Yes" : "No"
+        case .isMissing, .hasMarkers, .hasChapters:
+            guard let s = value as? String, !s.isEmpty else { return anyText }
+            if field.kind == .isMissing { return s.replacingOccurrences(of: "_", with: " ").capitalized }
+            return s == "true" ? "Yes" : "No"
+        case .booleanGroup:
+            return anyText
+        case .nestedFilter, .raw:
+            let count = (FilterCriteriaDocument.stringKeyedDict(value) ?? [:]).count
+            return count == 0 ? anyText : "\(count) criteria"
+        case .customFields:
+            let count = (value as? [Any])?.count ?? 0
+            return count == 0 ? anyText : "\(count) field(s)"
+        default:
+            guard let dict = FilterCriteriaDocument.stringKeyedDict(value) else { return anyText }
+            return dictSummary(field: field, dict: dict)
+        }
+    }
+
+    private static func dictSummary(field: FilterFieldDescriptor, dict: [String: Any]) -> String {
+        let modifierRaw = (dict["modifier"] as? String) ?? ""
+        let modifier = StashCriterionModifier(rawValue: modifierRaw)
+        if modifier == .isNull { return "Not set" }
+        if modifier == .notNull { return "Any value" }
+
+        switch field.kind {
+        case .hierarchicalMulti, .multi:
+            let included = FilterMapper.idStrings(from: dict["value"]).count
+            let excluded = FilterMapper.idStrings(from: dict["excludes"]).count
+            if included == 0 && excluded == 0 { return anyText }
+            var parts: [String] = []
+            if included > 0 { parts.append("\(included) selected") }
+            if excluded > 0 { parts.append("\(excluded) excluded") }
+            return parts.joined(separator: ", ")
+        case .gender, .circumcision:
+            let list = (dict["value_list"] as? [String]) ?? (dict["value"] as? [String]) ?? []
+            if list.isEmpty, let single = dict["value"] as? String { return prettify(single) }
+            if list.isEmpty { return anyText }
+            return list.map(prettify).joined(separator: ", ")
+        case .orientation:
+            let list = (dict["value"] as? [String]) ?? []
+            return list.isEmpty ? anyText : list.map(prettify).joined(separator: ", ")
+        case .duplication:
+            guard let dup = dict["duplicated"] as? Bool else { return anyText }
+            return dup ? "Duplicated" : "Unique"
+        case .stashID, .stashIDs:
+            return modifier?.label ?? anyText
+        default:
+            break
+        }
+
+        let value = displayValue(dict["value"])
+        let value2 = displayValue(dict["value2"])
+        guard !value.isEmpty else { return anyText }
+        let symbol = compactModifier(modifier)
+        if let value2 = value2.isEmpty ? nil : value2, modifier?.needsSecondValue == true {
+            return "\(symbol) \(value) – \(value2)"
+        }
+        return symbol.isEmpty ? value : "\(symbol) \(value)"
+    }
+
+    private static func compactModifier(_ modifier: StashCriterionModifier?) -> String {
+        switch modifier {
+        case .equals: return ""
+        case .notEquals: return "≠"
+        case .greaterThan: return ">"
+        case .lessThan: return "<"
+        case .between: return ""
+        case .notBetween: return "not"
+        case .includes, .includesAll: return "contains"
+        case .excludes: return "without"
+        case .matchesRegex: return "regex"
+        case .notMatchesRegex: return "not regex"
+        default: return ""
+        }
+    }
+
+    private static func displayValue(_ raw: Any?) -> String {
+        guard let raw else { return "" }
+        if let s = raw as? String { return s }
+        if let i = raw as? Int { return String(i) }
+        if let d = raw as? Double { return d == d.rounded() ? String(Int(d)) : String(d) }
+        if let n = raw as? NSNumber { return n.stringValue }
+        return ""
+    }
+
+    private static func prettify(_ raw: String) -> String {
+        raw.replacingOccurrences(of: "_", with: " ").capitalized
+    }
+}

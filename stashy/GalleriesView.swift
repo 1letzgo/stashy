@@ -23,7 +23,7 @@ private struct GalleriesViewContent: View {
     var hideTitle: Bool = false
 
     @State private var showFilterSortSheet = false
-    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .galleries)
+    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .galleries, pinsDefaults: true)
     @State private var catalogPresetRowSelection = ""
     @State private var localCatalogPresets: [GalleryListLiveFilterPreset] = GalleryListLiveFilterPresetStore.loadPresets()
     @State private var showSaveAsCatalogPresetAlert = false
@@ -38,25 +38,9 @@ private struct GalleriesViewContent: View {
     @State private var studioPickerOptions: [Studio] = []
     @State private var studioPickerLoading = false
 
-    private var isLiveFilterActive: Bool {
-        liveFilterFavorite != nil || liveFilterMinRating != 0 || liveFilterFiles != nil || liveFilterStudioId != nil
-    }
+    private var isLiveFilterActive: Bool { false }
 
-    private var activeLiveFilterDict: [String: Any] {
-        var dict: [String: Any] = [:]
-        if let fav = liveFilterFavorite { dict["favorite"] = fav }
-        if liveFilterMinRating == -1 {
-            dict["rating100"] = ["modifier": "IS_NULL"]
-        } else if liveFilterMinRating > 0 {
-            dict["rating100"] = ["value": (liveFilterMinRating * 20), "modifier": "EQUALS"]
-        }
-        if liveFilterFiles == "has" { dict["file_count"] = ["value": 0, "modifier": "GREATER_THAN"] }
-        if liveFilterFiles == "none" { dict["file_count"] = ["value": 0, "modifier": "EQUALS"] }
-        if let sid = liveFilterStudioId {
-            dict["studios"] = ["modifier": "INCLUDES", "value": [sid]]
-        }
-        return dict
-    }
+    private var activeLiveFilterDict: [String: Any] { [:] }
 
     /// Passed to `filter:` only while the advanced editor holds no copy of it. Once the editor has
     /// the criteria, re-sending the server filter would resurrect criteria the user edited away;
@@ -71,7 +55,7 @@ private struct GalleriesViewContent: View {
     }
 
     private var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     private var sortedServerGalleryFilters: [StashDBViewModel.SavedFilter] {
@@ -129,7 +113,9 @@ private struct GalleriesViewContent: View {
                 liveFilterFiles = "none"
             }
         }
-        if let st = frag["studios"] as? [String: Any],
+        if CatalogLiveChipFilterSupport.isNullCriterion(frag["studios"]) {
+            liveFilterStudioId = CatalogLiveChipFilterSupport.noneChipValue
+        } else if let st = frag["studios"] as? [String: Any],
            (st["modifier"] as? String) == "INCLUDES",
            let vals = st["value"] as? [Any] {
             let ids = vals.compactMap { $0 as? String }
@@ -160,6 +146,11 @@ private struct GalleriesViewContent: View {
         } else {
             clearGalleryLiveChipsOnly()
         }
+        // Ein lokales Preset speichert seine Kriterien im `liveFragment` — die legt der Editor
+        // über die Kriterien des Basisfilters, damit die Sheet zeigt, was wirklich gefiltert wird.
+        var mergedPresetCriteria: [String: Any] = selectedFilter?.criteriaObjectFilter() ?? [:]
+        for (key, value) in preset.liveFragment { mergedPresetCriteria[key] = value }
+        criteriaDocument.load(mergedPresetCriteria)
         performSearch()
     }
 
@@ -258,7 +249,7 @@ private struct GalleriesViewContent: View {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { _ in }
             return
         }
@@ -272,7 +263,7 @@ private struct GalleriesViewContent: View {
             createdAt: old.createdAt,
             sort: selectedSortOption,
             baseSavedFilterId: selectedFilter?.id,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         )
         GalleryListLiveFilterPresetStore.upsert(updated)
         refreshGalleryLocalPresets()
@@ -290,7 +281,7 @@ private struct GalleriesViewContent: View {
             sortField: selectedSortOption.sortField,
             sortDirection: selectedSortOption.direction,
             baseFilter: selectedFilter,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         ) { result in
             if case .success(let saved) = result {
                 catalogPresetRowSelection = ListLivePresetTag.serverRow(saved.id)
@@ -313,7 +304,7 @@ private struct GalleriesViewContent: View {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { result in
                 if case .success = result {
                     showRenameCatalogPresetAlert = false
@@ -744,13 +735,6 @@ private struct GalleriesViewContent: View {
             criteriaDocument: criteriaDocument,
             sortOption: selectedSortOption,
             onSortChange: { changeSortOption(to: $0) },
-            liveMinRating: $liveFilterMinRating,
-            liveFavorite: $liveFilterFavorite,
-            liveFiles: $liveFilterFiles,
-            liveStudioId: $liveFilterStudioId,
-            studioPickerOptions: studioPickerOptions,
-            studioPickerLoading: studioPickerLoading,
-            onStudioPickerSectionAppear: { loadGalleryStudioPickerOptions() },
             onApply: { applyLiveFilter() },
             onReset: {
                 catalogPresetRowSelection = ""
@@ -1349,6 +1333,9 @@ struct FullScreenImageView: View {
     @State private var shareItems: [Any] = []
     @State private var showingShare = false
     @State private var showingSetPerformerImagePicker = false
+    @State private var tagEditorImage: StashImage?
+    /// Play state to hand back when the tag editor closes.
+    @State private var wasPlayingBeforeTagEditor = false
     @State private var performerImageTargetPerformers: [GalleryPerformer] = []
     @State private var currentItemIsPlaying = true
     @State private var scrubberState = ScrubberState()
@@ -1489,6 +1476,23 @@ struct FullScreenImageView: View {
             .sheet(isPresented: $showingShare) {
                 ShareSheet(items: shareItems)
             }
+            .sheet(item: $tagEditorImage) { image in
+                AddTagsSheet(target: .image(image), viewModel: viewModel) { updated in
+                    if let position = images.firstIndex(where: { $0.id == image.id }) {
+                        images[position] = images[position].withTags(updated)
+                    }
+                }
+            }
+            .onChange(of: tagEditorImage?.id) { _, newValue in
+                // Nobody wants a clip looping with sound behind the tag picker.
+                if newValue != nil {
+                    wasPlayingBeforeTagEditor = currentItemIsPlaying
+                    currentItemIsPlaying = false
+                } else if wasPlayingBeforeTagEditor {
+                    wasPlayingBeforeTagEditor = false
+                    currentItemIsPlaying = true
+                }
+            }
             .alert("Set as Performer Image?", isPresented: $showingSetPerformerImagePicker) {
                 ForEach(performerImageTargetPerformers) { performer in
                     Button("Okay") {
@@ -1587,9 +1591,11 @@ struct FullScreenImageView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                         let tags = image.tags ?? []
-                        // AI Tags suggestions (stashy+, off by default) share this row, so
-                        // it also has to exist for an untagged item.
-                        let showsTagRow = !tags.isEmpty || AITagSuggestionManager.shared.isActive
+                        // Tag Suggestion (stashy+, off by default) and the manual "+"
+                        // share this row, so it also has to exist for an untagged item.
+                        let showsTagRow = !tags.isEmpty
+                            || appearanceManager.isEditModeEnabled
+                            || AITagSuggestionManager.shared.isActive
                         Group {
                             if showsTagRow {
                                 ScrollView(.horizontal, showsIndicators: false) {
@@ -1603,9 +1609,39 @@ struct FullScreenImageView: View {
                                                 .background(Color.black.opacity(0.3))
                                                 .clipShape(Capsule())
                                                 .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                                                .contextMenu {
+                                                    if appearanceManager.isEditModeEnabled {
+                                                        Button(role: .destructive) {
+                                                            removeTag(tag, from: image)
+                                                        } label: {
+                                                            Label("Remove tag", systemImage: "trash")
+                                                        }
+                                                    }
+                                                }
                                         }
 
-                                        AITagSuggestionBar(image: image) { newTags in
+                                        if appearanceManager.isEditModeEnabled {
+                                            Button {
+                                                tagEditorImage = image
+                                            } label: {
+                                                // A bare symbol is shorter than a line of
+                                                // text, which made this pill smaller than
+                                                // the tag chips beside it.
+                                                Image(systemName: "plus")
+                                                    .font(.system(size: 11, weight: .bold))
+                                                    .frame(height: tagChipGlyphHeight)
+                                                    .foregroundColor(.white.opacity(0.8))
+                                                    .padding(.horizontal, 8)
+                                                    .padding(.vertical, 3)
+                                                    .background(Color.black.opacity(0.3))
+                                                    .clipShape(Capsule())
+                                                    .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                                            }
+                                            .buttonStyle(.plain)
+                                            .accessibilityLabel("Add tags")
+                                        }
+
+                                        AITagSuggestionBar(target: .image(image)) { newTags in
                                             if let position = images.firstIndex(where: { $0.id == image.id }) {
                                                 images[position] = images[position].withTags(newTags)
                                             }
@@ -1627,6 +1663,23 @@ struct FullScreenImageView: View {
         .colorScheme(.dark)
         .opacity(showUI ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: showUI)
+    }
+
+    private func removeTag(_ tag: Tag, from image: StashImage) {
+        let remaining = (image.tags ?? []).filter { $0.id != tag.id }
+        Task {
+            let success = await AITagSuggestionManager.shared.write(tags: remaining, to: .image(image))
+            if success {
+                if let position = images.firstIndex(where: { $0.id == image.id }) {
+                    images[position] = images[position].withTags(remaining)
+                }
+                HapticManager.success()
+                ToastManager.shared.show("Removed #\(tag.name)")
+            } else {
+                HapticManager.error()
+                ToastManager.shared.show("Could not remove tag", icon: "exclamationmark.triangle.fill", style: .error)
+            }
+        }
     }
 
     /// Matches `ReelsView.reelsScrubberBar` / `IsolatedScrubberBar`.

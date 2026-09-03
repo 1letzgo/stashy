@@ -24,7 +24,7 @@ private struct StudiosViewContent: View {
 
     // Filter & sort sheet
     @State private var showFilterSortSheet = false
-    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .studios)
+    @StateObject private var criteriaDocument = FilterCriteriaDocument(mode: .studios, pinsDefaults: true)
     @State private var catalogPresetRowSelection = ""
     @State private var localCatalogPresets: [StudioListLiveFilterPreset] = StudioListLiveFilterPresetStore.loadPresets()
     @State private var showSaveAsCatalogPresetAlert = false
@@ -38,26 +38,9 @@ private struct StudiosViewContent: View {
     @State private var liveFilterMinRating: Int = 0
     @State private var liveFilterScenes: String? = nil // nil=any, "has"=has scenes, "none"=no scenes
 
-    private var isLiveFilterActive: Bool {
-        liveFilterFavorite != nil || liveFilterMinRating != 0 || liveFilterScenes != nil
-    }
+    private var isLiveFilterActive: Bool { false }
 
-    private var activeLiveFilterDict: [String: Any] {
-        var dict: [String: Any] = [:]
-        if let fav = liveFilterFavorite { 
-            // For Studios, the filter key appears to be "favorite"
-            dict["favorite"] = fav 
-        }
-        if liveFilterMinRating == -1 {
-            dict["rating100"] = ["modifier": "IS_NULL"]
-        } else if liveFilterMinRating > 0 {
-            // Exact star match (e.g. 1-star means exactly 20)
-            dict["rating100"] = ["value": (liveFilterMinRating * 20), "modifier": "EQUALS"]
-        }
-        if liveFilterScenes == "has"  { dict["scene_count"] = ["value": 0, "modifier": "GREATER_THAN"] }
-        if liveFilterScenes == "none" { dict["scene_count"] = ["value": 0, "modifier": "EQUALS"] }
-        return dict
-    }
+    private var activeLiveFilterDict: [String: Any] { [:] }
 
     /// Passed to `filter:` only while the advanced editor holds no copy of it. Once the editor has
     /// the criteria, re-sending the server filter would resurrect criteria the user edited away;
@@ -77,7 +60,7 @@ private struct StudiosViewContent: View {
     }
 
     private var catalogFilterSortFABActive: Bool {
-        selectedFilter != nil || isLiveFilterActive || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
+        selectedFilter != nil || !criteriaDocument.isEmpty || !catalogPresetRowSelection.isEmpty
     }
 
     private var sortedServerStudioFilters: [StashDBViewModel.SavedFilter] {
@@ -146,6 +129,11 @@ private struct StudiosViewContent: View {
         } else {
             clearStudioLiveChipsOnly()
         }
+        // Ein lokales Preset speichert seine Kriterien im `liveFragment` — die legt der Editor
+        // über die Kriterien des Basisfilters, damit die Sheet zeigt, was wirklich gefiltert wird.
+        var mergedPresetCriteria: [String: Any] = selectedFilter?.criteriaObjectFilter() ?? [:]
+        for (key, value) in preset.liveFragment { mergedPresetCriteria[key] = value }
+        criteriaDocument.load(mergedPresetCriteria)
         performSearch()
     }
 
@@ -244,7 +232,7 @@ private struct StudiosViewContent: View {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { _ in }
             return
         }
@@ -258,7 +246,7 @@ private struct StudiosViewContent: View {
             createdAt: old.createdAt,
             sort: selectedSortOption,
             baseSavedFilterId: selectedFilter?.id,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         )
         StudioListLiveFilterPresetStore.upsert(updated)
         refreshStudioLocalPresets()
@@ -276,7 +264,7 @@ private struct StudiosViewContent: View {
             sortField: selectedSortOption.sortField,
             sortDirection: selectedSortOption.direction,
             baseFilter: selectedFilter,
-            liveFragment: activeLiveFilterDict
+            liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
         ) { result in
             if case .success(let saved) = result {
                 catalogPresetRowSelection = ListLivePresetTag.serverRow(saved.id)
@@ -299,7 +287,7 @@ private struct StudiosViewContent: View {
                 sortField: selectedSortOption.sortField,
                 sortDirection: selectedSortOption.direction,
                 baseFilter: selectedFilter,
-                liveFragment: activeLiveFilterDict
+                liveFragment: criteriaDocument.merged(with: activeLiveFilterDict) ?? [:]
             ) { result in
                 if case .success = result {
                     showRenameCatalogPresetAlert = false
@@ -481,9 +469,6 @@ private struct StudiosViewContent: View {
             criteriaDocument: criteriaDocument,
             sortOption: selectedSortOption,
             onSortChange: { changeSortOption(to: $0) },
-            liveMinRating: $liveFilterMinRating,
-            liveFavorite: $liveFilterFavorite,
-            liveScenes: $liveFilterScenes,
             onApply: { applyLiveFilter() },
             onReset: {
                 catalogPresetRowSelection = ""

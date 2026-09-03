@@ -20,15 +20,33 @@ final class FilterCriteriaDocument: ObservableObject {
         set { keyOrders[""] = newValue }
     }
 
-    init(mode: StashDBViewModel.FilterMode, objectFilter: [String: Any] = [:]) {
+    /// Keys the editor always shows on the root level, even without a value — the "wichtigste
+    /// Kriterien" of a mode. Replaces the old quick-chip card: one list instead of chips plus a
+    /// separate advanced editor.
+    private(set) var pinnedKeys: [String] = []
+
+    init(mode: StashDBViewModel.FilterMode, objectFilter: [String: Any] = [:], pinsDefaults: Bool = false) {
         self.mode = mode
         self.objectFilter = Self.sanitize(objectFilter, mode: mode)
         self.keyOrders = ["": Self.defaultSortedKeys(Array(self.objectFilter.keys), mode: mode)]
+        if pinsDefaults {
+            self.pinnedKeys = FilterFieldCatalog.defaultCriterionKeys(for: mode)
+        }
+    }
+
+    /// Root-level display order: pinned first (catalog order), then everything else as inserted.
+    func displayedCriterionKeys() -> [String] {
+        let present = criterionKeys(at: [])
+        var out = pinnedKeys
+        out.append(contentsOf: present.filter { !pinnedKeys.contains($0) })
+        return out
     }
 
     /// Reconfigure for nested editors (AND/OR/NOT / `*_filter`) without allocating a new object.
     func reconfigure(mode: StashDBViewModel.FilterMode, objectFilter: [String: Any]) {
         self.mode = mode
+        // Nested editors (AND/OR/NOT, `*_filter`) pin nothing — pins are a root-sheet affordance.
+        pinnedKeys = []
         // Anderer Modus = andere Felder: Reihenfolge komplett neu aufbauen.
         keyOrders = [:]
         self.objectFilter = Self.sanitize(objectFilter, mode: mode)
@@ -65,7 +83,80 @@ final class FilterCriteriaDocument: ObservableObject {
     var isMarkerMode: Bool { mode == .sceneMarkers }
 
     var sanitizedObjectFilter: [String: Any] {
-        Self.sanitize(objectFilter, mode: mode)
+        Self.stripIncompleteCriteria(Self.sanitize(objectFilter, mode: mode), mode: mode)
+    }
+
+    /// Drops criteria the user has opened but not filled in.
+    ///
+    /// Most Stash criterion inputs declare `value` as non-null, so a half-edited row (a modifier
+    /// picked, no value yet) makes the server reject the **whole** query with a validation error —
+    /// the list then shows a connection failure instead of results. A criterion that says nothing
+    /// yet simply must not be sent. `IS_NULL` / `NOT_NULL` carry no value by definition and stay.
+    nonisolated static func stripIncompleteCriteria(
+        _ dict: [String: Any],
+        mode: StashDBViewModel.FilterMode
+    ) -> [String: Any] {
+        var out: [String: Any] = [:]
+        for (key, value) in dict {
+            if isGroupKey(key) {
+                if let nested = stringKeyedDict(value) {
+                    let cleaned = stripIncompleteCriteria(nested, mode: mode)
+                    if !cleaned.isEmpty { out[key] = cleaned }
+                } else if let list = value as? [[String: Any]] {
+                    let cleaned = list.map { stripIncompleteCriteria($0, mode: mode) }.filter { !$0.isEmpty }
+                    if !cleaned.isEmpty { out[key] = cleaned }
+                }
+                continue
+            }
+            guard let field = FilterFieldCatalog.field(key: key, mode: mode),
+                  let criterion = stringKeyedDict(value) else {
+                out[key] = value
+                continue
+            }
+            if criterionIsComplete(criterion, kind: field.kind) {
+                out[key] = value
+            }
+        }
+        return out
+    }
+
+    private nonisolated static func criterionIsComplete(_ criterion: [String: Any], kind: FilterCriterionKind) -> Bool {
+        let modifier = (criterion["modifier"] as? String).flatMap(StashCriterionModifier.init(rawValue:))
+        // No modifier at all means the row was never edited beyond being opened.
+        if let modifier, !modifier.needsValue { return true }
+
+        switch kind {
+        case .string, .date, .timestamp, .resolution, .phashDistance:
+            guard let text = criterion["value"] as? String,
+                  !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return false }
+            if modifier?.needsSecondValue == true {
+                let second = (criterion["value2"] as? String) ?? ""
+                return !second.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            }
+            return true
+        case .int, .float, .hierarchicalCount:
+            guard isNumber(criterion["value"]) else { return false }
+            if modifier?.needsSecondValue == true { return isNumber(criterion["value2"]) }
+            return true
+        case .gender, .circumcision:
+            if let list = criterion["value_list"] as? [Any], !list.isEmpty { return true }
+            if let single = criterion["value"] as? String, !single.isEmpty { return true }
+            if let list = criterion["value"] as? [Any], !list.isEmpty { return true }
+            return false
+        case .orientation:
+            guard let list = criterion["value"] as? [Any] else { return false }
+            return !list.isEmpty
+        case .multi, .hierarchicalMulti:
+            return !FilterMapper.idStrings(from: criterion["value"]).isEmpty
+                || !FilterMapper.idStrings(from: criterion["excludes"]).isEmpty
+        case .boolean, .isMissing, .hasMarkers, .hasChapters, .duplication,
+             .stashID, .stashIDs, .customFields, .booleanGroup, .nestedFilter, .raw:
+            return true
+        }
+    }
+
+    private nonisolated static func isNumber(_ value: Any?) -> Bool {
+        value is Int || value is Double || value is NSNumber
     }
 
     var criterionKeys: [String] {
@@ -102,11 +193,27 @@ final class FilterCriteriaDocument: ObservableObject {
     func setCriterion(key: String, value: Any?) {
         var next = objectFilter
         if let value {
-            next[key] = value
+            next[key] = Self.withRequiredModifier(value, key: key, mode: mode)
         } else {
             next.removeValue(forKey: key)
         }
         objectFilter = next
+    }
+
+    /// Fills in the modifier a criterion input requires but the user never touched.
+    ///
+    /// A row only writes the field that was edited — picking a studio stores `value` and nothing
+    /// else, while the modifier lived purely in the row's display default. Stash rejects the whole
+    /// query for that (`"must be defined", path: [… "studios", "modifier"]`), so the default the
+    /// row *shows* has to be persisted alongside the first edit.
+    private static func withRequiredModifier(_ value: Any, key: String, mode: StashDBViewModel.FilterMode) -> Any {
+        guard var dict = stringKeyedDict(value), dict["modifier"] == nil else { return value }
+        guard let field = FilterFieldCatalog.field(key: key, mode: mode) else { return value }
+        let template = FilterCriterionKind.defaultValue(for: field.kind, nestedMode: field.nestedMode)
+        guard let defaults = stringKeyedDict(template),
+              let modifier = defaults["modifier"] else { return value }
+        dict["modifier"] = modifier
+        return dict
     }
 
     func removeCriterion(key: String) {
@@ -128,9 +235,9 @@ final class FilterCriteriaDocument: ObservableObject {
     // criteria and implicitly ANDed, while `AND` / `OR` / `NOT` hold a nested filter of the same
     // shape. A path is the chain of group keys from the root, e.g. `["OR", "NOT"]`.
 
-    static let groupKeys = ["AND", "OR", "NOT"]
+    nonisolated static let groupKeys = ["AND", "OR", "NOT"]
 
-    static func isGroupKey(_ key: String) -> Bool { groupKeys.contains(key) }
+    nonisolated static func isGroupKey(_ key: String) -> Bool { groupKeys.contains(key) }
 
     /// Dictionary at `path`, or an empty one when the path does not exist (yet).
     func node(at path: [String]) -> [String: Any] {
@@ -169,7 +276,11 @@ final class FilterCriteriaDocument: ObservableObject {
         }
         var root = objectFilter
         Self.mutate(&root, path: path) { node in
-            if let value { node[key] = value } else { node.removeValue(forKey: key) }
+            if let value {
+                node[key] = Self.withRequiredModifier(value, key: key, mode: self.mode)
+            } else {
+                node.removeValue(forKey: key)
+            }
         }
         if value != nil { noteInsertion(of: key, at: path) }
         objectFilter = root
@@ -255,6 +366,19 @@ final class FilterCriteriaDocument: ObservableObject {
     func merged(with chipFilter: [String: Any]) -> [String: Any]? {
         var dict = sanitizedObjectFilter
         for (key, value) in chipFilter {
+            dict[key] = value
+        }
+        return dict.isEmpty ? nil : dict
+    }
+
+    /// Inverse of ``merged(with:)``: `base` first, this document's criteria on top.
+    ///
+    /// Feeds still derive a base fragment from the selected saved filter (studios / tags / groups),
+    /// but the editor is the surface the user actually sees — so an edited criterion must win over
+    /// the mirrored one, otherwise clearing it in the sheet would have no effect.
+    func layered(over base: [String: Any]) -> [String: Any]? {
+        var dict = base
+        for (key, value) in sanitizedObjectFilter {
             dict[key] = value
         }
         return dict.isEmpty ? nil : dict
