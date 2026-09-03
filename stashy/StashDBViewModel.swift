@@ -352,6 +352,7 @@ class StashDBViewModel: ObservableObject {
     private var imageTagsUpdatedObserver: NSObjectProtocol?
     private var sceneTagsUpdatedObserver: NSObjectProtocol?
     private var markerTagsUpdatedObserver: NSObjectProtocol?
+    private var bulkTagsAppliedObserver: NSObjectProtocol?
     private var sceneOCounterUpdatedObserver: NSObjectProtocol?
     private var sceneUpdatedObserver: NSObjectProtocol?
     private var tagImageUpdatedObserver: NSObjectProtocol?
@@ -452,6 +453,20 @@ class StashDBViewModel: ObservableObject {
             }
         }
 
+        bulkTagsAppliedObserver = NotificationCenter.default.addObserver(
+            forName: NSNotification.Name("BulkTagsApplied"),
+            object: nil,
+            queue: .main
+        ) { [weak self] notification in
+            guard let tag = notification.userInfo?["tag"] as? Tag else { return }
+            let imageIds = Set(notification.userInfo?["imageIds"] as? [String] ?? [])
+            let sceneIds = Set(notification.userInfo?["sceneIds"] as? [String] ?? [])
+            let viewModel = self
+            Task { @MainActor in
+                viewModel?.patchBulkAppliedTag(tag, imageIds: imageIds, sceneIds: sceneIds)
+            }
+        }
+
         markerTagsUpdatedObserver = NotificationCenter.default.addObserver(
             forName: NSNotification.Name("MarkerTagsUpdated"),
             object: nil,
@@ -521,6 +536,9 @@ class StashDBViewModel: ObservableObject {
         }
         if let markerTagsUpdatedObserver {
             NotificationCenter.default.removeObserver(markerTagsUpdatedObserver)
+        }
+        if let bulkTagsAppliedObserver {
+            NotificationCenter.default.removeObserver(bulkTagsAppliedObserver)
         }
         // Diese beiden hingen vorher ohne Token in der NotificationCenter —
         // `removeObserver(self)` erwischt block-basierte Observer nicht, sie
@@ -1951,6 +1969,33 @@ class StashDBViewModel: ObservableObject {
     }
 
     /// Live-listener: patch `o_counter` across in-memory scene lists.
+    /// A bulk tag action touched many items at once; add the tag to every one of them
+    /// that is currently in memory.
+    func patchBulkAppliedTag(_ tag: Tag, imageIds: Set<String>, sceneIds: Set<String>) {
+        guard !imageIds.isEmpty || !sceneIds.isEmpty else { return }
+
+        func patchImages(_ list: inout [StashImage]) {
+            for index in list.indices where imageIds.contains(list[index].id) {
+                let tags = list[index].tags ?? []
+                guard !tags.contains(where: { $0.id == tag.id }) else { continue }
+                list[index] = list[index].withTags(tags + [tag])
+            }
+        }
+        func patchScenes(_ list: inout [Scene]) {
+            for index in list.indices where sceneIds.contains(list[index].id) {
+                let tags = list[index].tags ?? []
+                guard !tags.contains(where: { $0.id == tag.id }) else { continue }
+                list[index] = list[index].withTags(tags + [tag])
+            }
+        }
+
+        patchImages(&clips)
+        patchImages(&allImages)
+        patchImages(&detailImages)
+        patchScenes(&scenes)
+        patchScenes(&previews)
+    }
+
     /// Same for scene lists — Feeds (Scenes/Previews) and any pushed scene list.
     func patchSceneTagsInLists(sceneId: String, tags: [Tag]) {
         func patch(_ list: inout [Scene]) {
@@ -7754,13 +7799,16 @@ struct GenerateData: Codable {
         }
     }
 
-    func fetchAllTags(completion: @escaping ([Tag]) -> Void) {
+    /// `sortField` decides which usage the 1000-tag cut favours — pass `images_count`
+    /// when the picker is for an image, or a tag heavy on images but absent from scenes
+    /// falls outside the page.
+    func fetchAllTags(sortField: String = "scenes_count", completion: @escaping ([Tag]) -> Void) {
         let query = GraphQLQueries.queryWithFragments("findTags")
         
         let variables: [String: Any] = [
             "filter": [
                 "per_page": 1000,
-                "sort": "scenes_count",
+                "sort": sortField,
                 "direction": "DESC"
             ],
             "tag_filter": [:]

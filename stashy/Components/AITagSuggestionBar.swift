@@ -22,6 +22,8 @@ struct AITagSuggestionBar: View {
     @State private var suggestions: [AITagSuggestion] = []
     @State private var didRun = false
     @State private var acceptingTagId: String?
+    @State private var pendingBulk: AITagSuggestionManager.BulkPlan?
+    @State private var isPlanningBulk = false
 
     /// Chips only — the caller puts them into its own tag row, so suggestions sit
     /// inline with the tags the item already has.
@@ -29,6 +31,16 @@ struct AITagSuggestionBar: View {
         if manager.isActive {
             content
                 .task(id: target.id) { await prepare() }
+                .alert(item: $pendingBulk) { plan in
+                    Alert(
+                        title: Text("Add #\(plan.tag.name)?"),
+                        message: Text(bulkMessage(for: plan)),
+                        primaryButton: .default(Text("Add to \(plan.total)")) {
+                            applyBulk(plan)
+                        },
+                        secondaryButton: .cancel()
+                    )
+                }
         }
     }
 
@@ -39,7 +51,7 @@ struct AITagSuggestionBar: View {
                 // Only worth saying on an untagged item — where a missing suggestion is the
                 // whole story. On an already tagged one it is just noise under the tag row.
                 if didRun, target.tags.isEmpty {
-                    Text(manager.hasModel ? "No tag suggestions" : "AI Tags needs statistics first")
+                    Text(manager.hasModel ? "No tag suggestions" : "Tag Suggestion needs statistics first")
                         .font(.system(size: 11, weight: .semibold))
                         .foregroundColor(.white.opacity(0.45))
                 }
@@ -89,7 +101,23 @@ struct AITagSuggestionBar: View {
                 HapticManager.light()
                 withAnimation { suggestions.removeAll { $0.id == suggestion.id } }
             } label: {
-                Label("Not this one", systemImage: "xmark")
+                Label("Ignore Tag", systemImage: "xmark")
+            }
+
+            if !target.galleryIds.isEmpty {
+                Button {
+                    planBulk(suggestion.tag, scope: .gallery)
+                } label: {
+                    Label("Set on all of gallery", systemImage: "photo.stack")
+                }
+            }
+
+            if !target.performerIds.isEmpty {
+                Button {
+                    planBulk(suggestion.tag, scope: .performer)
+                } label: {
+                    Label("Set on all of performer", systemImage: "person.text.rectangle")
+                }
             }
         }
         .accessibilityLabel("Add tag \(suggestion.tag.name)")
@@ -115,29 +143,52 @@ struct AITagSuggestionBar: View {
         // The feed may have moved on while the model was still loading.
         guard !Task.isCancelled else { return }
         let existing = Set(target.tags.map(\.id))
-        var pending = result.filter { !existing.contains($0.tag.id) }
-
-        // Auto-accept takes the confident ones straight to the server; whatever stays
-        // below the bar remains a tap-to-add chip.
-        if manager.autoAccept {
-            let confident = pending.filter { $0.confidence >= manager.autoAcceptThreshold }
-            if !confident.isEmpty {
-                pending.removeAll { suggestion in
-                    confident.contains { $0.tag.id == suggestion.tag.id }
-                }
-                if let newTags = await manager.accept(confident, on: target) {
-                    HapticManager.success()
-                    let names = confident.map { "#\($0.tag.name)" }.joined(separator: " ")
-                    ToastManager.shared.show("Auto-added \(names)")
-                    onTagsChanged(newTags)
-                }
-            }
-        }
-
         withAnimation(.easeInOut(duration: 0.2)) {
-            suggestions = pending
+            suggestions = result.filter { !existing.contains($0.tag.id) }
         }
         didRun = true
+    }
+
+    private func bulkMessage(for plan: AITagSuggestionManager.BulkPlan) -> String {
+        let scope = plan.scope == .gallery ? "this gallery" : "this performer"
+        var parts: [String] = []
+        if !plan.imageIds.isEmpty { parts.append("\(plan.imageIds.count) images") }
+        if !plan.sceneIds.isEmpty { parts.append("\(plan.sceneIds.count) scenes") }
+        return "The tag is added to \(parts.joined(separator: " and ")) of \(scope). Items that already have it stay unchanged."
+    }
+
+    /// Counts first, asks second: a bulk write can touch hundreds of items, and undoing
+    /// it means removing the tag one by one.
+    private func planBulk(_ tag: Tag, scope: AITagSuggestionManager.BulkScope) {
+        guard !isPlanningBulk else { return }
+        isPlanningBulk = true
+        Task {
+            let plan = await manager.planBulkApply(tag, scope: scope, target: target)
+            isPlanningBulk = false
+            guard let plan else {
+                ToastManager.shared.show("Nothing to tag", icon: "info.circle", style: .info)
+                return
+            }
+            pendingBulk = plan
+        }
+    }
+
+    private func applyBulk(_ plan: AITagSuggestionManager.BulkPlan) {
+        Task {
+            let success = await manager.applyBulk(plan, target: target)
+            guard success else {
+                HapticManager.error()
+                ToastManager.shared.show("Could not apply tag", icon: "exclamationmark.triangle.fill", style: .error)
+                return
+            }
+            HapticManager.success()
+            ToastManager.shared.show("Added #\(plan.tag.name) to \(plan.total) items")
+            // The item itself is part of the batch, so its own row has to follow.
+            if !target.tags.contains(where: { $0.id == plan.tag.id }) {
+                onTagsChanged(target.tags + [plan.tag])
+            }
+            withAnimation { suggestions.removeAll { $0.tag.id == plan.tag.id } }
+        }
     }
 
     private func accept(_ suggestion: AITagSuggestion) {

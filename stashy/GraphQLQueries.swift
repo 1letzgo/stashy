@@ -357,6 +357,31 @@ class GraphQLQueries {
         }
         """
 
+    /// Id-only lookups for the bulk tag actions.
+    static let idsImagesQuery = """
+        query BulkImageIds($filter: FindFilterType, $image_filter: ImageFilterType) {
+            findImages(filter: $filter, image_filter: $image_filter) { count images { id } }
+        }
+        """
+
+    static let idsScenesQuery = """
+        query BulkSceneIds($filter: FindFilterType, $scene_filter: SceneFilterType) {
+            findScenes(filter: $filter, scene_filter: $scene_filter) { count scenes { id } }
+        }
+        """
+
+    static let bulkImageAddTagsMutation = """
+        mutation BulkImageUpdate($input: BulkImageUpdateInput!) {
+            bulkImageUpdate(input: $input) { id }
+        }
+        """
+
+    static let bulkSceneAddTagsMutation = """
+        mutation BulkSceneUpdate($input: BulkSceneUpdateInput!) {
+            bulkSceneUpdate(input: $input) { id }
+        }
+        """
+
     static let sceneMarkerUpdateTagsMutation = """
         mutation SceneMarkerUpdate($input: SceneMarkerUpdateInput!) {
             sceneMarkerUpdate(input: $input) { id tags { id name } primary_tag { id name } }

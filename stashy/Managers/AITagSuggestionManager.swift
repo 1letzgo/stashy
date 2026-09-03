@@ -2,13 +2,16 @@
 //  AITagSuggestionManager.swift
 //  stashy
 //
-//  Tag suggestions ("AI Tags", stashy+) from the library's own statistics.
+//  Tag Suggestion (stashy+): tags proposed from the library's own statistics.
 //
 //  The whole library is counted once into a local statistics model:
 //
 //  * how often each performer is tagged with each tag
 //  * the same for galleries, for studios, and for the library as a whole
 //  * which tags occur *together* on the same item
+//
+//  Everything a scope knows is ranked and the top N are shown — no threshold, so the
+//  list is as long as configured whenever the statistics have that many candidates.
 //
 //  Suggestions are then plain lookups — no network round trip while browsing, no
 //  image analysis, nothing that leaves the device. Co-occurrence is what makes a
@@ -30,7 +33,6 @@ struct AITagSuggestion: Identifiable, Equatable {
         case performer   // how often this performer carries the tag
         case gallery     // how often this gallery carries the tag
         case studio      // how often this studio carries the tag
-        case library     // how often the whole library carries the tag
         case related     // co-occurrence with the tags the item already has
     }
 
@@ -149,26 +151,9 @@ final class AITagSuggestionManager: ObservableObject {
         }
     }
 
-    /// A tag has to appear on at least this share of the related items before it is
-    /// suggested. Below 50% a suggestion is wrong more often than right — that is
-    /// exactly where act tags live: the performer does them regularly, just not here.
-    @Published var minShare: Double {
-        didSet { UserDefaults.standard.set(minShare, forKey: Keys.minShare) }
-    }
-
     /// How many suggestions the chip row shows at most.
     @Published var maxSuggestions: Int {
         didSet { UserDefaults.standard.set(maxSuggestions, forKey: Keys.maxSuggestions) }
-    }
-
-    /// Apply high-confidence suggestions without a tap. Writes to the server, so it is
-    /// off unless the user turns it on.
-    @Published var autoAccept: Bool {
-        didSet { UserDefaults.standard.set(autoAccept, forKey: Keys.autoAccept) }
-    }
-
-    @Published var autoAcceptThreshold: Double {
-        didSet { UserDefaults.standard.set(autoAcceptThreshold, forKey: Keys.autoAcceptThreshold) }
     }
 
     // MARK: Published state
@@ -197,38 +182,38 @@ final class AITagSuggestionManager: ObservableObject {
     private var model: AITagStatsModel?
     private var tagsById: [String: Tag] = [:]
     private var buildTask: Task<Void, Never>?
+    private var persistTask: Task<Void, Never>?
     private var didLoadFromDisk = false
     private var serverObserver: NSObjectProtocol?
 
-    /// How often the user waved a tag away. Two strikes and it stops being offered —
-    /// the alternative is being wrong about the same tag on every single clip.
+    /// Tags the user waved away. Ignoring one takes it out of the suggestions until it
+    /// is accepted somewhere — the alternative is being wrong about the same tag on
+    /// every single clip.
     private var dismissals: [String: Int] = [:]
 
     private enum Keys {
         static let enabled = "ai_tags_enabled"
-        static let minShare = "ai_tags_stats_min_share"
         static let maxSuggestions = "ai_tags_max_suggestions"
-        static let autoAccept = "ai_tags_auto_accept"
-        static let autoAcceptThreshold = "ai_tags_auto_accept_threshold"
         static let dismissed = "ai_tags_dismissed"
     }
 
     private static let modelVersion = 2
-    private static let dismissStrikes = 2
+    /// One "Ignore Tag" is the answer, not a vote — the tag is out until it is
+    /// accepted somewhere.
+    private static let dismissStrikes = 1
     /// Laplace-style damping: one of one item is not a certainty.
     private static let smoothing = 1.0
     /// Co-occurrence is only kept for the strongest partners of a tag — the full matrix
     /// is mostly noise and would bloat the file for nothing.
     private static let partnersPerTag = 40
-    private static let pageSize = 250
+    /// Fewer, larger pages: the build is dominated by round trips, not by the rows
+    /// themselves — each item is only ids and tag names.
+    private static let pageSize = 500
 
     private init() {
         let defaults = UserDefaults.standard
         isEnabled = defaults.bool(forKey: Keys.enabled)
-        minShare = defaults.object(forKey: Keys.minShare) as? Double ?? 0.5
         maxSuggestions = defaults.object(forKey: Keys.maxSuggestions) as? Int ?? 8
-        autoAccept = defaults.bool(forKey: Keys.autoAccept)
-        autoAcceptThreshold = defaults.object(forKey: Keys.autoAcceptThreshold) as? Double ?? 0.8
         dismissals = defaults.dictionary(forKey: Keys.dismissed) as? [String: Int] ?? [:]
 
         serverObserver = NotificationCenter.default.addObserver(
@@ -263,6 +248,8 @@ final class AITagSuggestionManager: ObservableObject {
     }
 
     func cancelWork() {
+        persistTask?.cancel()
+        persistTask = nil
         buildTask?.cancel()
         buildTask = nil
         if case .building = state { state = restingState() }
@@ -480,7 +467,6 @@ final class AITagSuggestionManager: ObservableObject {
         func offer(_ tagId: String, _ score: Double, _ source: AITagSuggestion.Source) {
             guard !existingSet.contains(tagId) else { return }
             guard (dismissals[tagId] ?? 0) < Self.dismissStrikes else { return }
-            guard score >= minShare else { return }
             guard let current = scores[tagId] else {
                 scores[tagId] = (score, source)
                 return
@@ -535,11 +521,7 @@ final class AITagSuggestionManager: ObservableObject {
             )
         }
 
-        // 4. The library as a whole. Only tags you put on nearly everything survive the
-        //    minimum share here, which is exactly what this scope is good for.
-        absorb(model.tagTotals, model.itemCount, weight: 0.6, source: .library)
-
-        // 5. Tags that travel with the ones this item already has. The only signal here
+        // 4. Tags that travel with the ones this item already has. The only signal here
         //    that is about the item itself rather than about who is in it.
         for tag in target.tags {
             absorb(
@@ -561,6 +543,24 @@ final class AITagSuggestionManager: ObservableObject {
         let suggestions = Array(result)
         suggestionCache[target.id] = suggestions
         return suggestions
+    }
+
+    /// The server's tag list as captured by the last statistics build. Reusing it saves
+    /// the picker a 1000-tag round trip on every open.
+    var vocabulary: [Tag] { model?.tags ?? [] }
+
+    /// How often each tag appears on this item's performers, from the statistics model.
+    /// Several performers: the strongest count wins. Empty when no model is built.
+    func performerTagCounts(for target: AITagTarget) -> [String: Int] {
+        guard let model else { return [:] }
+        var counts: [String: Int] = [:]
+        for performerId in target.performerIds {
+            guard let performerCounts = model.performerCounts[performerId] else { continue }
+            for (tagId, count) in performerCounts {
+                counts[tagId] = max(counts[tagId] ?? 0, count)
+            }
+        }
+        return counts
     }
 
     /// How two signals for the same tag fold into one score: the stronger carries,
@@ -605,7 +605,7 @@ final class AITagSuggestionManager: ObservableObject {
         guard !additions.isEmpty else { return target.tags }
         let newTags = target.tags + additions
 
-        guard await Self.write(tags: newTags, to: target) else { return nil }
+        guard await write(tags: newTags, to: target) else { return nil }
 
         let acceptedIds = Set(additions.map(\.id))
         for tagId in acceptedIds where dismissals[tagId] != nil {
@@ -620,9 +620,11 @@ final class AITagSuggestionManager: ObservableObject {
         return newTags
     }
 
-    /// Writes a tag list to whichever entity the target stands for and broadcasts the
-    /// change so open lists patch themselves without a refetch.
-    static func write(tags: [Tag], to target: AITagTarget) async -> Bool {
+    /// Writes a tag list to whichever entity the target stands for, folds the change
+    /// into the local statistics and broadcasts it so open lists patch themselves
+    /// without a refetch.
+    @discardableResult
+    func write(tags: [Tag], to target: AITagTarget) async -> Bool {
         var input: [String: Any] = ["id": target.entityId]
         let mutation: String
         let notification: String
@@ -658,14 +660,278 @@ final class AITagSuggestionManager: ObservableObject {
             return false
         }
 
-        await MainActor.run {
-            NotificationCenter.default.post(
-                name: NSNotification.Name(notification),
-                object: nil,
-                userInfo: [idKey: target.entityId, "tags": tags]
-            )
+        // Tagging is how the library grows; the statistics have to grow with it or a
+        // performer you just tagged 25 more images for stays at their old numbers until
+        // the next full rebuild.
+        applyLocalUpdate(target: target, newTags: tags)
+
+        NotificationCenter.default.post(
+            name: NSNotification.Name(notification),
+            object: nil,
+            userInfo: [idKey: target.entityId, "tags": tags]
+        )
+        return true
+    }
+
+    /// Folds one tag change into the in-memory model and schedules a save.
+    private func applyLocalUpdate(target: AITagTarget, newTags: [Tag]) {
+        guard var model else { return }
+
+        let oldIds = Set(target.tags.map(\.id))
+        let newIds = Set(newTags.map(\.id))
+        let added = newIds.subtracting(oldIds)
+        let removed = oldIds.subtracting(newIds)
+        guard !added.isEmpty || !removed.isEmpty else { return }
+
+        // Markers are counted as part of no scope in the build (they are not items), so
+        // they only affect the tag vocabulary.
+        let countsAsItem = target.kind != .marker
+        // The build only counts items that carry at least one tag.
+        let wasCounted = countsAsItem && !oldIds.isEmpty
+        let isCounted = countsAsItem && !newIds.isEmpty
+        let itemDelta = (isCounted ? 1 : 0) - (wasCounted ? 1 : 0)
+
+        func bump(_ counts: inout [String: [String: Int]], _ totals: inout [String: Int], _ ids: [String]) {
+            for id in ids {
+                if itemDelta != 0 {
+                    totals[id] = max(0, (totals[id] ?? 0) + itemDelta)
+                }
+                var scope = counts[id] ?? [:]
+                for tagId in added { scope[tagId, default: 0] += 1 }
+                for tagId in removed { scope[tagId] = max(0, (scope[tagId] ?? 0) - 1) }
+                counts[id] = scope.filter { $0.value > 0 }
+            }
+        }
+
+        if countsAsItem {
+            bump(&model.performerCounts, &model.performerTotals, target.performerIds)
+            bump(&model.galleryCounts, &model.galleryTotals, target.galleryIds)
+            if let studioId = target.studioId {
+                bump(&model.studioCounts, &model.studioTotals, [studioId])
+            }
+            model.itemCount = max(0, model.itemCount + itemDelta)
+
+            for tagId in added { model.tagTotals[tagId, default: 0] += 1 }
+            for tagId in removed { model.tagTotals[tagId] = max(0, (model.tagTotals[tagId] ?? 0) - 1) }
+
+            // Co-occurrence: an added tag pairs with everything the item now has, a
+            // removed one loses its pairs with whatever stayed.
+            var pairs = model.pairCounts
+            func pair(_ lhs: String, _ rhs: String, by delta: Int) {
+                var partners = pairs[lhs] ?? [:]
+                partners[rhs] = max(0, (partners[rhs] ?? 0) + delta)
+                if partners[rhs] == 0 { partners[rhs] = nil }
+                pairs[lhs] = partners.isEmpty ? nil : partners
+            }
+            for tagId in added {
+                for other in newIds where other != tagId {
+                    pair(tagId, other, by: 1)
+                    pair(other, tagId, by: 1)
+                }
+            }
+            for tagId in removed {
+                for other in newIds where other != tagId {
+                    pair(tagId, other, by: -1)
+                    pair(other, tagId, by: -1)
+                }
+            }
+            model.pairCounts = pairs
+        }
+
+        // A tag created from the picker is not in the captured vocabulary yet.
+        for tag in newTags where tagsById[tag.id] == nil {
+            model.tags.append(tag)
+            tagsById[tag.id] = tag
+        }
+
+        self.model = model
+        itemCount = model.itemCount
+        // Every other item's cached suggestions were scored against the old numbers.
+        // Recomputing is a handful of dictionary lookups now, so drop the lot rather
+        // than serve stale scores for the rest of the session.
+        suggestionCache = [:]
+        schedulePersist()
+    }
+
+    /// Writing the whole model on every accepted tag would burn battery for nothing;
+    /// a short idle window collapses a tagging spree into one save.
+    private func schedulePersist() {
+        persistTask?.cancel()
+        persistTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(10))
+            guard !Task.isCancelled, let self, let model = self.model else { return }
+            self.persist(model)
+        }
+    }
+
+    // MARK: - Bulk actions
+
+    /// What a bulk tag action covers.
+    enum BulkScope: Equatable {
+        case gallery
+        case performer
+    }
+
+    struct BulkPlan: Equatable, Identifiable {
+        var id: String { "\(scope)-\(tag.id)" }
+        let scope: BulkScope
+        let tag: Tag
+        let imageIds: [String]
+        let sceneIds: [String]
+        var total: Int { imageIds.count + sceneIds.count }
+    }
+
+    /// Collects everything a bulk action would touch, so the user can be asked with a
+    /// real number instead of a blind "apply to all".
+    func planBulkApply(_ tag: Tag, scope: BulkScope, target: AITagTarget) async -> BulkPlan? {
+        let ids: [String]
+        switch scope {
+        case .gallery: ids = target.galleryIds
+        case .performer: ids = target.performerIds
+        }
+        guard !ids.isEmpty else { return nil }
+
+        let key = scope == .gallery ? "galleries" : "performers"
+        let filter: [String: Any] = ["per_page": -1, "sort": "id", "direction": "ASC"]
+        let itemFilter: [String: Any] = [key: ["value": ids, "modifier": "INCLUDES"]]
+
+        async let images = fetchIds(
+            query: GraphQLQueries.idsImagesQuery,
+            variables: ["filter": filter, "image_filter": itemFilter],
+            source: .images
+        )
+        // A gallery holds images; scenes only ever match the performer scope.
+        async let scenes: [String] = scope == .performer
+            ? fetchIds(
+                query: GraphQLQueries.idsScenesQuery,
+                variables: ["filter": filter, "scene_filter": itemFilter],
+                source: .scenes
+              )
+            : []
+
+        let plan = BulkPlan(scope: scope, tag: tag, imageIds: await images, sceneIds: await scenes)
+        return plan.total > 0 ? plan : nil
+    }
+
+    /// Adds the tag to everything the plan covers. Stash's bulk mutations take an ADD
+    /// mode, so existing tags on those items are kept.
+    @discardableResult
+    func applyBulk(_ plan: BulkPlan, target: AITagTarget) async -> Bool {
+        var ok = true
+        if !plan.imageIds.isEmpty {
+            ok = await bulkAdd(
+                tagId: plan.tag.id,
+                ids: plan.imageIds,
+                mutation: GraphQLQueries.bulkImageAddTagsMutation
+            ) && ok
+        }
+        if !plan.sceneIds.isEmpty {
+            ok = await bulkAdd(
+                tagId: plan.tag.id,
+                ids: plan.sceneIds,
+                mutation: GraphQLQueries.bulkSceneAddTagsMutation
+            ) && ok
+        }
+        guard ok else { return false }
+
+        applyBulkToModel(plan, target: target)
+        // The ids are the only thing that lets open lists patch themselves — without
+        // them a feed would keep showing the old tags until it is refetched.
+        NotificationCenter.default.post(
+            name: NSNotification.Name("BulkTagsApplied"),
+            object: nil,
+            userInfo: [
+                "tag": plan.tag,
+                "imageIds": plan.imageIds,
+                "sceneIds": plan.sceneIds
+            ]
+        )
+        return true
+    }
+
+    private func bulkAdd(tagId: String, ids: [String], mutation: String) async -> Bool {
+        // Chunked so a large gallery does not go out as one enormous request.
+        for chunk in stride(from: 0, to: ids.count, by: 200).map({ Array(ids[$0..<min($0 + 200, ids.count)]) }) {
+            let input: [String: Any] = [
+                "ids": chunk,
+                "tag_ids": ["ids": [tagId], "mode": "ADD"]
+            ]
+            do {
+                _ = try await GraphQLClient.shared.performMutation(mutation: mutation, variables: ["input": input])
+            } catch {
+                AppLog.error("AITags: bulk tag update failed — \(error.localizedDescription)")
+                return false
+            }
         }
         return true
+    }
+
+    /// After a bulk apply every item of that scope carries the tag, so its count is its
+    /// total. The library-wide total can only be approximated — the items that already
+    /// had the tag are not distinguishable here.
+    private func applyBulkToModel(_ plan: BulkPlan, target: AITagTarget) {
+        guard var model else { return }
+        let tagId = plan.tag.id
+
+        switch plan.scope {
+        case .gallery:
+            for galleryId in target.galleryIds {
+                guard let total = model.galleryTotals[galleryId] else { continue }
+                model.galleryCounts[galleryId, default: [:]][tagId] = total
+            }
+        case .performer:
+            for performerId in target.performerIds {
+                guard let total = model.performerTotals[performerId] else { continue }
+                model.performerCounts[performerId, default: [:]][tagId] = total
+            }
+        }
+        model.tagTotals[tagId] = max(model.tagTotals[tagId] ?? 0, plan.total)
+
+        if tagsById[tagId] == nil {
+            model.tags.append(plan.tag)
+            tagsById[tagId] = plan.tag
+        }
+        self.model = model
+        suggestionCache = [:]
+        schedulePersist()
+    }
+
+    private func fetchIds(query: String, variables: [String: Any], source: StatsSource) async -> [String] {
+        do {
+            switch source {
+            case .images:
+                let response: PerformerImagesResponse = try await GraphQLClient.shared.execute(
+                    query: query, variables: variables
+                )
+                return (response.data?.findImages.images ?? []).map(\.id)
+            case .scenes:
+                let response: PerformerScenesResponse = try await GraphQLClient.shared.execute(
+                    query: query, variables: variables
+                )
+                return (response.data?.findScenes.scenes ?? []).map(\.id)
+            }
+        } catch {
+            AppLog.error("AITags: bulk id lookup failed — \(error.localizedDescription)")
+            return []
+        }
+    }
+
+    private struct IdOnly: Decodable { let id: String }
+
+    private struct PerformerImagesResponse: Decodable {
+        struct DataBlock: Decodable {
+            struct FindImages: Decodable { let count: Int; let images: [IdOnly] }
+            let findImages: FindImages
+        }
+        let data: DataBlock?
+    }
+
+    private struct PerformerScenesResponse: Decodable {
+        struct DataBlock: Decodable {
+            struct FindScenes: Decodable { let count: Int; let scenes: [IdOnly] }
+            let findScenes: FindScenes
+        }
+        let data: DataBlock?
     }
 
     // MARK: - GraphQL

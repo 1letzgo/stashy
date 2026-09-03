@@ -261,6 +261,8 @@ struct ReelsViewBody: View {
     )
     @StateObject private var reelsPicsViewModel = StashDBViewModel()
     @State private var tagEditorTarget: AITagTarget?
+    /// Play state to hand back when the tag editor closes.
+    @State private var wasPlayingBeforeTagEditor = false
     @State private var selectedPreviewFilter: StashDBViewModel.SavedFilter?
     @State private var showReelsSceneFilterSheet = false
     /// While the scene-style filter sheet hydrates UI (migration / saved-filter list), ignore preset `onChange` so we do not refetch the Reels timeline.
@@ -1556,6 +1558,23 @@ struct ReelsViewBody: View {
         }
     }
 
+    /// Takes a tag off the item itself (not off the filter). A marker's primary tag is
+    /// a separate field in Stash and is left alone.
+    private func removeTag(_ tag: Tag, from target: AITagTarget) {
+        guard tag.id != target.primaryTagId else { return }
+        let remaining = target.tags.filter { $0.id != tag.id }
+        Task {
+            let success = await AITagSuggestionManager.shared.write(tags: remaining, to: target)
+            if success {
+                HapticManager.success()
+                ToastManager.shared.show("Removed #\(tag.name)")
+            } else {
+                HapticManager.error()
+                ToastManager.shared.show("Could not remove tag", icon: "exclamationmark.triangle.fill", style: .error)
+            }
+        }
+    }
+
     private func applyTagsChange(_ newTags: [Tag]) {
         switch reelsMode {
         case .scenes:
@@ -2726,6 +2745,20 @@ struct ReelsViewBody: View {
             .sheet(item: $tagEditorTarget) { target in
                 // Lists patch themselves through the *TagsUpdated broadcasts.
                 AddTagsSheet(target: target, viewModel: viewModel) { _ in }
+            }
+            .onChange(of: tagEditorTarget?.id) { _, newValue in
+                // Nobody wants a clip looping with sound behind the tag picker.
+                if newValue != nil {
+                    wasPlayingBeforeTagEditor = currentItemIsPlaying
+                    currentItemIsPlaying = false
+                    ReelsPlayerRegistry.pauseAll()
+                    NotificationCenter.default.post(name: .reelsPauseAllPlayers, object: nil)
+                } else if wasPlayingBeforeTagEditor {
+                    wasPlayingBeforeTagEditor = false
+                    currentItemIsPlaying = true
+                    ReelsPlayerRegistry.resumePlayback()
+                    playTrigger += 1
+                }
             }
     }
 
@@ -4255,7 +4288,7 @@ struct ReelsViewBody: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
 
                         let tags = item.tags
-                        // AI Tags suggestions (stashy+, off by default) share this row, so
+                        // Tag Suggestion (stashy+, off by default) shares this row, so
                         // it also has to exist for an untagged clip.
                         let showsTagRow = !tags.isEmpty
                             || appearanceManager.isEditModeEnabled
@@ -4284,6 +4317,17 @@ struct ReelsViewBody: View {
                                                     .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
                                             }
                                             .buttonStyle(.plain)
+                                            .contextMenu {
+                                                let target = item.aiTagTarget
+                                                if appearanceManager.isEditModeEnabled,
+                                                   tag.id != target.primaryTagId {
+                                                    Button(role: .destructive) {
+                                                        removeTag(tag, from: target)
+                                                    } label: {
+                                                        Label("Remove tag", systemImage: "trash")
+                                                    }
+                                                }
+                                            }
                                         }
 
                                         if appearanceManager.isEditModeEnabled {
@@ -4307,7 +4351,7 @@ struct ReelsViewBody: View {
                                             .accessibilityLabel("Add tags")
                                         }
 
-                                        // AI Tags (stashy+, off by default).
+                                        // Tag Suggestion (stashy+, off by default).
                                         AITagSuggestionBar(target: item.aiTagTarget) { _ in }
                                     }
                                 }

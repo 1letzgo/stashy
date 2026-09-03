@@ -2,7 +2,7 @@
 //  AITagsSettingsView.swift
 //  stashy
 //
-//  stashy+ hub for AI Tags: kill switch, the statistics model, and how eagerly
+//  stashy+ hub for Tag Suggestion: kill switch, the statistics model, and how eagerly
 //  suggestions are made.
 //
 
@@ -23,7 +23,7 @@ struct AITagsSettingsView: View {
         List {
             if !isUnlocked {
                 Section {
-                    Label("AI Tags requires stashy+", systemImage: "lock.fill")
+                    Label("Tag Suggestion requires stashy+", systemImage: "lock.fill")
                         .foregroundColor(.secondary)
                         .stashyGroupedSettingsRow()
                     stashyScrollingSectionFooter("Unlock stashy+ to use this feature.")
@@ -33,11 +33,10 @@ struct AITagsSettingsView: View {
             enableSection
             modelSection
             tuningSection
-            autoAcceptSection
         }
         .stashySettingsList()
         .applyAppBackground()
-        .stashySettingsDetailChrome("AI Tags")
+        .stashySettingsDetailChrome("Tag Suggestion")
         .task { await manager.loadIfNeeded() }
         .alert("Delete statistics?", isPresented: $showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -51,7 +50,7 @@ struct AITagsSettingsView: View {
 
     private var enableSection: some View {
         Section {
-            stashyScrollingSectionHeader("AI Tags", isBeta: true)
+            stashyScrollingSectionHeader("Tag Suggestion", isBeta: true)
             Toggle(isOn: enabledBinding) {
                 Label("Tag suggestions", systemImage: "sparkles")
             }
@@ -110,26 +109,13 @@ struct AITagsSettingsView: View {
             .disabled(!isBuilding && !manager.hasModel)
             .stashyGroupedBlockRow(index: 2, count: 3)
 
-            stashyScrollingSectionFooter("Counted once over the whole library, in four scopes — performer, gallery, studio and the library as a whole — plus which tags occur together on the same item. After that, suggestions need no server request at all. Rebuild after tagging a batch of new material. Each server keeps its own statistics on this device.")
+            stashyScrollingSectionFooter("Counted once over the whole library, in three scopes — performer, gallery and studio — plus which tags occur together on the same item. After that, suggestions need no server request at all. Tagging inside the app updates the numbers as you go; rebuild after tagging a batch outside it. Each server keeps its own statistics on this device.")
         }
     }
 
     private var tuningSection: some View {
         Section {
             stashyScrollingSectionHeader("Tuning")
-
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("Minimum share")
-                    Spacer()
-                    Text("\(Int((manager.minShare * 100).rounded()))%")
-                        .foregroundColor(.secondary)
-                }
-                Slider(value: $manager.minShare, in: 0.2...0.95, step: 0.05)
-                    .tint(appearanceManager.tintColor)
-            }
-            .padding(.vertical, 4)
-            .stashyGroupedBlockRow(index: 0, count: 3)
 
             Stepper(value: $manager.maxSuggestions, in: 1...20) {
                 HStack {
@@ -138,13 +124,13 @@ struct AITagsSettingsView: View {
                     Text("\(manager.maxSuggestions)").foregroundColor(.secondary)
                 }
             }
-            .stashyGroupedBlockRow(index: 1, count: 3)
+            .stashyGroupedBlockRow(index: 0, count: 2)
 
             Button {
                 manager.resetDismissals()
             } label: {
                 HStack {
-                    Label("Rejected tags", systemImage: "hand.thumbsdown")
+                    Label("Ignored tags", systemImage: "hand.thumbsdown")
                         .foregroundColor(appearanceManager.tintColor)
                     Spacer()
                     Text(manager.dismissedTagCount == 0 ? "None" : "\(manager.dismissedTagCount) · reset")
@@ -152,38 +138,9 @@ struct AITagsSettingsView: View {
                 }
             }
             .disabled(manager.dismissedTagCount == 0)
-            .stashyGroupedBlockRow(index: 2, count: 3)
-
-            stashyScrollingSectionFooter("Minimum share decides how sure the statistics have to be: a tag on half a performer's items is a coin flip, which is where wrong act tags come from — they happen regularly, just not in this clip. Raise it for fewer, safer suggestions. Long-press a suggestion and pick “Not this one” to reject a tag; after two rejections it is no longer offered, and accepting it anywhere clears that again.")
-        }
-        .disabled(!isUnlocked || !manager.isEnabled)
-    }
-
-    private var autoAcceptSection: some View {
-        Section {
-            stashyScrollingSectionHeader("Auto-accept")
-
-            Toggle(isOn: $manager.autoAccept) {
-                Label("Add confident tags automatically", systemImage: "checkmark.seal")
-            }
-            .tint(appearanceManager.tintColor)
-            .stashyGroupedBlockRow(index: 0, count: 2)
-
-            VStack(alignment: .leading, spacing: 4) {
-                HStack {
-                    Text("Auto-accept above")
-                    Spacer()
-                    Text("\(Int((manager.autoAcceptThreshold * 100).rounded()))%")
-                        .foregroundColor(.secondary)
-                }
-                Slider(value: $manager.autoAcceptThreshold, in: 0.5...0.95, step: 0.05)
-                    .tint(appearanceManager.tintColor)
-            }
-            .padding(.vertical, 4)
-            .disabled(!manager.autoAccept)
             .stashyGroupedBlockRow(index: 1, count: 2)
 
-            stashyScrollingSectionFooter("Suggestions at or above this share are written to the server without asking. Everything below stays a tap-to-add chip. Start high — a wrong tag has to be removed by hand.")
+            stashyScrollingSectionFooter("Always the strongest candidates the statistics have, as many as set here — fewer only when there are fewer. The percentage on a chip is the share of that performer's (or gallery's, or studio's) items carrying the tag. Long-press a suggestion and pick “Ignore Tag” to take it out of the suggestions; accepting it anywhere brings it back.")
         }
         .disabled(!isUnlocked || !manager.isEnabled)
     }
