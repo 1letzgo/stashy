@@ -554,6 +554,23 @@ struct ReelsViewBody: View {
         }
     }
 
+    /// Performer / Studio / Tag → Feeds: the feed must show exactly the handed criteria.
+    /// Quick chips and advanced criteria left over from the session would silently narrow it —
+    /// the chips were only reset *after* `applySettings` had already fetched, and the criteria
+    /// document was never reset at all. Mirrors `applyReelsPicsNavigation`, which already
+    /// enters with Filter = None.
+    private func reelsClearSessionFiltersForDeepLink() {
+        reelsSceneLiveChips.clearChipsOnly()
+        reelsMarkerLiveChips.clearChipsOnly()
+        reelsPreviewLiveChips.clearChipsOnly()
+        reelsCriteriaDocument.clear()
+        reelsMarkerCriteriaDocument.clear()
+        reelsClipImageFilters.selectedFilter = nil
+        reelsClipImageFilters.catalogPresetRowSelection = ""
+        reelsClipImageFilters.clearLiveChipsOnly()
+        reelsClipImageFilters.criteriaDocument.clear()
+    }
+
     private func reelsClearActiveLiveChipsOnly() {
         switch reelsMode {
         case .scenes: reelsSceneLiveChips.clearChipsOnly()
@@ -3206,6 +3223,9 @@ struct ReelsViewBody: View {
         }
 
         if initialPerformer != nil || !initialTags.isEmpty || initialStudio != nil {
+            // Before picking the mode: drop everything the session was still carrying, so only
+            // the handed performer / tags / studio plus the mode's default sort survive.
+            reelsClearSessionFiltersForDeepLink()
             let targetMode: ReelsMode = {
                 if let modeStr = targetModeStr {
                     if modeStr == "Pics" { return .pics }
@@ -4355,6 +4375,10 @@ struct ReelsViewBody: View {
                                         AITagSuggestionBar(target: item.aiTagTarget) { _ in }
                                     }
                                 }
+                                // Fresh identity per item: without it SwiftUI reuses the
+                                // row and the next clip inherits however far the previous
+                                // one was scrolled sideways.
+                                .id(item.id)
                             } else {
                                 Color.clear.opacity(0)
                             }
