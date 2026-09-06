@@ -1648,6 +1648,10 @@ struct FullScreenImageView: View {
                                         }
                                     }
                                 }
+                                // Fresh identity per image: without it SwiftUI reuses the
+                                // row and the next picture inherits however far the
+                                // previous one was scrolled sideways.
+                                .id(image.id)
                             } else {
                                 Color.clear.opacity(0)
                             }
