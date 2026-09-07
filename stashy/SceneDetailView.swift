@@ -328,6 +328,10 @@ struct SceneDetailView: View {
                     // Landscape Mode: Grid Layout for Metadata
                     LazyVGrid(columns: [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)], spacing: 12) {
 
+                        // stashy+ — hides itself when Suggestions is off or nothing is similar.
+                        SceneSimilarScenesCard(scene: activeScene)
+                            .gridCellColumns(2)
+
                         // Item 1: Galleries — always visible (full width)
                         SceneGalleriesCard(
                             sceneId: activeScene.id,
@@ -402,6 +406,9 @@ struct SceneDetailView: View {
                     }
                 } else {
                     // Portrait Mode: Vertical Stack
+                    // stashy+ — hides itself when Suggestions is off or nothing is similar.
+                    SceneSimilarScenesCard(scene: activeScene)
+
                     // Row 1: Galleries — always visible
                     SceneGalleriesCard(
                         sceneId: activeScene.id,
@@ -521,6 +528,12 @@ struct SceneDetailView: View {
                 captionTranslator.onTranslated = { [weak transcriptionController] cueID, text in
                     transcriptionController?.applyTranslation(cueID: cueID, text: text)
                 }
+            }
+            // Similar Scenes is loaded by the detail view for the scene it is showing, not by the
+            // card for itself. Keyed on the metadata, so it runs again once `fetchSceneDetails`
+            // replaces the slim list version of the scene with the full one.
+            .task(id: SimilarScenesFinder.signature(for: activeScene)) {
+                await SimilarScenesFinder.shared.load(for: activeScene)
             }
     }
 

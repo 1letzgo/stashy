@@ -170,6 +170,26 @@ final class AITagSuggestionManager: ObservableObject {
         return false
     }
 
+    /// How strongly other tags co-occur with `tagIds` in this library, 0…1 per tag.
+    ///
+    /// Lets Similar Scenes rank a candidate that merely shares a *related* tag above one that
+    /// shares nothing. Empty while no statistics are built — the caller then falls back to plain
+    /// overlap, so the feature works either way.
+    func relatedTagWeights(for tagIds: [String]) -> [String: Double] {
+        guard let model else { return [:] }
+        var weights: [String: Double] = [:]
+        for tagId in tagIds {
+            guard let partners = model.pairCounts[tagId] else { continue }
+            let total = Double(model.tagTotals[tagId] ?? 0)
+            guard total > 0 else { continue }
+            for (partner, count) in partners where !tagIds.contains(partner) {
+                let share = min(1.0, Double(count) / total)
+                weights[partner] = max(weights[partner] ?? 0, share)
+            }
+        }
+        return weights
+    }
+
     var buildProgress: Double {
         if case .building(let processed, let total) = state, total > 0 {
             return min(1, Double(processed) / Double(total))
@@ -260,8 +280,11 @@ final class AITagSuggestionManager: ObservableObject {
         return .ready(items: model.itemCount)
     }
 
+    /// Reads the cached statistics. Gated on stashy+ only, not on `isActive`: Similar Scenes
+    /// uses the same numbers for its ranking and has its own switch, so the file must be
+    /// readable even when tag suggestions are off.
     func loadIfNeeded() async {
-        guard !didLoadFromDisk, isActive else { return }
+        guard !didLoadFromDisk, StashyPlusManager.isUnlockedNow else { return }
         guard let url = Self.modelURL() else { return }
         didLoadFromDisk = true
         state = .loading

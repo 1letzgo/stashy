@@ -136,6 +136,8 @@
 		DFSEC0012F2A000100000001 /* SecurityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSEC0022F2A000100000002 /* SecurityManager.swift */; };
 		DFSEC0032F2A000100000003 /* PasscodeEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSEC0042F2A000100000004 /* PasscodeEntryView.swift */; };
 		AITAG00012F70A00000000001 /* AITagSuggestionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00022F70A00000000002 /* AITagSuggestionManager.swift */; };
+		5115C0010000000000000001 /* SimilarScenesFinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5115C0020000000000000002 /* SimilarScenesFinder.swift */; };
+		5115C0050000000000000005 /* SceneSimilarScenesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5115C0060000000000000006 /* SceneSimilarScenesCard.swift */; };
 		AITAG00032F70A00000000003 /* AITagSuggestionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00042F70A00000000004 /* AITagSuggestionBar.swift */; };
 		AITAG00092F70A00000000009 /* AddTagsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG000A2F70A0000000000A /* AddTagsSheet.swift */; };
 		AITAG00052F70A00000000005 /* AITagsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00062F70A00000000006 /* AITagsSettingsView.swift */; };
@@ -271,6 +273,8 @@
 		DFSEC0022F2A000100000002 /* SecurityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityManager.swift; sourceTree = "<group>"; };
 		DFSEC0042F2A000100000004 /* PasscodeEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasscodeEntryView.swift; sourceTree = "<group>"; };
 		AITAG00022F70A00000000002 /* AITagSuggestionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagSuggestionManager.swift; sourceTree = "<group>"; };
+		5115C0020000000000000002 /* SimilarScenesFinder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimilarScenesFinder.swift; sourceTree = "<group>"; };
+		5115C0060000000000000006 /* SceneSimilarScenesCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneSimilarScenesCard.swift; sourceTree = "<group>"; };
 		AITAG00042F70A00000000004 /* AITagSuggestionBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagSuggestionBar.swift; sourceTree = "<group>"; };
 		AITAG000A2F70A0000000000A /* AddTagsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTagsSheet.swift; sourceTree = "<group>"; };
 		AITAG00062F70A00000000006 /* AITagsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagsSettingsView.swift; sourceTree = "<group>"; };
@@ -413,6 +417,7 @@
 			isa = PBXGroup;
 			children = (
 				AITAG00022F70A00000000002 /* AITagSuggestionManager.swift */,
+				5115C0020000000000000002 /* SimilarScenesFinder.swift */,
 				372E2D982F64272300603361 /* VideoAnalysisManager.swift */,
 				372E2D9A2F64425000603361 /* StashSyncManager.swift */,
 				A1PLUS022F30B00000000002 /* StashyPlusManager.swift */,
@@ -469,6 +474,7 @@
 				DF675E742F2A6392004CA019 /* ScenePerformersCard.swift */,
 				DF675E752F2A6392004CA019 /* SceneStudioCard.swift */,
 				DF675E762F2A6392004CA019 /* SceneTagsCard.swift */,
+				5115C0060000000000000006 /* SceneSimilarScenesCard.swift */,
 				FA617C2A62174FFFB0912B44 /* SceneGroupsCard.swift */,
 				DF675E772F2A6392004CA019 /* SceneVideoPlayerCard.swift */,
 				37D3E4912F3A305D00AB8FAD /* SceneHeatmapCard.swift */,
@@ -744,6 +750,8 @@
 				DFSEC0012F2A000100000001 /* SecurityManager.swift in Sources */,
 				DFSEC0032F2A000100000003 /* PasscodeEntryView.swift in Sources */,
 				AITAG00012F70A00000000001 /* AITagSuggestionManager.swift in Sources */,
+				5115C0010000000000000001 /* SimilarScenesFinder.swift in Sources */,
+				5115C0050000000000000005 /* SceneSimilarScenesCard.swift in Sources */,
 				AITAG00032F70A00000000003 /* AITagSuggestionBar.swift in Sources */,
 				AITAG00092F70A00000000009 /* AddTagsSheet.swift in Sources */,
 				AITAG00052F70A00000000005 /* AITagsSettingsView.swift in Sources */,
@@ -945,7 +953,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 322;
+				CURRENT_PROJECT_VERSION = 324;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -975,7 +983,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 322;
+				CURRENT_PROJECT_VERSION = 324;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;

@@ -153,6 +153,10 @@ class GraphQLQueries {
         case "findScenes":
             // List: schlankes Fragment (ohne Marker/Tags/Galleries/Groups und ohne riesige PerformerFields-Streuung).
             fragments = loadQuery(named: "fragment_SceneListFields")
+        case "findScenesSimilar":
+            // Same slim list fragment; the query itself adds `tags` for the ranking.
+            fragments = loadQuery(named: "fragment_SceneListFields")
+
         case "findScene":
             fragments = sceneRelatedFragments
             

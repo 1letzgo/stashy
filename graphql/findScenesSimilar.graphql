@@ -1,0 +1,12 @@
+# Wie findScenes, aber mit Tags: Similar Scenes gewichtet Tag-Überschneidung und kann das
+# schlanke Listen-Fragment allein nicht auswerten. Bewusst eine eigene Query, damit die
+# Grids nicht bei jedem Aufruf Tags mitschleppen.
+query FindScenesSimilar($scene_filter: SceneFilterType, $filter: FindFilterType) {
+  findScenes(scene_filter: $scene_filter, filter: $filter) {
+    count
+    scenes {
+      ...SceneListFields
+      tags { id name }
+    }
+  }
+}

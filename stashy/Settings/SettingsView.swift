@@ -221,9 +221,9 @@ struct SettingsView: View {
             }
 
             Section {
-                stashyScrollingSectionHeader("Tag Suggestion", isBeta: true)
+                stashyScrollingSectionHeader("Suggestions", isBeta: true)
                 NavigationLink(destination: AITagsSettingsView()) {
-                    Label("Tag Suggestion", systemImage: "sparkles")
+                    Label("Suggestions", systemImage: "sparkles")
                 }
                 .stashyGroupedSettingsRow()
             }

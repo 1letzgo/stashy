@@ -2,8 +2,8 @@
 //  AITagsSettingsView.swift
 //  stashy
 //
-//  stashy+ hub for Tag Suggestion: kill switch, the statistics model, and how eagerly
-//  suggestions are made.
+//  stashy+ hub for Suggestions: one kill switch and one statistics model behind both tag
+//  suggestions and Similar Scenes.
 //
 
 #if !os(tvOS)
@@ -12,6 +12,7 @@ import SwiftUI
 
 struct AITagsSettingsView: View {
     @ObservedObject private var manager = AITagSuggestionManager.shared
+    @ObservedObject private var similar = SimilarScenesFinder.shared
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
 
@@ -23,20 +24,20 @@ struct AITagsSettingsView: View {
         List {
             if !isUnlocked {
                 Section {
-                    Label("Tag Suggestion requires stashy+", systemImage: "lock.fill")
+                    Label("Suggestions require stashy+", systemImage: "lock.fill")
                         .foregroundColor(.secondary)
                         .stashyGroupedSettingsRow()
                     stashyScrollingSectionFooter("Unlock stashy+ to use this feature.")
                 }
             }
 
-            enableSection
+            togglesSection
             modelSection
             tuningSection
         }
         .stashySettingsList()
         .applyAppBackground()
-        .stashySettingsDetailChrome("Tag Suggestion")
+        .stashySettingsDetailChrome("Suggestions")
         .task { await manager.loadIfNeeded() }
         .alert("Delete statistics?", isPresented: $showingDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -48,17 +49,29 @@ struct AITagsSettingsView: View {
 
     // MARK: - Sections
 
-    private var enableSection: some View {
+    private var togglesSection: some View {
         Section {
-            stashyScrollingSectionHeader("Tag Suggestion", isBeta: true)
+            stashyScrollingSectionHeader("Suggestions", isBeta: true)
+
             Toggle(isOn: enabledBinding) {
-                Label("Tag suggestions", systemImage: "sparkles")
+                Label("Tag suggestions", systemImage: "tag")
             }
             .tint(appearanceManager.tintColor)
             .disabled(!isUnlocked)
-            .stashyGroupedSettingsRow()
+            .stashyGroupedBlockRow(index: 0, count: 2)
 
-            stashyScrollingSectionFooter("Suggestions come from your own library only — nothing is analysed, nothing leaves the device. They appear in Feeds (Clips) and in the fullscreen image viewer; tap a suggested tag to add it. Tags an item already has are never suggested.")
+            Toggle(isOn: Binding(
+                get: { isUnlocked && similar.isEnabled },
+                set: { newValue in
+                    guard isUnlocked else { return }
+                    similar.isEnabled = newValue
+                }
+            )) {
+                Label("Similar scenes", systemImage: "square.stack.3d.up")
+            }
+            .tint(appearanceManager.tintColor)
+            .disabled(!isUnlocked)
+            .stashyGroupedBlockRow(index: 1, count: 2)
         }
     }
 
@@ -109,7 +122,6 @@ struct AITagsSettingsView: View {
             .disabled(!isBuilding && !manager.hasModel)
             .stashyGroupedBlockRow(index: 2, count: 3)
 
-            stashyScrollingSectionFooter("Counted once over the whole library, in three scopes — performer, gallery and studio — plus which tags occur together on the same item. After that, suggestions need no server request at all. Tagging inside the app updates the numbers as you go; rebuild after tagging a batch outside it. Each server keeps its own statistics on this device.")
         }
     }
 
@@ -119,12 +131,23 @@ struct AITagsSettingsView: View {
 
             Stepper(value: $manager.maxSuggestions, in: 1...20) {
                 HStack {
-                    Text("Suggestions per item")
+                    Text("Tags per item")
                     Spacer()
                     Text("\(manager.maxSuggestions)").foregroundColor(.secondary)
                 }
             }
-            .stashyGroupedBlockRow(index: 0, count: 2)
+            .disabled(!manager.isEnabled)
+            .stashyGroupedBlockRow(index: 0, count: 3)
+
+            Stepper(value: $similar.maxCount, in: 4...8) {
+                HStack {
+                    Text("Similar scenes")
+                    Spacer()
+                    Text("\(similar.maxCount)").foregroundColor(.secondary)
+                }
+            }
+            .disabled(!similar.isEnabled)
+            .stashyGroupedBlockRow(index: 1, count: 3)
 
             Button {
                 manager.resetDismissals()
@@ -138,11 +161,9 @@ struct AITagsSettingsView: View {
                 }
             }
             .disabled(manager.dismissedTagCount == 0)
-            .stashyGroupedBlockRow(index: 1, count: 2)
-
-            stashyScrollingSectionFooter("Always the strongest candidates the statistics have, as many as set here — fewer only when there are fewer. The percentage on a chip is the share of that performer's (or gallery's, or studio's) items carrying the tag. Long-press a suggestion and pick “Ignore Tag” to take it out of the suggestions; accepting it anywhere brings it back.")
+            .stashyGroupedBlockRow(index: 2, count: 3)
         }
-        .disabled(!isUnlocked || !manager.isEnabled)
+        .disabled(!isUnlocked)
     }
 
     // MARK: - Helpers
