@@ -562,10 +562,8 @@ struct SceneDetailMetadataCard: View {
                     Spacer(minLength: 4)
                 }
                 addMarkerButton
-                if aetherEngine == nil {
-                    Spacer(minLength: 4)
-                    setImageMenu
-                }
+                Spacer(minLength: 4)
+                setImageMenu
                 Spacer(minLength: 4)
                 qualityMenu
                 if let aether = aetherEngine,
@@ -662,17 +660,32 @@ struct SceneDetailMetadataCard: View {
         return CMTime(seconds: seconds, preferredTimescale: 600)
     }
 
+    /// One capture entry point for both "Set Image" actions. Uses the engine's own frame
+    /// extraction while the optional engine owns the scene, and the AVFoundation path
+    /// otherwise; both return the identical `data:image/jpeg;base64,…` string.
+    @MainActor
+    private func captureCurrentFrameDataURL() async -> String? {
+        if let aether = aetherEngine {
+            guard let image = await aether.captureFrame(at: aether.currentTime,
+                                                        maxSize: kCaptureFrameMaxSize) else {
+                return nil
+            }
+            return videoFrameDataURL(from: image)
+        }
+        return await captureVideoFrameDataURL(
+            from: player,
+            fallbackURL: activeScene.videoURL,
+            at: currentCaptureTime()
+        )
+    }
+
     private func captureTagImageFrameAndPresentSheet() {
         guard !isCapturingTagFrame, !isSettingSceneCover else { return }
         isCapturingTagFrame = true
         HapticManager.light()
 
         Task { @MainActor in
-            let dataURL = await captureVideoFrameDataURL(
-                from: player,
-                fallbackURL: activeScene.videoURL,
-                at: currentCaptureTime()
-            )
+            let dataURL = await captureCurrentFrameDataURL()
             isCapturingTagFrame = false
             guard let dataURL else {
                 ToastManager.shared.show(
@@ -692,11 +705,7 @@ struct SceneDetailMetadataCard: View {
         isSettingSceneCover = true
 
         Task { @MainActor in
-            let dataURL = await captureVideoFrameDataURL(
-                from: player,
-                fallbackURL: activeScene.videoURL,
-                at: currentCaptureTime()
-            )
+            let dataURL = await captureCurrentFrameDataURL()
             guard let dataURL else {
                 isSettingSceneCover = false
                 ToastManager.shared.show(

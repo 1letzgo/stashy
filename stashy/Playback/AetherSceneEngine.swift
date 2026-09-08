@@ -424,6 +424,30 @@ final class AetherSceneEngine: ObservableObject {
         return UIImage(cgImage: image)
     }
 
+    /// A full-quality still for "Set Image" (tag image / scene cover).
+    ///
+    /// `FrameExtractor.snapshot` is the only Aether API that returns the frame at native
+    /// resolution (capped to `maxSize`, aspect preserved, never upscaled) *and* decodes
+    /// forward to the requested pts. `scrubThumbnail` is deliberately the fallback: it is
+    /// keyframe-granular and its `maxWidth` is a thumbnail width, so it is only used when the
+    /// extractor cannot open a second connection (single-connection sources).
+    func captureFrame(at seconds: Double, maxSize: CGSize) async -> UIImage? {
+        let target = max(0, seconds)
+
+        if let extractor = scrubExtractorForCurrentURL(),
+           let image = await extractor.snapshot(at: target, maxSize: maxSize) {
+            return UIImage(cgImage: image)
+        }
+
+        if engine.supportsCacheBackedStills {
+            let width = Int(max(1, maxSize.width.rounded()))
+            if let image = await engine.scrubThumbnail(atSeconds: target, maxWidth: width) {
+                return UIImage(cgImage: image)
+            }
+        }
+        return nil
+    }
+
     /// Lazily builds (and reuses) the fallback extractor. Same auth as `load`: the signed URL
     /// plus the ApiKey header, so a server that only honours one of the two still works.
     private func scrubExtractorForCurrentURL() -> FrameExtractor? {

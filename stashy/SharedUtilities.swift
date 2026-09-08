@@ -633,6 +633,17 @@ func createMutedPreviewPlayer(for url: URL) -> AVPlayer {
 }
 
 #if !os(tvOS)
+/// Maximum still size the capture paths hand to Stash (aspect preserved, never upscaled).
+let kCaptureFrameMaxSize = CGSize(width: 1920, height: 1920)
+
+/// Encodes a captured still as the Stash-compatible `data:image/jpeg;base64,…` string.
+/// Single place both capture paths (AVFoundation and the optional engine) go through, so
+/// their output format stays identical.
+func videoFrameDataURL(from image: UIImage) -> String? {
+    guard let jpeg = image.jpegData(compressionQuality: 0.88) else { return nil }
+    return "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
+}
+
 /// Captures a still from the current player (or `fallbackURL`) as a Stash-compatible
 /// `data:image/jpeg;base64,…` string for `tagUpdate` / `performerUpdate` image fields.
 @MainActor
@@ -659,7 +670,7 @@ func captureVideoFrameDataURL(
 
     let generator = AVAssetImageGenerator(asset: asset)
     generator.appliesPreferredTrackTransform = true
-    generator.maximumSize = CGSize(width: 1920, height: 1920)
+    generator.maximumSize = kCaptureFrameMaxSize
     generator.requestedTimeToleranceBefore = CMTime(seconds: 0.05, preferredTimescale: 600)
     generator.requestedTimeToleranceAfter = CMTime(seconds: 0.35, preferredTimescale: 600)
 
@@ -672,9 +683,7 @@ func captureVideoFrameDataURL(
             var actual = CMTime.zero
             cgImage = try generator.copyCGImage(at: captureTime, actualTime: &actual)
         }
-        let uiImage = UIImage(cgImage: cgImage)
-        guard let jpeg = uiImage.jpegData(compressionQuality: 0.88) else { return nil }
-        return "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
+        return videoFrameDataURL(from: UIImage(cgImage: cgImage))
     } catch {
         print("🖼 Frame capture failed: \(error)")
         return nil
