@@ -411,8 +411,11 @@ final class AetherSceneEngine: ObservableObject {
         let width = Int(max(1, maxWidth.rounded()))
         let target = max(0, seconds)
 
-        if engine.supportsCacheBackedStills {
-            guard let image = await engine.scrubThumbnail(atSeconds: target, maxWidth: width) else { return nil }
+        // The cache-backed still only covers bytes the session already produced (around the
+        // playhead), so a nil there is the normal case when scrubbing far away: fall through
+        // to the extractor, which opens its own demuxer and can reach any position.
+        if engine.supportsCacheBackedStills,
+           let image = await engine.scrubThumbnail(atSeconds: target, maxWidth: width) {
             return UIImage(cgImage: image)
         }
 

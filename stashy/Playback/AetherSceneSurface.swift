@@ -33,7 +33,7 @@ struct AetherSceneSurface: View {
     /// written back — the previous frame stays up until a better one arrives.
     @State private var scrubPreviewImage: UIImage?
     @State private var scrubPreviewTask: Task<Void, Never>?
-    @State private var scrubPreviewRequestedAt: Date = .distantPast
+    @State private var scrubPreviewPendingSeconds: Double?
     #if DEBUG
     @State private var showsDebugStats = false
     #endif
@@ -516,25 +516,29 @@ struct AetherSceneSurface: View {
         .allowsHitTesting(false)
     }
 
-    /// Throttled to ~8 requests/s with only one decode in flight; a result that no longer
-    /// matches where the finger is by now is dropped, and a nil (still producing) keeps the
-    /// last good frame on screen.
+    /// One decode in flight at a time; while it runs, the newest finger position is parked
+    /// and requested as soon as the current one lands. Results are applied in order, so the
+    /// preview always converges on where the finger is. A nil keeps the last good frame.
     private func requestScrubPreview(at seconds: Double) {
-        let now = Date()
-        guard now.timeIntervalSince(scrubPreviewRequestedAt) >= 0.125 else { return }
-        scrubPreviewRequestedAt = now
-
-        scrubPreviewTask?.cancel()
+        if scrubPreviewTask != nil {
+            scrubPreviewPendingSeconds = seconds
+            return
+        }
+        scrubPreviewPendingSeconds = nil
         scrubPreviewTask = Task { @MainActor in
             let image = await engine.scrubThumbnail(at: seconds, maxWidth: 240)
-            guard !Task.isCancelled, let image else { return }
-            guard isScrubbing, abs(seconds - scrubSeconds) <= 0.5 else { return }
-            scrubPreviewImage = image
+            scrubPreviewTask = nil
+            guard isScrubbing else { return }
+            if let image { scrubPreviewImage = image }
+            if let next = scrubPreviewPendingSeconds {
+                scrubPreviewPendingSeconds = nil
+                requestScrubPreview(at: next)
+            }
         }
     }
 
     private func endScrubPreview() {
-        scrubPreviewTask?.cancel()
+        scrubPreviewPendingSeconds = nil
         scrubPreviewTask = nil
         scrubPreviewImage = nil
     }
