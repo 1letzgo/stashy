@@ -1235,8 +1235,8 @@ struct DownloadedGalleryFullScreenView: View {
     }
 }
 
-/// Offline counterpart to `GalleryItemView`: same player embedding (`FullScreenVideoPlayer` over
-/// `AVPlayerLayer`, not AVKit's `VideoPlayer`), same autoplay rule — only the active page plays.
+/// Offline counterpart to `GalleryItemView`: same engine embedding, same autoplay rule —
+/// only the active page plays. The source is a local file, so `load` skips the auth headers.
 struct DownloadedGalleryItemView: View {
     let image: DownloadedGalleryImage
     @Binding var currentVisibleId: String?
@@ -1248,12 +1248,8 @@ struct DownloadedGalleryItemView: View {
     let scrubberState: ScrubberState
 
     @ObservedObject private var downloadManager = DownloadManager.shared
-    @State private var player: AVPlayer?
-    @State private var timeObserver: Any?
-    /// The player the observer belongs to — removing it from another instance raises a fatal
-    /// AVFoundation exception.
-    @State private var timeObserverPlayer: AVPlayer?
-    @State private var endObserver: NSObjectProtocol?
+    /// One engine per page, reused across item changes.
+    @State private var engine: AetherSceneEngine?
 
     private var isActiveItem: Bool {
         image.id == (currentVisibleId ?? fallbackActiveId)
@@ -1282,22 +1278,25 @@ struct DownloadedGalleryItemView: View {
         .onChange(of: currentVisibleId) { _, _ in
             guard image.isVideo else { return }
             if isActiveItem {
-                if player == nil { setupPlayer() }
-                if isPlaying { player?.play() }
+                if engine == nil { setupPlayer() }
+                if isPlaying { engine?.play() }
             } else {
-                player?.pause()
+                engine?.pause()
             }
         }
         .onChange(of: isMuted) { _, muted in
-            player?.isMuted = muted
+            engine?.isMuted = muted
         }
         .onChange(of: isPlaying) { _, playing in
             guard isActiveItem else { return }
-            if playing { player?.play() } else { player?.pause() }
+            if playing { engine?.play() } else { engine?.pause() }
         }
         .onChange(of: scrubberState.seekTarget) { _, target in
-            guard isActiveItem, let target else { return }
-            player?.seek(to: CMTime(seconds: target, preferredTimescale: 600))
+            guard isActiveItem, let target, let engine else { return }
+            Task { @MainActor in
+                await engine.seek(to: target)
+                if self.isPlaying { engine.play() }
+            }
         }
     }
 
@@ -1306,8 +1305,8 @@ struct DownloadedGalleryItemView: View {
         if isAnimated, let data = try? Data(contentsOf: url) {
             AnimatedWebView(data: data, fillMode: false)
         } else if image.isVideo {
-            if let player {
-                FullScreenVideoPlayer(player: player, videoGravity: .resizeAspect)
+            if let engine {
+                AetherVideoSurface(engine: engine, videoGravity: .resizeAspect)
             } else {
                 Color.black
             }
@@ -1326,51 +1325,54 @@ struct DownloadedGalleryItemView: View {
     }
 
     private func setupPlayer() {
-        teardownPlayer()
-        let newPlayer = AVPlayer(url: url)
-        newPlayer.isMuted = isMuted
-        newPlayer.actionAtItemEnd = .none
-        player = newPlayer
-        if isActiveItem, isPlaying { newPlayer.play() }
+        let fileURL = url
+        let autoplay = isActiveItem && isPlaying
 
-        // Loop, matching the online viewer's continuous playback. The token is kept so the
-        // observer can actually be removed later — block observers ignore `removeObserver(self:)`.
-        endObserver = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: newPlayer.currentItem,
-            queue: .main
-        ) { [weak newPlayer] _ in
-            newPlayer?.seek(to: .zero)
-            newPlayer?.play()
+        if let existing = engine {
+            existing.isMuted = isMuted
+            bindEngineCallbacks(on: existing)
+            existing.prepareForItemReplacement()
+            Task { @MainActor in
+                await existing.load(url: fileURL, startAt: nil, autoplay: autoplay)
+            }
+            return
         }
 
-        timeObserverPlayer = newPlayer
-        timeObserver = newPlayer.addPeriodicTimeObserver(
-            forInterval: CMTime(seconds: 0.1, preferredTimescale: 600),
-            queue: .main
-        ) { [weak newPlayer] time in
-            guard let newPlayer, isActiveItem else { return }
-            if !scrubberState.seeking {
-                scrubberState.time = time.seconds
+        guard let created = try? AetherSceneEngine() else {
+            AppLog.error("DownloadedGalleryItemView: playback engine could not be created")
+            return
+        }
+        created.isMuted = isMuted
+        created.audioSessionPolicy = .playback
+        created.setVideoGravity(.resizeAspect)
+        bindEngineCallbacks(on: created)
+        engine = created
+        Task { @MainActor in
+            await created.load(url: fileURL, startAt: nil, autoplay: autoplay)
+        }
+    }
+
+    /// Time into the scrubber; the loop is the engine's own, matching the online viewer.
+    private func bindEngineCallbacks(on engine: AetherSceneEngine) {
+        engine.loopsAtEnd = true
+        let scrubber = scrubberState
+        engine.onTime = { time, duration in
+            guard self.isActiveItem else { return }
+            if !scrubber.seeking {
+                scrubber.time = time
             }
-            if let duration = newPlayer.currentItem?.duration.seconds, duration > 0, !duration.isNaN {
-                scrubberState.duration = duration
+            if duration > 0, !duration.isNaN {
+                scrubber.duration = duration
             }
         }
     }
 
+    /// `@State` release is not deterministic — the engine has to be stopped by hand.
     private func teardownPlayer() {
-        if let timeObserver {
-            timeObserverPlayer?.removeTimeObserver(timeObserver)
-        }
-        timeObserver = nil
-        timeObserverPlayer = nil
-        if let endObserver {
-            NotificationCenter.default.removeObserver(endObserver)
-        }
-        endObserver = nil
-        player?.pause()
-        player = nil
+        guard let engine else { return }
+        engine.onTime = nil
+        engine.stop()
+        self.engine = nil
     }
 }
 

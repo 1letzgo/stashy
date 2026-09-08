@@ -620,6 +620,12 @@ final class AetherSceneEngine: ObservableObject {
         engine.videoGravity = gravity
     }
 
+    /// Tells the engine a different item is coming, so the next `load` reuses the session
+    /// instead of tearing the whole route down (paging between gallery items).
+    func prepareForItemReplacement() {
+        engine.prepareForItemReplacement()
+    }
+
     func setPictureInPictureActive(_ active: Bool) {
         engine.pictureInPictureActive = active
     }

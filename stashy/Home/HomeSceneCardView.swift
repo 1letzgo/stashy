@@ -1,7 +1,6 @@
 
 #if !os(tvOS)
 import SwiftUI
-import AVKit
 
 struct HomeSceneCardView: View {
     let scene: Scene
@@ -9,7 +8,7 @@ struct HomeSceneCardView: View {
     let screenWidth: CGFloat
     @ObservedObject var appearanceManager = AppearanceManager.shared
 
-    @State private var previewPlayer: AVPlayer?
+    @StateObject private var previewPlayer = AetherPreviewPlayer()
     @State private var isPreviewing = false
 
     private var cardWidth: CGFloat {
@@ -40,8 +39,8 @@ struct HomeSceneCardView: View {
                     Image(systemName: "film").foregroundColor(.secondary)
                 }
 
-                if isPreviewing, let player = previewPlayer {
-                    AspectFillVideoPlayer(player: player)
+                if isPreviewing {
+                    AetherPreviewSurface(player: previewPlayer, fill: true)
                         .frame(width: cardWidth, height: cardHeight)
                         .clipped()
                         .allowsHitTesting(false)
@@ -119,15 +118,13 @@ struct HomeSceneCardView: View {
 
     private func startPreview() {
         guard let url = scene.previewURL else { return }
-        if previewPlayer == nil { previewPlayer = createMutedPreviewPlayer(for: url) }
+        previewPlayer.start(url: url)
         withAnimation(.easeIn(duration: 0.2)) { isPreviewing = true }
-        previewPlayer?.play()
     }
 
     private func stopPreview() {
         withAnimation(.easeOut(duration: 0.2)) { isPreviewing = false }
-        previewPlayer?.pause()
-        previewPlayer?.seek(to: .zero)
+        previewPlayer.stop(release: true)
     }
 
     private func formatDuration(_ seconds: Double) -> String {

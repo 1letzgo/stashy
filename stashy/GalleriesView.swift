@@ -925,10 +925,8 @@ struct GalleryItemView: View {
     @AppStorage("images_fullscreen_continuous") private var continuousPlay = false
     @AppStorage("images_fullscreen_continuous_duration") private var continuousDurationSeconds = 3
 
-    // Playback State
-    @State private var player: AVPlayer?
-    @State private var timeObserver: Any?
-    @State private var endObserver: NSObjectProtocol?
+    // Playback State — one engine per page, reused across item changes.
+    @State private var engine: AetherSceneEngine?
     @State private var animationAdvanceTimer: Timer?
 
     private var isActiveItem: Bool {
@@ -995,9 +993,9 @@ struct GalleryItemView: View {
                     withAnimation(.easeInOut(duration: 0.4)) { showUI.toggle() }
                     if showUI { onInteraction() }
                 }) {
-                    if let player = player {
-                        FullScreenVideoPlayer(
-                            player: player,
+                    if let engine {
+                        AetherVideoSurface(
+                            engine: engine,
                             videoGravity: shouldFill ? .resizeAspectFill : .resizeAspect,
                             bottomContentInset: bottomInset
                         )
@@ -1062,7 +1060,7 @@ struct GalleryItemView: View {
             if !isAnimatedImage && image.isVideo && !isPlaying && showUI {
                 CenterPlayButton {
                     isPlaying = true
-                    player?.play()
+                    engine?.play()
                     onInteraction()
                 }
             }
@@ -1080,20 +1078,12 @@ struct GalleryItemView: View {
         }
         .onDisappear {
             cancelAnimationAdvanceTimer()
-            player?.pause()
-            if let timeObserver = timeObserver {
-                player?.removeTimeObserver(timeObserver)
-                self.timeObserver = nil
-            }
-            if let endObserver {
-                NotificationCenter.default.removeObserver(endObserver)
-                self.endObserver = nil
-            }
+            teardownPlayer()
         }
         .onChange(of: isMuted) { _, newValue in
             // Persisting happens in the mute button, not here — this also fires for programmatic
-            // writes, which is how AVKit's resets used to reach the stored choice.
-            player?.isMuted = newValue
+            // writes, which is how the stored choice reaches the engine.
+            engine?.isMuted = newValue
             if newValue {
                 applyAmbientMixingAudioSession()
             } else {
@@ -1106,12 +1096,14 @@ struct GalleryItemView: View {
         .onChange(of: isPlaying) { _, playing in
             guard isActiveItem else { return }
             if playing {
-                player?.play()
+                engine?.play()
             } else {
-                player?.pause()
+                engine?.pause()
             }
         }
         .onChange(of: continuousPlay) { _, enabled in
+            // Looping is the engine's job unless continuous play takes over at the end.
+            engine?.loopsAtEnd = !enabled
             guard isActiveItem, !image.isVideo else { return }
             if enabled {
                 startStillAdvanceTimer()
@@ -1124,7 +1116,7 @@ struct GalleryItemView: View {
             startStillAdvanceTimer()
         }
         .onReceive(scrubberState.$seekTarget) { target in
-            guard let t = target, isActiveItem, player != nil else { return }
+            guard let t = target, isActiveItem, engine != nil else { return }
             seek(to: t)
             DispatchQueue.main.async {
                 if scrubberState.seekTarget != nil {
@@ -1135,9 +1127,9 @@ struct GalleryItemView: View {
         .onReceive(scrubberState.$seeking) { seeking in
             guard isActiveItem else { return }
             if seeking {
-                player?.pause()
+                engine?.pause()
             } else if isPlaying {
-                player?.play()
+                engine?.play()
                 onInteraction()
             }
         }
@@ -1147,21 +1139,21 @@ struct GalleryItemView: View {
 
     private func applyActivePlaybackState() {
         guard isActiveItem else {
-            player?.pause()
+            engine?.pause()
             cancelAnimationAdvanceTimer()
             return
         }
         if image.isVideo {
             // A row can become active without a fresh `onAppear` — e.g. when the image above it
-            // is deleted and this one slides into the active slot. Without this the player stays
+            // is deleted and this one slides into the active slot. Without this the engine stays
             // nil and `mediaLayer` falls back to the still thumbnail.
-            if player == nil { setupPlayer() }
+            if engine == nil { setupPlayer() }
             // Seed duration from metadata so the bar isn't stuck at 0/1 before the first tick.
             if let metaDuration = image.visual_files?.first?.duration, metaDuration > 0 {
                 scrubberState.duration = metaDuration
             }
-            if isPlaying { player?.play() }
-            else { player?.pause() }
+            if isPlaying { engine?.play() }
+            else { engine?.pause() }
         } else {
             scrubberState.time = 0
             scrubberState.duration = 1
@@ -1181,8 +1173,12 @@ struct GalleryItemView: View {
             onAdvanceToNext()
             return
         }
-        player?.seek(to: .zero)
-        player?.play()
+        if let engine {
+            Task { @MainActor in
+                await engine.seek(to: 0)
+                engine.play()
+            }
+        }
         isPlaying = true
     }
 
@@ -1208,59 +1204,61 @@ struct GalleryItemView: View {
         animationAdvanceTimer = nil
     }
 
+    /// Loads `streamURL` into this page's engine, building it on first use. A later page
+    /// reuses the same engine — `prepareForItemReplacement` keeps the route alive across
+    /// the swap instead of tearing it down and back up.
     private func initPlayer(with streamURL: URL) {
-        let headers = ["ApiKey": ServerConfigManager.shared.activeConfig?.secureApiKey ?? ""]
-        let authenticatedURL = signedURL(streamURL) ?? streamURL
-        let asset = AVURLAsset(url: authenticatedURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
-        let newItem = AVPlayerItem(asset: asset)
-        let scrubber = scrubberState
         let itemId = image.id
+        let autoplay = isActiveItem && isPlaying
 
-        if let existingPlayer = self.player {
-            // Reuse existing player to prevent FullScreenVideoPlayer re-renders
-            if let observer = timeObserver {
-                existingPlayer.removeTimeObserver(observer)
-                self.timeObserver = nil
+        if let existing = engine {
+            existing.isMuted = isMuted
+            bindEngineCallbacks(on: existing, itemId: itemId)
+            existing.prepareForItemReplacement()
+            Task { @MainActor in
+                await existing.load(url: streamURL, startAt: nil, autoplay: autoplay)
             }
-            if let endObserver {
-                NotificationCenter.default.removeObserver(endObserver)
-                self.endObserver = nil
-            }
-            existingPlayer.replaceCurrentItem(with: newItem)
-        } else {
-            self.player = createPlayer(for: streamURL, takesAudioSession: !isMuted, muted: isMuted)
+            return
         }
 
-        guard let player = self.player else { return }
+        guard let created = try? AetherSceneEngine() else {
+            AppLog.error("GalleryItemView: playback engine could not be created")
+            return
+        }
 
-        player.isMuted = isMuted
-        if isActiveItem, isPlaying { player.play() }
+        created.isMuted = isMuted
+        created.audioSessionPolicy = .playback
+        created.setVideoGravity(shouldFill ? .resizeAspectFill : .resizeAspect)
+        bindEngineCallbacks(on: created, itemId: itemId)
+        engine = created
 
         if let metaDuration = image.visual_files?.first?.duration, metaDuration > 0, isActiveItem {
-            scrubber.duration = metaDuration
+            scrubberState.duration = metaDuration
         }
 
-        endObserver = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: player.currentItem,
-            queue: .main
-        ) { _ in
+        Task { @MainActor in
+            await created.load(url: streamURL, startAt: nil, autoplay: autoplay)
+        }
+    }
+
+    /// Time into the scrubber, end-of-item into the continuous-play handler. Both check the
+    /// live visible id so a background page never writes the active page's state.
+    private func bindEngineCallbacks(on engine: AetherSceneEngine, itemId: String) {
+        // Loop in the engine unless continuous play wants the end event.
+        engine.loopsAtEnd = !continuousPlay
+        let scrubber = scrubberState
+        engine.onTime = { time, duration in
+            guard itemId == (self.currentVisibleId ?? self.fallbackActiveId) else { return }
+            if !scrubber.seeking {
+                scrubber.time = time
+            }
+            if duration > 0, !duration.isNaN {
+                scrubber.duration = duration
+            }
+        }
+        engine.onReachedEnd = {
             guard itemId == (self.currentVisibleId ?? self.fallbackActiveId) else { return }
             self.handlePlaybackEnded()
-        }
-
-        // Time observer — read visible id via Binding so paging updates stay live (Feeds pattern).
-        let interval = CMTime(seconds: 0.1, preferredTimescale: 600)
-        timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak player] time in
-            guard let player = player else { return }
-            let activeId = self.currentVisibleId ?? self.fallbackActiveId
-            guard itemId == activeId else { return }
-            if !scrubber.seeking {
-                scrubber.time = time.seconds
-            }
-            if let d = player.currentItem?.duration.seconds, d > 0, !d.isNaN {
-                scrubber.duration = d
-            }
         }
     }
 
@@ -1269,9 +1267,21 @@ struct GalleryItemView: View {
         initPlayer(with: url)
     }
 
+    /// `@State` release is not deterministic — the engine has to be stopped by hand.
+    private func teardownPlayer() {
+        guard let engine else { return }
+        engine.onTime = nil
+        engine.onReachedEnd = nil
+        engine.stop()
+        self.engine = nil
+    }
+
     private func seek(to time: Double) {
-        let cmTime = CMTime(seconds: time, preferredTimescale: 600)
-        player?.seek(to: cmTime)
+        guard let engine else { return }
+        Task { @MainActor in
+            await engine.seek(to: time)
+            if self.isActiveItem, self.isPlaying { engine.play() }
+        }
         if isActiveItem {
             scrubberState.time = time
         }

@@ -8,8 +8,6 @@
 #if !os(tvOS)
 import SwiftUI
 
-import AVKit
-
 // Card-based view for grid layout
 struct SceneCardView: View {
     let scene: Scene
@@ -17,7 +15,7 @@ struct SceneCardView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     
     // Preview Video State
-    @State private var player: AVPlayer?
+    @StateObject private var previewPlayer = AetherPreviewPlayer()
     @State private var isPreviewing = false
     @State private var isPressing = false
     
@@ -53,8 +51,8 @@ struct SceneCardView: View {
                     }
                     
                     // Video Preview Overlay
-                    if isPreviewing, let player = player {
-                        AspectFillVideoPlayer(player: player)
+                    if isPreviewing {
+                        AetherPreviewSurface(player: previewPlayer, fill: true)
                             .frame(width: geometry.size.width, height: geometry.size.height)
                             .clipped() // Ensures video respects the card bounds
                             .allowsHitTesting(false) // Pass touches through
@@ -199,23 +197,18 @@ struct SceneCardView: View {
     private func startPreview() {
         guard let previewURL = scene.previewURL else { return }
         
-        if player == nil {
-            player = createMutedPreviewPlayer(for: previewURL)
-        }
-        
+        previewPlayer.start(url: previewURL)
+
         withAnimation(.easeIn(duration: 0.2)) {
             isPreviewing = true
         }
-        player?.play()
     }
     
     private func stopPreview() {
         withAnimation(.easeOut(duration: 0.2)) {
             isPreviewing = false
         }
-        player?.pause()
-        // Optional: Seek to start or keep position? Usually previews loop or reset.
-        player?.seek(to: .zero)
+        previewPlayer.stop(release: true)
     }
     
     // Helper to format duration
@@ -232,16 +225,6 @@ struct SceneCardView: View {
         } else {
             return String(format: "%d:%02d", minutes, seconds)
         }
-    }
-}
-
-/// Inline card preview via `AVPlayerLayer`.
-/// `AVPlayerViewController` steals status-bar visibility when it attaches — avoid it in grids/home.
-struct AspectFillVideoPlayer: View {
-    let player: AVPlayer
-
-    var body: some View {
-        FullScreenVideoPlayer(player: player, videoGravity: .resizeAspectFill)
     }
 }
 #endif

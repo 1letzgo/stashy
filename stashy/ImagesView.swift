@@ -1607,17 +1607,17 @@ struct ImageThumbnailCard: View {
     /// Publish this card's global frame for feed-level "most centered video" selection.
     var reportsFeedVideoFrame: Bool = false
     @ObservedObject var appearanceManager = AppearanceManager.shared
-    @State private var previewPlayer: AVPlayer?
+    @StateObject private var previewPlayer = AetherPreviewPlayer()
     @State private var isPreviewing = false
     @State private var autoplayTask: Task<Void, Never>?
-    @State private var loopObserver: NSObjectProtocol?
 
     /// 1/row Feeds/Images crops from the top; multi-column grids stay centered.
     private var mediaFillAlignment: Alignment {
         showsOverlayChrome ? .center : .top
     }
 
-    /// Original media URL — Stash `paths.preview` is often a still/webp and blacks out in AVPlayer.
+    /// Original media URL — Stash `paths.preview` is often a still/webp, and the engine plays
+    /// the original clip container (mkv/webm included) directly.
     private var videoPlaybackURL: URL? {
         guard image.isVideo else { return nil }
         return image.imageURL
@@ -1650,8 +1650,12 @@ struct ImageThumbnailCard: View {
                         }
                     }
 
-                    if isPreviewing, let previewPlayer {
-                        AspectFillVideoPlayer(player: previewPlayer)
+                    if isPreviewing {
+                        AetherPreviewSurface(
+                            player: previewPlayer,
+                            fill: true,
+                            alignment: mediaFillAlignment
+                        )
                             .frame(
                                 width: geometry.size.width,
                                 height: geometry.size.height,
@@ -1779,25 +1783,11 @@ struct ImageThumbnailCard: View {
 
     private func startVideoPreview() {
         guard let url = videoPlaybackURL else { return }
-        if previewPlayer == nil {
-            let player = createMutedPreviewPlayer(for: url)
-            previewPlayer = player
-            if let observer = loopObserver {
-                NotificationCenter.default.removeObserver(observer)
-            }
-            loopObserver = NotificationCenter.default.addObserver(
-                forName: .AVPlayerItemDidPlayToEndTime,
-                object: player.currentItem,
-                queue: .main
-            ) { [weak player] _ in
-                player?.seek(to: .zero)
-                player?.play()
-            }
-        }
+        // The preview player loops on its own (`loopsAtEnd`).
+        previewPlayer.start(url: url)
         withAnimation(.easeIn(duration: 0.2)) {
             isPreviewing = true
         }
-        previewPlayer?.play()
     }
 
     private func stopVideoPreview(releasePlayer: Bool) {
@@ -1805,15 +1795,7 @@ struct ImageThumbnailCard: View {
         autoplayTask = nil
         // No animation — scroll-driven stops must not animate layout.
         isPreviewing = false
-        previewPlayer?.pause()
-        previewPlayer?.seek(to: .zero)
-        if releasePlayer {
-            if let observer = loopObserver {
-                NotificationCenter.default.removeObserver(observer)
-                loopObserver = nil
-            }
-            previewPlayer = nil
-        }
+        previewPlayer.stop(release: releasePlayer)
     }
 }
 

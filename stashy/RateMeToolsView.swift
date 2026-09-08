@@ -598,30 +598,12 @@ private extension String {
 
 // MARK: - Media
 
-/// Video preview that fits inside the media box (never wider/taller than the card slot).
-private struct RateMeAspectFitVideoPlayer: UIViewControllerRepresentable {
-    let player: AVPlayer
-
-    func makeUIViewController(context: Context) -> AVPlayerViewController {
-        let controller = AVPlayerViewController()
-        controller.player = player
-        controller.showsPlaybackControls = false
-        controller.videoGravity = .resizeAspect
-        return controller
-    }
-
-    func updateUIViewController(_ uiViewController: AVPlayerViewController, context: Context) {
-        uiViewController.player = player
-    }
-}
-
 private struct RateMeMediaView: View {
     let item: RateMeViewModel.Item
 
-    @State private var player: AVPlayer?
+    @StateObject private var previewPlayer = AetherPreviewPlayer()
     @State private var isPreviewing = false
     @State private var autoplayTask: Task<Void, Never>?
-    @State private var loopObserver: NSObjectProtocol?
 
     private var aspect: CGFloat {
         item.aspectRatio ?? (item.mode == .scenes ? (16.0 / 9.0) : 1)
@@ -648,8 +630,9 @@ private struct RateMeMediaView: View {
                 placeholderIcon
             }
 
-            if isPreviewing, let player {
-                RateMeAspectFitVideoPlayer(player: player)
+            if isPreviewing {
+                // Fit: the media box already carries the item's aspect ratio.
+                AetherPreviewSurface(player: previewPlayer, fill: false)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .allowsHitTesting(false)
                     .transition(.opacity)
@@ -699,40 +682,18 @@ private struct RateMeMediaView: View {
 
     private func startPreview() {
         guard let url = item.playbackURL else { return }
-        if player == nil {
-            let newPlayer = createMutedPreviewPlayer(for: url)
-            player = newPlayer
-            if let observer = loopObserver {
-                NotificationCenter.default.removeObserver(observer)
-            }
-            loopObserver = NotificationCenter.default.addObserver(
-                forName: .AVPlayerItemDidPlayToEndTime,
-                object: newPlayer.currentItem,
-                queue: .main
-            ) { [weak newPlayer] _ in
-                newPlayer?.seek(to: .zero)
-                newPlayer?.play()
-            }
-        }
+        // The preview player loops on its own (`loopsAtEnd`).
+        previewPlayer.start(url: url)
         withAnimation(.easeIn(duration: 0.2)) {
             isPreviewing = true
         }
-        player?.play()
     }
 
     private func stopPreview(releasePlayer: Bool) {
         autoplayTask?.cancel()
         autoplayTask = nil
         isPreviewing = false
-        player?.pause()
-        player?.seek(to: .zero)
-        if releasePlayer {
-            if let observer = loopObserver {
-                NotificationCenter.default.removeObserver(observer)
-                loopObserver = nil
-            }
-            player = nil
-        }
+        previewPlayer.stop(release: releasePlayer)
     }
 }
 
