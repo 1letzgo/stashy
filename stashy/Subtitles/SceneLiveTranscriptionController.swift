@@ -4,6 +4,9 @@ import Combine
 import Foundation
 import Speech
 import SwiftUI
+#if canImport(AetherEngine)
+import AetherEngine
+#endif
 
 enum SceneLiveTranscriptionError: LocalizedError {
     case noActivePlayback
@@ -115,6 +118,12 @@ final class SceneLiveTranscriptionController: ObservableObject {
     var translationRequestHandler: ((UUID, String) -> Void)?
 
     private weak var player: AVPlayer?
+    #if canImport(AetherEngine)
+    /// Set instead of `player` while the optional playback engine drives the scene. Audio then
+    /// comes from the engine's shared PCM tap and time from its clock.
+    private weak var aetherEngine: AetherSceneEngine?
+    private var aetherClockCancellable: AnyCancellable?
+    #endif
     private var sceneLanguageTag: String?
     private var sceneID: String?
     private var sceneDuration: Double?
@@ -194,6 +203,102 @@ final class SceneLiveTranscriptionController: ObservableObject {
         return Double(idx) + progress
     }
 
+    // MARK: - Playback source
+
+    /// True while something is loaded that captions can ride on.
+    private var hasActivePlayback: Bool {
+        #if canImport(AetherEngine)
+        if aetherEngine?.currentURL != nil { return true }
+        #endif
+        return player?.currentItem != nil
+    }
+
+    /// The clock captions are timed against. Under the engine this is `clock.sourceTime`, the same
+    /// axis the audio tap stamps its buffers with — never the presentation time.
+    private func playbackSeconds() -> Double? {
+        #if canImport(AetherEngine)
+        if let aetherEngine {
+            let seconds = aetherEngine.engine.clock.sourceTime
+            return seconds.isFinite ? max(0, seconds) : nil
+        }
+        #endif
+        guard let seconds = player?.currentTime().seconds, seconds.isFinite else { return nil }
+        return seconds
+    }
+
+    private var isPlaybackMoving: Bool {
+        #if canImport(AetherEngine)
+        if let aetherEngine { return aetherEngine.isPlaying }
+        #endif
+        return player?.timeControlStatus == .playing
+    }
+
+    /// True while audio has to come from the engine's shared PCM tap.
+    private var usesEngineAudio: Bool {
+        #if canImport(AetherEngine)
+        return aetherEngine != nil
+        #else
+        return false
+        #endif
+    }
+
+    #if canImport(AetherEngine)
+    /// Engine counterpart of `start(mode:player:…)`. The lookahead tiers (`AVAssetReader` on the
+    /// original, Stash transcode prefetch) are player-independent and stay in place; only the
+    /// realtime tier and the caption clock change.
+    func start(
+        mode: SceneTeleprompterMode,
+        aether: AetherSceneEngine,
+        sceneID: String?,
+        sceneDuration: Double? = nil,
+        sceneLanguage: String?,
+        streamURL: URL? = nil,
+        extraCandidateURLs: [URL] = []
+    ) {
+        self.mode = mode
+        guard mode != .off else {
+            Task { await disable() }
+            return
+        }
+        guard let sceneLanguage, !sceneLanguage.isEmpty else {
+            errorMessage = SceneLiveTranscriptionError.missingSceneLanguage.localizedDescription
+            return
+        }
+        guard #available(iOS 26.0, *) else {
+            errorMessage = SceneLiveTranscriptionError.requiresNewerOS.localizedDescription
+            isTeleprompterModeActive = false
+            return
+        }
+        guard aether.currentURL != nil else {
+            errorMessage = SceneLiveTranscriptionError.noActivePlayback.localizedDescription
+            return
+        }
+
+        enableTask?.cancel()
+        enableTask = Task { [weak self] in
+            guard let self else { return }
+            await self.tearDownForRestart()
+            guard !Task.isCancelled else { return }
+
+            self.player = nil
+            self.aetherEngine = aether
+            self.sceneLanguageTag = sceneLanguage
+            self.sceneID = sceneID
+            self.sceneDuration = sceneDuration
+            self.candidateURLs = Self.buildCandidateURLs(
+                fallback: aether.currentURL,
+                primary: streamURL,
+                extras: extraCandidateURLs
+            )
+            self.mode = mode
+            self.errorMessage = nil
+            self.isTeleprompterModeActive = true
+            self.attachSubtitleClock(aether: aether)
+            await self.runEnableSession()
+        }
+    }
+    #endif
+
     func start(
         mode: SceneTeleprompterMode,
         player: AVPlayer,
@@ -231,11 +336,14 @@ final class SceneLiveTranscriptionController: ObservableObject {
             guard !Task.isCancelled else { return }
 
             self.player = player
+            #if canImport(AetherEngine)
+            self.aetherEngine = nil
+            #endif
             self.sceneLanguageTag = sceneLanguage
             self.sceneID = sceneID
             self.sceneDuration = sceneDuration
             self.candidateURLs = Self.buildCandidateURLs(
-                player: player,
+                fallback: (player.currentItem?.asset as? AVURLAsset)?.url,
                 primary: streamURL,
                 extras: extraCandidateURLs
             )
@@ -327,8 +435,14 @@ final class SceneLiveTranscriptionController: ObservableObject {
     }
 
     func rebindStreamURL(_ url: URL?, extraCandidateURLs: [URL] = []) {
-        if let player {
-            candidateURLs = Self.buildCandidateURLs(player: player, primary: url, extras: extraCandidateURLs)
+        var fallback: URL?
+        #if canImport(AetherEngine)
+        fallback = aetherEngine?.currentURL
+        #endif
+        if fallback == nil { fallback = (player?.currentItem?.asset as? AVURLAsset)?.url }
+        let rebuilt = Self.buildCandidateURLs(fallback: fallback, primary: url, extras: extraCandidateURLs)
+        if !rebuilt.isEmpty {
+            candidateURLs = rebuilt
         } else if let url {
             candidateURLs = [url]
         }
@@ -341,7 +455,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
         }
     }
 
-    private static func buildCandidateURLs(player: AVPlayer, primary: URL?, extras: [URL]) -> [URL] {
+    private static func buildCandidateURLs(fallback: URL?, primary: URL?, extras: [URL]) -> [URL] {
         var ordered: [URL] = []
         var seen = Set<String>()
         func append(_ url: URL?) {
@@ -350,13 +464,28 @@ final class SceneLiveTranscriptionController: ObservableObject {
             guard seen.insert(key).inserted else { return }
             ordered.append(url)
         }
-        let pooled = extras + [primary].compactMap { $0 } + [(player.currentItem?.asset as? AVURLAsset)?.url].compactMap { $0 }
+        let pooled = extras + [primary].compactMap { $0 } + [fallback].compactMap { $0 }
         let progressive = pooled.filter { !$0.path.lowercased().contains(".m3u8") }
         let hls = pooled.filter { $0.path.lowercased().contains(".m3u8") }
         progressive.forEach { append($0) }
         hls.forEach { append($0) }
         return ordered
     }
+
+    #if canImport(AetherEngine)
+    /// The engine has no periodic time observer; its ~10 Hz clock publisher is the equivalent.
+    /// `sourceTime` (not `currentTime`) is the axis both the cues and the tap timestamps live on.
+    private func attachSubtitleClock(aether: AetherSceneEngine) {
+        detachSubtitleClock()
+        aetherClockCancellable = aether.engine.clock.$sourceTime
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] seconds in
+                guard let self, seconds.isFinite else { return }
+                self.handlePlayheadTick(at: max(0, seconds))
+            }
+    }
+    #endif
 
     private func attachSubtitleClock(player: AVPlayer) {
         detachSubtitleClock()
@@ -443,6 +572,10 @@ final class SceneLiveTranscriptionController: ObservableObject {
             player.removeTimeObserver(token)
         }
         subtitleTimeObserver = nil
+        #if canImport(AetherEngine)
+        aetherClockCancellable?.cancel()
+        aetherClockCancellable = nil
+        #endif
     }
 
     private func refreshSubtitleText(at time: Double) {
@@ -481,7 +614,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
         subtitleCues[index].translated = clipCaption(trimmed)
         // Display-only: a full `refreshSubtitleText` can flush pending words and re-enter
         // translation while `flushPendingSentence` is still on the stack (cache hits are sync).
-        if let seconds = player?.currentTime().seconds, seconds.isFinite {
+        if let seconds = playbackSeconds() {
             updateDisplayedSubtitle(at: seconds)
         }
     }
@@ -501,7 +634,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
     }
 
     private func noteRecognitionLag(speechStart: Double) {
-        guard let now = player?.currentTime().seconds, now.isFinite else { return }
+        guard let now = playbackSeconds() else { return }
         let lag = now - speechStart
         guard lag > 0.25 else { return }
         let target = min(Self.maxDisplayLeadSeconds, lag + 0.35)
@@ -521,7 +654,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
 
         let readingHold = max(1.6, Double(text.count) * 0.05)
         var end = max(last.globalEnd + 0.55, first.globalStart + readingHold)
-        if let now = player?.currentTime().seconds, now.isFinite {
+        if let now = playbackSeconds() {
             end = max(end, now + 1.0)
         }
 
@@ -530,7 +663,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
             end: end,
             text: clipCaption(text)
         )
-        if let seconds = player?.currentTime().seconds, seconds.isFinite {
+        if let seconds = playbackSeconds() {
             refreshSubtitleText(at: seconds)
         }
     }
@@ -587,7 +720,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
         let start = first.globalStart
         let readingHold = max(1.6, Double(text.count) * 0.05)
         var end = max(last.globalEnd + 0.55, start + readingHold)
-        if let now = player?.currentTime().seconds, now.isFinite {
+        if let now = playbackSeconds() {
             end = max(end, now + readingHold)
         }
 
@@ -615,7 +748,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
         // synchronously and must not see the same pending sentence still sitting here.
         translationRequestHandler?(cue.id, clipped)
 
-        if let seconds = player?.currentTime().seconds, seconds.isFinite {
+        if let seconds = playbackSeconds() {
             updateDisplayedSubtitle(at: seconds)
         }
     }
@@ -637,6 +770,9 @@ final class SceneLiveTranscriptionController: ObservableObject {
         generation &+= 1
         await stopSession()
         detachSubtitleClock()
+        #if canImport(AetherEngine)
+        aetherEngine = nil
+        #endif
         isTeleprompterModeActive = false
         isPreparing = false
         isTeleprompterReady = false
@@ -726,7 +862,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
     private func startSessionIOS26(generation: UInt) async throws {
         guard sessionIsCurrent(generation) else { return }
         try await ensureSpeechRecognitionAuthorized()
-        guard sessionIsCurrent(generation), let player else {
+        guard sessionIsCurrent(generation), hasActivePlayback else {
             throw SceneLiveTranscriptionError.noActivePlayback
         }
 
@@ -763,15 +899,16 @@ final class SceneLiveTranscriptionController: ObservableObject {
         guard sessionIsCurrent(generation) else { return }
         guard sessionIsCurrent(generation) else { return }
 
-        let playback = max(0, player.currentTime().seconds)
+        let playback = max(0, playbackSeconds() ?? 0)
         let localStart = max(0, playback - Self.preRollSeconds)
 
         let source = await resolveFeedSource(startSeconds: localStart)
         usesLookaheadFeed = source.isLookahead
         onLookaheadModeChanged?(usesLookaheadFeed)
 
-        if case .playerTap = source {
-            guard let item = player.currentItem else {
+        switch source {
+        case .playerTap:
+            guard let item = player?.currentItem else {
                 throw SceneLiveTranscriptionError.noActivePlayback
             }
             if StashVideoSyncManager.shared.currentItem !== item {
@@ -781,6 +918,20 @@ final class SceneLiveTranscriptionController: ObservableObject {
             guard tapReady else {
                 throw SceneLiveTranscriptionError.audioSourceUnavailable
             }
+        case .engineTap:
+            #if canImport(AetherEngine)
+            guard let aetherEngine else {
+                throw SceneLiveTranscriptionError.noActivePlayback
+            }
+            // One tap per engine session: this joins the stream AI Motion may already be
+            // consuming instead of installing a second one.
+            let tapReady = await waitForEngineAudioTap(engine: aetherEngine, timeoutSeconds: 8)
+            guard tapReady else {
+                throw SceneLiveTranscriptionError.audioSourceUnavailable
+            }
+            #endif
+        default:
+            break
         }
 
         let box = SpeechSessionBox()
@@ -851,6 +1002,18 @@ final class SceneLiveTranscriptionController: ObservableObject {
                     generation: generation
                 )
             }
+        case .engineTap:
+            #if canImport(AetherEngine)
+            feedTask = Task { [weak self] in
+                await self?.engineTapFeedLoop(
+                    targetFormat: format,
+                    input: continuation,
+                    generation: generation
+                )
+            }
+            #else
+            input.finish()
+            #endif
         }
     }
 
@@ -860,10 +1023,14 @@ final class SceneLiveTranscriptionController: ObservableObject {
         case assetReader(URL)
         case transcodePrefetch(sceneID: String)
         case playerTap
+        /// Realtime PCM from the playback engine's shared audio tap.
+        case engineTap
 
         var isLookahead: Bool {
-            if case .playerTap = self { return false }
-            return true
+            switch self {
+            case .playerTap, .engineTap: return false
+            default: return true
+            }
         }
     }
 
@@ -891,7 +1058,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
            SceneTranscodeAudioPrefetcher.isAvailable() {
             return .transcodePrefetch(sceneID: sceneID)
         }
-        return .playerTap
+        return usesEngineAudio ? .engineTap : .playerTap
     }
 
     /// Live transcodes are piped without range support, so `AVAssetReader` can never seek them.
@@ -960,6 +1127,22 @@ final class SceneLiveTranscriptionController: ObservableObject {
         }
     }
 
+    #if canImport(AetherEngine)
+    /// Joins the engine's shared tap, retrying while the playback session is still coming up
+    /// (`installAudioTap` reports no delivery source until it exists).
+    private func waitForEngineAudioTap(engine: AetherSceneEngine, timeoutSeconds: Double) async -> Bool {
+        let manager = StashVideoSyncManager.shared
+        let deadline = Date().addingTimeInterval(timeoutSeconds)
+        while Date() < deadline {
+            manager.ensureEngineAudioStream { [weak engine] in engine?.installAudioTap() }
+            if manager.hasEngineAudioAttached { return true }
+            if Task.isCancelled { return false }
+            try? await Task.sleep(nanoseconds: 200_000_000)
+        }
+        return manager.hasEngineAudioAttached
+    }
+    #endif
+
     private func waitForPlayerAudioTap(timeoutSeconds: Double) async -> Bool {
         let deadline = Date().addingTimeInterval(timeoutSeconds)
         while Date() < deadline {
@@ -976,6 +1159,10 @@ final class SceneLiveTranscriptionController: ObservableObject {
         feedTask = nil
         resultsTask = nil
         StashVideoSyncManager.shared.transcriptionPCMHandler = nil
+        #if canImport(AetherEngine)
+        StashVideoSyncManager.shared.engineTapHandler = nil
+        StashVideoSyncManager.shared.releaseEngineAudioStreamIfUnused()
+        #endif
         if #available(iOS 26.0, *), let box = speechSession as? SpeechSessionBox {
             box.inputBuilder?.finish()
             box.inputBuilder = nil
@@ -1016,10 +1203,11 @@ final class SceneLiveTranscriptionController: ObservableObject {
             if sessionIsCurrent(generation), !Self.isBenignStopError(error) {
                 // Reader died mid-session — fall back to tap without killing captions entirely.
                 AppLog.debug("💬 Lookahead feed failed, falling back to tap: \(error.localizedDescription)")
-                if let item = player?.currentItem {
+                if hasActivePlayback {
                     usesLookaheadFeed = false
                     onLookaheadModeChanged?(false)
-                    if StashVideoSyncManager.shared.currentItem !== item {
+                    if let item = player?.currentItem,
+                       StashVideoSyncManager.shared.currentItem !== item {
                         StashVideoSyncManager.shared.setup(for: item)
                     }
                     // Can't easily restart analyzer input after finish; restart whole session.
@@ -1134,8 +1322,8 @@ final class SceneLiveTranscriptionController: ObservableObject {
     }
 
     private func nextFeedStep(fedLocalSeconds: Double, generation: UInt) async -> FeedStep {
-        guard sessionIsCurrent(generation), let player else { return .restart }
-        let playback = max(0, player.currentTime().seconds)
+        guard sessionIsCurrent(generation), hasActivePlayback else { return .restart }
+        let playback = max(0, playbackSeconds() ?? 0)
         if playback - fedLocalSeconds > Self.feedBehindRestartSeconds {
             enableTask?.cancel()
             enableTask = Task { [weak self] in
@@ -1152,7 +1340,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
         }
         let lead = fedLocalSeconds - playback
         if lead > Self.preRollSeconds + Self.leadBufferSeconds {
-            let playing = player.timeControlStatus == .playing
+            let playing = isPlaybackMoving
             return .wait(playing ? 120_000_000 : 300_000_000)
         }
         return .feed
@@ -1223,6 +1411,92 @@ final class SceneLiveTranscriptionController: ObservableObject {
         }
     }
 
+    // MARK: - Engine tap (playback engine)
+
+    #if canImport(AetherEngine)
+    /// Realtime PCM from the engine's shared tap. Unlike the `MTAudioProcessingTap` fallback the
+    /// buffers carry their own source PTS, so cues are anchored on the real media timeline
+    /// instead of on accumulated analyzer seconds — a seek or track switch just opens a new
+    /// timeline segment rather than shifting every following timestamp.
+    @available(iOS 26.0, *)
+    private func engineTapFeedLoop(
+        targetFormat: AVAudioFormat,
+        input: AsyncStream<AnalyzerInput>.Continuation,
+        generation: UInt
+    ) async {
+        let (tapStream, tapCont) = AsyncStream.makeStream(
+            of: AudioTapBuffer.self,
+            bufferingPolicy: .bufferingOldest(96)
+        )
+        StashVideoSyncManager.shared.engineTapHandler = { buffer in
+            tapCont.yield(buffer)
+        }
+        defer {
+            // A newer session owns the shared handler by now; only the current one may clear it.
+            if sessionIsCurrent(generation) {
+                StashVideoSyncManager.shared.engineTapHandler = nil
+                StashVideoSyncManager.shared.releaseEngineAudioStreamIfUnused()
+            }
+            tapCont.finish()
+            input.finish()
+        }
+
+        var audioConverter: SceneTranscriptionAudioConverter?
+        // The engine finishes the stream on every load / stop / session-preserving reload, and
+        // the shared consumer reinstalls it — a gap shows up here as a discontinuity.
+        var expectedSourceTime: Double?
+
+        do {
+            for await tapBuffer in tapStream {
+                guard sessionIsCurrent(generation), !Task.isCancelled else { break }
+                let buffer = tapBuffer.buffer
+                guard buffer.frameLength > 0 else { continue }
+
+                let sourceTime = tapBuffer.sourceTime.isFinite ? max(0, tapBuffer.sourceTime) : (expectedSourceTime ?? 0)
+                let jumped = expectedSourceTime.map { abs(sourceTime - $0) > 0.25 } ?? true
+                if tapBuffer.discontinuity || jumped {
+                    // A jump far away from what has been fed is a seek; the transcript no longer
+                    // covers the playhead, so the session restarts instead of stitching.
+                    if let previous = expectedSourceTime, abs(sourceTime - previous) > Self.feedReseekLagSeconds {
+                        enableTask?.cancel()
+                        enableTask = Task { [weak self] in
+                            await self?.runEnableSession()
+                        }
+                        break
+                    }
+                    appendFeedTimeline(globalStart: sourceTime)
+                }
+
+                if audioConverter == nil
+                    || audioConverter?.sourceFormat.sampleRate != buffer.format.sampleRate
+                    || audioConverter?.sourceFormat.channelCount != buffer.format.channelCount {
+                    audioConverter = SceneTranscriptionAudioConverter(
+                        sourceFormat: buffer.format,
+                        targetFormat: targetFormat
+                    )
+                }
+                guard let converter = audioConverter else {
+                    throw SceneLiveTranscriptionError.conversionFailed
+                }
+                let converted = try converter.convert(buffer, to: targetFormat)
+                guard converted.frameLength > 0 else { continue }
+                input.yield(AnalyzerInput(buffer: converted))
+
+                let sourceDelta = Double(buffer.frameLength) / buffer.format.sampleRate
+                expectedSourceTime = sourceTime + sourceDelta
+                fedAnalyzerSeconds += Double(converted.frameLength) / targetFormat.sampleRate
+                fedLocalSeconds = sourceTime + sourceDelta
+            }
+        } catch is CancellationError {
+            // ignored
+        } catch {
+            if sessionIsCurrent(generation), !Self.isBenignStopError(error) {
+                errorMessage = (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+            }
+        }
+    }
+    #endif
+
     // MARK: - Tap fallback
 
     @available(iOS 26.0, *)
@@ -1252,7 +1526,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
             for await buffer in pcmStream {
                 guard sessionIsCurrent(generation), !Task.isCancelled else { break }
 
-                let playback = max(0, player?.currentTime().seconds ?? lastPlayback)
+                let playback = max(0, playbackSeconds() ?? lastPlayback)
                 if abs(playback - lastPlayback) > Self.feedReseekLagSeconds {
                     enableTask?.cancel()
                     enableTask = Task { [weak self] in
@@ -1327,7 +1601,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
         appendFinalToSentenceCues(newWords)
         publishWords()
         updateReadiness()
-        if let seconds = player?.currentTime().seconds, seconds.isFinite {
+        if let seconds = playbackSeconds() {
             refreshSubtitleText(at: seconds)
         }
     }

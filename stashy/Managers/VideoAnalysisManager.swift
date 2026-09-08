@@ -155,6 +155,10 @@ class StashVideoSyncManager: ObservableObject {
     /// audio pipeline, so the tap path stays disabled in this mode.
     private var usesEngineAudio = false
     private var engineAudioTask: Task<Void, Never>?
+    #if canImport(AetherEngine)
+    /// Backing store for `engineTapHandler`; guarded by `transcriptionHandlerLock`.
+    private var _engineTapHandler: ((AudioTapBuffer) -> Void)?
+    #endif
 
     private var cancellables = Set<AnyCancellable>()
     private let analysisQueue = DispatchQueue(label: "com.stashko.videoanalysis", qos: .userInteractive)
@@ -226,6 +230,55 @@ class StashVideoSyncManager: ObservableObject {
     /// session-preserving reload ends the stream). Set alongside `setup(aetherItem:audio:)`.
     var engineAudioStreamProvider: (@MainActor () -> AsyncStream<AudioTapBuffer>?)?
 
+    /// Full-fidelity hand-off of the engine tap for AI Subs. `transcriptionPCMHandler` drops the
+    /// `sourceTime`/`discontinuity` metadata, which live captions need to place cues on the source
+    /// axis — so live captions take the whole buffer through this second handler instead.
+    /// Called on the engine audio task, never on the main actor.
+    var engineTapHandler: ((AudioTapBuffer) -> Void)? {
+        get {
+            transcriptionHandlerLock.lock()
+            defer { transcriptionHandlerLock.unlock() }
+            return _engineTapHandler
+        }
+        set {
+            transcriptionHandlerLock.lock()
+            _engineTapHandler = newValue
+            transcriptionHandlerLock.unlock()
+        }
+    }
+
+    /// True while the engine's PCM tap is being consumed here (AI Motion, AI Subs, or both).
+    var hasEngineAudioAttached: Bool { usesEngineAudio && engineAudioTask != nil }
+
+    /// Opens the engine tap without touching video analysis, or joins the one AI Motion already
+    /// opened. One engine tap exists per session, so both consumers share this single stream:
+    /// whoever arrives first opens it, the other one only registers its handler.
+    @MainActor
+    func ensureEngineAudioStream(provider: @escaping @MainActor () -> AsyncStream<AudioTapBuffer>?) {
+        engineAudioStreamProvider = provider
+        if hasEngineAudioAttached { return }
+        usesEngineAudio = true
+        attachEngineAudioStream(provider())
+        // No delivery source yet (session still coming up): roll the flag back so an AVPlayer
+        // scene later on is not left with the `MTAudioProcessingTap` path disabled. AI Motion
+        // (`currentPlayerItem`) owns the flag while it runs and keeps it either way.
+        if engineAudioTask == nil, currentPlayerItem == nil {
+            usesEngineAudio = false
+            engineAudioStreamProvider = nil
+        }
+    }
+
+    /// Drops the shared attachment once nothing consumes it any more. A running AI Motion
+    /// session (`isActive`) or a still-registered caption handler keeps it alive.
+    func releaseEngineAudioStreamIfUnused() {
+        guard usesEngineAudio else { return }
+        guard !isActive, engineTapHandler == nil, transcriptionPCMHandler == nil else { return }
+        engineAudioTask?.cancel()
+        engineAudioTask = nil
+        usesEngineAudio = false
+        engineAudioStreamProvider = nil
+    }
+
     /// Entry point for the optional playback engine. The video path is unchanged — the engine's
     /// AVPlayer-backed item (`.loopback` / `.remoteBypass`) takes the same
     /// `AVPlayerItemVideoOutput`. Audio comes from the engine's decoded PCM tap instead, so no
@@ -257,7 +310,7 @@ class StashVideoSyncManager: ObservableObject {
                     if Task.isCancelled { return }
                     guard let self, self.usesEngineAudio else { return }
                     yielded = true
-                    self.consumeEngineAudio(tapBuffer.buffer)
+                    self.consumeEngineAudio(tapBuffer)
                 }
                 if Task.isCancelled { return }
                 guard let self, self.usesEngineAudio else { return }
@@ -272,7 +325,8 @@ class StashVideoSyncManager: ObservableObject {
     }
 
     /// Mono Float32 (`AetherEngine.audioTapFormat`) → the same RMS the tap callback computes.
-    private func consumeEngineAudio(_ buffer: AVAudioPCMBuffer) {
+    private func consumeEngineAudio(_ tapBuffer: AudioTapBuffer) {
+        let buffer = tapBuffer.buffer
         let frames = Int(buffer.frameLength)
         guard frames > 0, let channel = buffer.floatChannelData?[0] else { return }
         let sampleCount = min(frames, 4096)
@@ -282,8 +336,10 @@ class StashVideoSyncManager: ObservableObject {
 
         transcriptionHandlerLock.lock()
         let handler = _transcriptionPCMHandler
+        let tapHandler = _engineTapHandler
         transcriptionHandlerLock.unlock()
         handler?(buffer)
+        tapHandler?(tapBuffer)
     }
 
 #endif
@@ -1263,8 +1319,15 @@ enum AetherMotionAnalysis {
     }
 
     static func teardown(engine: AetherSceneEngine?) {
-        StashVideoSyncManager.shared.stop()
-        engine?.removeAudioTap()
+        let manager = StashVideoSyncManager.shared
+        // AI Subs shares the one engine tap; tearing motion analysis down must not silence it.
+        let keepsAudioForCaptions = manager.engineTapHandler != nil
+        manager.stop()
+        guard keepsAudioForCaptions, let engine else {
+            engine?.removeAudioTap()
+            return
+        }
+        manager.ensureEngineAudioStream { [weak engine] in engine?.installAudioTap() }
     }
 }
 

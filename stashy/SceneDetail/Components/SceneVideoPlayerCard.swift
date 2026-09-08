@@ -44,7 +44,10 @@ struct SceneVideoPlayerCard: View {
                         engine: aether,
                         posterURL: activeScene.thumbnailURL,
                         isMuted: $isMuted,
-                        onSeek: onSeek
+                        onSeek: onSeek,
+                        liveCaptionText: subtitleController.isLiveCaptionsActive
+                            ? subtitleController.currentText
+                            : ""
                     )
                     .aspectRatio(16/9, contentMode: .fit)
                     .frame(maxWidth: .infinity)
@@ -470,6 +473,15 @@ struct SceneDetailMetadataCard: View {
                     }
             }
         }
+        .background {
+            // The engine is a plain `let` here, so its state is observed through the publisher.
+            if let aether = aetherEngine {
+                Color.clear
+                    .onReceive(aether.$isPlaying) { playing in
+                        if playing { restorePreferredCaptionsIfNeeded() }
+                    }
+            }
+        }
         .onAppear {
             if let item = player?.currentItem {
                 StashVideoSyncManager.shared.setup(for: item)
@@ -551,14 +563,13 @@ struct SceneDetailMetadataCard: View {
             .frame(maxWidth: .infinity)
 
             HStack(spacing: 0) {
-                // Live captions, AI Motion, frame capture and the AVPlayer caption track are
-                // all AVFoundation-bound — they stay hidden while the engine is playing.
-                if aetherEngine == nil {
-                    languageAndCaptionsControls
-                    if stashSyncManager.isStashSyncEnabled {
-                        Spacer(minLength: 4)
-                        aiMotionPill
-                    }
+                // AI Subs runs on both players: the engine feeds the same recognizer from its
+                // shared PCM tap and its clock.
+                languageAndCaptionsControls
+                Spacer(minLength: 4)
+                // AI Motion on the AVPlayer path; the engine has its own gate below.
+                if aetherEngine == nil, stashSyncManager.isStashSyncEnabled {
+                    aiMotionPill
                     Spacer(minLength: 4)
                 }
                 #if canImport(AetherEngine)
@@ -581,7 +592,9 @@ struct SceneDetailMetadataCard: View {
                     Spacer(minLength: 4)
                     AetherAudioSubtitleMenu(engine: aether)
                 }
-                if aetherEngine == nil, activeScene.hasCaptions {
+                // Server VTT lives in the engine's own Audio & Subtitles menu, so under Aether
+                // this pill only carries the live-caption state.
+                if activeScene.hasCaptions || (aetherEngine != nil && subtitleController.isLiveCaptionsActive) {
                     Spacer(minLength: 4)
                     captionsMenu
                 }
@@ -975,17 +988,21 @@ struct SceneDetailMetadataCard: View {
                     }
                 }
             }
-            Section("Subtitles") {
-                ForEach(captions) { caption in
-                    Button {
-                        stopLiveCaptionsIfNeeded()
-                        subtitleController.select(caption, userInitiated: true)
-                    } label: {
-                        Label {
-                            Text(caption.displayName)
-                        } icon: {
-                            if subtitleController.selectedCaption == caption {
-                                Image(systemName: "checkmark")
+            // Under the engine, server captions are external subtitle tracks and are picked in
+            // its own Audio & Subtitles menu — listing them here too would draw them twice.
+            if aetherEngine == nil {
+                Section("Subtitles") {
+                    ForEach(captions) { caption in
+                        Button {
+                            stopLiveCaptionsIfNeeded()
+                            subtitleController.select(caption, userInitiated: true)
+                        } label: {
+                            Label {
+                                Text(caption.displayName)
+                            } icon: {
+                                if subtitleController.selectedCaption == caption {
+                                    Image(systemName: "checkmark")
+                                }
                             }
                         }
                     }
@@ -1056,8 +1073,6 @@ struct SceneDetailMetadataCard: View {
     }
 
     private func restorePreferredCaptionsIfNeeded() {
-        // Live captions need an AVPlayer timeline.
-        guard aetherEngine == nil else { return }
         guard !captionRestoreInFlight else { return }
         guard transcriptionController.mode == .off, !transcriptionController.isTeleprompterModeActive else { return }
         let preferred = SceneTeleprompterMode.preferred
@@ -1083,19 +1098,13 @@ struct SceneDetailMetadataCard: View {
             }
             return
         }
-        guard aetherEngine == nil else {
-            if userInitiated {
-                ToastManager.shared.show("AI captions are not available on the optional playback engine", icon: "captions.bubble", style: .error)
-            }
-            return
-        }
         guard transcriptionController.isReadAlongAvailable else {
             if userInitiated {
                 ToastManager.shared.show("Teleprompter requires iOS 26+ and supported hardware", icon: "text.viewfinder", style: .error)
             }
             return
         }
-        guard let player else {
+        guard player != nil || aetherEngine?.currentURL != nil else {
             if userInitiated {
                 ToastManager.shared.show("Start playback first", icon: "play.circle", style: .error)
             }
@@ -1108,7 +1117,8 @@ struct SceneDetailMetadataCard: View {
             return
         }
         let url = activeScene.transcriptionStreamURL
-            ?? (player.currentItem?.asset as? AVURLAsset).map { $0.url }
+            ?? (player?.currentItem?.asset as? AVURLAsset).map { $0.url }
+            ?? aetherEngine?.currentURL
         var extras: [URL] = []
         if let streams = activeScene.streams {
             for stream in streams where stream.mime_type == "video/mp4" {
@@ -1201,15 +1211,41 @@ struct SceneDetailMetadataCard: View {
             transcriptionController.liveCaptionHandler = { [weak subtitleController] text in
                 subtitleController?.pushLiveCaption(text)
             }
-            transcriptionController.start(
-                mode: mode,
-                player: player,
-                sceneID: activeScene.id,
-                sceneDuration: activeScene.sceneDuration,
-                sceneLanguage: sceneLanguage,
-                streamURL: url,
-                extraCandidateURLs: extras
-            )
+            #if canImport(AetherEngine)
+            if let aether = aetherEngine {
+                transcriptionController.start(
+                    mode: mode,
+                    aether: aether,
+                    sceneID: activeScene.id,
+                    sceneDuration: activeScene.sceneDuration,
+                    sceneLanguage: sceneLanguage,
+                    streamURL: url,
+                    extraCandidateURLs: extras
+                )
+            } else if let player {
+                transcriptionController.start(
+                    mode: mode,
+                    player: player,
+                    sceneID: activeScene.id,
+                    sceneDuration: activeScene.sceneDuration,
+                    sceneLanguage: sceneLanguage,
+                    streamURL: url,
+                    extraCandidateURLs: extras
+                )
+            }
+            #else
+            if let player {
+                transcriptionController.start(
+                    mode: mode,
+                    player: player,
+                    sceneID: activeScene.id,
+                    sceneDuration: activeScene.sceneDuration,
+                    sceneLanguage: sceneLanguage,
+                    streamURL: url,
+                    extraCandidateURLs: extras
+                )
+            }
+            #endif
 
             // Wait for ensureSpeechModel to park on the offer, then present after Menu teardown.
             for _ in 0..<20 {

@@ -20,6 +20,9 @@ struct AetherSceneSurface: View {
     let posterURL: URL?
     @Binding var isMuted: Bool
     var onSeek: (Double) -> Void
+    /// On-device live captions (AI Subs). Second source for the same overlay; an embedded or
+    /// sidecar subtitle track always wins when one is selected.
+    var liveCaptionText: String = ""
 
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @ObservedObject private var tabManager = TabManager.shared
@@ -132,6 +135,13 @@ struct AetherSceneSurface: View {
 
     // MARK: - Subtitles
 
+    /// Embedded/sidecar cue first, live ASR second — never both at once.
+    private var displayedSubtitleText: String? {
+        if let text = engine.currentSubtitleText, !text.isEmpty { return text }
+        let live = liveCaptionText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return live.isEmpty ? nil : live
+    }
+
     /// The engine draws nothing itself: the host renders the cue covering the current source time.
     @ViewBuilder
     private var subtitleOverlay: some View {
@@ -139,7 +149,7 @@ struct AetherSceneSurface: View {
             if let bitmap = engine.currentSubtitleImage {
                 subtitleImage(bitmap)
             }
-            if let text = engine.currentSubtitleText, !text.isEmpty {
+            if let text = displayedSubtitleText {
                 VStack {
                     Spacer()
                     Text(text)

@@ -3,6 +3,9 @@ import Foundation
 import AVFoundation
 import Combine
 import UIKit
+#if canImport(AetherEngine)
+import AetherEngine
+#endif
 
 // MARK: - Cue model
 
@@ -165,6 +168,9 @@ final class SubtitleController: ObservableObject {
     private var cueIndex: Int = 0
     private weak var player: AVPlayer?
     private var timeObserver: Any?
+    #if canImport(AetherEngine)
+    private var engineClockCancellable: AnyCancellable?
+    #endif
     private var loadTask: Task<Void, Never>?
     private var captionBaseURL: URL?
     private var liveHoldUntil = Date.distantPast
@@ -394,6 +400,24 @@ final class SubtitleController: ObservableObject {
         }
     }
 
+    #if canImport(AetherEngine)
+    /// Engine counterpart of `attach(player:)`. Only the live-caption channel needs it: server VTT
+    /// is registered as an external subtitle track on the engine and drawn from its own cue
+    /// pipeline, so `cues` stays empty here. The tick still matters — a non-timeline-synced live
+    /// caption expires by wall clock and needs someone to clear it.
+    func attach(aether: AetherSceneEngine) {
+        detachTimeObserver()
+        player = nil
+        engineClockCancellable = aether.engine.clock.$sourceTime
+            .removeDuplicates()
+            .receive(on: RunLoop.main)
+            .sink { [weak self] seconds in
+                guard let self, seconds.isFinite else { return }
+                self.updateText(at: max(0, seconds))
+            }
+    }
+    #endif
+
     func detach() {
         loadTask?.cancel()
         loadTask = nil
@@ -423,6 +447,10 @@ final class SubtitleController: ObservableObject {
             player.removeTimeObserver(token)
         }
         timeObserver = nil
+        #if canImport(AetherEngine)
+        engineClockCancellable?.cancel()
+        engineClockCancellable = nil
+        #endif
     }
 
     private func updateText(at seconds: TimeInterval) {

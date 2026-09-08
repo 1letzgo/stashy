@@ -681,6 +681,15 @@ struct SceneDetailView: View {
     }
 
     private func configureSubtitles() {
+        #if canImport(AetherEngine)
+        // Under the engine, Stash's VTT captions are external subtitle tracks with their own cue
+        // pipeline — configuring the AVPlayer caption path here would draw them a second time.
+        // The controller is still attached, because live captions share its display channel.
+        if let aether = aetherEngine {
+            subtitleController.attach(aether: aether)
+            return
+        }
+        #endif
         subtitleController.configure(scene: activeScene, player: player)
     }
 
@@ -722,6 +731,8 @@ struct SceneDetailView: View {
         subtitleController.detach()
         audioTrackController.detach()
         captionTranslator.deactivate()
+        // Releases this session's share of the engine audio tap (`stopSession`), so the
+        // AI Motion teardown below can close it for good.
         Task { await transcriptionController.disable() }
         #if canImport(AetherEngine)
         if aetherEngine != nil { AetherMotionAnalysis.teardown(engine: aetherEngine) }
@@ -955,6 +966,11 @@ struct SceneDetailView: View {
 
         withAnimation {
             isPlaybackStarted = true
+        }
+        // Live captions (AI Subs) share the caption channel with server VTT; under the engine the
+        // controller is driven by the engine clock instead of an AVPlayer time observer.
+        if let engine = aetherEngine {
+            subtitleController.attach(aether: engine)
         }
         aetherEngine?.play()
 
