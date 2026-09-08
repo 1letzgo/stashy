@@ -45,13 +45,6 @@ struct ToolsSettingsView: View {
         tabManager.tabs.first(where: { $0.id == .tools })?.isVisible ?? true
     }
 
-    /// Tools shown in the Tools tab (Server lives under Settings → Actions).
-    private var orderedTools: [ToolsItemConfig] {
-        tabManager.tools
-            .filter { $0.id != .server }
-            .sorted { $0.sortOrder < $1.sortOrder }
-    }
-
     var body: some View {
         List {
             Section {
@@ -64,54 +57,13 @@ struct ToolsSettingsView: View {
                 }
                 .tint(appearanceManager.tintColor)
                 .stashyGroupedSettingsRow()
-            }
 
-            if !orderedTools.isEmpty {
-                Section {
-                    stashyScrollingSectionHeader("Tools")
-                    ForEach(orderedTools) { tool in
-                        VStack(alignment: .leading, spacing: 0) {
-                            HStack {
-                                Label(tool.id.plusFeatureTitle, systemImage: tool.id.icon)
-                                    .font(.subheadline.weight(.semibold))
-                                    .foregroundColor(appearanceManager.tintColor)
-                                Spacer()
-                                Toggle("", isOn: Binding(
-                                    get: { tool.isEnabled },
-                                    set: { _ in tabManager.toggleTool(tool.id) }
-                                ))
-                                .labelsHidden()
-                                .tint(appearanceManager.tintColor)
-                            }
-                        }
-                        .padding(.vertical, 6)
-                        .stashySettingsCardRow()
-                    }
-                    .onMove { indices, newOffset in
-                        var working = orderedTools
-                        working.move(fromOffsets: indices, toOffset: newOffset)
-                        var rebuilt = working.enumerated().map { idx, item in
-                            ToolsItemConfig(id: item.id, isEnabled: item.isEnabled, sortOrder: idx)
-                        }
-                        // Keep tools not shown here (currently Server under Settings → Actions).
-                        for hidden in tabManager.tools where !rebuilt.contains(where: { $0.id == hidden.id }) {
-                            rebuilt.append(
-                                ToolsItemConfig(
-                                    id: hidden.id,
-                                    isEnabled: hidden.isEnabled,
-                                    sortOrder: rebuilt.count
-                                )
-                            )
-                        }
-                        tabManager.tools = rebuilt
-                        tabManager.saveTools()
-                    }
-                }
+                // Order and per-tool visibility used to live here. The Tools landing groups the
+                // tools into fixed categories, so their order is part of that layout now.
+                stashyScrollingSectionFooter("Tools are grouped on the Tools page.")
             }
         }
-        .stashyMovableCardsList()
-        .environment(\.editMode, .constant(.active))
-        .deleteDisabled(true)
+        .stashySettingsList()
         .applyAppBackground()
         .stashySettingsDetailChrome("Tools")
         .onAppear { tabManager.repairMissingToolsIfNeeded() }

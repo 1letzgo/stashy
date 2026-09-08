@@ -134,24 +134,17 @@ struct HomeChannelsRowView: View {
         .scrollContentBackground(.hidden)
     }
 
+    /// Plain label, not a link: the row's cards each open their own channel, and a header that
+    /// jumped to Feeds in general only ever led somewhere the user did not ask for.
     @ViewBuilder
     private var header: some View {
-        Button {
-            coordinator.selectedTab = .reels
-        } label: {
-            HStack(spacing: 4) {
-                Text(config.title)
-                    .font(.headline)
-                    .foregroundColor(.primary)
-                Image(systemName: "chevron.right")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(.secondary)
-                Spacer(minLength: 0)
-            }
-            .padding(.horizontal, 12)
-            .contentShape(Rectangle())
+        HStack(spacing: 4) {
+            Text(config.title)
+                .font(.headline)
+                .foregroundColor(.primary)
+            Spacer(minLength: 0)
         }
-        .buttonStyle(.plain)
+        .padding(.horizontal, 12)
     }
 
     private func open(_ channel: HomeChannel) {

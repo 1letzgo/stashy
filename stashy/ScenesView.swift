@@ -845,6 +845,7 @@ private struct ScenesViewContent: View {
         }()
         _selectedSortOption = State(initialValue: sort ?? defaultSort)
         _selectedFilter = State(initialValue: filter)
+        _hasInjectedFilter = State(initialValue: filter != nil)
         _hasInjectedSort = State(initialValue: sort != nil)
     }
 
@@ -852,6 +853,10 @@ private struct ScenesViewContent: View {
     @ObservedObject private var tabManager = TabManager.shared
 
     @State private var cardGridWidth: CGFloat = 0
+    /// A caller handed in its own filter (Director, and anything else scoping the catalogue list
+    /// without a detail scope). Such a list must never take the Settings default, and must not
+    /// wait for it either — waiting is what left it empty.
+    @State private var hasInjectedFilter = false
 
 
     private var columns: [GridItem] {
@@ -1179,8 +1184,9 @@ private struct ScenesViewContent: View {
             refreshLivePresets()
             
             // If no default filter is set, fetch immediately ONLY if we don't have scenes yet.
-            // Detail scopes never take the Settings default, so they must not wait for it either.
-            if isSceneListDetailScope || TabManager.shared.getDefaultFilterId(for: .scenes) == nil {
+            // Detail scopes and injected filters never take the Settings default, so they must
+            // not wait for it either.
+            if isSceneListDetailScope || hasInjectedFilter || TabManager.shared.getDefaultFilterId(for: .scenes) == nil {
                 if primarySceneListIsEmpty {
                     performSearch()
                 }
@@ -1193,9 +1199,9 @@ private struct ScenesViewContent: View {
             performSearch()
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
-            // Catalog only: on a performer / studio / tag / group page the list is already scoped,
-            // and layering the Settings default on top silently hides scenes (e.g. `organized`).
-            if scope == .catalog,
+            // Catalog only, and never over a filter the caller handed in: on a scoped list
+            // layering the Settings default on top silently hides scenes (e.g. `organized`).
+            if scope == .catalog, !hasInjectedFilter,
                let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.scenes.rawValue {
                 // Determine new filter
                 if let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes),
@@ -1235,8 +1241,8 @@ private struct ScenesViewContent: View {
             // Uses selectedSortOption which may have just been set from coordinator above
             if selectedFilter == nil {
                 // `scope == .catalog` mirrors `ImagesView`'s `guard gallery == nil`: the Settings
-                // default filter belongs to the catalog list, not to a scoped detail list.
-                if scope == .catalog,
+                // default filter belongs to the catalog list, not to a scoped one.
+                if scope == .catalog, !hasInjectedFilter,
                    let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes),
                    let filter = newValue[defaultId] {
                     selectedFilter = filter

@@ -304,23 +304,25 @@ struct ToolsView: View {
         }
     }
     
+    /// Fixed grouping and order. Previously this came from the user's Tools settings, but a
+    /// hand-sorted flat list stopped being a good way in once Tools grew — the grid needs stable
+    /// categories, so the order is part of the design now rather than a setting.
+    static let toolGroups: [(title: String, tools: [ToolsTab])] = [
+        ("Library", [.downloads, .filters]),
+        ("Insights", [.overview, .topLists, .oCount, .timeline]),
+        ("Discover", [.hotOrNot, .rateMe])
+    ]
+
     private var sortedTabs: [ToolsTab] {
-        // Use persisted order from Settings → Tools (Server lives under Settings)
-        tabManager.enabledTools.compactMap { item in
-            switch item {
-            case .downloads: return .downloads
-            case .statistics: return .overview
-            case .oCount: return .oCount
-            case .timeline: return .timeline
-            case .topLists: return .topLists
-            case .filters: return .filters
-            case .hotOrNot: return .hotOrNot
-            case .rateMe: return .rateMe
-            case .server: return nil
-            }
-        }
+        Self.toolGroups.flatMap(\.tools)
     }
     
+    /// Empty (or unknown) sub-tab means the landing grid, not "first tool". Tools grew past the
+    /// point where a dropdown alone is a good way in.
+    private var showsLanding: Bool {
+        ToolsTab(rawValue: coordinator.toolsSubTab).map { !sortedTabs.contains($0) } ?? true
+    }
+
     private var effectiveTab: ToolsTab {
         if let current = ToolsTab(rawValue: coordinator.toolsSubTab), sortedTabs.contains(current) {
             return current
@@ -337,6 +339,11 @@ struct ToolsView: View {
     
     var body: some View {
         Group {
+            if showsLanding {
+                ToolsLandingView(groups: Self.toolGroups) { tool in
+                    coordinator.toolsSubTab = tool.rawValue
+                }
+            } else {
             switch effectiveTab {
             case .downloads:
                 DownloadsView()
@@ -355,6 +362,7 @@ struct ToolsView: View {
             case .rateMe:
                 RateMeToolsView()
             }
+            }
         }
         .onAppear {
             tabManager.repairMissingToolsIfNeeded()
@@ -372,18 +380,34 @@ struct ToolsView: View {
         }
     }
 
+    /// Only the dropdown — its "All Tools" entry is the way back to the grid. A separate button
+    /// beside it repeated the same icon in the same bar.
     private var toolsCategoryRow: some View {
+        toolsDropdown
+    }
+
+    private static let allToolsMenuID = "__all_tools__"
+
+    private var toolsDropdown: some View {
         StashyTopNavNameDropdownRow(
             title: "Tools",
-            items: sortedTabs.map {
+            items: [
+                StashyNavMenuItem(
+                    id: Self.allToolsMenuID,
+                    title: "All Tools",
+                    systemImage: "square.grid.2x2"
+                )
+            ] + sortedTabs.map {
                 StashyNavMenuItem(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon)
             },
-            selectionID: effectiveTab.rawValue,
+            selectionID: showsLanding ? Self.allToolsMenuID : effectiveTab.rawValue,
             titleColor: .white,
             menuAccessibilityLabel: "Tool",
             menuAccessibilityHint: "Chooses which tool to show"
         ) { id in
-            if let tab = ToolsTab(rawValue: id) {
+            if id == Self.allToolsMenuID {
+                coordinator.toolsSubTab = ""
+            } else if let tab = ToolsTab(rawValue: id) {
                 selectedTabBinding.wrappedValue = tab
             }
         }
@@ -398,8 +422,81 @@ struct ToolsView: View {
             coordinator.toolsSubTab = ToolsTab.topLists.rawValue
         } else if ToolsTab(rawValue: coordinator.toolsSubTab) == nil
                     || !sortedTabs.contains(where: { $0.rawValue == coordinator.toolsSubTab }) {
-            coordinator.toolsSubTab = (sortedTabs.first ?? .overview).rawValue
+            // Land on the grid rather than dropping the user into an arbitrary tool.
+            coordinator.toolsSubTab = ""
         }
+    }
+}
+
+
+/// Tools landing: every enabled tool as an icon tile. Tools outgrew a single dropdown, and a
+/// grid inside the tab keeps the tab bar and the back gesture intact — unlike a sheet or an
+/// overlay, both of which cost exactly that.
+private struct ToolsLandingView: View {
+    let groups: [(title: String, tools: [ToolsView.ToolsTab])]
+    var onSelect: (ToolsView.ToolsTab) -> Void
+
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    private let columns = [GridItem(.adaptive(minimum: 104), spacing: 12)]
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: DesignTokens.Spacing.lg) {
+                ForEach(groups, id: \.title) { group in
+                    VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+                        // Same as the dashboard's row headings.
+                        Text(group.title)
+                            .font(.headline)
+                            .foregroundColor(.primary)
+                            .padding(.horizontal, 4)
+
+                        LazyVGrid(columns: columns, spacing: 12) {
+                            ForEach(group.tools, id: \.rawValue) { tool in
+                                Button {
+                                    onSelect(tool)
+                                } label: {
+                                    tile(tool)
+                                }
+                                .buttonStyle(.plain)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, DesignTokens.Tools.contentPadding)
+            .padding(.top, DesignTokens.Tools.menuTopPadding)
+            .padding(.bottom, DesignTokens.Tools.menuBottomPadding)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .applyAppBackground()
+    }
+
+    /// Built like `HomeChannelCardView` on the dashboard: the tinted glyph sits slightly above
+    /// centre on the card surface, the title centred at the bottom in 12pt bold. Same corner radius, and
+    /// no shadow — the channel cards carry none either.
+    private func tile(_ tool: ToolsView.ToolsTab) -> some View {
+        let height: CGFloat = 104
+
+        return ZStack(alignment: .bottom) {
+            Color.secondaryAppBackground
+
+            Image(systemName: tool.icon)
+                .font(.system(size: height * 0.34, weight: .semibold))
+                .foregroundColor(appearance.tintColor)
+                .offset(y: -height * 0.06)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            Text(tool.rawValue)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundColor(.primary)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: .infinity)
+                .padding(8)
+        }
+        .frame(height: height)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
     }
 }
 
