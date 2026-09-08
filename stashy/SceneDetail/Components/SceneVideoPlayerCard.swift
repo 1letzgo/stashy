@@ -561,6 +561,16 @@ struct SceneDetailMetadataCard: View {
                     }
                     Spacer(minLength: 4)
                 }
+                #if canImport(AetherEngine)
+                // AI Motion does work under the engine, but only where a real `AVPlayerItem`
+                // exists to sample (`.loopback` / `.remoteBypass`). The software route has none.
+                if let aether = aetherEngine, stashSyncManager.isStashSyncEnabled {
+                    AetherAnalysisGate(engine: aether) {
+                        aiMotionPill
+                        Spacer(minLength: 4)
+                    }
+                }
+                #endif
                 addMarkerButton
                 Spacer(minLength: 4)
                 setImageMenu
@@ -1818,4 +1828,19 @@ struct EditSceneTitleSheet: View {
         }
     }
 }
+
+#if canImport(AetherEngine)
+/// Shows its content only while the engine is on a route that exposes an `AVPlayerItem`
+/// for frame analysis. Observing the engine here keeps the route change reactive without
+/// making the whole metadata card depend on it.
+private struct AetherAnalysisGate<Content: View>: View {
+    @ObservedObject var engine: AetherSceneEngine
+    @ViewBuilder let content: () -> Content
+
+    var body: some View {
+        if engine.analysisPlayerItem != nil { content() }
+    }
+}
+#endif
+
 #endif

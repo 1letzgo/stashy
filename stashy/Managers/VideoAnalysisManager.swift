@@ -5,6 +5,9 @@ import Vision
 import Combine
 import SwiftUI
 import MediaToolbox
+#if canImport(AetherEngine)
+import AetherEngine
+#endif
 
 // MARK: - Motion Channel
 
@@ -147,6 +150,12 @@ class StashVideoSyncManager: ObservableObject {
     /// can take it back once the tap goes away.
     private var tapOwnsAudioMix = false
 
+    /// True while audio comes from the playback engine's PCM tap instead of the
+    /// `MTAudioProcessingTap`. An `audioMix` on the engine's item would fight its own
+    /// audio pipeline, so the tap path stays disabled in this mode.
+    private var usesEngineAudio = false
+    private var engineAudioTask: Task<Void, Never>?
+
     private var cancellables = Set<AnyCancellable>()
     private let analysisQueue = DispatchQueue(label: "com.stashko.videoanalysis", qos: .userInteractive)
     private let processingLock = NSLock()
@@ -191,18 +200,93 @@ class StashVideoSyncManager: ObservableObject {
     func setup(for playerItem: AVPlayerItem) {
         cleanup()
         self.currentPlayerItem = playerItem
+        installVideoOutput(on: playerItem)
+        refreshAudioTap()
+        startDisplayLink()
+    }
 
+    private func installVideoOutput(on playerItem: AVPlayerItem) {
         let settings: [String: Any] = [
             kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
         ]
         videoOutput = AVPlayerItemVideoOutput(pixelBufferAttributes: settings)
         if let output = videoOutput { playerItem.add(output) }
+    }
 
-        refreshAudioTap()
-
+    private func startDisplayLink() {
         displayLink = CADisplayLink(target: self, selector: #selector(updateDisplayLink))
         displayLink?.add(to: .main, forMode: .common)
     }
+
+#if canImport(AetherEngine)
+
+    // MARK: - Playback engine entry point
+
+    /// Reinstalls the engine's audio tap after it finishes (every `load`, `stop` and
+    /// session-preserving reload ends the stream). Set alongside `setup(aetherItem:audio:)`.
+    var engineAudioStreamProvider: (@MainActor () -> AsyncStream<AudioTapBuffer>?)?
+
+    /// Entry point for the optional playback engine. The video path is unchanged — the engine's
+    /// AVPlayer-backed item (`.loopback` / `.remoteBypass`) takes the same
+    /// `AVPlayerItemVideoOutput`. Audio comes from the engine's decoded PCM tap instead, so no
+    /// `audioMix` is ever written onto the engine's item.
+    func setup(aetherItem: AVPlayerItem, audio: AsyncStream<AudioTapBuffer>?) {
+        cleanup()
+        usesEngineAudio = true
+        self.currentPlayerItem = aetherItem
+        installVideoOutput(on: aetherItem)
+        attachEngineAudioStream(audio)
+        startDisplayLink()
+    }
+
+    /// Consumes the engine's tap on a detached task and feeds the same RMS/AGC analysis the
+    /// `MTAudioProcessingTap` feeds. Cancelled on teardown and on every re-setup.
+    func attachEngineAudioStream(_ audio: AsyncStream<AudioTapBuffer>?) {
+        engineAudioTask?.cancel()
+        engineAudioTask = nil
+        usesEngineAudio = true
+        guard let audio else { return }
+        engineAudioTask = Task { [weak self] in
+            var current: AsyncStream<AudioTapBuffer>? = audio
+            // A stream that finishes without yielding means the engine has no delivery source
+            // right now; bail out after a few empty rounds instead of reinstalling forever.
+            var emptyRounds = 0
+            while let stream = current {
+                var yielded = false
+                for await tapBuffer in stream {
+                    if Task.isCancelled { return }
+                    guard let self, self.usesEngineAudio else { return }
+                    yielded = true
+                    self.consumeEngineAudio(tapBuffer.buffer)
+                }
+                if Task.isCancelled { return }
+                guard let self, self.usesEngineAudio else { return }
+                emptyRounds = yielded ? 0 : emptyRounds + 1
+                if emptyRounds > 8 { return }
+                try? await Task.sleep(nanoseconds: 300_000_000)
+                if Task.isCancelled { return }
+                guard let provider = self.engineAudioStreamProvider else { return }
+                current = await MainActor.run { provider() }
+            }
+        }
+    }
+
+    /// Mono Float32 (`AetherEngine.audioTapFormat`) → the same RMS the tap callback computes.
+    private func consumeEngineAudio(_ buffer: AVAudioPCMBuffer) {
+        let frames = Int(buffer.frameLength)
+        guard frames > 0, let channel = buffer.floatChannelData?[0] else { return }
+        let sampleCount = min(frames, 4096)
+        var sumSquares: Float = 0
+        for i in 0..<sampleCount { let s = channel[i]; sumSquares += s * s }
+        updateAudioIntensity(sqrt(sumSquares / Float(sampleCount)))
+
+        transcriptionHandlerLock.lock()
+        let handler = _transcriptionPCMHandler
+        transcriptionHandlerLock.unlock()
+        handler?(buffer)
+    }
+
+#endif
 
     // MARK: - Audio Tap (MTAudioProcessingTap + AGC)
 
@@ -211,6 +295,8 @@ class StashVideoSyncManager: ObservableObject {
     /// something actually consumes the samples (AI Motion or live transcription); otherwise leave the
     /// mix to `SceneAudioTrackController` so audio tracks stay selectable in the player.
     func refreshAudioTap() {
+        // The engine owns its audio pipeline; its PCM tap already feeds both consumers.
+        guard !usesEngineAudio else { return }
         let needsTap = isVideoSyncEnabled || transcriptionPCMHandler != nil
         if needsTap {
             guard audioTap == nil, let item = currentPlayerItem else { return }
@@ -1084,6 +1170,12 @@ class StashVideoSyncManager: ObservableObject {
     }
 
     private func cleanup() {
+        engineAudioTask?.cancel()
+        engineAudioTask = nil
+        usesEngineAudio = false
+        #if canImport(AetherEngine)
+        engineAudioStreamProvider = nil
+        #endif
         displayLink?.invalidate()
         displayLink = nil
         if let output = videoOutput, let item = currentPlayerItem { item.remove(output) }
@@ -1134,4 +1226,48 @@ class StashVideoSyncManager: ObservableObject {
     func startRecording() {}
     func stopRecordingAndExport() -> String? { return nil }
 }
+
+// MARK: - AI Motion under the optional playback engine
+
+#if canImport(AetherEngine)
+
+/// The single entry point that wires AI Motion to ``AetherSceneEngine``. Both playback surfaces
+/// (Scene Detail and Feeds) go through here so the route rules live in one place:
+/// AVPlayer-backed routes (`.loopback`, `.remoteBypass`) expose an `AVPlayerItem` and are
+/// supported; the software route has none, so analysis stays cleanly off.
+@MainActor
+enum AetherMotionAnalysis {
+
+    /// True when a connected device actually wants motion data.
+    static var isWanted: Bool {
+        HandyManager.shared.isStashSyncMode
+            || ButtplugManager.shared.isStashSyncMode
+            || LoveSpouseManager.shared.isStashSyncMode
+    }
+
+    /// Whether this engine can drive AI Motion at all (false on the software route).
+    static func isSupported(_ engine: AetherSceneEngine?) -> Bool {
+        engine?.analysisPlayerItem != nil
+    }
+
+    /// Attaches (or re-attaches) analysis to the engine's current item. Safe to call repeatedly —
+    /// every call re-runs `setup`, which is what a reload needs since the item is swapped.
+    @discardableResult
+    static func ensure(engine: AetherSceneEngine) -> Bool {
+        guard isWanted, let item = engine.analysisPlayerItem else { return false }
+        let manager = StashVideoSyncManager.shared
+        manager.engineAudioStreamProvider = { [weak engine] in engine?.installAudioTap() }
+        manager.setup(aetherItem: item, audio: engine.installAudioTap())
+        manager.isActive = true
+        return true
+    }
+
+    static func teardown(engine: AetherSceneEngine?) {
+        StashVideoSyncManager.shared.stop()
+        engine?.removeAudioTap()
+    }
+}
+
+#endif
+
 #endif

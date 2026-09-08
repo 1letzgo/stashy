@@ -563,6 +563,7 @@ struct SceneDetailView: View {
             onRefreshMarkers: refreshSceneDetails,
             onInitialSync: initialSync,
             onEnsureAnalysis: ensureVideoAnalysis,
+            onEnsureAetherAnalysis: ensureAetherVideoAnalysis,
             onTimeControlChange: handleTimeControlStatusChange,
             handyManager: handyManager,
             buttplugManager: buttplugManager,
@@ -580,7 +581,16 @@ struct SceneDetailView: View {
             StashVideoSyncManager.shared.isActive = true
         }
     }
-    
+
+    /// Aether counterpart of `ensureVideoAnalysis`. Analysis rides the engine's AVPlayer-backed
+    /// item plus its decoded PCM tap; on the software route there is no item and this is a no-op.
+    private func ensureAetherVideoAnalysis() {
+        #if canImport(AetherEngine)
+        guard let aether = aetherEngine else { return }
+        AetherMotionAnalysis.ensure(engine: aether)
+        #endif
+    }
+
     private func initialSync() {
         guard let player = player, StashSyncManager.shared.isActive else { return }
                 ensureVideoAnalysis(for: player.currentItem)
@@ -713,6 +723,9 @@ struct SceneDetailView: View {
         audioTrackController.detach()
         captionTranslator.deactivate()
         Task { await transcriptionController.disable() }
+        #if canImport(AetherEngine)
+        if aetherEngine != nil { AetherMotionAnalysis.teardown(engine: aetherEngine) }
+        #endif
         // `@State` release is not deterministic, so the engine is torn down explicitly.
         aetherEngine?.stop()
         aetherEngine = nil
@@ -925,6 +938,10 @@ struct SceneDetailView: View {
                 guard let engine else { return }
                 handleAetherPlayingChange(engine, playing: playing)
             }
+            // A (re)load swaps the AVPlayerItem in place — re-attach AI Motion to the new one.
+            engine.onAnalysisItemChanged = { _ in
+                ensureAetherVideoAnalysis()
+            }
 
             aetherEngine = engine
             let scene = activeScene
@@ -997,6 +1014,7 @@ struct SceneDetailView: View {
             if loveSpouseManager.isSyncing || loveSpouseManager.isStashSyncMode { loveSpouseManager.pause() }
         } else {
             playbackActivityTracker.start()
+            ensureAetherVideoAnalysis()
             let stashSyncActive = handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode
             if stashSyncActive { StashSyncManager.shared.start() }
             if handyManager.isSyncing || handyManager.isStashSyncMode { handyManager.play(at: currentTime) }
@@ -1618,6 +1636,7 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
     let onRefreshMarkers:  () -> Void
     let onInitialSync:     () -> Void
     let onEnsureAnalysis:  (AVPlayerItem?) -> Void
+    let onEnsureAetherAnalysis: () -> Void
     let onTimeControlChange: (AVPlayer.TimeControlStatus) -> Void
     let handyManager:      HandyManager
     let buttplugManager:   ButtplugManager
@@ -1645,6 +1664,20 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
             // (in SceneDetailView) publishes time at 0.25s already.
             .onChange(of: StashSyncManager.shared.isActive) { _, active in if active { onInitialSync() } }
             .overlay(playerOverlay)
+            .overlay(aetherOverlay)
+    }
+
+    /// The engine's counterpart of `playerOverlay`: only the device-mode toggles, since the
+    /// engine reports play/pause through `onPlayingChanged` and item swaps through
+    /// `onAnalysisItemChanged`.
+    @ViewBuilder
+    private var aetherOverlay: some View {
+        if player == nil, aetherEngine != nil {
+            Color.clear
+                .onChange(of: handyManager.isStashSyncMode) { _, on in if on { onEnsureAetherAnalysis() } }
+                .onChange(of: buttplugManager.isStashSyncMode) { _, on in if on { onEnsureAetherAnalysis() } }
+                .onChange(of: loveSpouseManager.isStashSyncMode) { _, on in if on { onEnsureAetherAnalysis() } }
+        }
     }
 
     @ViewBuilder

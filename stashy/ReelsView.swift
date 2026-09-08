@@ -213,6 +213,16 @@ extension AetherSceneEngine: ReelsPausable {
     }
 }
 
+/// Route of the active Feeds row, published for the chrome only. Changes once per row / route,
+/// never on a per-frame path.
+@MainActor
+final class ReelsAetherRouteState: ObservableObject {
+    static let shared = ReelsAetherRouteState()
+    /// True while the active row plays through the engine's software route — no `AVPlayerItem`,
+    /// so AI Motion has nothing to analyse.
+    @Published var activeRowUsesSoftwareRoute = false
+}
+
 enum AetherReelsBridge {
     static func onMain(_ engine: AetherSceneEngine, _ body: @escaping @MainActor (AetherSceneEngine) -> Void) {
         if Thread.isMainThread {
@@ -4832,6 +4842,9 @@ private struct ReelsAIMotionPill: View {
     /// plays through the optional engine.
     var usesAetherEngine: Bool = false
 
+    #if canImport(AetherEngine)
+    @ObservedObject private var aetherRoute = ReelsAetherRouteState.shared
+    #endif
     @ObservedObject private var stashSyncManager = StashSyncManager.shared
     @ObservedObject private var handyManager = HandyManager.shared
     @ObservedObject private var buttplugManager = ButtplugManager.shared
@@ -4839,8 +4852,18 @@ private struct ReelsAIMotionPill: View {
     @ObservedObject private var plusManager = StashyPlusManager.shared
     @AppStorage("video_sync_enabled") private var isVideoSyncEnabled = false
 
+    /// AI Motion works on the engine's AVPlayer-backed routes; only the software route
+    /// (no `AVPlayerItem` to analyse) hides the control.
+    private var isBlockedByEngineRoute: Bool {
+        #if canImport(AetherEngine)
+        return usesAetherEngine && aetherRoute.activeRowUsesSoftwareRoute
+        #else
+        return usesAetherEngine
+        #endif
+    }
+
     private var showsButton: Bool {
-        plusManager.isUnlocked && isVideoSyncEnabled && !isPicsMode && !usesAetherEngine
+        plusManager.isUnlocked && isVideoSyncEnabled && !isPicsMode && !isBlockedByEngineRoute
     }
 
     private var isActive: Bool {
@@ -5364,7 +5387,16 @@ extension ReelItemView {
     @ViewBuilder
     private func applyStashSyncModifiers<V: View>(_ content: V) -> some View {
         content
-            .modifier(StashSyncManagerModifier(isActive: isActive, isPlaying: isPlaying, player: player))
+            .modifier(makeStashSyncModifier())
+    }
+
+    private func makeStashSyncModifier() -> StashSyncManagerModifier {
+        #if canImport(AetherEngine)
+        return StashSyncManagerModifier(isActive: isActive, isPlaying: isPlaying,
+                                        player: player, aetherEngine: aetherEngine)
+        #else
+        return StashSyncManagerModifier(isActive: isActive, isPlaying: isPlaying, player: player)
+        #endif
     }
 
     
@@ -6164,6 +6196,8 @@ extension ReelItemView {
     func cleanupAetherEngine() {
         #if canImport(AetherEngine)
         guard let aether = aetherEngine else { return }
+        if isActive { ReelsAetherRouteState.shared.activeRowUsesSoftwareRoute = false }
+        AetherMotionAnalysis.teardown(engine: aether)
         ReelsPlayerRegistry.unregister(aether)
         aether.stop()
         aetherEngine = nil
@@ -6230,6 +6264,17 @@ extension ReelItemView {
     private func bindAetherCallbacks(on aether: AetherSceneEngine) {
         aether.loopsAtEnd = !TabManager.shared.reelsContinuousPlay
 
+        // A (re)load swaps the AVPlayerItem in place; re-attach AI Motion and publish the route
+        // so the chrome pill can hide itself on the software route.
+        aether.onAnalysisItemChanged = { [weak aether] item in
+            guard let aether else { return }
+            if self.isActive {
+                ReelsAetherRouteState.shared.activeRowUsesSoftwareRoute = (item == nil)
+            }
+            guard item != nil else { return }
+            AetherMotionAnalysis.ensure(engine: aether)
+        }
+
         aether.onFirstFrame = {
             self.videoSurfaceReadiness.markAetherFrameReady()
         }
@@ -6283,6 +6328,11 @@ struct StashSyncManagerModifier: ViewModifier {
     let isActive: Bool
     let isPlaying: Bool
     let player: AVPlayer?
+    #if canImport(AetherEngine)
+    /// Non-nil while this row plays through the optional engine. Analysis then rides the
+    /// engine's AVPlayer-backed item instead of `player?.currentItem`.
+    var aetherEngine: AetherSceneEngine? = nil
+    #endif
 
     // Ohne diese `@ObservedObject`s werden die `onChange(of:)` unten nur ausgewertet,
     // wenn die View aus einem anderen Grund neu rendert — Sync-Mode-Toggles kamen
@@ -6373,6 +6423,13 @@ struct StashSyncManagerModifier: ViewModifier {
 
     
     private func ensureVideoAnalysis(for item: AVPlayerItem?) {
+        #if canImport(AetherEngine)
+        if let aether = aetherEngine {
+            // Engine row: the native routes expose an item, the software route does not.
+            AetherMotionAnalysis.ensure(engine: aether)
+            return
+        }
+        #endif
         guard let item = item else { return }
         if HandyManager.shared.isStashSyncMode || ButtplugManager.shared.isStashSyncMode || LoveSpouseManager.shared.isStashSyncMode {
             StashVideoSyncManager.shared.setup(for: item)

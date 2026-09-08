@@ -62,6 +62,11 @@ final class AetherSceneEngine: ObservableObject {
     @Published private(set) var currentSubtitleImage: AetherSubtitleImageCue?
     /// Non-nil only on a route that actually owns an AVPlayerLayer (PiP).
     @Published private(set) var pipPlayerLayer: AVPlayerLayer?
+    /// The item AI Motion's frame analysis can attach an `AVPlayerItemVideoOutput` to.
+    /// Non-nil only on the AVPlayer-backed routes (`.loopback`, `.remoteBypass`) — the software
+    /// route decodes into its own layer and never produces an `AVPlayerItem`.
+    /// Re-emitted on every (re)load, because items are swapped in place under the same player.
+    @Published private(set) var analysisPlayerItem: AVPlayerItem?
 
     // MARK: - Callbacks
 
@@ -69,6 +74,10 @@ final class AetherSceneEngine: ObservableObject {
     var onPlayingChanged: ((Bool) -> Void)?
     var onReachedEnd: (() -> Void)?
     var onFirstFrame: (() -> Void)?
+    /// Fires whenever `analysisPlayerItem` changes, including to nil (software route, teardown).
+    /// Hosts re-run their AI Motion setup from here — a reload swaps the item without any
+    /// other signal.
+    var onAnalysisItemChanged: ((AVPlayerItem?) -> Void)?
 
     // MARK: - Host-controlled knobs
 
@@ -261,6 +270,22 @@ final class AetherSceneEngine: ObservableObject {
                 guard let self else { return }
                 let routeSupportsPiP = (route == .loopback || route == .remoteBypass)
                 self.pipPlayerLayer = (routeSupportsPiP && player != nil) ? self.engine.nativePlayerLayer : nil
+            }
+            .store(in: &cancellables)
+
+        // Frame analysis (AI Motion) needs a real `AVPlayerItem`; only the AVPlayer-backed
+        // routes have one. Items are swapped in place across reloads, so this follows
+        // `$currentAVPlayerItem` rather than `$currentAVPlayer`.
+        engine.$videoRoute
+            .combineLatest(engine.$currentAVPlayerItem)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] route, item in
+                guard let self else { return }
+                let routeHasItem = (route == .loopback || route == .remoteBypass)
+                let next = routeHasItem ? item : nil
+                guard self.analysisPlayerItem !== next else { return }
+                self.analysisPlayerItem = next
+                self.onAnalysisItemChanged?(next)
             }
             .store(in: &cancellables)
     }
@@ -508,6 +533,29 @@ final class AetherSceneEngine: ObservableObject {
         return engine.addExternalSubtitleTrack(track).id
     }
 
+    // MARK: - Decoded audio tap
+
+    /// Installs the engine's PCM tap and returns its buffer stream (mono Float32 48 kHz).
+    /// Returns nil when the install found no delivery source (no session yet, video-only
+    /// source, or a backend without a tap path) so callers fail fast instead of awaiting a
+    /// stream that finishes immediately.
+    ///
+    /// The stream also finishes on every `load`, `stop` and session-preserving reload
+    /// (audio/subtitle track switch), so consumers must re-install when it ends.
+    func installAudioTap() -> AsyncStream<AudioTapBuffer>? {
+        let stream = engine.installAudioTap()
+        guard engine.audioTapHasDeliverySource else {
+            engine.removeAudioTap()
+            return nil
+        }
+        return stream
+    }
+
+    /// Removes the tap and finishes its stream. Safe when none is installed.
+    func removeAudioTap() {
+        engine.removeAudioTap()
+    }
+
     func setVideoGravity(_ gravity: AVLayerVideoGravity) {
         engine.videoGravity = gravity
     }
@@ -522,8 +570,10 @@ final class AetherSceneEngine: ObservableObject {
         loadGeneration &+= 1
         pendingSeek = nil
         shutdownScrubExtractor()
+        engine.removeAudioTap()
         engine.stop()
         currentURL = nil
+        analysisPlayerItem = nil
         isPlaying = false
         hasFirstFrame = false
         currentSubtitleText = nil
