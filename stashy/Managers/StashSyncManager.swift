@@ -16,7 +16,7 @@ class StashSyncManager: ObservableObject {
 
     /// Pulse output for device channels. Kept off `@Published` so SwiftUI parents that
     /// only observe on/off (`isActive`) are not rebuilt at ~30 Hz — that restacks
-    /// `AVPlayerLayer` over Feeds filter menus.
+    /// the video layer over Feeds filter menus.
     private let currentIntensitySubject = CurrentValueSubject<Float, Never>(0.0)
     private let headIntensitySubject = CurrentValueSubject<Float, Never>(0.0)
 
@@ -176,8 +176,6 @@ class StashSyncManager: ObservableObject {
 
         if enabled {
             StashVideoSyncManager.shared.isVideoSyncEnabled = true
-            // Toggled mid-playback: the tap is only installed on demand, so ask for it now.
-            StashVideoSyncManager.shared.refreshAudioTap()
         }
 
         HandyManager.shared.isStashSyncMode = enabled

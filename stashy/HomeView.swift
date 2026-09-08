@@ -1,6 +1,5 @@
 #if !os(tvOS)
 import SwiftUI
-import AVKit
 
 /// Dashboard; mit ``catalogBrowserViewModel`` dasselbe VM wie die anderen Katalog-Tabs (Daten bleiben beim Unter-Tab-Wechsel warm).
 struct HomeView: View {

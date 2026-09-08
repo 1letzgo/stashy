@@ -1,6 +1,5 @@
 #if !os(tvOS)
 import Foundation
-import AVFoundation
 import Combine
 import UIKit
 #if canImport(AetherEngine)
@@ -166,8 +165,9 @@ final class SubtitleController: ObservableObject {
 
     private var cues: [SubtitleCue] = []
     private var cueIndex: Int = 0
-    private weak var player: AVPlayer?
-    private var timeObserver: Any?
+    /// Last playhead value seen from the engine clock, so a caption file that finishes loading
+    /// mid-playback can render immediately instead of waiting for the next tick.
+    private var lastKnownSeconds: TimeInterval = 0
     #if canImport(AetherEngine)
     private var engineClockCancellable: AnyCancellable?
     #endif
@@ -183,7 +183,7 @@ final class SubtitleController: ObservableObject {
 
     var hasCaptions: Bool { !availableCaptions.isEmpty }
 
-    func configure(scene: Scene, player: AVPlayer?) {
+    func configure(scene: Scene) {
         let sceneChanged = configuredSceneID != scene.id
         if sceneChanged {
             configuredSceneID = scene.id
@@ -195,7 +195,6 @@ final class SubtitleController: ObservableObject {
         availableCaptions = scene.captions ?? []
         captionBaseURL = Self.resolveCaptionBaseURL(scene.paths?.caption)
             ?? Self.fallbackCaptionBaseURL(sceneID: scene.id)
-        attach(player: player)
 
         guard hasCaptions else {
             if !isLiveCaptionsActive {
@@ -268,9 +267,7 @@ final class SubtitleController: ObservableObject {
             self.cues = parsed
             self.cueIndex = 0
             self.loadTask = nil
-            if let seconds = self.player?.currentTime().seconds, seconds.isFinite {
-                self.updateText(at: seconds)
-            }
+            self.updateText(at: self.lastKnownSeconds)
         }
     }
 
@@ -385,29 +382,13 @@ final class SubtitleController: ObservableObject {
         cueIndex = 0
     }
 
-    func attach(player: AVPlayer?) {
-        detachTimeObserver()
-        self.player = player
-        guard let player else { return }
-
-        let interval = CMTime(seconds: 0.2, preferredTimescale: 600)
-        timeObserver = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { [weak self] time in
-            let seconds = time.seconds
-            guard seconds.isFinite else { return }
-            Task { @MainActor in
-                self?.updateText(at: seconds)
-            }
-        }
-    }
-
     #if canImport(AetherEngine)
-    /// Engine counterpart of `attach(player:)`. Only the live-caption channel needs it: server VTT
+    /// Binds the caption clock to the playback engine. Only the live-caption channel needs it: server VTT
     /// is registered as an external subtitle track on the engine and drawn from its own cue
     /// pipeline, so `cues` stays empty here. The tick still matters — a non-timeline-synced live
     /// caption expires by wall clock and needs someone to clear it.
     func attach(aether: AetherSceneEngine) {
-        detachTimeObserver()
-        player = nil
+        detachClock()
         engineClockCancellable = aether.engine.clock.$sourceTime
             .removeDuplicates()
             .receive(on: RunLoop.main)
@@ -422,8 +403,7 @@ final class SubtitleController: ObservableObject {
         loadTask?.cancel()
         loadTask = nil
         endLiveCaptions()
-        detachTimeObserver()
-        player = nil
+        detachClock()
         currentText = ""
         cues = []
         cueIndex = 0
@@ -442,11 +422,7 @@ final class SubtitleController: ObservableObject {
         return signedURL(components.url)
     }
 
-    private func detachTimeObserver() {
-        if let token = timeObserver, let player {
-            player.removeTimeObserver(token)
-        }
-        timeObserver = nil
+    private func detachClock() {
         #if canImport(AetherEngine)
         engineClockCancellable?.cancel()
         engineClockCancellable = nil
@@ -454,6 +430,7 @@ final class SubtitleController: ObservableObject {
     }
 
     private func updateText(at seconds: TimeInterval) {
+        lastKnownSeconds = seconds
         if isLiveCaptionsActive {
             if !liveCaptionsTimelineSynced, Date() >= liveHoldUntil, !currentText.isEmpty {
                 currentText = ""

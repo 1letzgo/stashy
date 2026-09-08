@@ -2,7 +2,6 @@
 
 #if !os(tvOS)
 import SwiftUI
-import AVFoundation
 import UIKit
 #if canImport(AetherEngine)
 import AetherEngine

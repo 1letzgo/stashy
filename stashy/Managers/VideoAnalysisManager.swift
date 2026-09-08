@@ -4,7 +4,6 @@ import AVFoundation
 import Vision
 import Combine
 import SwiftUI
-import MediaToolbox
 #if canImport(AetherEngine)
 import AetherEngine
 #endif
@@ -46,12 +45,6 @@ enum SexPosition: String, Equatable {
         case .fingering:      return "hand.point.up.fill"
         }
     }
-}
-
-extension Notification.Name {
-    /// Posted when the analysis audio tap releases the item's `audioMix`, so the audio-track
-    /// controller can re-apply its own exclusive mix.
-    static let sceneAudioTapChanged = Notification.Name("SceneAudioTapChanged")
 }
 
 class StashVideoSyncManager: ObservableObject {
@@ -125,10 +118,8 @@ class StashVideoSyncManager: ObservableObject {
     private var headAccum: Float = 0.0
     private var wristAccum: Float = 0.0
 
-    // Audio tap
-    private var audioTap: MTAudioProcessingTap?
+    // Audio level tracking (engine PCM tap)
     private var audioAGCMax: Float = 0.01  // adaptive ceiling for AGC normalization
-    private var tapASBD: AudioStreamBasicDescription?
     private let transcriptionHandlerLock = NSLock()
     private var _transcriptionPCMHandler: ((AVAudioPCMBuffer) -> Void)?
     /// Live PCM from the same decode path as playback (HLS-safe). Called on the audio thread; buffer is a copy.
@@ -142,17 +133,10 @@ class StashVideoSyncManager: ObservableObject {
             transcriptionHandlerLock.lock()
             _transcriptionPCMHandler = newValue
             transcriptionHandlerLock.unlock()
-            DispatchQueue.main.async { [weak self] in self?.refreshAudioTap() }
         }
     }
-    var hasAudioTapInstalled: Bool { audioTap != nil }
-    /// True while the `audioMix` on `currentPlayerItem` belongs to the tap, so `SceneAudioTrackController`
-    /// can take it back once the tap goes away.
-    private var tapOwnsAudioMix = false
 
-    /// True while audio comes from the playback engine's PCM tap instead of the
-    /// `MTAudioProcessingTap`. An `audioMix` on the engine's item would fight its own
-    /// audio pipeline, so the tap path stays disabled in this mode.
+    /// True while the playback engine's PCM tap is the audio source. It is the only source.
     private var usesEngineAudio = false
     private var engineAudioTask: Task<Void, Never>?
     #if canImport(AetherEngine)
@@ -199,14 +183,6 @@ class StashVideoSyncManager: ObservableObject {
     private init() {
         cachedSensitivity = Float(sensitivity)
         cachedSmoothing = Float(smoothing)
-    }
-
-    func setup(for playerItem: AVPlayerItem) {
-        cleanup()
-        self.currentPlayerItem = playerItem
-        installVideoOutput(on: playerItem)
-        refreshAudioTap()
-        startDisplayLink()
     }
 
     private func installVideoOutput(on playerItem: AVPlayerItem) {
@@ -259,8 +235,7 @@ class StashVideoSyncManager: ObservableObject {
         if hasEngineAudioAttached { return }
         usesEngineAudio = true
         attachEngineAudioStream(provider())
-        // No delivery source yet (session still coming up): roll the flag back so an AVPlayer
-        // scene later on is not left with the `MTAudioProcessingTap` path disabled. AI Motion
+        // No delivery source yet (session still coming up): roll the flag back. AI Motion
         // (`currentPlayerItem`) owns the flag while it runs and keeps it either way.
         if engineAudioTask == nil, currentPlayerItem == nil {
             usesEngineAudio = false
@@ -279,10 +254,9 @@ class StashVideoSyncManager: ObservableObject {
         engineAudioStreamProvider = nil
     }
 
-    /// Entry point for the optional playback engine. The video path is unchanged — the engine's
-    /// AVPlayer-backed item (`.loopback` / `.remoteBypass`) takes the same
-    /// `AVPlayerItemVideoOutput`. Audio comes from the engine's decoded PCM tap instead, so no
-    /// `audioMix` is ever written onto the engine's item.
+    /// Entry point for the playback engine. Video frames come off the engine's item through an
+    /// `AVPlayerItemVideoOutput`; audio comes from the engine's decoded PCM tap, so no `audioMix`
+    /// is ever written onto the engine's item.
     func setup(aetherItem: AVPlayerItem, audio: AsyncStream<AudioTapBuffer>?) {
         cleanup()
         usesEngineAudio = true
@@ -292,8 +266,8 @@ class StashVideoSyncManager: ObservableObject {
         startDisplayLink()
     }
 
-    /// Consumes the engine's tap on a detached task and feeds the same RMS/AGC analysis the
-    /// `MTAudioProcessingTap` feeds. Cancelled on teardown and on every re-setup.
+    /// Consumes the engine's tap on a detached task and feeds the RMS/AGC analysis.
+    /// Cancelled on teardown and on every re-setup.
     func attachEngineAudioStream(_ audio: AsyncStream<AudioTapBuffer>?) {
         engineAudioTask?.cancel()
         engineAudioTask = nil
@@ -324,7 +298,7 @@ class StashVideoSyncManager: ObservableObject {
         }
     }
 
-    /// Mono Float32 (`AetherEngine.audioTapFormat`) → the same RMS the tap callback computes.
+    /// Mono Float32 (`AetherEngine.audioTapFormat`) → RMS for the motion/audio channel.
     private func consumeEngineAudio(_ tapBuffer: AudioTapBuffer) {
         let buffer = tapBuffer.buffer
         let frames = Int(buffer.frameLength)
@@ -344,125 +318,6 @@ class StashVideoSyncManager: ObservableObject {
 
 #endif
 
-    // MARK: - Audio Tap (MTAudioProcessingTap + AGC)
-
-    /// The tap can only be reached through an `audioMix`, and a non-nil `audioMix` collapses AVKit's
-    /// native Audio menu to Enhance Dialogue — no track/language rows at all. So install it only while
-    /// something actually consumes the samples (AI Motion or live transcription); otherwise leave the
-    /// mix to `SceneAudioTrackController` so audio tracks stay selectable in the player.
-    func refreshAudioTap() {
-        // The engine owns its audio pipeline; its PCM tap already feeds both consumers.
-        guard !usesEngineAudio else { return }
-        let needsTap = isVideoSyncEnabled || transcriptionPCMHandler != nil
-        if needsTap {
-            guard audioTap == nil, let item = currentPlayerItem else { return }
-            setupAudioTap(for: item)
-        } else {
-            removeAudioTap()
-        }
-    }
-
-    private func removeAudioTap() {
-        guard audioTap != nil || tapOwnsAudioMix else { return }
-        audioTap = nil
-        tapASBD = nil
-        if tapOwnsAudioMix {
-            currentPlayerItem?.audioMix = nil
-            tapOwnsAudioMix = false
-        }
-        // Muxed multi-track files still need an exclusive mix — let the audio controller re-apply it.
-        NotificationCenter.default.post(name: .sceneAudioTapChanged, object: nil)
-    }
-
-    private func setupAudioTap(for playerItem: AVPlayerItem) {
-        let asset = playerItem.asset
-        Task { [weak self] in
-            guard let self else { return }
-            do {
-                let tracks = try await asset.loadTracks(withMediaType: .audio)
-                let selected = tracks.first(where: { $0.trackID == SceneExclusiveAudio.selectedTrackID }) ?? tracks.first
-                guard let audioTrack = selected else { return }
-                await MainActor.run {
-                    self.installAudioTap(on: playerItem, audioTrack: audioTrack, allAudioTracks: tracks)
-                }
-            } catch {
-                // If track loading fails, skip audio tap gracefully
-            }
-        }
-    }
-
-    private func installAudioTap(on playerItem: AVPlayerItem, audioTrack: AVAssetTrack, allAudioTracks: [AVAssetTrack]) {
-        // Track loading is async — the consumer may have gone away in the meantime.
-        guard isVideoSyncEnabled || transcriptionPCMHandler != nil else { return }
-        var callbacks = MTAudioProcessingTapCallbacks(
-            version: kMTAudioProcessingTapCallbacksVersion_0,
-            clientInfo: UnsafeMutableRawPointer(Unmanaged.passRetained(self).toOpaque()),
-            init: { tap, clientInfo, tapStorageOut in
-                tapStorageOut.pointee = clientInfo
-            },
-            finalize: { tap in
-                let storage = MTAudioProcessingTapGetStorage(tap)
-                Unmanaged<StashVideoSyncManager>.fromOpaque(storage).release()
-            },
-            prepare: { tap, _, processingFormat in
-                let storage = MTAudioProcessingTapGetStorage(tap)
-                let manager = Unmanaged<StashVideoSyncManager>.fromOpaque(storage).takeUnretainedValue()
-                manager.tapASBD = processingFormat.pointee
-            },
-            unprepare: { tap in
-                let storage = MTAudioProcessingTapGetStorage(tap)
-                let manager = Unmanaged<StashVideoSyncManager>.fromOpaque(storage).takeUnretainedValue()
-                manager.tapASBD = nil
-            },
-            process: { tap, numberFrames, flags, bufferListInOut, numberFramesOut, flagsOut in
-                let storage = MTAudioProcessingTapGetStorage(tap)
-                let manager = Unmanaged<StashVideoSyncManager>.fromOpaque(storage).takeUnretainedValue()
-
-                var outFrames: CMItemCount = 0
-                MTAudioProcessingTapGetSourceAudio(tap, numberFrames, bufferListInOut, flagsOut, nil, &outFrames)
-                numberFramesOut.pointee = outFrames
-
-                guard bufferListInOut.pointee.mNumberBuffers > 0,
-                      outFrames > 0 else { return }
-
-                let audioBuffer = bufferListInOut.pointee.mBuffers
-                guard let dataPtr = audioBuffer.mData else { return }
-                let sampleCount = min(Int(audioBuffer.mDataByteSize) / MemoryLayout<Float>.size, 4096)
-                guard sampleCount > 0 else { return }
-
-                let samples = dataPtr.assumingMemoryBound(to: Float.self)
-                var sumSquares: Float = 0
-                for i in 0..<sampleCount { let s = samples[i]; sumSquares += s * s }
-                let rms = sqrt(sumSquares / Float(sampleCount))
-                manager.updateAudioIntensity(rms)
-
-                manager.transcriptionHandlerLock.lock()
-                let handler = manager._transcriptionPCMHandler
-                let asbd = manager.tapASBD
-                manager.transcriptionHandlerLock.unlock()
-                if let handler, let asbd,
-                   let pcm = manager.copyTapBuffer(bufferList: bufferListInOut, frames: outFrames, asbd: asbd) {
-                    handler(pcm)
-                }
-            }
-        )
-
-        var tap: MTAudioProcessingTap?
-        let status = MTAudioProcessingTapCreate(kCFAllocatorDefault, &callbacks, kMTAudioProcessingTapCreationFlag_PostEffects, &tap)
-        guard status == noErr, let tap = tap else { return }
-        self.audioTap = tap
-
-        let tracks = allAudioTracks.isEmpty ? [audioTrack] : allAudioTracks
-        let selectedID = SceneExclusiveAudio.selectedTrackID ?? audioTrack.trackID
-        SceneExclusiveAudio.selectedTrackID = selectedID
-        playerItem.audioMix = SceneExclusiveAudio.makeMix(
-            tracks: tracks,
-            selectedTrackID: selectedID,
-            tap: tap
-        )
-        tapOwnsAudioMix = true
-    }
-
     // Called from audio real-time thread — only touches audioAGCMax (audio-thread-only) + dispatches to main
     private func updateAudioIntensity(_ rms: Float) {
         audioAGCMax = max(audioAGCMax * 0.9995, rms)
@@ -471,43 +326,6 @@ class StashVideoSyncManager: ObservableObject {
         DispatchQueue.main.async {
             self.audioIntensity = self.audioIntensity * sm + normalized * (1.0 - sm)
         }
-    }
-
-    /// Copy tap audio into an owned `AVAudioPCMBuffer` (safe to hand off the realtime thread).
-    private func copyTapBuffer(
-        bufferList: UnsafeMutablePointer<AudioBufferList>,
-        frames: CMItemCount,
-        asbd: AudioStreamBasicDescription
-    ) -> AVAudioPCMBuffer? {
-        guard frames > 0 else { return nil }
-        var asbdCopy = asbd
-        guard var format = AVAudioFormat(streamDescription: &asbdCopy) else { return nil }
-        // Some taps report an incomplete ASBD; fall back to common float stereo @ 48k.
-        if format.channelCount == 0 || format.sampleRate <= 0 {
-            let rate = asbd.mSampleRate > 0 ? asbd.mSampleRate : 48_000
-            let channels = AVAudioChannelCount(max(1, asbd.mChannelsPerFrame == 0 ? 2 : asbd.mChannelsPerFrame))
-            let interleaved = asbd.mFormatFlags & kAudioFormatFlagIsNonInterleaved == 0
-            guard let fallback = AVAudioFormat(
-                commonFormat: .pcmFormatFloat32,
-                sampleRate: rate,
-                channels: channels,
-                interleaved: interleaved
-            ) else { return nil }
-            format = fallback
-        }
-        guard let buffer = AVAudioPCMBuffer(pcmFormat: format, frameCapacity: AVAudioFrameCount(frames))
-        else { return nil }
-        buffer.frameLength = AVAudioFrameCount(frames)
-
-        let abl = UnsafeMutableAudioBufferListPointer(bufferList)
-        let destABL = UnsafeMutableAudioBufferListPointer(buffer.mutableAudioBufferList)
-        let count = min(abl.count, destABL.count)
-        for i in 0..<count {
-            guard let src = abl[i].mData, let dst = destABL[i].mData else { continue }
-            let byteCount = min(Int(abl[i].mDataByteSize), Int(destABL[i].mDataByteSize))
-            memcpy(dst, src, byteCount)
-        }
-        return buffer
     }
 
     // MARK: - Display Link
@@ -1236,13 +1054,7 @@ class StashVideoSyncManager: ObservableObject {
         displayLink = nil
         if let output = videoOutput, let item = currentPlayerItem { item.remove(output) }
         videoOutput = nil
-        if tapOwnsAudioMix {
-            currentPlayerItem?.audioMix = nil
-            tapOwnsAudioMix = false
-        }
         currentPlayerItem = nil
-        audioTap = nil
-        tapASBD = nil
         previousPixelBuffer = nil
         dominantPersonPixelYRange = nil
         cachedPersonMask = nil

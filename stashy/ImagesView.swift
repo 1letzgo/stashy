@@ -7,8 +7,6 @@
 
 #if !os(tvOS)
 import SwiftUI
-import AVFoundation
-import AVKit
 
 struct ImagesView: View {
     let initialGallery: Gallery?

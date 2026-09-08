@@ -7,7 +7,6 @@
 //
 
 #if !os(tvOS)
-import AVKit
 import SwiftUI
 
 // MARK: - DTOs

@@ -6,9 +6,7 @@
 //
 
 import Foundation
-import AVKit
 import AVFoundation
-import Network
 
 /// Protocol for types that provide a user-facing display name (used by tvOS sort picker)
 protocol DisplayNameProvider {
@@ -330,7 +328,7 @@ enum ScenePlayerMute {
 
     /// Without headphones playback always starts muted — the stored choice only applies while
     /// headphones are connected. Gating before the lookup also neutralises a `false` that an
-    /// earlier build persisted from AVKit's own mute resets.
+    /// earlier build persisted from a player's own mute reset.
     static func initialValue() -> Bool {
         guard isHeadphonesConnected() else { return true }
         if UserDefaults.standard.object(forKey: key) == nil {
@@ -349,7 +347,7 @@ enum ScenePlayerMute {
     }
 
     /// Call only from an explicit user action. Never from an `onChange`, which also sees
-    /// programmatic writes — that is how AVKit's resets used to leak into the stored choice.
+    /// programmatic writes — that is how a player's own resets used to leak into the stored choice.
     static func persist(_ muted: Bool) {
         UserDefaults.standard.set(muted, forKey: key)
     }
@@ -408,13 +406,6 @@ extension View {
     }
 }
 
-// MARK: - Playback Buffer Heuristics
-
-/// Buffer used during high-frequency scrubbing — keeps seeks responsive.
-let kScrubForwardBuffer: TimeInterval = 2
-/// Buffer used during steady-state playback — reduces stalls.
-let kPlayingForwardBuffer: TimeInterval = 6
-
 /// Builds an `AVURLAsset` for a Stash stream URL with apikey-query + ApiKey-header
 /// authentication applied consistently. Single source of truth for asset creation.
 func makeAuthenticatedAsset(for url: URL) -> AVURLAsset {
@@ -425,33 +416,6 @@ func makeAuthenticatedAsset(for url: URL) -> AVURLAsset {
         headers["ApiKey"] = apiKey
     }
     return AVURLAsset(url: authenticatedURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
-}
-
-/// Creates a VOD-tuned `AVPlayerItem` for Stash content with the playing-state buffer.
-func makeVODPlayerItem(for url: URL) -> AVPlayerItem {
-    let asset = makeAuthenticatedAsset(for: url)
-    let item = AVPlayerItem(
-        asset: asset,
-        automaticallyLoadedAssetKeys: [
-            "tracks",
-            "availableMediaCharacteristicsWithMediaSelectionOptions",
-            "duration"
-        ]
-    )
-    configureForVOD(item, isScrubbing: false)
-    // Seed a sensible peak bit rate based on the current network class.
-    if let cap = NetworkQualityMonitor.shared.recommendedPeakBitRate() {
-        item.preferredPeakBitRate = cap
-    }
-    return item
-}
-
-/// Applies VOD playback tuning. Call again with `isScrubbing: true` while the user
-/// is dragging the scrubber to keep seeks instantaneous.
-func configureForVOD(_ item: AVPlayerItem, isScrubbing: Bool) {
-    item.preferredForwardBufferDuration = isScrubbing ? kScrubForwardBuffer : kPlayingForwardBuffer
-    item.automaticallyPreservesTimeOffsetFromLive = false
-    item.canUseNetworkResourcesForLiveStreamingWhilePaused = true
 }
 
 func applyPlaybackAudioSession() {
@@ -472,41 +436,6 @@ func applyAmbientMixingAudioSession() {
         try AVAudioSession.sharedInstance().setActive(true)
     } catch {
         print("🎬 PREVIEW PLAYER: Error setting up AVAudioSession: \(error)")
-    }
-}
-
-/// - Parameter muted: deliberately has no default — the compiler then forces every call site to
-///   make a conscious choice instead of silently inheriting AVPlayer's unmuted default.
-func createPlayer(for url: URL, takesAudioSession: Bool = true, muted: Bool) -> AVPlayer {
-    if takesAudioSession {
-        applyPlaybackAudioSession()
-    }
-
-    let playerItem = makeVODPlayerItem(for: url)
-    #if DEBUG
-    print("🎬 VIDEO PLAYER: Creating player for URL: \(redactedURLString((playerItem.asset as? AVURLAsset)?.url ?? url))")
-    #endif
-
-    let player = AVPlayer(playerItem: playerItem)
-    // Scrubbing responsiveness: `automaticallyWaitsToMinimizeStalling` makes
-    // AVPlayer hold playback after every seek until a buffer threshold is met.
-    // Disabling it returns control instantly after `seek`/`play`.
-    player.automaticallyWaitsToMinimizeStalling = false
-    player.allowsExternalPlayback = true
-    player.preventsDisplaySleepDuringVideoPlayback = true
-    // Set here, not by the caller: otherwise the player briefly exists unmuted.
-    player.isMuted = muted
-    applyBackgroundPlaybackPolicy(to: player)
-    return player
-}
-
-/// When PiP is disabled in settings, pause A/V on lock/background instead of
-/// keeping a Now Playing / lock-screen session alive.
-func applyBackgroundPlaybackPolicy(to player: AVPlayer) {
-    if #available(iOS 15.0, *) {
-        player.audiovisualBackgroundPlaybackPolicy = TabManager.shared.isPiPEnabled
-            ? .automatic
-            : .pauses
     }
 }
 
@@ -621,17 +550,6 @@ final class ScenePlaybackActivityTracker {
     }
 }
 
-/// Creates a muted preview player that doesn't interrupt other audio
-func createMutedPreviewPlayer(for url: URL) -> AVPlayer {
-    applyAmbientMixingAudioSession()
-
-    let asset = makeAuthenticatedAsset(for: url)
-    let playerItem = AVPlayerItem(asset: asset)
-    let player = AVPlayer(playerItem: playerItem)
-    player.isMuted = true
-    return player
-}
-
 #if !os(tvOS)
 /// Maximum still size the capture paths hand to Stash (aspect preserved, never upscaled).
 let kCaptureFrameMaxSize = CGSize(width: 1920, height: 1920)
@@ -644,102 +562,7 @@ func videoFrameDataURL(from image: UIImage) -> String? {
     return "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
 }
 
-/// Captures a still from the current player (or `fallbackURL`) as a Stash-compatible
-/// `data:image/jpeg;base64,…` string for `tagUpdate` / `performerUpdate` image fields.
-@MainActor
-func captureVideoFrameDataURL(
-    from player: AVPlayer?,
-    fallbackURL: URL?,
-    at time: CMTime? = nil
-) async -> String? {
-    let asset: AVAsset?
-    let captureTime: CMTime
-
-    if let player, let itemAsset = player.currentItem?.asset {
-        asset = itemAsset
-        let playerTime = player.currentTime()
-        captureTime = time ?? (playerTime.isNumeric && playerTime.seconds.isFinite ? playerTime : .zero)
-    } else if let fallbackURL {
-        asset = makeAuthenticatedAsset(for: fallbackURL)
-        captureTime = time ?? .zero
-    } else {
-        return nil
-    }
-
-    guard let asset else { return nil }
-
-    let generator = AVAssetImageGenerator(asset: asset)
-    generator.appliesPreferredTrackTransform = true
-    generator.maximumSize = kCaptureFrameMaxSize
-    generator.requestedTimeToleranceBefore = CMTime(seconds: 0.05, preferredTimescale: 600)
-    generator.requestedTimeToleranceAfter = CMTime(seconds: 0.35, preferredTimescale: 600)
-
-    do {
-        let cgImage: CGImage
-        if #available(iOS 16.0, *) {
-            let (image, _) = try await generator.image(at: captureTime)
-            cgImage = image
-        } else {
-            var actual = CMTime.zero
-            cgImage = try generator.copyCGImage(at: captureTime, actualTime: &actual)
-        }
-        return videoFrameDataURL(from: UIImage(cgImage: cgImage))
-    } catch {
-        print("🖼 Frame capture failed: \(error)")
-        return nil
-    }
-}
 #endif
-
-// MARK: - Network Quality Monitor
-
-/// Monitors current network reachability/cellular state and provides
-/// a recommended `preferredPeakBitRate` for HLS so we don't burn data
-/// on Mobilfunk or stall on a constrained link.
-final class NetworkQualityMonitor: @unchecked Sendable {
-    static let shared = NetworkQualityMonitor()
-
-    enum Connection { case unknown, wifi, cellular, wired, constrained }
-
-    private let monitor = NWPathMonitor()
-    private let queue = DispatchQueue(label: "stashy.network.monitor")
-    private(set) var connection: Connection = .unknown
-    private(set) var isExpensive: Bool = false
-    private(set) var isConstrained: Bool = false
-
-    private init() {
-        monitor.pathUpdateHandler = { [weak self] path in
-            guard let self = self else { return }
-            self.isExpensive = path.isExpensive
-            self.isConstrained = path.isConstrained
-            if path.isConstrained {
-                self.connection = .constrained
-            } else if path.usesInterfaceType(.wifi) {
-                self.connection = .wifi
-            } else if path.usesInterfaceType(.wiredEthernet) {
-                self.connection = .wired
-            } else if path.usesInterfaceType(.cellular) {
-                self.connection = .cellular
-            } else {
-                self.connection = .unknown
-            }
-        }
-        monitor.start(queue: queue)
-    }
-
-    /// Returns a peak bit rate cap (bits/sec) appropriate for the current link.
-    /// Returns `nil` to mean "no cap" (Wi-Fi / Wired).
-    func recommendedPeakBitRate() -> Double? {
-        switch connection {
-        case .cellular:
-            return 4_000_000   // ~ 1080p H.264 capped
-        case .constrained:
-            return 1_500_000   // ~ 480p
-        case .wifi, .wired, .unknown:
-            return nil
-        }
-    }
-}
 
 // MARK: - Generic JSON Handling
 

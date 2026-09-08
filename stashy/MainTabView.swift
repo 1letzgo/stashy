@@ -7,7 +7,6 @@
 
 #if !os(tvOS)
 import SwiftUI
-import AVKit
 import AVFoundation
 
 struct MainTabView: View {

@@ -28,9 +28,7 @@
 		372E2D9D2F645A0100603361 /* SubtitleController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2D9C2F645A0100603361 /* SubtitleController.swift */; };
 		372E2DA32F646B0100603361 /* SceneTranscriptionSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DA22F646B0100603361 /* SceneTranscriptionSupport.swift */; };
 		372E2DA52F646B0100603361 /* SceneLiveTranscriptionController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DA42F646B0100603361 /* SceneLiveTranscriptionController.swift */; };
-		372E2DA92F646B0100603361 /* SceneTranscodeAudioPrefetcher.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DA82F646B0100603361 /* SceneTranscodeAudioPrefetcher.swift */; };
 		372E2DAB2F646B0100603361 /* SceneCaptionTranslator.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DAA2F646B0100603361 /* SceneCaptionTranslator.swift */; };
-		372E2DAD2F64A01000603361 /* SceneAudioTrackController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DAC2F64A01000603361 /* SceneAudioTrackController.swift */; };
 		372E2DB12F64C10000603361 /* OCountHeatmapLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DB02F64C10000603361 /* OCountHeatmapLoader.swift */; };
 		372E2DB22F64C10000603361 /* OCountHeatmapLoader.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DB02F64C10000603361 /* OCountHeatmapLoader.swift */; };
 		372E2DB42F64C11000603361 /* OCountHeatmapCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 372E2DB32F64C11000603361 /* OCountHeatmapCard.swift */; };
@@ -225,9 +223,7 @@
 		372E2D9C2F645A0100603361 /* SubtitleController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubtitleController.swift; sourceTree = "<group>"; };
 		372E2DA22F646B0100603361 /* SceneTranscriptionSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneTranscriptionSupport.swift; sourceTree = "<group>"; };
 		372E2DA42F646B0100603361 /* SceneLiveTranscriptionController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneLiveTranscriptionController.swift; sourceTree = "<group>"; };
-		372E2DA82F646B0100603361 /* SceneTranscodeAudioPrefetcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneTranscodeAudioPrefetcher.swift; sourceTree = "<group>"; };
 		372E2DAA2F646B0100603361 /* SceneCaptionTranslator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCaptionTranslator.swift; sourceTree = "<group>"; };
-		372E2DAC2F64A01000603361 /* SceneAudioTrackController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneAudioTrackController.swift; sourceTree = "<group>"; };
 		372E2DB02F64C10000603361 /* OCountHeatmapLoader.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCountHeatmapLoader.swift; sourceTree = "<group>"; };
 		372E2DB32F64C11000603361 /* OCountHeatmapCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OCountHeatmapCard.swift; sourceTree = "<group>"; };
 		37D092D52F8980B400DB7A08 /* MarkersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkersView.swift; sourceTree = "<group>"; };
@@ -453,7 +449,6 @@
 			children = (
 				372E2DA22F646B0100603361 /* SceneTranscriptionSupport.swift */,
 				372E2DA42F646B0100603361 /* SceneLiveTranscriptionController.swift */,
-				372E2DA82F646B0100603361 /* SceneTranscodeAudioPrefetcher.swift */,
 				372E2DAA2F646B0100603361 /* SceneCaptionTranslator.swift */,
 			);
 			path = Subtitles;
@@ -469,7 +464,6 @@
 				A1PLUS022F30B00000000002 /* StashyPlusManager.swift */,
 				A1ICON022F30B00000000002 /* AppIconManager.swift */,
 				372E2D9C2F645A0100603361 /* SubtitleController.swift */,
-				372E2DAC2F64A01000603361 /* SceneAudioTrackController.swift */,
 				372E2DB02F64C10000603361 /* OCountHeatmapLoader.swift */,
 				971A00092F999009 /* SessionTimelineLoader.swift */,
 				DFSEC0022F2A000100000002 /* SecurityManager.swift */,
@@ -738,11 +732,9 @@
 				A1PLUS012F30B00000000001 /* StashyPlusManager.swift in Sources */,
 				A1ICON012F30B00000000001 /* AppIconManager.swift in Sources */,
 				372E2D9D2F645A0100603361 /* SubtitleController.swift in Sources */,
-				372E2DAD2F64A01000603361 /* SceneAudioTrackController.swift in Sources */,
 				372E2DB12F64C10000603361 /* OCountHeatmapLoader.swift in Sources */,
 				372E2DA32F646B0100603361 /* SceneTranscriptionSupport.swift in Sources */,
 				372E2DA52F646B0100603361 /* SceneLiveTranscriptionController.swift in Sources */,
-				372E2DA92F646B0100603361 /* SceneTranscodeAudioPrefetcher.swift in Sources */,
 				372E2DAB2F646B0100603361 /* SceneCaptionTranslator.swift in Sources */,
 				DFST000132F30A0000000013 /* DefaultFilterView.swift in Sources */,
 				DFST000152F30A0000000015 /* ServerStatisticsView.swift in Sources */,

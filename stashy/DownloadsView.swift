@@ -7,7 +7,6 @@
 
 #if !os(tvOS)
 import SwiftUI
-import AVKit
 
 struct DownloadsView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared

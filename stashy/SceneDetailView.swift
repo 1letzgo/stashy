@@ -8,7 +8,6 @@
 #if !os(tvOS)
 import SwiftUI
 import AVFoundation
-import AVKit
 import WebKit
 import Combine
 import Translation

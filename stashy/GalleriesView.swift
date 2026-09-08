@@ -7,8 +7,6 @@
 //
 
 import SwiftUI
-import AVKit
-import AVFoundation
 
 private struct GalleriesViewContent: View {
     @ObservedObject var viewModel: StashDBViewModel
