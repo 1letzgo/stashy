@@ -442,22 +442,33 @@ private struct StudiosViewContent: View {
                 studiosList
             }
         }
-        .navigationTitle(hideTitle ? "" : "Studios")
-        .navigationBarTitleDisplayMode(.inline)
         .applyAppBackground()
-        .conditionalSearchable(isVisible: isSearchVisible, text: $searchText, prompt: "Search studios...")
-        .toolbar {
-            toolbarContent
-        }
-        .floatingActionBar(isPresented: true, catalogChrome: CatalogFloatingChromeState(hasActiveServerConfig: configManager.activeConfig != nil, primaryListIsEmpty: viewModel.studios.isEmpty, errorMessage: viewModel.errorMessage)) {
-            HStack(spacing: 0) {
-                Spacer(minLength: 0)
-                CatalogFilterFABButton(isActive: catalogFilterSortFABActive) {
-                    showFilterSortSheet = true
-                }
-                Spacer(minLength: 0)
-            }
-        }
+        .stashyCatalogChrome(catalogChromeConfig)
+    }
+
+    private var catalogChromeConfig: CatalogChromeConfig {
+        CatalogChromeConfig(
+            title: "Studios",
+            ownsNavigationBar: !hideTitle,
+            visibility: CatalogFloatingChromeState(
+                hasActiveServerConfig: configManager.activeConfig != nil,
+                primaryListIsEmpty: viewModel.studios.isEmpty,
+                errorMessage: viewModel.errorMessage
+            ),
+            isPresented: true,
+            filterSort: CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: catalogFilterSortFABActive,
+                accessibilityLabel: "Settings",
+                action: { showFilterSortSheet = true }
+            ),
+            search: CatalogSearchChrome(
+                text: $searchText,
+                isVisible: $isSearchVisible,
+                prompt: "Search studios...",
+                onClear: { performSearch() }
+            )
+        )
     }
 
     @ViewBuilder
@@ -520,31 +531,6 @@ private struct StudiosViewContent: View {
            let uuid = UUID(uuidString: ls),
            let preset = localCatalogPresets.first(where: { $0.id == uuid }) {
             applyStudioCatalogPreset(preset)
-        }
-    }
-
-    @ToolbarContentBuilder
-    private var toolbarContent: some ToolbarContent {
-        if !searchText.isEmpty {
-            ToolbarItem(placement: .principal) {
-                Button(action: {
-                    searchText = ""
-                    performSearch()
-                }) {
-                    HStack(spacing: 4) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 10, weight: .bold))
-                        Text(searchText)
-                            .font(.system(size: 12, weight: .bold))
-                            .lineLimit(1)
-                    }
-                    .foregroundColor(.white.opacity(0.9))
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 8)
-                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                    .clipShape(Capsule())
-                }
-            }
         }
     }
 

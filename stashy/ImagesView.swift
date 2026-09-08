@@ -137,6 +137,8 @@ private struct ImagesViewBody: View {
 
     // Multi-Select State
     @State private var isSelectionMode = false
+    /// iOS 18 search drawer toggle for the native chrome path.
+    @State private var isSearchVisible = false
     @State private var selectedImageIds: Set<String> = []
     @State private var showDeleteConfirmation = false
     @State private var isDeleting = false
@@ -396,18 +398,11 @@ private struct ImagesViewBody: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .modifier(OpenedGalleryNavigationChrome(
-            isOpenedGallery: isOpenedGallery,
-            feedsEmbedded: feedsEmbedded,
-            searchText: $searchText,
-            onClearSearch: {
-                searchText = ""
-                viewModel.currentImageSearchQuery = ""
-                imageListFilters.refetchImages(viewModel: viewModel, initial: true)
-            }
+        .modifier(FeedsEmbeddedNavigationChrome(
+            enabled: !isOpenedGallery && feedsEmbedded
         ))
         .applyAppBackground()
-        .overlay(alignment: .bottom) {
+        .stashyBottomOverlay {
             if isSelectionMode {
                 floatingDeleteBar
             }
@@ -420,7 +415,10 @@ private struct ImagesViewBody: View {
         } message: {
             Text("These images will be permanently deleted. This action cannot be undone.")
         }
-        .modifier(ImagesTopChromeInset(isOpenedGallery: isOpenedGallery) {
+        .modifier(OpenedGalleryDetailChrome(
+            isOpenedGallery: isOpenedGallery,
+            config: openedGalleryChromeConfig
+        ) {
             openedGalleryNavBar
         })
         .sheet(isPresented: $showingEditGallerySheet) {
@@ -595,55 +593,22 @@ private struct ImagesViewBody: View {
                 }
             }
         }
-        .floatingActionBar(isPresented: !feedsEmbedded, catalogChrome: CatalogFloatingChromeState(hasActiveServerConfig: configManager.activeConfig != nil, primaryListIsEmpty: displayedImages.isEmpty, errorMessage: viewModel.errorMessage, imageFindListError: viewModel.imageFindListError)) {
-            HStack(spacing: 0) {
-                if isSelectionMode {
-                    CatalogFABIconButton(systemImage: "checkmark.circle.fill") {
-                        withAnimation(DesignTokens.Animation.quick) { isSelectionMode = false }
-                        selectedImageIds.removeAll()
-                    }
-                    .frame(maxWidth: .infinity)
-                } else {
-                    let cardColumns = effectiveCardColumns
-                    CatalogFABIconButton(
-                        systemImage: cardColumns.toggleIcon,
-                        accessibilityLabel: cardColumns.accessibilityLabel,
-                        accessibilityHint: "Switches between one and two cards per row"
-                    ) {
-                        withAnimation(DesignTokens.Animation.quick) {
-                            ignoreForcedOneColumnFeed = true
-                            tabManager.toggleCatalogCardColumns(for: cardColumnScope)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-
-                    CatalogFABIconButton(systemImage: "checkmark.circle") {
-                        withAnimation(DesignTokens.Animation.quick) { isSelectionMode = true }
-                    }
-                    .frame(maxWidth: .infinity)
-
-                    // Feeds → Pics: quick filter lives in the Reels navbar.
-                    if !feedsEmbedded {
-                        imagesFilterMenuButton
-                    }
-
-                    CatalogFilterFABButton(isActive: catalogFilterSortFABActive) {
-                        imageListFilters.showFilterSortSheet = true
-                    }
-                    .frame(maxWidth: .infinity)
-
-                    if let gallery {
-                        galleryDownloadButton(gallery)
-                            .frame(maxWidth: .infinity)
-                    }
-                }
-            }
-        }
+        .stashyCatalogChrome(imagesChromeConfig)
+        .modifier(GalleryDownloadOptionsAlert(
+            gallery: gallery,
+            isPresented: $showingGalleryDownloadOptions
+        ))
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ImageDeleted"))) { notification in
             if let imageId = notification.userInfo?["imageId"] as? String {
                 viewModel.removeImage(id: imageId)
             }
         }
+    }
+
+    /// Shared detail chrome for an opened gallery. The list slots stay with
+    /// `stashyCatalogChrome`, so this config carries no `listSlots`.
+    private var openedGalleryChromeConfig: StashyDetailChromeConfig {
+        StashyDetailChromeConfig(listSlots: nil, insetSpacing: DesignTokens.Chrome.contentTopGap)
     }
 
     /// Custom top chrome for opened galleries: Back · Edit (title lives in the header card).
@@ -849,65 +814,38 @@ private struct ImagesViewBody: View {
     }
 
     /// Download / sync control for the gallery currently being browsed.
-    @ViewBuilder
-    private func galleryDownloadButton(_ gallery: Gallery) -> some View {
+    private func galleryDownloadSlot(_ gallery: Gallery) -> CatalogChromeSlot {
         let isDownloading = downloadManager.activeDownloads[gallery.id] != nil
         let stored = downloadManager.downloadedGallery(id: gallery.id)
 
         if isDownloading {
             // Tapping while it runs cancels — a long gallery is otherwise unstoppable.
-            CatalogFABIconButton(
+            return CatalogChromeSlot(
                 systemImage: "stop.circle",
                 isActive: true,
-                accessibilityLabel: "Cancel download"
-            ) {
-                HapticManager.light()
-                downloadManager.cancelGalleryDownload(id: gallery.id)
-            }
-        } else {
-            CatalogFABIconButton(
-                systemImage: stored == nil ? "arrow.down.doc" : "checkmark.circle.fill",
-                isActive: stored != nil,
-                accessibilityLabel: stored == nil ? "Download gallery" : "Downloaded"
-            ) {
+                accessibilityLabel: "Cancel download",
+                action: {
+                    HapticManager.light()
+                    downloadManager.cancelGalleryDownload(id: gallery.id)
+                }
+            )
+        }
+        return CatalogChromeSlot(
+            systemImage: stored == nil ? "arrow.down.doc" : "checkmark.circle.fill",
+            isActive: stored != nil,
+            accessibilityLabel: stored == nil ? "Download gallery" : "Downloaded",
+            action: {
                 HapticManager.light()
                 showingGalleryDownloadOptions = true
             }
-            .alert("Gallery", isPresented: $showingGalleryDownloadOptions) {
-                if stored != nil {
-                    Button("Sync newest") {
-                        downloadManager.syncGallery(id: gallery.id)
-                    }
-                    Button("Sync newest \(DownloadManager.galleryNewestBatchSize)") {
-                        downloadManager.syncGallery(id: gallery.id, limit: DownloadManager.galleryNewestBatchSize)
-                    }
-                    Button("Remove download", role: .destructive) {
-                        downloadManager.deleteGalleryDownload(id: gallery.id)
-                    }
-                } else {
-                    Button("Newest \(DownloadManager.galleryNewestBatchSize) images") {
-                        downloadManager.downloadGallery(gallery, limit: DownloadManager.galleryNewestBatchSize)
-                    }
-                    Button("All images") {
-                        downloadManager.downloadGallery(gallery, limit: nil)
-                    }
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                if let stored, let total = stored.serverImageCount {
-                    Text("\(stored.images.count) of \(total) downloaded")
-                } else if let count = gallery.imageCount {
-                    Text("\(count) images in this gallery")
-                }
-            }
-        }
+        )
     }
 
     @ViewBuilder
-    private var imagesFilterMenuButton: some View {
+    private var quickFilterMenuContent: some View {
         let serverFilters = imageListFilters.sortedServerImageFilters(viewModel: viewModel)
         let selection = imageListFilters.catalogPresetRowSelection
-        Menu {
+        Group {
             Button {
                 imageListFilters.catalogPresetRowSelection = ""
             } label: {
@@ -953,12 +891,74 @@ private struct ImagesViewBody: View {
                     }
                 }
             }
-        } label: {
-            CatalogQuickFilterFABLabel(isActive: imagesFilterMenuActive)
         }
-        .frame(maxWidth: .infinity)
-        .accessibilityLabel("Filter")
-        .accessibilityHint("Chooses a saved filter or preset")
+    }
+
+    /// Single chrome call site: legacy floating bar or native toolbar, decided by the environment flag.
+    private var imagesChromeConfig: CatalogChromeConfig {
+        let cardColumns = effectiveCardColumns
+        let ownsNavBar = !isOpenedGallery && !feedsEmbedded
+        return CatalogChromeConfig(
+            title: "Images",
+            ownsNavigationBar: ownsNavBar,
+            visibility: CatalogFloatingChromeState(
+                hasActiveServerConfig: configManager.activeConfig != nil,
+                primaryListIsEmpty: displayedImages.isEmpty,
+                errorMessage: viewModel.errorMessage,
+                imageFindListError: viewModel.imageFindListError
+            ),
+            isPresented: !feedsEmbedded,
+            columns: CatalogChromeSlot(
+                systemImage: cardColumns.toggleIcon,
+                accessibilityLabel: cardColumns.accessibilityLabel,
+                accessibilityHint: "Switches between one and two cards per row",
+                action: {
+                    withAnimation(DesignTokens.Animation.quick) {
+                        ignoreForcedOneColumnFeed = true
+                        tabManager.toggleCatalogCardColumns(for: cardColumnScope)
+                    }
+                }
+            ),
+            // Feeds → Pics: quick filter lives in the Reels navbar.
+            quickFilter: feedsEmbedded ? nil : CatalogQuickFilterMenuModel(
+                isActive: imagesFilterMenuActive,
+                accessibilityLabel: "Filter",
+                menuContent: AnyView(quickFilterMenuContent)
+            ),
+            filterSort: CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: catalogFilterSortFABActive,
+                accessibilityLabel: "Settings",
+                action: { imageListFilters.showFilterSortSheet = true }
+            ),
+            contextual: CatalogChromeSlot(
+                systemImage: "checkmark.circle",
+                accessibilityLabel: "Select images",
+                action: {
+                    withAnimation(DesignTokens.Animation.quick) { isSelectionMode = true }
+                }
+            ),
+            secondaryContextual: gallery.map { galleryDownloadSlot($0) },
+            selection: CatalogSelectionChrome(
+                isActive: isSelectionMode,
+                count: selectedImageIds.count,
+                onDone: {
+                    withAnimation(DesignTokens.Animation.quick) { isSelectionMode = false }
+                    selectedImageIds.removeAll()
+                },
+                onSelectAll: { selectedImageIds = Set(displayedImages.map { $0.id }) },
+                onDelete: { showDeleteConfirmation = true }
+            ),
+            search: ownsNavBar ? CatalogSearchChrome(
+                text: $searchText,
+                isVisible: $isSearchVisible,
+                prompt: "Search images...",
+                onClear: {
+                    viewModel.currentImageSearchQuery = ""
+                    imageListFilters.refetchImages(viewModel: viewModel, initial: true)
+                }
+            ) : nil
+        )
     }
 
     @ViewBuilder
@@ -1832,22 +1832,14 @@ private struct ImageThumbnailCardChrome: ViewModifier {
     }
 }
 
-/// System title for Images catalog; custom chrome + swipe-back for opened galleries.
 /// Feeds → Pics: only suppress the system title (no swipe-enabler on the embedded root —
 /// that raced with pushed FullScreenImageView and killed back/swipe).
-private struct OpenedGalleryNavigationChrome: ViewModifier {
-    let isOpenedGallery: Bool
-    var feedsEmbedded: Bool = false
-    @Binding var searchText: String
-    var onClearSearch: () -> Void
+private struct FeedsEmbeddedNavigationChrome: ViewModifier {
+    let enabled: Bool
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if isOpenedGallery {
-            content
-                .hideSystemNavigationBarForCustomChrome()
-                .enableSwipeBackWhenNavBarHidden()
-        } else if feedsEmbedded {
+        if enabled {
             content
                 .navigationTitle("")
                 .navigationBarTitleDisplayMode(.inline)
@@ -1855,44 +1847,62 @@ private struct OpenedGalleryNavigationChrome: ViewModifier {
                 .toolbar(.hidden, for: .navigationBar)
         } else {
             content
-                .navigationTitle("Images")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    if !searchText.isEmpty {
-                        ToolbarItem(placement: .principal) {
-                            Button {
-                                searchText = ""
-                                onClearSearch()
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "xmark")
-                                        .font(.system(size: 10, weight: .bold))
-                                    Text(searchText)
-                                        .font(.system(size: 12, weight: .bold))
-                                        .lineLimit(1)
-                                }
-                                .foregroundColor(.white.opacity(0.9))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 8)
-                                .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                                .clipShape(Capsule())
-                            }
-                        }
-                    }
-                }
         }
     }
 }
 
-/// Only attach top chrome inset when an opened gallery actually has a nav bar.
-private struct ImagesTopChromeInset<Chrome: View>: ViewModifier {
+/// Download / sync options for the opened gallery (moved off the FAB button when the
+/// chrome slots became data instead of views).
+private struct GalleryDownloadOptionsAlert: ViewModifier {
+    let gallery: Gallery?
+    @Binding var isPresented: Bool
+    @ObservedObject private var downloadManager = DownloadManager.shared
+
+    func body(content: Content) -> some View {
+        let stored = gallery.flatMap { downloadManager.downloadedGallery(id: $0.id) }
+        return content.alert("Gallery", isPresented: $isPresented) {
+            if let gallery {
+                if stored != nil {
+                    Button("Sync newest") {
+                        downloadManager.syncGallery(id: gallery.id)
+                    }
+                    Button("Sync newest \(DownloadManager.galleryNewestBatchSize)") {
+                        downloadManager.syncGallery(id: gallery.id, limit: DownloadManager.galleryNewestBatchSize)
+                    }
+                    Button("Remove download", role: .destructive) {
+                        downloadManager.deleteGalleryDownload(id: gallery.id)
+                    }
+                } else {
+                    Button("Newest \(DownloadManager.galleryNewestBatchSize) images") {
+                        downloadManager.downloadGallery(gallery, limit: DownloadManager.galleryNewestBatchSize)
+                    }
+                    Button("All images") {
+                        downloadManager.downloadGallery(gallery, limit: nil)
+                    }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            if let stored, let total = stored.serverImageCount {
+                Text("\(stored.images.count) of \(total) downloaded")
+            } else if let count = gallery?.imageCount {
+                Text("\(count) images in this gallery")
+            }
+        }
+    }
+}
+
+/// Only attach the shared detail chrome when a gallery is actually opened; the Images
+/// catalog root keeps its `stashyCatalogChrome` title and search chip.
+private struct OpenedGalleryDetailChrome<Chrome: View>: ViewModifier {
     let isOpenedGallery: Bool
+    let config: StashyDetailChromeConfig
     @ViewBuilder var chrome: () -> Chrome
 
     @ViewBuilder
     func body(content: Content) -> some View {
         if isOpenedGallery {
-            content.stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap, content: chrome)
+            content.stashyDetailChrome(config) { chrome() }
         } else {
             content
         }

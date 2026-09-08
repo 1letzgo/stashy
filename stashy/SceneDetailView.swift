@@ -72,6 +72,11 @@ struct SceneDetailView: View {
 
     @Environment(\.verticalSizeClass) var verticalSizeClass
 
+    /// Shared detail chrome: `sceneDetailNavBar` renders the actual bar content.
+    private var sceneDetailChromeConfig: StashyDetailChromeConfig {
+        StashyDetailChromeConfig(insetSpacing: 0)
+    }
+
     /// Custom top chrome: Back · Identify (if no Stash-ID) · Download.
     @ViewBuilder
     private var sceneDetailNavBar: some View {
@@ -498,9 +503,7 @@ struct SceneDetailView: View {
     var body: some View {
         mainContentView
             .applyAppBackground()
-            .hideSystemNavigationBarForCustomChrome()
-            .enableSwipeBackWhenNavBarHidden()
-            .stashyCustomChromeInset(spacing: 0) {
+            .stashyDetailChrome(sceneDetailChromeConfig) {
                 sceneDetailNavBar
             }
             .modifier(SceneDetailAlertModifier(

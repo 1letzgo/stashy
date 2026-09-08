@@ -90,7 +90,7 @@ struct ServerDetailView: View {
             Text(alertMessage)
         }
         .sheet(isPresented: $showingEditSheet) {
-            NavigationView {
+            NavigationStack {
                 ServerFormViewNew(configToEdit: server) { updatedConfig in
                     configManager.addOrUpdateServer(updatedConfig)
                     if configManager.activeConfig?.id == updatedConfig.id {

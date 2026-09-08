@@ -576,21 +576,10 @@ struct CatalogFilterFABButton: View {
     var isActive: Bool
     var accessibilityLabel: String = "Settings"
     let action: () -> Void
-    @ObservedObject private var appearance = AppearanceManager.shared
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: "slider.horizontal.3")
-                .font(.system(size: DesignTokens.Chrome.fabIconSize, weight: .semibold))
-                .foregroundColor(isActive ? appearance.tintColor : .primary)
-                .overlay(alignment: .topTrailing) {
-                    if isActive {
-                        Circle()
-                            .fill(appearance.tintColor)
-                            .frame(width: DesignTokens.Chrome.fabActiveDot, height: DesignTokens.Chrome.fabActiveDot)
-                            .offset(x: 3, y: -3)
-                    }
-                }
+            CatalogFilterGlyph(isActive: isActive)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel)
@@ -605,21 +594,10 @@ struct CatalogFABIconButton: View {
     var accessibilityLabel: String? = nil
     var accessibilityHint: String? = nil
     let action: () -> Void
-    @ObservedObject private var appearance = AppearanceManager.shared
 
     var body: some View {
         Button(action: action) {
-            Image(systemName: systemImage)
-                .font(.system(size: DesignTokens.Chrome.fabIconSize, weight: .semibold))
-                .foregroundColor(isActive ? appearance.tintColor : tint)
-                .overlay(alignment: .topTrailing) {
-                    if isActive {
-                        Circle()
-                            .fill(appearance.tintColor)
-                            .frame(width: DesignTokens.Chrome.fabActiveDot, height: DesignTokens.Chrome.fabActiveDot)
-                            .offset(x: 3, y: -3)
-                    }
-                }
+            CatalogSlotGlyph(systemImage: systemImage, tint: tint, isActive: isActive)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(accessibilityLabel ?? systemImage)

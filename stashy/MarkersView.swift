@@ -480,10 +480,7 @@ private struct MarkersViewContent: View {
                 markersList
             }
         }
-        .navigationTitle(hideTitle ? "" : "Markers")
-        .navigationBarTitleDisplayMode(.inline)
         .applyAppBackground()
-        .conditionalSearchable(isVisible: isSearchVisible, text: $searchText, prompt: "Search markers...")
         .onChange(of: searchText) { oldValue, newValue in
             NSObject.cancelPreviousPerformRequests(withTarget: self)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -492,46 +489,36 @@ private struct MarkersViewContent: View {
                 }
             }
         }
-        .toolbar {
-            if !searchText.isEmpty {
-                ToolbarItem(placement: .principal) {
-                    Button(action: {
-                        searchText = ""
-                        performSearch()
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 10, weight: .bold))
-                            Text(searchText)
-                                .font(.system(size: 12, weight: .bold))
-                                .lineLimit(1)
-                        }
-                        .foregroundColor(.white.opacity(0.9))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                        .clipShape(Capsule())
-                    }
-                }
-            }
-        }
+        .stashyCatalogChrome(catalogChromeConfig)
     }
 
-    private var markersFloatingFilterBar: some View {
-        HStack(spacing: 0) {
-            Spacer(minLength: 0)
-            CatalogFilterFABButton(isActive: catalogFilterSortFABActive) {
-                showFilterSortSheet = true
-            }
-            Spacer(minLength: 0)
-        }
+    private var catalogChromeConfig: CatalogChromeConfig {
+        CatalogChromeConfig(
+            title: "Markers",
+            ownsNavigationBar: !hideTitle,
+            visibility: CatalogFloatingChromeState(
+                hasActiveServerConfig: configManager.activeConfig != nil,
+                primaryListIsEmpty: viewModel.sceneMarkers.isEmpty,
+                errorMessage: viewModel.errorMessage
+            ),
+            isPresented: true,
+            filterSort: CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: catalogFilterSortFABActive,
+                accessibilityLabel: "Settings",
+                action: { showFilterSortSheet = true }
+            ),
+            search: CatalogSearchChrome(
+                text: $searchText,
+                isVisible: $isSearchVisible,
+                prompt: "Search markers...",
+                onClear: { performSearch() }
+            )
+        )
     }
 
     var body: some View {
         markersMainStack
-        .floatingActionBar(isPresented: true, catalogChrome: CatalogFloatingChromeState(hasActiveServerConfig: configManager.activeConfig != nil, primaryListIsEmpty: viewModel.sceneMarkers.isEmpty, errorMessage: viewModel.errorMessage)) {
-            markersFloatingFilterBar
-        }
         .sheet(isPresented: $showFilterSortSheet) {
             markersFilterSortSheet
         }

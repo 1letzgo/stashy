@@ -426,9 +426,6 @@ private struct TagsViewContent: View {
                 tagsList
             }
         }
-        .navigationTitle(hideTitle ? "" : "Tags")
-        .navigationBarTitleDisplayMode(.inline)
-        .conditionalSearchable(isVisible: isSearchVisible, text: $searchText, prompt: "Search tags...")
         .onChange(of: searchText) { oldValue, newValue in
             NSObject.cancelPreviousPerformRequests(withTarget: self)
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -437,38 +434,32 @@ private struct TagsViewContent: View {
                 }
             }
         }
-        .toolbar {
-            if !searchText.isEmpty {
-                ToolbarItem(placement: .principal) {
-                    Button(action: {
-                        searchText = ""
-                        performSearch()
-                    }) {
-                        HStack(spacing: 4) {
-                            Image(systemName: "xmark")
-                                .font(.system(size: 10, weight: .bold))
-                            Text(searchText)
-                                .font(.system(size: 12, weight: .bold))
-                                .lineLimit(1)
-                        }
-                        .foregroundColor(.white.opacity(0.9))
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
-                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                        .clipShape(Capsule())
-                    }
-                }
-            }
-        }
-        .floatingActionBar(isPresented: true, catalogChrome: CatalogFloatingChromeState(hasActiveServerConfig: configManager.activeConfig != nil, primaryListIsEmpty: viewModel.tags.isEmpty, errorMessage: viewModel.errorMessage)) {
-            HStack(spacing: 0) {
-                Spacer(minLength: 0)
-                CatalogFilterFABButton(isActive: catalogFilterSortFABActive) {
-                    showFilterSortSheet = true
-                }
-                Spacer(minLength: 0)
-            }
-        }
+        .stashyCatalogChrome(catalogChromeConfig)
+    }
+
+    private var catalogChromeConfig: CatalogChromeConfig {
+        CatalogChromeConfig(
+            title: "Tags",
+            ownsNavigationBar: !hideTitle,
+            visibility: CatalogFloatingChromeState(
+                hasActiveServerConfig: configManager.activeConfig != nil,
+                primaryListIsEmpty: viewModel.tags.isEmpty,
+                errorMessage: viewModel.errorMessage
+            ),
+            isPresented: true,
+            filterSort: CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: catalogFilterSortFABActive,
+                accessibilityLabel: "Settings",
+                action: { showFilterSortSheet = true }
+            ),
+            search: CatalogSearchChrome(
+                text: $searchText,
+                isVisible: $isSearchVisible,
+                prompt: "Search tags...",
+                onClear: { performSearch() }
+            )
+        )
     }
 
     @ViewBuilder
@@ -695,6 +686,7 @@ struct TagDetailView: View {
     @Environment(\.verticalSizeClass) var verticalSizeClass
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var tagLiveFilterSheetPresented = false
+    @State private var tagSceneFilterActive = false
     @State private var isFavorite: Bool = false
     @State private var isUpdatingFavorite: Bool = false
     @State private var isHeaderExpanded = false
@@ -859,6 +851,7 @@ struct TagDetailView: View {
             scope: .tag(tagId: selectedTag.id),
             sharedViewModel: viewModel,
             externalLiveFilterSheetBinding: $tagLiveFilterSheetPresented,
+            externalLiveFilterActiveBinding: $tagSceneFilterActive,
             showsFloatingFilterButton: false,
             scrollHeader: AnyView(
                 tagHeaderView
@@ -1180,9 +1173,7 @@ struct TagDetailView: View {
                 selectedTag.updatedAt = updatedAt
             }
         }
-        .hideSystemNavigationBarForCustomChrome()
-        .enableSwipeBackWhenNavBarHidden()
-        .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
+        .stashyDetailChrome(tagDetailChromeConfig) {
             tagDetailNavBar
         }
         .sheet(isPresented: $showingEditTagSheet) {
@@ -1216,64 +1207,79 @@ struct TagDetailView: View {
             }
             Button("Cancel", role: .cancel) {}
         }
-        .floatingActionBar(
-            isPresented: selectedDetailTab != .groups,
-            catalogChrome: catalogFloatingChromeForFooter
-        ) {
-            HStack(spacing: 0) {
-                if selectedDetailTab == .scenes {
-                    CatalogFilterFABButton(isActive: true) {
-                        HapticManager.light()
-                        tagLiveFilterSheetPresented = true
-                    }
-                    .frame(maxWidth: .infinity)
-                } else if selectedDetailTab == .galleries {
-                    CatalogFilterFABButton(isActive: linkedGalleries.catalogFilterSortFABActive) {
-                        HapticManager.light()
-                        linkedGalleries.showFilterSortSheet = true
-                    }
-                    .frame(maxWidth: .infinity)
-                } else if selectedDetailTab == .studios {
-                    CatalogFilterFABButton(isActive: linkedStudios.catalogFilterSortFABActive) {
-                        HapticManager.light()
-                        linkedStudios.showFilterSortSheet = true
-                    }
-                    .frame(maxWidth: .infinity)
-                } else if selectedDetailTab == .images {
-                    let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.images)
-                    CatalogFABIconButton(
-                        systemImage: cardColumns.toggleIcon,
-                        accessibilityLabel: cardColumns.accessibilityLabel,
-                        accessibilityHint: "Switches between one and two cards per row"
-                    ) {
-                        withAnimation(DesignTokens.Animation.quick) {
-                            tabManager.toggleCatalogCardColumns(for: CatalogCardColumnScope.images)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    CatalogFilterFABButton(isActive: linkedImages.catalogFilterSortFABActive) {
-                        HapticManager.light()
-                        linkedImages.showFilterSortSheet = true
-                    }
-                    .frame(maxWidth: .infinity)
+    }
 
-                    tagImagesDownloadFABButton
-                        .frame(maxWidth: .infinity)
+    // MARK: - Shared detail chrome
+
+    /// Per-tab slots for the embedded list, mirroring the previous floating action bar content.
+    private var tagDetailListSlots: CatalogSlotSet {
+        var slots = CatalogSlotSet(
+            visibility: catalogFloatingChromeForFooter,
+            isPresented: selectedDetailTab != .groups
+        )
+        switch selectedDetailTab {
+        case .scenes:
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: tagSceneFilterActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                tagLiveFilterSheetPresented = true
+            }
+        case .galleries:
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: linkedGalleries.catalogFilterSortFABActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                linkedGalleries.showFilterSortSheet = true
+            }
+        case .studios:
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: linkedStudios.catalogFilterSortFABActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                linkedStudios.showFilterSortSheet = true
+            }
+        case .images:
+            let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.images)
+            slots.columns = CatalogChromeSlot(
+                systemImage: cardColumns.toggleIcon,
+                accessibilityLabel: cardColumns.accessibilityLabel,
+                accessibilityHint: "Switches between one and two cards per row"
+            ) {
+                withAnimation(DesignTokens.Animation.quick) {
+                    tabManager.toggleCatalogCardColumns(for: CatalogCardColumnScope.images)
                 }
             }
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: linkedImages.catalogFilterSortFABActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                linkedImages.showFilterSortSheet = true
+            }
+            slots.contextual = tagImagesDownloadSlot
+        case .groups:
+            break
         }
+        return slots
     }
 
     /// Downloads the tag's images for offline use. Mirrors the gallery control: pick a batch size
     /// first, then sync or remove once something is stored.
-    @ViewBuilder
-    private var tagImagesDownloadFABButton: some View {
+    private var tagImagesDownloadSlot: CatalogChromeSlot {
         let entryId = "tag-" + selectedTag.id
         let isDownloading = downloadManager.activeDownloads[entryId] != nil
         let stored = downloadManager.downloadedGallery(id: entryId)
 
         if isDownloading {
-            CatalogFABIconButton(
+            return CatalogChromeSlot(
                 systemImage: "stop.circle",
                 isActive: true,
                 accessibilityLabel: "Cancel download"
@@ -1282,7 +1288,7 @@ struct TagDetailView: View {
                 downloadManager.cancelGalleryDownload(id: entryId)
             }
         } else if stored != nil {
-            CatalogFABIconButton(
+            return CatalogChromeSlot(
                 systemImage: "checkmark.circle.fill",
                 isActive: true,
                 accessibilityLabel: "Downloaded"
@@ -1291,11 +1297,18 @@ struct TagDetailView: View {
                 showingTagDownloadOptions = true
             }
         } else {
-            CatalogFABIconButton(systemImage: "arrow.down.doc", accessibilityLabel: "Download images") {
+            return CatalogChromeSlot(
+                systemImage: "arrow.down.doc",
+                accessibilityLabel: "Download images"
+            ) {
                 HapticManager.light()
                 showingTagDownloadOptions = true
             }
         }
+    }
+
+    private var tagDetailChromeConfig: StashyDetailChromeConfig {
+        StashyDetailChromeConfig(listSlots: tagDetailListSlots, insetSpacing: DesignTokens.Chrome.contentTopGap)
     }
 
     @ViewBuilder

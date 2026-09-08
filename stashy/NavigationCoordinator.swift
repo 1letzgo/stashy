@@ -73,6 +73,24 @@ class NavigationCoordinator: ObservableObject {
         if let firstTab = TabManager.shared.visibleTabs.first {
             selectedTab = firstTab
         }
+
+        #if DEBUG
+        // Simulator automation: `xcrun simctl launch <udid> de.letzgo.stashy -stashyDebugCatalogueSubTab Studios`
+        // lands on that catalogue sub-tab (UserDefaults argument domain), no taps needed.
+        if let debugSubTab = UserDefaults.standard.string(forKey: "stashyDebugCatalogueSubTab"), !debugSubTab.isEmpty {
+            catalogueSubTab = debugSubTab
+        }
+        // `-stashyDebugOpenStudio "<id>|<name>"` pushes that studio detail from the Studios catalogue.
+        if let raw = UserDefaults.standard.string(forKey: "stashyDebugOpenStudio"), !raw.isEmpty {
+            let parts = raw.split(separator: "|", maxSplits: 1).map(String.init)
+            catalogueSubTab = "Studios"
+            studioToOpen = Studio(id: parts[0], name: parts.count > 1 ? parts[1] : "Studio")
+        }
+        // `-stashyDebugSelectedTab settings` (AppTab raw value) selects that main tab at launch.
+        if let raw = UserDefaults.standard.string(forKey: "stashyDebugSelectedTab"), let tab = AppTab(rawValue: raw) {
+            selectedTab = tab
+        }
+        #endif
         
         // Listen for server changes to reset all stacks
         NotificationCenter.default.addObserver(self, selector: #selector(handleServerChange), name: NSNotification.Name("ServerConfigChanged"), object: nil)

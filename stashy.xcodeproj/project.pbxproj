@@ -44,6 +44,9 @@
 		42AECC4BE2264997B0333A90 /* HomeSceneCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E5E2F2A46A1004CA019 /* HomeSceneCardView.swift */; };
 		4641A386019F4F5F81B587A8 /* StashDBViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB77A2FE84155DC02AAC07 /* StashDBViewModel.swift */; };
 		4FA2DDB674AB41BC92ACAB15 /* FilterCriteriaDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2195D672B4B04628BD280AA1 /* FilterCriteriaDocument.swift */; };
+		C4B0E00200000000000000B1 /* NativeChromeSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A1 /* NativeChromeSupport.swift */; };
+		C4B0E00200000000000000B2 /* CatalogChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A2 /* CatalogChrome.swift */; };
+		C4B0E00200000000000000B3 /* StashyDetailToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A3 /* StashyDetailToolbar.swift */; };
 		51487CAA64DF4CC3B986B68C /* SceneStudioCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E752F2A6392004CA019 /* SceneStudioCard.swift */; };
 		5B0100661A854DEDA5E55778 /* CatalogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB142F167223007C2090 /* CatalogsView.swift */; };
 		5B3249B4152046408B964DDC /* StarRatingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */; };
@@ -197,6 +200,9 @@
 		0D91ABA114F544C390FD6F8E /* FilterCriteriaEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterCriteriaEditorView.swift; sourceTree = "<group>"; };
 		130472FFD9E64071BF78EDAE /* FiltersToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FiltersToolsView.swift; sourceTree = "<group>"; };
 		2195D672B4B04628BD280AA1 /* FilterCriteriaDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterCriteriaDocument.swift; sourceTree = "<group>"; };
+		C4B0E00100000000000000A1 /* NativeChromeSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeChromeSupport.swift; sourceTree = "<group>"; };
+		C4B0E00100000000000000A2 /* CatalogChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogChrome.swift; sourceTree = "<group>"; };
+		C4B0E00100000000000000A3 /* StashyDetailToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyDetailToolbar.swift; sourceTree = "<group>"; };
 		372E2D692F6339EE00603361 /* LoginAuthHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginAuthHelper.swift; sourceTree = "<group>"; };
 		372E2D982F64272300603361 /* VideoAnalysisManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoAnalysisManager.swift; sourceTree = "<group>"; };
 		372E2D9A2F64425000603361 /* StashSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashSyncManager.swift; sourceTree = "<group>"; };
@@ -362,6 +368,7 @@
 				971A00022F999002 /* HotOrNotToolsView.swift */,
 				971A00042F999004 /* RateMeToolsView.swift */,
 				A1F11TER50F11TER50F11TER /* Filters */,
+				C4B0E00300000000000000C1 /* Chrome */,
 				971A00062F999006 /* TopListsToolsView.swift */,
 				971A00072F999007 /* SessionTimelineToolsView.swift */,
 				372E2D692F6339EE00603361 /* LoginAuthHelper.swift */,
@@ -429,6 +436,16 @@
 				DFSEC0022F2A000100000002 /* SecurityManager.swift */,
 			);
 			path = Managers;
+			sourceTree = "<group>";
+		};
+		C4B0E00300000000000000C1 /* Chrome */ = {
+			isa = PBXGroup;
+			children = (
+				C4B0E00100000000000000A1 /* NativeChromeSupport.swift */,
+				C4B0E00100000000000000A2 /* CatalogChrome.swift */,
+				C4B0E00100000000000000A3 /* StashyDetailToolbar.swift */,
+			);
+			path = Chrome;
 			sourceTree = "<group>";
 		};
 		A1F11TER50F11TER50F11TER /* Filters */ = {
@@ -728,6 +745,9 @@
 				821D4E34EE344BBC881B7E2E /* FilterCriterionTypes.swift in Sources */,
 				F3FAA876F0564E51BFE25096 /* FilterFieldCatalog.swift in Sources */,
 				4FA2DDB674AB41BC92ACAB15 /* FilterCriteriaDocument.swift in Sources */,
+				C4B0E00200000000000000B1 /* NativeChromeSupport.swift in Sources */,
+				C4B0E00200000000000000B2 /* CatalogChrome.swift in Sources */,
+				C4B0E00200000000000000B3 /* StashyDetailToolbar.swift in Sources */,
 				A1B2C3D40002400180011002 /* FilterPickerOptionsStore.swift in Sources */,
 				13B8ED271E86457390593F48 /* FilterCriteriaEditorView.swift in Sources */,
 				B981A60AAA104A77A56B0923 /* FiltersToolsView.swift in Sources */,

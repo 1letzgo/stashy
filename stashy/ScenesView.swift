@@ -314,6 +314,8 @@ private struct ScenesViewContent: View {
     @ObservedObject var viewModel: StashDBViewModel
     let scope: ScenesListScope
     let externalLiveFilterSheetBinding: Binding<Bool>?
+    /// Mirrors `liveFilterFABHasSomethingSet` for a hosting detail screen that renders its own filter button.
+    let externalLiveFilterActiveBinding: Binding<Bool>?
     let showsFloatingFilterButton: Bool
     @State private var selectedSortOption: StashDBViewModel.SceneSortOption = StashDBViewModel.SceneSortOption(rawValue: TabManager.shared.getSortOption(for: .scenes) ?? "") ?? .dateDesc
     @State private var isChangingSort = false
@@ -823,12 +825,14 @@ private struct ScenesViewContent: View {
         hideTitle: Bool = false,
         scope: ScenesListScope = .catalog,
         externalLiveFilterSheetBinding: Binding<Bool>? = nil,
+        externalLiveFilterActiveBinding: Binding<Bool>? = nil,
         showsFloatingFilterButton: Bool = true,
         scrollHeader: AnyView? = nil
     ) {
         self.viewModel = viewModel
         self.scope = scope
         self.externalLiveFilterSheetBinding = externalLiveFilterSheetBinding
+        self.externalLiveFilterActiveBinding = externalLiveFilterActiveBinding
         self.showsFloatingFilterButton = showsFloatingFilterButton
         self.hideTitle = hideTitle
         self.scrollHeader = scrollHeader
@@ -1003,6 +1007,44 @@ private struct ScenesViewContent: View {
         }
     }
 
+    /// Single source for nav bar + slot chrome. The legacy/native branch lives in `stashyCatalogChrome`.
+    private var catalogChromeConfig: CatalogChromeConfig {
+        let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.scenes)
+        return CatalogChromeConfig(
+            title: "Scenes",
+            ownsNavigationBar: !hideTitle,
+            visibility: CatalogFloatingChromeState(
+                hasActiveServerConfig: configManager.activeConfig != nil,
+                primaryListIsEmpty: primarySceneListIsEmpty,
+                errorMessage: viewModel.errorMessage
+            ),
+            isPresented: showsFloatingFilterButton,
+            columns: CatalogChromeSlot(
+                systemImage: cardColumns.toggleIcon,
+                accessibilityLabel: cardColumns.accessibilityLabel,
+                accessibilityHint: "Switches between one and two cards per row",
+                action: {
+                    withAnimation(DesignTokens.Animation.quick) {
+                        tabManager.toggleCatalogCardColumns(for: CatalogCardColumnScope.scenes)
+                    }
+                }
+            ),
+            filterSort: CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: liveFilterFABHasSomethingSet,
+                accessibilityLabel: "Settings",
+                action: { liveFilterSheetPresented.wrappedValue = true }
+            ),
+            // Embedded in a detail screen the parent owns the nav bar, so no search field here.
+            search: hideTitle ? nil : CatalogSearchChrome(
+                text: $searchText,
+                isVisible: $isSearchVisible,
+                prompt: "Search scenes...",
+                onClear: { performSearch() }
+            )
+        )
+    }
+
     var body: some View {
         ZStack(alignment: .bottom) {
             // Main Content
@@ -1023,7 +1065,10 @@ private struct ScenesViewContent: View {
         }
 
         .applyAppBackground()
-        .modifier(ScenesEmbeddedNavigationChrome(hideTitle: hideTitle, searchText: $searchText, onClearSearch: performSearch))
+        .stashyCatalogChrome(catalogChromeConfig)
+        .onChange(of: liveFilterFABHasSomethingSet, initial: true) { _, isActive in
+            externalLiveFilterActiveBinding?.wrappedValue = isActive
+        }
         .onChange(of: searchText) { oldValue, newValue in
             // Debounce: Nur suchen wenn Nutzer aufhört zu tippen (0.5s Delay)
             NSObject.cancelPreviousPerformRequests(withTarget: self)
@@ -1031,29 +1076,6 @@ private struct ScenesViewContent: View {
                 if newValue == self.searchText {
                     self.performSearch()
                 }
-            }
-        }
-        .floatingActionBar(
-            isPresented: showsFloatingFilterButton,
-            catalogChrome: CatalogFloatingChromeState(hasActiveServerConfig: configManager.activeConfig != nil, primaryListIsEmpty: primarySceneListIsEmpty, errorMessage: viewModel.errorMessage)
-        ) {
-            HStack(spacing: 0) {
-                let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.scenes)
-                CatalogFABIconButton(
-                    systemImage: cardColumns.toggleIcon,
-                    accessibilityLabel: cardColumns.accessibilityLabel,
-                    accessibilityHint: "Switches between one and two cards per row"
-                ) {
-                    withAnimation(DesignTokens.Animation.quick) {
-                        tabManager.toggleCatalogCardColumns(for: CatalogCardColumnScope.scenes)
-                    }
-                }
-                .frame(maxWidth: .infinity)
-
-                CatalogFilterFABButton(isActive: liveFilterFABHasSomethingSet) {
-                    liveFilterSheetPresented.wrappedValue = true
-                }
-                .frame(maxWidth: .infinity)
             }
         }
         .sheet(isPresented: liveFilterSheetPresented) {
@@ -1383,6 +1405,7 @@ struct ScenesView: View {
     let hideTitle: Bool
     let scope: ScenesListScope
     let externalLiveFilterSheetBinding: Binding<Bool>?
+    let externalLiveFilterActiveBinding: Binding<Bool>?
     let showsFloatingFilterButton: Bool
     let scrollHeader: AnyView?
 
@@ -1393,6 +1416,7 @@ struct ScenesView: View {
         scope: ScenesListScope = .catalog,
         sharedViewModel: StashDBViewModel? = nil,
         externalLiveFilterSheetBinding: Binding<Bool>? = nil,
+        externalLiveFilterActiveBinding: Binding<Bool>? = nil,
         showsFloatingFilterButton: Bool? = nil,
         scrollHeader: AnyView? = nil
     ) {
@@ -1402,6 +1426,7 @@ struct ScenesView: View {
         self.scope = scope
         self.sharedViewModel = sharedViewModel
         self.externalLiveFilterSheetBinding = externalLiveFilterSheetBinding
+        self.externalLiveFilterActiveBinding = externalLiveFilterActiveBinding
         self.showsFloatingFilterButton = showsFloatingFilterButton ?? (externalLiveFilterSheetBinding == nil)
         self.scrollHeader = scrollHeader
     }
@@ -1414,6 +1439,7 @@ struct ScenesView: View {
             hideTitle: hideTitle,
             scope: scope,
             externalLiveFilterSheetBinding: externalLiveFilterSheetBinding,
+            externalLiveFilterActiveBinding: externalLiveFilterActiveBinding,
             showsFloatingFilterButton: showsFloatingFilterButton,
             scrollHeader: scrollHeader
         )
@@ -1434,49 +1460,6 @@ struct ScenesView: View {
             externalLiveFilterSheetBinding: nil,
             showsFloatingFilterButton: true
         )
-    }
-}
-
-/// When embedded in Performer/Studio/Tag/Group detail (`hideTitle`), do not re-enable the system
-/// nav bar — child `.toolbar` / `.navigationTitle` would otherwise override the parent's custom chrome
-/// (especially when pushed from Search).
-private struct ScenesEmbeddedNavigationChrome: ViewModifier {
-    let hideTitle: Bool
-    @Binding var searchText: String
-    var onClearSearch: () -> Void
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if hideTitle {
-            content.hideSystemNavigationBarForCustomChrome()
-        } else {
-            content
-                .navigationTitle("Scenes")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    if !searchText.isEmpty {
-                        ToolbarItem(placement: .principal) {
-                            Button {
-                                searchText = ""
-                                onClearSearch()
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "xmark")
-                                        .font(.system(size: 10, weight: .bold))
-                                    Text(searchText)
-                                        .font(.system(size: 12, weight: .bold))
-                                        .lineLimit(1)
-                                }
-                                .foregroundColor(.white.opacity(0.9))
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 8)
-                                .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                                .clipShape(Capsule())
-                            }
-                        }
-                    }
-                }
-        }
     }
 }
 

@@ -48,7 +48,11 @@ struct DirectorDetailView: View {
             )
         )
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .stashyCustomChromeInset { navBar }
+        .stashyDetailChrome(directorChromeConfig) { navBar }
+    }
+
+    private var directorChromeConfig: StashyDetailChromeConfig {
+        StashyDetailChromeConfig(insetSpacing: 0)
     }
 
     // Hero modeled after PerformerDetailView.headerView.

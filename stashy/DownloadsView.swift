@@ -128,8 +128,6 @@ struct DownloadsView: View {
                 }
             }
         }
-        .navigationTitle("Downloads")
-        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

@@ -49,50 +49,10 @@ struct FiltersToolsView: View {
                 filtersList
             }
         }
-        .safeAreaInset(edge: .top, spacing: 0) {
-            HStack(spacing: DesignTokens.Spacing.sm) {
-                HStack(spacing: DesignTokens.Spacing.xs) {
-                    Image(systemName: "magnifyingglass")
-                        .foregroundColor(.secondary)
-                    TextField("Search filters", text: $searchText)
-                        .textInputAutocapitalization(.never)
-                        .disableAutocorrection(true)
-                    if !searchText.isEmpty {
-                        Button {
-                            searchText = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundColor(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Clear search")
-                    }
-                }
-                .padding(.horizontal, DesignTokens.Spacing.sm)
-                .padding(.vertical, DesignTokens.Spacing.xs + 2)
-                .background(Color.secondaryAppBackground(for: appearance.currentTheme))
-                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-                Menu {
-                    ForEach(Self.listedModes, id: \.self) { mode in
-                        Button(Self.modeTitle(mode)) {
-                            createMode = mode
-                            isCreating = true
-                        }
-                    }
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        .foregroundColor(.white)
-                        .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
-                        .background(appearance.tintColor)
-                        .clipShape(Circle())
-                }
-                .accessibilityLabel("New filter")
-            }
-            .padding(.horizontal, DesignTokens.Tools.contentPadding)
-            .padding(.vertical, DesignTokens.Spacing.xs + 2)
-            .background(Color.appBackground(for: appearance.currentTheme))
-        }
+        .modifier(FiltersToolsSearchChromeModifier(
+            searchText: $searchText,
+            addMenuItems: { addMenuItems }
+        ))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground(for: appearance.currentTheme))
         .onAppear { viewModel.fetchSavedFilters() }
@@ -144,6 +104,17 @@ struct FiltersToolsView: View {
             Button("Cancel", role: .cancel) { deleteTarget = nil }
         } message: {
             Text(deleteTarget.map { "Delete “\($0.name)” from the server?" } ?? "")
+        }
+    }
+
+    /// Shared "+" menu items for the inset button.
+    @ViewBuilder
+    private var addMenuItems: some View {
+        ForEach(Self.listedModes, id: \.self) { mode in
+            Button(Self.modeTitle(mode)) {
+                createMode = mode
+                isCreating = true
+            }
         }
     }
 
@@ -278,6 +249,57 @@ struct FiltersToolsView: View {
                 ToastManager.shared.show("Delete failed: \(error.localizedDescription)", icon: "exclamationmark.triangle.fill", style: .error)
             }
         }
+    }
+}
+
+/// Search + "+" chrome for the Filters list, pinned as a custom top inset.
+private struct FiltersToolsSearchChromeModifier<MenuItems: View>: ViewModifier {
+    @Binding var searchText: String
+    @ViewBuilder var addMenuItems: () -> MenuItems
+
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    func body(content: Content) -> some View {
+        content
+            .safeAreaInset(edge: .top, spacing: 0) {
+                HStack(spacing: DesignTokens.Spacing.sm) {
+                    HStack(spacing: DesignTokens.Spacing.xs) {
+                        Image(systemName: "magnifyingglass")
+                            .foregroundColor(.secondary)
+                        TextField("Search filters", text: $searchText)
+                            .textInputAutocapitalization(.never)
+                            .disableAutocorrection(true)
+                        if !searchText.isEmpty {
+                            Button {
+                                searchText = ""
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundColor(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("Clear search")
+                        }
+                    }
+                    .padding(.horizontal, DesignTokens.Spacing.sm)
+                    .padding(.vertical, DesignTokens.Spacing.xs + 2)
+                    .background(Color.secondaryAppBackground(for: appearance.currentTheme))
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                    Menu {
+                        addMenuItems()
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                            .foregroundColor(.white)
+                            .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
+                            .background(appearance.tintColor)
+                            .clipShape(Circle())
+                    }
+                    .accessibilityLabel("New filter")
+                }
+                .padding(.horizontal, DesignTokens.Tools.contentPadding)
+                .padding(.vertical, DesignTokens.Spacing.xs + 2)
+                .background(Color.appBackground(for: appearance.currentTheme))
+            }
     }
 }
 

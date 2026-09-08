@@ -500,91 +500,99 @@ private struct GalleriesViewContent: View {
     }
 
     @ViewBuilder
-    private var galleriesFloatingBarContent: some View {
+    private var quickFilterMenuContent: some View {
+            Button {
+                catalogPresetRowSelection = ""
+            } label: {
+                HStack {
+                    Text("No Filter")
+                    if catalogPresetRowSelection.isEmpty && selectedFilter == nil {
+                        Image(systemName: "checkmark")
+                    }
+                }
+            }
+
+            let serverFilters = sortedServerGalleryFilters
+            if !serverFilters.isEmpty {
+                Section("Saved Filters") {
+                    ForEach(serverFilters) { filter in
+                        Button {
+                            catalogPresetRowSelection = ListLivePresetTag.serverRow(filter.id)
+                        } label: {
+                            HStack {
+                                Text(filter.name)
+                                if catalogPresetRowSelection == ListLivePresetTag.serverRow(filter.id)
+                                    || (catalogPresetRowSelection.isEmpty && selectedFilter?.id == filter.id) {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !localCatalogPresets.isEmpty {
+                Section("Presets") {
+                    ForEach(localCatalogPresets) { preset in
+                        Button {
+                            catalogPresetRowSelection = ListLivePresetTag.localRow(preset.id)
+                        } label: {
+                            HStack {
+                                Text(preset.name)
+                                if catalogPresetRowSelection == ListLivePresetTag.localRow(preset.id) {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+    }
+
+    /// Single source for nav bar + slot chrome. The legacy/native branch lives in `stashyCatalogChrome`.
+    private var catalogChromeConfig: CatalogChromeConfig {
         let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.galleries)
         let filterMenuActive = selectedFilter != nil || !catalogPresetRowSelection.isEmpty
-        HStack(spacing: 0) {
-            CatalogFABIconButton(
+        return CatalogChromeConfig(
+            title: "Galleries",
+            ownsNavigationBar: !hideTitle,
+            visibility: galleriesFloatingBarChrome,
+            isPresented: true,
+            columns: CatalogChromeSlot(
                 systemImage: cardColumns.toggleIcon,
                 accessibilityLabel: cardColumns.accessibilityLabel,
-                accessibilityHint: "Switches between one and two cards per row"
-            ) {
-                withAnimation(DesignTokens.Animation.quick) {
-                    tabManager.toggleCatalogCardColumns(for: CatalogCardColumnScope.galleries)
-                }
-            }
-            .frame(maxWidth: .infinity)
-
-            Menu {
-                Button {
-                    catalogPresetRowSelection = ""
-                } label: {
-                    HStack {
-                        Text("No Filter")
-                        if catalogPresetRowSelection.isEmpty && selectedFilter == nil {
-                            Image(systemName: "checkmark")
-                        }
+                accessibilityHint: "Switches between one and two cards per row",
+                action: {
+                    withAnimation(DesignTokens.Animation.quick) {
+                        tabManager.toggleCatalogCardColumns(for: CatalogCardColumnScope.galleries)
                     }
                 }
-
-                let serverFilters = sortedServerGalleryFilters
-                if !serverFilters.isEmpty {
-                    Section("Saved Filters") {
-                        ForEach(serverFilters) { filter in
-                            Button {
-                                catalogPresetRowSelection = ListLivePresetTag.serverRow(filter.id)
-                            } label: {
-                                HStack {
-                                    Text(filter.name)
-                                    if catalogPresetRowSelection == ListLivePresetTag.serverRow(filter.id)
-                                        || (catalogPresetRowSelection.isEmpty && selectedFilter?.id == filter.id) {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-
-                if !localCatalogPresets.isEmpty {
-                    Section("Presets") {
-                        ForEach(localCatalogPresets) { preset in
-                            Button {
-                                catalogPresetRowSelection = ListLivePresetTag.localRow(preset.id)
-                            } label: {
-                                HStack {
-                                    Text(preset.name)
-                                    if catalogPresetRowSelection == ListLivePresetTag.localRow(preset.id) {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            } label: {
-                CatalogQuickFilterFABLabel(isActive: filterMenuActive)
-            }
-            .frame(maxWidth: .infinity)
-            .accessibilityLabel("Filter")
-            .accessibilityHint("Chooses a saved filter or preset")
-
-            CatalogFilterFABButton(isActive: catalogFilterSortFABActive) {
-                showFilterSortSheet = true
-            }
-            .frame(maxWidth: .infinity)
-        }
+            ),
+            quickFilter: CatalogQuickFilterMenuModel(
+                isActive: filterMenuActive,
+                accessibilityLabel: "Filter",
+                menuContent: AnyView(quickFilterMenuContent)
+            ),
+            filterSort: CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: catalogFilterSortFABActive,
+                accessibilityLabel: "Settings",
+                action: { showFilterSortSheet = true }
+            ),
+            // Embedded in a detail screen the parent owns the nav bar, so no search field here.
+            search: hideTitle ? nil : CatalogSearchChrome(
+                text: $searchText,
+                isVisible: $isSearchVisible,
+                prompt: "Search galleries...",
+                onClear: { performSearch() }
+            )
+        )
     }
 
     private var galleriesCoreChrome: some View {
         galleriesPrimaryContent
             .applyAppBackground()
-            .modifier(GalleriesEmbeddedNavigationChrome(
-                hideTitle: hideTitle,
-                isSearchVisible: isSearchVisible,
-                searchText: $searchText,
-                onClearSearch: { performSearch() }
-            ))
+            .stashyCatalogChrome(catalogChromeConfig)
             .onChange(of: searchText) { _, newValue in
                 NSObject.cancelPreviousPerformRequests(withTarget: self)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
@@ -592,9 +600,6 @@ private struct GalleriesViewContent: View {
                         performSearch()
                     }
                 }
-            }
-            .floatingActionBar(isPresented: true, catalogChrome: galleriesFloatingBarChrome) {
-                galleriesFloatingBarContent
             }
             .onAppear(perform: handleGalleriesAppear)
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
@@ -767,49 +772,6 @@ private struct GalleriesViewContent: View {
             ListLivePresetTag.migrateLegacySelection(&catalogPresetRowSelection)
             refreshGalleryLocalPresets()
             applyCatalogPresetSelectionFromSheetIfNeeded()
-        }
-    }
-}
-
-/// When embedded under custom chrome (`hideTitle`), keep the system nav bar hidden.
-private struct GalleriesEmbeddedNavigationChrome: ViewModifier {
-    let hideTitle: Bool
-    let isSearchVisible: Bool
-    @Binding var searchText: String
-    var onClearSearch: () -> Void
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if hideTitle {
-            content.hideSystemNavigationBarForCustomChrome()
-        } else {
-            content
-                .navigationTitle("Galleries")
-                .navigationBarTitleDisplayMode(.inline)
-                .conditionalSearchable(isVisible: isSearchVisible, text: $searchText, prompt: "Search galleries...")
-                .toolbar {
-                    if !searchText.isEmpty {
-                        ToolbarItem(placement: .principal) {
-                            Button {
-                                searchText = ""
-                                onClearSearch()
-                            } label: {
-                                HStack(spacing: 4) {
-                                    Image(systemName: "xmark")
-                                        .font(.system(size: 10, weight: .bold))
-                                    Text(searchText)
-                                        .font(.system(size: 12, weight: .bold))
-                                        .lineLimit(1)
-                                }
-                                .foregroundColor(.white.opacity(0.9))
-                                .padding(Edge.Set.horizontal, 10)
-                                .padding(.vertical, 8)
-                                .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                                .clipShape(Capsule())
-                            }
-                        }
-                    }
-                }
         }
     }
 }

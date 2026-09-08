@@ -87,6 +87,7 @@ struct MainTabView: View {
             .animation(nil, value: coordinator.selectedTab)
             .tint(appearanceManager.tintColor)
             .withToasts()
+            .modifier(TabBarNeverMinimizes())
             .onAppear {
                 ServerConfigManager.shared.scrubPlaintextAPIKeysFromDisk()
                 checkConfiguration()
@@ -369,14 +370,9 @@ struct ToolsView: View {
             normalizeToolsSubTab()
         }
         .onChange(of: stashyPlus.isUnlocked) { _, _ in normalizeToolsSubTab() }
-        .navigationBarHidden(true)
         .popNavigationToRootOnChange(effectiveTab.rawValue)
-        .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
-            StashySectionChromeBar {
-                toolsCategoryRow
-                    .padding(.horizontal, StashyExpandingDock.edgePadding)
-                    .padding(.vertical, 6)
-            }
+        .stashySectionChrome {
+            toolsCategoryRow
         }
     }
 
@@ -697,8 +693,6 @@ private struct ToolsServerChromeModifier: ViewModifier {
             content
         } else {
             content
-                .navigationTitle("Server Tasks")
-                .navigationBarTitleDisplayMode(.inline)
                 .applyAppBackground()
         }
     }
@@ -736,5 +730,17 @@ private struct ToolsStatisticsView: View {
 
 #Preview {
     MainTabView()
+}
+
+/// The tab bar must stay put while scrolling. iOS 26 would otherwise be free to collapse it.
+private struct TabBarNeverMinimizes: ViewModifier {
+    @ViewBuilder
+    func body(content: Content) -> some View {
+        if #available(iOS 26.0, *) {
+            content.tabBarMinimizeBehavior(.never)
+        } else {
+            content
+        }
+    }
 }
 #endif

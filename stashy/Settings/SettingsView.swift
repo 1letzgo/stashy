@@ -38,10 +38,10 @@ struct SettingsView: View {
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
 
     enum SettingsSection: String, CaseIterable, Identifiable {
-        case main = "Main"
-        case stashyPlus = "stashy+"
-        case actions = "Actions"
+        case main = "Settings"
         case design = "Design"
+        case actions = "Server"
+        case stashyPlus = "stashy+"
         
         var id: String { rawValue }
         
@@ -89,26 +89,21 @@ struct SettingsView: View {
         }
         .applyAppBackground()
         .tint(appearanceManager.tintColor)
-        .navigationBarHidden(true)
         .popNavigationToRootOnChange(activeSection.rawValue)
-        .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
-            StashySectionChromeBar {
-                SettingsCategoryRow(
-                    selection: Binding(
-                        get: { activeSection },
-                        set: { newValue in
-                            guard !stashyPlusOnly else { return }
-                            selectedSection = newValue
-                        }
-                    ),
-                    sections: chromeSections
-                )
-                    .padding(.horizontal, StashyExpandingDock.edgePadding)
-                    .padding(.vertical, 6)
-            }
+        .stashySectionChrome(showsSwitcher: chromeSections.count > 1) {
+            SettingsCategoryRow(
+                selection: Binding(
+                    get: { activeSection },
+                    set: { newValue in
+                        guard !stashyPlusOnly else { return }
+                        selectedSection = newValue
+                    }
+                ),
+                sections: chromeSections
+            )
         }
         .sheet(isPresented: $showingAddServerSheet) {
-            NavigationView {
+            NavigationStack {
                 ServerFormViewNew(configToEdit: nil) { newConfig in
                     configManager.addOrUpdateServer(newConfig)
                     if configManager.activeConfig == nil {
@@ -119,7 +114,7 @@ struct SettingsView: View {
             .presentationDetents([.medium, .large])
         }
         .sheet(item: $editingServer) { server in
-            NavigationView {
+            NavigationStack {
                 ServerFormViewNew(configToEdit: server, onSave: { updatedConfig in
                     configManager.addOrUpdateServer(updatedConfig)
                     if configManager.activeConfig?.id == updatedConfig.id {

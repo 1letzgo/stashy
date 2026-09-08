@@ -156,17 +156,10 @@ struct CatalogsView: View {
         }
         .transaction(value: coordinator.catalogueSubTab) { $0.animation = nil }
         .animation(nil, value: coordinator.catalogueSubTab)
-        .navigationBarHidden(true)
         // Swipe-back can desync UIKit/SwiftUI stacks; menu switches must always clear details.
         .popNavigationToRootOnChange("\(coordinator.catalogueSubTab)|\(coordinator.cataloguePopToken.uuidString)")
-        .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
-            if showTabSwitcher {
-                StashySectionChromeBar {
-                    CatalogCategoryRow(tabs: sortedVisibleTabs, selection: selectedTabBinding)
-                        .padding(.horizontal, StashyExpandingDock.edgePadding)
-                        .padding(.vertical, 6)
-                }
-            }
+        .stashySectionChrome(showsSwitcher: showTabSwitcher) {
+            CatalogCategoryRow(tabs: sortedVisibleTabs, selection: selectedTabBinding)
         }
     }
 }
@@ -313,6 +306,145 @@ private struct GroupsViewContent: View {
         )
     }
 
+    private var catalogChromeConfig: CatalogChromeConfig {
+        CatalogChromeConfig(
+            title: "Groups",
+            ownsNavigationBar: !hideTitle,
+            visibility: CatalogFloatingChromeState(
+                hasActiveServerConfig: configManager.activeConfig != nil,
+                primaryListIsEmpty: viewModel.groups.isEmpty,
+                errorMessage: viewModel.errorMessage
+            ),
+            isPresented: true,
+            quickFilter: CatalogQuickFilterMenuModel(
+                isActive: selectedSortOption != .nameAsc,
+                accessibilityLabel: "Sort",
+                menuContent: AnyView(sortMenuContent)
+            ),
+            filterSort: CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: selectedFilter != nil || !groupsCriteriaDocument.objectFilter.isEmpty,
+                accessibilityLabel: "Filter",
+                action: {
+                    if let f = selectedFilter {
+                        groupsPresetRowSelection = ListLivePresetTag.serverRow(f.id)
+                        groupsCriteriaDocument.load(f.criteriaObjectFilter())
+                    }
+                    showGroupsFilterSheet = true
+                }
+            ),
+            search: CatalogSearchChrome(
+                text: $searchText,
+                isVisible: $isSearchVisible,
+                prompt: "Search groups...",
+                onClear: { performSearch() }
+            )
+        )
+    }
+
+    @ViewBuilder
+    private var sortMenuContent: some View {
+        // Random
+        Button(action: { changeSortOption(to: .random) }) {
+            HStack {
+                Text("Random")
+                if selectedSortOption == .random { Image(systemName: "checkmark") }
+            }
+        }
+
+        Divider()
+
+        // Name
+        Menu {
+            Button(action: { changeSortOption(to: .nameAsc) }) {
+                HStack {
+                    Text("A → Z")
+                    if selectedSortOption == .nameAsc { Image(systemName: "checkmark") }
+                }
+            }
+            Button(action: { changeSortOption(to: .nameDesc) }) {
+                HStack {
+                    Text("Z → A")
+                    if selectedSortOption == .nameDesc { Image(systemName: "checkmark") }
+                }
+            }
+        } label: {
+            HStack {
+                Text("Name")
+                if selectedSortOption == .nameAsc || selectedSortOption == .nameDesc { Image(systemName: "checkmark") }
+            }
+        }
+
+        // Date
+        Menu {
+            Button(action: { changeSortOption(to: .dateDesc) }) {
+                HStack {
+                    Text("Newest First")
+                    if selectedSortOption == .dateDesc { Image(systemName: "checkmark") }
+                }
+            }
+            Button(action: { changeSortOption(to: .dateAsc) }) {
+                HStack {
+                    Text("Oldest First")
+                    if selectedSortOption == .dateAsc { Image(systemName: "checkmark") }
+                }
+            }
+        } label: {
+            HStack {
+                Text("Date")
+                if selectedSortOption == .dateAsc || selectedSortOption == .dateDesc { Image(systemName: "checkmark") }
+            }
+        }
+
+        // Rating
+        Menu {
+            Button(action: { changeSortOption(to: .ratingDesc) }) {
+                HStack {
+                    Text("High → Low")
+                    if selectedSortOption == .ratingDesc { Image(systemName: "checkmark") }
+                }
+            }
+            Button(action: { changeSortOption(to: .ratingAsc) }) {
+                HStack {
+                    Text("Low → High")
+                    if selectedSortOption == .ratingAsc { Image(systemName: "checkmark") }
+                }
+            }
+        } label: {
+            HStack {
+                Text("Rating")
+                if selectedSortOption == .ratingAsc || selectedSortOption == .ratingDesc { Image(systemName: "checkmark") }
+            }
+        }
+
+        // Counts
+        Menu {
+            Button(action: { changeSortOption(to: .sceneCountDesc) }) {
+                HStack {
+                    Text("Scenes (High → Low)")
+                    if selectedSortOption == .sceneCountDesc { Image(systemName: "checkmark") }
+                }
+            }
+            Button(action: { changeSortOption(to: .galleryCountDesc) }) {
+                HStack {
+                    Text("Galleries (High → Low)")
+                    if selectedSortOption == .galleryCountDesc { Image(systemName: "checkmark") }
+                }
+            }
+            Button(action: { changeSortOption(to: .performerCountDesc) }) {
+                HStack {
+                    Text("Performers (High → Low)")
+                    if selectedSortOption == .performerCountDesc { Image(systemName: "checkmark") }
+                }
+            }
+        } label: {
+            HStack {
+                Text("Counts")
+                if selectedSortOption == .sceneCountDesc || selectedSortOption == .galleryCountDesc || selectedSortOption == .performerCountDesc { Image(systemName: "checkmark") }
+            }
+        }
+    }
+
     var body: some View {
         Group {
             if configManager.activeConfig == nil {
@@ -327,150 +459,8 @@ private struct GroupsViewContent: View {
                 groupsGrid
             }
         }
-        .navigationTitle("Groups")
-        .navigationBarTitleDisplayMode(.inline)
         .applyAppBackground()
-        .floatingActionBar(isPresented: true, catalogChrome: CatalogFloatingChromeState(hasActiveServerConfig: configManager.activeConfig != nil, primaryListIsEmpty: viewModel.groups.isEmpty, errorMessage: viewModel.errorMessage)) {
-            HStack(spacing: 0) {
-                // Search Pill (if active)
-                if !searchText.isEmpty {
-                    Button(action: {
-                        searchText = ""
-                        performSearch()
-                    }) {
-                            HStack(spacing: 4) {
-                                Image(systemName: "xmark")
-                                    .font(.system(size: 10, weight: .bold))
-                                Text(searchText)
-                                    .font(.system(size: 11, weight: .bold))
-                            }
-                            .foregroundColor(.white.opacity(0.9))
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 6)
-                            .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                            .clipShape(Capsule())
-                        }
-                        .frame(maxWidth: .infinity)
-                    }
-
-                    // Sort Menu
-                    Menu {
-                        // Random
-                        Button(action: { changeSortOption(to: .random) }) {
-                            HStack {
-                                Text("Random")
-                                if selectedSortOption == .random { Image(systemName: "checkmark") }
-                            }
-                        }
-                        
-                        Divider()
-                        
-                        // Name
-                        Menu {
-                            Button(action: { changeSortOption(to: .nameAsc) }) {
-                                HStack {
-                                    Text("A → Z")
-                                    if selectedSortOption == .nameAsc { Image(systemName: "checkmark") }
-                                }
-                            }
-                            Button(action: { changeSortOption(to: .nameDesc) }) {
-                                HStack {
-                                    Text("Z → A")
-                                    if selectedSortOption == .nameDesc { Image(systemName: "checkmark") }
-                                }
-                            }
-                        } label: {
-                            HStack {
-                                Text("Name")
-                                if selectedSortOption == .nameAsc || selectedSortOption == .nameDesc { Image(systemName: "checkmark") }
-                            }
-                        }
-
-                        // Date
-                        Menu {
-                            Button(action: { changeSortOption(to: .dateDesc) }) {
-                                HStack {
-                                    Text("Newest First")
-                                    if selectedSortOption == .dateDesc { Image(systemName: "checkmark") }
-                                }
-                            }
-                            Button(action: { changeSortOption(to: .dateAsc) }) {
-                                HStack {
-                                    Text("Oldest First")
-                                    if selectedSortOption == .dateAsc { Image(systemName: "checkmark") }
-                                }
-                            }
-                        } label: {
-                            HStack {
-                                Text("Date")
-                                if selectedSortOption == .dateAsc || selectedSortOption == .dateDesc { Image(systemName: "checkmark") }
-                            }
-                        }
-
-                        // Rating
-                        Menu {
-                            Button(action: { changeSortOption(to: .ratingDesc) }) {
-                                HStack {
-                                    Text("High → Low")
-                                    if selectedSortOption == .ratingDesc { Image(systemName: "checkmark") }
-                                }
-                            }
-                            Button(action: { changeSortOption(to: .ratingAsc) }) {
-                                HStack {
-                                    Text("Low → High")
-                                    if selectedSortOption == .ratingAsc { Image(systemName: "checkmark") }
-                                }
-                            }
-                        } label: {
-                            HStack {
-                                Text("Rating")
-                                if selectedSortOption == .ratingAsc || selectedSortOption == .ratingDesc { Image(systemName: "checkmark") }
-                            }
-                        }
-
-                        // Counts
-                        Menu {
-                            Button(action: { changeSortOption(to: .sceneCountDesc) }) {
-                                HStack {
-                                    Text("Scenes (High → Low)")
-                                    if selectedSortOption == .sceneCountDesc { Image(systemName: "checkmark") }
-                                }
-                            }
-                            Button(action: { changeSortOption(to: .galleryCountDesc) }) {
-                                HStack {
-                                    Text("Galleries (High → Low)")
-                                    if selectedSortOption == .galleryCountDesc { Image(systemName: "checkmark") }
-                                }
-                            }
-                            Button(action: { changeSortOption(to: .performerCountDesc) }) {
-                                HStack {
-                                    Text("Performers (High → Low)")
-                                    if selectedSortOption == .performerCountDesc { Image(systemName: "checkmark") }
-                                }
-                            }
-                        } label: {
-                            HStack {
-                                Text("Counts")
-                                if selectedSortOption == .sceneCountDesc || selectedSortOption == .galleryCountDesc || selectedSortOption == .performerCountDesc { Image(systemName: "checkmark") }
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "arrow.up.arrow.down")
-                            .font(.system(size: DesignTokens.Chrome.fabIconSize, weight: .semibold))
-                            .foregroundColor(.primary)
-                    }
-                    .frame(maxWidth: .infinity)
-
-                    CatalogFilterFABButton(isActive: selectedFilter != nil || !groupsCriteriaDocument.objectFilter.isEmpty) {
-                        if let f = selectedFilter {
-                            groupsPresetRowSelection = ListLivePresetTag.serverRow(f.id)
-                            groupsCriteriaDocument.load(f.criteriaObjectFilter())
-                        }
-                        showGroupsFilterSheet = true
-                    }
-                    .frame(maxWidth: .infinity)
-            }
-        }
+        .stashyCatalogChrome(catalogChromeConfig)
         .sheet(isPresented: $showGroupsFilterSheet) {
             GroupsCatalogFilterSortSheet(
                 serverFilters: viewModel.savedFilters.values.filter { $0.mode == .groups }.sorted { $0.name < $1.name },
@@ -521,7 +511,7 @@ private struct GroupsViewContent: View {
                 isSearchVisible = true
                 coordinator.activeSearchText = ""
             }
-            
+
             // Initial fetch if empty
             if viewModel.groups.isEmpty {
                 // If no default filter is set, fetch immediately
@@ -747,6 +737,7 @@ struct GroupDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var groupLiveFilterSheetPresented = false
+    @State private var groupSceneFilterActive = false
     @State private var isHeaderExpanded = false
     @State private var showingEditGroupSheet = false
     @StateObject private var linkedPerformers: DetailLinkedPerformersFilterModel
@@ -852,6 +843,7 @@ struct GroupDetailView: View {
             scope: .group(groupId: selectedGroup.id),
             sharedViewModel: viewModel,
             externalLiveFilterSheetBinding: $groupLiveFilterSheetPresented,
+            externalLiveFilterActiveBinding: $groupSceneFilterActive,
             showsFloatingFilterButton: false,
             scrollHeader: AnyView(headerView)
         )
@@ -1134,6 +1126,77 @@ struct GroupDetailView: View {
             }
     }
 
+    // MARK: - Shared detail chrome
+
+    /// Per-tab slots for the embedded list, mirroring the previous floating action bar content.
+    private var groupDetailListSlots: CatalogSlotSet {
+        var slots = CatalogSlotSet(visibility: groupDetailCatalogFloatingChromeForFooter)
+        switch selectedDetailTab {
+        case .scenes:
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: groupSceneFilterActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                groupLiveFilterSheetPresented = true
+            }
+        case .galleries:
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: linkedGalleries.catalogFilterSortFABActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                linkedGalleries.showFilterSortSheet = true
+            }
+        case .performers:
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: linkedPerformers.catalogFilterSortFABActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                linkedPerformers.showFilterSortSheet = true
+            }
+        case .studios:
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: linkedStudios.catalogFilterSortFABActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                linkedStudios.showFilterSortSheet = true
+            }
+        case .tags:
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: linkedTags.catalogFilterSortFABActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                linkedTags.showFilterSortSheet = true
+            }
+        case .images:
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: linkedImages.catalogFilterSortFABActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                linkedImages.showFilterSortSheet = true
+            }
+        }
+        return slots
+    }
+
+    private var groupDetailChromeConfig: StashyDetailChromeConfig {
+        StashyDetailChromeConfig(
+            listSlots: groupDetailListSlots,
+            insetSpacing: DesignTokens.Chrome.contentTopGap
+        )
+    }
+
     private var groupDetailCoreChrome: some View {
         Group {
             if selectedDetailTab == .scenes {
@@ -1144,55 +1207,12 @@ struct GroupDetailView: View {
         }
         .applyAppBackground()
         .sceneLiveUpdates(using: viewModel)
-        .hideSystemNavigationBarForCustomChrome()
-        .enableSwipeBackWhenNavBarHidden()
-        .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
+        .stashyDetailChrome(groupDetailChromeConfig) {
             groupDetailNavBar
         }
         .sheet(isPresented: $showingEditGroupSheet) {
             EditGroupSheet(group: selectedGroup, viewModel: viewModel) { updated in
                 selectedGroup = updated
-            }
-        }
-        .floatingActionBar(isPresented: true, catalogChrome: groupDetailCatalogFloatingChromeForFooter) {
-            HStack(spacing: 0) {
-                if selectedDetailTab == .scenes {
-                    CatalogFilterFABButton(isActive: true) {
-                        HapticManager.light()
-                        groupLiveFilterSheetPresented = true
-                    }
-                    .frame(maxWidth: .infinity)
-                } else if selectedDetailTab == .galleries {
-                    CatalogFilterFABButton(isActive: linkedGalleries.catalogFilterSortFABActive) {
-                        HapticManager.light()
-                        linkedGalleries.showFilterSortSheet = true
-                    }
-                    .frame(maxWidth: .infinity)
-                } else if selectedDetailTab == .performers {
-                    CatalogFilterFABButton(isActive: linkedPerformers.catalogFilterSortFABActive) {
-                        HapticManager.light()
-                        linkedPerformers.showFilterSortSheet = true
-                    }
-                    .frame(maxWidth: .infinity)
-                } else if selectedDetailTab == .studios {
-                    CatalogFilterFABButton(isActive: linkedStudios.catalogFilterSortFABActive) {
-                        HapticManager.light()
-                        linkedStudios.showFilterSortSheet = true
-                    }
-                    .frame(maxWidth: .infinity)
-                } else if selectedDetailTab == .tags {
-                    CatalogFilterFABButton(isActive: linkedTags.catalogFilterSortFABActive) {
-                        HapticManager.light()
-                        linkedTags.showFilterSortSheet = true
-                    }
-                    .frame(maxWidth: .infinity)
-                } else if selectedDetailTab == .images {
-                    CatalogFilterFABButton(isActive: linkedImages.catalogFilterSortFABActive) {
-                        HapticManager.light()
-                        linkedImages.showFilterSortSheet = true
-                    }
-                    .frame(maxWidth: .infinity)
-                }
             }
         }
         .onAppear {

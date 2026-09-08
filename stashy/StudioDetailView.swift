@@ -19,6 +19,7 @@ struct StudioDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var studioLiveFilterSheetPresented = false
+    @State private var studioSceneFilterActive = false
     @StateObject private var linkedPerformers: DetailLinkedPerformersFilterModel
     @StateObject private var linkedTags: DetailLinkedTagsFilterModel
     @StateObject private var linkedChildStudios: DetailLinkedStudiosFilterModel
@@ -133,6 +134,7 @@ struct StudioDetailView: View {
             scope: .studio(studioId: studio.id),
             sharedViewModel: viewModel,
             externalLiveFilterSheetBinding: $studioLiveFilterSheetPresented,
+            externalLiveFilterActiveBinding: $studioSceneFilterActive,
             showsFloatingFilterButton: false,
             scrollHeader: AnyView(
                 headerCard
@@ -509,9 +511,7 @@ struct StudioDetailView: View {
             }
         }
         .sceneLiveUpdates(using: viewModel)
-        .hideSystemNavigationBarForCustomChrome()
-        .enableSwipeBackWhenNavBarHidden()
-        .stashyCustomChromeInset(spacing: 0) {
+        .stashyDetailChrome(studioDetailChromeConfig) {
             studioDetailNavBar
         }
         .sheet(isPresented: $showingEditStudioSheet) {
@@ -519,58 +519,86 @@ struct StudioDetailView: View {
                 studio = updated
             }
         }
-        .floatingActionBar(isPresented: true, catalogChrome: studioDetailCatalogFloatingChromeForFooter) {
-            HStack(spacing: 0) {
-                if selectedDetailTab == .scenes {
-                    CatalogFilterFABButton(isActive: true) {
-                        HapticManager.light()
-                        studioLiveFilterSheetPresented = true
-                    }
-                    .frame(maxWidth: .infinity)
-                } else if selectedDetailTab == .galleries {
-                    CatalogFilterFABButton(isActive: linkedGalleries.catalogFilterSortFABActive) {
-                        HapticManager.light()
-                        linkedGalleries.showFilterSortSheet = true
-                    }
-                    .frame(maxWidth: .infinity)
-                } else if selectedDetailTab == .performers {
-                    CatalogFilterFABButton(isActive: linkedPerformers.catalogFilterSortFABActive) {
-                        HapticManager.light()
-                        linkedPerformers.showFilterSortSheet = true
-                    }
-                    .frame(maxWidth: .infinity)
-                } else if selectedDetailTab == .tags {
-                    CatalogFilterFABButton(isActive: linkedTags.catalogFilterSortFABActive) {
-                        HapticManager.light()
-                        linkedTags.showFilterSortSheet = true
-                    }
-                    .frame(maxWidth: .infinity)
-                } else if selectedDetailTab == .studios {
-                    CatalogFilterFABButton(isActive: linkedChildStudios.catalogFilterSortFABActive) {
-                        HapticManager.light()
-                        linkedChildStudios.showFilterSortSheet = true
-                    }
-                    .frame(maxWidth: .infinity)
-                } else if selectedDetailTab == .images {
-                    let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.images)
-                    CatalogFABIconButton(
-                        systemImage: cardColumns.toggleIcon,
-                        accessibilityLabel: cardColumns.accessibilityLabel,
-                        accessibilityHint: "Switches between one and two cards per row"
-                    ) {
-                        withAnimation(DesignTokens.Animation.quick) {
-                            tabManager.toggleCatalogCardColumns(for: CatalogCardColumnScope.images)
-                        }
-                    }
-                    .frame(maxWidth: .infinity)
-                    CatalogFilterFABButton(isActive: linkedImages.catalogFilterSortFABActive) {
-                        HapticManager.light()
-                        linkedImages.showFilterSortSheet = true
-                    }
-                    .frame(maxWidth: .infinity)
+    }
+
+    // MARK: - Shared detail chrome
+
+    /// Per-tab slots for the embedded list, mirroring the previous floating action bar content.
+    private var studioDetailListSlots: CatalogSlotSet {
+        var slots = CatalogSlotSet(visibility: studioDetailCatalogFloatingChromeForFooter)
+        switch selectedDetailTab {
+        case .scenes:
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: studioSceneFilterActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                studioLiveFilterSheetPresented = true
+            }
+        case .galleries:
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: linkedGalleries.catalogFilterSortFABActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                linkedGalleries.showFilterSortSheet = true
+            }
+        case .performers:
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: linkedPerformers.catalogFilterSortFABActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                linkedPerformers.showFilterSortSheet = true
+            }
+        case .tags:
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: linkedTags.catalogFilterSortFABActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                linkedTags.showFilterSortSheet = true
+            }
+        case .studios:
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: linkedChildStudios.catalogFilterSortFABActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                linkedChildStudios.showFilterSortSheet = true
+            }
+        case .images:
+            let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.images)
+            slots.columns = CatalogChromeSlot(
+                systemImage: cardColumns.toggleIcon,
+                accessibilityLabel: cardColumns.accessibilityLabel,
+                accessibilityHint: "Switches between one and two cards per row"
+            ) {
+                withAnimation(DesignTokens.Animation.quick) {
+                    tabManager.toggleCatalogCardColumns(for: CatalogCardColumnScope.images)
                 }
             }
+            slots.filterSort = CatalogChromeSlot(
+                systemImage: "slider.horizontal.3",
+                isActive: linkedImages.catalogFilterSortFABActive,
+                accessibilityLabel: "Filter and sort"
+            ) {
+                HapticManager.light()
+                linkedImages.showFilterSortSheet = true
+            }
+        case .groups:
+            break
         }
+        return slots
+    }
+
+    private var studioDetailChromeConfig: StashyDetailChromeConfig {
+        StashyDetailChromeConfig(listSlots: studioDetailListSlots, insetSpacing: 0)
     }
 
     @ViewBuilder
