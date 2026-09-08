@@ -165,6 +165,7 @@
 		AE7E0000000000000000B003 /* PlayerEnginePreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B001 /* PlayerEnginePreference.swift */; };
 		AE7E0000000000000000B012 /* AetherSceneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B011 /* AetherSceneEngine.swift */; };
 		AE7E0000000000000000B022 /* Scene+AetherPlayback.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */; };
+		AE7E0000000000000000B042 /* AetherSceneSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B041 /* AetherSceneSurface.swift */; };
 		AE7E0000000000000000B032 /* AcknowledgementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B031 /* AcknowledgementsView.swift */; };
 		AE7E0000000000000000B033 /* AcknowledgementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B031 /* AcknowledgementsView.swift */; };
 		F0A11E1B0B0B0B0B0B0B0B01 /* PocketSVG in Frameworks */ = {isa = PBXBuildFile; productRef = 1A2B3C4D5E6F708192A3B4C5 /* PocketSVG */; };
@@ -315,6 +316,7 @@
 		AE7E0000000000000000B001 /* PlayerEnginePreference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerEnginePreference.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B011 /* AetherSceneEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherSceneEngine.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Scene+AetherPlayback.swift"; sourceTree = "<group>"; };
+		AE7E0000000000000000B041 /* AetherSceneSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherSceneSurface.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B031 /* AcknowledgementsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcknowledgementsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
@@ -361,6 +363,7 @@
 				AE7E0000000000000000B001 /* PlayerEnginePreference.swift */,
 				AE7E0000000000000000B011 /* AetherSceneEngine.swift */,
 				AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */,
+				AE7E0000000000000000B041 /* AetherSceneSurface.swift */,
 			);
 			path = Playback;
 			sourceTree = "<group>";
@@ -698,6 +701,7 @@
 				AE7E0000000000000000B002 /* PlayerEnginePreference.swift in Sources */,
 				AE7E0000000000000000B012 /* AetherSceneEngine.swift in Sources */,
 				AE7E0000000000000000B022 /* Scene+AetherPlayback.swift in Sources */,
+				AE7E0000000000000000B042 /* AetherSceneSurface.swift in Sources */,
 				AE7E0000000000000000B032 /* AcknowledgementsView.swift in Sources */,
 				DF675E7A2F2A6392004CA019 /* SceneGalleriesCard.swift in Sources */,
 				DF675E7B2F2A6392004CA019 /* SceneVideoPlayerCard.swift in Sources */,

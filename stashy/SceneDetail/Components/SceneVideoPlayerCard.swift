@@ -4,10 +4,15 @@
 import SwiftUI
 import AVKit
 import UIKit
+#if canImport(AetherEngine)
+import AetherEngine
+#endif
 
 struct SceneVideoPlayerCard: View {
     @Binding var activeScene: Scene
     @Binding var player: AVPlayer?
+    /// Non-nil while the optional playback engine owns this scene.
+    let aetherEngine: AetherSceneEngine?
     @Binding var isPlaybackStarted: Bool
     @Binding var isFullscreen: Bool
     @Binding var isPreviewing: Bool
@@ -31,8 +36,24 @@ struct SceneVideoPlayerCard: View {
     @ViewBuilder
     private var videoPlayerArea: some View {
         VStack(spacing: 0) {
-            if activeScene.videoURL != nil {
-                if isPlaybackStarted, let player = player {
+            if activeScene.videoURL != nil || aetherEngine != nil || PlayerEngineResolver.shouldUseAether(for: activeScene) {
+                if isPlaybackStarted, let aether = aetherEngine {
+                    AetherSceneSurface(
+                        engine: aether,
+                        posterURL: activeScene.thumbnailURL,
+                        onSeek: onSeek
+                    )
+                    .aspectRatio(16/9, contentMode: .fit)
+                    .frame(maxWidth: .infinity)
+                    .clipShape(
+                        UnevenRoundedRectangle(
+                            topLeadingRadius: 12,
+                            bottomLeadingRadius: 0,
+                            bottomTrailingRadius: 0,
+                            topTrailingRadius: 12
+                        )
+                    )
+                } else if isPlaybackStarted, let player = player {
                     VideoPlayerView(
                         player: player,
                         isFullscreen: $isFullscreen,
@@ -350,6 +371,8 @@ private enum SceneMetadataPillStyle {
 struct SceneDetailMetadataCard: View {
     @Binding var activeScene: Scene
     @Binding var player: AVPlayer?
+    /// Non-nil while the optional playback engine owns this scene.
+    let aetherEngine: AetherSceneEngine?
     @Binding var isHeaderExpanded: Bool
     @Binding var showingAddMarkerSheet: Bool
     @Binding var capturedMarkerTime: Double
@@ -525,18 +548,28 @@ struct SceneDetailMetadataCard: View {
             .frame(maxWidth: .infinity)
 
             HStack(spacing: 0) {
-                languageAndCaptionsControls
-                if stashSyncManager.isStashSyncEnabled {
+                // Live captions, AI Motion, frame capture and the AVPlayer caption track are
+                // all AVFoundation-bound — they stay hidden while the engine is playing.
+                if aetherEngine == nil {
+                    languageAndCaptionsControls
+                    if stashSyncManager.isStashSyncEnabled {
+                        Spacer(minLength: 4)
+                        aiMotionPill
+                    }
                     Spacer(minLength: 4)
-                    aiMotionPill
+                }
+                addMarkerButton
+                if aetherEngine == nil {
+                    Spacer(minLength: 4)
+                    setImageMenu
                 }
                 Spacer(minLength: 4)
-                addMarkerButton
-                Spacer(minLength: 4)
-                setImageMenu
-                Spacer(minLength: 4)
                 qualityMenu
-                if activeScene.hasCaptions {
+                if let aether = aetherEngine, aether.audioTracks.count > 1 {
+                    Spacer(minLength: 4)
+                    AetherAudioTrackMenu(engine: aether)
+                }
+                if aetherEngine == nil, activeScene.hasCaptions {
                     Spacer(minLength: 4)
                     captionsMenu
                 }
@@ -580,7 +613,7 @@ struct SceneDetailMetadataCard: View {
     @ViewBuilder
     private var addMarkerButton: some View {
         Button(action: {
-            capturedMarkerTime = player?.currentTime().seconds ?? 0
+            capturedMarkerTime = aetherEngine?.currentTime ?? player?.currentTime().seconds ?? 0
             showingAddMarkerSheet = true
         }) {
             infoPill(icon: "plus.square.fill.on.square.fill", text: "Marker", color: .green)
@@ -739,6 +772,12 @@ struct SceneDetailMetadataCard: View {
     }
 
     private func switchPlayerStream(to url: URL) {
+        if let aether = aetherEngine {
+            let currentTime = aether.currentTime
+            let wasPlaying = aether.isPlaying
+            Task { await aether.load(url: url, startAt: currentTime > 0 ? currentTime : nil, autoplay: wasPlaying) }
+            return
+        }
         guard let player = player else { return }
         let currentTime = player.currentTime()
         let wasPlaying = (player.rate > 0) || (player.timeControlStatus == .playing)
@@ -791,7 +830,8 @@ struct SceneDetailMetadataCard: View {
     }
 
     private var currentStreamURLString: String? {
-        (player?.currentItem?.asset as? AVURLAsset)?.url.absoluteString
+        if let aetherURL = aetherEngine?.currentURL { return aetherURL.absoluteString }
+        return (player?.currentItem?.asset as? AVURLAsset)?.url.absoluteString
     }
 
     private func isCurrentlyPlaying(_ stream: SceneStream) -> Bool {
@@ -993,6 +1033,8 @@ struct SceneDetailMetadataCard: View {
     }
 
     private func restorePreferredCaptionsIfNeeded() {
+        // Live captions need an AVPlayer timeline.
+        guard aetherEngine == nil else { return }
         guard !captionRestoreInFlight else { return }
         guard transcriptionController.mode == .off, !transcriptionController.isTeleprompterModeActive else { return }
         let preferred = SceneTeleprompterMode.preferred
@@ -1015,6 +1057,12 @@ struct SceneDetailMetadataCard: View {
         guard StashyPlusManager.shared.isUnlocked else {
             if userInitiated {
                 ToastManager.shared.show("AI captions are part of stashy+ — unlock in Settings", icon: "sparkles", style: .error)
+            }
+            return
+        }
+        guard aetherEngine == nil else {
+            if userInitiated {
+                ToastManager.shared.show("AI captions are not available on the optional playback engine", icon: "captions.bubble", style: .error)
             }
             return
         }
@@ -1214,6 +1262,71 @@ struct SceneDetailMetadataCard: View {
     }
 
     private static var cachedSpeechLanguageOptions: [(id: String, label: String)]?
+}
+
+/// Audio-track picker for the optional playback engine. Its own view so the pill follows
+/// the engine's published track list without the whole metadata card observing it.
+private struct AetherAudioTrackMenu: View {
+    @ObservedObject var engine: AetherSceneEngine
+
+    var body: some View {
+        Menu {
+            ForEach(engine.audioTracks) { track in
+                Button {
+                    engine.selectAudioTrack(index: track.id)
+                } label: {
+                    Label {
+                        Text(label(for: track))
+                    } icon: {
+                        if engine.activeAudioTrackIndex == track.id {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Image(systemName: "waveform")
+                    .font(.system(size: 10, weight: .bold))
+                Text(activeLabel)
+                    .font(.system(size: 10, weight: .bold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .padding(.horizontal, 8)
+            .frame(height: SceneMetadataPillStyle.height)
+            .background(Color.orange.opacity(0.1))
+            .foregroundColor(.orange)
+            .clipShape(Capsule())
+        }
+        .accessibilityLabel("Audio track")
+    }
+
+    private var activeLabel: String {
+        guard let active = engine.activeAudioTrackIndex,
+              let track = engine.audioTracks.first(where: { $0.id == active }) else {
+            return "Audio"
+        }
+        return shortLabel(for: track)
+    }
+
+    private func shortLabel(for track: TrackInfo) -> String {
+        if let language = track.language, !language.isEmpty { return language.uppercased() }
+        if !track.name.isEmpty { return track.name }
+        return "Audio"
+    }
+
+    private func label(for track: TrackInfo) -> String {
+        var parts: [String] = []
+        if !track.name.isEmpty {
+            parts.append(track.name)
+        } else if let language = track.language, !language.isEmpty {
+            parts.append(language.uppercased())
+        }
+        if !track.codec.isEmpty { parts.append(track.codec.uppercased()) }
+        if track.channels > 0 { parts.append("\(track.channels)ch") }
+        return parts.isEmpty ? "Audio" : parts.joined(separator: " · ")
+    }
 }
 
 /// Scene language + AI captions in one pill; flat sections instead of nested submenus.
