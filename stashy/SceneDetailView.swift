@@ -282,6 +282,7 @@ struct SceneDetailView: View {
                         isPlaybackStarted: $isPlaybackStarted,
                         isFullscreen: $isFullscreen,
                         isPreviewing: $isPreviewing,
+                        isMuted: $isMuted,
                         subtitleController: subtitleController,
                         transcriptionController: transcriptionController,
                         onSeek: { seconds in seekTo(seconds) },

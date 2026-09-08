@@ -23,6 +23,7 @@ struct SettingsView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @StateObject private var viewModel = StashDBViewModel()
     @ObservedObject private var configManager = ServerConfigManager.shared
+    @ObservedObject private var tabManager = TabManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
 
     // UI State
@@ -232,21 +233,16 @@ struct SettingsView: View {
             }
 
             Section {
-                stashyScrollingSectionHeader("Tools")
-                StashyPlusToolToggle(item: .downloads)
-                    .stashyGroupedBlockRow(index: 0, count: 7)
-                StashyPlusToolToggle(item: .statistics)
-                    .stashyGroupedBlockRow(index: 1, count: 7)
-                StashyPlusToolToggle(item: .oCount)
-                    .stashyGroupedBlockRow(index: 2, count: 7)
-                StashyPlusToolToggle(item: .timeline)
-                    .stashyGroupedBlockRow(index: 3, count: 7)
-                StashyPlusToolToggle(item: .topLists)
-                    .stashyGroupedBlockRow(index: 4, count: 7)
-                StashyPlusToolToggle(item: .hotOrNot)
-                    .stashyGroupedBlockRow(index: 5, count: 7)
-                StashyPlusToolToggle(item: .rateMe)
-                    .stashyGroupedBlockRow(index: 6, count: 7)
+                stashyScrollingSectionHeader("Playback Engine", isBeta: true)
+                Picker(selection: $tabManager.playerEnginePreference) {
+                    ForEach(PlayerEnginePreference.allCases) { preference in
+                        Text(preference.displayName).tag(preference)
+                    }
+                } label: {
+                    Label("Playback Engine", systemImage: "cpu")
+                }
+                .stashyGroupedSettingsRow()
+                stashyScrollingSectionFooter("Playback Engine plays MKV, WebM, AVI and other formats directly, without server transcoding. Automatic uses it only for files iOS cannot play natively. While active, AI Motion, live captions, AirPlay and frame capture are unavailable.")
             }
         } else {
             Section {

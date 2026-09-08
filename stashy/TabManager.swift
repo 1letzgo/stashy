@@ -1260,8 +1260,10 @@ class TabManager: ObservableObject {
         let sorted = tools.sorted { $0.sortOrder < $1.sortOrder }
         // Server tasks live under Settings.
         // Downloads / Overview / O-Count / Charts / Match / RateMe require stashy+ on iOS.
+        // `isEnabled` is still persisted (legacy show/hide toggles) but no longer honoured for
+        // visibility — Tools are a fixed set now, so an old "off" must not hide a tool forever.
         return sorted.compactMap { item -> ToolsItem? in
-            guard item.isEnabled, item.id != .server else { return nil }
+            guard item.id != .server else { return nil }
             #if !os(tvOS)
             if Self.isStashyPlusTool(item.id), !StashyPlusManager.isUnlockedNow {
                 return nil

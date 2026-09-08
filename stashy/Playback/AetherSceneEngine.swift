@@ -68,16 +68,21 @@ final class AetherSceneEngine: ObservableObject {
     var isMuted: Bool {
         get { _isMuted }
         set {
-            guard newValue != _isMuted else { return }
-            _isMuted = newValue
-            if newValue {
+            // No early-out on an unchanged value: the software route builds its audio output
+            // only after `load` returns, so a re-assert has to write through to be effective.
+            if newValue, !_isMuted {
                 let current = engine.volume
                 if current > 0 { unmutedVolume = current }
-                engine.volume = 0
-            } else {
-                engine.volume = unmutedVolume > 0 ? unmutedVolume : 1.0
             }
+            _isMuted = newValue
+            applyVolumeState()
         }
+    }
+
+    /// Writes the current mute state onto the engine. Idempotent, so it can be re-applied at
+    /// every point where the audio output may have been (re)created.
+    private func applyVolumeState() {
+        engine.volume = _isMuted ? 0 : (unmutedVolume > 0 ? unmutedVolume : 1.0)
     }
 
     // MARK: - Internals
@@ -131,7 +136,10 @@ final class AetherSceneEngine: ObservableObject {
                 guard let self else { return }
                 let wasReady = self.hasFirstFrame
                 self.hasFirstFrame = ready
-                if ready && !wasReady { self.onFirstFrame?() }
+                if ready && !wasReady {
+                    self.applyVolumeState()
+                    self.onFirstFrame?()
+                }
             }
             .store(in: &cancellables)
 
@@ -182,6 +190,7 @@ final class AetherSceneEngine: ObservableObject {
         case .playing, .paused:
             isLoading = false
             didEnd = false
+            applyVolumeState()
             flushPendingSeekIfNeeded()
         case .ended:
             isLoading = false
@@ -247,7 +256,7 @@ final class AetherSceneEngine: ObservableObject {
                                       options: options)
             guard generation == loadGeneration else { return }
             if _rate != 1.0 { engine.setRate(_rate) }
-            if _isMuted { engine.volume = 0 }
+            applyVolumeState()
         } catch is CancellationError {
             // A newer load superseded this one; nothing to report.
         } catch {

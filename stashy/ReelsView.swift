@@ -338,12 +338,6 @@ struct ReelsViewBody: View {
     @State private var showDeleteConfirmation = false
     /// Item behind the optional overlay delete button (scene / preview with files, or clip image).
     @State private var reelsItemToDelete: ReelItemData?
-    /// Explicit `ScrollViewProxy` scroll (delete flow); `.scrollPosition(id:)` writes alone do not page reliably.
-    @State private var reelsScrollRequest: ReelsScrollRequest?
-    /// Deleted on the server but kept in the list as placeholders: shrinking the `LazyVStack` while the
-    /// neighbour is already playing re-laid out its player and left a black surface (slow connections).
-    /// Cleared on the next feed load / mode change.
-    @State private var deletedReelItemIds: Set<String> = []
     @State private var reelsMode: ReelsMode = Self.sessionRestoredReelsMode()
     @State private var selectedMarkerSortOption: StashDBViewModel.SceneMarkerSortOption = StashDBViewModel.SceneMarkerSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .markers) ?? "") ?? .random
     @StateObject private var reelsClipImageFilters = DetailLinkedImagesFilterModel(
@@ -1380,12 +1374,6 @@ struct ReelsViewBody: View {
         @unknown default:
             return true
         }
-    }
-
-    struct ReelsScrollRequest: Equatable {
-        let id: String
-        let animated: Bool
-        let token = UUID()
     }
 
     enum ReelsMode: String, CaseIterable {
@@ -2821,60 +2809,63 @@ struct ReelsViewBody: View {
 
     /// Markers point at a scene shared with other markers; deleting from the marker feed is not offered.
     private func reelsItemSupportsDelete(_ item: ReelItemData) -> Bool {
-        guard !deletedReelItemIds.contains(item.id) else { return false }
         switch item {
         case .scene, .preview, .clip: return true
         case .marker: return false
         }
     }
 
+    /// Same flow as the fullscreen image viewer: resolve the successor now, move the
+    /// `scrollPosition` binding before the request, prune the array on success.
     private func reelsDeleteItem(_ item: ReelItemData) {
         reelsItemToDelete = nil
         HapticManager.light()
-        // Jump first, delete afterwards: the page turn must not wait for the server round trip.
-        let neighbour = reelsNeighbourId(of: item)
-        if let neighbour {
+
+        let items = currentReelItems
+        guard let currentIndex = items.firstIndex(where: { $0.id == item.id }) else { return }
+        let successorId: String? = {
+            if currentIndex + 1 < items.count { return items[currentIndex + 1].id }
+            if currentIndex > 0 { return items[currentIndex - 1].id }
+            return nil
+        }()
+
+        // Move before deleting: the binding must never point at an id that has left the array.
+        if let successorId {
             isUserScrollingReels = false
-            currentVisibleSceneId = neighbour
-            reelsScrollRequest = ReelsScrollRequest(id: neighbour, animated: true)
+            currentVisibleSceneId = successorId
         }
 
-        let finish: (Bool, String) -> Void = { success, label in
-            Task { @MainActor in
+        let finish: (Bool, String, @escaping () -> Void) -> Void = { success, label, prune in
+            DispatchQueue.main.async {
                 guard success else {
+                    self.currentVisibleSceneId = item.id
                     ToastManager.shared.show("Failed to delete \(label)", icon: "exclamationmark.triangle", style: .error)
                     return
                 }
-                self.markReelItemDeleted(item, neighbour: neighbour)
                 ToastManager.shared.show("\(label.capitalized) deleted", icon: "trash", style: .success)
+                prune()
+                if successorId == nil {
+                    self.currentVisibleSceneId = nil
+                }
             }
         }
 
         switch item {
         case .scene(let scene), .preview(let scene):
-            viewModel.deleteSceneWithFiles(scene: scene) { success in finish(success, "scene") }
+            viewModel.deleteSceneWithFiles(scene: scene) { success in
+                finish(success, "scene") {
+                    self.viewModel.scenes.removeAll { $0.id == scene.id }
+                    self.viewModel.previews.removeAll { $0.id == scene.id }
+                }
+            }
         case .clip(let clip):
-            viewModel.deleteImage(imageId: clip.id) { success in finish(success, "image") }
+            viewModel.deleteImage(imageId: clip.id) { success in
+                finish(success, "image") {
+                    self.viewModel.clips.removeAll { $0.id == clip.id }
+                }
+            }
         case .marker:
             break
-        }
-    }
-
-    /// Next item that is not a deleted placeholder, or the previous one for the last page.
-    private func reelsNeighbourId(of item: ReelItemData) -> String? {
-        let items = currentReelItems
-        guard let i = items.firstIndex(where: { $0.id == item.id }) else { return nil }
-        if let next = items[(i + 1)...].first(where: { !deletedReelItemIds.contains($0.id) }) { return next.id }
-        if let previous = items[..<i].last(where: { !deletedReelItemIds.contains($0.id) }) { return previous.id }
-        return nil
-    }
-
-    /// No list mutation: the row turns into a placeholder, the arrays are purged with the next feed load.
-    private func markReelItemDeleted(_ item: ReelItemData, neighbour: String?) {
-        deletedReelItemIds.insert(item.id)
-        if currentVisibleSceneId == item.id, let neighbour {
-            currentVisibleSceneId = neighbour
-            reelsScrollRequest = ReelsScrollRequest(id: neighbour, animated: true)
         }
     }
 
@@ -2935,9 +2926,6 @@ struct ReelsViewBody: View {
                 activateFeed()
             }
             .onChange(of: isFeedLoading) { wasLoading, nowLoading in
-                if !wasLoading && nowLoading {
-                    deletedReelItemIds.removeAll()
-                }
                 if wasLoading && !nowLoading {
                     continuePagedRestoreIfNeeded()
                     activateFeed()
@@ -3864,7 +3852,6 @@ struct ReelsViewBody: View {
     }
 
     private func handleModeChange(from oldValue: ReelsMode, to newValue: ReelsMode) {
-        deletedReelItemIds.removeAll()
         // When switching sub-tabs always pause immediately. Autoplay for the new *video*
         // mode is restored below; Pics embeds ImagesView and must not keep clip audio.
         persistSessionReelsMode(newValue)
@@ -4040,24 +4027,13 @@ struct ReelsViewBody: View {
     private func advanceToNextItem(from item: ReelItemData) {
         let items = currentReelItems
         guard let currentIndex = items.firstIndex(where: { $0.id == item.id }) else { return }
-        guard let next = items[(currentIndex + 1)...].first(where: { !deletedReelItemIds.contains($0.id) }) else { return }
-        currentVisibleSceneId = next.id
+        let nextIndex = currentIndex + 1
+        guard nextIndex < items.count else { return }
+        currentVisibleSceneId = items[nextIndex].id
     }
 
     @ViewBuilder
     private func reelItemRow(index: Int, item: ReelItemData, itemCount: Int) -> some View {
-        if deletedReelItemIds.contains(item.id) {
-            ReelDeletedPlaceholderView()
-                .containerRelativeFrame([.horizontal, .vertical])
-                .background(Color.black)
-                .id(item.id)
-        } else {
-            reelItemPlayerRow(index: index, item: item, itemCount: itemCount)
-        }
-    }
-
-    @ViewBuilder
-    private func reelItemPlayerRow(index: Int, item: ReelItemData, itemCount: Int) -> some View {
         ReelItemView(
             item: item,
             currentVisibleSceneId: $currentVisibleSceneId,
@@ -4159,12 +4135,6 @@ struct ReelsViewBody: View {
                     if pendingFeedActivation {
                         requestFeedActivation()
                     }
-                }
-            }
-            .onChange(of: reelsScrollRequest) { _, request in
-                guard let request, items.contains(where: { $0.id == request.id }) else { return }
-                withAnimation(request.animated ? .easeInOut(duration: 0.3) : nil) {
-                    proxy.scrollTo(request.id, anchor: .top)
                 }
             }
             .onChange(of: items.count) { _, _ in
@@ -6474,21 +6444,6 @@ struct IsolatedScrubberBar: View {
         .opacity(isUIVisible ? 1 : 0)
         .allowsHitTesting(isUIVisible)
         .animation(.easeInOut(duration: 0.2), value: isUIVisible)
-    }
-}
-
-/// Full-page stand-in for an item deleted from the overlay. Keeps the list geometry stable.
-struct ReelDeletedPlaceholderView: View {
-    var body: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "trash")
-                .font(.system(size: 34, weight: .semibold))
-            Text("Deleted")
-                .font(.headline)
-        }
-        .foregroundColor(.white.opacity(0.5))
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.black)
     }
 }
 #endif

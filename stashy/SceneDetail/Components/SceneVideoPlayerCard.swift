@@ -16,6 +16,8 @@ struct SceneVideoPlayerCard: View {
     @Binding var isPlaybackStarted: Bool
     @Binding var isFullscreen: Bool
     @Binding var isPreviewing: Bool
+    /// Owned by SceneDetailView; the engine surface draws its own mute button.
+    @Binding var isMuted: Bool
 
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var subtitleController: SubtitleController
@@ -41,6 +43,7 @@ struct SceneVideoPlayerCard: View {
                     AetherSceneSurface(
                         engine: aether,
                         posterURL: activeScene.thumbnailURL,
+                        isMuted: $isMuted,
                         onSeek: onSeek
                     )
                     .aspectRatio(16/9, contentMode: .fit)

@@ -18,6 +18,7 @@ import AetherEngine
 struct AetherSceneSurface: View {
     @ObservedObject var engine: AetherSceneEngine
     let posterURL: URL?
+    @Binding var isMuted: Bool
     var onSeek: (Double) -> Void
 
     @ObservedObject private var appearanceManager = AppearanceManager.shared
@@ -65,6 +66,11 @@ struct AetherSceneSurface: View {
                 engine?.setPictureInPictureActive(active)
             }
             scheduleControlsHide()
+        }
+        // Give the transport a few seconds once there is something to look at, so the mute and
+        // PiP controls are found before the overlay hides itself.
+        .onChange(of: engine.hasFirstFrame) { _, ready in
+            if ready { revealControls() }
         }
         // The engine swaps its layer on every load, so the controller has to follow it.
         .onChange(of: engine.pipPlayerLayer.map(ObjectIdentifier.init)) { _, _ in
@@ -148,18 +154,41 @@ struct AetherSceneSurface: View {
                 }
             }
 
-            if pip.isAvailable, tabManager.isPiPEnabled, AVPictureInPictureController.isPictureInPictureSupported() {
-                VStack {
-                    HStack {
-                        Spacer()
-                        pipButton
-                            .padding(.trailing, 10)
-                            .padding(.top, 10)
-                    }
+            // Always reachable, unlike the auto-hiding transport: the engine surface has no
+            // system transport bar, so mute would otherwise be unavailable.
+            VStack {
+                HStack(spacing: 8) {
                     Spacer()
+                    if pip.isAvailable, tabManager.isPiPEnabled, AVPictureInPictureController.isPictureInPictureSupported() {
+                        pipButton
+                    }
+                    muteButton
                 }
+                .padding(.trailing, 10)
+                .padding(.top, 10)
+                Spacer()
             }
         }
+    }
+
+    @ViewBuilder
+    private var muteButton: some View {
+        Button {
+            HapticManager.light()
+            let next = !isMuted
+            isMuted = next
+            // Explicit user action — the only place the shared choice may be written.
+            ScenePlayerMute.persist(next)
+            revealControls()
+        } label: {
+            Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(8)
+                .background(Color.black.opacity(0.4), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isMuted ? "Unmute" : "Mute")
     }
 
     @ViewBuilder
