@@ -14,7 +14,7 @@ import UIKit
 /// konventionell zweispaltig: schmale Liste links, Kontext zum fokussierten
 /// Eintrag rechts. Deshalb braucht die Liste auch nie die volle Breite.
 private enum TVSettingsEntry: Hashable {
-    case servers, appearance, security, playback, stashyPlus
+    case servers, appearance, security, stashyPlus
     case defaultSort, defaultFilters, visibleTabs
     case sidebar
     case maintenance
@@ -25,7 +25,6 @@ private enum TVSettingsEntry: Hashable {
         case .servers: return "Servers"
         case .appearance: return "Appearance"
         case .security: return "Security"
-        case .playback: return "Playback"
         case .stashyPlus: return "stashy+"
         case .defaultSort: return "Default Sorting"
         case .defaultFilters: return "Default Filters"
@@ -41,7 +40,6 @@ private enum TVSettingsEntry: Hashable {
         case .servers: return "server.rack"
         case .appearance: return "paintbrush.fill"
         case .security: return "lock.fill"
-        case .playback: return "play.rectangle.fill"
         case .stashyPlus: return "sparkles.tv.fill"
         case .defaultSort: return "arrow.up.arrow.down"
         case .defaultFilters: return "line.3.horizontal.decrease.circle"
@@ -60,8 +58,6 @@ private enum TVSettingsEntry: Hashable {
             return "Pick the accent color used for focus highlights and icons throughout the app."
         case .security:
             return "Require a PIN before the app opens."
-        case .playback:
-            return "Choose the streaming quality. \"Original\" plays the file directly for the best seeking; lower qualities transcode."
         case .stashyPlus:
             return "Premium features, including Channels — continuous playback of a performer, studio, tag or saved filter."
         case .defaultSort:
@@ -109,7 +105,6 @@ struct TVSettingsView: View {
                 link(.servers) { TVServersSettingsView() }
                 link(.appearance) { TVAppearanceSettingsView() }
                 link(.security) { TVSecuritySettingsView() }
-                link(.playback) { TVPlaybackSettingsView() }
                 link(.stashyPlus) { TVStashyPlusSettingsView() }
             } header: {
                 Text("General")
@@ -456,45 +451,6 @@ private struct TVSecuritySettingsView: View {
         }
         .background(Color.appBackground)
         .navigationTitle("Security")
-    }
-}
-
-// MARK: - Playback
-
-private struct TVPlaybackSettingsView: View {
-    @ObservedObject private var configManager = ServerConfigManager.shared
-
-    var body: some View {
-        List {
-            Section {
-                if let config = configManager.activeConfig {
-                    TVSettingsPickerRow(
-                        title: "Streaming Quality",
-                        options: StreamingQuality.allCases.map { TVPickerOption($0, $0.displayName) },
-                        selection: Binding(
-                            get: { config.defaultQuality },
-                            set: { quality in
-                                var updated = config
-                                updated.defaultQuality = quality
-                                configManager.saveConfig(updated)
-                                configManager.addOrUpdateServer(updated)
-                            }
-                        )
-                    )
-                } else {
-                    Text("Connect to a server to configure quality.")
-                        .foregroundStyle(.secondary)
-                        .focusable()
-                }
-            } footer: {
-                Text("\"Original\" streams MP4 files directly for best seeking performance. Lower qualities use HLS transcoding.")
-            }
-        }
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: 80).focusable(false)
-        }
-        .background(Color.appBackground)
-        .navigationTitle("Playback")
     }
 }
 

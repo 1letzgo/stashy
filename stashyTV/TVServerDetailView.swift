@@ -125,7 +125,6 @@ struct TVServerDetailView: View {
             if let port = config.port, !port.isEmpty {
                 row(label: "Port", value: port)
             }
-            row(label: "Default Quality", value: config.defaultQuality.displayName)
             row(label: "API Key", value: (config.secureApiKey?.isEmpty == false) ? "•••• configured" : "Not set")
         }
         .padding(20)

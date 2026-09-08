@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import AVKit
 import Combine
 
 struct TVSceneDetailView: View {
@@ -14,15 +13,11 @@ struct TVSceneDetailView: View {
 
     @ObservedObject private var configManager = ServerConfigManager.shared
     @StateObject private var viewModel = StashDBViewModel()
-    @StateObject private var playerViewModel = TVPlayerViewModel()
+    @StateObject private var playerModel = TVAetherPlaybackModel()
     @State private var sceneDetail: Scene?
-    @State private var sceneStreams: [SceneStream] = []
     @State private var isLoadingDetail = true
-    @State private var isLoadingStreams = true
     @State private var hasAddedPlay = false
-    @State private var selectedQuality: StreamingQuality? = nil
     @State private var showingRatingPicker = false
-    @State private var showingQualityPicker = false
     @FocusState private var focusedHeroAction: HeroAction?
 
     private enum HeroAction: Hashable {
@@ -117,30 +112,28 @@ struct TVSceneDetailView: View {
                 loadData()
             } else {
                 isLoadingDetail = false
-                isLoadingStreams = false
             }
         }
         .onPlayPauseCommand {
             // On the detail surface: start playback. Native VideoPlayer owns Play/Pause in cover.
-            guard let scene = sceneDetail, !playerViewModel.isShowingPlayer else { return }
+            guard let scene = sceneDetail, !playerModel.isShowingPlayer else { return }
             startPlayback(for: scene)
         }
         .defaultFocus($focusedHeroAction, .play)
-        .fullScreenCover(isPresented: $playerViewModel.isShowingPlayer, onDismiss: {
-            playerViewModel.clear()
+        .fullScreenCover(isPresented: $playerModel.isShowingPlayer, onDismiss: {
+            playerModel.clear()
             loadData()
         }) {
-            if let player = playerViewModel.player {
-                TVVideoPlayerView(player: player, isPresented: $playerViewModel.isShowingPlayer) {
+            TVAetherPlayerView(
+                model: playerModel,
+                title: sceneDetail?.displayTitle ?? "Untitled Scene",
+                subtitle: sceneDetail?.studio?.name ?? "",
+                posterURL: sceneDetail?.thumbnailURL,
+                onDisappear: {
                     // Failsafe — save progress falls fullScreenCover ohne `onDismiss` weggeht.
-                    playerViewModel.saveProgress()
+                    playerModel.saveProgress()
                 }
-            } else {
-                // Fallback, wenn der Player nicht erzeugt werden konnte oder fehlschlägt.
-                TVPlayerErrorView(error: playerViewModel.error) {
-                    playerViewModel.isShowingPlayer = false
-                }
-            }
+            )
         }
     }
 
@@ -174,21 +167,14 @@ struct TVSceneDetailView: View {
     private func loadData() {
         guard hasValidActiveServer else {
             isLoadingDetail = false
-            isLoadingStreams = false
             return
         }
 
         isLoadingDetail = true
-        isLoadingStreams = true
 
         viewModel.fetchSceneDetails(sceneId: sceneId) { scene in
             self.sceneDetail = scene
             self.isLoadingDetail = false
-        }
-
-        viewModel.fetchSceneStreams(sceneId: sceneId) { streams in
-            self.sceneStreams = streams
-            self.isLoadingStreams = false
         }
     }
 
@@ -238,8 +224,8 @@ struct TVSceneDetailView: View {
 
     @ViewBuilder
     private func heroContent(scene: Scene) -> some View {
-        let hasStream = !sceneStreams.isEmpty || scene.paths?.stream != nil
-        let isWaiting = isLoadingDetail || isLoadingStreams
+        let hasStream = scene.aetherVideoURL != nil
+        let isWaiting = isLoadingDetail
         let hasProgress = (scene.resumeTime ?? 0) > 0
         
         VStack(alignment: .leading, spacing: 16) {
@@ -404,18 +390,6 @@ struct TVSceneDetailView: View {
                     }
                     Button("Cancel", role: .cancel) {}
                 }
-
-                heroCardButton {
-                    showingQualityPicker = true
-                } label: {
-                    heroActionLabel(icon: "rectangle.stack", title: currentQuality.displayName)
-                }
-                .confirmationDialog("Quality", isPresented: $showingQualityPicker, titleVisibility: .visible) {
-                    ForEach(StreamingQuality.allCases, id: \.self) { q in
-                        Button(q.displayName) { selectedQuality = q }
-                    }
-                    Button("Cancel", role: .cancel) {}
-                }
             }
             .padding(.top, 16)
         }
@@ -463,10 +437,6 @@ struct TVSceneDetailView: View {
         .contentShape(Rectangle())
     }
 
-    private var currentQuality: StreamingQuality {
-        selectedQuality ?? ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original
-    }
-
     private func currentRatingStars(_ scene: Scene) -> Int {
         guard let r = scene.rating100, r > 0 else { return 0 }
         return Int(round(Double(r) / 20.0))
@@ -512,10 +482,14 @@ struct TVSceneDetailView: View {
             )
         }
         
-        let quality = selectedQuality ?? ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original
-        if let streamURL = tvPlaybackURL(for: scene, streams: sceneStreams, quality: quality) {
-            playerViewModel.setupPlayer(url: streamURL, sceneId: scene.id, viewModel: viewModel, startAt: startTime)
-        }
+        guard let streamURL = scene.aetherVideoURL else { return }
+        playerModel.setup(url: streamURL,
+                          sceneId: scene.id,
+                          viewModel: viewModel,
+                          startAt: startTime,
+                          title: scene.displayTitle,
+                          subtitle: scene.studio?.name,
+                          artworkURL: scene.thumbnailURL)
     }
 
     // MARK: - Markers Section
@@ -736,317 +710,5 @@ struct TVSceneDetailView: View {
         } else {
             return String(format: "%d:%02d", minutes, seconds)
         }
-    }
-}
-
-// MARK: - Player View Model
-
-class TVPlayerViewModel: ObservableObject {
-    @Published var player: AVPlayer?
-    @Published var isShowingPlayer = false
-    @Published var error: Error?
-    /// Called when the current item finishes. Used by channel continuous play.
-    var onPlaybackEnded: (() -> Void)?
-
-    private var statusObserver: NSKeyValueObservation?
-    private var progressTimer: AnyCancellable?
-    /// Nach System-Spulen bleibt der Player oft bei rate 0; Apple-TV+-ähnlich wieder anspielen.
-    private var timeJumpedObserver: NSObjectProtocol?
-    private var playbackEndedObserver: NSObjectProtocol?
-    /// Lifecycle-Observer für robuste Resume-Saves (Home-Knopf, Sleep, App-Switch).
-    private var willResignActiveObserver: NSObjectProtocol?
-    private var didEnterBackgroundObserver: NSObjectProtocol?
-    /// Coalesces repeated remote scrubs; we restore steady-state buffering only
-    /// after the user has stopped seeking for a short moment.
-    private var scrubSettleWorkItem: DispatchWorkItem?
-    private var sceneId: String?
-    private var viewModel: StashDBViewModel?
-    /// Avoid duplicate seek/play when `status` KVO fires more than once at `.readyToPlay`.
-    private var didApplyInitialPlayback = false
-    /// `saveProgress()` already ran in `suspend()` — skip the duplicate in `clear()`.
-    private var isSuspended = false
-
-    init() {
-        let center = NotificationCenter.default
-        willResignActiveObserver = center.addObserver(
-            forName: UIApplication.willResignActiveNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.saveProgress()
-        }
-        didEnterBackgroundObserver = center.addObserver(
-            forName: UIApplication.didEnterBackgroundNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.saveProgress()
-        }
-    }
-
-    deinit {
-        // Defensive cleanup: falls `clear()` vor Dealloc nicht aufgerufen wurde
-        // (z.B. Parent-View wird während fullScreenCover entfernt), verhindern
-        // wir hier leaking Observer / Timer und späte KVO-Callbacks auf toten VMs.
-        if let t = willResignActiveObserver { NotificationCenter.default.removeObserver(t) }
-        if let t = didEnterBackgroundObserver { NotificationCenter.default.removeObserver(t) }
-        removeTimeJumpedObserver()
-        removePlaybackEndedObserver()
-        statusObserver = nil
-        progressTimer = nil
-        scrubSettleWorkItem?.cancel()
-        scrubSettleWorkItem = nil
-    }
-
-    func setupPlayer(url: URL, sceneId: String, viewModel: StashDBViewModel, startAt timestamp: Double = 0) {
-        AppLog.debug("🚀 TV PLAYER VM: Setting up player for URL: \(redactedURLString(url)) at \(timestamp)s")
-        self.sceneId = sceneId
-        self.viewModel = viewModel
-        self.didApplyInitialPlayback = false
-
-        // Never gated on headphones: on Apple TV the set's speakers are the normal output, so the
-        // rule would start every playback silent.
-        let newPlayer = createPlayer(for: url, muted: false)
-        let previousPlayer = self.player
-        self.player = newPlayer
-        self.isShowingPlayer = true
-        previousPlayer?.pause()
-        previousPlayer?.replaceCurrentItem(with: nil)
-
-        let startSeconds = max(0, timestamp)
-
-        statusObserver = newPlayer.currentItem?.observe(\.status, options: [.new, .initial]) { [weak self, weak newPlayer] item, _ in
-            guard let self, let newPlayer else { return }
-            DispatchQueue.main.async {
-                guard self.player === newPlayer else { return }
-                if item.status == .failed {
-                    self.error = item.error
-                    AppLog.debug("❌ TV PLAYER VM: Playback FAILED: \(item.error?.localizedDescription ?? "Unknown error")")
-                    if let error = item.error as NSError? {
-                        AppLog.debug("❌ TV PLAYER VM: Error domain: \(error.domain), code: \(error.code)")
-                        AppLog.debug("❌ TV PLAYER VM: Error user info: \(error.userInfo)")
-                    }
-                } else if item.status == .readyToPlay {
-                    AppLog.debug("✅ TV PLAYER VM: Player item READY to play")
-                    self.applyInitialPlaybackIfNeeded(player: newPlayer, startSeconds: startSeconds)
-                }
-            }
-        }
-
-        progressTimer = Timer.publish(every: 10, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                self?.saveProgress()
-            }
-
-        registerAutoResumeAfterScrub(on: newPlayer)
-        if let item = newPlayer.currentItem {
-            registerPlaybackEndedObserver(on: item)
-        }
-    }
-
-    private func registerAutoResumeAfterScrub(on player: AVPlayer) {
-        removeTimeJumpedObserver()
-        guard let item = player.currentItem else { return }
-        timeJumpedObserver = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemTimeJumped,
-            object: item,
-            queue: .main
-        ) { [weak self, weak player] _ in
-            guard let self, let player else { return }
-            if let item = player.currentItem {
-                // During scrub bursts (remote seek), prefer a short buffer so
-                // seeks stay responsive instead of re-buffering deeply.
-                configureForVOD(item, isScrubbing: true)
-            }
-
-            // Restore normal playback buffering once seek activity settles.
-            self.scrubSettleWorkItem?.cancel()
-            let settleWork = DispatchWorkItem { [weak player] in
-                guard let item = player?.currentItem else { return }
-                configureForVOD(item, isScrubbing: false)
-            }
-            self.scrubSettleWorkItem = settleWork
-            DispatchQueue.main.asyncAfter(deadline: .now() + 0.45, execute: settleWork)
-
-            // tvOS frequently leaves rate at 0 after scrub; auto-resume for a
-            // smoother "Apple TV+"-like experience.
-            if player.rate == 0 {
-                player.play()
-            }
-        }
-    }
-
-    private func registerPlaybackEndedObserver(on item: AVPlayerItem) {
-        removePlaybackEndedObserver()
-        playbackEndedObserver = NotificationCenter.default.addObserver(
-            forName: .AVPlayerItemDidPlayToEndTime,
-            object: item,
-            queue: .main
-        ) { [weak self] _ in
-            let vm = self
-            Task { @MainActor in
-                vm?.onPlaybackEnded?()
-            }
-        }
-    }
-
-    private func removePlaybackEndedObserver() {
-        if let token = playbackEndedObserver {
-            NotificationCenter.default.removeObserver(token)
-            playbackEndedObserver = nil
-        }
-    }
-
-    private func removeTimeJumpedObserver() {
-        if let token = timeJumpedObserver {
-            NotificationCenter.default.removeObserver(token)
-            timeJumpedObserver = nil
-        }
-    }
-
-    /// Seeking before `readyToPlay` (especially HLS/transcodes) causes UI hangs and endless buffering after scrubs.
-    private func applyInitialPlaybackIfNeeded(player: AVPlayer, startSeconds: Double) {
-        guard !didApplyInitialPlayback else { return }
-        didApplyInitialPlayback = true
-
-        let item = player.currentItem
-        let durationSec = item?.duration.seconds ?? 0
-        var start = startSeconds
-        if durationSec.isFinite, durationSec > 0 {
-            start = min(start, max(0, durationSec - 0.5))
-        }
-
-        if start > 0.25 {
-            let target = CMTime(seconds: start, preferredTimescale: 600)
-            let tol = CMTime(seconds: 2, preferredTimescale: 600)
-            player.seek(to: target, toleranceBefore: tol, toleranceAfter: tol) { [weak self, weak player] _ in
-                DispatchQueue.main.async {
-                    guard let self, let player, self.player === player else { return }
-                    player.play()
-                }
-            }
-        } else {
-            player.play()
-        }
-    }
-
-    func saveProgress() {
-        guard let player = player,
-              let sceneId = sceneId,
-              let viewModel = viewModel else { return }
-        
-        let currentTime = player.currentTime().seconds
-        if currentTime > 0 {
-            // Prefer the dedicated activity tracker when available; otherwise at least
-            // persist resume. Play-duration deltas are accumulated on iOS Scene Detail / Feeds.
-            AppLog.debug("💾 TV PLAYER VM: Saving progress: \(currentTime)s for \(sceneId)")
-            let duration = player.currentItem?.duration.seconds ?? 0
-            var resume = currentTime
-            if duration.isFinite, duration > 0, (100.0 / duration) * currentTime >= 98 {
-                resume = 0
-            }
-            viewModel.updateSceneResumeTime(sceneId: sceneId, resumeTime: resume, playDuration: 0)
-            NotificationCenter.default.post(
-                name: NSNotification.Name("SceneResumeTimeUpdated"),
-                object: nil,
-                userInfo: ["sceneId": sceneId, "resumeTime": resume]
-            )
-        }
-    }
-
-    /// Stoppt Timer/Observer und pausiert, lässt den veröffentlichten `player` aber stehen.
-    /// `player = nil` während das fullScreenCover noch dismissed wird reißt die noch
-    /// sichtbare AVPlayerViewController-Hierarchie weg — auf tvOS ein sicherer Force-Close
-    /// beim Back-Exit aus dem Kanal-Player. Für diesen Moment gibt es `suspend()`;
-    /// `clear()` läuft erst in `onDisappear`, wenn das Cover bereits entfernt ist.
-    func suspend() {
-        guard !isSuspended else { return }
-        isSuspended = true
-        saveProgress()
-        scrubSettleWorkItem?.cancel()
-        scrubSettleWorkItem = nil
-        removeTimeJumpedObserver()
-        removePlaybackEndedObserver()
-        progressTimer = nil
-        statusObserver = nil
-        didApplyInitialPlayback = true
-        player?.pause()
-    }
-
-    func clear() {
-        if !isSuspended {
-            saveProgress()
-        }
-        isSuspended = false
-        scrubSettleWorkItem?.cancel()
-        scrubSettleWorkItem = nil
-        removeTimeJumpedObserver()
-        removePlaybackEndedObserver()
-        progressTimer = nil
-        statusObserver = nil
-        didApplyInitialPlayback = true
-        let p = player
-        player = nil
-        sceneId = nil
-        viewModel = nil
-        p?.pause()
-        p?.replaceCurrentItem(with: nil)
-    }
-}
-
-// MARK: - Embedded Video Player for tvOS Full Screen Cover
-
-struct TVVideoPlayerView: View {
-    let player: AVPlayer
-    @Binding var isPresented: Bool
-    var onDisappear: (() -> Void)? = nil
-
-    var body: some View {
-        VideoPlayer(player: player) {
-            // Empty overlay - VideoPlayer provides native tvOS controls
-        }
-        .ignoresSafeArea()
-        .onExitCommand {
-            // Menu button should close the player, not exit the app.
-            isPresented = false
-        }
-        .onDisappear {
-            onDisappear?()
-        }
-    }
-}
-
-// MARK: - Player Error Fallback (fullScreenCover)
-
-/// Wird angezeigt, wenn `setupPlayer` `isShowingPlayer = true` gesetzt hat, der
-/// `AVPlayer` aber nicht erzeugt werden konnte oder `.failed` ist — ohne diese
-/// View bliebe das fullScreenCover leer und ohne Dismiss-Affordance.
-private struct TVPlayerErrorView: View {
-    let error: Error?
-    let onDismiss: () -> Void
-
-    var body: some View {
-        ZStack {
-            Color.black.ignoresSafeArea()
-            VStack(spacing: 24) {
-                Image(systemName: "exclamationmark.triangle")
-                    .font(.system(size: 80))
-                    .foregroundStyle(.secondary)
-                Text("Unable to play this scene")
-                    .font(.title2)
-                    .foregroundColor(.white.opacity(0.7))
-                if let error {
-                    Text(error.localizedDescription)
-                        .font(.callout)
-                        .foregroundStyle(.secondary)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 80)
-                }
-                Button("Close", action: onDismiss)
-                    .font(.title3)
-            }
-        }
-        .onExitCommand { onDismiss() }
     }
 }

@@ -571,9 +571,7 @@ struct TVServerSetupView: View {
             serverAddress: finalAddress,
             port: finalPort,
             serverProtocol: selectedProtocol,
-            apiKey: apiKey.isEmpty ? nil : apiKey,
-            defaultQuality: .original,
-            reelsQuality: .original
+            apiKey: apiKey.isEmpty ? nil : apiKey
         )
 
         isTesting = true
@@ -618,9 +616,7 @@ struct TVServerSetupView: View {
             name: serverName,
             serverAddress: finalAddress,
             port: finalPort,
-            serverProtocol: selectedProtocol,
-            defaultQuality: .original,
-            reelsQuality: .original
+            serverProtocol: selectedProtocol
         )
         
         isFetchingKey = true

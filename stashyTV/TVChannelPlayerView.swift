@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import AVKit
 import Combine
 import UIKit
 
@@ -153,7 +152,7 @@ struct TVChannel: Identifiable, Hashable {
 final class TVChannelSession: ObservableObject {
     let channel: TVChannel
     let catalog = StashDBViewModel()
-    let player = TVPlayerViewModel()
+    let player = TVAetherPlaybackModel()
 
     @Published var scenes: [Scene] = []
     @Published var currentIndex = 0
@@ -217,8 +216,8 @@ final class TVChannelSession: ObservableObject {
     }
 
     /// Hält die Wiedergabe an, solange das Cover selbst noch auf dem Schirm ist
-    /// (Back-Command). Der Player bleibt veröffentlicht, damit SwiftUI die
-    /// AVPlayerViewController-Hierarchie nicht mitten im Dismiss abbaut.
+    /// (Back-Command). Die Engine bleibt stehen, damit SwiftUI die Surface nicht
+    /// mitten im Dismiss abbaut.
     func stop() {
         player.onPlaybackEnded = nil
         player.suspend()
@@ -266,24 +265,36 @@ final class TVChannelSession: ObservableObject {
         let scene = scenes[index]
         currentIndex = index
         isSwitching = true
-        player.saveProgress()
         prefetchIfNeeded()
 
-        catalog.fetchSceneStreams(sceneId: scene.id) { [weak self] streams in
-            guard let self else { return }
-            let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original
-            guard let url = tvPlaybackURL(for: scene, streams: streams, quality: quality) else {
-                self.handleMissingStream()
-                return
-            }
-            self.skipFailures = 0
-            if self.playedSceneIDs.insert(scene.id).inserted {
-                self.catalog.addScenePlay(sceneId: scene.id)
-            }
-            self.player.setupPlayer(url: url, sceneId: scene.id, viewModel: self.catalog, startAt: 0)
-            self.isSwitching = false
-            self.prefetchNextStreams()
+        guard let url = scene.aetherVideoURL else {
+            handleMissingStream()
+            return
         }
+        skipFailures = 0
+        if playedSceneIDs.insert(scene.id).inserted {
+            catalog.addScenePlay(sceneId: scene.id)
+        }
+        let subtitle = scene.studio?.name
+        // One engine across the whole channel: `playNext` reuses the session
+        // (`prepareForItemReplacement`) instead of rebuilding the route per scene.
+        if player.hasEngine {
+            player.playNext(url: url,
+                            sceneId: scene.id,
+                            viewModel: catalog,
+                            title: scene.displayTitle,
+                            subtitle: subtitle,
+                            artworkURL: scene.thumbnailURL)
+        } else {
+            player.setup(url: url,
+                         sceneId: scene.id,
+                         viewModel: catalog,
+                         startAt: 0,
+                         title: scene.displayTitle,
+                         subtitle: subtitle,
+                         artworkURL: scene.thumbnailURL)
+        }
+        isSwitching = false
     }
 
     private func handleMissingStream() {
@@ -323,12 +334,6 @@ final class TVChannelSession: ObservableObject {
             completion?()
         }
     }
-
-    private func prefetchNextStreams() {
-        let next = currentIndex + 1
-        guard scenes.indices.contains(next) else { return }
-        catalog.fetchSceneStreams(sceneId: scenes[next].id) { _ in }
-    }
 }
 
 struct TVChannelPlayerView: View {
@@ -344,17 +349,21 @@ struct TVChannelPlayerView: View {
         ZStack {
             Color.black.ignoresSafeArea()
 
-            if let player = session.player.player {
-                TVChannelVideoPlayer(
-                    player: player,
-                    session: session,
-                    sceneID: session.currentScene?.id,
+            if session.player.hasEngine {
+                TVAetherPlayerView(
+                    model: session.player,
                     title: session.currentScene?.displayTitle ?? "Untitled",
                     subtitle: subtitle,
+                    posterURL: session.currentScene?.thumbnailURL,
                     canGoPrevious: session.canGoPrevious,
                     canGoNext: session.canGoNext,
                     onPrevious: { session.playPrevious() },
-                    onNext: { session.playNext() }
+                    onNext: { session.playNext() },
+                    panelExtra: {
+                        TVChannelUpNextView(session: session)
+                            .frame(height: 360)
+                    },
+                    onExit: { close() }
                 )
                 .ignoresSafeArea()
             } else if session.isLoading || session.isSwitching {
@@ -375,14 +384,14 @@ struct TVChannelPlayerView: View {
                 }
             }
         }
-        // Nur solange kein Player läuft: der Ladezweig ist nur ein Spinner auf
+        // Nur solange keine Engine läuft: der Ladezweig ist nur ein Spinner auf
         // Schwarz, ohne Fokus-Ziel erreicht die Menu-Taste `onExitCommand` nicht.
         //
         // Sobald der Player da ist, **muss** der Fokus bei ihm liegen — ein
         // fokussierbarer Container darüber nimmt ihm die Transport-Steuerung,
         // also Pause, Scrubbing und „Up Next". Im Fehlerzweig übernimmt der
         // Close-Button die Rolle des Ankers.
-        .focusable(session.player.player == nil && session.errorMessage == nil)
+        .focusable(!session.player.hasEngine && session.errorMessage == nil)
         .onAppear { session.start() }
         .onDisappear { session.teardown() }
         .onExitCommand { close() }
@@ -399,138 +408,6 @@ struct TVChannelPlayerView: View {
         isClosing = true
         session.stop()
         dismiss()
-    }
-}
-
-// MARK: - Player with transport bar skip controls
-
-/// Wraps `AVPlayerViewController` so Previous / Next live in the native transport bar:
-/// they appear and disappear together with the rest of the playback controls and are
-/// reachable with the remote, which a SwiftUI `VideoPlayer` overlay cannot do.
-private struct TVChannelVideoPlayer: UIViewControllerRepresentable {
-    let player: AVPlayer
-    let session: TVChannelSession
-    let sceneID: String?
-    let title: String
-    let subtitle: String
-    let canGoPrevious: Bool
-    let canGoNext: Bool
-    let onPrevious: () -> Void
-    let onNext: () -> Void
-
-    func makeCoordinator() -> Coordinator { Coordinator() }
-
-    func makeUIViewController(context: Context) -> AVPlayerViewController {
-        let controller = AVPlayerViewController()
-        controller.player = player
-
-        let coordinator = context.coordinator
-        coordinator.previousAction = UIAction(
-            title: "Previous",
-            image: UIImage(systemName: "backward.end.fill")
-        ) { [weak coordinator] _ in coordinator?.onPrevious() }
-        coordinator.nextAction = UIAction(
-            title: "Next",
-            image: UIImage(systemName: "forward.end.fill")
-        ) { [weak coordinator] _ in coordinator?.onNext() }
-
-        // Upcoming scenes as a tab in the native info panel (swipe down during playback).
-        let upNext = UIHostingController(rootView: TVChannelUpNextView(session: session))
-        upNext.title = "Up Next"
-        upNext.view.backgroundColor = .clear
-        upNext.preferredContentSize = CGSize(width: 0, height: 360)
-        controller.customInfoViewControllers = [upNext]
-
-        return controller
-    }
-
-    func updateUIViewController(_ controller: AVPlayerViewController, context: Context) {
-        let coordinator = context.coordinator
-        coordinator.onPrevious = onPrevious
-        coordinator.onNext = onNext
-        coordinator.metadata = metadataItems
-
-        if controller.player !== player {
-            controller.player = player
-            coordinator.appliedSceneID = nil
-        }
-        coordinator.observe(player: player)
-
-        if coordinator.appliedSceneID != sceneID {
-            coordinator.appliedSceneID = sceneID
-            coordinator.applyPresentation(to: controller.player?.currentItem)
-        }
-
-        guard let previousAction = coordinator.previousAction,
-              let nextAction = coordinator.nextAction else { return }
-
-        // Reassigning the array moves focus back to the start of the transport bar,
-        // so only rebuild it when the enabled state actually changes.
-        let enabled = [canGoPrevious, canGoNext]
-        if coordinator.appliedEnabledState != enabled {
-            coordinator.appliedEnabledState = enabled
-            previousAction.attributes = canGoPrevious ? [] : .disabled
-            nextAction.attributes = canGoNext ? [] : .disabled
-            controller.transportBarCustomMenuItems = [previousAction, nextAction]
-        }
-    }
-
-    private func metadataItems() -> [AVMetadataItem] {
-        [
-            metadataItem(identifier: .commonIdentifierTitle, value: title),
-            metadataItem(identifier: .iTunesMetadataTrackSubTitle, value: subtitle)
-        ]
-    }
-
-    private func metadataItem(identifier: AVMetadataIdentifier, value: String) -> AVMetadataItem {
-        let item = AVMutableMetadataItem()
-        item.identifier = identifier
-        item.value = value as NSString
-        item.extendedLanguageTag = "und"
-        return item
-    }
-
-    final class Coordinator {
-        var onPrevious: () -> Void = {}
-        var onNext: () -> Void = {}
-        var metadata: () -> [AVMetadataItem] = { [] }
-        var previousAction: UIAction?
-        var nextAction: UIAction?
-        var appliedSceneID: String?
-        var appliedEnabledState: [Bool]?
-
-        private weak var observedPlayer: AVPlayer?
-        private var itemObservation: NSKeyValueObservation?
-        private var statusObservation: NSKeyValueObservation?
-
-        /// Each scene arrives as a fresh player item, and SwiftUI updates can run before the
-        /// swap. Driving the item setup from the swap itself keeps title and chapter handling
-        /// tied to the item that is actually playing.
-        func observe(player: AVPlayer) {
-            guard observedPlayer !== player else { return }
-            observedPlayer = player
-            itemObservation = player.observe(\.currentItem, options: [.initial, .new]) { [weak self] player, _ in
-                let item = player.currentItem
-                DispatchQueue.main.async { self?.applyPresentation(to: item) }
-            }
-        }
-
-        func applyPresentation(to item: AVPlayerItem?) {
-            guard let item else { return }
-            item.externalMetadata = metadata()
-            clearChapters(on: item)
-            // Chapter markers can surface only once the asset finished loading.
-            statusObservation = item.observe(\.status, options: [.new]) { [weak self] item, _ in
-                DispatchQueue.main.async { self?.clearChapters(on: item) }
-            }
-        }
-
-        /// The info panel shows a Chapters tab as soon as the item carries navigation markers.
-        /// Channel playback only wants Info and Up Next.
-        private func clearChapters(on item: AVPlayerItem) {
-            guard !item.navigationMarkerGroups.isEmpty else { return }
-            item.navigationMarkerGroups = []
-        }
     }
 }
 
