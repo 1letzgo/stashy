@@ -185,12 +185,45 @@ class StashVideoSyncManager: ObservableObject {
         cachedSmoothing = Float(smoothing)
     }
 
+    /// Pull delegate for the video output. On HLS items — which is every route the playback engine
+    /// exposes an `AVPlayerItem` for (`.loopback` serves local fMP4 HLS, `.remoteBypass` the origin
+    /// playlist) — AVFoundation only starts vending pixel buffers once the output has asked to be
+    /// told about media-data changes. A plain `add(output)` (which was enough for the old
+    /// progressive-file items) can leave `hasNewPixelBuffer` false forever.
+    private final class VideoOutputPullDelegate: NSObject, AVPlayerItemOutputPullDelegate {
+        var onMediaDataWillChange: (() -> Void)?
+        func outputMediaDataWillChange(_ sender: AVPlayerItemOutput) {
+            onMediaDataWillChange?()
+        }
+    }
+
+    private let videoOutputPullDelegate = VideoOutputPullDelegate()
+    private let videoOutputDelegateQueue = DispatchQueue(label: "com.stashko.videooutput")
+    /// Host time of the last copied pixel buffer; 0 while none has arrived in this session.
+    private var lastPixelBufferHostTime: CFTimeInterval = 0
+    private var lastMediaDataRequestHostTime: CFTimeInterval = 0
+    private var lastAudioOnlyIntensityHostTime: CFTimeInterval = 0
+    private var didLogFirstPixelBuffer = false
+    private var didLogFirstAudioBuffer = false
+    private var didLogFirstIntensity = false
+
     private func installVideoOutput(on playerItem: AVPlayerItem) {
         let settings: [String: Any] = [
             kCVPixelBufferPixelFormatTypeKey as String: Int(kCVPixelFormatType_32BGRA)
         ]
-        videoOutput = AVPlayerItemVideoOutput(pixelBufferAttributes: settings)
-        if let output = videoOutput { playerItem.add(output) }
+        let output = AVPlayerItemVideoOutput(pixelBufferAttributes: settings)
+        output.suppressesPlayerRendering = false
+        videoOutputPullDelegate.onMediaDataWillChange = { [weak self] in
+            AppLog.debug("🎥 AI Motion: video output signalled media data will change")
+            self?.lastMediaDataRequestHostTime = 0
+        }
+        output.setDelegate(videoOutputPullDelegate, queue: videoOutputDelegateQueue)
+        videoOutput = output
+        playerItem.add(output)
+        // Kick the pipeline; re-armed from the display link if nothing arrives (see `rearmVideoOutputIfStarved`).
+        output.requestNotificationOfMediaDataChange(withAdvanceInterval: 0.1)
+        lastMediaDataRequestHostTime = CACurrentMediaTime()
+        AppLog.debug("🎥 AI Motion: video output attached (itemStatus=\(playerItem.status.rawValue) outputs=\(playerItem.outputs.count))")
     }
 
     private func startDisplayLink() {
@@ -257,11 +290,17 @@ class StashVideoSyncManager: ObservableObject {
     /// Entry point for the playback engine. Video frames come off the engine's item through an
     /// `AVPlayerItemVideoOutput`; audio comes from the engine's decoded PCM tap, so no `audioMix`
     /// is ever written onto the engine's item.
-    func setup(aetherItem: AVPlayerItem, audio: AsyncStream<AudioTapBuffer>?) {
+    /// `provider` is (re)installed here rather than by the caller: `cleanup()` clears it, so a
+    /// provider set before this call would be wiped and the tap could never be re-opened once its
+    /// stream finishes (which the engine does on every load, stop and session-preserving reload).
+    func setup(aetherItem: AVPlayerItem,
+               audio: AsyncStream<AudioTapBuffer>?,
+               provider: (@MainActor () -> AsyncStream<AudioTapBuffer>?)? = nil) {
         cleanup()
         usesEngineAudio = true
         self.currentPlayerItem = aetherItem
         installVideoOutput(on: aetherItem)
+        if let provider { engineAudioStreamProvider = provider }
         attachEngineAudioStream(audio)
         startDisplayLink()
     }
@@ -272,27 +311,44 @@ class StashVideoSyncManager: ObservableObject {
         engineAudioTask?.cancel()
         engineAudioTask = nil
         usesEngineAudio = true
-        guard let audio else { return }
+        // A nil stream is the normal case right after the item is published: the engine's item
+        // reaches the host at `replaceCurrentItem`, well before its audio delivery source exists,
+        // so `installAudioTap()` finds none and returns nil. Bailing out here (as this used to)
+        // made that a permanent silence — enter the retry loop instead whenever a provider exists.
+        guard audio != nil || engineAudioStreamProvider != nil else {
+            AppLog.debug("🔈 AI Motion: no engine audio stream and no provider — audio channel off")
+            return
+        }
         engineAudioTask = Task { [weak self] in
             var current: AsyncStream<AudioTapBuffer>? = audio
             // A stream that finishes without yielding means the engine has no delivery source
-            // right now; bail out after a few empty rounds instead of reinstalling forever.
+            // right now; give the session time to come up, then stop reinstalling forever.
             var emptyRounds = 0
-            while let stream = current {
+            while true {
                 var yielded = false
-                for await tapBuffer in stream {
-                    if Task.isCancelled { return }
-                    guard let self, self.usesEngineAudio else { return }
-                    yielded = true
-                    self.consumeEngineAudio(tapBuffer)
+                if let stream = current {
+                    for await tapBuffer in stream {
+                        if Task.isCancelled { return }
+                        guard let self, self.usesEngineAudio else { return }
+                        yielded = true
+                        self.consumeEngineAudio(tapBuffer)
+                    }
                 }
                 if Task.isCancelled { return }
                 guard let self, self.usesEngineAudio else { return }
                 emptyRounds = yielded ? 0 : emptyRounds + 1
-                if emptyRounds > 8 { return }
+                // ~12s of 300 ms rounds: a loopback session needs several seconds before its
+                // segment cache can feed the tap, and the old 8-round budget expired first.
+                if emptyRounds > 40 {
+                    AppLog.debug("🔈 AI Motion: engine audio tap stayed empty — giving up re-install")
+                    return
+                }
                 try? await Task.sleep(nanoseconds: 300_000_000)
                 if Task.isCancelled { return }
-                guard let provider = self.engineAudioStreamProvider else { return }
+                guard let provider = self.engineAudioStreamProvider else {
+                    AppLog.debug("🔈 AI Motion: engine audio stream ended and no provider is set")
+                    return
+                }
                 current = await MainActor.run { provider() }
             }
         }
@@ -304,6 +360,10 @@ class StashVideoSyncManager: ObservableObject {
         let frames = Int(buffer.frameLength)
         guard frames > 0, let channel = buffer.floatChannelData?[0] else { return }
         let sampleCount = min(frames, 4096)
+        if !didLogFirstAudioBuffer {
+            didLogFirstAudioBuffer = true
+            AppLog.debug("🔈 AI Motion: first audio tap buffer (\(frames) frames @ \(Int(buffer.format.sampleRate)) Hz, \(buffer.format.channelCount) ch)")
+        }
         var sumSquares: Float = 0
         for i in 0..<sampleCount { let s = channel[i]; sumSquares += s * s }
         updateAudioIntensity(sqrt(sumSquares / Float(sampleCount)))
@@ -325,6 +385,14 @@ class StashVideoSyncManager: ObservableObject {
         let sm = cachedSmoothing
         DispatchQueue.main.async {
             self.audioIntensity = self.audioIntensity * sm + normalized * (1.0 - sm)
+            // `currentIntensity` is otherwise only recomputed from the optical-flow / pose paths,
+            // so a starved video output silences the whole feature even while audio flows.
+            // Fallback only: it stands down as soon as pixel buffers arrive.
+            let now = CACurrentMediaTime()
+            guard now - self.lastPixelBufferHostTime > 1.0,
+                  now - self.lastAudioOnlyIntensityHostTime > 0.05 else { return }
+            self.lastAudioOnlyIntensityHostTime = now
+            self.currentIntensity = self.computeCurrentIntensity()
         }
     }
 
@@ -336,9 +404,29 @@ class StashVideoSyncManager: ObservableObject {
         self.currentPlayerTime = itemTime.seconds
         if output.hasNewPixelBuffer(forItemTime: itemTime) {
             if let pixelBuffer = output.copyPixelBuffer(forItemTime: itemTime, itemTimeForDisplay: nil) {
+                lastPixelBufferHostTime = CACurrentMediaTime()
+                if !didLogFirstPixelBuffer {
+                    didLogFirstPixelBuffer = true
+                    AppLog.debug("🎥 AI Motion: first pixel buffer at itemTime \(String(format: "%.2f", itemTime.seconds))s")
+                }
                 processFrame(pixelBuffer)
             }
+        } else {
+            rearmVideoOutputIfStarved(output)
         }
+    }
+
+    /// Nothing has been vended for a while: ask the output again to be notified of media data.
+    /// Cheap (at most one request every two seconds) and the only recovery for an HLS pipeline
+    /// that was rebuilt under the item — a reload, an audio-track switch, or a return from AirPlay,
+    /// where external playback holds the picture and the output stays dry until it comes back.
+    private func rearmVideoOutputIfStarved(_ output: AVPlayerItemVideoOutput) {
+        let now = CACurrentMediaTime()
+        if lastPixelBufferHostTime == 0 { lastPixelBufferHostTime = now; return }
+        guard now - lastPixelBufferHostTime > 2.0, now - lastMediaDataRequestHostTime > 2.0 else { return }
+        lastMediaDataRequestHostTime = now
+        output.requestNotificationOfMediaDataChange(withAdvanceInterval: 0.1)
+        AppLog.debug("🎥 AI Motion: no pixel buffer for \(String(format: "%.1f", now - lastPixelBufferHostTime))s — re-armed video output (itemStatus=\(currentPlayerItem?.status.rawValue ?? -1))")
     }
 
     private func processFrame(_ pixelBuffer: CVPixelBuffer) {
@@ -1033,7 +1121,12 @@ class StashVideoSyncManager: ObservableObject {
         }
 
         let ceiling: Float = s < 0.3 ? 0.4 : (s < 0.7 ? 0.8 : 1.0)
-        return min(ceiling, scaled)
+        let out = min(ceiling, scaled)
+        if !didLogFirstIntensity, out > 0.02 {
+            didLogFirstIntensity = true
+            AppLog.debug("🎛 AI Motion: first intensity emitted \(String(format: "%.2f", out)) (motion \(String(format: "%.2f", motionSignal)) / audio \(String(format: "%.2f", audioIntensity)))")
+        }
+        return out
     }
 
     // MARK: - Lifecycle
@@ -1052,8 +1145,18 @@ class StashVideoSyncManager: ObservableObject {
         #endif
         displayLink?.invalidate()
         displayLink = nil
-        if let output = videoOutput, let item = currentPlayerItem { item.remove(output) }
+        videoOutputPullDelegate.onMediaDataWillChange = nil
+        if let output = videoOutput {
+            output.setDelegate(nil, queue: nil)
+            if let item = currentPlayerItem { item.remove(output) }
+        }
         videoOutput = nil
+        lastPixelBufferHostTime = 0
+        lastMediaDataRequestHostTime = 0
+        lastAudioOnlyIntensityHostTime = 0
+        didLogFirstPixelBuffer = false
+        didLogFirstAudioBuffer = false
+        didLogFirstIntensity = false
         currentPlayerItem = nil
         previousPixelBuffer = nil
         dominantPersonPixelYRange = nil
@@ -1122,11 +1225,20 @@ enum AetherMotionAnalysis {
     /// every call re-runs `setup`, which is what a reload needs since the item is swapped.
     @discardableResult
     static func ensure(engine: AetherSceneEngine) -> Bool {
-        guard isWanted, let item = engine.analysisPlayerItem else { return false }
+        guard isWanted, let item = engine.analysisPlayerItem else {
+            AppLog.debug("🎛 AI Motion ensure skipped — wanted:\(isWanted) item:\(engine.analysisPlayerItem != nil)")
+            return false
+        }
         let manager = StashVideoSyncManager.shared
-        manager.engineAudioStreamProvider = { [weak engine] in engine?.installAudioTap() }
-        manager.setup(aetherItem: item, audio: engine.installAudioTap())
+        let stream = engine.installAudioTap()
+        // The provider travels through `setup`: it runs `cleanup()`, which clears it, so setting it
+        // beforehand left the re-install loop without a way to reopen the tap after the engine
+        // finished the stream (every load / reload / track switch does).
+        manager.setup(aetherItem: item,
+                      audio: stream,
+                      provider: { [weak engine] in engine?.installAudioTap() })
         manager.isActive = true
+        AppLog.debug("🎛 AI Motion attached — item:\(UInt(bitPattern: ObjectIdentifier(item).hashValue)) audioTap:\(stream != nil)")
         return true
     }
 

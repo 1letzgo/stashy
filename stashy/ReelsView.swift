@@ -5826,7 +5826,9 @@ struct StashSyncManagerModifier: ViewModifier {
             .onChange(of: handyManager.isStashSyncMode) { _, isStash in
                 if isStash && isActive {
                     ensureVideoAnalysis()
-                    StashSyncManager.shared.isActive = true
+                    // `isActive = true` alone never starts the pulse oscillator, and the device
+                    // managers only ever see `currentIntensityPublisher` — go through `start()`.
+                    if !StashSyncManager.shared.isActive { StashSyncManager.shared.start() }
                     if isPlaying { HandyManager.shared.play(at: aetherEngine?.currentTime ?? 0) }
                 } else if !isStash {
                     checkAndStopStashSync()
@@ -5835,7 +5837,9 @@ struct StashSyncManagerModifier: ViewModifier {
             .onChange(of: buttplugManager.isStashSyncMode) { _, isStash in
                 if isStash && isActive {
                     ensureVideoAnalysis()
-                    StashSyncManager.shared.isActive = true
+                    // `isActive = true` alone never starts the pulse oscillator, and the device
+                    // managers only ever see `currentIntensityPublisher` — go through `start()`.
+                    if !StashSyncManager.shared.isActive { StashSyncManager.shared.start() }
                     if isPlaying { ButtplugManager.shared.play(at: aetherEngine?.currentTime ?? 0) }
                 } else if !isStash {
                     checkAndStopStashSync()
@@ -5844,7 +5848,9 @@ struct StashSyncManagerModifier: ViewModifier {
             .onChange(of: loveSpouseManager.isStashSyncMode) { _, isStash in
                 if isStash && isActive {
                     ensureVideoAnalysis()
-                    StashSyncManager.shared.isActive = true
+                    // `isActive = true` alone never starts the pulse oscillator, and the device
+                    // managers only ever see `currentIntensityPublisher` — go through `start()`.
+                    if !StashSyncManager.shared.isActive { StashSyncManager.shared.start() }
                     if isPlaying { LoveSpouseManager.shared.play(at: aetherEngine?.currentTime ?? 0) }
                 } else if !isStash {
                     checkAndStopStashSync()
