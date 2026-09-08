@@ -8,7 +8,7 @@
 //  reachable via `engine` for the SwiftUI surface.
 //
 
-#if !os(tvOS) && canImport(AetherEngine)
+#if canImport(AetherEngine)
 
 import Foundation
 import Combine
@@ -16,6 +16,15 @@ import AVFoundation
 import CoreGraphics
 import UIKit
 import AetherEngine
+
+/// How a playback surface wants the shared audio session configured when it loads.
+/// Muted previews must not take the session away from a running scene, so they ask for
+/// `.ambient`; a surface that manages the session itself asks for `.none`.
+enum AetherAudioSessionPolicy {
+    case playback
+    case ambient
+    case none
+}
 
 /// A bitmap subtitle cue resolved for the current playhead. Deliberately a local value type:
 /// the app already owns a `SubtitleCue` (the AVPlayer caption path), so the engine's cue type
@@ -84,6 +93,35 @@ final class AetherSceneEngine: ObservableObject {
     /// Loop the current item shortly before its end instead of ending.
     var loopsAtEnd: Bool = false
 
+    /// Which audio session `load` installs. Previews use `.ambient` so they never steal the
+    /// session from a playing scene.
+    var audioSessionPolicy: AetherAudioSessionPolicy = .playback
+
+    /// Whether the engine owns the system Now-Playing session for the native video path.
+    /// Must be set before the first `load` — the native host is built with this value.
+    var ownsNowPlaying: Bool {
+        get { engine.ownsVideoNowPlayingSession }
+        set { engine.ownsVideoNowPlayingSession = newValue }
+    }
+
+    /// Stages Now-Playing metadata. Ignored unless `ownsNowPlaying` is set.
+    func setNowPlayingInfo(_ info: [String: Any]) {
+        engine.setVideoNowPlayingInfo(info)
+    }
+
+    /// Presentation size of the current source, in pixels, or nil while unknown.
+    /// The software route reports the settled picture size directly; the AVPlayer-backed routes
+    /// only have coded dimensions, so the pixel aspect is applied to the width.
+    var sourceSize: CGSize? {
+        if let size = engine.softwareDisplaySize, size.width > 0, size.height > 0 { return size }
+        let width = Double(engine.sourceVideoWidth)
+        let height = Double(engine.sourceVideoHeight)
+        guard width > 0, height > 0 else { return nil }
+        let aspect = engine.sourceVideoPixelAspectRatio
+        let scale = (aspect.isFinite && aspect > 0) ? aspect : 1
+        return CGSize(width: width * scale, height: height)
+    }
+
     private(set) var currentURL: URL?
 
     private var _rate: Float = 1.0
@@ -139,7 +177,9 @@ final class AetherSceneEngine: ObservableObject {
     init() throws {
         engine = try AetherEngine()
         engine.deactivatesAudioSessionOnStop = false
+        #if os(iOS)
         engine.backgroundPlaybackEnabled = TabManager.shared.isPiPEnabled
+        #endif
         bind()
     }
 
@@ -346,11 +386,21 @@ final class AetherSceneEngine: ObservableObject {
     // MARK: - Loading
 
     /// Loads a URL. Never throws: a failure lands in `errorMessage`.
-    func load(url: URL, startAt: Double?, autoplay: Bool) async {
+    /// `customizeOptions` runs after the defaults are filled in, so a caller can tune the
+    /// `LoadOptions` (buffer window, display-criteria suppression, …) without a new parameter
+    /// per knob.
+    func load(url: URL,
+              startAt: Double?,
+              autoplay: Bool,
+              customizeOptions: ((inout LoadOptions) -> Void)? = nil) async {
         loadGeneration &+= 1
         let generation = loadGeneration
 
-        applyPlaybackAudioSession()
+        switch audioSessionPolicy {
+        case .playback: applyPlaybackAudioSession()
+        case .ambient: applyAmbientMixingAudioSession()
+        case .none: break
+        }
 
         if currentURL != url { shutdownScrubExtractor() }
         currentURL = url
@@ -369,6 +419,7 @@ final class AetherSceneEngine: ObservableObject {
            url.isFileURL == false {
             options.httpHeaders["ApiKey"] = key
         }
+        customizeOptions?(&options)
 
         do {
             _ = try await engine.load(url: signedURL(url) ?? url,

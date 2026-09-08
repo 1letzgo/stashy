@@ -62,9 +62,6 @@ enum PlayerEngineResolver {
     }
 
     static func hasLocalDownload(sceneID: String) -> Bool {
-        let fileManager = FileManager.default
-        guard let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first else { return false }
-        let localURL = docs.appendingPathComponent("Downloads/\(sceneID)/video.mp4")
-        return fileManager.fileExists(atPath: localURL.path)
+        LocalDownloadStore.exists(sceneID: sceneID)
     }
 }

@@ -8792,13 +8792,9 @@ struct Scene: Codable, Identifiable, Equatable {
     // Computed property for stream URL (respects global default)
     var videoURL: URL? {
         // 0. Check for local download first (Offline first!)
-        let fileManager = FileManager.default
-        if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
-            let localURL = docs.appendingPathComponent("Downloads/\(id)/video.mp4")
-            if fileManager.fileExists(atPath: localURL.path) {
-                AppLog.debug("📂 Using local download for scene \(id)")
-                return localURL
-            }
+        if let localURL = LocalDownloadStore.videoURL(sceneID: id) {
+            AppLog.debug("📂 Using local download for scene \(id)")
+            return localURL
         }
 
         let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original
@@ -9314,12 +9310,8 @@ struct MarkerScene: Codable, Identifiable, Equatable {
 
     var videoURL: URL? {
         // 0. Check local first
-        let fileManager = FileManager.default
-        if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
-            let localURL = docs.appendingPathComponent("Downloads/\(id)/video.mp4")
-            if fileManager.fileExists(atPath: localURL.path) {
-                return localURL
-            }
+        if let localURL = LocalDownloadStore.videoURL(sceneID: id) {
+            return localURL
         }
         let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original
         if let streamURL = bestStream(for: quality) {
@@ -9408,15 +9400,9 @@ struct SceneMarker: Codable, Identifiable, Equatable {
     // Computed property for stream URL
     var videoURL: URL? {
         // 0. Check for local download first
-        if let sceneId = scene?.id {
-            let fileManager = FileManager.default
-            if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
-                let localURL = docs.appendingPathComponent("Downloads/\(sceneId)/video.mp4")
-                if fileManager.fileExists(atPath: localURL.path) {
-                    AppLog.debug("📂 Using local download for marker \(id)")
-                    return localURL
-                }
-            }
+        if let sceneId = scene?.id, let localURL = LocalDownloadStore.videoURL(sceneID: sceneId) {
+            AppLog.debug("📂 Using local download for marker \(id)")
+            return localURL
         }
 
         let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original

@@ -18,6 +18,11 @@ struct TVApp: App {
     @State private var lastScenePhase: ScenePhase = .active
 
     init() {
+        #if canImport(AetherEngine)
+        // TLS-Policy und Logging der Playback-Engine einmalig verdrahten.
+        AetherPlaybackBootstrap.installOnce()
+        #endif
+
         // Konfiguriere Audio-Session einmal beim App-Start:
         // - `.playback`: erlaubt Audio, auch wenn der Silent-Switch aktiv ist (irrelevant auf tvOS,
         //   wichtig aber für Audio-Routing/Mixing-Verhalten)

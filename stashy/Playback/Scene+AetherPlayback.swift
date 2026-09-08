@@ -7,19 +7,14 @@
 //  engine is to play the original file.
 //
 
-#if !os(tvOS)
 import Foundation
 
 extension Scene {
     /// Original-file URL for the optional playback engine, or nil when no source is known.
     var aetherVideoURL: URL? {
         // 0. A finished local download wins (offline first).
-        let fileManager = FileManager.default
-        if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
-            let localURL = docs.appendingPathComponent("Downloads/\(id)/video.mp4")
-            if fileManager.fileExists(atPath: localURL.path) {
-                return localURL
-            }
+        if let localURL = LocalDownloadStore.videoURL(sceneID: id) {
+            return localURL
         }
 
         // 1. The stream path the server reported.
@@ -32,4 +27,3 @@ extension Scene {
         return signedURL(URL(string: "\(config.baseURL)/scene/\(id)/stream"))
     }
 }
-#endif
