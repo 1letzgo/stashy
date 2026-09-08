@@ -1671,11 +1671,9 @@ struct ReelsViewBody: View {
         /// Rows a scrub still can be decoded for: real video with a stream.
         /// Clips are images and animations have no timeline.
         var supportsScrubPreview: Bool {
+            // Animated clips (GIF/WebP) have no video track to decode; video clips do.
             guard !isAnimated else { return false }
-            switch self {
-            case .clip: return false
-            case .scene, .marker, .preview: return videoURL != nil
-            }
+            return videoURL != nil
         }
 
         /// Source URL for the optional engine (never a transcode for scenes).
@@ -6665,21 +6663,20 @@ struct IsolatedScrubberBar: View {
             : barWidth / 2
 
         VStack(spacing: 3) {
-            ZStack {
-                Color.black.opacity(0.7)
-                if let image = state.previewImage {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                }
+            // No frame yet (first decode, or a source without stills): only the time label,
+            // never an empty black box.
+            if let image = state.previewImage {
+                Image(uiImage: image)
+                    .resizable()
+                    .scaledToFill()
+                    .frame(width: previewWidth, height: previewHeight)
+                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 6, style: .continuous)
+                            .stroke(Color.white.opacity(0.75), lineWidth: 0.5)
+                    )
+                    .shadow(color: .black.opacity(0.55), radius: 6, x: 0, y: 2)
             }
-            .frame(width: previewWidth, height: previewHeight)
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(Color.white.opacity(0.75), lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(0.55), radius: 6, x: 0, y: 2)
 
             Text(Self.formatTime(state.time))
                 .font(.system(size: 10, weight: .semibold).monospacedDigit())
