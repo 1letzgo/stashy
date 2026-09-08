@@ -160,6 +160,13 @@
 		DFUI000032F3AUDIT003 /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFUI000042F3AUDIT004 /* HapticManager.swift */; };
 		DFUI000052F3AUDIT005 /* ToastManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFUI000062F3AUDIT006 /* ToastManager.swift */; };
 		E909C6E8F4744C4D939F78BD /* GraphQLQueries.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFGQ000042F28A0000000004 /* GraphQLQueries.swift */; };
+		AE7E00000000000000000003 /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = AE7E00000000000000000002 /* AetherEngine */; };
+		AE7E0000000000000000B002 /* PlayerEnginePreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B001 /* PlayerEnginePreference.swift */; };
+		AE7E0000000000000000B003 /* PlayerEnginePreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B001 /* PlayerEnginePreference.swift */; };
+		AE7E0000000000000000B012 /* AetherSceneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B011 /* AetherSceneEngine.swift */; };
+		AE7E0000000000000000B022 /* Scene+AetherPlayback.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */; };
+		AE7E0000000000000000B032 /* AcknowledgementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B031 /* AcknowledgementsView.swift */; };
+		AE7E0000000000000000B033 /* AcknowledgementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B031 /* AcknowledgementsView.swift */; };
 		F0A11E1B0B0B0B0B0B0B0B01 /* PocketSVG in Frameworks */ = {isa = PBXBuildFile; productRef = 1A2B3C4D5E6F708192A3B4C5 /* PocketSVG */; };
 		F0A11E1B0B0B0B0B0B0B0B02 /* PocketSVG in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 1A2B3C4D5E6F708192A3B4C5 /* PocketSVG */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		F21C93AC1160498EB0A17AF4 /* GalleryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E672F2A6386004CA019 /* GalleryRepository.swift */; };
@@ -305,6 +312,10 @@
 		LIMG000022345678901234AB /* LinkedImagesCatalogGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkedImagesCatalogGrid.swift; sourceTree = "<group>"; };
 		SCHR000022345678901234AB /* SharedChromeComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedChromeComponents.swift; sourceTree = "<group>"; };
 		STNV000022345678901234AB /* StashyTopNavStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyTopNavStrip.swift; sourceTree = "<group>"; };
+		AE7E0000000000000000B001 /* PlayerEnginePreference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerEnginePreference.swift; sourceTree = "<group>"; };
+		AE7E0000000000000000B011 /* AetherSceneEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherSceneEngine.swift; sourceTree = "<group>"; };
+		AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Scene+AetherPlayback.swift"; sourceTree = "<group>"; };
+		AE7E0000000000000000B031 /* AcknowledgementsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcknowledgementsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -316,6 +327,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AE7E00000000000000000003 /* AetherEngine in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -343,6 +355,16 @@
 			);
 			sourceTree = "<group>";
 		};
+		AE7E0000000000000000C001 /* Playback */ = {
+			isa = PBXGroup;
+			children = (
+				AE7E0000000000000000B001 /* PlayerEnginePreference.swift */,
+				AE7E0000000000000000B011 /* AetherSceneEngine.swift */,
+				AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */,
+			);
+			path = Playback;
+			sourceTree = "<group>";
+		};
 		08FB77A8FE84155DC02AAC07 /* stashy */ = {
 			isa = PBXGroup;
 			children = (
@@ -351,6 +373,7 @@
 				AA0000022E8A9C0000000001 /* Assets.xcassets */,
 				DF675E612F2A46A1004CA019 /* Home */,
 				DFST000012F30A0000000001 /* Settings */,
+				AE7E0000000000000000C001 /* Playback */,
 				DF22BB142F167223007C2090 /* CatalogsView.swift */,
 				DFUI000022F3AUDIT002 /* DesignTokens.swift */,
 				DF22BB172F16743C007C2090 /* DownloadsView.swift */,
@@ -520,6 +543,7 @@
 		DFST000012F30A0000000001 /* Settings */ = {
 			isa = PBXGroup;
 			children = (
+				AE7E0000000000000000B031 /* AcknowledgementsView.swift */,
 				AITAG00062F70A00000000006 /* AITagsSettingsView.swift */,
 				DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */,
 				A1ED4C0112345678901234AB /* EditModeSettingsView.swift */,
@@ -556,6 +580,7 @@
 			);
 			name = stashy;
 			packageProductDependencies = (
+				AE7E00000000000000000002 /* AetherEngine */,
 			);
 			productName = stashy;
 			productReference = DFE504602E8A8E6F00323FF0 /* stashy.app */;
@@ -611,6 +636,7 @@
 			mainGroup = 08FB778CFE84155DC02AAC07;
 			packageReferences = (
 				0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "PocketSVG" */,
+				AE7E00000000000000000001 /* XCRemoteSwiftPackageReference "AetherEngine" */,
 			);
 			productRefGroup = 08FB778CFE84155DC02AAC07;
 			projectDirPath = "";
@@ -669,6 +695,10 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AE7E0000000000000000B002 /* PlayerEnginePreference.swift in Sources */,
+				AE7E0000000000000000B012 /* AetherSceneEngine.swift in Sources */,
+				AE7E0000000000000000B022 /* Scene+AetherPlayback.swift in Sources */,
+				AE7E0000000000000000B032 /* AcknowledgementsView.swift in Sources */,
 				DF675E7A2F2A6392004CA019 /* SceneGalleriesCard.swift in Sources */,
 				DF675E7B2F2A6392004CA019 /* SceneVideoPlayerCard.swift in Sources */,
 				DF675E7C2F2A6392004CA019 /* SceneStudioCard.swift in Sources */,
@@ -783,6 +813,8 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				AE7E0000000000000000B003 /* PlayerEnginePreference.swift in Sources */,
+				AE7E0000000000000000B033 /* AcknowledgementsView.swift in Sources */,
 				FDFEA639517B4DF2B8490448 /* App.swift in Sources */,
 				AAB8EA012D744BBCB254F7D6 /* MainTabView.swift in Sources */,
 				4641A386019F4F5F81B587A8 /* StashDBViewModel.swift in Sources */,
@@ -1141,6 +1173,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		AE7E00000000000000000001 /* XCRemoteSwiftPackageReference "AetherEngine" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/superuser404notfound/AetherEngine";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 6.73.0;
+			};
+		};
 		0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "PocketSVG" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/pocketsvg/PocketSVG.git";
@@ -1152,6 +1192,11 @@
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		AE7E00000000000000000002 /* AetherEngine */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = AE7E00000000000000000001 /* XCRemoteSwiftPackageReference "AetherEngine" */;
+			productName = AetherEngine;
+		};
 		1A2B3C4D5E6F708192A3B4C5 /* PocketSVG */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "PocketSVG" */;

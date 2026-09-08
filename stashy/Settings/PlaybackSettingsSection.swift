@@ -11,10 +11,17 @@ struct PlaybackSettingsSection: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
     @ObservedObject var tabManager = TabManager.shared
+    #if !os(tvOS)
+    @ObservedObject var stashyPlus = StashyPlusManager.shared
+    #endif
 
     var body: some View {
         let qualityRows = configManager.activeConfig != nil ? 2 : 1
+        #if os(tvOS)
         let rowCount = qualityRows + 1
+        #else
+        let rowCount = qualityRows + 2
+        #endif
 
         Section {
             stashyScrollingSectionHeader("Playback")
@@ -65,6 +72,29 @@ struct PlaybackSettingsSection: View {
             }
             .tint(appearanceManager.tintColor)
             .stashyGroupedBlockRow(index: qualityRows, count: rowCount)
+
+            if stashyPlus.isUnlocked {
+                Picker(selection: $tabManager.playerEnginePreference) {
+                    ForEach(PlayerEnginePreference.allCases) { preference in
+                        Text(preference.displayName).tag(preference)
+                    }
+                } label: {
+                    Label("Playback Engine", systemImage: "cpu")
+                }
+                .stashyGroupedBlockRow(index: qualityRows + 1, count: rowCount)
+            } else {
+                HStack {
+                    Label("Playback Engine", systemImage: "lock.fill")
+                        .foregroundColor(.secondary)
+                    StashyBetaBadge()
+                    Spacer(minLength: 0)
+                }
+                .stashyGroupedBlockRow(index: qualityRows + 1, count: rowCount)
+            }
+
+            if stashyPlus.isUnlocked {
+                stashyScrollingSectionFooter("Playback Engine plays MKV, WebM, AVI and other formats directly, without server transcoding. Automatic uses it only for files iOS cannot play natively. While active, AI Motion, live captions, AirPlay and frame capture are unavailable.")
+            }
             #endif
         }
     }

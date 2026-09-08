@@ -439,6 +439,12 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(isPiPEnabled, forKey: isPiPEnabledKey)
         }
     }
+    /// Optional playback engine (stashy+). Global, not per server.
+    @Published var playerEnginePreference: PlayerEnginePreference = .off {
+        didSet {
+            UserDefaults.standard.set(playerEnginePreference.rawValue, forKey: playerEnginePreferenceKey)
+        }
+    }
     /// Feeds overlay: optional delete button between Rating and Mute.
     @Published var reelsShowsDeleteButton: Bool = false {
         didSet {
@@ -490,6 +496,7 @@ class TabManager: ObservableObject {
     private let reelsFillHeightKey = "ReelsFillHeight"
     private let reelsContinuousPlayKey = "ReelsContinuousPlay"
     private let isPiPEnabledKey = "isPiPEnabled"
+    private let playerEnginePreferenceKey = "PlayerEnginePreference"
     private let reelsShowsDeleteButtonKey = "ReelsShowsDeleteButton"
     private let isLiveCaptionLookaheadKey = "isLiveCaptionLookaheadEnabled"
     private let dashboardHeroSizeKey = "DashboardHeroSize"
@@ -530,6 +537,9 @@ class TabManager: ObservableObject {
         self.reelsFillHeight = UserDefaults.standard.object(forKey: reelsFillHeightKey) as? Bool ?? true
         self.reelsContinuousPlay = UserDefaults.standard.bool(forKey: reelsContinuousPlayKey)
         self.isPiPEnabled = UserDefaults.standard.object(forKey: isPiPEnabledKey) as? Bool ?? true
+        self.playerEnginePreference = PlayerEnginePreference(
+            rawValue: UserDefaults.standard.string(forKey: playerEnginePreferenceKey) ?? ""
+        ) ?? .off
         self.reelsShowsDeleteButton = UserDefaults.standard.bool(forKey: reelsShowsDeleteButtonKey)
         self.isLiveCaptionLookaheadEnabled = UserDefaults.standard.object(forKey: isLiveCaptionLookaheadKey) as? Bool ?? true
         if let heroSizeRaw = UserDefaults.standard.string(forKey: dashboardHeroSizeKey),

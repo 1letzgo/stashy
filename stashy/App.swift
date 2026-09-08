@@ -18,6 +18,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Entitlements (lifetime IAP, paid-app grandfathering) must sync at launch,
         // not only when Settings is opened.
         _ = StoreManager.shared
+        #if !os(tvOS) && canImport(AetherEngine)
+        AetherPlaybackBootstrap.installOnce()
+        #endif
         return true
     }
 

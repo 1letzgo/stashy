@@ -253,35 +253,37 @@ struct SettingsView: View {
                 stashyScrollingSectionHeader("Included with stashy+")
                 Label("Custom App Icons", systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 0, count: 11)
+                    .stashyGroupedBlockRow(index: 0, count: 12)
                 Label("Download Scenes", systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 1, count: 11)
+                    .stashyGroupedBlockRow(index: 1, count: 12)
                 lockedPlusFeature("AI Subtitles and translation", systemImage: "lock.fill", isBeta: true)
-                    .stashyGroupedBlockRow(index: 2, count: 11)
+                    .stashyGroupedBlockRow(index: 2, count: 12)
                 lockedPlusFeature(AIMotionCopy.name, systemImage: "lock.fill", isBeta: true)
-                    .stashyGroupedBlockRow(index: 3, count: 11)
+                    .stashyGroupedBlockRow(index: 3, count: 12)
+                lockedPlusFeature("Playback Engine", systemImage: "lock.fill", isBeta: true)
+                    .stashyGroupedBlockRow(index: 4, count: 12)
                 Label(ToolsItem.statistics.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 4, count: 11)
+                    .stashyGroupedBlockRow(index: 5, count: 12)
                 Label(ToolsItem.oCount.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 5, count: 11)
+                    .stashyGroupedBlockRow(index: 6, count: 12)
                 Label(ToolsItem.timeline.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 6, count: 11)
+                    .stashyGroupedBlockRow(index: 7, count: 12)
                 Label(ToolsItem.topLists.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 7, count: 11)
+                    .stashyGroupedBlockRow(index: 8, count: 12)
                 Label(ToolsItem.filters.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 8, count: 11)
+                    .stashyGroupedBlockRow(index: 9, count: 12)
                 Label(ToolsItem.hotOrNot.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 9, count: 11)
+                    .stashyGroupedBlockRow(index: 10, count: 12)
                 Label(ToolsItem.rateMe.title, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 10, count: 11)
+                    .stashyGroupedBlockRow(index: 11, count: 12)
             }
         }
 
@@ -646,12 +648,18 @@ struct SettingsView: View {
                     Label("GitHub", systemImage: "chevron.left.forwardslash.chevron.right")
                         .foregroundColor(appearanceManager.tintColor)
                 }
-                .stashyGroupedBlockRow(index: 0, count: 2)
+                .stashyGroupedBlockRow(index: 0, count: 3)
                 Link(destination: URL(string: "https://discord.gg/DMxEFaVzUM")!) {
                     Label("Discord", systemImage: "bubble.left.and.bubble.right.fill")
                         .foregroundColor(appearanceManager.tintColor)
                 }
-                .stashyGroupedBlockRow(index: 1, count: 2)
+                .stashyGroupedBlockRow(index: 1, count: 3)
+                NavigationLink {
+                    AcknowledgementsView()
+                } label: {
+                    Label("Acknowledgements", systemImage: "doc.text")
+                }
+                .stashyGroupedBlockRow(index: 2, count: 3)
             }
             
         }
