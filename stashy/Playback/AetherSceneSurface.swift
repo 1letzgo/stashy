@@ -214,40 +214,40 @@ struct AetherSceneSurface: View {
                     revealControls()
                 }
 
-            if areControlsVisible {
-                playPauseGlyph
-            }
+            // Opacity instead of structural insertion: a conditional `if` plus a transition
+            // proved unreliable over the UIKit-hosted player view (the re-inserted controls
+            // never became visible), while a plain opacity change always renders.
+            playPauseGlyph
+                .opacity(areControlsVisible ? 1 : 0)
 
             VStack {
                 Spacer()
-                if areControlsVisible {
-                    timeBar
-                        .padding(.horizontal, 12)
-                        .padding(.bottom, 10)
-                        .transition(.opacity)
-                }
+                timeBar
+                    .padding(.horizontal, 12)
+                    .padding(.bottom, 10)
             }
+            .opacity(areControlsVisible ? 1 : 0)
+            .allowsHitTesting(areControlsVisible)
 
             // Same auto-hiding group as play/pause and the time bar: one tap brings the whole
             // transport back, and it all leaves together.
             VStack {
-                if areControlsVisible {
-                    HStack(spacing: 8) {
-                        Spacer()
-                        if hasTrackChoices {
-                            tracksMenu
-                        }
-                        if pip.isAvailable, tabManager.isPiPEnabled, AVPictureInPictureController.isPictureInPictureSupported() {
-                            pipButton
-                        }
-                        muteButton
+                HStack(spacing: 8) {
+                    Spacer()
+                    if hasTrackChoices {
+                        tracksMenu
                     }
-                    .padding(.trailing, 10)
-                    .padding(.top, 10)
-                    .transition(.opacity)
+                    if pip.isAvailable, tabManager.isPiPEnabled, AVPictureInPictureController.isPictureInPictureSupported() {
+                        pipButton
+                    }
+                    muteButton
                 }
+                .padding(.trailing, 10)
+                .padding(.top, 10)
                 Spacer()
             }
+            .opacity(areControlsVisible ? 1 : 0)
+            .allowsHitTesting(areControlsVisible)
         }
     }
 
@@ -345,7 +345,6 @@ struct AetherSceneSurface: View {
             .padding(16)
             .background(Color.black.opacity(0.35), in: Circle())
             .allowsHitTesting(false)
-            .transition(.opacity)
     }
 
     @ViewBuilder
@@ -454,7 +453,7 @@ struct AetherSceneSurface: View {
     private func scheduleControlsHide() {
         let token = UUID()
         controlsHideToken = token
-        DispatchQueue.main.asyncAfter(deadline: .now() + 3) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
             guard controlsHideToken == token, !isScrubbing else { return }
             withAnimation(.easeInOut(duration: 0.2)) {
                 areControlsVisible = false
