@@ -14,6 +14,7 @@ import Foundation
 import Combine
 import AVFoundation
 import CoreGraphics
+import UIKit
 import AetherEngine
 
 /// A bitmap subtitle cue resolved for the current playhead. Deliberately a local value type:
@@ -119,6 +120,10 @@ final class AetherSceneEngine: ObservableObject {
     private var pendingSeek: Double?
     private var loopSeekInFlight = false
     private var isLoading = false
+    /// Fallback still extractor for the software route (no SegmentCache, so no cache-backed
+    /// stills). Kept for the session and torn down on `stop()` / a load of a different URL.
+    private var scrubExtractor: FrameExtractor?
+    private var scrubExtractorURL: URL?
 
     // MARK: - Lifecycle
 
@@ -322,6 +327,7 @@ final class AetherSceneEngine: ObservableObject {
 
         applyPlaybackAudioSession()
 
+        if currentURL != url { shutdownScrubExtractor() }
         currentURL = url
         didEnd = false
         hasFirstFrame = false
@@ -394,6 +400,54 @@ final class AetherSceneEngine: ObservableObject {
         }
     }
 
+    // MARK: - Scrub stills
+
+    /// A still for the scrub preview. Prefers the engine's cache-backed still (decoded from
+    /// bytes the active native session already produced — no second connection); on the
+    /// software route it falls back to a session-coupled `FrameExtractor` over the same
+    /// signed URL playback uses. A nil result is expected and transient ("time only, no
+    /// image"), so callers should keep whatever they last showed.
+    func scrubThumbnail(at seconds: Double, maxWidth: CGFloat) async -> UIImage? {
+        let width = Int(max(1, maxWidth.rounded()))
+        let target = max(0, seconds)
+
+        if engine.supportsCacheBackedStills {
+            guard let image = await engine.scrubThumbnail(atSeconds: target, maxWidth: width) else { return nil }
+            return UIImage(cgImage: image)
+        }
+
+        guard let extractor = scrubExtractorForCurrentURL() else { return nil }
+        guard let image = await extractor.thumbnail(at: target, maxWidth: width) else { return nil }
+        return UIImage(cgImage: image)
+    }
+
+    /// Lazily builds (and reuses) the fallback extractor. Same auth as `load`: the signed URL
+    /// plus the ApiKey header, so a server that only honours one of the two still works.
+    private func scrubExtractorForCurrentURL() -> FrameExtractor? {
+        guard let url = currentURL else { return nil }
+        let signed = signedURL(url) ?? url
+        if let existing = scrubExtractor, scrubExtractorURL == signed { return existing }
+        shutdownScrubExtractor()
+
+        var headers: [String: String] = [:]
+        if let key = ServerConfigManager.shared.activeConfig?.secureApiKey, !key.isEmpty,
+           url.isFileURL == false {
+            headers["ApiKey"] = key
+        }
+        let created = engine.makeFrameExtractor(url: signed, httpHeaders: headers)
+        scrubExtractor = created
+        scrubExtractorURL = signed
+        return created
+    }
+
+    private func shutdownScrubExtractor() {
+        if let extractor = scrubExtractor {
+            Task { await extractor.shutdown() }
+        }
+        scrubExtractor = nil
+        scrubExtractorURL = nil
+    }
+
     // MARK: - Tracks and presentation
 
     func selectAudioTrack(index: Int) {
@@ -440,6 +494,7 @@ final class AetherSceneEngine: ObservableObject {
         cancellables.removeAll()
         loadGeneration &+= 1
         pendingSeek = nil
+        shutdownScrubExtractor()
         engine.stop()
         currentURL = nil
         isPlaying = false

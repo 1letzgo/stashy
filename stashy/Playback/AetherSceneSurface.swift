@@ -29,6 +29,11 @@ struct AetherSceneSurface: View {
     @State private var controlsHideToken = UUID()
     @State private var isScrubbing = false
     @State private var scrubSeconds: Double = 0
+    /// Last good scrub still. A nil result from the engine is transient, so it is never
+    /// written back — the previous frame stays up until a better one arrives.
+    @State private var scrubPreviewImage: UIImage?
+    @State private var scrubPreviewTask: Task<Void, Never>?
+    @State private var scrubPreviewRequestedAt: Date = .distantPast
     #if DEBUG
     @State private var showsDebugStats = false
     #endif
@@ -80,6 +85,7 @@ struct AetherSceneSurface: View {
         }
         .onDisappear {
             pip.update(layer: nil)
+            endScrubPreview()
         }
     }
 
@@ -201,24 +207,25 @@ struct AetherSceneSurface: View {
     @ViewBuilder
     private var transportOverlay: some View {
         ZStack {
-            Color.clear
-                .contentShape(Rectangle())
-                .onTapGesture {
-                    engine.togglePlayPause()
-                    revealControls()
-                }
-                .onLongPressGesture(minimumDuration: 0.6) {
-                    #if DEBUG
-                    showsDebugStats.toggle()
-                    #endif
-                    revealControls()
-                }
+            // Left / right thirds take a double tap for -10 / +10 s (AVKit's gesture); the
+            // middle third keeps a plain single tap so the most common play/pause tap never
+            // waits out a double-tap window.
+            HStack(spacing: 0) {
+                tapRegion(doubleTapSkip: -10)
+                tapRegion(doubleTapSkip: nil)
+                tapRegion(doubleTapSkip: 10)
+            }
 
             // Opacity instead of structural insertion: a conditional `if` plus a transition
             // proved unreliable over the UIKit-hosted player view (the re-inserted controls
             // never became visible), while a plain opacity change always renders.
-            playPauseGlyph
-                .opacity(areControlsVisible ? 1 : 0)
+            HStack(spacing: 26) {
+                skipButton(-10)
+                playPauseGlyph
+                skipButton(10)
+            }
+            .opacity(areControlsVisible ? 1 : 0)
+            .allowsHitTesting(areControlsVisible)
 
             VStack {
                 Spacer()
@@ -337,6 +344,60 @@ struct AetherSceneSurface: View {
         .accessibilityLabel(isMuted ? "Unmute" : "Mute")
     }
 
+    /// One third of the surface. Single tap toggles playback everywhere; the outer thirds
+    /// additionally take a double tap for the ±10 s jump.
+    @ViewBuilder
+    private func tapRegion(doubleTapSkip: Double?) -> some View {
+        let region = Color.clear
+            .contentShape(Rectangle())
+            .onLongPressGesture(minimumDuration: 0.6) {
+                #if DEBUG
+                showsDebugStats.toggle()
+                #endif
+                revealControls()
+            }
+        if let doubleTapSkip {
+            region
+                .onTapGesture(count: 2) { skip(by: doubleTapSkip) }
+                .onTapGesture {
+                    engine.togglePlayPause()
+                    revealControls()
+                }
+        } else {
+            region
+                .onTapGesture {
+                    engine.togglePlayPause()
+                    revealControls()
+                }
+        }
+    }
+
+    @ViewBuilder
+    private func skipButton(_ delta: Double) -> some View {
+        Button {
+            skip(by: delta)
+        } label: {
+            Image(systemName: delta < 0 ? "gobackward.10" : "goforward.10")
+                .font(.system(size: 19, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(12)
+                .background(Color.black.opacity(0.35), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(delta < 0 ? "Back 10 seconds" : "Forward 10 seconds")
+    }
+
+    /// Seeks through the host's `onSeek`, so the coalesced engine seek, the device sync and
+    /// the activity tracker all run exactly as they do for a scrub.
+    private func skip(by delta: Double) {
+        HapticManager.light()
+        let duration = engine.duration
+        let raw = engine.currentTime + delta
+        let target = duration > 0 ? min(max(0, raw), duration) : max(0, raw)
+        onSeek(target)
+        revealControls()
+    }
+
     @ViewBuilder
     private var playPauseGlyph: some View {
         Image(systemName: engine.isPlaying ? "pause.fill" : "play.fill")
@@ -387,6 +448,7 @@ struct AetherSceneSurface: View {
                             guard duration > 0 else { return }
                             isScrubbing = true
                             scrubSeconds = Double(min(max(0, value.location.x), width) / width) * duration
+                            requestScrubPreview(at: scrubSeconds)
                             revealControls()
                         }
                         .onEnded { value in
@@ -394,10 +456,16 @@ struct AetherSceneSurface: View {
                             let seconds = Double(min(max(0, value.location.x), width) / width) * duration
                             scrubSeconds = seconds
                             isScrubbing = false
+                            endScrubPreview()
                             onSeek(seconds)
                             revealControls()
                         }
                 )
+                .overlay(alignment: .topLeading) {
+                    if isScrubbing, duration > 0 {
+                        scrubPreviewOverlay(barWidth: width, progress: CGFloat(progress))
+                    }
+                }
             }
             .frame(height: 16)
 
@@ -409,6 +477,66 @@ struct AetherSceneSurface: View {
             .font(.system(size: 10, weight: .semibold).monospacedDigit())
             .foregroundStyle(.white.opacity(0.85))
         }
+    }
+
+    /// Floating still above the scrub thumb, clamped to the bar so it never leaves the surface.
+    @ViewBuilder
+    private func scrubPreviewOverlay(barWidth: CGFloat, progress: CGFloat) -> some View {
+        let previewWidth: CGFloat = 120
+        let previewHeight: CGFloat = previewWidth * 9 / 16
+        let half = previewWidth / 2
+        let rawCenter = barWidth * progress
+        let center = barWidth > previewWidth
+            ? min(max(half, rawCenter), barWidth - half)
+            : barWidth / 2
+
+        VStack(spacing: 3) {
+            ZStack {
+                Color.black.opacity(0.7)
+                if let image = scrubPreviewImage {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                }
+            }
+            .frame(width: previewWidth, height: previewHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(Color.white.opacity(0.75), lineWidth: 0.5)
+            )
+            .shadow(color: .black.opacity(0.55), radius: 6, x: 0, y: 2)
+
+            Text(formatTime(scrubSeconds))
+                .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.white)
+        }
+        .frame(width: previewWidth)
+        .offset(x: center - half, y: -(previewHeight + 24))
+        .allowsHitTesting(false)
+    }
+
+    /// Throttled to ~8 requests/s with only one decode in flight; a result that no longer
+    /// matches where the finger is by now is dropped, and a nil (still producing) keeps the
+    /// last good frame on screen.
+    private func requestScrubPreview(at seconds: Double) {
+        let now = Date()
+        guard now.timeIntervalSince(scrubPreviewRequestedAt) >= 0.125 else { return }
+        scrubPreviewRequestedAt = now
+
+        scrubPreviewTask?.cancel()
+        scrubPreviewTask = Task { @MainActor in
+            let image = await engine.scrubThumbnail(at: seconds, maxWidth: 240)
+            guard !Task.isCancelled, let image else { return }
+            guard isScrubbing, abs(seconds - scrubSeconds) <= 0.5 else { return }
+            scrubPreviewImage = image
+        }
+    }
+
+    private func endScrubPreview() {
+        scrubPreviewTask?.cancel()
+        scrubPreviewTask = nil
+        scrubPreviewImage = nil
     }
 
     #if DEBUG
