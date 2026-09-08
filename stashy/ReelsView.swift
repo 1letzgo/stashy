@@ -10,6 +10,9 @@ import SwiftUI
 import AVKit
 import AVFoundation
 import Combine
+#if canImport(AetherEngine)
+import AetherEngine
+#endif
 
 private extension Notification.Name {
     static let reelsPauseAllPlayers = Notification.Name("ReelsPauseAllPlayers")
@@ -88,8 +91,30 @@ enum ReelsImmersiveChromeLayout {
     }
 }
 
+/// Everything Feeds can pause / resume centrally. `AVPlayer` is the only
+/// implementation on the default path; the optional playback engine adds a
+/// second one with identical semantics.
+protocol ReelsPausable: AnyObject {
+    func reelsPause()
+    func reelsPlay()
+    var reelsIsPlaying: Bool { get }
+}
+
+extension AVPlayer: ReelsPausable {
+    func reelsPause() {
+        pause()
+        rate = 0
+    }
+
+    func reelsPlay() {
+        play()
+    }
+
+    var reelsIsPlaying: Bool { timeControlStatus == .playing }
+}
+
 enum ReelsPlayerRegistry {
-    private static let players = NSHashTable<AVPlayer>.weakObjects()
+    private static let players = NSHashTable<AnyObject>.weakObjects()
     private static let lock = NSLock()
     /// When true, Feeds left the visible tab — block deferred `play()` / stream-upgrade races.
     private static var _isSuspended = false
@@ -100,25 +125,29 @@ enum ReelsPlayerRegistry {
         return _isSuspended
     }
 
-    static func register(_ player: AVPlayer) {
+    /// Snapshot of the live registrations (the table is weak, entries can vanish).
+    private static func registered() -> [ReelsPausable] {
         lock.lock()
-        players.add(player)
+        let all = players.allObjects
+        lock.unlock()
+        return all.compactMap { $0 as? ReelsPausable }
+    }
+
+    static func register(_ player: ReelsPausable) {
+        lock.lock()
+        players.add(player as AnyObject)
         lock.unlock()
     }
 
-    static func unregister(_ player: AVPlayer) {
+    static func unregister(_ player: ReelsPausable) {
         lock.lock()
-        players.remove(player)
+        players.remove(player as AnyObject)
         lock.unlock()
     }
 
     static func pauseAll() {
-        lock.lock()
-        let all = players.allObjects
-        lock.unlock()
-        for player in all {
-            player.pause()
-            player.rate = 0
+        for player in registered() {
+            player.reelsPause()
         }
     }
 
@@ -126,11 +155,9 @@ enum ReelsPlayerRegistry {
     static func suspendPlayback() {
         lock.lock()
         _isSuspended = true
-        let all = players.allObjects
         lock.unlock()
-        for player in all {
-            player.pause()
-            player.rate = 0
+        for player in registered() {
+            player.reelsPause()
         }
     }
 
@@ -143,10 +170,7 @@ enum ReelsPlayerRegistry {
     /// True while any registered player is actually running — used to tell "the feed never
     /// started" apart from "the user paused it".
     static var hasPlayingPlayer: Bool {
-        lock.lock()
-        let all = players.allObjects
-        lock.unlock()
-        return all.contains { $0.timeControlStatus == .playing }
+        registered().contains { $0.reelsIsPlaying }
     }
 
     /// Safe play entry point for Reel rows — no-op while Feeds is backgrounded/suspended.
@@ -158,7 +182,72 @@ enum ReelsPlayerRegistry {
         guard !suspended else { return }
         player.play()
     }
+
+    #if canImport(AetherEngine)
+    /// Same contract as the `AVPlayer` entry point, for the optional playback engine.
+    static func playIfAllowed(_ engine: AetherSceneEngine?) {
+        guard let engine else { return }
+        lock.lock()
+        let suspended = _isSuspended
+        lock.unlock()
+        guard !suspended else { return }
+        engine.reelsPlay()
+    }
+    #endif
 }
+
+#if canImport(AetherEngine)
+/// The engine wrapper is `@MainActor`; the registry is not. These hops keep the
+/// conformance honest instead of asserting isolation the registry cannot promise.
+extension AetherSceneEngine: ReelsPausable {
+    nonisolated func reelsPause() {
+        AetherReelsBridge.onMain(self) { $0.pause() }
+    }
+
+    nonisolated func reelsPlay() {
+        AetherReelsBridge.onMain(self) { $0.play() }
+    }
+
+    nonisolated var reelsIsPlaying: Bool {
+        AetherReelsBridge.readOnMain(self, fallback: false) { $0.isPlaying }
+    }
+}
+
+enum AetherReelsBridge {
+    static func onMain(_ engine: AetherSceneEngine, _ body: @escaping @MainActor (AetherSceneEngine) -> Void) {
+        if Thread.isMainThread {
+            MainActor.assumeIsolated { body(engine) }
+        } else {
+            DispatchQueue.main.async {
+                MainActor.assumeIsolated { body(engine) }
+            }
+        }
+    }
+
+    static func readOnMain<T: Sendable>(_ engine: AetherSceneEngine,
+                                        fallback: T,
+                                        _ body: @MainActor (AetherSceneEngine) -> T) -> T {
+        guard Thread.isMainThread else { return fallback }
+        return MainActor.assumeIsolated { body(engine) }
+    }
+}
+
+/// Feeds surface for the optional engine. Mirrors `FullScreenVideoPlayer`'s fill
+/// behaviour (top-aligned crop plus a visual-only bottom inset) without AVKit.
+struct AetherReelSurface: View {
+    @ObservedObject var engine: AetherSceneEngine
+    let fill: Bool
+    let bottomInset: CGFloat
+
+    var body: some View {
+        AetherPlayerSurface(engine: engine.engine)
+            .padding(.bottom, fill ? bottomInset : 0)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: fill ? .top : .center)
+            .clipped()
+            .background(Color.black)
+    }
+}
+#endif
 
 /// Reels „Session“ state: **RAM only** — survives tab switches / navigation within one app launch, **not** an app restart.
 /// One-time cleanup removes legacy `UserDefaults` keys from older builds so nothing persists across relaunch.
@@ -1553,6 +1642,41 @@ struct ReelsViewBody: View {
             case .clip: return nil
             case .preview(let s): return s
             }
+        }
+
+        /// True when this row should play through the optional engine instead of `AVPlayer`.
+        /// Clips, previews and animations always stay on the AVPlayer path, and so does
+        /// anything already backed by a local file (AVPlayer handles those natively).
+        var shouldUseAether: Bool {
+            #if canImport(AetherEngine)
+            guard !isAnimated else { return false }
+            if let url = videoURL, !url.absoluteString.hasPrefix("http") { return false }
+            guard aetherVideoURL != nil else { return false }
+            switch self {
+            case .scene(let s):
+                return PlayerEngineResolver.shouldUseAether(for: s)
+            case .marker:
+                // Marker streams are server-side mp4 — only worth the engine on "Always".
+                return StashyPlusManager.isUnlockedNow && TabManager.shared.playerEnginePreference == .always
+            case .clip, .preview:
+                return false
+            }
+            #else
+            return false
+            #endif
+        }
+
+        /// Source URL for the optional engine (never a transcode for scenes).
+        var aetherVideoURL: URL? {
+            #if canImport(AetherEngine)
+            switch self {
+            case .scene(let s): return s.aetherVideoURL
+            case .marker: return videoURL
+            case .clip, .preview: return nil
+            }
+            #else
+            return nil
+            #endif
         }
 
     }
@@ -4142,7 +4266,9 @@ struct ReelsViewBody: View {
 
                     HStack(spacing: 6) {
                         #if !os(tvOS)
-                        ReelsAIMotionPill(pillHeight: reelsTopChromePillHeight, isPicsMode: reelsMode == .pics)
+                        ReelsAIMotionPill(pillHeight: reelsTopChromePillHeight,
+                                          isPicsMode: reelsMode == .pics,
+                                          usesAetherEngine: currentItem?.shouldUseAether ?? false)
                         #endif
                         reelsFilterSortPill
                     }
@@ -4728,6 +4854,9 @@ struct ReelsViewBody: View {
 private struct ReelsAIMotionPill: View {
     let pillHeight: CGFloat
     let isPicsMode: Bool
+    /// AI Motion needs an `AVPlayerItem` to analyse — hidden while the active item
+    /// plays through the optional engine.
+    var usesAetherEngine: Bool = false
 
     @ObservedObject private var stashSyncManager = StashSyncManager.shared
     @ObservedObject private var handyManager = HandyManager.shared
@@ -4737,7 +4866,7 @@ private struct ReelsAIMotionPill: View {
     @AppStorage("video_sync_enabled") private var isVideoSyncEnabled = false
 
     private var showsButton: Bool {
-        plusManager.isUnlocked && isVideoSyncEnabled && !isPicsMode
+        plusManager.isUnlocked && isVideoSyncEnabled && !isPicsMode && !usesAetherEngine
     }
 
     private var isActive: Bool {
@@ -4841,6 +4970,24 @@ private final class ReelItemVideoSurfaceReadiness: ObservableObject {
         resyncFromBoundLayer()
     }
 
+    /// Optional-engine equivalent of `bind(layer:)`'s `isReadyForDisplay` transition:
+    /// the engine reports its first decoded frame through a callback instead of KVO.
+    func markAetherFrameReady() {
+        showsDecodedVideo = true
+    }
+
+    /// Drops any AVPlayer-era observation before a row switches to the optional engine.
+    func resetForAether() {
+        layerReadyObservation?.invalidate()
+        layerReadyObservation = nil
+        itemStatusObservation?.invalidate()
+        itemStatusObservation = nil
+        currentItemObservation?.invalidate()
+        currentItemObservation = nil
+        boundLayer = nil
+        showsDecodedVideo = false
+    }
+
     /// Nach Pause/Navigation/Seek: sichtbaren Stand vom gebundenen Layer wiederherstellen.
     func resyncFromBoundLayer() {
         if let layer = boundLayer, layer.isReadyForDisplay {
@@ -4894,6 +5041,12 @@ struct ReelItemView: View {
     }
 
     @State private var player: AVPlayer?
+    #if canImport(AetherEngine)
+    /// Optional playback engine for this row. Invariant: non-nil ⇒ `player == nil`.
+    @State private var aetherEngine: AetherSceneEngine?
+    #endif
+    /// Sticky per row: once the engine failed here we stay on the AVPlayer path.
+    @State private var aetherFailedForItem = false
     @State private var looper: Any?
     @State private var animationAdvanceTimer: Timer?
     @ObservedObject var tabManager = TabManager.shared
@@ -5030,8 +5183,9 @@ extension ReelItemView {
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.15) {
                         guard !ReelsPlayerRegistry.isPlaybackSuspended else { return }
                         if isActive && isPlaying && !isRotating && !isUserScrolling {
-                            if player == nil { setupPlayer() }
+                            if player == nil && !usesAetherEngine { setupPlayer() }
                             ReelsPlayerRegistry.playIfAllowed(player)
+                            aetherPlayIfAllowed()
                         }
                     }
                 }
@@ -5051,6 +5205,7 @@ extension ReelItemView {
                 // `currentVisibleSceneId` (and thus `isActive`) hasn't updated yet.
                 player?.pause()
                 player?.rate = 0
+                aetherPause()
                 syncPlaybackActivityPosition()
                 playbackActivityTracker.stop()
             }
@@ -5060,12 +5215,21 @@ extension ReelItemView {
             }
             .onChange(of: isMuted) { _, newValue in
                 player?.isMuted = newValue
+                aetherSetMuted(newValue)
             }
             .onChange(of: isActive) { _, newValue in
                 if newValue {
                     guard !isUserScrolling else { return }
-                    if player == nil { setupPlayer() } else { refreshTimeObserver() }
-                    if isPlaying && !isRotating { ReelsPlayerRegistry.playIfAllowed(player) }
+                    if player == nil && !usesAetherEngine {
+                        setupPlayer()
+                    } else {
+                        refreshTimeObserver()
+                        refreshAetherCallbacks()
+                    }
+                    if isPlaying && !isRotating {
+                        ReelsPlayerRegistry.playIfAllowed(player)
+                        aetherPlayIfAllowed()
+                    }
                     onInteraction()
                     if item.isAnimated { startAnimationAdvanceTimer() }
                     // Deferred play: ensure player starts even if isPlaying binding
@@ -5074,6 +5238,7 @@ extension ReelItemView {
                         guard !ReelsPlayerRegistry.isPlaybackSuspended else { return }
                         if self.isActive && self.isPlaying && !self.isRotating && !self.isUserScrolling {
                             ReelsPlayerRegistry.playIfAllowed(self.player)
+                            self.aetherPlayIfAllowed()
                         }
                     }
                     armPlaybackWatchdog()
@@ -5082,6 +5247,7 @@ extension ReelItemView {
                     if isUserScrolling {
                         player?.pause()
                         player?.rate = 0
+                        aetherPause()
                         cancelAnimationAdvanceTimer()
                     } else {
                         cleanupPlayer()
@@ -5108,17 +5274,27 @@ extension ReelItemView {
                     onInteraction()
                     return
                 }
-                if player == nil { setupPlayer() } else { refreshTimeObserver() }
-                if isPlaying && !isRotating { ReelsPlayerRegistry.playIfAllowed(player) }
+                if player == nil && !usesAetherEngine {
+                    setupPlayer()
+                } else {
+                    refreshTimeObserver()
+                    refreshAetherCallbacks()
+                }
+                if isPlaying && !isRotating {
+                    ReelsPlayerRegistry.playIfAllowed(player)
+                    aetherPlayIfAllowed()
+                }
                 onInteraction()
                 DispatchQueue.main.async {
                     guard !ReelsPlayerRegistry.isPlaybackSuspended else { return }
                     if self.isActive && self.isPlaying && !self.isRotating && !self.isUserScrolling {
                         ReelsPlayerRegistry.playIfAllowed(self.player)
+                        self.aetherPlayIfAllowed()
                     }
                 }
             }
             .onChange(of: tabManager.reelsContinuousPlay) { _, enabled in
+                aetherSetLoops(continuousPlay: enabled)
                 if item.isAnimated {
                     if enabled && isActive {
                         startAnimationAdvanceTimer()
@@ -5132,14 +5308,16 @@ extension ReelItemView {
                 // `!isUserScrolling` — that flag is often still true from the
                 // first paging layout when this fires.
                 guard isActive else { return }
-                if player == nil { setupPlayer(forcePlay: true) }
+                if player == nil && !usesAetherEngine { setupPlayer(forcePlay: true) }
                 if !isRotating {
                     ReelsPlayerRegistry.playIfAllowed(player)
+                    aetherPlayIfAllowed()
                     videoSurfaceReadiness.notePlaybackStarted()
                 }
                 DispatchQueue.main.async {
                     guard self.isActive, !self.isRotating else { return }
                     ReelsPlayerRegistry.playIfAllowed(self.player)
+                    self.aetherPlayIfAllowed()
                     self.videoSurfaceReadiness.notePlaybackStarted()
                 }
                 armPlaybackWatchdog()
@@ -5147,8 +5325,10 @@ extension ReelItemView {
             .onChange(of: isRotating) { _, newValue in
                 if !newValue && isPlaybackActive && isPlaying {
                     ReelsPlayerRegistry.playIfAllowed(player)
+                    aetherPlayIfAllowed()
                 } else if newValue {
                     player?.pause()
+                    aetherPause()
                 }
             }
             .onChange(of: player) { _, newPlayer in
@@ -5170,11 +5350,13 @@ extension ReelItemView {
                 if playing {
                     if !isRotating {
                         ReelsPlayerRegistry.playIfAllowed(player)
+                        aetherPlayIfAllowed()
                         videoSurfaceReadiness.notePlaybackStarted()
                         startPlaybackActivityTrackingIfNeeded()
                     }
                 } else {
                     player?.pause()
+                    aetherPause()
                     syncPlaybackActivityPosition()
                     playbackActivityTracker.stop()
                 }
@@ -5183,7 +5365,7 @@ extension ReelItemView {
                 guard let t = target else { return }
                 // Scrubber lives outside the pager; allow seek whenever this row is the active item
                 // (do not require `!isUserScrolling` — that flag can briefly be true during chrome drags).
-                guard isActive, player != nil else { return }
+                guard isActive, player != nil || usesAetherEngine else { return }
                 seek(to: t)
                 DispatchQueue.main.async {
                     if scrubberState.seekTarget != nil {
@@ -5195,8 +5377,10 @@ extension ReelItemView {
                 guard isActive else { return }
                 if seeking {
                     player?.pause()
+                    aetherPause()
                 } else if isPlaying, !isUserScrolling {
                     ReelsPlayerRegistry.playIfAllowed(player)
+                    aetherPlayIfAllowed()
                     onInteraction()
                 }
             }
@@ -5249,6 +5433,7 @@ extension ReelItemView {
                         // Ein nicht-dekodierter Layer ist schwarz auf schwarzem Grund — visuell identisch.
                         // Das frühere `isReadyForDisplay`-Gating konnte dauerhaft auf 0 hängen
                         // (Layer-Instanzwechsel beim Listen-Relayout) → spielendes Video blieb schwarz.
+                        aetherMediaSurface(fill: shouldFill, bottomInset: bottomInset)
                         if let player = player {
                             FullScreenVideoPlayer(
                                 player: player,
@@ -5287,7 +5472,28 @@ extension ReelItemView {
     }
 
     private func handleLongPress(_ isPressed: Bool) {
-        guard !item.isAnimated, let player = player else { return }
+        guard !item.isAnimated else { return }
+
+        #if canImport(AetherEngine)
+        if let aether = aetherEngine {
+            if isPressed {
+                HapticManager.selection()
+                aether.rate = 2.0
+                withAnimation {
+                    isFastForwarding = true
+                }
+            } else {
+                aether.rate = 1.0
+                withAnimation {
+                    isFastForwarding = false
+                }
+            }
+            onInteraction()
+            return
+        }
+        #endif
+
+        guard let player = player else { return }
         
         if isPressed {
             #if !os(tvOS)
@@ -5465,14 +5671,25 @@ extension ReelItemView {
             guard self.isActive,
                   !ReelsPlayerRegistry.isPlaybackSuspended else { return }
 
-            if self.player == nil {
+            if self.player == nil && !self.usesAetherEngine {
                 AppLog.error("🎬 Reel watchdog: active row has no player — recovering (scrolling=\(self.isUserScrolling) playing=\(self.isPlaying))")
                 // Build the player either way so a frame appears; only start it when the
                 // user actually wants playback.
                 self.setupPlayer(forcePlay: self.isPlaying)
                 if self.isPlaying {
                     ReelsPlayerRegistry.playIfAllowed(self.player)
+                    self.aetherPlayIfAllowed()
                 }
+                return
+            }
+
+            // A dead engine never recovers on its own — drop back to the AVPlayer path
+            // (which can still reach the scene via HLS).
+            if let message = self.aetherErrorMessage {
+                AppLog.error("🎬 Reel watchdog: playback engine failed (\(message)) — falling back to AVPlayer")
+                self.aetherFailedForItem = true
+                self.cleanupPlayer()
+                self.setupAVPlayerAfterAetherFailure(forcePlay: true)
                 return
             }
 
@@ -5480,7 +5697,7 @@ extension ReelItemView {
             // so they must respect a pause the user tapped in the last 2.5s.
             guard self.isPlaying else { return }
 
-            guard self.player?.timeControlStatus != .playing else {
+            guard !self.isPlaybackMoving else {
                 // Playing but no decoded frame surfaced yet — force the readiness fallback.
                 if !self.videoSurfaceReadiness.showsDecodedVideo {
                     AppLog.error("🎬 Reel watchdog: playing without decoded surface — forcing visibility")
@@ -5489,14 +5706,16 @@ extension ReelItemView {
                 return
             }
             ReelsPlayerRegistry.playIfAllowed(self.player)
+            self.aetherPlayIfAllowed()
 
             if await cancellableSleep(nanoseconds: 1_200_000_000) { return }
             guard self.isActive, self.isPlaying else { return }
-            if self.player?.timeControlStatus != .playing {
+            if !self.isPlaybackMoving {
                 AppLog.error("🎬 Reel watchdog: player stalled after kick — rebuilding")
                 self.cleanupPlayer()
                 self.setupPlayer()
                 ReelsPlayerRegistry.playIfAllowed(self.player)
+                self.aetherPlayIfAllowed()
                 self.videoSurfaceReadiness.notePlaybackStarted()
             }
         }
@@ -5513,6 +5732,17 @@ extension ReelItemView {
         // Off-tab: do not create/upgrade players (createPlayer would re-activate AVAudioSession).
         guard !ReelsPlayerRegistry.isPlaybackSuspended else { return }
 
+        // Optional playback engine takes over the whole row; everything below stays untouched.
+        if item.shouldUseAether && !aetherFailedForItem {
+            setupAetherPlayer(forcePlay: forcePlay)
+            return
+        }
+
+        setupAVPlayer(forcePlay: forcePlay)
+    }
+
+    /// The unchanged AVPlayer setup path (split out only so the engine can fall back to it).
+    private func setupAVPlayer(forcePlay: Bool) {
         // `onAppear` + scroll settle can both call `setupPlayer` in the same transition; avoid a second
         // `initPlayer`/generation bump (visible flash + duplicate stream work).
         if player != nil {
@@ -5734,8 +5964,8 @@ extension ReelItemView {
     private func syncPlaybackActivityPosition(from player: AVPlayer? = nil) {
         guard tracksPlaybackActivity else { return }
         let p = player ?? self.player
-        let current = p?.currentTime().seconds ?? scrubberState.time
-        let duration = p?.currentItem?.duration.seconds ?? scrubberState.duration
+        let current = aetherCurrentTime ?? p?.currentTime().seconds ?? scrubberState.time
+        let duration = aetherDuration ?? p?.currentItem?.duration.seconds ?? scrubberState.duration
         playbackActivityTracker.setPosition(currentTime: current, duration: duration)
     }
     
@@ -5758,6 +5988,7 @@ extension ReelItemView {
             p.replaceCurrentItem(with: nil)
         }
         player = nil
+        cleanupAetherEngine()
         playbackPresentationSize = nil
     }
 
@@ -5824,6 +6055,18 @@ extension ReelItemView {
     }
 
     func seek(to time: Double) {
+        #if canImport(AetherEngine)
+        if let aether = aetherEngine {
+            Task {
+                await aether.seek(to: time)
+                self.videoSurfaceReadiness.resyncFromBoundLayer()
+                if self.isPlaying && self.isPlaybackActive && !self.isRotating {
+                    ReelsPlayerRegistry.playIfAllowed(aether)
+                }
+            }
+            return
+        }
+        #endif
         let cmTime = CMTime(seconds: time, preferredTimescale: 600)
         guard let player else { return }
         player.seek(to: cmTime, toleranceBefore: .zero, toleranceAfter: .zero) { [weak player] _ in
@@ -5850,6 +6093,216 @@ extension ReelItemView {
         animationAdvanceTimer?.invalidate()
         animationAdvanceTimer = nil
     }
+}
+
+// MARK: - Optional playback engine (Feeds)
+
+/// Every Aether touch point of ``ReelItemView`` lives here. On a build without the
+/// package these all fold to no-ops, so the AVPlayer path stays exactly as before.
+extension ReelItemView {
+
+    /// True while this row plays through the optional engine instead of `AVPlayer`.
+    var usesAetherEngine: Bool {
+        #if canImport(AetherEngine)
+        return aetherEngine != nil
+        #else
+        return false
+        #endif
+    }
+
+    var aetherErrorMessage: String? {
+        #if canImport(AetherEngine)
+        return aetherEngine?.errorMessage
+        #else
+        return nil
+        #endif
+    }
+
+    /// "Playback really moves" for both engines (the watchdog's stall check).
+    var isPlaybackMoving: Bool {
+        #if canImport(AetherEngine)
+        if let aether = aetherEngine { return aether.isPlaying }
+        #endif
+        return player?.timeControlStatus == .playing
+    }
+
+    var aetherCurrentTime: Double? {
+        #if canImport(AetherEngine)
+        return aetherEngine?.currentTime
+        #else
+        return nil
+        #endif
+    }
+
+    var aetherDuration: Double? {
+        #if canImport(AetherEngine)
+        guard let d = aetherEngine?.duration, d > 0, !d.isNaN else { return nil }
+        return d
+        #else
+        return nil
+        #endif
+    }
+
+    func aetherPause() {
+        #if canImport(AetherEngine)
+        aetherEngine?.pause()
+        #endif
+    }
+
+    func aetherPlayIfAllowed() {
+        #if canImport(AetherEngine)
+        ReelsPlayerRegistry.playIfAllowed(aetherEngine)
+        #endif
+    }
+
+    func aetherSetMuted(_ muted: Bool) {
+        #if canImport(AetherEngine)
+        aetherEngine?.isMuted = muted
+        #endif
+    }
+
+    func aetherSetLoops(continuousPlay: Bool) {
+        #if canImport(AetherEngine)
+        aetherEngine?.loopsAtEnd = !continuousPlay
+        #endif
+    }
+
+    /// Surface for the optional engine — sibling of the `FullScreenVideoPlayer` branch.
+    @ViewBuilder
+    func aetherMediaSurface(fill: Bool, bottomInset: CGFloat) -> some View {
+        #if canImport(AetherEngine)
+        if let aether = aetherEngine {
+            AetherReelSurface(engine: aether, fill: fill, bottomInset: bottomInset)
+                .allowsHitTesting(false)
+        }
+        #endif
+    }
+
+    /// Re-binds the engine callbacks so they capture the current view struct —
+    /// the engine's equivalent of `refreshTimeObserver()`.
+    func refreshAetherCallbacks() {
+        #if canImport(AetherEngine)
+        guard let aether = aetherEngine else { return }
+        bindAetherCallbacks(on: aether)
+        #endif
+    }
+
+    func cleanupAetherEngine() {
+        #if canImport(AetherEngine)
+        guard let aether = aetherEngine else { return }
+        ReelsPlayerRegistry.unregister(aether)
+        aether.stop()
+        aetherEngine = nil
+        #endif
+    }
+
+    /// Re-entry into the untouched AVPlayer path after the engine refused to work.
+    func setupAVPlayerAfterAetherFailure(forcePlay: Bool) {
+        guard !item.isAnimated else { return }
+        guard !ReelsPlayerRegistry.isPlaybackSuspended else { return }
+        setupAVPlayer(forcePlay: forcePlay)
+    }
+
+    #if canImport(AetherEngine)
+    /// Mirror of `setupPlayer`'s AVPlayer branch: one engine per row, created lazily,
+    /// no `updateBestStream` (the engine plays the original file).
+    func setupAetherPlayer(forcePlay: Bool) {
+        if let aether = aetherEngine {
+            refreshAetherCallbacks()
+            if !isRotating && (forcePlay || (isPlaying && isPlaybackActive)) {
+                ReelsPlayerRegistry.playIfAllowed(aether)
+            }
+            return
+        }
+
+        playerSetupGeneration &+= 1
+
+        guard let url = item.aetherVideoURL else {
+            aetherFailedForItem = true
+            setupAVPlayerAfterAetherFailure(forcePlay: forcePlay)
+            return
+        }
+
+        guard let aether = try? AetherSceneEngine() else {
+            AppLog.error("🎬 Reel: playback engine could not be created — using AVPlayer for this item")
+            aetherFailedForItem = true
+            setupAVPlayerAfterAetherFailure(forcePlay: forcePlay)
+            return
+        }
+
+        aether.isMuted = isMuted
+        aether.loopsAtEnd = !TabManager.shared.reelsContinuousPlay
+        aether.setVideoGravity(shouldFill ? .resizeAspectFill : .resizeAspect)
+        bindAetherCallbacks(on: aether)
+
+        videoSurfaceReadiness.resetForAether()
+        aetherEngine = aether
+        ReelsPlayerRegistry.register(aether)
+
+        let autoplay = !isRotating && isActive && (forcePlay || isPlaying)
+        Task { await aether.load(url: url, startAt: nil, autoplay: autoplay) }
+
+        // Initial duration guess from model (same as the AVPlayer path).
+        if let d = item.duration, d > 0 {
+            if isActive { scrubberState.duration = d }
+        }
+
+        if isPlaying && isPlaybackActive && !isRotating {
+            startPlaybackActivityTrackingIfNeeded()
+        }
+    }
+
+    /// The engine's equivalent of `installTimeObserver` + the end-of-item observer.
+    private func bindAetherCallbacks(on aether: AetherSceneEngine) {
+        aether.loopsAtEnd = !TabManager.shared.reelsContinuousPlay
+
+        aether.onFirstFrame = {
+            self.videoSurfaceReadiness.markAetherFrameReady()
+        }
+
+        aether.onReachedEnd = {
+            // Tab leave can race with end-of-item; never restart audio off-Feeds.
+            guard !ReelsPlayerRegistry.isPlaybackSuspended, self.isPlaying, self.isPlaybackActive else { return }
+            self.onVideoEnded()
+        }
+
+        aether.onTime = { time, duration in
+            if self.isActive && !self.scrubberState.seeking {
+                self.scrubberState.time = time
+            }
+
+            if self.isActive, duration > 0, !duration.isNaN {
+                self.scrubberState.duration = duration
+            }
+
+            self.syncAetherPresentationSize(aether)
+            self.syncPlaybackActivityPosition()
+            self.noteReelsWatchProgress()
+            if self.isPlaying && self.isPlaybackActive && !self.isRotating {
+                self.startPlaybackActivityTrackingIfNeeded()
+            }
+        }
+    }
+
+    /// `presentationSize` equivalent: the decoded source size once a frame exists.
+    private func syncAetherPresentationSize(_ aether: AetherSceneEngine) {
+        guard aether.hasFirstFrame else { return }
+        var size = CGSize(width: CGFloat(aether.engine.sourceVideoWidth),
+                          height: CGFloat(aether.engine.sourceVideoHeight))
+        if size.width <= 1 || size.height <= 1, let software = aether.engine.softwareDisplaySize {
+            size = software
+        }
+        guard size.width > 1, size.height > 1 else { return }
+        if playbackPresentationSize != size {
+            playbackPresentationSize = size
+        }
+    }
+    #else
+    /// Without the package `shouldUseAether` is always false — this can never run.
+    func setupAetherPlayer(forcePlay: Bool) {
+        setupAVPlayerAfterAetherFailure(forcePlay: forcePlay)
+    }
+    #endif
 }
 
 struct StashSyncManagerModifier: ViewModifier {
