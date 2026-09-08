@@ -256,7 +256,7 @@ struct DownloadDetailView: View {
     let downloaded: DownloadedScene
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @StateObject private var downloadManager = DownloadManager.shared
-    @State private var player: AVPlayer?
+    @State private var engine: AetherSceneEngine?
     @State private var isPlaybackStarted = false
     @State private var isFullScreen = false
     @State private var isHeaderExpanded = false
@@ -317,9 +317,22 @@ struct DownloadDetailView: View {
             VStack(spacing: 12) {
                 // Video Player
                 VStack(spacing: 0) {
-                    if isPlaybackStarted, let player = player {
-                        VideoPlayerView(player: player, isFullscreen: $isFullScreen)
-                            .aspectRatio(16/9, contentMode: .fit) // Keep 16:9 for consistency or use nil for 9:16
+                    if isPlaybackStarted, let engine, !isFullScreen {
+                        AetherSceneSurface(
+                            engine: engine,
+                            posterURL: nil,
+                            isMuted: $isMuted,
+                            onSeek: { seconds in seekTo(seconds) },
+                            onToggleFullscreen: { isFullScreen = true },
+                            isFullscreen: false
+                        )
+                        .aspectRatio(16/9, contentMode: .fit) // Keep 16:9 for consistency or use nil for 9:16
+                        .frame(maxWidth: .infinity)
+                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                    } else if isPlaybackStarted, isFullScreen {
+                        // The fullscreen cover owns the engine's layer while it is up.
+                        Color.black
+                            .aspectRatio(16/9, contentMode: .fit)
                             .frame(maxWidth: .infinity)
                             .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                     } else {
@@ -356,14 +369,7 @@ struct DownloadDetailView: View {
                         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                         .contentShape(Rectangle())
                         .onTapGesture {
-                            if player == nil {
-                                let videoURL = downloadManager.getLocalVideoURL(for: downloaded)
-                                player = createPlayer(for: videoURL, muted: isMuted)
-                            }
-                            withAnimation {
-                                isPlaybackStarted = true
-                            }
-                            player?.play()
+                            startPlayback()
                         }
                     }
                 }
@@ -520,8 +526,80 @@ struct DownloadDetailView: View {
         .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
             downloadDetailNavBar
         }
+        .fullScreenCover(isPresented: $isFullScreen) {
+            fullscreenPlayer
+        }
+        .onChange(of: isMuted) { _, muted in
+            engine?.isMuted = muted
+        }
+        .onDisappear {
+            teardownPlayer()
+        }
     }
-    
+
+    /// Own fullscreen presentation: the same engine, rebound to a full-bleed surface.
+    @ViewBuilder
+    private var fullscreenPlayer: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            if let engine {
+                AetherSceneSurface(
+                    engine: engine,
+                    posterURL: nil,
+                    isMuted: $isMuted,
+                    onSeek: { seconds in seekTo(seconds) },
+                    onToggleFullscreen: { isFullScreen = false },
+                    isFullscreen: true
+                )
+                .ignoresSafeArea()
+            }
+        }
+    }
+
+    /// Local file URL — the engine skips auth headers for `file://`.
+    private func startPlayback() {
+        let videoURL = downloadManager.getLocalVideoURL(for: downloaded)
+
+        if engine == nil {
+            guard let created = try? AetherSceneEngine() else {
+                AppLog.error("DownloadDetailView: playback engine could not be created")
+                ToastManager.shared.show(
+                    "Playback engine unavailable",
+                    icon: "exclamationmark.triangle",
+                    style: .error
+                )
+                return
+            }
+            created.isMuted = isMuted
+            created.audioSessionPolicy = .playback
+            engine = created
+            Task { @MainActor in
+                await created.load(url: videoURL, startAt: nil, autoplay: true)
+            }
+        }
+
+        withAnimation {
+            isPlaybackStarted = true
+        }
+        engine?.play()
+    }
+
+    private func seekTo(_ seconds: Double) {
+        guard let engine else { return }
+        Task { @MainActor in
+            await engine.seek(to: seconds)
+        }
+    }
+
+    /// `@State` release is not deterministic — the engine has to be stopped by hand.
+    private func teardownPlayer() {
+        guard !isFullScreen, let engine else { return }
+        engine.onTime = nil
+        engine.stop()
+        self.engine = nil
+        isPlaybackStarted = false
+    }
+
     private func shareVideo(url: URL) {
         let activityVC = UIActivityViewController(activityItems: [url], applicationActivities: nil)
         

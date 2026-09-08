@@ -8850,52 +8850,38 @@ struct Scene: Codable, Identifiable, Equatable {
         return comps?.url ?? url
     }
 
-    // Computed property for download URL (preferring MP4 transcoded stream)
+    /// Download source: always the signed original file (`paths.stream`).
+    /// No MP4-transcode preference and no "incompatible format" bail-out — the local player
+    /// plays whatever the server stores, so the download keeps the original container.
     var downloadURL: URL? {
-        let compatibleExtensions = ["mp4", "m4v", "mov"]
-        let fileFmt = files?.first?.format?.lowercased() ?? ""
-        let isOriginalCompatible = compatibleExtensions.contains(fileFmt)
-
-        // 1. Try to find a high-quality MP4 transcode (specifically excluding HLS and direct MKV links)
-        let mp4Transcodes = streams?.filter { $0.mime_type == "video/mp4" }
-            .filter { stream in
-                let label = stream.label.lowercased()
-                // Exclude direct streams that are just the original incompatible file
-                if label.contains("direct stream") || label.contains("mkv") { return false }
-                return true
-            }
-        
-        if let bestMP4 = mp4Transcodes?.sorted(by: { s1, s2 in
-            let r1 = Int(s1.label.lowercased().replacingOccurrences(of: "p", with: "")) ?? 0
-            let r2 = Int(s2.label.lowercased().replacingOccurrences(of: "p", with: "")) ?? 0
-            return r1 > r2
-        }).first, let url = URL(string: bestMP4.url) {
-            AppLog.debug("💾 Download: Using best MP4 transcode (\(bestMP4.label)) for scene \(id)")
+        if let streamPath = paths?.stream, let url = URL(string: streamPath) {
             return signedURL(url)
         }
-        
-        // 2. Fallback to original ONLY if it's compatible (MP4/MOV/etc)
-        if isOriginalCompatible {
-             if let streamPath = paths?.stream, let url = URL(string: streamPath) {
-                 AppLog.debug("💾 Download: Using compatible original file (\(fileFmt)) for scene \(id)")
-                 return signedURL(url)
-             }
+        if let config = ServerConfigManager.shared.loadConfig(),
+           let url = URL(string: "\(config.baseURL)/scene/\(id)/stream") {
+            return signedURL(url)
         }
-        
-        // 3. Last ditch effort: Look for ANY MP4 stream that isn't the original incompatible file
-        // (Sometimes transcodes don't have clear labels)
-        if !isOriginalCompatible {
-            if let anyMP4 = streams?.first(where: { $0.mime_type == "video/mp4" && !$0.label.lowercased().contains("mkv") }),
-               let url = URL(string: anyMP4.url) {
-                return signedURL(url)
-            }
-        }
-        
-        AppLog.error("⚠️ Download: No compatible MP4 file found for scene \(id). Original format: \(fileFmt)")
+        AppLog.error("⚠️ Download: no stream path for scene \(id)")
         return nil
     }
-    
-    
+
+    /// File extension for a local copy of the original: the file's own format when Stash
+    /// reports one, else the extension of `paths.stream`, else `mp4`.
+    var downloadFileExtension: String {
+        if let fmt = files?.first?.format?.lowercased() {
+            let sanitized = String(fmt.filter { $0.isLetter || $0.isNumber }.prefix(5))
+            if !sanitized.isEmpty { return sanitized }
+        }
+        if let streamPath = paths?.stream {
+            let clean = streamPath.components(separatedBy: "?").first ?? streamPath
+            let ext = (clean as NSString).pathExtension.lowercased()
+            let sanitized = String(ext.filter { $0.isLetter || $0.isNumber }.prefix(5))
+            if !sanitized.isEmpty { return sanitized }
+        }
+        return "mp4"
+    }
+
+
     // Computed property for preview URL (video preview)
     var previewURL: URL? {
         // Helper to sign the URL with apikey
@@ -10673,11 +10659,8 @@ class DownloadManager: NSObject, ObservableObject {
         }
         #endif
 
-        // 1. Fetch streams first to ensure we get a compatible MP4 if original is not
-        StashDBViewModel().fetchSceneStreams(sceneId: sceneId) { streams in
-            let sceneWithStreams = scene.withStreams(streams)
-            self.startDownload(sceneWithStreams)
-        }
+        // The original file is what gets downloaded, so there is no stream list to fetch.
+        startDownload(scene)
     }
 
     private func startDownload(_ scene: Scene) {
@@ -10704,14 +10687,16 @@ class DownloadManager: NSObject, ObservableObject {
             }
         }
         
-        // 2. Download Video (Uses downloadURL which prefers MP4 transcoded stream)
+        // 2. Download Video (the signed original file, kept in its own container)
+        let videoExtension = scene.downloadFileExtension
+        let videoFileName = "video.\(videoExtension)"
         if let videoURL = scene.downloadURL {
             dispatchGroup.enter()
             
             // Initialize with size info
             self.activeDownloads[sceneId] = ActiveDownload(id: sceneId, title: title, progress: 0.1, totalSize: 0, downloadedSize: 0)
             
-            downloadFile(id: sceneId, from: videoURL, to: sceneFolder.appendingPathComponent("video.mp4")) { progress, written, total in
+            downloadFile(id: sceneId, from: videoURL, to: sceneFolder.appendingPathComponent(videoFileName)) { progress, written, total in
                 // Update progress
                 Task { @MainActor in
                     if var activeDownload = self.activeDownloads[sceneId] {
@@ -10739,7 +10724,7 @@ class DownloadManager: NSObject, ObservableObject {
                     studioName: scene.studio?.name,
                     performerNames: scene.performers.map { $0.name },
                     downloadDate: Date(),
-                    localVideoPath: "\(sceneId)/video.mp4",
+                    localVideoPath: "\(sceneId)/\(videoFileName)",
                     localThumbnailPath: "\(sceneId)/thumbnail.jpg",
                     duration: scene.sceneDuration
                 )
@@ -11284,8 +11269,12 @@ class DownloadManager: NSObject, ObservableObject {
         next(0)
     }
 
+    /// Local file of a finished download. The metadata path wins; the store's `video.*` lookup
+    /// covers entries whose container changed underneath them.
     func getLocalVideoURL(for scene: DownloadedScene) -> URL {
-        return downloadsFolder.appendingPathComponent(scene.localVideoPath)
+        let fromMetadata = downloadsFolder.appendingPathComponent(scene.localVideoPath)
+        if FileManager.default.fileExists(atPath: fromMetadata.path) { return fromMetadata }
+        return LocalDownloadStore.videoURL(sceneID: scene.id) ?? fromMetadata
     }
     
     func getLocalThumbnailURL(for scene: DownloadedScene) -> URL {
