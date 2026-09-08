@@ -1668,6 +1668,16 @@ struct ReelsViewBody: View {
             #endif
         }
 
+        /// Rows a scrub still can be decoded for: real video with a stream.
+        /// Clips are images and animations have no timeline.
+        var supportsScrubPreview: Bool {
+            guard !isAnimated else { return false }
+            switch self {
+            case .clip: return false
+            case .scene, .marker, .preview: return videoURL != nil
+            }
+        }
+
         /// Source URL for the optional engine (never a transcode for scenes).
         var aetherVideoURL: URL? {
             #if canImport(AetherEngine)
@@ -5042,6 +5052,11 @@ struct ReelItemView: View {
     /// Optional playback engine for this row. Invariant: non-nil ⇒ `player == nil`.
     @State private var aetherEngine: AetherSceneEngine?
     #endif
+    #if canImport(AetherEngine)
+    /// Scrub preview stills for this row. Only the active row ever asks it for a frame,
+    /// so only the active row can open a decode context.
+    @StateObject private var scrubThumbs = ReelsScrubThumbnailProvider()
+    #endif
     /// Sticky per row: once the engine failed here we stay on the AVPlayer path.
     @State private var aetherFailedForItem = false
     @State private var looper: Any?
@@ -5194,6 +5209,7 @@ extension ReelItemView {
                 // the active `AVPlayer` there causes a second flash when paging settles.
                 disarmPlaybackWatchdog()
                 guard !isActive else { return }
+                shutdownScrubPreview()
                 cleanupPlayer()
                 cancelAnimationAdvanceTimer()
             }
@@ -5363,6 +5379,7 @@ extension ReelItemView {
                 // Scrubber lives outside the pager; allow seek whenever this row is the active item
                 // (do not require `!isUserScrolling` — that flag can briefly be true during chrome drags).
                 guard isActive, player != nil || usesAetherEngine else { return }
+                requestScrubPreviewIfDragging(at: t)
                 seek(to: t)
                 DispatchQueue.main.async {
                     if scrubberState.seekTarget != nil {
@@ -5375,12 +5392,44 @@ extension ReelItemView {
                 if seeking {
                     player?.pause()
                     aetherPause()
-                } else if isPlaying, !isUserScrolling {
-                    ReelsPlayerRegistry.playIfAllowed(player)
-                    aetherPlayIfAllowed()
-                    onInteraction()
+                } else {
+                    endScrubPreview()
+                    if isPlaying, !isUserScrolling {
+                        ReelsPlayerRegistry.playIfAllowed(player)
+                        aetherPlayIfAllowed()
+                        onInteraction()
+                    }
                 }
             }
+    }
+
+    // MARK: - Scrub preview
+
+    /// Decoding a still is worth it only while the finger is actually on the bar and this row
+    /// owns playback. `seekTarget` is also set by checkpoint restore, hence the `seeking` gate.
+    private func requestScrubPreviewIfDragging(at seconds: Double) {
+        #if canImport(AetherEngine)
+        guard isActive, scrubberState.seeking, item.supportsScrubPreview else { return }
+        // The bar lives outside the pager and reads the still off `ScrubberState`, so the
+        // decode result is pushed there directly instead of through a view-level binding.
+        let state = scrubberState
+        scrubThumbs.onImage = { image in state.previewImage = image }
+        scrubThumbs.request(at: seconds, aether: aetherEngine, url: item.videoURL)
+        #endif
+    }
+
+    private func endScrubPreview() {
+        #if canImport(AetherEngine)
+        scrubThumbs.end()
+        scrubberState.previewImage = nil
+        #endif
+    }
+
+    private func shutdownScrubPreview() {
+        #if canImport(AetherEngine)
+        scrubThumbs.shutdown()
+        if isActive { scrubberState.previewImage = nil }
+        #endif
     }
 
 
@@ -5976,6 +6025,7 @@ extension ReelItemView {
     }
     
     func cleanupPlayer() {
+        shutdownScrubPreview()
         playerSetupGeneration &+= 1
         syncPlaybackActivityPosition()
         playbackActivityTracker.stop()
@@ -6195,6 +6245,7 @@ extension ReelItemView {
 
     func cleanupAetherEngine() {
         #if canImport(AetherEngine)
+        shutdownScrubPreview()
         guard let aether = aetherEngine else { return }
         if isActive { ReelsAetherRouteState.shared.activeRowUsesSoftwareRoute = false }
         AetherMotionAnalysis.teardown(engine: aether)
@@ -6475,13 +6526,183 @@ class ScrubberState: ObservableObject {
     @Published var duration: Double = 1.0
     @Published var seeking: Bool = false
     @Published var seekTarget: Double? = nil
+    /// Scrub preview still for the active row. The bar renders it; the active `ReelItemView`
+    /// is the only writer (it owns the decode). Deliberately parked here rather than passed
+    /// down: the bar lives outside the pager, so this object is the only channel between them.
+    @Published var previewImage: UIImage? = nil
 }
+
+#if canImport(AetherEngine)
+/// Scrub preview stills for the Feeds scrubber.
+///
+/// Same policy as `AetherSceneSurface`: one decode in flight, the newest finger position
+/// parked and requested as soon as the current one lands, results applied in order, and a
+/// nil result keeps whatever was last shown (nil is transient, not "no frame here").
+///
+/// Source: the row's engine when it has one (its still comes from bytes the playing session
+/// already produced, so no second connection); otherwise a standalone `FrameExtractor` over
+/// the same signed URL, built lazily on the first request and reused until the URL changes.
+@MainActor
+final class ReelsScrubThumbnailProvider: ObservableObject {
+    @Published var image: UIImage?
+
+    /// Where a landed still is delivered (the Feeds bar reads it off `ScrubberState`).
+    var onImage: ((UIImage?) -> Void)?
+
+    private static let thumbnailWidth = 240
+
+    private var task: Task<Void, Never>?
+    private var pendingSeconds: Double?
+    private var extractor: FrameExtractor?
+    private var extractorURL: URL?
+    /// Bumped by `end()` / `shutdown()` so a decode that lands after the drag ended
+    /// cannot repaint the overlay or chain the parked position.
+    private var epoch = 0
+
+    func request(at seconds: Double, aether: AetherSceneEngine?, url: URL?) {
+        guard aether != nil || url != nil else { return }
+        if task != nil {
+            pendingSeconds = seconds
+            return
+        }
+        pendingSeconds = nil
+        let target = max(0, seconds)
+        let startedEpoch = epoch
+        task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let result: UIImage?
+            if let aether {
+                result = await aether.scrubThumbnail(at: target, maxWidth: CGFloat(Self.thumbnailWidth))
+            } else if let extractor = self.makeExtractor(for: url) {
+                result = await extractor.thumbnail(at: target, maxWidth: Self.thumbnailWidth)
+                    .map { UIImage(cgImage: $0) }
+            } else {
+                result = nil
+            }
+            self.task = nil
+            guard self.epoch == startedEpoch else { return }
+            if let result {
+                self.image = result
+                self.onImage?(result)
+            }
+            if let next = self.pendingSeconds {
+                self.pendingSeconds = nil
+                self.request(at: next, aether: aether, url: url)
+            }
+        }
+    }
+
+    /// Drag ended: drop the overlay, keep the extractor warm for the next drag on this row.
+    func end() {
+        epoch &+= 1
+        pendingSeconds = nil
+        task = nil
+        image = nil
+        onImage?(nil)
+    }
+
+    /// Row torn down: release the decode context too. The sink is dropped first so a row
+    /// that is no longer the active one cannot blank the bar's still on its way out.
+    func shutdown() {
+        onImage = nil
+        end()
+        if let extractor {
+            Task { await extractor.shutdown() }
+        }
+        extractor = nil
+        extractorURL = nil
+    }
+
+    /// Same auth as playback: the signed URL plus the `ApiKey` header, so a server that
+    /// honours only one of the two still returns frames. Local files get neither.
+    private func makeExtractor(for url: URL?) -> FrameExtractor? {
+        guard let url else { return nil }
+        let signed = signedURL(url) ?? url
+        if let existing = extractor, extractorURL == signed { return existing }
+        if let extractor { Task { await extractor.shutdown() } }
+
+        var headers: [String: String] = [:]
+        if !url.isFileURL, url.absoluteString.hasPrefix("http"),
+           let key = ServerConfigManager.shared.activeConfig?.secureApiKey, !key.isEmpty {
+            headers["ApiKey"] = key
+        }
+        let created = FrameExtractor(url: signed, httpHeaders: headers)
+        extractor = created
+        extractorURL = signed
+        return created
+    }
+}
+#endif
 
 struct IsolatedScrubberBar: View {
     @ObservedObject var state: ScrubberState
     var isUIVisible: Bool
-    
+
     var body: some View {
+        scrubber
+            .overlay(alignment: .top) {
+                GeometryReader { geo in
+                    if state.seeking, state.duration > 0 {
+                        scrubPreviewOverlay(barWidth: max(geo.size.width, 1))
+                    }
+                }
+                .allowsHitTesting(false)
+                .opacity(isUIVisible ? 1 : 0)
+            }
+    }
+
+    /// Floating still above the scrub position, clamped to the bar so it never leaves the screen.
+    /// Matches the scene-detail overlay: 120 pt, 16:9, radius 6, white hairline, time label.
+    @ViewBuilder
+    private func scrubPreviewOverlay(barWidth: CGFloat) -> some View {
+        let previewWidth: CGFloat = 120
+        let previewHeight: CGFloat = previewWidth * 9 / 16
+        let half = previewWidth / 2
+        let progress = CGFloat(min(1, max(0, state.time / max(state.duration, 0.001))))
+        let rawCenter = barWidth * progress
+        let center = barWidth > previewWidth
+            ? min(max(half, rawCenter), barWidth - half)
+            : barWidth / 2
+
+        VStack(spacing: 3) {
+            ZStack {
+                Color.black.opacity(0.7)
+                if let image = state.previewImage {
+                    Image(uiImage: image)
+                        .resizable()
+                        .scaledToFill()
+                }
+            }
+            .frame(width: previewWidth, height: previewHeight)
+            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
+            .overlay(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .stroke(Color.white.opacity(0.75), lineWidth: 0.5)
+            )
+            .shadow(color: .black.opacity(0.55), radius: 6, x: 0, y: 2)
+
+            Text(Self.formatTime(state.time))
+                .font(.system(size: 10, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.white)
+        }
+        .frame(width: previewWidth)
+        .offset(x: center - half, y: -(previewHeight + 28))
+        .allowsHitTesting(false)
+    }
+
+    private static func formatTime(_ seconds: Double) -> String {
+        guard seconds.isFinite, seconds >= 0 else { return "0:00" }
+        let total = Int(seconds)
+        let h = total / 3600
+        let m = (total % 3600) / 60
+        let s = total % 60
+        return h > 0
+            ? String(format: "%d:%02d:%02d", h, m, s)
+            : String(format: "%d:%02d", m, s)
+    }
+
+    @ViewBuilder
+    private var scrubber: some View {
         CustomVideoScrubber(
             value: Binding(
                 get: { state.time },
