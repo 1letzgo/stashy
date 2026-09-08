@@ -43,6 +43,12 @@ enum StashyExpandingDock {
     static let circleSize: CGFloat = 40
     static let iconSize: CGFloat = 18
     static let activeHeight: CGFloat = 40
+    /// Diameter of the stacked round overlay buttons (Play · Mute · Rating · O-Counter).
+    static let stackedButtonSize: CGFloat = 48
+    /// Same colours as the hashtag chips in the Feeds / fullscreen overlay.
+    static let hashtagFill = Color.black.opacity(0.3)
+    static let hashtagStroke = Color.white.opacity(0.15)
+    static let hashtagForeground = Color.white.opacity(0.8)
     /// Same inset before icon and after label when expanded.
     static let activeHorizontalPadding: CGFloat = 14
     static let iconLabelSpacing: CGFloat = 8
@@ -59,6 +65,10 @@ enum StashyExpandingDock {
 struct StashyChromePillStyle: ViewModifier {
     var height: CGFloat = StashyExpandingDock.activeHeight
     var iconOnly: Bool = false
+    /// Fixed pill width (stacked overlay controls share one width).
+    var width: CGFloat? = nil
+    /// Overlay buttons use the hashtag chip colours instead of the dock fill.
+    var hashtagColors: Bool = false
 
     func body(content: Content) -> some View {
         content
@@ -70,9 +80,14 @@ struct StashyChromePillStyle: ViewModifier {
             )
             .frame(height: height)
             .frame(minWidth: StashyExpandingDock.circleSize, minHeight: StashyExpandingDock.circleSize)
-            .frame(width: iconOnly ? StashyExpandingDock.circleSize : nil)
-            .background(StashyExpandingDock.inactiveBackground)
+            .frame(width: iconOnly ? StashyExpandingDock.circleSize : width)
+            .background(hashtagColors ? StashyExpandingDock.hashtagFill : StashyExpandingDock.inactiveBackground)
             .clipShape(Capsule(style: .continuous))
+            .overlay {
+                if hashtagColors {
+                    Capsule(style: .continuous).stroke(StashyExpandingDock.hashtagStroke, lineWidth: 0.5)
+                }
+            }
     }
 }
 

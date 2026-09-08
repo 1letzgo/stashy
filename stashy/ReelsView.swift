@@ -247,7 +247,10 @@ struct ReelsViewBody: View {
     @State private var isMuted = ScenePlayerMute.initialValue()
     @State private var currentVisibleSceneId: String?
     @State private var showDeleteConfirmation = false
-    @State private var sceneToDelete: Scene?
+    /// Item behind the optional overlay delete button (scene / preview with files, or clip image).
+    @State private var reelsItemToDelete: ReelItemData?
+    /// Explicit `ScrollViewProxy` scroll (delete flow); `.scrollPosition(id:)` writes alone do not page reliably.
+    @State private var reelsScrollRequest: ReelsScrollRequest?
     @State private var reelsMode: ReelsMode = Self.sessionRestoredReelsMode()
     @State private var selectedMarkerSortOption: StashDBViewModel.SceneMarkerSortOption = StashDBViewModel.SceneMarkerSortOption(rawValue: TabManager.shared.getReelsDefaultSort(for: .markers) ?? "") ?? .random
     @StateObject private var reelsClipImageFilters = DetailLinkedImagesFilterModel(
@@ -1284,6 +1287,12 @@ struct ReelsViewBody: View {
         @unknown default:
             return true
         }
+    }
+
+    struct ReelsScrollRequest: Equatable {
+        let id: String
+        let animated: Bool
+        let token = UUID()
     }
 
     enum ReelsMode: String, CaseIterable {
@@ -2656,6 +2665,104 @@ struct ReelsViewBody: View {
             } message: {
                 Text(reelsSceneDeletePresetConfirmationText)
             }
+            .alert(reelsDeleteConfirmationTitle, isPresented: $showDeleteConfirmation, presenting: reelsItemToDelete) { item in
+                Button("Delete", role: .destructive) { reelsDeleteItem(item) }
+                Button("Cancel", role: .cancel) { reelsItemToDelete = nil }
+            } message: { item in
+                Text(reelsDeleteConfirmationMessage(for: item))
+            }
+    }
+
+    // MARK: - Overlay delete button
+
+    private var reelsDeleteConfirmationTitle: String {
+        if case .clip = reelsItemToDelete { return "Delete image?" }
+        return "Delete scene?"
+    }
+
+    private func reelsDeleteConfirmationMessage(for item: ReelItemData) -> String {
+        switch item {
+        case .clip:
+            return "The image is removed from the server. This cannot be undone."
+        case .scene, .preview:
+            return "The scene and its files are removed from the server. This cannot be undone."
+        case .marker:
+            return ""
+        }
+    }
+
+    /// Markers point at a scene shared with other markers; deleting from the marker feed is not offered.
+    private func reelsItemSupportsDelete(_ item: ReelItemData) -> Bool {
+        switch item {
+        case .scene, .preview, .clip: return true
+        case .marker: return false
+        }
+    }
+
+    private func reelsDeleteItem(_ item: ReelItemData) {
+        reelsItemToDelete = nil
+        HapticManager.light()
+        // Jump first, delete afterwards: the page turn must not wait for the server round trip.
+        let neighbour = reelsNeighbourId(of: item)
+        if let neighbour {
+            isUserScrollingReels = false
+            currentVisibleSceneId = neighbour
+            reelsScrollRequest = ReelsScrollRequest(id: neighbour, animated: true)
+        }
+
+        let finish: (Bool, String, @escaping () -> Void) -> Void = { success, label, removal in
+            Task { @MainActor in
+                guard success else {
+                    ToastManager.shared.show("Failed to delete \(label)", icon: "exclamationmark.triangle", style: .error)
+                    return
+                }
+                self.removeDeletedReelItem(neighbour: neighbour, removal: removal)
+                ToastManager.shared.show("\(label.capitalized) deleted", icon: "trash", style: .success)
+            }
+        }
+
+        switch item {
+        case .scene(let scene), .preview(let scene):
+            viewModel.deleteSceneWithFiles(scene: scene) { success in
+                finish(success, "scene") {
+                    self.viewModel.scenes.removeAll { $0.id == scene.id }
+                    self.viewModel.previews.removeAll { $0.id == scene.id }
+                }
+            }
+        case .clip(let clip):
+            viewModel.deleteImage(imageId: clip.id) { success in
+                finish(success, "image") {
+                    self.viewModel.clips.removeAll { $0.id == clip.id }
+                }
+            }
+        case .marker:
+            break
+        }
+    }
+
+    /// Next item, or the previous one for the last page.
+    private func reelsNeighbourId(of item: ReelItemData) -> String? {
+        let items = currentReelItems
+        guard let i = items.firstIndex(where: { $0.id == item.id }) else { return nil }
+        if i + 1 < items.count { return items[i + 1].id }
+        if i > 0 { return items[i - 1].id }
+        return nil
+    }
+
+    /// Removes the deleted item and re-anchors the (already visible) neighbour without animation,
+    /// so the list shrinking above it cannot shift the feed onto the wrong page.
+    private func removeDeletedReelItem(neighbour: String?, removal: @escaping () -> Void) {
+        removal()
+        guard let neighbour else {
+            currentVisibleSceneId = nil
+            return
+        }
+        DispatchQueue.main.async {
+            self.currentVisibleSceneId = neighbour
+            self.reelsScrollRequest = ReelsScrollRequest(id: neighbour, animated: false)
+            self.isUserScrollingReels = false
+            self.currentItemIsPlaying = true
+        }
     }
 
     private func applyPremiumModeLifecycle<V: View>(_ content: V) -> some View {
@@ -3926,6 +4033,12 @@ struct ReelsViewBody: View {
                     }
                 }
             }
+            .onChange(of: reelsScrollRequest) { _, request in
+                guard let request, items.contains(where: { $0.id == request.id }) else { return }
+                withAnimation(request.animated ? .easeInOut(duration: 0.3) : nil) {
+                    proxy.scrollTo(request.id, anchor: .top)
+                }
+            }
             .onChange(of: items.count) { _, _ in
                 continuePagedRestoreIfNeeded()
                 snapToPendingRestoreIfLoaded(using: proxy)
@@ -4007,9 +4120,10 @@ struct ReelsViewBody: View {
     /// Criterion chips + O/Rating sit outside the bar (over the feed).
     @ViewBuilder
     private func reelsNavBar(currentItem: ReelItemData?) -> some View {
-        let showsRateChrome = reelsMode != .pics && !isListEmpty
+        // O-Counter / Rating live in the info overlay next to mute/play; this row only carries chips.
+        let showsRateChrome = false
         let hasActiveCriterionChips = selectedPerformer != nil || !selectedTags.isEmpty || selectedStudio != nil
-        let showsCriterionRow = hasActiveCriterionChips || showsRateChrome
+        let showsCriterionRow = hasActiveCriterionChips
         let prefersBottom = StashyChromePlacement.prefersBottom
 
         VStack(spacing: 0) {
@@ -4147,28 +4261,70 @@ struct ReelsViewBody: View {
         }
     }
 
+    /// "Name - Title" on one line, plain text. Name applies the performer filter.
+    @ViewBuilder
+    private func reelsNameTitleLine(item: ReelItemData) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            if let performer = item.performers.first {
+                Button(action: { applyPerformerFilter(performer) }) {
+                    Text(performer.name)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                }
+                .buttonStyle(.plain)
+                .layoutPriority(1)
+                .accessibilityLabel("Filter by \(performer.name)")
+                Text("-")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            reelsTitleText(item: item)
+        }
+    }
+
+    @ViewBuilder
+    private func reelsTitleText(item: ReelItemData) -> some View {
+        if let title = item.title, !title.isEmpty {
+            if let scene = item.underlyingScene {
+                NavigationLink(destination: SceneDetailView(scene: scene)) {
+                    Text(title)
+                        .font(.system(size: 15, weight: .medium))
+                        .foregroundColor(.white.opacity(0.85))
+                        .lineLimit(1)
+                }
+                .buttonStyle(.plain)
+            } else {
+                Text(title)
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(.white.opacity(0.85))
+                    .lineLimit(1)
+            }
+        }
+    }
+
     @ViewBuilder
     private func reelsRateChrome(currentItem: ReelItemData?) -> some View {
         let oCounter = currentItem?.oCounter ?? 0
         let rating100 = currentItem?.rating100 ?? 0
         let stars = max(0, min(5, Int(round(Double(rating100) / 20.0))))
 
-        HStack(spacing: 6) {
+        VStack(alignment: .trailing, spacing: 8) {
             Button {
                 if let item = currentItem {
                     handleOCounterChange(item: item, newCount: oCounter + 1)
                 }
             } label: {
-                HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                VStack(spacing: 2) {
                     Image(systemName: oCounter > 0 ? AppearanceManager.shared.oCounterIconFilled : AppearanceManager.shared.oCounterIcon)
                         .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
                         .foregroundColor(.white.opacity(oCounter > 0 ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
                     Text("\(oCounter)")
-                        .font(.subheadline.weight(.semibold))
+                        .font(.caption2.weight(.semibold))
                         .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
                 }
                 .opacity(currentItem == nil ? 0.35 : 1.0)
-                .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
+                .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
             }
             .buttonStyle(.plain)
             .disabled(currentItem == nil)
@@ -4197,26 +4353,26 @@ struct ReelsViewBody: View {
                             }
                         }
                     } label: {
-                        HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                        VStack(spacing: 2) {
                             Image(systemName: "star.fill")
                                 .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
                                 .foregroundColor(.white.opacity(stars > 0 ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
                             Text("\(stars)")
-                                .font(.subheadline.weight(.semibold))
+                                .font(.caption2.weight(.semibold))
                                 .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
                         }
-                        .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
+                        .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
                     }
                     .buttonStyle(.plain)
                 } else {
-                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                    VStack(spacing: 2) {
                         Image(systemName: "star.fill")
                             .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
                         Text("0")
-                            .font(.subheadline.weight(.semibold))
+                            .font(.caption2.weight(.semibold))
                     }
                     .foregroundColor(.white.opacity(0.35))
-                    .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight))
+                    .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
                 }
             }
             .accessibilityLabel("Rating")
@@ -4245,156 +4401,140 @@ struct ReelsViewBody: View {
             if let item = currentItem {
                 // Own row above the performer line — the circles used to sit inside it and
                 // squeezed the title/tag column on narrow screens.
-                HStack(spacing: 8) {
-                    Spacer(minLength: 0)
-                    ChromeCircleButton(
-                        systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                        enabled: isVideo,
-                        accessibilityLabel: isMuted ? "Ton an" : "Stumm"
-                    ) {
-                        if isVideo {
-                            isMuted.toggle()
-                            ScenePlayerMute.persist(isMuted)
-                        }
-                    }
-
-                    ChromeCircleButton(
-                        systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
-                        enabled: isVideo,
-                        accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
-                    ) {
-                        if isVideo { currentItemIsPlaying.toggle() }
-                    }
-                }
-                .padding(.horizontal, StashyExpandingDock.edgePadding)
-                .padding(.bottom, 8)
-
-                HStack(alignment: .center, spacing: 10) {
-                    if let performer = item.performers.first {
-                        NavigationLink(
-                            destination: PerformerDetailView(
-                                performer: performer.toPerformer(),
-                                // Clips (and Pics) are image feeds — open the Images tab, not Galleries/Scenes.
-                                initialTab: (reelsMode == .clips || reelsMode == .pics) ? .images : nil
-                            )
-                        ) {
-                            performerThumbnail(performer)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            if let performer = item.performers.first {
-                                Button(action: { applyPerformerFilter(performer) }) {
-                                    Text(performer.name)
-                                        .font(.system(size: 15, weight: .bold))
-                                        .foregroundColor(.white)
-                                }
-                                .buttonStyle(.plain)
-                                .layoutPriority(1)
-                                Text("-")
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.6))
+                // Avatar · (name - title / tags) on the leading side, the control stack trailing.
+                HStack(alignment: .bottom, spacing: 8) {
+                    HStack(alignment: .center, spacing: 10) {
+                        if let performer = item.performers.first {
+                            NavigationLink(
+                                destination: PerformerDetailView(
+                                    performer: performer.toPerformer(),
+                                    // Clips (and Pics) are image feeds — open the Images tab, not Galleries/Scenes.
+                                    initialTab: (reelsMode == .clips || reelsMode == .pics) ? .images : nil
+                                )
+                            ) {
+                                performerThumbnail(performer)
                             }
-                            if let title = item.title, !title.isEmpty {
-                                if let scene = item.underlyingScene {
-                                    NavigationLink(destination: SceneDetailView(scene: scene)) {
-                                        Text(title)
-                                            .font(.system(size: 15, weight: .medium))
-                                            .foregroundColor(.white.opacity(0.85))
-                                            .lineLimit(1)
-                                    }
-                                    .buttonStyle(.plain)
-                                } else {
-                                    Text(title)
-                                        .font(.system(size: 15, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.85))
-                                        .lineLimit(1)
-                                }
-                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(performer.name)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                        let tags = item.tags
-                        // Tag Suggestion (stashy+, off by default) shares this row, so
-                        // it also has to exist for an untagged clip.
-                        let showsTagRow = !tags.isEmpty
-                            || appearanceManager.isEditModeEnabled
-                            || AITagSuggestionManager.shared.isActive
-                        Group {
-                            if showsTagRow {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 6) {
-                                        ForEach(tags) { tag in
-                                            Button(action: {
-                                                var newTags = selectedTags
-                                                if newTags.contains(where: { $0.id == tag.id }) {
-                                                    newTags.removeAll { $0.id == tag.id }
-                                                } else {
-                                                    newTags.append(tag)
+                        VStack(alignment: .leading, spacing: 4) {
+                            reelsNameTitleLine(item: item)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+
+                            let tags = item.tags
+                            // Tag Suggestion (stashy+, off by default) shares this row, so
+                            // it also has to exist for an untagged clip.
+                            let showsTagRow = !tags.isEmpty
+                                || appearanceManager.isEditModeEnabled
+                                || AITagSuggestionManager.shared.isActive
+                            Group {
+                                if showsTagRow {
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 6) {
+                                            ForEach(tags) { tag in
+                                                Button(action: {
+                                                    var newTags = selectedTags
+                                                    if newTags.contains(where: { $0.id == tag.id }) {
+                                                        newTags.removeAll { $0.id == tag.id }
+                                                    } else {
+                                                        newTags.append(tag)
+                                                    }
+                                                    applyTagsChange(newTags)
+                                                }) {
+                                                    Text("#\(tag.name)")
+                                                        .font(.system(size: 11, weight: .semibold))
+                                                        .foregroundColor(.white.opacity(0.8))
+                                                        .padding(.horizontal, 8)
+                                                        .padding(.vertical, 3)
+                                                        .background(Color.black.opacity(0.3))
+                                                        .clipShape(Capsule())
+                                                        .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
                                                 }
-                                                applyTagsChange(newTags)
-                                            }) {
-                                                Text("#\(tag.name)")
-                                                    .font(.system(size: 11, weight: .semibold))
-                                                    .foregroundColor(.white.opacity(0.8))
-                                                    .padding(.horizontal, 8)
-                                                    .padding(.vertical, 3)
-                                                    .background(Color.black.opacity(0.3))
-                                                    .clipShape(Capsule())
-                                                    .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
-                                            }
-                                            .buttonStyle(.plain)
-                                            .contextMenu {
-                                                let target = item.aiTagTarget
-                                                if appearanceManager.isEditModeEnabled,
-                                                   tag.id != target.primaryTagId {
-                                                    Button(role: .destructive) {
-                                                        removeTag(tag, from: target)
-                                                    } label: {
-                                                        Label("Remove tag", systemImage: "trash")
+                                                .buttonStyle(.plain)
+                                                .contextMenu {
+                                                    let target = item.aiTagTarget
+                                                    if appearanceManager.isEditModeEnabled,
+                                                       tag.id != target.primaryTagId {
+                                                        Button(role: .destructive) {
+                                                            removeTag(tag, from: target)
+                                                        } label: {
+                                                            Label("Remove tag", systemImage: "trash")
+                                                        }
                                                     }
                                                 }
                                             }
-                                        }
 
-                                        if appearanceManager.isEditModeEnabled {
-                                            Button {
-                                                tagEditorTarget = item.aiTagTarget
-                                            } label: {
-                                                // A bare symbol is shorter than a line
-                                                // of text, which made this pill smaller
-                                                // than the tag chips beside it.
-                                                Image(systemName: "plus")
-                                                    .font(.system(size: 11, weight: .bold))
-                                                    .frame(height: tagChipGlyphHeight)
-                                                    .foregroundColor(.white.opacity(0.8))
-                                                    .padding(.horizontal, 8)
-                                                    .padding(.vertical, 3)
-                                                    .background(Color.black.opacity(0.3))
-                                                    .clipShape(Capsule())
-                                                    .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                                            if appearanceManager.isEditModeEnabled {
+                                                Button {
+                                                    tagEditorTarget = item.aiTagTarget
+                                                } label: {
+                                                    // A bare symbol is shorter than a line
+                                                    // of text, which made this pill smaller
+                                                    // than the tag chips beside it.
+                                                    Image(systemName: "plus")
+                                                        .font(.system(size: 11, weight: .bold))
+                                                        .frame(height: tagChipGlyphHeight)
+                                                        .foregroundColor(.white.opacity(0.8))
+                                                        .padding(.horizontal, 8)
+                                                        .padding(.vertical, 3)
+                                                        .background(Color.black.opacity(0.3))
+                                                        .clipShape(Capsule())
+                                                        .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                                                }
+                                                .buttonStyle(.plain)
+                                                .accessibilityLabel("Add tags")
                                             }
-                                            .buttonStyle(.plain)
-                                            .accessibilityLabel("Add tags")
-                                        }
 
-                                        // Tag Suggestion (stashy+, off by default).
-                                        AITagSuggestionBar(target: item.aiTagTarget) { _ in }
+                                            // Tag Suggestion (stashy+, off by default).
+                                            AITagSuggestionBar(target: item.aiTagTarget) { _ in }
+                                        }
                                     }
+                                    // Fresh identity per item: without it SwiftUI reuses the
+                                    // row and the next clip inherits however far the previous
+                                    // one was scrolled sideways.
+                                    .id(item.id)
+                                } else {
+                                    Color.clear.opacity(0)
                                 }
-                                // Fresh identity per item: without it SwiftUI reuses the
-                                // row and the next clip inherits however far the previous
-                                // one was scrolled sideways.
-                                .id(item.id)
-                            } else {
-                                Color.clear.opacity(0)
+                            }
+                            .frame(height: 22)
+                        }
+                    }
+                    Spacer(minLength: 8)
+
+                    // O-Counter · Rating · Mute · Play stacked on the trailing edge.
+                    VStack(alignment: .trailing, spacing: 8) {
+                        if reelsMode != .pics {
+                            reelsRateChrome(currentItem: item)
+                        }
+
+                        if tabManager.reelsShowsDeleteButton, reelsItemSupportsDelete(item) {
+                            ChromePillIconButton(systemImage: "trash", accessibilityLabel: "Delete") {
+                                reelsItemToDelete = item
+                                showDeleteConfirmation = true
                             }
                         }
-                        .frame(height: 22)
-                    }
 
+                        ChromePillIconButton(
+                            systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                            enabled: isVideo,
+                            accessibilityLabel: isMuted ? "Ton an" : "Stumm"
+                        ) {
+                            if isVideo {
+                                isMuted.toggle()
+                                ScenePlayerMute.persist(isMuted)
+                            }
+                        }
+
+                        ChromePillIconButton(
+                            systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
+                            enabled: isVideo,
+                            accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
+                        ) {
+                            if isVideo { currentItemIsPlaying.toggle() }
+                        }
+                    }
                 }
                 .padding(.horizontal, StashyExpandingDock.edgePadding)
             }
@@ -4407,8 +4547,7 @@ struct ReelsViewBody: View {
     }
 
     @ViewBuilder
-    private func performerThumbnail(_ performer: ScenePerformer) -> some View {
-        let size: CGFloat = StashyExpandingDock.circleSize
+    private func performerThumbnail(_ performer: ScenePerformer, size: CGFloat = StashyExpandingDock.circleSize) -> some View {
         Circle()
             .fill(appearanceManager.tintColor.opacity(0.2))
             .frame(width: size, height: size)

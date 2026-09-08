@@ -439,6 +439,12 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(isPiPEnabled, forKey: isPiPEnabledKey)
         }
     }
+    /// Feeds overlay: optional delete button between Rating and Mute.
+    @Published var reelsShowsDeleteButton: Bool = false {
+        didSet {
+            UserDefaults.standard.set(reelsShowsDeleteButton, forKey: reelsShowsDeleteButtonKey)
+        }
+    }
     /// Allows live captions to pull a second low-res transcode ahead of the playhead.
     /// Costs extra server CPU, but is the only way to avoid recognition lag on transcoded scenes.
     @Published var isLiveCaptionLookaheadEnabled: Bool = true {
@@ -484,6 +490,7 @@ class TabManager: ObservableObject {
     private let reelsFillHeightKey = "ReelsFillHeight"
     private let reelsContinuousPlayKey = "ReelsContinuousPlay"
     private let isPiPEnabledKey = "isPiPEnabled"
+    private let reelsShowsDeleteButtonKey = "ReelsShowsDeleteButton"
     private let isLiveCaptionLookaheadKey = "isLiveCaptionLookaheadEnabled"
     private let dashboardHeroSizeKey = "DashboardHeroSize"
     private let useCompactStatisticsKey = "useCompactStatistics"
@@ -523,6 +530,7 @@ class TabManager: ObservableObject {
         self.reelsFillHeight = UserDefaults.standard.object(forKey: reelsFillHeightKey) as? Bool ?? true
         self.reelsContinuousPlay = UserDefaults.standard.bool(forKey: reelsContinuousPlayKey)
         self.isPiPEnabled = UserDefaults.standard.object(forKey: isPiPEnabledKey) as? Bool ?? true
+        self.reelsShowsDeleteButton = UserDefaults.standard.bool(forKey: reelsShowsDeleteButtonKey)
         self.isLiveCaptionLookaheadEnabled = UserDefaults.standard.object(forKey: isLiveCaptionLookaheadKey) as? Bool ?? true
         if let heroSizeRaw = UserDefaults.standard.string(forKey: dashboardHeroSizeKey),
            let heroSize = DashboardHeroSize(rawValue: heroSizeRaw) {

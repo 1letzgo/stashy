@@ -56,6 +56,7 @@ struct FeedsPlaybackSettingsCard: View {
         VStack(alignment: .leading, spacing: 16) {
             CatalogFilterSortToggleRow(label: "Immersive", isOn: $tabManager.reelsFillHeight)
             CatalogFilterSortToggleRow(label: "Continuous", isOn: $tabManager.reelsContinuousPlay)
+            CatalogFilterSortToggleRow(label: "Delete button", isOn: $tabManager.reelsShowsDeleteButton)
         }
     }
 }

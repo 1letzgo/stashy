@@ -1229,9 +1229,12 @@ private struct ScenesViewContent: View {
                 if let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes),
                    let newFilter = viewModel.savedFilters[defaultId] {
                     selectedFilter = newFilter
+                    // Keep the sheet's preset row in sync so the default shows as selected.
+                    liveSheetPresetSelection = SceneLivePresetTag.serverRow(newFilter.id)
                     syncLiveChipsToMatchSelectedFilter()
                 } else {
                     selectedFilter = nil
+                    liveSheetPresetSelection = ""
                 }
                 performSearch()
             }
@@ -1268,6 +1271,8 @@ private struct ScenesViewContent: View {
                    let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes),
                    let filter = newValue[defaultId] {
                     selectedFilter = filter
+                    // Keep the sheet's preset row in sync so the default shows as selected.
+                    liveSheetPresetSelection = SceneLivePresetTag.serverRow(filter.id)
                     syncLiveChipsToMatchSelectedFilter()
                     // Only fetch if we don't have scenes yet (e.g., initial app load)
                     if primarySceneListIsEmpty {

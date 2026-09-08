@@ -1476,6 +1476,112 @@ struct FullScreenImageView: View {
         }
     }
 
+    /// "Name - Title" on one line, plain text. Name opens the performer detail.
+    @ViewBuilder
+    private func fullScreenNameTitleLine(image: StashImage) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 6) {
+            if let performer = image.performers?.first {
+                NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer())) {
+                    Text(performer.name)
+                        .font(.system(size: 15, weight: .bold))
+                        .foregroundColor(.white)
+                        .lineLimit(1)
+                }
+                .buttonStyle(.plain)
+                .layoutPriority(1)
+                Text("-")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(.white.opacity(0.6))
+            }
+            fullScreenTitleText(image: image)
+        }
+    }
+
+    @ViewBuilder
+    private func fullScreenTitleText(image: StashImage) -> some View {
+        if let title = image.title, !title.isEmpty {
+            Text(title)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundColor(.white.opacity(0.85))
+                .lineLimit(1)
+        } else if let gallery = image.galleries?.first {
+            let galleryObj = Gallery(
+                id: gallery.id,
+                title: gallery.title ?? "Gallery",
+                date: nil, details: nil, imageCount: nil, organized: nil,
+                createdAt: nil, updatedAt: nil, studio: nil, performers: nil, cover: nil
+            )
+            NavigationLink(destination: ImagesView(gallery: galleryObj)) {
+                Text(gallery.title ?? "Unknown Gallery")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundColor(.white.opacity(0.85))
+                    .lineLimit(1)
+            }
+            .buttonStyle(.plain)
+        }
+    }
+
+    /// O-Counter · Rating pills, leading in the mute/play row (mirrors `ReelsView.reelsRateChrome`).
+    @ViewBuilder
+    private func fullScreenRateChrome(image: StashImage) -> some View {
+        let oCounter = image.o_counter ?? 0
+        let rating100 = image.rating100 ?? 0
+        let stars = max(0, min(5, Int(round(Double(rating100) / 20.0))))
+
+        VStack(alignment: .trailing, spacing: 8) {
+            Button {
+                incrementCurrentOCounter()
+            } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: oCounter > 0 ? AppearanceManager.shared.oCounterIconFilled : AppearanceManager.shared.oCounterIcon)
+                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        .foregroundColor(oCounter > 0 ? appearanceManager.tintColor : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                    Text("\(oCounter)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                }
+                .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("O-Counter")
+
+            Menu {
+                Button {
+                    updateCurrentRating(0)
+                } label: {
+                    HStack {
+                        Text("Clear Rating")
+                        if stars == 0 { Image(systemName: "checkmark") }
+                    }
+                }
+                Divider()
+                ForEach(1...5, id: \.self) { s in
+                    Button {
+                        updateCurrentRating(s * 20)
+                    } label: {
+                        HStack {
+                            Text(String(repeating: "★", count: s))
+                            if stars == s { Image(systemName: "checkmark") }
+                        }
+                    }
+                }
+            } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        .foregroundColor(.white.opacity(stars > 0 ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
+                    Text("\(stars)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                }
+                .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Rating")
+        }
+        .fixedSize()
+    }
+
     /// Matches `ReelsView.reelsInfoOverlay` 1:1 (thumbnail · name - title · tags · mute/play).
     @ViewBuilder
     private func feedsStyleInfoOverlay(currentImage: StashImage?) -> some View {
@@ -1483,144 +1589,115 @@ struct FullScreenImageView: View {
         VStack(alignment: .leading, spacing: 0) {
             if let image = currentImage {
                 // Own row above the performer line — mirrors `ReelsView.reelsInfoOverlay`.
-                HStack(spacing: 8) {
-                    Spacer(minLength: 0)
-                    ChromeCircleButton(
-                        systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                        enabled: isVideo,
-                        accessibilityLabel: isMuted ? "Ton an" : "Stumm"
-                    ) {
-                        if isVideo {
-                            isMuted.toggle()
-                            ScenePlayerMute.persist(isMuted)
-                        }
-                    }
-
-                    ChromeCircleButton(
-                        systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
-                        enabled: isVideo,
-                        accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
-                    ) {
-                        if isVideo { currentItemIsPlaying.toggle() }
-                    }
-                }
-                .padding(.horizontal, StashyExpandingDock.edgePadding)
-                .padding(.bottom, 8)
-
-                HStack(alignment: .center, spacing: 10) {
-                    if let performer = image.performers?.first {
-                        NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer())) {
-                            feedsPerformerThumbnail(performer)
-                        }
-                        .buttonStyle(.plain)
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                        HStack(alignment: .firstTextBaseline, spacing: 6) {
-                            if let performer = image.performers?.first {
-                                NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer())) {
-                                    Text(performer.name)
-                                        .font(.system(size: 15, weight: .bold))
-                                        .foregroundColor(.white)
-                                }
-                                .buttonStyle(.plain)
-                                .layoutPriority(1)
-                                Text("-")
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.6))
+                // Avatar · (name - title / tags) on the leading side, the control stack trailing.
+                HStack(alignment: .bottom, spacing: 8) {
+                    HStack(alignment: .center, spacing: 10) {
+                        if let performer = image.performers?.first {
+                            NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer())) {
+                                feedsPerformerThumbnail(performer)
                             }
-                            if let title = image.title, !title.isEmpty {
-                                Text(title)
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.85))
-                                    .lineLimit(1)
-                            } else if let gallery = image.galleries?.first {
-                                let galleryObj = Gallery(
-                                    id: gallery.id,
-                                    title: gallery.title ?? "Gallery",
-                                    date: nil, details: nil, imageCount: nil, organized: nil,
-                                    createdAt: nil, updatedAt: nil, studio: nil, performers: nil, cover: nil
-                                )
-                                NavigationLink(destination: ImagesView(gallery: galleryObj)) {
-                                    Text(gallery.title ?? "Unknown Gallery")
-                                        .font(.system(size: 15, weight: .medium))
-                                        .foregroundColor(.white.opacity(0.85))
-                                        .lineLimit(1)
-                                }
-                                .buttonStyle(.plain)
-                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(performer.name)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                        let tags = image.tags ?? []
-                        // Tag Suggestion (stashy+, off by default) and the manual "+"
-                        // share this row, so it also has to exist for an untagged item.
-                        let showsTagRow = !tags.isEmpty
-                            || appearanceManager.isEditModeEnabled
-                            || AITagSuggestionManager.shared.isActive
-                        Group {
-                            if showsTagRow {
-                                ScrollView(.horizontal, showsIndicators: false) {
-                                    HStack(spacing: 6) {
-                                        ForEach(tags) { tag in
-                                            Text("#\(tag.name)")
-                                                .font(.system(size: 11, weight: .semibold))
-                                                .foregroundColor(.white.opacity(0.8))
-                                                .padding(.horizontal, 8)
-                                                .padding(.vertical, 3)
-                                                .background(Color.black.opacity(0.3))
-                                                .clipShape(Capsule())
-                                                .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
-                                                .contextMenu {
-                                                    if appearanceManager.isEditModeEnabled {
-                                                        Button(role: .destructive) {
-                                                            removeTag(tag, from: image)
-                                                        } label: {
-                                                            Label("Remove tag", systemImage: "trash")
-                                                        }
-                                                    }
-                                                }
-                                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            fullScreenNameTitleLine(image: image)
+                                .frame(maxWidth: .infinity, alignment: .leading)
 
-                                        if appearanceManager.isEditModeEnabled {
-                                            Button {
-                                                tagEditorImage = image
-                                            } label: {
-                                                // A bare symbol is shorter than a line of
-                                                // text, which made this pill smaller than
-                                                // the tag chips beside it.
-                                                Image(systemName: "plus")
-                                                    .font(.system(size: 11, weight: .bold))
-                                                    .frame(height: tagChipGlyphHeight)
+                            let tags = image.tags ?? []
+                            // Tag Suggestion (stashy+, off by default) and the manual "+"
+                            // share this row, so it also has to exist for an untagged item.
+                            let showsTagRow = !tags.isEmpty
+                                || appearanceManager.isEditModeEnabled
+                                || AITagSuggestionManager.shared.isActive
+                            Group {
+                                if showsTagRow {
+                                    ScrollView(.horizontal, showsIndicators: false) {
+                                        HStack(spacing: 6) {
+                                            ForEach(tags) { tag in
+                                                Text("#\(tag.name)")
+                                                    .font(.system(size: 11, weight: .semibold))
                                                     .foregroundColor(.white.opacity(0.8))
                                                     .padding(.horizontal, 8)
                                                     .padding(.vertical, 3)
                                                     .background(Color.black.opacity(0.3))
                                                     .clipShape(Capsule())
                                                     .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                                                    .contextMenu {
+                                                        if appearanceManager.isEditModeEnabled {
+                                                            Button(role: .destructive) {
+                                                                removeTag(tag, from: image)
+                                                            } label: {
+                                                                Label("Remove tag", systemImage: "trash")
+                                                            }
+                                                        }
+                                                    }
                                             }
-                                            .buttonStyle(.plain)
-                                            .accessibilityLabel("Add tags")
-                                        }
 
-                                        AITagSuggestionBar(target: .image(image)) { newTags in
-                                            if let position = images.firstIndex(where: { $0.id == image.id }) {
-                                                images[position] = images[position].withTags(newTags)
+                                            if appearanceManager.isEditModeEnabled {
+                                                Button {
+                                                    tagEditorImage = image
+                                                } label: {
+                                                    // A bare symbol is shorter than a line of
+                                                    // text, which made this pill smaller than
+                                                    // the tag chips beside it.
+                                                    Image(systemName: "plus")
+                                                        .font(.system(size: 11, weight: .bold))
+                                                        .frame(height: tagChipGlyphHeight)
+                                                        .foregroundColor(.white.opacity(0.8))
+                                                        .padding(.horizontal, 8)
+                                                        .padding(.vertical, 3)
+                                                        .background(Color.black.opacity(0.3))
+                                                        .clipShape(Capsule())
+                                                        .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                                                }
+                                                .buttonStyle(.plain)
+                                                .accessibilityLabel("Add tags")
+                                            }
+
+                                            AITagSuggestionBar(target: .image(image)) { newTags in
+                                                if let position = images.firstIndex(where: { $0.id == image.id }) {
+                                                    images[position] = images[position].withTags(newTags)
+                                                }
                                             }
                                         }
                                     }
+                                    // Fresh identity per image: without it SwiftUI reuses the
+                                    // row and the next picture inherits however far the
+                                    // previous one was scrolled sideways.
+                                    .id(image.id)
+                                } else {
+                                    Color.clear.opacity(0)
                                 }
-                                // Fresh identity per image: without it SwiftUI reuses the
-                                // row and the next picture inherits however far the
-                                // previous one was scrolled sideways.
-                                .id(image.id)
-                            } else {
-                                Color.clear.opacity(0)
+                            }
+                            .frame(height: 22)
+                        }
+                    }
+                    Spacer(minLength: 8)
+
+                    // O-Counter · Rating · Mute · Play stacked on the trailing edge.
+                    VStack(alignment: .trailing, spacing: 8) {
+                        fullScreenRateChrome(image: image)
+
+                        ChromePillIconButton(
+                            systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                            enabled: isVideo,
+                            accessibilityLabel: isMuted ? "Ton an" : "Stumm"
+                        ) {
+                            if isVideo {
+                                isMuted.toggle()
+                                ScenePlayerMute.persist(isMuted)
                             }
                         }
-                        .frame(height: 22)
-                    }
 
+                        ChromePillIconButton(
+                            systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
+                            enabled: isVideo,
+                            accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
+                        ) {
+                            if isVideo { currentItemIsPlaying.toggle() }
+                        }
+                    }
                 }
                 .padding(.horizontal, StashyExpandingDock.edgePadding)
             }
@@ -1663,8 +1740,7 @@ struct FullScreenImageView: View {
     }
 
     @ViewBuilder
-    private func feedsPerformerThumbnail(_ performer: GalleryPerformer) -> some View {
-        let size: CGFloat = StashyExpandingDock.circleSize
+    private func feedsPerformerThumbnail(_ performer: GalleryPerformer, size: CGFloat = StashyExpandingDock.circleSize) -> some View {
         Circle()
             .fill(appearanceManager.tintColor.opacity(0.2))
             .frame(width: size, height: size)
@@ -1693,9 +1769,6 @@ struct FullScreenImageView: View {
     @ViewBuilder
     private var fullScreenImageNavBar: some View {
         let image = currentImage
-        let oCounter = image?.o_counter ?? 0
-        let rating100 = image?.rating100 ?? 0
-        let stars = max(0, min(5, Int(round(Double(rating100) / 20.0))))
         let performers = image?.performers ?? []
 
         StashySectionChromeBar {
@@ -1709,6 +1782,7 @@ struct FullScreenImageView: View {
                         Text("Back")
                             .font(.subheadline.weight(.semibold))
                     }
+                    .fixedSize()
                     .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
                     .modifier(StashyChromePillStyle(height: chromePillHeight))
                 }
@@ -1717,109 +1791,58 @@ struct FullScreenImageView: View {
 
                 Spacer(minLength: 8)
 
-                HStack(spacing: 6) {
-                    // Share / download / performer image behind one menu — as separate pills they
-                    // squeezed the Back button into two lines.
-                    Menu {
-                        Button {
-                            shareCurrentImage()
-                        } label: {
-                            Label("Share", systemImage: "square.and.arrow.up")
-                        }
-
-                        if let image = currentImage {
-                            let entryId = "image-" + image.id
-                            let isDownloaded = downloadManager.isGalleryDownloaded(id: entryId)
-                            let isDownloading = downloadManager.activeDownloads[entryId] != nil
-                            Button {
-                                downloadManager.downloadImage(image)
-                            } label: {
-                                Label(
-                                    isDownloaded ? "Downloaded" : (isDownloading ? "Downloading…" : "Download"),
-                                    systemImage: isDownloaded ? "checkmark.circle.fill" : "arrow.down.doc"
-                                )
-                            }
-                            .disabled(isDownloaded || isDownloading)
-                        }
-
-                        if !performers.isEmpty {
-                            Button {
-                                performerImageTargetPerformers = performers
-                                showingSetPerformerImagePicker = true
-                            } label: {
-                                Label("Set as performer image", systemImage: "person.crop.circle.badge.plus")
-                            }
-                        }
-                    } label: {
-                        Image(systemName: "ellipsis")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                            .modifier(StashyChromePillStyle(height: chromePillHeight, iconOnly: true))
-                    }
-                    .accessibilityLabel("More actions")
-
-                    Button {
-                        showingDeleteConfirmation = true
-                    } label: {
-                        Image(systemName: "trash")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                            .modifier(StashyChromePillStyle(height: chromePillHeight, iconOnly: true))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Delete")
-
-                    Menu {
-                        Button {
-                            updateCurrentRating(0)
-                        } label: {
-                            HStack {
-                                Text("Clear Rating")
-                                if stars == 0 { Image(systemName: "checkmark") }
-                            }
-                        }
-                        Divider()
-                        ForEach(1...5, id: \.self) { s in
-                            Button {
-                                updateCurrentRating(s * 20)
-                            } label: {
-                                HStack {
-                                    Text(String(repeating: "★", count: s))
-                                    if stars == s { Image(systemName: "checkmark") }
-                                }
-                            }
-                        }
-                    } label: {
-                        HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                            Image(systemName: "star.fill")
-                                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                                .foregroundColor(.white.opacity(stars > 0 ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
-                            Text("\(stars)")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                        }
-                        .modifier(StashyChromePillStyle(height: chromePillHeight))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Rating")
-
-                    Button {
-                        incrementCurrentOCounter()
-                    } label: {
-                        HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
-                            Image(systemName: oCounter > 0 ? AppearanceManager.shared.oCounterIconFilled : AppearanceManager.shared.oCounterIcon)
-                                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                                .foregroundColor(oCounter > 0 ? appearanceManager.tintColor : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                            Text("\(oCounter)")
-                                .font(.subheadline.weight(.semibold))
-                                .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
-                        }
-                        .modifier(StashyChromePillStyle(height: chromePillHeight))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("O-Counter")
+                Button {
+                    shareCurrentImage()
+                } label: {
+                    Image(systemName: "square.and.arrow.up")
+                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                        .modifier(StashyChromePillStyle(height: chromePillHeight, iconOnly: true))
                 }
-                .layoutPriority(1)
+                .buttonStyle(.plain)
+                .accessibilityLabel("Share")
+
+                if let image = currentImage {
+                    let entryId = "image-" + image.id
+                    let isDownloaded = downloadManager.isGalleryDownloaded(id: entryId)
+                    let isDownloading = downloadManager.activeDownloads[entryId] != nil
+                    Button {
+                        downloadManager.downloadImage(image)
+                    } label: {
+                        Image(systemName: isDownloaded ? "checkmark.circle.fill" : (isDownloading ? "arrow.down.circle" : "arrow.down.doc"))
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                            .foregroundColor(isDownloaded ? appearanceManager.tintColor : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                            .modifier(StashyChromePillStyle(height: chromePillHeight, iconOnly: true))
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isDownloaded || isDownloading)
+                    .accessibilityLabel(isDownloaded ? "Downloaded" : (isDownloading ? "Downloading" : "Download"))
+                }
+
+                if !performers.isEmpty {
+                    Button {
+                        performerImageTargetPerformers = performers
+                        showingSetPerformerImagePicker = true
+                    } label: {
+                        Image(systemName: "person.crop.circle.badge.plus")
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                            .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                            .modifier(StashyChromePillStyle(height: chromePillHeight, iconOnly: true))
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Set as performer image")
+                }
+
+                Button {
+                    showingDeleteConfirmation = true
+                } label: {
+                    Image(systemName: "trash")
+                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                        .modifier(StashyChromePillStyle(height: chromePillHeight, iconOnly: true))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Delete")
             }
             .frame(height: chromePillHeight)
             .padding(.horizontal, StashyExpandingDock.edgePadding)

@@ -684,6 +684,26 @@ struct PaginationLoadingFooter: View {
 
 // MARK: - Circle chrome button (Dock-sized)
 
+/// Icon-only capsule pill in the same style as the Rating / O-Counter pills (Feeds, image fullscreen).
+struct ChromePillIconButton: View {
+    let systemImage: String
+    var enabled: Bool = true
+    var accessibilityLabel: String? = nil
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                .foregroundColor(enabled ? StashyExpandingDock.hashtagForeground : .white.opacity(0.35))
+                .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
+        }
+        .buttonStyle(.plain)
+        .disabled(!enabled)
+        .accessibilityLabel(accessibilityLabel ?? systemImage)
+    }
+}
+
 struct ChromeCircleButton: View {
     let systemImage: String
     var enabled: Bool = true
