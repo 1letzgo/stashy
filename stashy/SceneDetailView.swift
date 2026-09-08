@@ -927,7 +927,11 @@ struct SceneDetailView: View {
             }
 
             aetherEngine = engine
-            Task { await engine.load(url: url, startAt: resumeTarget, autoplay: true) }
+            let scene = activeScene
+            Task {
+                await engine.load(url: url, startAt: resumeTarget, autoplay: true)
+                registerAetherCaptions(on: engine, scene: scene)
+            }
         } else if let resumeTarget, let engine = aetherEngine {
             Task { await engine.seek(to: resumeTarget) }
         }
@@ -954,6 +958,25 @@ struct SceneDetailView: View {
             registerScenePlay()
         }
         return true
+    }
+
+    /// Stash's server captions as selectable external subtitle tracks on the engine. Nothing is
+    /// auto-selected — the user picks from the Audio & Subtitles menu.
+    private func registerAetherCaptions(on engine: AetherSceneEngine, scene: Scene) {
+        guard let captions = scene.captions, !captions.isEmpty else { return }
+        for caption in captions {
+            guard let url = SubtitleController.captionURL(for: caption, scene: scene) else { continue }
+            let language = caption.languageCode.isEmpty || caption.languageCode == "00"
+                ? nil
+                : caption.languageCode
+            let name = language.flatMap { Locale.current.localizedString(forIdentifier: $0) }
+                ?? language?.uppercased()
+                ?? "Captions"
+            engine.addExternalSubtitleTrack(url: url,
+                                            name: name,
+                                            language: language,
+                                            formatHint: caption.captionType)
+        }
     }
 
     /// Aether counterpart of `handleTimeControlStatusChange`, without the AVPlayer-bound

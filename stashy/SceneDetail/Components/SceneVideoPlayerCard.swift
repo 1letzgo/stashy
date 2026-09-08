@@ -568,9 +568,10 @@ struct SceneDetailMetadataCard: View {
                 }
                 Spacer(minLength: 4)
                 qualityMenu
-                if let aether = aetherEngine, aether.audioTracks.count > 1 {
+                if let aether = aetherEngine,
+                   aether.audioTracks.count > 1 || !aether.subtitleTracks.isEmpty {
                     Spacer(minLength: 4)
-                    AetherAudioTrackMenu(engine: aether)
+                    AetherAudioSubtitleMenu(engine: aether)
                 }
                 if aetherEngine == nil, activeScene.hasCaptions {
                     Spacer(minLength: 4)
@@ -1267,29 +1268,61 @@ struct SceneDetailMetadataCard: View {
     private static var cachedSpeechLanguageOptions: [(id: String, label: String)]?
 }
 
-/// Audio-track picker for the optional playback engine. Its own view so the pill follows
-/// the engine's published track list without the whole metadata card observing it.
-private struct AetherAudioTrackMenu: View {
+/// Audio + subtitle picker for the optional playback engine. Its own view so the pill follows
+/// the engine's published track lists without the whole metadata card observing it.
+private struct AetherAudioSubtitleMenu: View {
     @ObservedObject var engine: AetherSceneEngine
 
     var body: some View {
         Menu {
-            ForEach(engine.audioTracks) { track in
-                Button {
-                    engine.selectAudioTrack(index: track.id)
-                } label: {
-                    Label {
-                        Text(label(for: track))
-                    } icon: {
-                        if engine.activeAudioTrackIndex == track.id {
-                            Image(systemName: "checkmark")
+            if engine.audioTracks.count > 1 {
+                Section("Audio") {
+                    ForEach(engine.audioTracks) { track in
+                        Button {
+                            engine.selectAudioTrack(index: track.id)
+                        } label: {
+                            Label {
+                                Text(AetherTrackLabel.audio(track))
+                            } icon: {
+                                if engine.activeAudioTrackIndex == track.id {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if !engine.subtitleTracks.isEmpty {
+                Section("Subtitles") {
+                    Button {
+                        engine.clearSubtitle()
+                    } label: {
+                        Label {
+                            Text("Off")
+                        } icon: {
+                            if engine.activeSubtitleTrackIndex == nil {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                    ForEach(engine.subtitleTracks) { track in
+                        Button {
+                            engine.selectSubtitleTrack(index: track.id)
+                        } label: {
+                            Label {
+                                Text(AetherTrackLabel.subtitle(track))
+                            } icon: {
+                                if engine.activeSubtitleTrackIndex == track.id {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
                         }
                     }
                 }
             }
         } label: {
             HStack(spacing: 4) {
-                Image(systemName: "waveform")
+                Image(systemName: "text.bubble")
                     .font(.system(size: 10, weight: .bold))
                 Text(activeLabel)
                     .font(.system(size: 10, weight: .bold))
@@ -1302,33 +1335,16 @@ private struct AetherAudioTrackMenu: View {
             .foregroundColor(.orange)
             .clipShape(Capsule())
         }
-        .accessibilityLabel("Audio track")
+        .accessibilityLabel("Audio and subtitles")
     }
 
     private var activeLabel: String {
         guard let active = engine.activeAudioTrackIndex,
-              let track = engine.audioTracks.first(where: { $0.id == active }) else {
-            return "Audio"
+              let track = engine.audioTracks.first(where: { $0.id == active }),
+              engine.audioTracks.count > 1 else {
+            return engine.audioTracks.count > 1 ? "Audio" : "Subtitles"
         }
-        return shortLabel(for: track)
-    }
-
-    private func shortLabel(for track: TrackInfo) -> String {
-        if let language = track.language, !language.isEmpty { return language.uppercased() }
-        if !track.name.isEmpty { return track.name }
-        return "Audio"
-    }
-
-    private func label(for track: TrackInfo) -> String {
-        var parts: [String] = []
-        if !track.name.isEmpty {
-            parts.append(track.name)
-        } else if let language = track.language, !language.isEmpty {
-            parts.append(language.uppercased())
-        }
-        if !track.codec.isEmpty { parts.append(track.codec.uppercased()) }
-        if track.channels > 0 { parts.append("\(track.channels)ch") }
-        return parts.isEmpty ? "Audio" : parts.joined(separator: " · ")
+        return AetherTrackLabel.short(track)
     }
 }
 

@@ -51,6 +51,8 @@ struct AetherSceneSurface: View {
                 errorLabel(message)
             }
 
+            subtitleOverlay
+
             transportOverlay
 
             #if DEBUG
@@ -122,6 +124,78 @@ struct AetherSceneSurface: View {
         .allowsHitTesting(false)
     }
 
+    // MARK: - Subtitles
+
+    /// The engine draws nothing itself: the host renders the cue covering the current source time.
+    @ViewBuilder
+    private var subtitleOverlay: some View {
+        ZStack {
+            if let bitmap = engine.currentSubtitleImage {
+                subtitleImage(bitmap)
+            }
+            if let text = engine.currentSubtitleText, !text.isEmpty {
+                VStack {
+                    Spacer()
+                    Text(text)
+                        .font(.system(size: 16, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .multilineTextAlignment(.center)
+                        .lineLimit(3)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(Color.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                        .padding(.horizontal, 16)
+                        .padding(.bottom, 14)
+                        .transition(.opacity)
+                }
+            }
+        }
+        .allowsHitTesting(false)
+    }
+
+    /// Bitmap cues carry a [0, 1] rect against their own composition canvas, so they are mapped
+    /// onto the aspect-fitted video rect. An empty rect falls back to bottom-centre.
+    @ViewBuilder
+    private func subtitleImage(_ cue: AetherSubtitleImageCue) -> some View {
+        GeometryReader { geo in
+            let aspect: CGFloat? = (cue.canvasSize.width > 0 && cue.canvasSize.height > 0)
+                ? cue.canvasSize.width / cue.canvasSize.height
+                : nil
+            let rect = Self.videoRect(in: geo.size, aspect: aspect)
+            let image = Image(decorative: cue.image, scale: 1)
+
+            if cue.position.width > 0, cue.position.height > 0 {
+                image
+                    .resizable()
+                    .frame(width: max(1, rect.width * cue.position.width),
+                           height: max(1, rect.height * cue.position.height))
+                    .position(x: rect.minX + rect.width * cue.position.midX,
+                              y: rect.minY + rect.height * cue.position.midY)
+            } else {
+                image
+                    .resizable()
+                    .scaledToFit()
+                    .frame(maxWidth: rect.width, maxHeight: rect.height * 0.3)
+                    .position(x: rect.midX, y: rect.maxY - rect.height * 0.16)
+            }
+        }
+    }
+
+    /// Aspect-fit rect for the video inside the surface; without a known aspect the surface itself is it.
+    private static func videoRect(in size: CGSize, aspect: CGFloat?) -> CGRect {
+        guard let aspect, aspect > 0, size.width > 0, size.height > 0 else {
+            return CGRect(origin: .zero, size: size)
+        }
+        let containerAspect = size.width / size.height
+        if containerAspect > aspect {
+            let width = size.height * aspect
+            return CGRect(x: (size.width - width) / 2, y: 0, width: width, height: size.height)
+        } else {
+            let height = size.width / aspect
+            return CGRect(x: 0, y: (size.height - height) / 2, width: size.width, height: height)
+        }
+    }
+
     // MARK: - Transport
 
     @ViewBuilder
@@ -154,21 +228,93 @@ struct AetherSceneSurface: View {
                 }
             }
 
-            // Always reachable, unlike the auto-hiding transport: the engine surface has no
-            // system transport bar, so mute would otherwise be unavailable.
+            // Same auto-hiding group as play/pause and the time bar: one tap brings the whole
+            // transport back, and it all leaves together.
             VStack {
-                HStack(spacing: 8) {
-                    Spacer()
-                    if pip.isAvailable, tabManager.isPiPEnabled, AVPictureInPictureController.isPictureInPictureSupported() {
-                        pipButton
+                if areControlsVisible {
+                    HStack(spacing: 8) {
+                        Spacer()
+                        if hasTrackChoices {
+                            tracksMenu
+                        }
+                        if pip.isAvailable, tabManager.isPiPEnabled, AVPictureInPictureController.isPictureInPictureSupported() {
+                            pipButton
+                        }
+                        muteButton
                     }
-                    muteButton
+                    .padding(.trailing, 10)
+                    .padding(.top, 10)
+                    .transition(.opacity)
                 }
-                .padding(.trailing, 10)
-                .padding(.top, 10)
                 Spacer()
             }
         }
+    }
+
+    private var hasTrackChoices: Bool {
+        engine.audioTracks.count > 1 || !engine.subtitleTracks.isEmpty
+    }
+
+    /// One button for both track kinds: a flat menu with an Audio and a Subtitles section.
+    @ViewBuilder
+    private var tracksMenu: some View {
+        Menu {
+            if engine.audioTracks.count > 1 {
+                Section("Audio") {
+                    ForEach(engine.audioTracks) { track in
+                        Button {
+                            engine.selectAudioTrack(index: track.id)
+                            revealControls()
+                        } label: {
+                            Label {
+                                Text(AetherTrackLabel.audio(track))
+                            } icon: {
+                                if engine.activeAudioTrackIndex == track.id {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            if !engine.subtitleTracks.isEmpty {
+                Section("Subtitles") {
+                    Button {
+                        engine.clearSubtitle()
+                        revealControls()
+                    } label: {
+                        Label {
+                            Text("Off")
+                        } icon: {
+                            if engine.activeSubtitleTrackIndex == nil {
+                                Image(systemName: "checkmark")
+                            }
+                        }
+                    }
+                    ForEach(engine.subtitleTracks) { track in
+                        Button {
+                            engine.selectSubtitleTrack(index: track.id)
+                            revealControls()
+                        } label: {
+                            Label {
+                                Text(AetherTrackLabel.subtitle(track))
+                            } icon: {
+                                if engine.activeSubtitleTrackIndex == track.id {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        } label: {
+            Image(systemName: "text.bubble")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(8)
+                .background(Color.black.opacity(0.4), in: Circle())
+        }
+        .accessibilityLabel("Audio and subtitles")
     }
 
     @ViewBuilder
@@ -325,6 +471,44 @@ struct AetherSceneSurface: View {
         return h > 0
             ? String(format: "%d:%02d:%02d", h, m, s)
             : String(format: "%d:%02d", m, s)
+    }
+}
+
+// MARK: - Track labels
+
+/// Shared naming for the engine's audio and subtitle tracks, so the transport overlay and the
+/// metadata pill never disagree about what a track is called.
+enum AetherTrackLabel {
+    static func audio(_ track: TrackInfo) -> String {
+        var parts: [String] = []
+        if !track.name.isEmpty {
+            parts.append(track.name)
+        } else if let language = track.language, !language.isEmpty {
+            parts.append(language.uppercased())
+        }
+        if !track.codec.isEmpty { parts.append(track.codec.uppercased()) }
+        if track.channels > 0 { parts.append("\(track.channels)ch") }
+        return parts.isEmpty ? "Audio" : parts.joined(separator: " · ")
+    }
+
+    static func subtitle(_ track: TrackInfo) -> String {
+        var name = track.name
+        if name.isEmpty, let language = track.language, !language.isEmpty {
+            name = language.uppercased()
+        }
+        if name.isEmpty { name = "Subtitles" }
+        var suffixes: [String] = []
+        if track.isForced { suffixes.append("Forced") }
+        if track.isHearingImpaired { suffixes.append("SDH") }
+        if track.isExternal { suffixes.append("External") }
+        return suffixes.isEmpty ? name : "\(name) · \(suffixes.joined(separator: " · "))"
+    }
+
+    /// Compact pill caption for the current selection.
+    static func short(_ track: TrackInfo) -> String {
+        if let language = track.language, !language.isEmpty { return language.uppercased() }
+        if !track.name.isEmpty { return track.name }
+        return "Audio"
     }
 }
 

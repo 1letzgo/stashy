@@ -13,7 +13,25 @@
 import Foundation
 import Combine
 import AVFoundation
+import CoreGraphics
 import AetherEngine
+
+/// A bitmap subtitle cue resolved for the current playhead. Deliberately a local value type:
+/// the app already owns a `SubtitleCue` (the AVPlayer caption path), so the engine's cue type
+/// never leaves this file.
+struct AetherSubtitleImageCue {
+    let image: CGImage
+    /// Normalized [0, 1] rect against the subtitle canvas.
+    let position: CGRect
+    /// Coded canvas the position is normalized against; `.zero` when unknown.
+    let canvasSize: CGSize
+}
+
+extension AetherSubtitleImageCue: Equatable {
+    static func == (lhs: AetherSubtitleImageCue, rhs: AetherSubtitleImageCue) -> Bool {
+        lhs.image === rhs.image && lhs.position == rhs.position && lhs.canvasSize == rhs.canvasSize
+    }
+}
 
 @MainActor
 final class AetherSceneEngine: ObservableObject {
@@ -33,6 +51,14 @@ final class AetherSceneEngine: ObservableObject {
     @Published private(set) var errorMessage: String?
     @Published private(set) var audioTracks: [TrackInfo] = []
     @Published private(set) var activeAudioTrackIndex: Int?
+    /// Embedded text/bitmap streams, sidecar files and live renditions in one list.
+    @Published private(set) var subtitleTracks: [TrackInfo] = []
+    @Published private(set) var activeSubtitleTrackIndex: Int?
+    @Published private(set) var isSubtitleActive: Bool = false
+    /// The text of the cue covering the current source time, already flattened from rich text.
+    @Published private(set) var currentSubtitleText: String?
+    /// The bitmap cue covering the current source time (PGS / DVB / DVD tracks).
+    @Published private(set) var currentSubtitleImage: AetherSubtitleImageCue?
     /// Non-nil only on a route that actually owns an AVPlayerLayer (PiP).
     @Published private(set) var pipPlayerLayer: AVPlayerLayer?
 
@@ -153,6 +179,67 @@ final class AetherSceneEngine: ObservableObject {
             .sink { [weak self] index in self?.activeAudioTrackIndex = index }
             .store(in: &cancellables)
 
+        engine.$subtitleTracks
+            .receive(on: RunLoop.main)
+            .sink { [weak self] tracks in self?.subtitleTracks = tracks }
+            .store(in: &cancellables)
+
+        engine.$activeSubtitleTrackIndex
+            .receive(on: RunLoop.main)
+            .sink { [weak self] index in
+                guard let self else { return }
+                self.activeSubtitleTrackIndex = index
+                if index == nil {
+                    self.currentSubtitleText = nil
+                    self.currentSubtitleImage = nil
+                }
+            }
+            .store(in: &cancellables)
+
+        engine.$isSubtitleActive
+            .receive(on: RunLoop.main)
+            .sink { [weak self] active in
+                guard let self else { return }
+                self.isSubtitleActive = active
+                if !active {
+                    self.currentSubtitleText = nil
+                    self.currentSubtitleImage = nil
+                }
+            }
+            .store(in: &cancellables)
+
+        // `subtitleCues` is a rolling window of decoded cues, not the visible ones, and the cues
+        // carry raw source PTS — so they are resolved against `clock.sourceTime`, never `currentTime`.
+        engine.$subtitleCues
+            .combineLatest(engine.clock.$sourceTime)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] cues, sourceTime in
+                guard let self else { return }
+                guard self.isSubtitleActive, !cues.isEmpty else {
+                    if self.currentSubtitleText != nil { self.currentSubtitleText = nil }
+                    if self.currentSubtitleImage != nil { self.currentSubtitleImage = nil }
+                    return
+                }
+
+                var text: String?
+                var image: AetherSubtitleImageCue?
+                for cue in cues where cue.startTime <= sourceTime && sourceTime < cue.endTime {
+                    if case .image(let bitmap) = cue.body {
+                        image = AetherSubtitleImageCue(image: bitmap.cgImage,
+                                                       position: bitmap.position,
+                                                       canvasSize: bitmap.canvasSize)
+                    } else if let cueText = cue.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+                              !cueText.isEmpty {
+                        // Overlapping text cues stack; join instead of letting the last one win.
+                        text = text.map { "\($0)\n\(cueText)" } ?? cueText
+                    }
+                }
+
+                if self.currentSubtitleText != text { self.currentSubtitleText = text }
+                if self.currentSubtitleImage != image { self.currentSubtitleImage = image }
+            }
+            .store(in: &cancellables)
+
         engine.$errorInfo
             .receive(on: RunLoop.main)
             .sink { [weak self] info in
@@ -239,6 +326,8 @@ final class AetherSceneEngine: ObservableObject {
         didEnd = false
         hasFirstFrame = false
         errorMessage = nil
+        currentSubtitleText = nil
+        currentSubtitleImage = nil
         pendingSeek = nil
         loopSeekInFlight = false
         isLoading = true
@@ -311,6 +400,33 @@ final class AetherSceneEngine: ObservableObject {
         engine.selectAudioTrack(index: index)
     }
 
+    func selectSubtitleTrack(index: Int) {
+        engine.selectSubtitleTrack(index: index)
+    }
+
+    func clearSubtitle() {
+        engine.clearSubtitle()
+        currentSubtitleText = nil
+        currentSubtitleImage = nil
+    }
+
+    /// Registers a sidecar file (Stash's server captions) as a selectable track. Overlay-only —
+    /// tracks added after `load` never become native WebVTT renditions. Nothing is auto-selected.
+    @discardableResult
+    func addExternalSubtitleTrack(url: URL, name: String?, language: String?, formatHint: String? = nil) -> Int? {
+        var headers: [String: String]?
+        if let key = ServerConfigManager.shared.activeConfig?.secureApiKey, !key.isEmpty,
+           url.isFileURL == false {
+            headers = ["ApiKey": key]
+        }
+        let track = ExternalSubtitleTrack(url: url,
+                                          name: name,
+                                          language: language,
+                                          httpHeaders: headers,
+                                          formatHint: formatHint)
+        return engine.addExternalSubtitleTrack(track).id
+    }
+
     func setVideoGravity(_ gravity: AVLayerVideoGravity) {
         engine.videoGravity = gravity
     }
@@ -328,6 +444,8 @@ final class AetherSceneEngine: ObservableObject {
         currentURL = nil
         isPlaying = false
         hasFirstFrame = false
+        currentSubtitleText = nil
+        currentSubtitleImage = nil
     }
 }
 

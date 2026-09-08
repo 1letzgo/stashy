@@ -306,6 +306,22 @@ final class SubtitleController: ObservableObject {
         return URL(string: "\(config.baseURL)/scene/\(sceneID)/caption")
     }
 
+    /// Caption URL for a scene without needing a configured controller — the engine path
+    /// registers Stash's server captions as external subtitle tracks.
+    static func captionURL(for caption: VideoCaption, scene: Scene) -> URL? {
+        let base = resolveCaptionBaseURL(scene.paths?.caption)
+            ?? fallbackCaptionBaseURL(sceneID: scene.id)
+        guard let base, var components = URLComponents(url: base, resolvingAgainstBaseURL: false) else { return nil }
+        var items = (components.queryItems ?? []).filter {
+            let name = $0.name.lowercased()
+            return name != "lang" && name != "type" && name != "apikey"
+        }
+        items.append(URLQueryItem(name: "lang", value: caption.languageCode))
+        items.append(URLQueryItem(name: "type", value: caption.captionType))
+        components.queryItems = items
+        return signedURL(components.url)
+    }
+
     private static func parseCaptionFile(_ raw: String) -> [SubtitleCue] {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return [] }
