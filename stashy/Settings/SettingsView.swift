@@ -231,55 +231,40 @@ struct SettingsView: View {
                 }
                 .stashyGroupedSettingsRow()
             }
-
-            Section {
-                stashyScrollingSectionHeader("Playback Engine", isBeta: true)
-                Picker(selection: $tabManager.playerEnginePreference) {
-                    ForEach(PlayerEnginePreference.allCases) { preference in
-                        Text(preference.displayName).tag(preference)
-                    }
-                } label: {
-                    Label("Playback Engine", systemImage: "cpu")
-                }
-                .stashyGroupedSettingsRow()
-                stashyScrollingSectionFooter("Playback Engine plays MKV, WebM, AVI and other formats directly, without server transcoding. Automatic uses it only for files iOS cannot play natively. While active, AI Motion, live captions, AirPlay and frame capture are unavailable.")
-            }
         } else {
             Section {
                 stashyScrollingSectionHeader("Included with stashy+")
                 Label("Custom App Icons", systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 0, count: 12)
+                    .stashyGroupedBlockRow(index: 0, count: 11)
                 Label("Download Scenes", systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 1, count: 12)
+                    .stashyGroupedBlockRow(index: 1, count: 11)
                 lockedPlusFeature("AI Subtitles and translation", systemImage: "lock.fill", isBeta: true)
-                    .stashyGroupedBlockRow(index: 2, count: 12)
+                    .stashyGroupedBlockRow(index: 2, count: 11)
                 lockedPlusFeature(AIMotionCopy.name, systemImage: "lock.fill", isBeta: true)
-                    .stashyGroupedBlockRow(index: 3, count: 12)
-                lockedPlusFeature("Playback Engine", systemImage: "lock.fill", isBeta: true)
-                    .stashyGroupedBlockRow(index: 4, count: 12)
+                    .stashyGroupedBlockRow(index: 3, count: 11)
                 Label(ToolsItem.statistics.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 5, count: 12)
+                    .stashyGroupedBlockRow(index: 4, count: 11)
                 Label(ToolsItem.oCount.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 6, count: 12)
+                    .stashyGroupedBlockRow(index: 5, count: 11)
                 Label(ToolsItem.timeline.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 7, count: 12)
+                    .stashyGroupedBlockRow(index: 6, count: 11)
                 Label(ToolsItem.topLists.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 8, count: 12)
+                    .stashyGroupedBlockRow(index: 7, count: 11)
                 Label(ToolsItem.filters.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 9, count: 12)
+                    .stashyGroupedBlockRow(index: 8, count: 11)
                 Label(ToolsItem.hotOrNot.plusFeatureTitle, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 10, count: 12)
+                    .stashyGroupedBlockRow(index: 9, count: 11)
                 Label(ToolsItem.rateMe.title, systemImage: "lock.fill")
                     .foregroundColor(.secondary)
-                    .stashyGroupedBlockRow(index: 11, count: 12)
+                    .stashyGroupedBlockRow(index: 10, count: 11)
             }
         }
 

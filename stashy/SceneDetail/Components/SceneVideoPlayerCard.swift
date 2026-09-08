@@ -2,7 +2,7 @@
 
 #if !os(tvOS)
 import SwiftUI
-import AVKit
+import AVFoundation
 import UIKit
 #if canImport(AetherEngine)
 import AetherEngine
@@ -10,8 +10,7 @@ import AetherEngine
 
 struct SceneVideoPlayerCard: View {
     @Binding var activeScene: Scene
-    @Binding var player: AVPlayer?
-    /// Non-nil while the optional playback engine owns this scene.
+    /// Non-nil once playback has started.
     let aetherEngine: AetherSceneEngine?
     @Binding var isPlaybackStarted: Bool
     @Binding var isFullscreen: Bool
@@ -23,7 +22,7 @@ struct SceneVideoPlayerCard: View {
     @ObservedObject var subtitleController: SubtitleController
     @ObservedObject var transcriptionController: SceneLiveTranscriptionController
 
-    @State private var previewPlayer: AVPlayer?
+    @StateObject private var previewPlayer = AetherPreviewPlayer()
 
     var onSeek: (Double) -> Void
     var onStartPlayback: (Bool) -> Void
@@ -38,53 +37,28 @@ struct SceneVideoPlayerCard: View {
     @ViewBuilder
     private var videoPlayerArea: some View {
         VStack(spacing: 0) {
-            if activeScene.videoURL != nil || aetherEngine != nil || PlayerEngineResolver.shouldUseAether(for: activeScene) {
+            if activeScene.aetherVideoURL != nil || aetherEngine != nil {
                 if isPlaybackStarted, let aether = aetherEngine {
-                    AetherSceneSurface(
-                        engine: aether,
-                        posterURL: activeScene.thumbnailURL,
-                        isMuted: $isMuted,
-                        onSeek: onSeek,
-                        liveCaptionText: subtitleController.isLiveCaptionsActive
-                            ? subtitleController.currentText
-                            : ""
-                    )
-                    .aspectRatio(16/9, contentMode: .fit)
-                    .frame(maxWidth: .infinity)
-                    .clipShape(
-                        UnevenRoundedRectangle(
-                            topLeadingRadius: 12,
-                            bottomLeadingRadius: 0,
-                            bottomTrailingRadius: 0,
-                            topTrailingRadius: 12
-                        )
-                    )
-                } else if isPlaybackStarted, let player = player {
-                    VideoPlayerView(
-                        player: player,
-                        isFullscreen: $isFullscreen,
-                        // Inline: only the bottom SwiftUI overlay. contentOverlayView is for fullscreen.
-                        subtitleText: isFullscreen ? subtitleController.currentText : ""
-                    )
-                    .aspectRatio(16/9, contentMode: .fit)
-                    .frame(maxWidth: .infinity)
-                    .overlay(alignment: .bottom) {
-                        // Same caption channel for server VTT and live ASR.
-                        if !subtitleController.currentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                            Text(subtitleController.currentText)
-                                .font(.system(size: 16, weight: .semibold))
-                                .foregroundStyle(.white)
-                                .multilineTextAlignment(.center)
-                                .lineLimit(3)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 7)
-                                .background(Color.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
-                                .padding(.horizontal, 16)
-                                .padding(.bottom, 14)
-                                .allowsHitTesting(false)
-                                .transition(.opacity)
+                    // While the host's fullscreen cover is up it hosts the engine's layer, so
+                    // the inline surface steps aside instead of fighting it for the layer.
+                    Group {
+                        if isFullscreen {
+                            Color.black
+                        } else {
+                            AetherSceneSurface(
+                                engine: aether,
+                                posterURL: activeScene.thumbnailURL,
+                                isMuted: $isMuted,
+                                onSeek: onSeek,
+                                liveCaptionText: subtitleController.isLiveCaptionsActive
+                                    ? subtitleController.currentText
+                                    : "",
+                                onToggleFullscreen: { isFullscreen = true }
+                            )
                         }
                     }
+                    .aspectRatio(16/9, contentMode: .fit)
+                    .frame(maxWidth: .infinity)
                     .clipShape(
                         UnevenRoundedRectangle(
                             topLeadingRadius: 12,
@@ -133,9 +107,9 @@ struct SceneVideoPlayerCard: View {
             }
             
             // Video Preview Overlay
-            if isPreviewing, let previewPlayer = previewPlayer {
+            if isPreviewing {
                 GeometryReader { geo in
-                    AspectFillVideoPlayer(player: previewPlayer)
+                    AetherPreviewSurface(player: previewPlayer)
                         .frame(width: geo.size.width, height: geo.size.height)
                         .clipped()
                         .allowsHitTesting(false)
@@ -173,6 +147,7 @@ struct SceneVideoPlayerCard: View {
         .onLongPressGesture(minimumDuration: 0.15, pressing: { pressing in
             if pressing { startPreview() } else { stopPreview() }
         }, perform: {})
+        .onDisappear { previewPlayer.stop(release: true) }
     }
 
     @ViewBuilder
@@ -263,7 +238,7 @@ struct SceneVideoPlayerCard: View {
     }
 
     private var markerStripTopPadding: CGFloat {
-        let playing = isPlaybackStarted && player != nil
+        let playing = isPlaybackStarted && aetherEngine != nil
         return playing ? 10 : 8
     }
 
@@ -349,21 +324,17 @@ struct SceneVideoPlayerCard: View {
     
     private func startPreview() {
         guard let previewURL = activeScene.previewURL else { return }
-        if previewPlayer == nil {
-            previewPlayer = createMutedPreviewPlayer(for: previewURL)
-        }
+        previewPlayer.start(url: previewURL)
         withAnimation(.easeIn(duration: 0.2)) {
             isPreviewing = true
         }
-        previewPlayer?.play()
     }
-    
+
     private func stopPreview() {
         withAnimation(.easeOut(duration: 0.2)) {
             isPreviewing = false
         }
-        previewPlayer?.pause()
-        previewPlayer?.seek(to: CMTime.zero)
+        previewPlayer.stop(release: true)
     }
 
 }
@@ -376,8 +347,7 @@ private enum SceneMetadataPillStyle {
 
 struct SceneDetailMetadataCard: View {
     @Binding var activeScene: Scene
-    @Binding var player: AVPlayer?
-    /// Non-nil while the optional playback engine owns this scene.
+    /// Non-nil once playback has started.
     let aetherEngine: AetherSceneEngine?
     @Binding var isHeaderExpanded: Bool
     @Binding var showingAddMarkerSheet: Bool
@@ -389,7 +359,6 @@ struct SceneDetailMetadataCard: View {
     @ObservedObject var subtitleController: SubtitleController
     @ObservedObject var transcriptionController: SceneLiveTranscriptionController
     @ObservedObject var captionTranslator: SceneCaptionTranslator
-    @ObservedObject var audioTrackController: SceneAudioTrackController
     @ObservedObject private var stashSyncManager = StashSyncManager.shared
 
     @State private var showingEditTitleSheet = false
@@ -458,21 +427,6 @@ struct SceneDetailMetadataCard: View {
         .padding(.horizontal, 12)
         .padding(.bottom, 12)
         .padding(.top, hasSceneMarkers ? 4 : 12)
-        .onChange(of: player) { _, newPlayer in
-            if let item = newPlayer?.currentItem {
-                StashVideoSyncManager.shared.setup(for: item)
-            }
-        }
-        .background {
-            if let player {
-                Color.clear
-                    .onReceive(player.publisher(for: \.timeControlStatus)) { status in
-                        if status == .playing {
-                            restorePreferredCaptionsIfNeeded()
-                        }
-                    }
-            }
-        }
         .background {
             // The engine is a plain `let` here, so its state is observed through the publisher.
             if let aether = aetherEngine {
@@ -483,9 +437,6 @@ struct SceneDetailMetadataCard: View {
             }
         }
         .onAppear {
-            if let item = player?.currentItem {
-                StashVideoSyncManager.shared.setup(for: item)
-            }
             Task { await loadSpeechSupportedLanguagesIfNeeded() }
         }
         .onChange(of: transcriptionController.errorMessage) { _, message in
@@ -567,14 +518,9 @@ struct SceneDetailMetadataCard: View {
                 // shared PCM tap and its clock.
                 languageAndCaptionsControls
                 Spacer(minLength: 4)
-                // AI Motion on the AVPlayer path; the engine has its own gate below.
-                if aetherEngine == nil, stashSyncManager.isStashSyncEnabled {
-                    aiMotionPill
-                    Spacer(minLength: 4)
-                }
                 #if canImport(AetherEngine)
-                // AI Motion does work under the engine, but only where a real `AVPlayerItem`
-                // exists to sample (`.loopback` / `.remoteBypass`). The software route has none.
+                // AI Motion only works where a real player item exists to sample
+                // (`.loopback` / `.remoteBypass`). The software route has none.
                 if let aether = aetherEngine, stashSyncManager.isStashSyncEnabled {
                     AetherAnalysisGate(engine: aether) {
                         aiMotionPill
@@ -585,16 +531,18 @@ struct SceneDetailMetadataCard: View {
                 addMarkerButton
                 Spacer(minLength: 4)
                 setImageMenu
-                Spacer(minLength: 4)
-                qualityMenu
+                if let res = sourceResolutionLabel {
+                    Spacer(minLength: 4)
+                    infoPill(icon: "video.fill", text: res, color: .blue)
+                }
                 if let aether = aetherEngine,
                    aether.audioTracks.count > 1 || !aether.subtitleTracks.isEmpty {
                     Spacer(minLength: 4)
                     AetherAudioSubtitleMenu(engine: aether)
                 }
-                // Server VTT lives in the engine's own Audio & Subtitles menu, so under Aether
-                // this pill only carries the live-caption state.
-                if activeScene.hasCaptions || (aetherEngine != nil && subtitleController.isLiveCaptionsActive) {
+                // Server VTT lives in the engine's own Audio & Subtitles menu, so this pill
+                // only carries the live-caption state.
+                if activeScene.hasCaptions || subtitleController.isLiveCaptionsActive {
                     Spacer(minLength: 4)
                     captionsMenu
                 }
@@ -638,7 +586,7 @@ struct SceneDetailMetadataCard: View {
     @ViewBuilder
     private var addMarkerButton: some View {
         Button(action: {
-            capturedMarkerTime = aetherEngine?.currentTime ?? player?.currentTime().seconds ?? 0
+            capturedMarkerTime = aetherEngine?.currentTime ?? 0
             showingAddMarkerSheet = true
         }) {
             infoPill(icon: "plus.square.fill.on.square.fill", text: "Marker", color: .green)
@@ -675,31 +623,16 @@ struct SceneDetailMetadataCard: View {
         .accessibilityLabel("Set image from current frame")
     }
 
-    private func currentCaptureTime() -> CMTime {
-        let seconds: Double = {
-            let t = player?.currentTime().seconds ?? 0
-            return t.isFinite && t >= 0 ? t : 0
-        }()
-        return CMTime(seconds: seconds, preferredTimescale: 600)
-    }
-
-    /// One capture entry point for both "Set Image" actions. Uses the engine's own frame
-    /// extraction while the optional engine owns the scene, and the AVFoundation path
-    /// otherwise; both return the identical `data:image/jpeg;base64,…` string.
+    /// One capture entry point for both "Set Image" actions: the engine's own frame extraction,
+    /// returning a `data:image/jpeg;base64,…` string.
     @MainActor
     private func captureCurrentFrameDataURL() async -> String? {
-        if let aether = aetherEngine {
-            guard let image = await aether.captureFrame(at: aether.currentTime,
-                                                        maxSize: kCaptureFrameMaxSize) else {
-                return nil
-            }
-            return videoFrameDataURL(from: image)
+        guard let aether = aetherEngine else { return nil }
+        guard let image = await aether.captureFrame(at: aether.currentTime,
+                                                    maxSize: kCaptureFrameMaxSize) else {
+            return nil
         }
-        return await captureVideoFrameDataURL(
-            from: player,
-            fallbackURL: activeScene.videoURL,
-            at: currentCaptureTime()
-        )
+        return videoFrameDataURL(from: image)
     }
 
     private func captureTagImageFrameAndPresentSheet() {
@@ -807,41 +740,15 @@ struct SceneDetailMetadataCard: View {
         .clipShape(Capsule())
     }
 
+    /// Reloads the engine on a different source, keeping position and play state.
     private func switchPlayerStream(to url: URL) {
-        if let aether = aetherEngine {
-            let currentTime = aether.currentTime
-            let wasPlaying = aether.isPlaying
-            Task { await aether.load(url: url, startAt: currentTime > 0 ? currentTime : nil, autoplay: wasPlaying) }
-            return
-        }
-        guard let player = player else { return }
-        let currentTime = player.currentTime()
-        let wasPlaying = (player.rate > 0) || (player.timeControlStatus == .playing)
-
-        let newItem = makeVODPlayerItem(for: url)
-        player.replaceCurrentItem(with: newItem)
-        player.seek(to: currentTime, toleranceBefore: .positiveInfinity, toleranceAfter: .positiveInfinity)
-        player.rate = Float(playbackSpeed)
-        if wasPlaying { player.play() }
-
-        StashVideoSyncManager.shared.setup(for: newItem)
-        audioTrackController.attach(player: player)
-
+        guard let aether = aetherEngine else { return }
+        let currentTime = aether.currentTime
+        let wasPlaying = aether.isPlaying
+        Task { await aether.load(url: url, startAt: currentTime > 0 ? currentTime : nil, autoplay: wasPlaying) }
         if transcriptionController.isTeleprompterModeActive {
-            // Prefer dedicated transcription URL (MP4/direct); fall back to the new player URL.
             transcriptionController.rebindStreamURL(activeScene.transcriptionStreamURL ?? url)
         }
-    }
-
-    private func resolutionFromLabel(_ label: String) -> Int? {
-        let cleaned = label.lowercased()
-            .replacingOccurrences(of: "p", with: "")
-            .replacingOccurrences(of: " ", with: "")
-        return Int(cleaned)
-    }
-
-    private func sortByResolutionDesc(_ a: SceneStream, _ b: SceneStream) -> Bool {
-        (resolutionFromLabel(a.label) ?? 0) > (resolutionFromLabel(b.label) ?? 0)
     }
 
     /// File height → short quality chip text (`4K`, `1080p`, …).
@@ -853,128 +760,10 @@ struct SceneDetailMetadataCard: View {
         return "\(height)p"
     }
 
-    private func isDirectStreamLabel(_ label: String) -> Bool {
-        label.lowercased().contains("direct stream")
-    }
-
-    /// Prefer resolution over Stash's "Direct stream" label on the quality chip.
-    private func displayLabel(for stream: SceneStream) -> String {
-        if isDirectStreamLabel(stream.label), let res = sourceResolutionLabel {
-            return res
-        }
-        return stream.label
-    }
-
-    private var currentStreamURLString: String? {
-        if let aetherURL = aetherEngine?.currentURL { return aetherURL.absoluteString }
-        return (player?.currentItem?.asset as? AVURLAsset)?.url.absoluteString
-    }
-
-    private func isCurrentlyPlaying(_ stream: SceneStream) -> Bool {
-        guard let current = currentStreamURLString else { return false }
-        guard let lhs = URLComponents(string: current),
-              let rhs = URLComponents(string: stream.url) else {
-            return current == stream.url
-        }
-        return lhs.host == rhs.host && lhs.path == rhs.path
-    }
-
-    private func isPlayingDirectStream(_ directURL: URL) -> Bool {
-        guard let current = currentStreamURLString,
-              let currentPath = URLComponents(string: current)?.path,
-              let directPath = URLComponents(url: directURL, resolvingAgainstBaseURL: false)?.path else {
-            return false
-        }
-        return currentPath == directPath
-    }
-
-    @ViewBuilder
-    private var qualityMenu: some View {
-        let streams = activeScene.streams ?? []
-        let hls = streams.filter { $0.mime_type == "application/vnd.apple.mpegurl" }
-            .sorted(by: sortByResolutionDesc)
-        let mp4 = streams.filter { $0.mime_type == "video/mp4" }
-            .filter { !$0.label.lowercased().contains("mkv") }
-            .sorted(by: sortByResolutionDesc)
-        let directStreamURL: URL? = {
-            guard let path = activeScene.paths?.stream else { return nil }
-            return URL(string: path)
-        }()
-
-        if !hls.isEmpty || !mp4.isEmpty || directStreamURL != nil {
-            Menu {
-                if !hls.isEmpty {
-                    Section("HLS · Adaptive") {
-                        ForEach(hls, id: \.url) { stream in
-                            Button(action: {
-                                if let url = URL(string: stream.url) { switchPlayerStream(to: url) }
-                            }) {
-                                Label {
-                                    Text(stream.label)
-                                } icon: {
-                                    if isCurrentlyPlaying(stream) {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                if !mp4.isEmpty {
-                    Section("MP4 · Transcoded") {
-                        ForEach(mp4, id: \.url) { stream in
-                            Button(action: {
-                                if let url = URL(string: stream.url) { switchPlayerStream(to: url) }
-                            }) {
-                                Label {
-                                    Text(stream.label)
-                                } icon: {
-                                    if isCurrentlyPlaying(stream) {
-                                        Image(systemName: "checkmark")
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-                if let directURL = directStreamURL {
-                    Section("Original") {
-                        Button(action: { switchPlayerStream(to: directURL) }) {
-                            let label: String = {
-                                if let res = sourceResolutionLabel { return "Original · \(res)" }
-                                return "Original"
-                            }()
-                            Label {
-                                Text(label)
-                            } icon: {
-                                if isPlayingDirectStream(directURL) {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                }
-            } label: {
-                let currentLabel: String = {
-                    if let directURL = directStreamURL, isPlayingDirectStream(directURL) {
-                        return sourceResolutionLabel ?? "Original"
-                    }
-                    if let current = currentStreamURLString,
-                       let active = streams.first(where: { isCurrentlyPlaying($0) || $0.url == current }) {
-                        return displayLabel(for: active)
-                    }
-                    return sourceResolutionLabel ?? "Quality"
-                }()
-                infoPill(icon: "video.fill", text: currentLabel, color: .blue)
-            }
-        } else if let res = sourceResolutionLabel {
-            infoPill(icon: "video.fill", text: res, color: .blue)
-        }
-    }
-
     @ViewBuilder
     private var captionsMenu: some View {
-        let captions = activeScene.captions ?? []
+        // Server captions are external subtitle tracks on the engine and are picked in its own
+        // Audio & Subtitles menu — this pill only carries the live-caption state.
         Menu {
             Button {
                 stopLiveCaptionsIfNeeded()
@@ -985,26 +774,6 @@ struct SceneDetailMetadataCard: View {
                 } icon: {
                     if subtitleController.selectedCaption == nil && !subtitleController.isLiveCaptionsActive {
                         Image(systemName: "checkmark")
-                    }
-                }
-            }
-            // Under the engine, server captions are external subtitle tracks and are picked in
-            // its own Audio & Subtitles menu — listing them here too would draw them twice.
-            if aetherEngine == nil {
-                Section("Subtitles") {
-                    ForEach(captions) { caption in
-                        Button {
-                            stopLiveCaptionsIfNeeded()
-                            subtitleController.select(caption, userInitiated: true)
-                        } label: {
-                            Label {
-                                Text(caption.displayName)
-                            } icon: {
-                                if subtitleController.selectedCaption == caption {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
                     }
                 }
             }
@@ -1104,7 +873,7 @@ struct SceneDetailMetadataCard: View {
             }
             return
         }
-        guard player != nil || aetherEngine?.currentURL != nil else {
+        guard aetherEngine?.currentURL != nil else {
             if userInitiated {
                 ToastManager.shared.show("Start playback first", icon: "play.circle", style: .error)
             }
@@ -1116,9 +885,7 @@ struct SceneDetailMetadataCard: View {
             }
             return
         }
-        let url = activeScene.transcriptionStreamURL
-            ?? (player?.currentItem?.asset as? AVURLAsset).map { $0.url }
-            ?? aetherEngine?.currentURL
+        let url = activeScene.transcriptionStreamURL ?? aetherEngine?.currentURL
         var extras: [URL] = []
         if let streams = activeScene.streams {
             for stream in streams where stream.mime_type == "video/mp4" {
@@ -1216,28 +983,6 @@ struct SceneDetailMetadataCard: View {
                 transcriptionController.start(
                     mode: mode,
                     aether: aether,
-                    sceneID: activeScene.id,
-                    sceneDuration: activeScene.sceneDuration,
-                    sceneLanguage: sceneLanguage,
-                    streamURL: url,
-                    extraCandidateURLs: extras
-                )
-            } else if let player {
-                transcriptionController.start(
-                    mode: mode,
-                    player: player,
-                    sceneID: activeScene.id,
-                    sceneDuration: activeScene.sceneDuration,
-                    sceneLanguage: sceneLanguage,
-                    streamURL: url,
-                    extraCandidateURLs: extras
-                )
-            }
-            #else
-            if let player {
-                transcriptionController.start(
-                    mode: mode,
-                    player: player,
                     sceneID: activeScene.id,
                     sceneDuration: activeScene.sceneDuration,
                     sceneLanguage: sceneLanguage,
@@ -1866,7 +1611,7 @@ struct EditSceneTitleSheet: View {
 }
 
 #if canImport(AetherEngine)
-/// Shows its content only while the engine is on a route that exposes an `AVPlayerItem`
+/// Shows its content only while the engine is on a route that exposes a native player item
 /// for frame analysis. Observing the engine here keeps the route change reactive without
 /// making the whole metadata card depend on it.
 private struct AetherAnalysisGate<Content: View>: View {

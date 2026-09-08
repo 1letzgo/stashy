@@ -302,6 +302,15 @@ final class AetherSceneEngine: ObservableObject {
             }
             .store(in: &cancellables)
 
+        // AirPlay rides the same AVPlayer the native routes build, and the engine creates a new
+        // one per session — so the flag is (re)asserted on every emission rather than once.
+        #if os(iOS)
+        engine.$currentAVPlayer
+            .receive(on: RunLoop.main)
+            .sink { player in player?.allowsExternalPlayback = true }
+            .store(in: &cancellables)
+        #endif
+
         // PiP is only meaningful where an AVPlayerLayer actually exists.
         engine.$videoRoute
             .combineLatest(engine.$currentAVPlayer)

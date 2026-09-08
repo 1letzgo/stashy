@@ -161,8 +161,6 @@
 		DFUI000052F3AUDIT005 /* ToastManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFUI000062F3AUDIT006 /* ToastManager.swift */; };
 		E909C6E8F4744C4D939F78BD /* GraphQLQueries.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFGQ000042F28A0000000004 /* GraphQLQueries.swift */; };
 		AE7E00000000000000000003 /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = AE7E00000000000000000002 /* AetherEngine */; };
-		AE7E0000000000000000B002 /* PlayerEnginePreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B001 /* PlayerEnginePreference.swift */; };
-		AE7E0000000000000000B003 /* PlayerEnginePreference.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B001 /* PlayerEnginePreference.swift */; };
 		AE7E0000000000000000B012 /* AetherSceneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B011 /* AetherSceneEngine.swift */; };
 		AE7E0000000000000000B022 /* Scene+AetherPlayback.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */; };
 		AE7E0000000000000000B042 /* AetherSceneSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B041 /* AetherSceneSurface.swift */; };
@@ -323,7 +321,6 @@
 		LIMG000022345678901234AB /* LinkedImagesCatalogGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkedImagesCatalogGrid.swift; sourceTree = "<group>"; };
 		SCHR000022345678901234AB /* SharedChromeComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedChromeComponents.swift; sourceTree = "<group>"; };
 		STNV000022345678901234AB /* StashyTopNavStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyTopNavStrip.swift; sourceTree = "<group>"; };
-		AE7E0000000000000000B001 /* PlayerEnginePreference.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerEnginePreference.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B011 /* AetherSceneEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherSceneEngine.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Scene+AetherPlayback.swift"; sourceTree = "<group>"; };
 		AE7E0000000000000000B041 /* AetherSceneSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherSceneSurface.swift; sourceTree = "<group>"; };
@@ -374,7 +371,6 @@
 		AE7E0000000000000000C001 /* Playback */ = {
 			isa = PBXGroup;
 			children = (
-				AE7E0000000000000000B001 /* PlayerEnginePreference.swift */,
 				AE7E0000000000000000B011 /* AetherSceneEngine.swift */,
 				AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */,
 				AE7E0000000000000000B041 /* AetherSceneSurface.swift */,
@@ -716,7 +712,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AE7E0000000000000000B002 /* PlayerEnginePreference.swift in Sources */,
 				AE7E0000000000000000B012 /* AetherSceneEngine.swift in Sources */,
 				AE7E0000000000000000B022 /* Scene+AetherPlayback.swift in Sources */,
 				AE7E0000000000000000B042 /* AetherSceneSurface.swift in Sources */,
@@ -838,7 +833,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				AE7E0000000000000000B003 /* PlayerEnginePreference.swift in Sources */,
 				AE7E0000000000000000B013 /* AetherSceneEngine.swift in Sources */,
 				AE7E0000000000000000B023 /* Scene+AetherPlayback.swift in Sources */,
 				AE7E0000000000000000B043 /* AetherSceneSurface.swift in Sources */,

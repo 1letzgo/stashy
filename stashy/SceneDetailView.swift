@@ -27,7 +27,6 @@ struct SceneDetailView: View {
     @StateObject private var subtitleController = SubtitleController()
     @StateObject private var transcriptionController = SceneLiveTranscriptionController()
     @StateObject private var captionTranslator = SceneCaptionTranslator()
-    @StateObject private var audioTrackController = SceneAudioTrackController()
     
     let autoPlay: Bool
     
@@ -36,8 +35,7 @@ struct SceneDetailView: View {
         self.autoPlay = autoPlay
         _activeScene = State(initialValue: scene)
     }
-    @State private var player: AVPlayer?
-    /// Parallel seam for the optional playback engine. Invariant: non-nil implies `player == nil`.
+    /// The one player. Non-nil from the first `startPlayback` until teardown.
     @State private var aetherEngine: AetherSceneEngine?
     @State private var showDeleteWithFilesConfirmation = false
     @State private var isDeleting = false
@@ -57,7 +55,6 @@ struct SceneDetailView: View {
     @State private var capturedMarkerTime: Double = 0
     @State private var playbackSpeed: Double = 1.0
     @State private var currentPlaybackTime: Double = 0
-    @State private var timeObserverToken: Any?
     @State private var playbackActivityTracker = ScenePlaybackActivityTracker()
     /// True while the user is actively dragging the heatmap scrubber. Used to
     /// suppress redundant work (sync restarts, play-state side-effects) during
@@ -68,7 +65,6 @@ struct SceneDetailView: View {
     @State private var aetherSeekInFlight = false
     
     // Preview Video State
-    @State private var previewPlayer: AVPlayer?
     @State private var isPreviewing = false
     @State private var isPressing = false
     @State private var hasInitializedDevices = false
@@ -277,7 +273,6 @@ struct SceneDetailView: View {
                 VStack(spacing: 0) {
                     SceneVideoPlayerCard(
                         activeScene: $activeScene,
-                        player: $player,
                         aetherEngine: aetherEngine,
                         isPlaybackStarted: $isPlaybackStarted,
                         isFullscreen: $isFullscreen,
@@ -291,7 +286,6 @@ struct SceneDetailView: View {
 
                     SceneDetailMetadataCard(
                         activeScene: $activeScene,
-                        player: $player,
                         aetherEngine: aetherEngine,
                         isHeaderExpanded: $isHeaderExpanded,
                         showingAddMarkerSheet: $showingAddMarkerSheet,
@@ -301,7 +295,6 @@ struct SceneDetailView: View {
                         subtitleController: subtitleController,
                         transcriptionController: transcriptionController,
                         captionTranslator: captionTranslator,
-                        audioTrackController: audioTrackController,
                         onSeek: { seconds in seekTo(seconds) },
                         onTitleUpdated: { newTitle, newDetails in
                             applyLocalSceneEdit(Scene(id: activeScene.id, title: newTitle, details: newDetails, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, streams: activeScene.streams, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
@@ -312,7 +305,6 @@ struct SceneDetailView: View {
                 .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                 .cardShadow()
 
-                // Live captions render inside AVPlayer overlay — no separate teleprompter panel.
                 
                 let isStashSyncActive = handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode
                 
@@ -521,13 +513,16 @@ struct SceneDetailView: View {
                 capturedMarkerTime: capturedMarkerTime,
                 sceneId: activeScene.id,
                 sceneTagIds: Set((activeScene.tags ?? []).map(\.id)),
-                player: player,
-                videoURL: activeScene.videoURL ?? activeScene.aetherVideoURL,
+                videoURL: activeScene.aetherVideoURL,
+                aetherEngine: aetherEngine,
                 viewModel: viewModel,
                 onRefresh: refreshSceneDetails,
                 onDelete: deleteSceneWithFiles
             ))
             .modifier(lifecycleModifier)
+            .fullScreenCover(isPresented: $isFullscreen) {
+                fullscreenPlayer
+            }
             .onChange(of: playbackSpeed) { _, speed in
                 aetherEngine?.rate = Float(speed)
             }
@@ -551,20 +546,58 @@ struct SceneDetailView: View {
             }
     }
 
+    /// Own fullscreen presentation: the same engine, rebound to a full-bleed surface.
+    /// The inline card drops its surface while this is up, so only one view ever hosts the
+    /// engine's layer.
+    @ViewBuilder
+    private var fullscreenPlayer: some View {
+        ZStack {
+            Color.black.ignoresSafeArea()
+            if let aether = aetherEngine {
+                AetherSceneSurface(
+                    engine: aether,
+                    posterURL: activeScene.thumbnailURL,
+                    isMuted: $isMuted,
+                    onSeek: { seconds in seekTo(seconds) },
+                    liveCaptionText: subtitleController.isLiveCaptionsActive
+                        ? subtitleController.currentText
+                        : "",
+                    onToggleFullscreen: { isFullscreen = false },
+                    isFullscreen: true
+                )
+                .ignoresSafeArea()
+            }
+        }
+        // Best effort: an attached keyboard (iPad / Mac) skips ±15 s. Deliberately without
+        // `.focusable()` — that steals the taps the transport needs.
+        .onKeyPress(.leftArrow) {
+            skipFullscreen(by: -15)
+            return .handled
+        }
+        .onKeyPress(.rightArrow) {
+            skipFullscreen(by: 15)
+            return .handled
+        }
+    }
+
+    private func skipFullscreen(by delta: Double) {
+        guard let aether = aetherEngine else { return }
+        let duration = aether.duration
+        let raw = aether.currentTime + delta
+        seekTo(duration > 0 ? min(max(0, raw), duration) : max(0, raw))
+    }
+
     private var lifecycleModifier: SceneDetailLifecycleModifier {
         SceneDetailLifecycleModifier(
             sceneId: activeScene.id,
             isMuted: $isMuted,
-            player: player,
             aetherEngine: aetherEngine,
             onAppear: handleOnAppear,
             onDisappear: handleOnDisappear,
             onPeriodicSync: handlePeriodicSync,
             onRefreshMarkers: refreshSceneDetails,
             onInitialSync: initialSync,
-            onEnsureAnalysis: ensureVideoAnalysis,
             onEnsureAetherAnalysis: ensureAetherVideoAnalysis,
-            onTimeControlChange: handleTimeControlStatusChange,
             handyManager: handyManager,
             buttplugManager: buttplugManager,
             loveSpouseManager: loveSpouseManager
@@ -572,18 +605,8 @@ struct SceneDetailView: View {
     }
 
 
-    private func ensureVideoAnalysis(for item: AVPlayerItem?) {
-        guard let item = item else { return }
-        let needsForDevice = handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode
-        if needsForDevice {
-            AppLog.debug("🎬 SceneDetail: Ensuring Video Analysis for StashSync")
-            StashVideoSyncManager.shared.setup(for: item)
-            StashVideoSyncManager.shared.isActive = true
-        }
-    }
-
-    /// Aether counterpart of `ensureVideoAnalysis`. Analysis rides the engine's AVPlayer-backed
-    /// item plus its decoded PCM tap; on the software route there is no item and this is a no-op.
+    /// Analysis rides the engine's native-route player item plus its decoded PCM tap; on the
+    /// software route there is no item and this is a no-op.
     private func ensureAetherVideoAnalysis() {
         #if canImport(AetherEngine)
         guard let aether = aetherEngine else { return }
@@ -592,11 +615,11 @@ struct SceneDetailView: View {
     }
 
     private func initialSync() {
-        guard let player = player, StashSyncManager.shared.isActive else { return }
-                ensureVideoAnalysis(for: player.currentItem)
-        
-        if player.timeControlStatus == .playing {
-            let currentTime = player.currentTime().seconds
+        guard let aether = aetherEngine, StashSyncManager.shared.isActive else { return }
+        ensureAetherVideoAnalysis()
+
+        if aether.isPlaying {
+            let currentTime = aether.currentTime
             AppLog.debug("🎬 SceneDetail: Executing initial StashSync play at \(currentTime)s")
             if handyManager.isStashSyncMode { handyManager.play(at: currentTime) }
             if buttplugManager.isStashSyncMode { buttplugManager.play(at: currentTime) }
@@ -645,7 +668,6 @@ struct SceneDetailView: View {
                 if !streams.isEmpty {
                     DispatchQueue.main.async {
                         self.activeScene = self.activeScene.withStreams(streams)
-                        self.updatePlayerStream()
                     }
                 }
             }
@@ -681,21 +703,15 @@ struct SceneDetailView: View {
     }
 
     private func configureSubtitles() {
-        #if canImport(AetherEngine)
-        // Under the engine, Stash's VTT captions are external subtitle tracks with their own cue
-        // pipeline — configuring the AVPlayer caption path here would draw them a second time.
-        // The controller is still attached, because live captions share its display channel.
-        if let aether = aetherEngine {
-            subtitleController.attach(aether: aether)
-            return
-        }
-        #endif
-        subtitleController.configure(scene: activeScene, player: player)
+        // Stash's VTT captions are external subtitle tracks on the engine, with their own cue
+        // pipeline. The controller is still attached, because live captions share its
+        // display channel.
+        guard let aether = aetherEngine else { return }
+        subtitleController.attach(aether: aether)
     }
 
     private func handleOnDisappear() {
         if isDeleting {
-            player?.pause()
             aetherEngine?.pause()
             stopPreview()
             return
@@ -721,22 +737,17 @@ struct SceneDetailView: View {
 
         activeScene.postListMetadataUpdated()
 
-        player?.pause()
         aetherEngine?.pause()
         StashSyncManager.shared.stop()
         if handyManager.isSyncing || handyManager.isStashSyncMode { handyManager.pause() }
         if buttplugManager.isConnected { buttplugManager.stop() }
         if loveSpouseManager.isConnected { loveSpouseManager.stop() }
-        removeTimeObserver()
         subtitleController.detach()
-        audioTrackController.detach()
         captionTranslator.deactivate()
         // Releases this session's share of the engine audio tap (`stopSession`), so the
         // AI Motion teardown below can close it for good.
         Task { await transcriptionController.disable() }
-        #if canImport(AetherEngine)
-        if aetherEngine != nil { AetherMotionAnalysis.teardown(engine: aetherEngine) }
-        #endif
+        AetherMotionAnalysis.teardown(engine: aetherEngine)
         // `@State` release is not deterministic, so the engine is torn down explicitly.
         aetherEngine?.stop()
         aetherEngine = nil
@@ -746,12 +757,6 @@ struct SceneDetailView: View {
         if let aether = aetherEngine {
             let currentTime = aether.currentTime
             let duration = aether.duration > 0 ? aether.duration : (activeScene.sceneDuration ?? 0)
-            if currentTime.isFinite, currentTime >= 0 {
-                playbackActivityTracker.setPosition(currentTime: currentTime, duration: duration)
-            }
-        } else if let player {
-            let currentTime = player.currentTime().seconds
-            let duration = player.currentItem?.duration.seconds ?? activeScene.sceneDuration ?? 0
             if currentTime.isFinite, currentTime >= 0 {
                 playbackActivityTracker.setPosition(currentTime: currentTime, duration: duration)
             }
@@ -770,17 +775,6 @@ struct SceneDetailView: View {
             guard aether.isPlaying else { return }
             let currentTime = aether.currentTime
             let duration = aether.duration > 0 ? aether.duration : (activeScene.sceneDuration ?? 0)
-            playbackActivityTracker.setPosition(currentTime: currentTime, duration: duration)
-            ensurePlaybackActivityConfigured()
-            playbackActivityTracker.start()
-            if !hasAddedPlay, currentTime > 1 {
-                registerScenePlay()
-            }
-            return
-        }
-        if let player = player, player.timeControlStatus == .playing {
-            let currentTime = player.currentTime().seconds
-            let duration = player.currentItem?.duration.seconds ?? activeScene.sceneDuration ?? 0
             playbackActivityTracker.setPosition(currentTime: currentTime, duration: duration)
             ensurePlaybackActivityConfigured()
             playbackActivityTracker.start()
@@ -812,38 +806,6 @@ struct SceneDetailView: View {
         }
     }
 
-    private func handleTimeControlStatusChange(_ status: AVPlayer.TimeControlStatus) {
-        guard let player = player else { return }
-        // Scrubbing produces rapid play → waitingToPlay → playing transitions.
-        // Running the full sync-restart below each time is expensive (Bluetooth
-        // round-trips, StashSyncManager restart, video analysis). Skip while
-        // the user is actively dragging; `commitScrub` handles the resume.
-        if isScrubbing { return }
-        let currentTime = player.currentTime().seconds
-        let duration = player.currentItem?.duration.seconds ?? activeScene.sceneDuration ?? 0
-        playbackActivityTracker.setPosition(currentTime: currentTime, duration: duration)
-        ensurePlaybackActivityConfigured()
-
-        if status == .paused {
-            playbackActivityTracker.stop()
-            StashSyncManager.shared.stop()
-            if handyManager.isSyncing || handyManager.isStashSyncMode { handyManager.pause() }
-            if buttplugManager.isSyncing || buttplugManager.isStashSyncMode { buttplugManager.pause() }
-            if loveSpouseManager.isSyncing || loveSpouseManager.isStashSyncMode { loveSpouseManager.pause() }
-        } else if status == .playing {
-            playbackActivityTracker.start()
-            if audioTrackController.tracks.isEmpty {
-                audioTrackController.attach(player: player)
-            }
-            ensureVideoAnalysis(for: player.currentItem)
-            let stashSyncActive = handyManager.isStashSyncMode || buttplugManager.isStashSyncMode || loveSpouseManager.isStashSyncMode
-            if stashSyncActive { StashSyncManager.shared.start() }
-            if handyManager.isSyncing || handyManager.isStashSyncMode { handyManager.play(at: currentTime) }
-            if buttplugManager.isSyncing || buttplugManager.isStashSyncMode { buttplugManager.play(at: currentTime) }
-            if loveSpouseManager.isSyncing || loveSpouseManager.isStashSyncMode { loveSpouseManager.play(at: currentTime) }
-        }
-    }
-
     /// Updates local Scene Detail state and notifies catalog lists (title, studio, tags, …).
     private func applyLocalSceneEdit(_ updated: Scene) {
         activeScene = updated
@@ -851,60 +813,8 @@ struct SceneDetailView: View {
     }
 
     private func startPlayback(resume: Bool) {
-        if PlayerEngineResolver.shouldUseAether(for: activeScene),
-           let aetherURL = activeScene.aetherVideoURL,
-           startAetherPlayback(url: aetherURL, resume: resume) {
-            return
-        }
+        guard let url = activeScene.aetherVideoURL else { return }
 
-        guard let videoURL = activeScene.videoURL else { return }
-
-        if player == nil {
-            AppLog.debug("🎬 Player initializing with URL: \(redactedURLString(videoURL))")
-            // Re-read here, not at `@State` init: only now is the playback audio session active,
-            // so only now does the route report connected headphones.
-            isMuted = ScenePlayerMute.initialValueForPlayback()
-            player = createPlayer(for: videoURL, muted: isMuted)
-            addTimeObserverIfNeeded()
-            configureSubtitles()
-
-            if resume, let resumeTime = activeScene.resumeTime, resumeTime > 0 {
-                let targetTime = CMTime(seconds: resumeTime, preferredTimescale: 600)
-                player?.seek(to: targetTime)
-            }
-        } else if resume, let resumeTime = activeScene.resumeTime, resumeTime > 0 {
-             let targetTime = CMTime(seconds: resumeTime, preferredTimescale: 600)
-             player?.seek(to: targetTime)
-        }
-        
-        withAnimation {
-            isPlaybackStarted = true
-        }
-        player?.play()
-        subtitleController.attach(player: player)
-        audioTrackController.attach(player: player)
-        if handyManager.isSyncing {
-            handyManager.play(at: player?.currentTime().seconds ?? 0)
-        }
-        if buttplugManager.isConnected {
-            buttplugManager.play(at: player?.currentTime().seconds ?? 0)
-        }
-        if loveSpouseManager.isSyncing {
-            loveSpouseManager.play(at: player?.currentTime().seconds ?? 0)
-        }
-        player?.rate = Float(playbackSpeed)
-        ensurePlaybackActivityConfigured()
-        playbackActivityTracker.start()
-        
-        if !hasAddedPlay {
-            registerScenePlay()
-        }
-    }
-
-    /// Aether counterpart of `startPlayback`. Returns false when the engine could not be
-    /// created, so the caller falls through to the AVPlayer path.
-    @discardableResult
-    private func startAetherPlayback(url: URL, resume: Bool) -> Bool {
         let resumeTarget: Double? = {
             guard resume, let time = activeScene.resumeTime, time > 0 else { return nil }
             return time
@@ -915,16 +825,16 @@ struct SceneDetailView: View {
             do {
                 engine = try AetherSceneEngine()
             } catch {
-                AppLog.error("Aether engine unavailable, falling back to AVPlayer: \(error.localizedDescription)")
+                AppLog.error("Playback engine unavailable: \(error.localizedDescription)")
                 ToastManager.shared.show(
-                    "Playback engine unavailable — using the standard player",
+                    "Playback engine unavailable",
                     icon: "exclamationmark.triangle",
                     style: .error
                 )
-                return false
+                return
             }
 
-            AppLog.debug("🎬 Aether player initializing with URL: \(redactedURLString(url))")
+            AppLog.debug("🎬 Player initializing with URL: \(redactedURLString(url))")
             // Re-read here, not at `@State` init: only now is the playback audio session active,
             // so only now does the route report connected headphones.
             isMuted = ScenePlayerMute.initialValueForPlayback()
@@ -949,7 +859,7 @@ struct SceneDetailView: View {
                 guard let engine else { return }
                 handleAetherPlayingChange(engine, playing: playing)
             }
-            // A (re)load swaps the AVPlayerItem in place — re-attach AI Motion to the new one.
+            // A (re)load swaps the analysis item in place — re-attach AI Motion to the new one.
             engine.onAnalysisItemChanged = { _ in
                 ensureAetherVideoAnalysis()
             }
@@ -967,8 +877,8 @@ struct SceneDetailView: View {
         withAnimation {
             isPlaybackStarted = true
         }
-        // Live captions (AI Subs) share the caption channel with server VTT; under the engine the
-        // controller is driven by the engine clock instead of an AVPlayer time observer.
+        // Live captions (AI Subs) share the caption channel with server VTT; the controller is
+        // driven by the engine clock.
         if let engine = aetherEngine {
             subtitleController.attach(aether: engine)
         }
@@ -990,7 +900,6 @@ struct SceneDetailView: View {
         if !hasAddedPlay {
             registerScenePlay()
         }
-        return true
     }
 
     /// Stash's server captions as selectable external subtitle tracks on the engine. Nothing is
@@ -1012,8 +921,7 @@ struct SceneDetailView: View {
         }
     }
 
-    /// Aether counterpart of `handleTimeControlStatusChange`, without the AVPlayer-bound
-    /// pieces (audio-track controller, video analysis).
+    /// Play-state fan-out: activity tracker, StashSync and the device managers.
     private func handleAetherPlayingChange(_ aether: AetherSceneEngine, playing: Bool) {
         // Scrubbing produces rapid playing/paused transitions; `commitScrub` handles the resume.
         if isScrubbing { return }
@@ -1053,28 +961,6 @@ struct SceneDetailView: View {
         }
     }
 
-    private func addTimeObserverIfNeeded() {
-        guard timeObserverToken == nil, let player = player else { return }
-        let interval = CMTime(seconds: 0.25, preferredTimescale: 600)
-        timeObserverToken = player.addPeriodicTimeObserver(forInterval: interval, queue: .main) { time in
-            let seconds = time.seconds
-            Task { @MainActor in
-                if seconds >= 0 {
-                    currentPlaybackTime = seconds
-                    let duration = player.currentItem?.duration.seconds ?? activeScene.sceneDuration ?? 0
-                    playbackActivityTracker.setPosition(currentTime: seconds, duration: duration)
-                    if player.timeControlStatus == .playing {
-                        ensurePlaybackActivityConfigured()
-                        playbackActivityTracker.start()
-                    }
-                }
-                if !hasAddedPlay, seconds > 1 {
-                    registerScenePlay()
-                }
-            }
-        }
-    }
-
     private func registerScenePlay() {
         viewModel.addScenePlay(sceneId: activeScene.id)
         hasAddedPlay = true
@@ -1083,12 +969,6 @@ struct SceneDetailView: View {
             object: nil,
             userInfo: ["sceneId": activeScene.id]
         )
-    }
-
-    private func removeTimeObserver() {
-        guard let token = timeObserverToken, let player = player else { return }
-        player.removeTimeObserver(token)
-        timeObserverToken = nil
     }
 
     private func deleteSceneWithFiles() {
@@ -1118,67 +998,25 @@ struct SceneDetailView: View {
         }
     }
 
-    private func startPreview() {
-        guard let previewURL = activeScene.previewURL else { return }
-        
-        if previewPlayer == nil {
-            previewPlayer = createMutedPreviewPlayer(for: previewURL)
-        }
-        
-        withAnimation(.easeIn(duration: 0.2)) {
-            isPreviewing = true
-        }
-        previewPlayer?.play()
-    }
-    
     private func stopPreview() {
         withAnimation(.easeOut(duration: 0.2)) {
             isPreviewing = false
         }
-        previewPlayer?.pause()
-        previewPlayer?.seek(to: .zero)
     }
-    
+
     private func seekTo(_ seconds: Double) {
         if !isPlaybackStarted {
             startPlayback(resume: false)
         }
 
-        if let aether = aetherEngine {
-            enqueueAetherSeek(aether, to: seconds)
-            playbackActivityTracker.noteSeek(to: seconds)
-            guard !isScrubbing else { return }
-            aether.play()
-            if handyManager.isSyncing {
-                handyManager.play(at: seconds)
-            }
-            if buttplugManager.isConnected {
-                buttplugManager.play(at: seconds)
-            }
-            if loveSpouseManager.isSyncing {
-                loveSpouseManager.play(at: seconds)
-            }
-            return
-        }
-
-        // Switch to scrub-buffer once when scrubbing begins so AVPlayer
-        // can react to repeated seeks without re-buffering 6+ seconds.
-        if isScrubbing, let item = player?.currentItem {
-            configureForVOD(item, isScrubbing: true)
-        }
-
-        let targetTime = CMTime(seconds: seconds, preferredTimescale: 600)
-        // Keyframe-tolerant seeks are dramatically faster on HLS / transcoded
-        // streams because AVPlayer can snap to the nearest I-frame instead of
-        // forcing the server to re-encode up to the exact frame.
-        player?.seek(to: targetTime, toleranceBefore: .positiveInfinity, toleranceAfter: .positiveInfinity)
+        guard let aether = aetherEngine else { return }
+        enqueueAetherSeek(aether, to: seconds)
         playbackActivityTracker.noteSeek(to: seconds)
-
-        // While actively scrubbing we don't kick device-syncs on every micro-seek
-        // (that explodes network/Bluetooth traffic). Final commit happens on
-        // drag end via `commitScrub(to:)`.
+        // While actively scrubbing we don't kick device-syncs on every micro-seek (that
+        // explodes network / Bluetooth traffic). Final commit happens on drag end via
+        // `commitScrub(to:)`.
         guard !isScrubbing else { return }
-        player?.play()
+        aether.play()
         if handyManager.isSyncing {
             handyManager.play(at: seconds)
         }
@@ -1193,26 +1031,10 @@ struct SceneDetailView: View {
     /// Called from the heatmap scrubber when the user releases the drag.
     /// Does the final accurate seek + sync resume.
     private func commitScrub(to seconds: Double) {
-        if let aether = aetherEngine {
-            enqueueAetherSeek(aether, to: seconds)
-            playbackActivityTracker.noteSeek(to: seconds)
-            aether.play()
-            if handyManager.isSyncing { handyManager.play(at: seconds) }
-            if buttplugManager.isConnected { buttplugManager.play(at: seconds) }
-            if loveSpouseManager.isSyncing { loveSpouseManager.play(at: seconds) }
-            return
-        }
-
-        // Restore the steady-state forward buffer for stable playback.
-        if let item = player?.currentItem {
-            configureForVOD(item, isScrubbing: false)
-        }
-        let targetTime = CMTime(seconds: seconds, preferredTimescale: 600)
-        // Final commit should be precise; only intermediate drag seeks are
-        // keyframe-tolerant for responsiveness.
-        player?.seek(to: targetTime, toleranceBefore: .zero, toleranceAfter: .zero)
+        guard let aether = aetherEngine else { return }
+        enqueueAetherSeek(aether, to: seconds)
         playbackActivityTracker.noteSeek(to: seconds)
-        player?.play()
+        aether.play()
         if handyManager.isSyncing { handyManager.play(at: seconds) }
         if buttplugManager.isConnected { buttplugManager.play(at: seconds) }
         if loveSpouseManager.isSyncing { loveSpouseManager.play(at: seconds) }
@@ -1240,36 +1062,6 @@ struct SceneDetailView: View {
         .overlay(Capsule().stroke((color ?? appearanceManager.tintColor).opacity(0.4), lineWidth: 0.5))
     }
     
-    /// Updates the player if a better stream becomes available (e.g. replacing an incompatible MKV fallback with a transcoded MP4).
-    /// Uses the central `makeVODPlayerItem` helper so buffering, headers and apikey-signing stay consistent with `qualityMenu` switches.
-    private func updatePlayerStream() {
-        // The engine owns its own source; stream upgrades are handled by the quality menu.
-        guard aetherEngine == nil else { return }
-        guard let currentAsset = player?.currentItem?.asset as? AVURLAsset else { return }
-        guard let newURL = activeScene.videoURL else { return }
-
-        if currentAsset.url.absoluteString == newURL.absoluteString { return }
-
-        let oldIsFallback = currentAsset.url.pathExtension.lowercased() == "mkv"
-        let newIsStream = newURL.pathExtension.lowercased() == "mp4" || newURL.absoluteString.contains("/stream")
-        guard oldIsFallback || newIsStream else { return }
-
-        AppLog.debug("♻️ Upgrading stream from \(currentAsset.url.lastPathComponent) to \(newURL.lastPathComponent)…")
-
-        let currentTime = player?.currentTime() ?? .zero
-        let wasPlaying = (player?.rate ?? 0) > 0
-
-        let item = makeVODPlayerItem(for: newURL)
-        player?.replaceCurrentItem(with: item)
-        audioTrackController.attach(player: player)
-        if currentTime > .zero {
-            player?.seek(to: currentTime, toleranceBefore: .positiveInfinity, toleranceAfter: .positiveInfinity)
-        }
-        if wasPlaying || isPlaybackStarted {
-            player?.play()
-        }
-        StashVideoSyncManager.shared.setup(for: item)
-    }
 }
 
 // Extensions for Scene conversion
@@ -1334,9 +1126,12 @@ struct AddMarkerSheet: View {
     let sceneTitle: String
     let sceneTagIds: Set<String>
     let seconds: Double
-    /// Used to capture a still at the marker start (same path as Scene Cover).
-    let player: AVPlayer?
+    /// Source of the marker still. Only used for the log line — the frame itself comes from
+    /// the engine, which already has the file open.
     let videoURL: URL?
+    /// Captures the still at the marker start (same path as Scene Cover). nil before playback
+    /// has started, in which case the marker is created without a local thumbnail.
+    let aetherEngine: AetherSceneEngine?
     @ObservedObject var viewModel: StashDBViewModel
     var onComplete: () -> Void
     @Environment(\.dismiss) var dismiss
@@ -1473,15 +1268,17 @@ struct AddMarkerSheet: View {
     private func createMarker() {
         isCreating = true
         let endSeconds = parseTime(endTimeString)
-        let captureTime = CMTime(seconds: max(0, seconds), preferredTimescale: 600)
 
         Task { @MainActor in
-            // Capture start-frame still like Scene Cover (instant local thumb).
-            let frameDataURL = await captureVideoFrameDataURL(
-                from: player,
-                fallbackURL: videoURL,
-                at: captureTime
-            )
+            // Capture start-frame still like Scene Cover (instant local thumb). The engine
+            // decodes it from the source it is already playing; without one there is no still.
+            let frameDataURL: String? = await {
+                guard let aetherEngine, videoURL != nil else { return nil }
+                guard let image = await aetherEngine.captureFrame(at: max(0, seconds),
+                                                                  maxSize: kCaptureFrameMaxSize)
+                else { return nil }
+                return videoFrameDataURL(from: image)
+            }()
 
             viewModel.createSceneMarker(
                 sceneId: sceneId,
@@ -1609,8 +1406,8 @@ private struct SceneDetailAlertModifier: ViewModifier {
     let capturedMarkerTime: Double
     let sceneId:            String
     let sceneTagIds:        Set<String>
-    let player:             AVPlayer?
     let videoURL:           URL?
+    let aetherEngine:       AetherSceneEngine?
     let viewModel:          StashDBViewModel
     let onRefresh:          () -> Void
     let onDelete:           () -> Void
@@ -1629,8 +1426,8 @@ private struct SceneDetailAlertModifier: ViewModifier {
                     sceneTitle: title,
                     sceneTagIds: sceneTagIds,
                     seconds: capturedMarkerTime,
-                    player: player,
                     videoURL: videoURL,
+                    aetherEngine: aetherEngine,
                     viewModel: viewModel
                 ) {
                     onRefresh()
@@ -1644,16 +1441,13 @@ private struct SceneDetailAlertModifier: ViewModifier {
 private struct SceneDetailLifecycleModifier: ViewModifier {
     let sceneId:           String
     @Binding var isMuted:  Bool
-    let player:            AVPlayer?
     let aetherEngine:      AetherSceneEngine?
     let onAppear:          () -> Void
     let onDisappear:       () -> Void
     let onPeriodicSync:    () -> Void
     let onRefreshMarkers:  () -> Void
     let onInitialSync:     () -> Void
-    let onEnsureAnalysis:  (AVPlayerItem?) -> Void
     let onEnsureAetherAnalysis: () -> Void
-    let onTimeControlChange: (AVPlayer.TimeControlStatus) -> Void
     let handyManager:      HandyManager
     let buttplugManager:   ButtplugManager
     let loveSpouseManager: LoveSpouseManager
@@ -1663,9 +1457,8 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
             .onAppear { onAppear() }
             .onDisappear { onDisappear() }
             .onChange(of: isMuted) { _, v in
-                // No persist: this view has no mute button, so the handler only ever sees
-                // programmatic writes. Storing those leaked AVKit's resets into the shared key.
-                player?.isMuted = v
+                // No persist: this view has no mute button of its own, so the handler only
+                // ever sees programmatic writes.
                 aetherEngine?.isMuted = v
             }
             // Without a mute button here the route is the only control the user has: plugging
@@ -1676,52 +1469,24 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
                 if muted != isMuted { isMuted = muted }
             }
             .onReceive(Timer.publish(every: 10, on: .main, in: .common).autoconnect()) { _ in onPeriodicSync() }
-            // The 0.5s fallback timer was removed — `addPeriodicTimeObserver`
-            // (in SceneDetailView) publishes time at 0.25s already.
             .onChange(of: StashSyncManager.shared.isActive) { _, active in if active { onInitialSync() } }
-            .overlay(playerOverlay)
             .overlay(aetherOverlay)
     }
 
-    /// The engine's counterpart of `playerOverlay`: only the device-mode toggles, since the
-    /// engine reports play/pause through `onPlayingChanged` and item swaps through
-    /// `onAnalysisItemChanged`.
+    /// Only the device-mode toggles: the engine reports play/pause through `onPlayingChanged`
+    /// and item swaps through `onAnalysisItemChanged`.
     @ViewBuilder
     private var aetherOverlay: some View {
-        if player == nil, aetherEngine != nil {
+        if aetherEngine != nil {
             Color.clear
-                .onChange(of: handyManager.isStashSyncMode) { _, on in if on { onEnsureAetherAnalysis() } }
-                .onChange(of: buttplugManager.isStashSyncMode) { _, on in if on { onEnsureAetherAnalysis() } }
-                .onChange(of: loveSpouseManager.isStashSyncMode) { _, on in if on { onEnsureAetherAnalysis() } }
-        }
-    }
-
-    @ViewBuilder
-    private var playerOverlay: some View {
-        if let player {
-            Color.clear
-                // Follows the player, never fights it: AVKit's own mute control in the transport
-                // bar writes straight to `player.isMuted`, so re-asserting our state here would
-                // make that button dead. Harmless because this view never persists — AVKit's
-                // reset on fullscreen in/out stays inside the session.
-                .onReceive(player.publisher(for: \.isMuted)) { muted in
-                    if muted != isMuted {
-                        isMuted = muted
-                    }
-                }
-                .onReceive(player.publisher(for: \.timeControlStatus)) { status in
-                    onTimeControlChange(status)
-                }
-                .onReceive(player.publisher(for: \.status)) { _ in }
-                .onChange(of: player.currentItem) { _, item in onEnsureAnalysis(item) }
                 .onChange(of: handyManager.isStashSyncMode) { _, on in
-                    if on { onEnsureAnalysis(player.currentItem); onInitialSync() }
+                    if on { onEnsureAetherAnalysis(); onInitialSync() }
                 }
                 .onChange(of: buttplugManager.isStashSyncMode) { _, on in
-                    if on { onEnsureAnalysis(player.currentItem); onInitialSync() }
+                    if on { onEnsureAetherAnalysis(); onInitialSync() }
                 }
                 .onChange(of: loveSpouseManager.isStashSyncMode) { _, on in
-                    if on { onEnsureAnalysis(player.currentItem); onInitialSync() }
+                    if on { onEnsureAetherAnalysis(); onInitialSync() }
                 }
         }
     }

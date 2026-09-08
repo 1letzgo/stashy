@@ -23,6 +23,10 @@ struct AetherSceneSurface: View {
     /// On-device live captions (AI Subs). Second source for the same overlay; an embedded or
     /// sidecar subtitle track always wins when one is selected.
     var liveCaptionText: String = ""
+    /// Enters or leaves the host's own fullscreen presentation. nil hides the button.
+    var onToggleFullscreen: (() -> Void)?
+    /// Only drives the button's glyph — the host owns the actual presentation state.
+    var isFullscreen: Bool = false
 
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @ObservedObject private var tabManager = TabManager.shared
@@ -254,8 +258,18 @@ struct AetherSceneSurface: View {
                     if hasTrackChoices {
                         tracksMenu
                     }
+                    #if os(iOS)
+                    // The route picker only does anything on a route that owns an AVPlayer;
+                    // the software route decodes into its own layer and cannot be mirrored.
+                    if engine.pipPlayerLayer != nil {
+                        airPlayButton
+                    }
+                    #endif
                     if pip.isAvailable, tabManager.isPiPEnabled, AVPictureInPictureController.isPictureInPictureSupported() {
                         pipButton
+                    }
+                    if onToggleFullscreen != nil {
+                        fullscreenButton
                     }
                     muteButton
                 }
@@ -417,6 +431,35 @@ struct AetherSceneSurface: View {
             .background(Color.black.opacity(0.35), in: Circle())
             .allowsHitTesting(false)
     }
+
+    @ViewBuilder
+    private var fullscreenButton: some View {
+        Button {
+            HapticManager.light()
+            onToggleFullscreen?()
+            revealControls()
+        } label: {
+            Image(systemName: isFullscreen
+                  ? "arrow.down.right.and.arrow.up.left"
+                  : "arrow.up.left.and.arrow.down.right")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(8)
+                .background(Color.black.opacity(0.4), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isFullscreen ? "Exit full screen" : "Full screen")
+    }
+
+    #if os(iOS)
+    @ViewBuilder
+    private var airPlayButton: some View {
+        AetherRoutePickerView()
+            .frame(width: 31, height: 31)
+            .background(Color.black.opacity(0.4), in: Circle())
+            .accessibilityLabel("AirPlay")
+    }
+    #endif
 
     @ViewBuilder
     private var pipButton: some View {
@@ -652,6 +695,24 @@ enum AetherTrackLabel {
         return "Audio"
     }
 }
+
+// MARK: - AirPlay
+
+#if os(iOS)
+/// System route picker. UIKit-only control, so it is bridged rather than redrawn.
+private struct AetherRoutePickerView: UIViewRepresentable {
+    func makeUIView(context: Context) -> AVRoutePickerView {
+        let view = AVRoutePickerView()
+        view.activeTintColor = .white
+        view.tintColor = .white
+        view.prioritizesVideoDevices = true
+        view.backgroundColor = .clear
+        return view
+    }
+
+    func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
+}
+#endif
 
 // MARK: - Picture in Picture
 
