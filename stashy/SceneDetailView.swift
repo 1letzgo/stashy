@@ -560,9 +560,12 @@ struct SceneDetailView: View {
                     onToggleFullscreen: { isFullscreen = false },
                     isFullscreen: true
                 )
-                .ignoresSafeArea()
+                // Only the black backdrop bleeds under the notch and home indicator; the
+                // surface (and with it the transport) stays inside the safe area so every
+                // control is reachable.
             }
         }
+        .statusBarHidden(true)
         // Best effort: an attached keyboard (iPad / Mac) skips ±15 s. Deliberately without
         // `.focusable()` — that steals the taps the transport needs.
         .onKeyPress(.leftArrow) {

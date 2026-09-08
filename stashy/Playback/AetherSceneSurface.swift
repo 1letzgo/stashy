@@ -254,10 +254,7 @@ struct AetherSceneSurface: View {
             // transport back, and it all leaves together.
             VStack {
                 HStack(spacing: 8) {
-                    Spacer()
-                    if hasTrackChoices {
-                        tracksMenu
-                    }
+                    // Output routes on the left (AirPlay, PiP), playback controls on the right.
                     #if os(iOS)
                     // The route picker only does anything on a route that owns an AVPlayer;
                     // the software route decodes into its own layer and cannot be mirrored.
@@ -268,12 +265,16 @@ struct AetherSceneSurface: View {
                     if pip.isAvailable, tabManager.isPiPEnabled, AVPictureInPictureController.isPictureInPictureSupported() {
                         pipButton
                     }
+                    Spacer()
+                    if hasTrackChoices {
+                        tracksMenu
+                    }
                     if onToggleFullscreen != nil {
                         fullscreenButton
                     }
                     muteButton
                 }
-                .padding(.trailing, 10)
+                .padding(.horizontal, 10)
                 .padding(.top, 10)
                 Spacer()
             }
