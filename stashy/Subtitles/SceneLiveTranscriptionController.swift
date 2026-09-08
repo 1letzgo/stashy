@@ -1051,13 +1051,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
         if let url = await firstReadableCandidate(from: candidateURLs, startSeconds: startSeconds) {
             return .assetReader(url)
         }
-        if #available(iOS 26.0, *),
-           !transcodePrefetchFailed,
-           TabManager.shared.isLiveCaptionLookaheadEnabled,
-           let sceneID,
-           SceneTranscodeAudioPrefetcher.isAvailable() {
-            return .transcodePrefetch(sceneID: sceneID)
-        }
+        // The transcode lookahead tier is retired: playback always uses the original file.
         return usesEngineAudio ? .engineTap : .playerTap
     }
 

@@ -36,28 +36,6 @@ enum AuthMethod: String, Codable, CaseIterable {
     case apiKey = "API Key"
 }
 
-enum StreamingQuality: String, Codable, CaseIterable {
-    case original = "Original"
-    case uhd = "4K (2160p)"
-    case fhd = "Full HD (1080p)"
-    case hd = "HD (720p)"
-    case sd = "Standard (480p)"
-    case low = "Low (240p)"
-    
-    var displayName: String { rawValue }
-    
-    var maxVerticalResolution: Int? {
-        switch self {
-        case .original: return nil
-        case .uhd: return 2160
-        case .fhd: return 1080
-        case .hd: return 720
-        case .sd: return 480
-        case .low: return 240
-        }
-    }
-}
-
 // Legacy enum for backward compatibility
 enum ConnectionType: String, Codable, CaseIterable {
     case ipAddress = "IP Address"
@@ -76,8 +54,6 @@ struct ServerConfig: Codable, Identifiable, Equatable {
     var serverProtocol: ServerProtocol
     var apiKey: String?        // Optional API Key for authentication
     var subpath: String?       // Optional subpath (e.g. "/stash")
-    var defaultQuality: StreamingQuality = .original
-    var reelsQuality: StreamingQuality = .original
 
     var baseURL: String {
         let effectivePort = port ?? serverProtocol.defaultPort
@@ -130,9 +106,7 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         port: String? = nil,
         serverProtocol: ServerProtocol = .https,
         apiKey: String? = nil,
-        subpath: String? = nil,
-        defaultQuality: StreamingQuality = .original,
-        reelsQuality: StreamingQuality = .original
+        subpath: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -141,8 +115,6 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         self.serverProtocol = serverProtocol
         self.apiKey = apiKey
         self.subpath = subpath
-        self.defaultQuality = defaultQuality
-        self.reelsQuality = reelsQuality
     }
     
     // Backward compatibility decoder
@@ -152,8 +124,6 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         name = try container.decodeIfPresent(String.self, forKey: .name) ?? "My Stash"
         apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey)
-        defaultQuality = try container.decodeIfPresent(StreamingQuality.self, forKey: .defaultQuality) ?? .original
-        reelsQuality = try container.decodeIfPresent(StreamingQuality.self, forKey: .reelsQuality) ?? .original
         
         // Try to decode new format first
         if let serverAddress = try? container.decode(String.self, forKey: .serverAddress),
@@ -193,14 +163,12 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         try container.encode(serverProtocol, forKey: .serverProtocol)
         try container.encodeIfPresent(apiKey, forKey: .apiKey)
         try container.encodeIfPresent(subpath, forKey: .subpath)
-        try container.encode(defaultQuality, forKey: .defaultQuality)
-        try container.encode(reelsQuality, forKey: .reelsQuality)
     }
     
     enum CodingKeys: String, CodingKey {
         case id, name, apiKey, subpath
         // New format keys
-        case serverAddress, port, serverProtocol, defaultQuality, reelsQuality
+        case serverAddress, port, serverProtocol
         // Legacy format keys (for backward compatibility)
         case connectionType, ipAddress, domain, useHTTPS
     }
@@ -295,7 +263,7 @@ class ServerConfigManager: ObservableObject {
                 // Notify all ViewModels to reset their data
                 NotificationCenter.default.post(name: NSNotification.Name("ServerConfigChanged"), object: nil)
             } else {
-                // Settings like StreamingQuality changed. Emit a minor notification if needed,
+                // Only secondary settings changed. Emit a minor notification if needed,
                 // but do not nuke the URLSession.
                 NotificationCenter.default.post(name: NSNotification.Name("ServerConfigPropertiesChanged"), object: nil)
             }

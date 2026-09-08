@@ -2,15 +2,14 @@
 //  Scene+AetherPlayback.swift
 //  stashy
 //
-//  Source URL for the optional playback engine. Unlike `Scene.videoURL`
-//  this never resolves to a server-side transcode: the whole point of the
-//  engine is to play the original file.
+//  Source URL for the playback engine. Never a server-side transcode:
+//  the engine always plays the original file.
 //
 
 import Foundation
 
 extension Scene {
-    /// Original-file URL for the optional playback engine, or nil when no source is known.
+    /// Original-file URL for the playback engine, or nil when no source is known.
     var aetherVideoURL: URL? {
         // 0. A finished local download wins (offline first).
         if let localURL = LocalDownloadStore.videoURL(sceneID: id) {

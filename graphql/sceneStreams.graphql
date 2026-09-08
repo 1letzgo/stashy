@@ -1,7 +1,0 @@
-query SceneStreams($id: ID!) {
-  sceneStreams(id: $id) {
-    label
-    mime_type
-    url
-  }
-}

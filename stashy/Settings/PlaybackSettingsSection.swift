@@ -9,62 +9,17 @@ import SwiftUI
 
 struct PlaybackSettingsSection: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
-    @ObservedObject var configManager = ServerConfigManager.shared
     @ObservedObject var tabManager = TabManager.shared
 
     var body: some View {
-        let qualityRows = configManager.activeConfig != nil ? 2 : 1
-        let rowCount = qualityRows + 1
-
         Section {
             stashyScrollingSectionHeader("Playback")
-            if let config = configManager.activeConfig {
-                Picker(selection: Binding(
-                    get: { config.defaultQuality },
-                    set: { newValue in
-                        var updated = config
-                        updated.defaultQuality = newValue
-                        ServerConfigManager.shared.saveConfig(updated)
-                        ServerConfigManager.shared.addOrUpdateServer(updated)
-                    }
-                )) {
-                    ForEach(StreamingQuality.allCases, id: \.self) { quality in
-                        Text(quality.displayName).tag(quality)
-                    }
-                } label: {
-                    Label("Library Quality", systemImage: "film")
-                }
-                .stashyGroupedBlockRow(index: 0, count: rowCount)
-
-                Picker(selection: Binding(
-                    get: { config.reelsQuality },
-                    set: { newValue in
-                        var updated = config
-                        updated.reelsQuality = newValue
-                        ServerConfigManager.shared.saveConfig(updated)
-                        ServerConfigManager.shared.addOrUpdateServer(updated)
-                    }
-                )) {
-                    ForEach(StreamingQuality.allCases, id: \.self) { quality in
-                        Text(quality.displayName).tag(quality)
-                    }
-                } label: {
-                    Label("Feeds Quality", systemImage: "play.rectangle.on.rectangle")
-                }
-                .stashyGroupedBlockRow(index: 1, count: rowCount)
-            } else {
-                Text("Connect to a server to configure quality settings.")
-                    .foregroundColor(.secondary)
-                    .font(.caption)
-                    .stashyGroupedBlockRow(index: 0, count: rowCount)
-            }
-
             #if !os(tvOS)
             Toggle(isOn: $tabManager.isPiPEnabled) {
                 Label("Picture-in-Picture", systemImage: "pip")
             }
             .tint(appearanceManager.tintColor)
-            .stashyGroupedBlockRow(index: qualityRows, count: rowCount)
+            .stashyGroupedBlockRow(index: 0, count: 1)
             #endif
         }
     }
@@ -92,13 +47,7 @@ struct StashyPlusAISubtitlesSettings: View {
         } label: {
             Label("My subtitle language", systemImage: "captions.bubble")
         }
-        .stashyGroupedBlockRow(index: 0, count: 2)
-
-        Toggle(isOn: $tabManager.isLiveCaptionLookaheadEnabled) {
-            Label("Live CC Lookahead", systemImage: "hare")
-        }
-        .tint(appearanceManager.tintColor)
-        .stashyGroupedBlockRow(index: 1, count: 2)
+        .stashyGroupedBlockRow(index: 0, count: 1)
     }
 }
 

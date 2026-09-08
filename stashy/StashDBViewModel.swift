@@ -710,7 +710,6 @@ class StashDBViewModel: ObservableObject {
 
     private var activeReelsFeed: ReelsFeedKind?
     private var reelsFeedSignatures: [ReelsFeedKind: ReelsFeedSignature] = [:]
-    private var streamPrefetchGeneration = 0
 
     func makeReelsFeedSignature(
         kind: ReelsFeedKind,
@@ -752,7 +751,6 @@ class StashDBViewModel: ObservableObject {
     /// Drop in-flight work for every Reels feed except `kind` so a mode switch
     /// does not keep hammering Stash (old find* + stream prefetch).
     func abandonInactiveReelsFeeds(keeping kind: ReelsFeedKind) {
-        streamPrefetchGeneration += 1
         activeReelsFeed = kind
         if kind != .scenes {
             scenesFetchGeneration += 1
@@ -781,14 +779,12 @@ class StashDBViewModel: ObservableObject {
 
     func setActiveReelsFeed(_ kind: ReelsFeedKind?) {
         if activeReelsFeed != kind {
-            streamPrefetchGeneration += 1
-        }
+            }
         activeReelsFeed = kind
     }
 
     func forgetAllReelsFeedSignatures() {
         reelsFeedSignatures.removeAll()
-        streamPrefetchGeneration += 1
         activeReelsFeed = nil
     }
 
@@ -1742,7 +1738,6 @@ class StashDBViewModel: ObservableObject {
         scenesFetchGeneration += 1
         previewsFetchGeneration += 1
         markersFetchGeneration += 1
-        streamPrefetchGeneration += 1
         reelsFeedSignatures.removeAll()
         activeReelsFeed = nil
         
@@ -3559,10 +3554,6 @@ class StashDBViewModel: ObservableObject {
                             self.scenes = scenesResult.scenes
                             self.totalScenes = scenesResult.count
                             self.resetFeedPagingState("scenes")
-                            // Only the visible Scenes feed — never Markers/Clips/Previews.
-                            if self.activeReelsFeed == .scenes {
-                                self.prefetchSceneStreams(sceneIds: self.scenes.map { $0.id })
-                            }
                         } else {
                             // Deduplicate: Only add scenes that aren't already in the list
                             let existingIds = Set(self.scenes.map { $0.id })
@@ -8488,7 +8479,6 @@ struct Scene: Codable, Identifiable, Equatable {
     let paths: ScenePaths?
     let sceneMarkers: [SceneMarker]?
     let interactive: Bool?
-    var streams: [SceneStream]?
     let stashIds: [StashID]?
     let captions: [VideoCaption]?
     let customFields: [String: StashJSONValue]?
@@ -8539,29 +8529,17 @@ struct Scene: Codable, Identifiable, Equatable {
         SubtitleTargetLanguage.normalizedSceneLanguageTag(from: customFields?["language"]?.stringValue)
     }
 
-    /// Prefer Direct/MP4 for speech reader; fall back to paths.stream.
+    /// Source for the speech reader: always the original file the engine plays.
     var transcriptionStreamURL: URL? {
-        if let streams {
-            let mp4 = streams.filter {
-                $0.mime_type == "video/mp4" && !$0.label.lowercased().contains("mkv")
-            }
-            if let best = mp4.first, let url = URL(string: best.url) {
-                return signedURL(url)
-            }
-            if let direct = streams.first(where: { $0.label.lowercased().contains("direct") }),
-               let url = URL(string: direct.url) {
-                return signedURL(url)
-            }
-        }
         if let path = paths?.stream, let url = URL(string: path) {
             return signedURL(url)
         }
-        return videoURL
+        return aetherVideoURL
     }
     
     
     enum CodingKeys: String, CodingKey {
-        case id, title, details, director, date, duration, studio, performers, files, tags, galleries, groups, organized, rating100, paths, interactive, streams, captions
+        case id, title, details, director, date, duration, studio, performers, files, tags, galleries, groups, organized, rating100, paths, interactive, captions
         case resumeTime = "resume_time"
         case playCount = "play_count"
         case playDuration = "play_duration"
@@ -8574,8 +8552,8 @@ struct Scene: Codable, Identifiable, Equatable {
         case customFields = "custom_fields"
     }
 
-    // Explicit initializer to handle manual updates like 'withStreams'
-    init(id: String, title: String?, details: String?, director: String? = nil, date: String?, duration: Double?, studio: SceneStudio?, performers: [ScenePerformer], files: [SceneFile]?, tags: [Tag]?, galleries: [Gallery]?, groups: [SceneGroupEntry]? = nil, organized: Bool?, resumeTime: Double?, playCount: Int?, oCounter: Int?, rating100: Int?, createdAt: String?, updatedAt: String?, paths: ScenePaths?, sceneMarkers: [SceneMarker]?, interactive: Bool?, streams: [SceneStream]? = nil, stashIds: [StashID]? = nil, captions: [VideoCaption]? = nil, customFields: [String: StashJSONValue]? = nil, playDuration: Double? = nil, lastPlayedAt: String? = nil) {
+    // Explicit initializer for copy-constructors
+    init(id: String, title: String?, details: String?, director: String? = nil, date: String?, duration: Double?, studio: SceneStudio?, performers: [ScenePerformer], files: [SceneFile]?, tags: [Tag]?, galleries: [Gallery]?, groups: [SceneGroupEntry]? = nil, organized: Bool?, resumeTime: Double?, playCount: Int?, oCounter: Int?, rating100: Int?, createdAt: String?, updatedAt: String?, paths: ScenePaths?, sceneMarkers: [SceneMarker]?, interactive: Bool?, stashIds: [StashID]? = nil, captions: [VideoCaption]? = nil, customFields: [String: StashJSONValue]? = nil, playDuration: Double? = nil, lastPlayedAt: String? = nil) {
         self.id = id
         self.title = title
         self.details = details
@@ -8600,7 +8578,6 @@ struct Scene: Codable, Identifiable, Equatable {
         self.paths = paths
         self.sceneMarkers = sceneMarkers
         self.interactive = interactive
-        self.streams = streams
         self.stashIds = stashIds
         self.captions = captions
         self.customFields = customFields
@@ -8633,7 +8610,6 @@ struct Scene: Codable, Identifiable, Equatable {
         paths = try container.decodeIfPresent(ScenePaths.self, forKey: .paths)
         sceneMarkers = try container.decodeIfPresent([SceneMarker].self, forKey: .sceneMarkers)
         interactive = try container.decodeIfPresent(Bool.self, forKey: .interactive)
-        streams = try container.decodeIfPresent([SceneStream].self, forKey: .streams)
         stashIds = try container.decodeIfPresent([StashID].self, forKey: .stashIds)
         captions = try container.decodeIfPresent([VideoCaption].self, forKey: .captions)
         customFields = try container.decodeIfPresent([String: StashJSONValue].self, forKey: .customFields)
@@ -8714,115 +8690,6 @@ struct Scene: Codable, Identifiable, Equatable {
             manualPath = "\(manualPath)&t=\(updated.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? updated)"
         }
         return signed(URL(string: manualPath))
-    }
-
-    /// Finds the best available stream matching the requested quality
-    func bestStream(for quality: StreamingQuality) -> URL? {
-        guard let streams = streams, !streams.isEmpty else { return nil }
-        
-        let compatible = ["mp4", "m4v", "mov"]
-        let fmt = files?.first?.format?.lowercased() ?? ""
-        let isCompatible = compatible.contains(fmt)
-        
-        // Rule: For compatible formats (MP4), always prefer direct streaming (Original)
-        // unless the user specifically requested a different quality and we have a match.
-        if isCompatible && (quality == .original) {
-            AppLog.debug("🎬 MP4 detected: Using direct stream for Original quality.")
-            return nil // Use direct URL from paths?.stream
-        }
-        
-        let hlsStreams = streams.filter { $0.mime_type == "application/vnd.apple.mpegurl" }
-        let mp4Streams = streams.filter { $0.mime_type == "video/mp4" }
-            .filter { !$0.label.lowercased().contains("direct stream") && !$0.label.lowercased().contains("mkv") }
-        
-        let targetRes = quality.maxVerticalResolution ?? 0
-        
-        // Rule: For all other formats (or when specific quality is needed), prioritize HLS
-        if !hlsStreams.isEmpty {
-            if targetRes > 0 {
-                let bestHLS = hlsStreams
-                    .compactMap({ stream -> (SceneStream, Int)? in
-                        let resString = stream.label.lowercased().replacingOccurrences(of: "p", with: "")
-                        if let res = Int(resString) { return (stream, res) }
-                        return nil
-                    })
-                    .filter({ $0.1 <= targetRes })
-                    .sorted(by: { $0.1 > $1.1 })
-                    .first?.0
-                
-                if let stream = bestHLS, let url = URL(string: stream.url) {
-                    AppLog.debug("📺 Using HLS stream (\(stream.label)) for quality \(quality.displayName)")
-                    return url
-                }
-            }
-            
-            // Fallback: Use first HLS if no resolution match or for non-compatible formats
-            if let firstHLS = hlsStreams.first, let url = URL(string: firstHLS.url) {
-                AppLog.debug("📺 Using default HLS stream (\(firstHLS.label))")
-                return url
-            }
-        }
-        
-        // Final fallback to MP4 transcodes if HLS is unavailable
-        if targetRes > 0 {
-            let matchingMP4 = mp4Streams
-                .compactMap { stream -> (SceneStream, Int)? in
-                    let resString = stream.label.lowercased().replacingOccurrences(of: "p", with: "")
-                    if let res = Int(resString) { return (stream, res) }
-                    return nil
-                }
-                .filter { $0.1 <= targetRes }
-                .sorted(by: { $0.1 > $1.1 })
-                .first?.0
-            
-            if let mp4 = matchingMP4, let url = URL(string: mp4.url) {
-                AppLog.debug("⚡ Using MP4 transcode (\(mp4.label)) for quality \(quality.displayName)")
-                return url
-            }
-        }
-        
-        // Catch-all: Try any non-mkv MP4 or just the first stream
-        if let firstMP4 = mp4Streams.first, let url = URL(string: firstMP4.url) {
-             return url
-        }
-        
-        return nil
-    }
-
-    // Computed property for stream URL (respects global default)
-    var videoURL: URL? {
-        // 0. Check for local download first (Offline first!)
-        if let localURL = LocalDownloadStore.videoURL(sceneID: id) {
-            AppLog.debug("📂 Using local download for scene \(id)")
-            return localURL
-        }
-
-        let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original
-        
-        // 1. Try best stream (transcoded)
-        if let streamURL = bestStream(for: quality) {
-            return signedURL(streamURL)
-        }
-
-        // 2. Fallbacks (API path or manual construction)
-        let potentialURL: URL?
-        if let streamPath = paths?.stream, let url = URL(string: streamPath) {
-             potentialURL = url
-        } else if let config = ServerConfigManager.shared.loadConfig() {
-            let urlString = "\(config.baseURL)/scene/\(id)/stream"
-            potentialURL = URL(string: urlString)
-        } else {
-            potentialURL = nil
-        }
-        
-        if let files = files, let first = files.first, let fmt = first.format {
-            let compatible = ["mp4", "m4v", "mov"]
-            if !compatible.contains(fmt.lowercased()) {
-                AppLog.debug("⛔️ Preventing fallback to incompatible '\(fmt)' file for scene \(id)")
-                return nil
-            }
-        }
-        return signedURL(potentialURL)
     }
 
     var heatmapURL: URL? {
@@ -8914,7 +8781,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: newResumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields,
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
             playDuration: playDuration, lastPlayedAt: lastPlayedAt
         )
     }
@@ -8927,7 +8794,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields,
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
             playDuration: playDuration, lastPlayedAt: lastPlayedAt
         )
     }
@@ -8940,20 +8807,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: newRating, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields,
-            playDuration: playDuration, lastPlayedAt: lastPlayedAt
-        )
-    }
-
-    /// Creates a copy with updated streams
-    func withStreams(_ newStreams: [SceneStream]?) -> Scene {
-        return Scene(
-            id: id, title: title, details: details, director: director, date: date, duration: duration,
-            studio: studio, performers: performers, files: files, tags: tags,
-            galleries: galleries, groups: groups, organized: organized,
-            resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
-            rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: newStreams, stashIds: stashIds, captions: captions, customFields: customFields,
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
             playDuration: playDuration, lastPlayedAt: lastPlayedAt
         )
     }
@@ -8966,7 +8820,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: newPlayCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields,
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
             playDuration: playDuration, lastPlayedAt: lastPlayedAt
         )
     }
@@ -8979,7 +8833,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: newOCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields,
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
             playDuration: playDuration, lastPlayedAt: lastPlayedAt
         )
     }
@@ -9030,7 +8884,6 @@ struct Scene: Codable, Identifiable, Equatable {
             paths: paths,
             sceneMarkers: sceneMarkers,
             interactive: interactive,
-            streams: streams,
             stashIds: other.stashIds ?? stashIds,
             captions: captions,
             customFields: customFields,
@@ -9093,7 +8946,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: newUpdatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: customFields,
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: customFields,
             playDuration: playDuration, lastPlayedAt: lastPlayedAt
         )
     }
@@ -9106,7 +8959,7 @@ struct Scene: Codable, Identifiable, Equatable {
             galleries: galleries, groups: groups, organized: organized,
             resumeTime: resumeTime, playCount: playCount, oCounter: oCounter,
             rating100: rating100, createdAt: createdAt, updatedAt: updatedAt,
-            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, streams: streams, stashIds: stashIds, captions: captions, customFields: newFields,
+            paths: paths, sceneMarkers: sceneMarkers, interactive: interactive, stashIds: stashIds, captions: captions, customFields: newFields,
             playDuration: playDuration, lastPlayedAt: lastPlayedAt
         )
     }
@@ -9135,21 +8988,6 @@ struct VideoCaption: Codable, Equatable, Hashable, Identifiable {
     }
 }
 
-struct SceneStream: Codable, Equatable {
-    let label: String
-    let mime_type: String
-    let url: String
-}
-
-struct SceneStreamsResponse: Codable {
-    let data: SceneStreamsData?
-}
-
-struct SceneStreamsData: Codable {
-    let sceneStreams: [SceneStream]
-}
-
-
 struct ScenePaths: Codable, Equatable {
     let screenshot: String?
     let preview: String?
@@ -9173,28 +9011,24 @@ struct MarkerScene: Codable, Identifiable, Equatable {
     let oCounter: Int?
     let interactive: Bool?
     let paths: ScenePaths?
-    let streams: [SceneStream]?
 
     enum CodingKeys: String, CodingKey {
-        case id, title, date, files, performers, rating100, interactive, paths, streams
+        case id, title, date, files, performers, rating100, interactive, paths
         case playCount = "play_count"
         case oCounter = "o_counter"
     }
 
     func withRating(_ rating: Int?) -> MarkerScene {
-        MarkerScene(id: id, title: title, date: date, files: files, performers: performers, rating100: rating, playCount: playCount, oCounter: oCounter, interactive: interactive, paths: paths, streams: streams)
+        MarkerScene(id: id, title: title, date: date, files: files, performers: performers, rating100: rating, playCount: playCount, oCounter: oCounter, interactive: interactive, paths: paths)
     }
     func withOCounter(_ count: Int?) -> MarkerScene {
-        MarkerScene(id: id, title: title, date: date, files: files, performers: performers, rating100: rating100, playCount: playCount, oCounter: count, interactive: interactive, paths: paths, streams: streams)
-    }
-    func withStreams(_ newStreams: [SceneStream]?) -> MarkerScene {
-        MarkerScene(id: id, title: title, date: date, files: files, performers: performers, rating100: rating100, playCount: playCount, oCounter: oCounter, interactive: interactive, paths: paths, streams: newStreams)
+        MarkerScene(id: id, title: title, date: date, files: files, performers: performers, rating100: rating100, playCount: playCount, oCounter: count, interactive: interactive, paths: paths)
     }
     func withPlayCount(_ count: Int?) -> MarkerScene {
-        MarkerScene(id: id, title: title, date: date, files: files, performers: performers, rating100: rating100, playCount: count, oCounter: oCounter, interactive: interactive, paths: paths, streams: streams)
+        MarkerScene(id: id, title: title, date: date, files: files, performers: performers, rating100: rating100, playCount: count, oCounter: oCounter, interactive: interactive, paths: paths)
     }
     func withPerformers(_ newPerformers: [ScenePerformer]?) -> MarkerScene {
-        MarkerScene(id: id, title: title, date: date, files: files, performers: newPerformers, rating100: rating100, playCount: playCount, oCounter: oCounter, interactive: interactive, paths: paths, streams: streams)
+        MarkerScene(id: id, title: title, date: date, files: files, performers: newPerformers, rating100: rating100, playCount: playCount, oCounter: oCounter, interactive: interactive, paths: paths)
     }
 
     func toScene() -> Scene {
@@ -9218,8 +9052,7 @@ struct MarkerScene: Codable, Identifiable, Equatable {
             updatedAt: nil,
             paths: paths,
             sceneMarkers: nil,
-            interactive: interactive,
-            streams: streams
+            interactive: interactive
         )
     }
 
@@ -9228,86 +9061,6 @@ struct MarkerScene: Codable, Identifiable, Equatable {
         return paths?.funscript != nil
     }
 
-    /// Finds the best available stream matching the requested quality
-    func bestStream(for quality: StreamingQuality) -> URL? {
-        guard let streams = streams, !streams.isEmpty else { return nil }
-        
-        let compatible = ["mp4", "m4v", "mov"]
-        let fmt = files?.first?.format?.lowercased() ?? ""
-        let isCompatible = compatible.contains(fmt)
-        
-        // For markers, we check the associated scene's file format.
-        if isCompatible && (quality == .original) {
-            return nil // Use direct
-        }
-        
-        let hlsStreams = streams.filter { $0.mime_type == "application/vnd.apple.mpegurl" }
-        let mp4Streams = streams.filter { $0.mime_type == "video/mp4" }
-            .filter { !$0.label.lowercased().contains("direct stream") && !$0.label.lowercased().contains("mkv") }
-        
-        let targetRes = quality.maxVerticalResolution ?? 0
-        
-        // Prioritize HLS for non-MP4 or specific quality
-        if !hlsStreams.isEmpty {
-            if targetRes > 0 {
-                let bestHLS = hlsStreams
-                    .compactMap({ stream -> (SceneStream, Int)? in
-                        let resString = stream.label.lowercased().replacingOccurrences(of: "p", with: "")
-                        if let res = Int(resString) { return (stream, res) }
-                        return nil
-                    })
-                    .filter({ $0.1 <= targetRes })
-                    .sorted(by: { $0.1 > $1.1 })
-                    .first?.0
-                
-                if let stream = bestHLS, let url = URL(string: stream.url) {
-                    return url
-                }
-            }
-            
-            if let firstHLS = hlsStreams.first, let url = URL(string: firstHLS.url) {
-                return url
-            }
-        }
-        
-        // Fallback to MP4 transcode
-        if targetRes > 0 {
-            let matchingMP4 = mp4Streams
-                .compactMap { stream -> (SceneStream, Int)? in
-                    let resString = stream.label.lowercased().replacingOccurrences(of: "p", with: "")
-                    if let res = Int(resString) { return (stream, res) }
-                    return nil
-                }
-                .filter { $0.1 <= targetRes }
-                .sorted(by: { $0.1 > $1.1 })
-                .first?.0
-            
-            if let mp4 = matchingMP4, let url = URL(string: mp4.url) {
-                return url
-            }
-        }
-        
-        if let firstMP4 = mp4Streams.first, let url = URL(string: firstMP4.url) {
-             return url
-        }
-        
-        return nil
-    }
-
-    var videoURL: URL? {
-        // 0. Check local first
-        if let localURL = LocalDownloadStore.videoURL(sceneID: id) {
-            return localURL
-        }
-        let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original
-        if let streamURL = bestStream(for: quality) {
-            return signedURL(streamURL)
-        }
-        
-        guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
-        return signedURL(URL(string: "\(config.baseURL)/scene/\(id)/stream"))
-    }
-    
     var thumbnailURL: URL? {
         // 0. Check local first
         let fileManager = FileManager.default
@@ -9383,40 +9136,17 @@ struct SceneMarker: Codable, Identifiable, Equatable {
         return signedURL(URL(string: "\(config.baseURL)/scenemarker/\(id)/screenshot"))
     }
     
-    // Computed property for stream URL
+    /// Server-generated marker clip. Markers are their own short file, never a
+    /// transcode of the scene, so this is unrelated to the scene's playback source.
     var videoURL: URL? {
-        // 0. Check for local download first
-        if let sceneId = scene?.id, let localURL = LocalDownloadStore.videoURL(sceneID: sceneId) {
-            AppLog.debug("📂 Using local download for marker \(id)")
-            return localURL
-        }
-
-        let quality = ServerConfigManager.shared.activeConfig?.defaultQuality ?? .original
-        
-        // 1. Try best stream from associated scene (transcoded)
-        if let scene = scene, let streamURL = scene.bestStream(for: quality) {
-            return signedURL(streamURL)
-        }
-        
-        // 2. Fallbacks (API path or manual construction)
         let potentialURL: URL?
         if let streamPath = stream, let url = URL(string: streamPath) {
-             potentialURL = url
+            potentialURL = url
         } else if let config = ServerConfigManager.shared.loadConfig() {
             potentialURL = URL(string: "\(config.baseURL)/scenemarker/\(id)/stream")
         } else {
             potentialURL = nil
         }
-        
-        // Safety Check: Verify format compatibility from associated scene
-        if let scene = scene, let files = scene.files, let first = files.first, let fmt = first.format {
-            let compatible = ["mp4", "m4v", "mov"]
-            if !compatible.contains(fmt.lowercased()) {
-                AppLog.debug("⛔️ Preventing fallback to incompatible '\(fmt)' file for marker \(id)")
-                return nil
-            }
-        }
-        
         return signedURL(potentialURL)
     }
     
@@ -11861,105 +11591,6 @@ extension StashDBViewModel {
         }
     }
     
-    func fetchSceneStreams(sceneId: String, completion: @escaping ([SceneStream]) -> Void) {
-        // RAM cache: the stream list (HLS/MP4 variants + direct stream URL) is
-        // deterministic per scene for the session, but we hit this endpoint
-        // every time the user opens a SceneDetailView (and once per Reels
-        // card). Caching shaves a full GraphQL round-trip off detail opens,
-        // which is especially noticeable on tapped-through navigation.
-        if let cached = SceneStreamsRAMCache.shared.streams(for: sceneId) {
-            DispatchQueue.main.async { completion(cached) }
-            return
-        }
-
-        let query = GraphQLQueries.loadQuery(named: "sceneStreams")
-        let variables = ["id": sceneId]
-
-        let body: [String: Any] = [
-            "query": query,
-            "variables": variables
-        ]
-
-        guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
-              let bodyString = String(data: bodyData, encoding: .utf8) else {
-            // Konsistent zur Erfolgsbahn: completion immer auf Main aufrufen
-            // (UI / `@Published`-Updates erwarten Main-Thread).
-            DispatchQueue.main.async { completion([]) }
-            return
-        }
-
-        performGraphQLQuery(query: bodyString, clearsGlobalErrorMessageOnStart: false, setsGlobalLoading: false) { (response: SceneStreamsResponse?) in
-            if let response {
-                let streams = response.data?.sceneStreams ?? []
-                AppLog.debug("📺 Fetched \(streams.count) transcoded streams for scene \(sceneId)")
-                // Cache only real results — an empty list here is usually a failed
-                // request (nil response path below), and caching that would black-hole
-                // the reel's stream resolution for the whole TTL.
-                if !streams.isEmpty {
-                    SceneStreamsRAMCache.shared.set(streams, for: sceneId)
-                }
-                DispatchQueue.main.async {
-                    completion(streams)
-                }
-            } else {
-                AppLog.error("📺 Stream resolution failed for scene \(sceneId) — not caching, caller may retry")
-                DispatchQueue.main.async {
-                    completion([])
-                }
-            }
-        }
-    }
-
-    /// Warms `SceneStreamsRAMCache` right after a feed page lands so the first visible
-    /// rows can create their players synchronously. This removes the cold-start race
-    /// where row mount, player setup and stream resolution all collide during the
-    /// initial request burst (black first cell).
-    func prefetchSceneStreams(sceneIds: [String], limit: Int = 4) {
-        guard activeReelsFeed == .scenes else { return }
-        let generation = streamPrefetchGeneration
-        for id in sceneIds.prefix(limit) where SceneStreamsRAMCache.shared.streams(for: id) == nil {
-            fetchSceneStreams(sceneId: id) { [weak self] _ in
-                guard let self, generation == self.streamPrefetchGeneration else { return }
-            }
-        }
-    }
-}
-
-/// Session-lifetime RAM cache for scene stream metadata. Cleared only on
-/// explicit invalidation (e.g. server change) or app restart.
-final class SceneStreamsRAMCache {
-    static let shared = SceneStreamsRAMCache()
-    private let lock = NSLock()
-    private var store: [String: (streams: [SceneStream], cachedAt: Date)] = [:]
-    /// 10-minute TTL — keeps re-opens instant without pinning stale URLs
-    /// forever when the server reconfigures transcoders.
-    private let ttl: TimeInterval = 10 * 60
-    private init() {}
-
-    func streams(for sceneId: String) -> [SceneStream]? {
-        lock.lock(); defer { lock.unlock() }
-        guard let entry = store[sceneId] else { return nil }
-        if Date().timeIntervalSince(entry.cachedAt) > ttl {
-            store[sceneId] = nil
-            return nil
-        }
-        return entry.streams
-    }
-
-    func set(_ streams: [SceneStream], for sceneId: String) {
-        lock.lock(); defer { lock.unlock() }
-        store[sceneId] = (streams, Date())
-    }
-
-    func invalidate(sceneId: String) {
-        lock.lock(); defer { lock.unlock() }
-        store[sceneId] = nil
-    }
-
-    func clear() {
-        lock.lock(); defer { lock.unlock() }
-        store.removeAll()
-    }
 }
 
 #if !os(tvOS)

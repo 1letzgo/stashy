@@ -887,13 +887,8 @@ struct SceneDetailMetadataCard: View {
         }
         let url = activeScene.transcriptionStreamURL ?? aetherEngine?.currentURL
         var extras: [URL] = []
-        if let streams = activeScene.streams {
-            for stream in streams where stream.mime_type == "video/mp4" {
-                if let u = URL(string: stream.url) { extras.append(signedURL(u) ?? u) }
-            }
-            if let path = activeScene.paths?.stream, let u = URL(string: path) {
-                extras.append(signedURL(u) ?? u)
-            }
+        if let original = activeScene.aetherVideoURL, original != url {
+            extras.append(original)
         }
 
         let targetLanguage = mode.captionTargetCode ?? SubtitleTargetLanguage.load()

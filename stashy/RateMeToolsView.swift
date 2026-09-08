@@ -899,8 +899,7 @@ struct RateMeToolsView: View {
             updatedAt: nil,
             paths: nil,
             sceneMarkers: nil,
-            interactive: nil,
-            streams: nil
+            interactive: nil
         )
     }
 
