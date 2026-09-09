@@ -53,12 +53,18 @@ struct AetherSceneSurface: View {
 
     var body: some View {
         ZStack {
+            // Picture and backdrop run edge to edge (under the notch and home indicator in
+            // fullscreen); the overlays below stay inside the safe area so they remain
+            // reachable. Inline the surface has no safe-area inset, so this is a no-op there.
             Color.black
+                .ignoresSafeArea()
 
             AetherPlayerSurface(engine: engine.engine)
+                .ignoresSafeArea()
 
             if !engine.hasFirstFrame {
                 posterPlaceholder
+                    .ignoresSafeArea()
             }
 
             if let message = engine.errorMessage {
