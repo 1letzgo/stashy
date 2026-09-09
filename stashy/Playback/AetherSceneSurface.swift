@@ -47,6 +47,9 @@ struct AetherSceneSurface: View {
     /// Mirrors of engine state that is not observable, so the slider and the speed menu redraw.
     @State private var volumeLevel: Float = 1
     @State private var playbackRate: Float = 1
+    /// Inline speed picker (replaces a UIKit `Menu`, which did not take selections inside the
+    /// glass capsule); keeps the transport visible while open.
+    @State private var showsSpeedPicker = false
     #if DEBUG
     @State private var showsDebugStats = false
     #endif
@@ -297,6 +300,12 @@ struct AetherSceneSurface: View {
             VStack {
                 Spacer()
                 VStack(spacing: 10) {
+                    if showsSpeedPicker {
+                        HStack {
+                            Spacer(minLength: 0)
+                            speedPicker
+                        }
+                    }
                     HStack {
                         Spacer(minLength: 0)
                         bottomTrailingControls
@@ -442,26 +451,52 @@ struct AetherSceneSurface: View {
 
     @ViewBuilder
     private var speedMenu: some View {
-        Menu {
-            ForEach(availableSpeedOptions, id: \.self) { option in
-                Button {
-                    engine.rate = option
-                    playbackRate = engine.rate
-                    revealControls()
-                } label: {
-                    Label {
-                        Text(Self.speedLabel(option))
-                    } icon: {
-                        if abs(playbackRate - option) < 0.001 {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
+        Button {
+            HapticManager.light()
+            showsSpeedPicker.toggle()
+            revealControls()
         } label: {
             glyph("gauge.with.dots.needle.67percent")
+                .overlay(alignment: .bottom) {
+                    if abs(playbackRate - 1) > 0.001 {
+                        Text(Self.speedLabel(playbackRate))
+                            .font(.system(size: 8, weight: .bold).monospacedDigit())
+                            .foregroundStyle(.white)
+                            .padding(.bottom, 2)
+                    }
+                }
         }
+        .buttonStyle(.plain)
         .accessibilityLabel("Playback speed")
+    }
+
+    /// Glass capsule with every selectable speed; sits above the bottom-right controls.
+    @ViewBuilder
+    private var speedPicker: some View {
+        HStack(spacing: 2) {
+            ForEach(availableSpeedOptions, id: \.self) { option in
+                let selected = abs(playbackRate - option) < 0.001
+                Button {
+                    HapticManager.light()
+                    engine.rate = option
+                    playbackRate = engine.rate
+                    showsSpeedPicker = false
+                    revealControls()
+                } label: {
+                    Text(Self.speedLabel(option))
+                        .font(.system(size: isCompact ? 12 : 14, weight: selected ? .bold : .semibold).monospacedDigit())
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, isCompact ? 8 : 11)
+                        .frame(height: chromeButtonSize - 8)
+                        .background(selected ? Color.white.opacity(0.28) : Color.clear, in: Capsule())
+                        .contentShape(Capsule())
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 6)
+        .frame(height: chromeButtonSize)
+        .stashyGlass(shape: Capsule())
     }
 
     private static func speedLabel(_ rate: Float) -> String {
@@ -583,6 +618,7 @@ struct AetherSceneSurface: View {
     }
 
     private func hideControls() {
+        showsSpeedPicker = false
         controlsHideToken = UUID()
         withAnimation(.easeInOut(duration: 0.2)) {
             areControlsVisible = false
@@ -854,6 +890,11 @@ struct AetherSceneSurface: View {
         controlsHideToken = token
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
             guard controlsHideToken == token, !isScrubbing else { return }
+            if showsSpeedPicker {
+                // Keep the transport while a choice is pending; re-arm and check again.
+                scheduleControlsHide()
+                return
+            }
             withAnimation(.easeInOut(duration: 0.2)) {
                 areControlsVisible = false
             }
