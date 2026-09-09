@@ -80,6 +80,9 @@ struct TVSettingsView: View {
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @AppStorage("tvUseSidebar") private var useSidebar = true
     @FocusState private var focusedEntry: TVSettingsEntry?
+    /// Der Fokus verlässt die Liste, sobald er in die Sidebar wandert. Ohne
+    /// gemerkten Eintrag stünde die rechte Spalte dann leer.
+    @State private var detailEntry: TVSettingsEntry = .servers
 
     /// Liste links schmal halten — eine Einstellungszeile über die volle
     /// 1920pt-Breite ist der Hauptgrund, warum das vorher nach iOS aussah.
@@ -97,6 +100,9 @@ struct TVSettingsView: View {
         }
         .padding(.trailing, 80)
         .background(Color.appBackground)
+        .onChange(of: focusedEntry) { _, entry in
+            if let entry { detailEntry = entry }
+        }
     }
 
     private var entryList: some View {
@@ -165,28 +171,87 @@ struct TVSettingsView: View {
         }
     }
 
-    @ViewBuilder
     private var detailPane: some View {
-        if let entry = focusedEntry {
-            VStack(alignment: .leading, spacing: 28) {
-                Image(systemName: entry.icon)
-                    .font(.system(size: 72))
-                    .foregroundColor(appearanceManager.tintColor)
+        let entry = detailEntry
+        return VStack(alignment: .leading, spacing: 28) {
+            Image(systemName: entry.icon)
+                .font(.system(size: 72))
+                .foregroundColor(appearanceManager.tintColor)
 
-                Text(entry.title)
-                    .font(.title)
-                    .fontWeight(.semibold)
+            Text(entry.title)
+                .font(.title)
+                .fontWeight(.semibold)
 
-                Text(entry.summary)
+            Text(entry.summary)
+                .font(.title3)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .frame(maxWidth: 620, alignment: .leading)
+    }
+}
+
+// MARK: - Settings page chrome
+
+/// Gemeinsames Gerüst für alle Settings-Unterseiten.
+///
+/// tvOS zeichnet keine Navigation-Bar — `navigationTitle` ist dort unsichtbar.
+/// Ohne eigenen Titel landet der Nutzer in einer Liste ohne Überschrift und
+/// weiß nicht, wo er ist. Der Erklärtext steht rechts statt als Listen-Footer:
+/// zweispaltig ist die tvOS-Form, ein Footer unter der Liste ist aus iOS
+/// übernommen und auf 1920pt kaum lesbar.
+struct TVSettingsPageChrome: ViewModifier {
+    let title: String
+    let description: String?
+
+    /// Knapp halbe Bildbreite. Eine Einstellungszeile über die volle Breite ist
+    /// der Hauptgrund, warum diese Seiten vorher nach iOS aussahen.
+    private static let contentWidth: CGFloat = 900
+
+    func body(content: Content) -> some View {
+        HStack(alignment: .top, spacing: 80) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text(title)
+                    .font(.largeTitle)
+                    .fontWeight(.bold)
+
+                content
+                    .safeAreaInset(edge: .bottom) {
+                        Color.clear.frame(height: 80).focusable(false)
+                    }
+            }
+            .frame(width: Self.contentWidth)
+            .focusSection()
+
+            if let description {
+                Text(description)
                     .font(.title3)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: 620, alignment: .leading)
+                    // Auf Höhe der ersten Listenzeile, nicht des Titels.
+                    .padding(.top, 96)
             }
-            .frame(maxWidth: 620, alignment: .leading)
-            .transition(.opacity)
-        } else {
-            Color.clear
+
+            Spacer(minLength: 0)
         }
+        // Gepushte Seiten decken die Sidebar ab; der überscan-sichere Rand
+        // muss deshalb hier selbst kommen.
+        .padding(.leading, 60)
+        .padding(.trailing, 80)
+        .padding(.top, 60)
+        .background(Color.appBackground)
+        // tvOS zeichnet `navigationTitle` mittig und ausgegraut über den Inhalt.
+        // Neben der linksbündigen Überschrift stünde der Titel doppelt da, also
+        // leer setzen — dasselbe macht `TVSceneDetailView`.
+        .navigationTitle("")
+    }
+}
+
+extension View {
+    /// Titel + zweispaltiges Layout für eine Settings-Unterseite.
+    func tvSettingsPage(_ title: String, description: String? = nil) -> some View {
+        modifier(TVSettingsPageChrome(title: title, description: description))
     }
 }
 
@@ -201,6 +266,11 @@ private struct TVServersSettingsView: View {
     /// View nur eine, gestapelt hoben sie sich gegenseitig auf (Sheet ging auf
     /// und sofort wieder zu).
     @State private var serverForm: ServerFormTarget?
+
+    /// Der aktive Server steht schon oben; hier nur die Umschalt-Kandidaten.
+    private var otherServers: [ServerConfig] {
+        configManager.savedServers.filter { $0.id != configManager.activeConfig?.id }
+    }
 
     private enum ServerFormTarget: Identifiable {
         case new
@@ -255,28 +325,28 @@ private struct TVServersSettingsView: View {
                 Text("Active Server")
             }
 
-            Section {
-                ForEach(configManager.savedServers) { server in
-                    TVSavedServerRow(
-                        server: server,
-                        isActive: server.id == configManager.activeConfig?.id,
-                        onActivate: { configManager.saveConfig(server) },
-                        onEdit: { serverForm = .edit(server) },
-                        onDelete: { configManager.deleteServer(id: server.id) }
-                    )
+            if !otherServers.isEmpty {
+                Section {
+                    ForEach(otherServers) { server in
+                        TVSavedServerRow(
+                            server: server,
+                            onActivate: { configManager.saveConfig(server) },
+                            onEdit: { serverForm = .edit(server) },
+                            onDelete: { configManager.deleteServer(id: server.id) }
+                        )
+                    }
+                } header: {
+                    Text("Switch Server")
                 }
+            }
 
+            Section {
                 Button {
                     serverForm = .new
                 } label: {
                     Label("Add Server", systemImage: "plus")
                 }
-            } header: {
-                Text("Saved Servers")
             }
-        }
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: 80).focusable(false)
         }
         .sheet(item: $serverForm) { target in
             switch target {
@@ -296,8 +366,7 @@ private struct TVServersSettingsView: View {
                 }
             }
         }
-        .background(Color.appBackground)
-        .navigationTitle("Servers")
+        .tvSettingsPage("Servers", description: "Add Stash servers and switch between them. Hold Select on a saved server to edit or remove it.")
     }
 }
 
@@ -310,31 +379,20 @@ private struct TVServersSettingsView: View {
 /// liegen deshalb wieder auf dem Kontextmenü (langes Select).
 private struct TVSavedServerRow: View {
     let server: ServerConfig
-    let isActive: Bool
     let onActivate: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
 
-    @ObservedObject private var appearanceManager = AppearanceManager.shared
-
     var body: some View {
         Button(action: onActivate) {
-            HStack(spacing: 16) {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(server.name)
-                        .font(.headline)
-                    Text(server.baseURL)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-
-                Spacer()
-
-                if isActive {
-                    Image(systemName: "checkmark")
-                        .foregroundColor(appearanceManager.tintColor)
-                }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(server.name)
+                    .font(.headline)
+                Text(server.baseURL)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
         .contextMenu {
             Button("Edit", action: onEdit)
@@ -374,11 +432,7 @@ private struct TVAppearanceSettingsView: View {
                 }
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: 80).focusable(false)
-        }
-        .background(Color.appBackground)
-        .navigationTitle("Appearance")
+        .tvSettingsPage("Appearance", description: "Pick the accent color used for focus highlights and icons throughout the app.")
     }
 
     private func colorsEqual(_ a: Color, _ b: Color, tolerance: CGFloat = 0.01) -> Bool {
@@ -438,19 +492,13 @@ private struct TVSecuritySettingsView: View {
                         securityManager.removePin()
                     }
                 }
-            } footer: {
-                Text("The app will require your PIN each time it is opened and whenever it returns from the background.")
             }
-        }
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: 80).focusable(false)
         }
         .fullScreenCover(isPresented: $showingSetPasscode) {
             TVPasscodeSetupView(isPresented: $showingSetPasscode)
                 .presentationBackground(Color.black)
         }
-        .background(Color.appBackground)
-        .navigationTitle("Security")
+        .tvSettingsPage("Security", description: "The app asks for your PIN each time it opens and whenever it returns from the background.")
     }
 }
 
@@ -467,15 +515,9 @@ private struct TVDefaultSortSettingsView: View {
                 sortRow(label: "Studios", tab: .studios, type: StashDBViewModel.StudioSortOption.self, fallback: .nameAsc)
                 sortRow(label: "Tags", tab: .tags, type: StashDBViewModel.TagSortOption.self, fallback: .nameAsc)
                 sortRow(label: "Groups", tab: .groups, type: StashDBViewModel.GroupSortOption.self, fallback: .nameAsc)
-            } footer: {
-                Text("The sort order used when opening each tab.")
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: 80).focusable(false)
-        }
-        .background(Color.appBackground)
-        .navigationTitle("Default Sorting")
+        .tvSettingsPage("Default Sorting", description: "The sort order each section opens with.")
     }
 
     /// Eine flache Auswahl pro Entität. Vorher lagen hier verschachtelte
@@ -515,18 +557,12 @@ private struct TVDefaultFilterSettingsView: View {
                 tvFilterRow(label: "Studios", icon: "building.2", tab: .studios, mode: .studios)
                 tvFilterRow(label: "Tags", icon: "tag", tab: .tags, mode: .tags)
                 tvFilterRow(label: "Groups", icon: "rectangle.stack", tab: .groups, mode: .groups)
-            } footer: {
-                Text("Saved filters from your Stash server that will be applied automatically when opening each tab.")
             }
-        }
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: 80).focusable(false)
         }
         .onAppear {
             filterViewModel.fetchSavedFilters()
         }
-        .background(Color.appBackground)
-        .navigationTitle("Default Filters")
+        .tvSettingsPage("Default Filters", description: "A saved filter from your Stash server, applied automatically when a section opens.")
     }
 
     @ViewBuilder
@@ -572,15 +608,9 @@ private struct TVTabVisibilitySettingsView: View {
                 tabVisibilityRow(.groups, label: "Groups", icon: "rectangle.stack.fill")
                 tabVisibilityRow(.galleries, label: "Galleries", icon: "photo.stack.fill")
                 tabVisibilityRow(.images, label: "Images", icon: "photo.fill")
-            } footer: {
-                Text("Choose which tabs appear in the top navigation bar.")
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: 80).focusable(false)
-        }
-        .background(Color.appBackground)
-        .navigationTitle("Visible Tabs")
+        .tvSettingsPage("Visible Tabs", description: "Sections you turn off disappear from the sidebar. Home, Search and Settings always stay.")
     }
 
     @ViewBuilder
@@ -628,15 +658,9 @@ private struct TVMaintenanceSettingsView: View {
                         }
                     }
                 }
-            } footer: {
-                Text("Removes the cached artwork for the active server. Images are downloaded again as they appear.")
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: 80).focusable(false)
-        }
-        .background(Color.appBackground)
-        .navigationTitle("Maintenance")
+        .tvSettingsPage("Maintenance", description: "Removes the cached artwork for the active server. Images are downloaded again as they appear.")
     }
 }
 
@@ -646,34 +670,24 @@ private struct TVAboutSettingsView: View {
     var body: some View {
         List {
             Section {
-                HStack {
-                    Text("App")
-                    Spacer()
-                    Text("stashy for Apple TV")
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack {
-                    Text("Version")
-                    Spacer()
-                    Text(appVersion)
-                        .foregroundStyle(.secondary)
-                }
-
-                HStack {
-                    Text("Build")
-                    Spacer()
-                    Text(buildNumber)
-                        .foregroundStyle(.secondary)
-                }
-                .focusable()
+                // Jede Zeile fokussierbar: eine tvOS-Liste ohne fokussierbare
+                // Zeile lässt sich weder scrollen noch verlassen.
+                aboutRow("App", "stashy for Apple TV")
+                aboutRow("Version", appVersion)
+                aboutRow("Build", buildNumber)
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: 80).focusable(false)
+        .tvSettingsPage("About", description: "Version and build number of this app.")
+    }
+
+    private func aboutRow(_ label: String, _ value: String) -> some View {
+        HStack {
+            Text(label)
+            Spacer()
+            Text(value)
+                .foregroundStyle(.secondary)
         }
-        .background(Color.appBackground)
-        .navigationTitle("About")
+        .focusable()
     }
 
     private var appVersion: String {

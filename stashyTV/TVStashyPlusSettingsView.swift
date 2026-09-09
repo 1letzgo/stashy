@@ -228,7 +228,12 @@ final class TVStashyPlusStore: ObservableObject {
 struct TVStashyPlusSettingsView: View {
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
-    @ObservedObject private var store = TVStashyPlusStore.shared
+    // `NavigationLink { … }` baut sein Ziel in einer List sofort mit auf. Als
+    // `@ObservedObject` liefe der Singleton-Initializer — und damit StoreKit —
+    // schon beim Öffnen der Settings los; auf einem Apple TV ohne angemeldeten
+    // Account poppte dort die Apple-Account-Anmeldung auf. `@StateObject`
+    // wertet den Ausdruck erst beim ersten Rendern dieser Seite aus.
+    @StateObject private var store = TVStashyPlusStore.shared
 
     var body: some View {
         List {
@@ -333,11 +338,7 @@ struct TVStashyPlusSettingsView: View {
                 }
             }
         }
-        .safeAreaInset(edge: .bottom) {
-            Color.clear.frame(height: 80).focusable(false)
-        }
-        .background(Color.appBackground)
-        .navigationTitle("stashy+")
+        .tvSettingsPage("stashy+")
         .task {
             if store.products.isEmpty {
                 await store.fetchProducts()

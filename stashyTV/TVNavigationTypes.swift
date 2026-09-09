@@ -188,7 +188,12 @@ private struct TVExitCommandDismiss: ViewModifier {
             }
             if let path, !path.wrappedValue.isEmpty {
                 path.wrappedValue.removeLast()
+                return
             }
+            // Destination-based `NavigationLink` (Settings) taucht nie im
+            // gebundenen Pfad auf. Ohne diesen Rückfall verschluckte der
+            // Handler die Menu-Taste und die Unterseite war eine Sackgasse.
+            dismiss()
         }
     }
 }
