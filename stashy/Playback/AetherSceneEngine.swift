@@ -130,10 +130,19 @@ final class AetherSceneEngine: ObservableObject {
         get { _rate }
         set {
             let clamped = max(0.1, min(newValue, engine.maxSupportedRate))
-            guard clamped != _rate else { return }
             _rate = clamped
+            // Always forwarded, never short-circuited on equality: the engine drops the speed
+            // back to 1.0 on a load (the ended-reload, a quality switch) while `_rate` still
+            // holds the old pick, so a re-select of the same value must reach the engine.
             engine.setRate(clamped)
         }
+    }
+
+    /// Re-asserts the picked speed on the running session. `setRate` before a session is
+    /// ready is a no-op on the engine, so the pick is replayed once the transport moves.
+    private func applyRateState() {
+        guard abs(_rate - 1.0) > 0.001 else { return }
+        engine.setRate(_rate)
     }
 
     private var unmutedVolume: Float = 1.0
@@ -376,6 +385,7 @@ final class AetherSceneEngine: ObservableObject {
             isLoading = false
             didEnd = false
             applyVolumeState()
+            applyRateState()
             flushPendingSeekIfNeeded()
         case .ended:
             isLoading = false
@@ -454,7 +464,7 @@ final class AetherSceneEngine: ObservableObject {
                                       startPosition: startAt,
                                       options: options)
             guard generation == loadGeneration else { return }
-            if _rate != 1.0 { engine.setRate(_rate) }
+            applyRateState()
             applyVolumeState()
         } catch is CancellationError {
             // A newer load superseded this one; nothing to report.
