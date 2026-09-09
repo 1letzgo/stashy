@@ -69,9 +69,11 @@ struct StashyChromePillStyle: ViewModifier {
     var width: CGFloat? = nil
     /// Overlay buttons use the hashtag chip colours instead of the dock fill.
     var hashtagColors: Bool = false
+    /// Feeds overlay chrome: Liquid Glass instead of the flat fill. Sizes stay identical.
+    var glass: Bool = false
 
     func body(content: Content) -> some View {
-        content
+        let sized = content
             .padding(
                 .horizontal,
                 iconOnly
@@ -81,13 +83,19 @@ struct StashyChromePillStyle: ViewModifier {
             .frame(height: height)
             .frame(minWidth: StashyExpandingDock.circleSize, minHeight: StashyExpandingDock.circleSize)
             .frame(width: iconOnly ? StashyExpandingDock.circleSize : width)
-            .background(hashtagColors ? StashyExpandingDock.hashtagFill : StashyExpandingDock.inactiveBackground)
-            .clipShape(Capsule(style: .continuous))
-            .overlay {
-                if hashtagColors {
-                    Capsule(style: .continuous).stroke(StashyExpandingDock.hashtagStroke, lineWidth: 0.5)
+
+        if glass {
+            sized.stashyGlass(shape: Capsule(style: .continuous))
+        } else {
+            sized
+                .background(hashtagColors ? StashyExpandingDock.hashtagFill : StashyExpandingDock.inactiveBackground)
+                .clipShape(Capsule(style: .continuous))
+                .overlay {
+                    if hashtagColors {
+                        Capsule(style: .continuous).stroke(StashyExpandingDock.hashtagStroke, lineWidth: 0.5)
+                    }
                 }
-            }
+        }
     }
 }
 

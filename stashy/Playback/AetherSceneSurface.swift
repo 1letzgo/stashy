@@ -356,7 +356,7 @@ struct AetherSceneSurface: View {
             }
             .padding(.horizontal, 6)
             .frame(height: chromeButtonSize)
-            .aetherGlass(shape: Capsule())
+            .stashyGlass(shape: Capsule())
         }
     }
 
@@ -372,11 +372,11 @@ struct AetherSceneSurface: View {
             .padding(.leading, 16)
             .padding(.trailing, 10)
             .frame(width: 210, height: chromeButtonSize)
-            .aetherGlass(shape: Capsule())
+            .stashyGlass(shape: Capsule())
         } else {
             muteButton
                 .frame(width: chromeButtonSize, height: chromeButtonSize)
-                .aetherGlass(shape: Circle())
+                .stashyGlass(shape: Circle())
         }
     }
 
@@ -430,7 +430,7 @@ struct AetherSceneSurface: View {
         }
         .padding(.horizontal, 6)
         .frame(height: chromeButtonSize)
-        .aetherGlass(shape: Capsule())
+        .stashyGlass(shape: Capsule())
     }
 
     private static let speedOptions: [Float] = [0.5, 0.75, 1, 1.25, 1.5, 2]
@@ -722,7 +722,7 @@ struct AetherSceneSurface: View {
         }
         .padding(.horizontal, 16)
         .frame(height: timeBarHeight)
-        .aetherGlass(shape: Capsule())
+        .stashyGlass(shape: Capsule())
     }
 
     /// Floating still above the scrub thumb, clamped to the bar so it never leaves the surface.
@@ -838,7 +838,7 @@ struct AetherSceneSurface: View {
             .font(.system(size: glyphSize ?? (isCompact ? 13 : 15), weight: .semibold))
             .foregroundStyle(.white)
             .frame(width: diameter, height: diameter)
-            .aetherGlass(shape: Circle())
+            .stashyGlass(shape: Circle())
             .contentShape(Circle())
     }
 
@@ -875,18 +875,6 @@ struct AetherSceneSurface: View {
 // MARK: - Glass and auto-hiding
 
 private extension View {
-    /// Liquid Glass where the system has it, a material capsule with a hairline everywhere else.
-    @ViewBuilder
-    func aetherGlass<S: Shape>(shape: S) -> some View {
-        if #available(iOS 26.0, *) {
-            self.glassEffect(.regular, in: shape)
-        } else {
-            self
-                .background(.ultraThinMaterial, in: shape)
-                .overlay(shape.stroke(Color.white.opacity(0.25), lineWidth: 0.5))
-        }
-    }
-
     /// Every transport group fades and stops taking hits together.
     func autoHiding(_ visible: Bool) -> some View {
         opacity(visible ? 1 : 0).allowsHitTesting(visible)

@@ -7,6 +7,23 @@ import ObjectiveC
 /// would otherwise render shorter than the chips it sits next to.
 let tagChipGlyphHeight: CGFloat = UIFont.systemFont(ofSize: 11, weight: .semibold).lineHeight
 
+// MARK: - Glass
+
+extension View {
+    /// Liquid Glass where the system has it, a material fill with a hairline everywhere else.
+    /// Shared by the Aether transport surface and the Feeds overlay chrome.
+    @ViewBuilder
+    func stashyGlass<S: Shape>(shape: S) -> some View {
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.regular, in: shape)
+        } else {
+            self
+                .background(.ultraThinMaterial, in: shape)
+                .overlay(shape.stroke(Color.white.opacity(0.25), lineWidth: 0.5))
+        }
+    }
+}
+
 // MARK: - Swipe-back with hidden system navigation bar
 
 /// Long-lived pop-gesture delegate on the `UINavigationController` itself.
@@ -689,6 +706,8 @@ struct ChromePillIconButton: View {
     let systemImage: String
     var enabled: Bool = true
     var accessibilityLabel: String? = nil
+    /// Feeds overlay uses the glass capsule; every other caller keeps the flat chip fill.
+    var glass: Bool = false
     let action: () -> Void
 
     var body: some View {
@@ -696,7 +715,7 @@ struct ChromePillIconButton: View {
             Image(systemName: systemImage)
                 .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
                 .foregroundColor(enabled ? StashyExpandingDock.hashtagForeground : .white.opacity(0.35))
-                .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
+                .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true, glass: glass))
         }
         .buttonStyle(.plain)
         .disabled(!enabled)

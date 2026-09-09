@@ -4355,7 +4355,7 @@ struct ReelsViewBody: View {
                         .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
                 }
                 .opacity(currentItem == nil ? 0.35 : 1.0)
-                .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
+                .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true, glass: true))
             }
             .buttonStyle(.plain)
             .disabled(currentItem == nil)
@@ -4392,7 +4392,7 @@ struct ReelsViewBody: View {
                                 .font(.caption2.weight(.semibold))
                                 .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
                         }
-                        .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
+                        .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true, glass: true))
                     }
                     .buttonStyle(.plain)
                 } else {
@@ -4403,7 +4403,7 @@ struct ReelsViewBody: View {
                             .font(.caption2.weight(.semibold))
                     }
                     .foregroundColor(.white.opacity(0.35))
-                    .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
+                    .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true, glass: true))
                 }
             }
             .accessibilityLabel("Rating")
@@ -4509,9 +4509,7 @@ struct ReelsViewBody: View {
                                                         .foregroundColor(.white.opacity(0.8))
                                                         .padding(.horizontal, 8)
                                                         .padding(.vertical, 3)
-                                                        .background(Color.black.opacity(0.3))
-                                                        .clipShape(Capsule())
-                                                        .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                                                        .stashyGlass(shape: Capsule())
                                                 }
                                                 .buttonStyle(.plain)
                                                 .accessibilityLabel("Add tags")
@@ -4541,7 +4539,7 @@ struct ReelsViewBody: View {
                         }
 
                         if tabManager.reelsShowsDeleteButton, reelsItemSupportsDelete(item) {
-                            ChromePillIconButton(systemImage: "trash", accessibilityLabel: "Delete") {
+                            ChromePillIconButton(systemImage: "trash", accessibilityLabel: "Delete", glass: true) {
                                 reelsItemToDelete = item
                                 showDeleteConfirmation = true
                             }
@@ -4550,7 +4548,8 @@ struct ReelsViewBody: View {
                         ChromePillIconButton(
                             systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
                             enabled: isVideo,
-                            accessibilityLabel: isMuted ? "Ton an" : "Stumm"
+                            accessibilityLabel: isMuted ? "Ton an" : "Stumm",
+                            glass: true
                         ) {
                             if isVideo {
                                 isMuted.toggle()
@@ -4561,7 +4560,8 @@ struct ReelsViewBody: View {
                         ChromePillIconButton(
                             systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
                             enabled: isVideo,
-                            accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
+                            accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play",
+                            glass: true
                         ) {
                             if isVideo { currentItemIsPlaying.toggle() }
                         }
@@ -4691,7 +4691,7 @@ struct ReelsViewBody: View {
                         : .white.opacity(StashyExpandingDock.inactiveIconOpacity)
                 )
                 .frame(width: StashyExpandingDock.iconSize, height: StashyExpandingDock.iconSize)
-                .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight, iconOnly: true))
+                .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight, iconOnly: true, glass: true))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Filter")
@@ -4794,7 +4794,7 @@ private struct ReelsAIMotionPill: View {
                     .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
                     .foregroundColor(.white.opacity(isActive ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
                     .frame(width: StashyExpandingDock.iconSize, height: StashyExpandingDock.iconSize)
-                    .modifier(StashyChromePillStyle(height: pillHeight, iconOnly: true))
+                    .modifier(StashyChromePillStyle(height: pillHeight, iconOnly: true, glass: true))
             }
             .buttonStyle(.plain)
             .accessibilityLabel(AIMotionCopy.name)
@@ -5312,9 +5312,7 @@ extension ReelItemView {
                     .foregroundColor(.white)
                     .padding(.horizontal, 22)
                     .padding(.vertical, 14)
-                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                    .clipShape(Capsule())
-                    .overlay(Capsule().stroke(Color.white.opacity(0.2), lineWidth: 0.5))
+                    .stashyGlass(shape: Capsule())
                     .padding(.top, 130)
                 Spacer()
             }
@@ -5366,8 +5364,7 @@ extension ReelItemView {
                     }
                     .padding(.vertical, 10)
                     .padding(Edge.Set.horizontal, 16)
-                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                    .clipShape(Capsule())
+                    .stashyGlass(shape: Capsule())
                     .padding(Edge.Set.bottom, 8)
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
