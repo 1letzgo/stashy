@@ -562,6 +562,62 @@ func videoFrameDataURL(from image: UIImage) -> String? {
     return "data:image/jpeg;base64,\(jpeg.base64EncodedString())"
 }
 
+extension Notification.Name {
+    /// Posted on the main thread whenever the hardware volume buttons change the output volume.
+    static let stashyHardwareVolumeChanged = Notification.Name("stashyHardwareVolumeChanged")
+}
+
+/// Watches `AVAudioSession.outputVolume` (the only signal the hardware volume buttons leave
+/// behind) and posts `.stashyHardwareVolumeChanged`. The first sample after `start()` is the
+/// baseline and never posts, so opening a player does not count as a button press.
+@MainActor
+final class HardwareVolumeMonitor {
+    static let shared = HardwareVolumeMonitor()
+
+    private var observation: NSKeyValueObservation?
+    private var lastVolume: Float?
+
+    private init() {}
+
+    func start() {
+        guard observation == nil else { return }
+        let session = AVAudioSession.sharedInstance()
+        lastVolume = session.outputVolume
+        observation = session.observe(\.outputVolume, options: [.new]) { [weak self] _, change in
+            guard let volume = change.newValue else { return }
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                defer { self.lastVolume = volume }
+                guard let last = self.lastVolume, abs(volume - last) > 0.0005 else { return }
+                NotificationCenter.default.post(name: .stashyHardwareVolumeChanged, object: nil)
+            }
+        }
+    }
+}
+
+/// A volume button press while a player is muted is the user asking for sound: clear the mute
+/// and persist it like the on-screen mute button would.
+struct UnmuteOnHardwareVolume: ViewModifier {
+    @Binding var isMuted: Bool
+
+    func body(content: Content) -> some View {
+        content
+            .onAppear { HardwareVolumeMonitor.shared.start() }
+            .onReceive(NotificationCenter.default.publisher(for: .stashyHardwareVolumeChanged)
+                .receive(on: DispatchQueue.main)) { _ in
+                guard isMuted else { return }
+                isMuted = false
+                ScenePlayerMute.persist(false)
+            }
+    }
+}
+
+extension View {
+    func unmutesOnHardwareVolume(_ isMuted: Binding<Bool>) -> some View {
+        modifier(UnmuteOnHardwareVolume(isMuted: isMuted))
+    }
+}
+
 #endif
 
 // MARK: - Generic JSON Handling

@@ -5006,6 +5006,7 @@ extension ReelItemView {
                 cleanupPlayer()
                 cancelAnimationAdvanceTimer()
             }
+            .unmutesOnHardwareVolume($isMuted)
             .onChange(of: isMuted) { _, newValue in
                 aetherSetMuted(newValue)
             }

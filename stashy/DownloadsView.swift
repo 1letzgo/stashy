@@ -528,6 +528,7 @@ struct DownloadDetailView: View {
         .fullScreenCover(isPresented: $isFullScreen) {
             fullscreenPlayer
         }
+        .unmutesOnHardwareVolume($isMuted)
         .onChange(of: isMuted) { _, muted in
             engine?.isMuted = muted
         }
@@ -1361,6 +1362,7 @@ struct DownloadedGalleryItemView: View {
                 engine?.pause()
             }
         }
+        .unmutesOnHardwareVolume($isMuted)
         .onChange(of: isMuted) { _, muted in
             engine?.isMuted = muted
         }

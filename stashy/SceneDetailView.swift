@@ -1440,6 +1440,7 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
         content
             .onAppear { onAppear() }
             .onDisappear { onDisappear() }
+            .unmutesOnHardwareVolume($isMuted)
             .onChange(of: isMuted) { _, v in
                 // No persist: this view has no mute button of its own, so the handler only
                 // ever sees programmatic writes.

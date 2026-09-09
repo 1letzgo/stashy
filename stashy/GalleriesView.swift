@@ -1078,6 +1078,7 @@ struct GalleryItemView: View {
             cancelAnimationAdvanceTimer()
             teardownPlayer()
         }
+        .unmutesOnHardwareVolume($isMuted)
         .onChange(of: isMuted) { _, newValue in
             // Persisting happens in the mute button, not here — this also fires for programmatic
             // writes, which is how the stored choice reaches the engine.
