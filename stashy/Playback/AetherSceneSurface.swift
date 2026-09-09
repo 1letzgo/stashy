@@ -33,6 +33,8 @@ struct AetherSceneSurface: View {
     @StateObject private var pip = AetherPictureInPictureCoordinator()
 
     @State private var areControlsVisible = true
+    /// Fullscreen only: crop to fill the whole screen instead of letterboxing.
+    @State private var fillsScreen = false
     @State private var controlsHideToken = UUID()
     @State private var isScrubbing = false
     @State private var scrubSeconds: Double = 0
@@ -90,7 +92,17 @@ struct AetherSceneSurface: View {
         .onChange(of: engine.pipPlayerLayer.map(ObjectIdentifier.init)) { _, _ in
             pip.update(layer: engine.pipPlayerLayer)
         }
+        .onAppear {
+            // The gravity lives on the engine and outlives this view; every surface starts
+            // letterboxed, and the fill mode is opted into per fullscreen session.
+            fillsScreen = false
+            engine.setVideoGravity(.resizeAspect)
+        }
+        .onChange(of: fillsScreen) { _, fills in
+            engine.setVideoGravity(fills ? .resizeAspectFill : .resizeAspect)
+        }
         .onDisappear {
+            if isFullscreen { engine.setVideoGravity(.resizeAspect) }
             pip.update(layer: nil)
             endScrubPreview()
         }
@@ -284,6 +296,9 @@ struct AetherSceneSurface: View {
                 HStack {
                     muteButton
                     Spacer()
+                    if isFullscreen {
+                        fillButton
+                    }
                     if onToggleFullscreen != nil {
                         fullscreenButton
                     }
@@ -463,6 +478,25 @@ struct AetherSceneSurface: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(engine.isPlaying ? "Pause" : "Play")
+    }
+
+    @ViewBuilder
+    private var fillButton: some View {
+        Button {
+            HapticManager.light()
+            fillsScreen.toggle()
+            revealControls()
+        } label: {
+            Image(systemName: fillsScreen
+                  ? "rectangle.arrowtriangle.2.inward"
+                  : "rectangle.arrowtriangle.2.outward")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.white)
+                .padding(8)
+                .background(Color.black.opacity(0.4), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(fillsScreen ? "Fit to screen" : "Fill screen")
     }
 
     @ViewBuilder
