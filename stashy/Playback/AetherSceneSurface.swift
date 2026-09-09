@@ -275,12 +275,13 @@ struct AetherSceneSurface: View {
             // Opacity instead of structural insertion: a conditional `if` plus a transition
             // proved unreliable over the UIKit-hosted player view (the re-inserted controls
             // never became visible), while a plain opacity change always renders.
+            // Hidden while the speed picker is open so the picker has the stage to itself.
             HStack(spacing: centerSpacing) {
                 skipButton(-10)
                 playPauseGlyph
                 skipButton(10)
             }
-            .autoHiding(areControlsVisible)
+            .autoHiding(areControlsVisible && !showsSpeedPicker)
 
             // Top row: dismiss / expand plus the output-route capsule on the left, the volume
             // capsule on the right.
