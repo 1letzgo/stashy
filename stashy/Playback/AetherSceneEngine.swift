@@ -212,6 +212,13 @@ final class AetherSceneEngine: ObservableObject {
     }
 
     private func bind() {
+        #if os(iOS)
+        NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.resumeFromBackgroundIfNeeded() }
+            .store(in: &cancellables)
+        #endif
+
         engine.clock.$currentTime
             .receive(on: RunLoop.main)
             .sink { [weak self] time in
@@ -479,7 +486,49 @@ final class AetherSceneEngine: ObservableObject {
     // MARK: - Transport
 
     func play() {
+        // A session the engine tore down while backgrounded (#127) has no transport left;
+        // `engine.play()` would flip the state and play nothing. Rebuild it first.
+        if isSessionTornDown {
+            Task { [weak self] in
+                guard let self else { return }
+                await self.rebuildTornDownSession()
+                self.engine.play()
+            }
+            return
+        }
         engine.play()
+    }
+
+    /// True when a loaded session lost its pipeline (background teardown) and only a reload can
+    /// bring it back: the route drops to `.none` on teardown while `currentURL` still names the item.
+    private var isSessionTornDown: Bool {
+        currentURL != nil && !didEnd && !isLoading && engine.videoRoute == .none
+    }
+
+    /// `reloadAtCurrentPosition` replays the mount's autoplay flag on a torn-down session, so a
+    /// caller that wants to come back paused pauses right after.
+    private func rebuildTornDownSession() async {
+        let generation = loadGeneration
+        isLoading = true
+        defer { if generation == loadGeneration { isLoading = false } }
+        do {
+            try await engine.reloadAtCurrentPosition()
+        } catch is CancellationError {
+        } catch {
+            AppLog.error("AetherSceneEngine background rebuild failed: \(error.localizedDescription)")
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// iOS convention: an app that comes back from the background shows the paused frame and
+    /// waits for the user. Rebuild the torn-down pipeline now so the picture is there, then pause.
+    private func resumeFromBackgroundIfNeeded() {
+        guard isSessionTornDown else { return }
+        Task { [weak self] in
+            guard let self else { return }
+            await self.rebuildTornDownSession()
+            self.engine.pause()
+        }
     }
 
     func pause() {
