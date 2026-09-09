@@ -269,7 +269,9 @@ struct AetherSceneSurface: View {
                     if hasTrackChoices {
                         tracksMenu
                     }
-                    if onToggleFullscreen != nil {
+                    // Inline: enter-fullscreen sits with the other top-right controls.
+                    // Fullscreen: the close button lives bottom-right (see below).
+                    if onToggleFullscreen != nil, !isFullscreen {
                         fullscreenButton
                     }
                     muteButton
@@ -280,6 +282,21 @@ struct AetherSceneSurface: View {
             }
             .opacity(areControlsVisible ? 1 : 0)
             .allowsHitTesting(areControlsVisible)
+
+            if isFullscreen, onToggleFullscreen != nil {
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        fullscreenButton
+                    }
+                    .padding(.trailing, 10)
+                    // Clear of the time bar (16 pt track + label row + its 10 pt bottom padding).
+                    .padding(.bottom, 52)
+                }
+                .opacity(areControlsVisible ? 1 : 0)
+                .allowsHitTesting(areControlsVisible)
+            }
         }
     }
 
