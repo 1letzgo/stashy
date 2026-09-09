@@ -67,6 +67,19 @@ struct AetherVideoSurface: View {
             .onChange(of: engine.hasFirstFrame) { _, ready in
                 if ready { onFirstFrame?() }
             }
+            .overlay(alignment: .bottomTrailing) {
+                if engine.isUsingTranscodeFallback {
+                    Text("Transcode")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(Color.black.opacity(0.45), in: Capsule())
+                        .padding(.trailing, 12)
+                        .padding(.bottom, 12 + bottomContentInset)
+                        .allowsHitTesting(false)
+                }
+            }
     }
 }
 

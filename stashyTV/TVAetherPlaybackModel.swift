@@ -83,7 +83,9 @@ final class TVAetherPlaybackModel: ObservableObject {
                startAt: Double = 0,
                title: String? = nil,
                subtitle: String? = nil,
-               artworkURL: URL? = nil) {
+               artworkURL: URL? = nil,
+               fallbackSources: [URL] = [],
+               fallbackDeclaredDuration: Double? = nil) {
         AppLog.debug("🚀 TV PLAYBACK: setup \(redactedURLString(url)) at \(startAt)s")
         self.sceneId = sceneId
         self.viewModel = viewModel
@@ -99,6 +101,9 @@ final class TVAetherPlaybackModel: ObservableObject {
         isShowingPlayer = true
         startProgressTimer()
 
+        engine.fallbackSources = fallbackSources
+        engine.fallbackDeclaredDuration = fallbackDeclaredDuration
+
         let start = max(0, startAt)
         Task { await engine.load(url: url, startAt: start > 0.25 ? start : nil, autoplay: true) }
     }
@@ -110,10 +115,14 @@ final class TVAetherPlaybackModel: ObservableObject {
                   viewModel: StashDBViewModel,
                   title: String? = nil,
                   subtitle: String? = nil,
-                  artworkURL: URL? = nil) {
+                  artworkURL: URL? = nil,
+                  fallbackSources: [URL] = [],
+                  fallbackDeclaredDuration: Double? = nil) {
         guard let engine else {
             setup(url: url, sceneId: sceneId, viewModel: viewModel,
-                  title: title, subtitle: subtitle, artworkURL: artworkURL)
+                  title: title, subtitle: subtitle, artworkURL: artworkURL,
+                  fallbackSources: fallbackSources,
+                  fallbackDeclaredDuration: fallbackDeclaredDuration)
             return
         }
         saveProgress()
@@ -124,6 +133,9 @@ final class TVAetherPlaybackModel: ObservableObject {
 
         applyNowPlaying(title: title, subtitle: subtitle, artworkURL: artworkURL)
         startProgressTimer()
+
+        engine.fallbackSources = fallbackSources
+        engine.fallbackDeclaredDuration = fallbackDeclaredDuration
 
         engine.prepareForItemReplacement()
         Task { await engine.load(url: url, startAt: nil, autoplay: true) }

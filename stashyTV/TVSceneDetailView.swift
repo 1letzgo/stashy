@@ -489,7 +489,9 @@ struct TVSceneDetailView: View {
                           startAt: startTime,
                           title: scene.displayTitle,
                           subtitle: scene.studio?.name,
-                          artworkURL: scene.thumbnailURL)
+                          artworkURL: scene.thumbnailURL,
+                          fallbackSources: scene.transcodeFallbackURLs,
+                          fallbackDeclaredDuration: scene.sceneDuration)
     }
 
     // MARK: - Markers Section

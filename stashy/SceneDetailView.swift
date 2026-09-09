@@ -50,6 +50,8 @@ struct SceneDetailView: View {
     @State private var tagsTotalHeight: CGFloat = 0
     @State private var isMuted = ScenePlayerMute.initialValue()
     @State private var hasAddedPlay = false
+    /// The transcode-fallback toast is shown once per screen, not once per rung.
+    @State private var didAnnounceTranscodeFallback = false
     @State private var showingAddMarkerSheet = false
     @State private var capturedMarkerTime: Double = 0
     @State private var playbackSpeed: Double = 1.0
@@ -846,6 +848,19 @@ struct SceneDetailView: View {
             // A (re)load swaps the analysis item in place — re-attach AI Motion to the new one.
             engine.onAnalysisItemChanged = { _ in
                 ensureAetherVideoAnalysis()
+            }
+
+            // Server transcodes the engine falls back to when the original will not play.
+            engine.fallbackSources = activeScene.transcodeFallbackURLs
+            engine.fallbackDeclaredDuration = activeScene.sceneDuration
+            engine.onTranscodeFallback = { _ in
+                guard !didAnnounceTranscodeFallback else { return }
+                didAnnounceTranscodeFallback = true
+                ToastManager.shared.show(
+                    "Original could not be played — using the server transcode",
+                    icon: "arrow.triangle.2.circlepath",
+                    style: .error
+                )
             }
 
             aetherEngine = engine

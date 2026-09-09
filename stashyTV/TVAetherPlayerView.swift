@@ -281,6 +281,14 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                             .lineLimit(1)
                     }
                     Spacer()
+                    if engine.isUsingTranscodeFallback {
+                        Text("Transcode")
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundStyle(.white.opacity(0.8))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 6)
+                            .background(Color.white.opacity(0.15), in: Capsule())
+                    }
                     Image(systemName: engine.isPlaying ? "play.fill" : "pause.fill")
                         .font(.system(size: 24))
                         .foregroundStyle(.white.opacity(0.8))

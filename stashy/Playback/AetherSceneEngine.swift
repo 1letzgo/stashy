@@ -49,6 +49,16 @@ final class AetherSceneEngine: ObservableObject {
     /// The underlying engine; the SwiftUI surface binds to this directly.
     let engine: AetherEngine
 
+    /// Which source the session is playing: the original file, or one of the server's
+    /// transcodes the ladder fell back to.
+    enum SourceKind: String {
+        case original
+        case hlsTranscode
+        case mp4Transcode
+
+        var isTranscode: Bool { self != .original }
+    }
+
     // MARK: - Published state
 
     @Published private(set) var currentTime: Double = 0
@@ -81,6 +91,11 @@ final class AetherSceneEngine: ObservableObject {
     /// Re-emitted on every (re)load, because items are swapped in place under the same player.
     @Published private(set) var analysisPlayerItem: AVPlayerItem?
 
+    /// Which rung of the source ladder is playing.
+    @Published private(set) var activeSourceKind: SourceKind = .original
+    /// Convenience mirror of `activeSourceKind != .original`, for the badge every surface draws.
+    @Published private(set) var isUsingTranscodeFallback: Bool = false
+
     // MARK: - Callbacks
 
     var onTime: ((Double, Double) -> Void)?
@@ -96,6 +111,18 @@ final class AetherSceneEngine: ObservableObject {
 
     /// Loop the current item shortly before its end instead of ending.
     var loopsAtEnd: Bool = false
+
+    /// Server transcodes to fall back to, in order, when the original cannot be played
+    /// (`Scene.transcodeFallbackURLs`). Set before `load`; empty disables the ladder, which is
+    /// what markers, clips, previews and local downloads want.
+    var fallbackSources: [URL] = []
+
+    /// Duration of the item, handed to the engine for the progressive-transcode rung: that
+    /// origin is sequential, so the demuxer cannot measure a duration of its own.
+    var fallbackDeclaredDuration: Double?
+
+    /// Fires once per switch, with the rung the ladder moved to. Hosts use it for a toast.
+    var onTranscodeFallback: ((SourceKind) -> Void)?
 
     /// Which audio session `load` installs. Previews use `.ambient` so they never steal the
     /// session from a playing scene.
@@ -204,6 +231,27 @@ final class AetherSceneEngine: ObservableObject {
     private var scrubExtractor: FrameExtractor?
     private var scrubExtractorURL: URL?
 
+    // MARK: Source ladder
+
+    /// The URL the host asked for. A `load` of a different one resets the ladder.
+    private var primarySourceURL: URL?
+    /// The URL the current rung loads from, before any `?start=` shift.
+    private var activeSourceBaseURL: URL?
+    /// Rung the session is on: -1 is the original, 0… index into `fallbackSources`.
+    private var fallbackRung: Int = -1
+    /// One escalation at a time; a failing source usually fires several triggers at once.
+    private var fallbackSwitchInFlight = false
+    /// Playback intent the current source was loaded with, replayed on the next rung.
+    private var lastAutoplayIntent = true
+    /// `customizeOptions` of the host's load, replayed on every rung and internal reload.
+    private var hostCustomizeOptions: ((inout LoadOptions) -> Void)?
+    /// Seconds the sequential transcode was started at (`?start=`); the engine's clock is
+    /// zero-based there, so this is added back on the way out.
+    private var sourceTimeOffset: Double = 0
+    /// Fires when a load never shows a frame.
+    private var firstFrameWatchdog: Task<Void, Never>?
+    private static let firstFrameWatchdogSeconds: UInt64 = 20
+
     // MARK: - Lifecycle
 
     init() throws {
@@ -227,10 +275,11 @@ final class AetherSceneEngine: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] time in
                 guard let self else { return }
-                self.currentTime = time
+                let adjusted = time + self.sourceTimeOffset
+                self.currentTime = adjusted
                 let dur = self.duration
-                self.onTime?(time, dur)
-                self.handleLoopIfNeeded(time: time, duration: dur)
+                self.onTime?(adjusted, dur)
+                self.handleLoopIfNeeded(time: adjusted, duration: dur)
             }
             .store(in: &cancellables)
 
@@ -255,7 +304,10 @@ final class AetherSceneEngine: ObservableObject {
                 guard let self else { return }
                 let wasReady = self.hasFirstFrame
                 self.hasFirstFrame = ready
-                if ready { self.hasPresentedFrame = true }
+                if ready {
+                    self.hasPresentedFrame = true
+                    self.cancelFirstFrameWatchdog()
+                }
                 if ready && !wasReady {
                     self.applyVolumeState()
                     self.onFirstFrame?()
@@ -338,7 +390,20 @@ final class AetherSceneEngine: ObservableObject {
             .receive(on: RunLoop.main)
             .sink { [weak self] info in
                 guard let self else { return }
-                if let info { self.errorMessage = info.message }
+                if let info {
+                    self.errorMessage = info.message
+                    self.escalateToFallback(reason: "engine error: \(info.message)")
+                }
+            }
+            .store(in: &cancellables)
+
+        // A source whose audio no pipeline could deliver plays silently; that is exactly the
+        // case a server transcode fixes, so it is a ladder trigger like a hard failure.
+        engine.$audioDelivery
+            .receive(on: RunLoop.main)
+            .sink { [weak self] delivery in
+                guard let self, delivery == .droppedNoPipeline else { return }
+                self.escalateToFallback(reason: "audio dropped, no pipeline")
             }
             .store(in: &cancellables)
 
@@ -405,6 +470,7 @@ final class AetherSceneEngine: ObservableObject {
         case .error(let message):
             isLoading = false
             errorMessage = message
+            escalateToFallback(reason: "playback error: \(message)")
         default:
             break
         }
@@ -412,9 +478,10 @@ final class AetherSceneEngine: ObservableObject {
 
     private func handleEnded() {
         guard !didEnd else { return }
-        if loopsAtEnd, let url = currentURL {
-            // `.ended` is terminal: loop by reloading at zero.
-            Task { await self.load(url: url, startAt: nil, autoplay: true) }
+        if loopsAtEnd, currentURL != nil {
+            // `.ended` is terminal: loop by reloading at zero. Reloads the rung that is
+            // playing, so a fallback source keeps its options instead of restarting the ladder.
+            Task { await self.reloadCurrentSource(startAt: nil, autoplay: true) }
             return
         }
         didEnd = true
@@ -443,6 +510,38 @@ final class AetherSceneEngine: ObservableObject {
               startAt: Double?,
               autoplay: Bool,
               customizeOptions: ((inout LoadOptions) -> Void)? = nil) async {
+        // A host load always starts at the top of the ladder: it names the original.
+        if url != primarySourceURL { resetSourceLadder() }
+        primarySourceURL = url
+        hostCustomizeOptions = customizeOptions
+        await performLoad(url: url,
+                          startAt: startAt,
+                          autoplay: autoplay,
+                          kind: .original,
+                          rung: -1,
+                          preservesPresentedFrame: false)
+    }
+
+    /// Reloads the rung that is playing (loop, ended-seek), keeping its `LoadOptions` and its
+    /// place on the ladder.
+    private func reloadCurrentSource(startAt: Double?, autoplay: Bool) async {
+        guard let url = activeSourceBaseURL ?? currentURL else { return }
+        await performLoad(url: url,
+                          startAt: startAt,
+                          autoplay: autoplay,
+                          kind: activeSourceKind,
+                          rung: fallbackRung,
+                          preservesPresentedFrame: false)
+    }
+
+    /// The single load path. `kind` decides the `LoadOptions` the rung needs; the host's
+    /// `customizeOptions` still runs last, so it can override anything set here.
+    private func performLoad(url: URL,
+                             startAt: Double?,
+                             autoplay: Bool,
+                             kind: SourceKind,
+                             rung: Int,
+                             preservesPresentedFrame: Bool) async {
         loadGeneration &+= 1
         let generation = loadGeneration
 
@@ -452,14 +551,39 @@ final class AetherSceneEngine: ObservableObject {
         case .none: break
         }
 
-        if currentURL != url {
+        cancelFirstFrameWatchdog()
+
+        // The sequential transcode has no byte seeking: a shifted start is a different URL,
+        // and its clock is zero-based, so the offset is carried here.
+        var requestURL = url
+        var startPosition = startAt
+        if kind == .mp4Transcode, let target = startAt, target > 0.25 {
+            requestURL = Self.appendingStartQuery(seconds: target, to: url)
+            startPosition = nil
+            sourceTimeOffset = target
+        } else {
+            sourceTimeOffset = 0
+        }
+
+        if preservesPresentedFrame {
+            // Switching rung under a picture that is already up: keep it until the new session
+            // replaces it, instead of flashing the poster.
+            if hasPresentedFrame { engine.prepareForItemReplacement() }
+        } else if currentURL != requestURL {
             shutdownScrubExtractor()
             hasPresentedFrame = false
         } else if hasPresentedFrame {
             // Same item again: keep the outgoing picture up until the new session replaces it.
             engine.prepareForItemReplacement()
         }
-        currentURL = url
+        currentURL = requestURL
+        activeSourceBaseURL = url
+        fallbackRung = rung
+        lastAutoplayIntent = autoplay
+        if activeSourceKind != kind {
+            activeSourceKind = kind
+            isUsingTranscodeFallback = kind.isTranscode
+        }
         didEnd = false
         hasFirstFrame = false
         errorMessage = nil
@@ -472,26 +596,116 @@ final class AetherSceneEngine: ObservableObject {
         var options = LoadOptions()
         options.autoplay = autoplay
         if let key = ServerConfigManager.shared.activeConfig?.secureApiKey, !key.isEmpty,
-           url.isFileURL == false {
+           requestURL.isFileURL == false {
             options.httpHeaders["ApiKey"] = key
         }
-        customizeOptions?(&options)
+        switch kind {
+        case .original:
+            break
+        case .hlsTranscode:
+            // Hand the playlist to AVPlayer directly (route `.remoteBypass`): VOD honours the
+            // resume anchor there, and PiP / AirPlay / seeking keep working.
+            options.nativeRemoteHLS = true
+        case .mp4Transcode:
+            // Stash streams the progressive transcode forward-only; the tail read is gone with
+            // it, so the duration has to be declared or the load fails with `zeroDuration`.
+            options.sequentialOrigin = true
+            options.declaredDurationSeconds = fallbackDeclaredDuration
+        }
+        hostCustomizeOptions?(&options)
 
         do {
-            _ = try await engine.load(url: signedURL(url) ?? url,
-                                      startPosition: startAt,
+            _ = try await engine.load(url: signedURL(requestURL) ?? requestURL,
+                                      startPosition: startPosition,
                                       options: options)
             guard generation == loadGeneration else { return }
             applyRateState()
             applyVolumeState()
+            armFirstFrameWatchdog(generation: generation, url: requestURL)
         } catch is CancellationError {
             // A newer load superseded this one; nothing to report.
         } catch {
             guard generation == loadGeneration else { return }
             errorMessage = error.localizedDescription
             AppLog.error("AetherSceneEngine load failed: \(error.localizedDescription)")
+            escalateToFallback(reason: "load threw: \(error.localizedDescription)")
         }
         if generation == loadGeneration { isLoading = false }
+    }
+
+    // MARK: - Transcode fallback ladder
+
+    /// Moves to the next rung, once per rung and only while the current source is the one that
+    /// failed. Remembers the playhead and the transport intent.
+    private func escalateToFallback(reason: String) {
+        guard !fallbackSwitchInFlight else { return }
+        let next = fallbackRung + 1
+        guard next < fallbackSources.count else { return }
+        let url = fallbackSources[next]
+        let kind: SourceKind = url.pathExtension.lowercased() == "m3u8" ? .hlsTranscode : .mp4Transcode
+        let position = currentTime
+        let autoplay = lastAutoplayIntent
+
+        fallbackSwitchInFlight = true
+        cancelFirstFrameWatchdog()
+        AppLog.error("Aether fallback → \(kind.rawValue): \(reason)")
+
+        Task { [weak self] in
+            guard let self else { return }
+            await self.performLoad(url: url,
+                                   startAt: position > 0.25 ? position : nil,
+                                   autoplay: autoplay,
+                                   kind: kind,
+                                   rung: next,
+                                   preservesPresentedFrame: true)
+            self.fallbackSwitchInFlight = false
+            self.onTranscodeFallback?(kind)
+        }
+    }
+
+    private func resetSourceLadder() {
+        cancelFirstFrameWatchdog()
+        fallbackRung = -1
+        fallbackSwitchInFlight = false
+        sourceTimeOffset = 0
+        activeSourceBaseURL = nil
+        if activeSourceKind != .original {
+            activeSourceKind = .original
+            isUsingTranscodeFallback = false
+        }
+    }
+
+    /// A load that reached the engine but never shows a picture is the silent failure mode the
+    /// ladder exists for. Local files are excluded: nothing to fall back to.
+    private func armFirstFrameWatchdog(generation: Int, url: URL) {
+        cancelFirstFrameWatchdog()
+        guard !url.isFileURL, fallbackRung + 1 < fallbackSources.count else { return }
+        switch engine.playbackPhase {
+        case .ended, .error:
+            return
+        default:
+            break
+        }
+        firstFrameWatchdog = Task { [weak self] in
+            try? await Task.sleep(nanoseconds: Self.firstFrameWatchdogSeconds * 1_000_000_000)
+            guard !Task.isCancelled, let self else { return }
+            guard generation == self.loadGeneration, !self.hasFirstFrame else { return }
+            self.escalateToFallback(reason: "no first frame within \(Self.firstFrameWatchdogSeconds)s")
+        }
+    }
+
+    private func cancelFirstFrameWatchdog() {
+        firstFrameWatchdog?.cancel()
+        firstFrameWatchdog = nil
+    }
+
+    /// Stash serves a shifted progressive transcode as `?start=<seconds>`.
+    private static func appendingStartQuery(seconds: Double, to url: URL) -> URL {
+        guard var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        var items = (comps.queryItems ?? []).filter { $0.name != "start" }
+        items.append(URLQueryItem(name: "start", value: String(format: "%.3f", max(0, seconds))))
+        comps.queryItems = items
+        return comps.url ?? url
     }
 
     // MARK: - Transport
@@ -553,8 +767,15 @@ final class AetherSceneEngine: ObservableObject {
     /// Seeks. `.ended` is terminal on the engine, so that case reloads instead.
     func seek(to seconds: Double) async {
         let target = max(0, seconds)
-        if didEnd, let url = currentURL {
-            await load(url: url, startAt: target, autoplay: true)
+        if didEnd {
+            await reloadCurrentSource(startAt: target, autoplay: true)
+            return
+        }
+        // The progressive transcode comes off a sequential origin: there is no byte seeking,
+        // so a seek is a reload of `stream.mp4?start=<seconds>`.
+        if activeSourceKind == .mp4Transcode {
+            let wantsPlay = isPlaying || lastAutoplayIntent
+            await reloadCurrentSource(startAt: target, autoplay: wantsPlay)
             return
         }
         if isLoading {
@@ -724,6 +945,9 @@ final class AetherSceneEngine: ObservableObject {
         cancellables.removeAll()
         loadGeneration &+= 1
         pendingSeek = nil
+        resetSourceLadder()
+        primarySourceURL = nil
+        hostCustomizeOptions = nil
         shutdownScrubExtractor()
         engine.removeAudioTap()
         engine.stop()

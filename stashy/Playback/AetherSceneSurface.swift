@@ -308,8 +308,9 @@ struct AetherSceneSurface: View {
                             speedPicker
                         }
                     }
-                    HStack {
+                    HStack(spacing: 8) {
                         Spacer(minLength: 0)
+                        if engine.isUsingTranscodeFallback { transcodeTag }
                         bottomTrailingControls
                     }
                     timeBar
@@ -442,6 +443,18 @@ struct AetherSceneSurface: View {
         .padding(.horizontal, 6)
         .frame(height: chromeButtonSize)
         .stashyGlass(shape: Capsule())
+    }
+
+    /// Non-interactive marker: this session is not playing the original file.
+    @ViewBuilder
+    private var transcodeTag: some View {
+        Text("Transcode")
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundStyle(.white)
+            .padding(.horizontal, 10)
+            .frame(height: chromeButtonSize)
+            .stashyGlass(shape: Capsule())
+            .allowsHitTesting(false)
     }
 
     private static let speedOptions: [Float] = [0.5, 0.75, 1, 1.25, 1.5, 2]
@@ -853,7 +866,8 @@ struct AetherSceneSurface: View {
         let codec = underlying.sourceVideoCodecName ?? "—"
         let decoder = underlying.activeVideoDecoder ?? "—"
         let phase = String(describing: underlying.playbackPhase)
-        return "route \(route)\ncodec \(codec)\ndecoder \(decoder)\nphase \(phase)"
+        let source = engine.activeSourceKind.rawValue
+        return "route \(route)\nsource \(source)\ncodec \(codec)\ndecoder \(decoder)\nphase \(phase)"
     }
     #endif
 

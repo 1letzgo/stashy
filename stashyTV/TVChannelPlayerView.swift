@@ -284,7 +284,9 @@ final class TVChannelSession: ObservableObject {
                             viewModel: catalog,
                             title: scene.displayTitle,
                             subtitle: subtitle,
-                            artworkURL: scene.thumbnailURL)
+                            artworkURL: scene.thumbnailURL,
+                            fallbackSources: scene.transcodeFallbackURLs,
+                            fallbackDeclaredDuration: scene.sceneDuration)
         } else {
             player.setup(url: url,
                          sceneId: scene.id,
@@ -292,7 +294,9 @@ final class TVChannelSession: ObservableObject {
                          startAt: 0,
                          title: scene.displayTitle,
                          subtitle: subtitle,
-                         artworkURL: scene.thumbnailURL)
+                         artworkURL: scene.thumbnailURL,
+                         fallbackSources: scene.transcodeFallbackURLs,
+                         fallbackDeclaredDuration: scene.sceneDuration)
         }
         isSwitching = false
     }
