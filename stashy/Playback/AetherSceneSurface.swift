@@ -28,7 +28,6 @@ struct AetherSceneSurface: View {
     /// Only drives the button's glyph — the host owns the actual presentation state.
     var isFullscreen: Bool = false
 
-    @ObservedObject private var appearanceManager = AppearanceManager.shared
     @ObservedObject private var tabManager = TabManager.shared
     @StateObject private var pip = AetherPictureInPictureCoordinator()
 
@@ -43,6 +42,11 @@ struct AetherSceneSurface: View {
     @State private var scrubPreviewImage: UIImage?
     @State private var scrubPreviewTask: Task<Void, Never>?
     @State private var scrubPreviewPendingSeconds: Double?
+    /// Surface height, so the inline card can use the same layout at smaller sizes.
+    @State private var surfaceHeight: CGFloat = 0
+    /// Mirrors of engine state that is not observable, so the slider and the speed menu redraw.
+    @State private var volumeLevel: Float = 1
+    @State private var playbackRate: Float = 1
     #if DEBUG
     @State private var showsDebugStats = false
     #endif
@@ -82,7 +86,12 @@ struct AetherSceneSurface: View {
             #endif
         }
         .contentShape(Rectangle())
+        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
+            surfaceHeight = height
+        }
         .onAppear {
+            volumeLevel = engine.volume > 0 ? engine.volume : 1
+            playbackRate = engine.rate
             pip.update(layer: engine.pipPlayerLayer)
             pip.onActiveChange = { [weak engine] active in
                 engine?.setPictureInPictureActive(active)
@@ -236,6 +245,18 @@ struct AetherSceneSurface: View {
 
     // MARK: - Transport
 
+    // MARK: Metrics
+    //
+    // One layout for both surfaces; the inline card is simply too short for the fullscreen
+    // sizes, so the same groups shrink and the volume slider drops out (mute stays).
+    private var isCompact: Bool { surfaceHeight > 0 && surfaceHeight < 260 }
+    private var skipButtonSize: CGFloat { isCompact ? 44 : 66 }
+    private var playButtonSize: CGFloat { isCompact ? 64 : 96 }
+    private var centerSpacing: CGFloat { isCompact ? 24 : 70 }
+    private var chromeButtonSize: CGFloat { isCompact ? 34 : 42 }
+    private var timeBarHeight: CGFloat { isCompact ? 36 : 44 }
+    private var showsVolumeSlider: Bool { !isCompact }
+
     @ViewBuilder
     private var transportOverlay: some View {
         ZStack {
@@ -251,71 +272,204 @@ struct AetherSceneSurface: View {
             // Opacity instead of structural insertion: a conditional `if` plus a transition
             // proved unreliable over the UIKit-hosted player view (the re-inserted controls
             // never became visible), while a plain opacity change always renders.
-            HStack(spacing: 26) {
+            HStack(spacing: centerSpacing) {
                 skipButton(-10)
                 playPauseGlyph
                 skipButton(10)
             }
-            .opacity(areControlsVisible ? 1 : 0)
-            .allowsHitTesting(areControlsVisible)
+            .autoHiding(areControlsVisible)
 
+            // Top row: dismiss / expand plus the output-route capsule on the left, the volume
+            // capsule on the right.
             VStack {
-                Spacer()
-                timeBar
-                    .padding(.horizontal, 12)
-                    .padding(.bottom, 10)
-            }
-            .opacity(areControlsVisible ? 1 : 0)
-            .allowsHitTesting(areControlsVisible)
-
-            // Same auto-hiding group as play/pause and the time bar: one tap brings the whole
-            // transport back, and it all leaves together.
-            VStack {
-                HStack(spacing: 8) {
-                    // Output routes on the left (AirPlay, PiP), playback controls on the right.
-                    #if os(iOS)
-                    // The route picker only does anything on a route that owns an AVPlayer;
-                    // the software route decodes into its own layer and cannot be mirrored.
-                    if engine.pipPlayerLayer != nil {
-                        airPlayButton
-                    }
-                    #endif
-                    if pip.isAvailable, tabManager.isPiPEnabled, AVPictureInPictureController.isPictureInPictureSupported() {
-                        pipButton
-                    }
-                    Spacer()
-                    if hasTrackChoices {
-                        tracksMenu
-                    }
+                HStack(alignment: .top, spacing: 10) {
+                    topLeadingControls
+                    Spacer(minLength: 12)
+                    volumeControls
                 }
-                .padding(.horizontal, 10)
-                .padding(.top, 10)
+                .padding(.horizontal, 16)
+                .padding(.top, 12)
                 Spacer()
             }
-            .opacity(areControlsVisible ? 1 : 0)
-            .allowsHitTesting(areControlsVisible)
+            .autoHiding(areControlsVisible)
 
-            // Bottom row, clear of the time bar: mute on the left, fullscreen toggle on the
-            // right. Same on the inline and the fullscreen surface.
+            // Bottom: the option capsule sits above the full-width time bar.
             VStack {
                 Spacer()
-                HStack {
-                    muteButton
-                    Spacer()
-                    if isFullscreen {
-                        fillButton
+                VStack(spacing: 10) {
+                    HStack {
+                        Spacer(minLength: 0)
+                        bottomTrailingControls
                     }
-                    if onToggleFullscreen != nil {
-                        fullscreenButton
-                    }
+                    timeBar
                 }
-                .padding(.horizontal, 10)
-                // Clear of the time bar (16 pt track + label row + its 10 pt bottom padding).
-                .padding(.bottom, 52)
+                .padding(.horizontal, 16)
+                .padding(.bottom, 12)
             }
-            .opacity(areControlsVisible ? 1 : 0)
-            .allowsHitTesting(areControlsVisible)
+            .autoHiding(areControlsVisible)
         }
+    }
+
+    // MARK: Top leading
+
+    @ViewBuilder
+    private var topLeadingControls: some View {
+        HStack(spacing: 10) {
+            if onToggleFullscreen != nil {
+                dismissOrExpandButton
+            }
+            routeCapsule
+        }
+    }
+
+    /// Fullscreen closes with an `xmark`; inline the same slot enters fullscreen.
+    @ViewBuilder
+    private var dismissOrExpandButton: some View {
+        Button {
+            HapticManager.light()
+            onToggleFullscreen?()
+            revealControls()
+        } label: {
+            glassCircle(systemName: isFullscreen ? "xmark" : "arrow.up.left.and.arrow.down.right",
+                        diameter: chromeButtonSize)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isFullscreen ? "Close" : "Full screen")
+    }
+
+    private var showsPiPButton: Bool {
+        pip.isAvailable && tabManager.isPiPEnabled && AVPictureInPictureController.isPictureInPictureSupported()
+    }
+
+    /// The route picker only does anything on a route that owns an AVPlayer; the software route
+    /// decodes into its own layer and cannot be mirrored. With neither control the capsule goes.
+    private var showsAirPlayButton: Bool {
+        engine.pipPlayerLayer != nil
+    }
+
+    @ViewBuilder
+    private var routeCapsule: some View {
+        if showsPiPButton || showsAirPlayButton {
+            HStack(spacing: 2) {
+                if showsPiPButton { pipButton }
+                if showsAirPlayButton { airPlayButton }
+            }
+            .padding(.horizontal, 6)
+            .frame(height: chromeButtonSize)
+            .aetherGlass(shape: Capsule())
+        }
+    }
+
+    // MARK: Volume
+
+    @ViewBuilder
+    private var volumeControls: some View {
+        if showsVolumeSlider {
+            HStack(spacing: 12) {
+                volumeSlider
+                muteButton
+            }
+            .padding(.leading, 16)
+            .padding(.trailing, 10)
+            .frame(width: 210, height: chromeButtonSize)
+            .aetherGlass(shape: Capsule())
+        } else {
+            muteButton
+                .frame(width: chromeButtonSize, height: chromeButtonSize)
+                .aetherGlass(shape: Circle())
+        }
+    }
+
+    /// Custom track rather than a `Slider`: the stock control cannot be made this thin, and the
+    /// engine's volume is not observable, so the level is mirrored in `volumeLevel`.
+    @ViewBuilder
+    private var volumeSlider: some View {
+        GeometryReader { geo in
+            let width = max(geo.size.width, 1)
+            let level = CGFloat(isMuted ? 0 : min(max(volumeLevel, 0), 1))
+            ZStack(alignment: .leading) {
+                Capsule()
+                    .fill(Color.white.opacity(0.3))
+                Capsule()
+                    .fill(Color.white)
+                    .frame(width: width * level)
+            }
+            .frame(height: 4)
+            .frame(maxHeight: .infinity)
+            .contentShape(Rectangle())
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        setVolume(Float(min(max(0, value.location.x), width) / width))
+                    }
+                    .onEnded { value in
+                        setVolume(Float(min(max(0, value.location.x), width) / width))
+                    }
+            )
+        }
+        .frame(height: 22)
+        .accessibilityLabel("Volume")
+    }
+
+    /// Dragging the slider is an unmute: the level is what the user asked for.
+    private func setVolume(_ level: Float) {
+        volumeLevel = level
+        if level > 0, isMuted { isMuted = false }
+        engine.volume = level
+        revealControls()
+    }
+
+    // MARK: Bottom trailing
+
+    @ViewBuilder
+    private var bottomTrailingControls: some View {
+        HStack(spacing: 4) {
+            speedMenu
+            if hasTrackChoices { tracksMenu }
+            if isFullscreen { fillButton }
+        }
+        .padding(.horizontal, 6)
+        .frame(height: chromeButtonSize)
+        .aetherGlass(shape: Capsule())
+    }
+
+    private static let speedOptions: [Float] = [0.5, 0.75, 1, 1.25, 1.5, 2]
+
+    private var availableSpeedOptions: [Float] {
+        let cap = min(engine.engine.maxSupportedRate, 2.0)
+        return Self.speedOptions.filter { $0 <= cap + 0.001 }
+    }
+
+    @ViewBuilder
+    private var speedMenu: some View {
+        Menu {
+            ForEach(availableSpeedOptions, id: \.self) { option in
+                Button {
+                    engine.rate = option
+                    playbackRate = engine.rate
+                    revealControls()
+                } label: {
+                    Label {
+                        Text(Self.speedLabel(option))
+                    } icon: {
+                        if abs(playbackRate - option) < 0.001 {
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        } label: {
+            glyph("gauge.with.dots.needle.67percent")
+        }
+        .accessibilityLabel("Playback speed")
+    }
+
+    private static func speedLabel(_ rate: Float) -> String {
+        let rounded = (rate * 100).rounded() / 100
+        let text = rounded == rounded.rounded()
+            ? String(format: "%.0f", rounded)
+            : String(format: "%g", rounded)
+        return "\(text)×"
     }
 
     private var hasTrackChoices: Bool {
@@ -375,11 +529,7 @@ struct AetherSceneSurface: View {
                 }
             }
         } label: {
-            Image(systemName: "text.bubble")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(8)
-                .background(Color.black.opacity(0.4), in: Circle())
+            glyph("waveform")
         }
         .accessibilityLabel("Audio and subtitles")
     }
@@ -394,11 +544,7 @@ struct AetherSceneSurface: View {
             ScenePlayerMute.persist(next)
             revealControls()
         } label: {
-            Image(systemName: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(8)
-                .background(Color.black.opacity(0.4), in: Circle())
+            glyph(isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill")
         }
         .buttonStyle(.plain)
         .accessibilityLabel(isMuted ? "Unmute" : "Mute")
@@ -448,11 +594,9 @@ struct AetherSceneSurface: View {
         Button {
             skip(by: delta)
         } label: {
-            Image(systemName: delta < 0 ? "gobackward.10" : "goforward.10")
-                .font(.system(size: 19, weight: .bold))
-                .foregroundStyle(.white)
-                .padding(12)
-                .background(Color.black.opacity(0.35), in: Circle())
+            glassCircle(systemName: delta < 0 ? "gobackward.10" : "goforward.10",
+                        diameter: skipButtonSize,
+                        glyphSize: isCompact ? 18 : 24)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(delta < 0 ? "Back 10 seconds" : "Forward 10 seconds")
@@ -476,11 +620,9 @@ struct AetherSceneSurface: View {
             engine.togglePlayPause()
             revealControls()
         } label: {
-            Image(systemName: engine.isPlaying ? "pause.fill" : "play.fill")
-                .font(.system(size: 26, weight: .bold))
-                .foregroundStyle(.white)
-                .padding(16)
-                .background(Color.black.opacity(0.35), in: Circle())
+            glassCircle(systemName: engine.isPlaying ? "pause.fill" : "play.fill",
+                        diameter: playButtonSize,
+                        glyphSize: isCompact ? 26 : 38)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(engine.isPlaying ? "Pause" : "Play")
@@ -493,43 +635,19 @@ struct AetherSceneSurface: View {
             fillsScreen.toggle()
             revealControls()
         } label: {
-            Image(systemName: fillsScreen
+            glyph(fillsScreen
                   ? "rectangle.arrowtriangle.2.inward"
                   : "rectangle.arrowtriangle.2.outward")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(8)
-                .background(Color.black.opacity(0.4), in: Circle())
         }
         .buttonStyle(.plain)
         .accessibilityLabel(fillsScreen ? "Fit to screen" : "Fill screen")
-    }
-
-    @ViewBuilder
-    private var fullscreenButton: some View {
-        Button {
-            HapticManager.light()
-            onToggleFullscreen?()
-            revealControls()
-        } label: {
-            Image(systemName: isFullscreen
-                  ? "arrow.down.right.and.arrow.up.left"
-                  : "arrow.up.left.and.arrow.down.right")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(8)
-                .background(Color.black.opacity(0.4), in: Circle())
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(isFullscreen ? "Exit full screen" : "Full screen")
     }
 
     #if os(iOS)
     @ViewBuilder
     private var airPlayButton: some View {
         AetherRoutePickerView()
-            .frame(width: 31, height: 31)
-            .background(Color.black.opacity(0.4), in: Circle())
+            .frame(width: chromeButtonSize - 8, height: chromeButtonSize - 8)
             .accessibilityLabel("AirPlay")
     }
     #endif
@@ -541,20 +659,23 @@ struct AetherSceneSurface: View {
             pip.toggle()
             revealControls()
         } label: {
-            Image(systemName: pip.isActive ? "pip.exit" : "pip.enter")
-                .font(.system(size: 15, weight: .semibold))
-                .foregroundStyle(.white)
-                .padding(8)
-                .background(Color.black.opacity(0.4), in: Circle())
+            glyph(pip.isActive ? "pip.exit" : "pip.enter")
         }
         .buttonStyle(.plain)
         .accessibilityLabel(pip.isActive ? "Stop Picture in Picture" : "Start Picture in Picture")
     }
 
+    /// Full-width glass bar: elapsed on the left, the scrub track in the middle, the remaining
+    /// time (`-mm:ss`) on the right.
     @ViewBuilder
     private var timeBar: some View {
         let duration = max(engine.duration, 0)
-        VStack(spacing: 4) {
+        let remaining = max(0, duration - displayedTime)
+        HStack(spacing: 12) {
+            Text(formatTime(displayedTime))
+                .font(.system(size: isCompact ? 10 : 12, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.white.opacity(0.7))
+
             GeometryReader { geo in
                 let width = max(geo.size.width, 1)
                 let progress = duration > 0 ? min(1, max(0, displayedTime / duration)) : 0
@@ -562,7 +683,7 @@ struct AetherSceneSurface: View {
                     Capsule()
                         .fill(Color.white.opacity(0.28))
                     Capsule()
-                        .fill(appearanceManager.tintColor)
+                        .fill(Color.white)
                         .frame(width: width * CGFloat(progress))
                 }
                 .frame(height: 4)
@@ -593,16 +714,15 @@ struct AetherSceneSurface: View {
                     }
                 }
             }
-            .frame(height: 16)
+            .frame(maxHeight: .infinity)
 
-            HStack {
-                Text(formatTime(displayedTime))
-                Spacer()
-                Text(formatTime(duration))
-            }
-            .font(.system(size: 10, weight: .semibold).monospacedDigit())
-            .foregroundStyle(.white.opacity(0.85))
+            Text("-\(formatTime(remaining))")
+                .font(.system(size: isCompact ? 10 : 12, weight: .semibold).monospacedDigit())
+                .foregroundStyle(.white.opacity(0.7))
         }
+        .padding(.horizontal, 16)
+        .frame(height: timeBarHeight)
+        .aetherGlass(shape: Capsule())
     }
 
     /// Floating still above the scrub thumb, clamped to the bar so it never leaves the surface.
@@ -701,6 +821,27 @@ struct AetherSceneSurface: View {
 
     // MARK: - Helpers
 
+    /// Icon inside a capsule group — the capsule already carries the glass, so this is bare.
+    @ViewBuilder
+    private func glyph(_ systemName: String) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: isCompact ? 13 : 15, weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: chromeButtonSize, height: chromeButtonSize)
+            .contentShape(Rectangle())
+    }
+
+    /// Stand-alone round glass button.
+    @ViewBuilder
+    private func glassCircle(systemName: String, diameter: CGFloat, glyphSize: CGFloat? = nil) -> some View {
+        Image(systemName: systemName)
+            .font(.system(size: glyphSize ?? (isCompact ? 13 : 15), weight: .semibold))
+            .foregroundStyle(.white)
+            .frame(width: diameter, height: diameter)
+            .aetherGlass(shape: Circle())
+            .contentShape(Circle())
+    }
+
     private func revealControls() {
         withAnimation(.easeInOut(duration: 0.15)) {
             areControlsVisible = true
@@ -728,6 +869,27 @@ struct AetherSceneSurface: View {
         return h > 0
             ? String(format: "%d:%02d:%02d", h, m, s)
             : String(format: "%d:%02d", m, s)
+    }
+}
+
+// MARK: - Glass and auto-hiding
+
+private extension View {
+    /// Liquid Glass where the system has it, a material capsule with a hairline everywhere else.
+    @ViewBuilder
+    func aetherGlass<S: Shape>(shape: S) -> some View {
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.regular, in: shape)
+        } else {
+            self
+                .background(.ultraThinMaterial, in: shape)
+                .overlay(shape.stroke(Color.white.opacity(0.25), lineWidth: 0.5))
+        }
+    }
+
+    /// Every transport group fades and stops taking hits together.
+    func autoHiding(_ visible: Bool) -> some View {
+        opacity(visible ? 1 : 0).allowsHitTesting(visible)
     }
 }
 

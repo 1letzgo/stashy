@@ -153,6 +153,25 @@ final class AetherSceneEngine: ObservableObject {
         }
     }
 
+    /// Output level in 0…1. Reads the engine directly; writing remembers the level as the
+    /// unmuted one, so a later unmute restores it. Setting a level above zero while muted is
+    /// treated as an unmute — that is what dragging the volume slider means.
+    var volume: Float {
+        get { engine.volume }
+        set {
+            let clamped = max(0, min(newValue, 1))
+            guard clamped > 0 else {
+                // Zero is a level, not a mute: `unmutedVolume` keeps the remembered value so a
+                // later unmute does not resurrect silence.
+                engine.volume = 0
+                return
+            }
+            unmutedVolume = clamped
+            _isMuted = false
+            applyVolumeState()
+        }
+    }
+
     /// Writes the current mute state onto the engine. Idempotent, so it can be re-applied at
     /// every point where the audio output may have been (re)created.
     private func applyVolumeState() {
