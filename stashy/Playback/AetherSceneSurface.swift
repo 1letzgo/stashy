@@ -384,16 +384,27 @@ struct AetherSceneSurface: View {
         if let doubleTapSkip {
             region
                 .onTapGesture(count: 2) { skip(by: doubleTapSkip) }
-                .onTapGesture {
-                    engine.togglePlayPause()
-                    revealControls()
-                }
+                .onTapGesture { toggleControls() }
         } else {
             region
-                .onTapGesture {
-                    engine.togglePlayPause()
-                    revealControls()
-                }
+                .onTapGesture { toggleControls() }
+        }
+    }
+
+    /// A tap on free surface never changes the transport: hidden controls come up, visible
+    /// controls go away. Play/pause is the glyph's job.
+    private func toggleControls() {
+        if areControlsVisible {
+            hideControls()
+        } else {
+            revealControls()
+        }
+    }
+
+    private func hideControls() {
+        controlsHideToken = UUID()
+        withAnimation(.easeInOut(duration: 0.2)) {
+            areControlsVisible = false
         }
     }
 
@@ -425,12 +436,19 @@ struct AetherSceneSurface: View {
 
     @ViewBuilder
     private var playPauseGlyph: some View {
-        Image(systemName: engine.isPlaying ? "pause.fill" : "play.fill")
-            .font(.system(size: 26, weight: .bold))
-            .foregroundStyle(.white)
-            .padding(16)
-            .background(Color.black.opacity(0.35), in: Circle())
-            .allowsHitTesting(false)
+        Button {
+            HapticManager.light()
+            engine.togglePlayPause()
+            revealControls()
+        } label: {
+            Image(systemName: engine.isPlaying ? "pause.fill" : "play.fill")
+                .font(.system(size: 26, weight: .bold))
+                .foregroundStyle(.white)
+                .padding(16)
+                .background(Color.black.opacity(0.35), in: Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(engine.isPlaying ? "Pause" : "Play")
     }
 
     @ViewBuilder
