@@ -57,6 +57,10 @@ final class AetherSceneEngine: ObservableObject {
     @Published private(set) var isPlaying: Bool = false
     @Published private(set) var isBuffering: Bool = false
     @Published private(set) var hasFirstFrame: Bool = false
+    /// Latched once a frame of the current item has been shown; survives the reloads a session
+    /// makes on its own (track switch, ended-loop, background rebuild) so a poster is only ever
+    /// drawn before the very first picture of a title, never over a reload's brief gap.
+    @Published private(set) var hasPresentedFrame: Bool = false
     @Published private(set) var didEnd: Bool = false
     @Published private(set) var errorMessage: String?
     @Published private(set) var audioTracks: [TrackInfo] = []
@@ -251,6 +255,7 @@ final class AetherSceneEngine: ObservableObject {
                 guard let self else { return }
                 let wasReady = self.hasFirstFrame
                 self.hasFirstFrame = ready
+                if ready { self.hasPresentedFrame = true }
                 if ready && !wasReady {
                     self.applyVolumeState()
                     self.onFirstFrame?()
@@ -447,7 +452,13 @@ final class AetherSceneEngine: ObservableObject {
         case .none: break
         }
 
-        if currentURL != url { shutdownScrubExtractor() }
+        if currentURL != url {
+            shutdownScrubExtractor()
+            hasPresentedFrame = false
+        } else if hasPresentedFrame {
+            // Same item again: keep the outgoing picture up until the new session replaces it.
+            engine.prepareForItemReplacement()
+        }
         currentURL = url
         didEnd = false
         hasFirstFrame = false
@@ -720,6 +731,7 @@ final class AetherSceneEngine: ObservableObject {
         analysisPlayerItem = nil
         isPlaying = false
         hasFirstFrame = false
+        hasPresentedFrame = false
         currentSubtitleText = nil
         currentSubtitleImage = nil
     }

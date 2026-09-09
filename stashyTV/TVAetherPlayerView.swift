@@ -125,7 +125,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             AetherVideoSurface(engine: engine)
                 .ignoresSafeArea()
 
-            if !engine.hasFirstFrame {
+            if !engine.hasPresentedFrame {
                 posterOverlay
             }
 

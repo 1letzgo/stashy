@@ -66,7 +66,7 @@ struct AetherSceneSurface: View {
             AetherPlayerSurface(engine: engine.engine)
                 .ignoresSafeArea()
 
-            if !engine.hasFirstFrame {
+            if !engine.hasPresentedFrame {
                 posterPlaceholder
                     .ignoresSafeArea()
             }
