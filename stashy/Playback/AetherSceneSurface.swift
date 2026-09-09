@@ -269,7 +269,6 @@ struct AetherSceneSurface: View {
                     if hasTrackChoices {
                         tracksMenu
                     }
-                    muteButton
                 }
                 .padding(.horizontal, 10)
                 .padding(.top, 10)
@@ -278,21 +277,23 @@ struct AetherSceneSurface: View {
             .opacity(areControlsVisible ? 1 : 0)
             .allowsHitTesting(areControlsVisible)
 
-            // Enter and exit fullscreen both live bottom-right, clear of the time bar.
-            if onToggleFullscreen != nil {
-                VStack {
+            // Bottom row, clear of the time bar: mute on the left, fullscreen toggle on the
+            // right. Same on the inline and the fullscreen surface.
+            VStack {
+                Spacer()
+                HStack {
+                    muteButton
                     Spacer()
-                    HStack {
-                        Spacer()
+                    if onToggleFullscreen != nil {
                         fullscreenButton
                     }
-                    .padding(.trailing, 10)
-                    // Clear of the time bar (16 pt track + label row + its 10 pt bottom padding).
-                    .padding(.bottom, 52)
                 }
-                .opacity(areControlsVisible ? 1 : 0)
-                .allowsHitTesting(areControlsVisible)
+                .padding(.horizontal, 10)
+                // Clear of the time bar (16 pt track + label row + its 10 pt bottom padding).
+                .padding(.bottom, 52)
             }
+            .opacity(areControlsVisible ? 1 : 0)
+            .allowsHitTesting(areControlsVisible)
         }
     }
 
