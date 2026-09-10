@@ -77,8 +77,13 @@ struct TVMainTabView: View {
                     // gepushte Seite den Wechsel des Sidebar-Eintrags, der Nutzer sah
                     // nach „Home" also weiter die Settings-Unterseite. Beim Verlassen
                     // deshalb zurück zur Settings-Wurzel.
-                    if selectedTab == .settings {
+                    if selectedTab == .settings, navigationStore.hasPushedPages(.settings) {
+                        // Pop first and let the stack settle before the TabView swaps its
+                        // content; doing both in one pass left the pushed page on screen
+                        // (measured on the tvOS 26.2 simulator).
                         navigationStore.popToRoot(.settings)
+                        DispatchQueue.main.async { selectedTab = newValue }
+                        return
                     }
                     selectedTab = newValue
                 }

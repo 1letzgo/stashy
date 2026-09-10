@@ -108,6 +108,10 @@ final class TVNavigationStore: ObservableObject {
 
     /// Zurück zur Wurzel — z. B. wenn der bereits aktive Sidebar-Eintrag erneut
     /// gewählt wird.
+    func hasPushedPages(_ tab: TVRootTab) -> Bool {
+        !(paths[tab]?.isEmpty ?? true)
+    }
+
     func popToRoot(_ tab: TVRootTab) {
         guard let path = paths[tab], !path.isEmpty else { return }
         paths[tab] = NavigationPath()
