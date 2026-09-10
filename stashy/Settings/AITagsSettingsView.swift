@@ -43,7 +43,9 @@ struct AITagsSettingsView: View {
             Button("Cancel", role: .cancel) { }
             Button("Delete", role: .destructive) { manager.deleteModel() }
         } message: {
-            Text("The statistics for this server are removed from the device. Suggestions stop until you build them again.")
+            Text(manager.needsStatistics
+                 ? "The statistics for this server are removed from the device and built again from scratch."
+                 : "The statistics for this server are removed from the device. Suggestions stop until you build them again.")
         }
     }
 

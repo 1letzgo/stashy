@@ -376,6 +376,11 @@ final class AITagSuggestionManager: ObservableObject {
         if let url = Self.modelURL() {
             try? FileManager.default.removeItem(at: url)
         }
+        // With a consumer still on, the statistics are rebuilt right away — delete acts as
+        // a fresh start, not as a way to run without them.
+        if needsStatistics {
+            Task { await ensureStatistics() }
+        }
     }
 
     private func performBuild() async {
