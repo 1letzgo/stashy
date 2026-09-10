@@ -209,7 +209,7 @@ final class FilterCriteriaDocument: ObservableObject {
     private static func withRequiredModifier(_ value: Any, key: String, mode: StashDBViewModel.FilterMode) -> Any {
         guard var dict = stringKeyedDict(value), dict["modifier"] == nil else { return value }
         guard let field = FilterFieldCatalog.field(key: key, mode: mode) else { return value }
-        let template = FilterCriterionKind.defaultValue(for: field.kind, nestedMode: field.nestedMode)
+        let template = FilterCriterionKind.defaultValue(for: field.kind, nestedMode: field.nestedMode, mode: mode)
         guard let defaults = stringKeyedDict(template),
               let modifier = defaults["modifier"] else { return value }
         dict["modifier"] = modifier
@@ -225,7 +225,7 @@ final class FilterCriteriaDocument: ObservableObject {
     /// Adds an empty criterion. Never overwrites an existing one — `addableFields` already hides present keys.
     func addDefaultCriterion(for field: FilterFieldDescriptor) {
         guard objectFilter[field.key] == nil else { return }
-        let value = FilterCriterionKind.defaultValue(for: field.kind, nestedMode: field.nestedMode)
+        let value = FilterCriterionKind.defaultValue(for: field.kind, nestedMode: field.nestedMode, mode: mode)
         setCriterion(key: field.key, value: value)
     }
 
@@ -289,7 +289,7 @@ final class FilterCriteriaDocument: ObservableObject {
     /// Adds an empty criterion at `path`. Never overwrites an existing one.
     func addDefaultCriterion(for field: FilterFieldDescriptor, at path: [String]) {
         guard node(at: path)[field.key] == nil else { return }
-        let value = FilterCriterionKind.defaultValue(for: field.kind, nestedMode: field.nestedMode)
+        let value = FilterCriterionKind.defaultValue(for: field.kind, nestedMode: field.nestedMode, mode: mode)
         setCriterion(key: field.key, value: value, at: path)
     }
 

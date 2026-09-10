@@ -385,7 +385,7 @@ struct FilterCriteriaEditorView: View {
                 onChange: applyChange
             )
         case .isMissing:
-            FilterIsMissingRow(value: stringBinding(for: field.key), onChange: applyChange)
+            FilterIsMissingRow(value: stringBinding(for: field.key), mode: document.mode, onChange: applyChange)
         case .hasMarkers, .hasChapters:
             FilterTrueFalseStringRow(value: stringBinding(for: field.key), onChange: applyChange)
         case .stashID, .stashIDs:
@@ -897,8 +897,10 @@ struct FilterCircumcisionCriterionRow: View {
 
 struct FilterIsMissingRow: View {
     @Binding var value: String
+    /// Decides which property names are offered — they differ per entity.
+    var mode: StashDBViewModel.FilterMode
     var onChange: () -> Void
-    private let common = ["title", "studio", "performers", "tags", "date", "details", "url", "cover", "galleries", "stash_id"]
+    private var common: [String] { FilterFieldCatalog.isMissingOptions(for: mode) }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {

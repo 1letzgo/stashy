@@ -97,6 +97,7 @@ enum FilterFieldCatalog {
         .init(key: "play_duration", label: "Play duration", kind: .int),
         .init(key: "last_played_at", label: "Last played", kind: .timestamp),
         .init(key: "date", label: "Date", kind: .date),
+        .init(key: "production_date", label: "Production date", kind: .date),
         .init(key: "created_at", label: "Created", kind: .timestamp),
         .init(key: "updated_at", label: "Updated", kind: .timestamp),
         .init(key: "galleries_filter", label: "Galleries filter", kind: .nestedFilter, nestedMode: .galleries),
@@ -130,6 +131,7 @@ enum FilterFieldCatalog {
         .init(key: "fake_tits", label: "Implants", kind: .string),
         .init(key: "penis_length", label: "Penis length", kind: .float),
         .init(key: "circumcised", label: "Circumcised", kind: .circumcision),
+        .init(key: "career_length", label: "Career length (years)", kind: .int),
         .init(key: "career_start", label: "Career start", kind: .date),
         .init(key: "career_end", label: "Career end", kind: .date),
         .init(key: "tattoos", label: "Tattoos", kind: .string),
@@ -234,6 +236,7 @@ enum FilterFieldCatalog {
         .init(key: "performers_filter", label: "Performers filter", kind: .nestedFilter, nestedMode: .performers),
         .init(key: "studios_filter", label: "Studios filter", kind: .nestedFilter, nestedMode: .studios),
         .init(key: "tags_filter", label: "Tags filter", kind: .nestedFilter, nestedMode: .tags),
+        .init(key: "files_filter", label: "Files filter", kind: .raw),
         .init(key: "custom_fields", label: "Custom fields", kind: .customFields)
     ]
 
@@ -272,6 +275,7 @@ enum FilterFieldCatalog {
         .init(key: "performers_filter", label: "Performers filter", kind: .nestedFilter, nestedMode: .performers),
         .init(key: "studios_filter", label: "Studios filter", kind: .nestedFilter, nestedMode: .studios),
         .init(key: "tags_filter", label: "Tags filter", kind: .nestedFilter, nestedMode: .tags),
+        .init(key: "files_filter", label: "Files filter", kind: .raw),
         .init(key: "custom_fields", label: "Custom fields", kind: .customFields)
     ]
 
@@ -336,6 +340,39 @@ enum FilterFieldCatalog {
         .init(key: "studios_filter", label: "Studios filter", kind: .nestedFilter, nestedMode: .studios),
         .init(key: "custom_fields", label: "Custom fields", kind: .customFields)
     ]
+
+    // MARK: - is_missing
+
+    /// Property names Stash accepts for `is_missing`, per entity — mirrors the option lists in
+    /// Stash's `list-filter/criteria/is-missing.ts`. Each entity has its own set; the scene list
+    /// used to be offered everywhere, which produced criteria the server silently ignored.
+    static func isMissingOptions(for mode: StashDBViewModel.FilterMode) -> [String] {
+        switch mode {
+        case .scenes:
+            return ["title", "code", "details", "director", "url", "date", "production_date", "rating",
+                    "cover", "galleries", "studio", "group", "performers", "tags", "stash_id"]
+        case .images:
+            return ["title", "details", "photographer", "url", "date", "code", "rating",
+                    "galleries", "studio", "performers", "tags"]
+        case .performers:
+            return ["image", "url", "details", "aliases", "gender", "birthdate", "death_date", "disambiguation",
+                    "ethnicity", "country", "hair_color", "eye_color", "height", "weight", "measurements",
+                    "fake_tits", "penis_length", "circumcised", "career_start", "career_end", "tattoos",
+                    "piercings", "tags", "rating", "stash_id"]
+        case .galleries:
+            return ["title", "code", "details", "photographer", "url", "date", "rating", "cover",
+                    "studio", "performers", "tags", "scenes"]
+        case .tags:
+            return ["image", "aliases", "description", "stash_id"]
+        case .studios:
+            return ["image", "stash_id", "details", "url", "aliases", "tags", "rating"]
+        case .groups:
+            return ["aliases", "description", "director", "date", "url", "rating", "studio",
+                    "performers", "tags", "front_image", "back_image", "scenes"]
+        case .sceneMarkers, .unknown:
+            return []
+        }
+    }
 
     // MARK: - Markers
 

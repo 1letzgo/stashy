@@ -103,7 +103,9 @@ enum FilterCriterionKind: String, CaseIterable, Hashable {
     }
 
     /// Default empty criterion payload for a newly added field.
-    static func defaultValue(for kind: FilterCriterionKind, nestedMode: StashDBViewModel.FilterMode? = nil) -> Any {
+    /// `mode` is the entity being filtered (drives `is_missing`'s property list); `nestedMode`
+    /// only matters for `.nestedFilter`.
+    static func defaultValue(for kind: FilterCriterionKind, nestedMode: StashDBViewModel.FilterMode? = nil, mode: StashDBViewModel.FilterMode = .scenes) -> Any {
         switch kind {
         case .boolean:
             return true
@@ -137,7 +139,7 @@ enum FilterCriterionKind: String, CaseIterable, Hashable {
         case .customFields:
             return [["field": "", "value": [] as [Any], "modifier": StashCriterionModifier.equals.rawValue]]
         case .isMissing:
-            return "title"
+            return FilterFieldCatalog.isMissingOptions(for: mode).first ?? "title"
         case .hasMarkers, .hasChapters:
             return "true"
         case .booleanGroup, .nestedFilter:
