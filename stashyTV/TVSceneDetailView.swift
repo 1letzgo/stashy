@@ -132,6 +132,25 @@ struct TVSceneDetailView: View {
                 onDisappear: {
                     // Failsafe — save progress falls fullScreenCover ohne `onDismiss` weggeht.
                     playerModel.saveProgress()
+                },
+                panelExtra: {
+                    // Statt „Up Next“ (Channel) zeigt die Einzelszene ihre Marker.
+                    // `currentTime` wird bei jedem Rebuild des Panels frisch gelesen —
+                    // die Engine ist dort das beobachtete Objekt.
+                    let markers = sceneDetail?.sceneMarkers ?? []
+                    if !markers.isEmpty {
+                        TVMarkerRailView(
+                            markers: markers,
+                            currentTime: playerModel.engine?.currentTime ?? 0,
+                            onSelect: { marker in
+                                guard let engine = playerModel.engine else { return }
+                                Task {
+                                    await engine.seek(to: marker.seconds)
+                                    engine.play()
+                                }
+                            }
+                        )
+                    }
                 }
             )
         }

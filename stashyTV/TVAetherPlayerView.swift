@@ -67,6 +67,44 @@ struct TVAetherPlayerView<Panel: View>: View {
     }
 }
 
+// MARK: - Panel environment
+
+/// Lets `panelExtra` content (e.g. `TVMarkerRailView`) dismiss the down panel without the
+/// host having to thread a closure through both the player and the extra's own API.
+private struct TVPlayerClosePanelKey: EnvironmentKey {
+    static let defaultValue: () -> Void = {}
+}
+
+extension EnvironmentValues {
+    var tvPlayerClosePanel: () -> Void {
+        get { self[TVPlayerClosePanelKey.self] }
+        set { self[TVPlayerClosePanelKey.self] = newValue }
+    }
+}
+
+extension TVAetherPlayerView {
+    /// Single-scene player with a panel extra but no channel Prev/Next row.
+    init(model: TVAetherPlaybackModel,
+         title: String = "",
+         subtitle: String = "",
+         posterURL: URL? = nil,
+         onExit: (() -> Void)? = nil,
+         onDisappear: (() -> Void)? = nil,
+         @ViewBuilder panelExtra: @escaping () -> Panel) {
+        self.init(model: model,
+                  title: title,
+                  subtitle: subtitle,
+                  posterURL: posterURL,
+                  canGoPrevious: false,
+                  canGoNext: false,
+                  onPrevious: nil,
+                  onNext: nil,
+                  panelExtra: panelExtra,
+                  onExit: onExit,
+                  onDisappear: onDisappear)
+    }
+}
+
 extension TVAetherPlayerView where Panel == EmptyView {
     init(model: TVAetherPlaybackModel,
          title: String = "",
@@ -398,6 +436,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
 
                 panelExtra()
                     .focusSection()
+                    .environment(\.tvPlayerClosePanel, { closePanel() })
             }
             .padding(.horizontal, 60)
             .padding(.vertical, 40)
