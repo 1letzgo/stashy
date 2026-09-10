@@ -397,6 +397,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                 }
 
                 panelExtra()
+                    .focusSection()
             }
             .padding(.horizontal, 60)
             .padding(.vertical, 40)
@@ -404,6 +405,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             .background(Color.black.opacity(0.9))
         }
         .ignoresSafeArea()
+        // Reaches us only for an up no row could take, i.e. from the topmost row.
         .onMoveCommand { direction in
             if direction == .up { closePanel() }
         }
@@ -450,6 +452,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                 .padding(.vertical, 6)
             }
         }
+        .focusSection()
     }
 
     private func label(for track: TrackInfo, isActive: Bool) -> String {
@@ -479,14 +482,17 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     }
 
     private func handleMove(_ direction: MoveCommandDirection) {
+        // With the panel up, every move belongs to the focus engine. The ones that reach us
+        // are the moves no button could take (an edge of a row, the rail's last card), and
+        // treating those as seeks or as "close" made the panel feel broken.
+        guard !isPanelOpen else { return }
         switch direction {
         case .down:
-            guard !isPanelOpen else { return }
             cancelScrub()
             isPanelOpen = true
             cancelAutoHide()
         case .up:
-            if isPanelOpen { closePanel() } else { reveal() }
+            reveal()
         case .left:
             step(by: -stepSeconds())
         case .right:
