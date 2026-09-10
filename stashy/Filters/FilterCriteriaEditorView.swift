@@ -348,7 +348,11 @@ struct FilterCriteriaEditorView: View {
         case .boolean:
             FilterBoolCriterionRow(value: optionalBoolBinding(for: field.key), onChange: applyChange)
         case .string:
-            FilterStringCriterionRow(value: dictBinding(for: field.key), onChange: applyChange)
+            FilterStringCriterionRow(
+                value: dictBinding(for: field.key),
+                suggestions: FilterFieldCatalog.valueSuggestions(key: field.key, mode: document.mode),
+                onChange: applyChange
+            )
         case .int, .hierarchicalCount:
             FilterNumericCriterionRow(value: dictBinding(for: field.key), isFloat: false, onChange: applyChange)
         case .float:
@@ -618,6 +622,8 @@ struct FilterStringCriterionRow: View {
     @Binding var value: [String: Any]
     var placeholder: String = "Value"
     var modifiers: [StashCriterionModifier] = FilterCriterionKind.defaultModifiers(for: .string)
+    /// Per-entity value chips under the text field (hair colour, country, codec, …). Empty = none.
+    var suggestions: [FilterFieldCatalog.ValueSuggestion] = []
     var onChange: () -> Void
 
     @FocusState private var isFocused: Bool
@@ -651,6 +657,24 @@ struct FilterStringCriterionRow: View {
                 .onSubmit { onChange() }
                 .onChange(of: isFocused) { _, focused in
                     if !focused { onChange() }
+                }
+                if !suggestions.isEmpty {
+                    let current = value["value"] as? String ?? ""
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(suggestions) { suggestion in
+                                CatalogFilterChip(title: suggestion.label, isActive: current == suggestion.value) {
+                                    // A chip is an exact value: switch a fuzzy modifier to equals so
+                                    // "Blonde" does not also match "Dark Blonde".
+                                    var updates: [String: Any] = ["value": suggestion.value]
+                                    if modifierRaw == StashCriterionModifier.includes.rawValue {
+                                        updates["modifier"] = StashCriterionModifier.equals.rawValue
+                                    }
+                                    patch(updates, commit: true)
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }

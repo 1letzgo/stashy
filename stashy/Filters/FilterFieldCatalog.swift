@@ -341,6 +341,60 @@ enum FilterFieldCatalog {
         .init(key: "custom_fields", label: "Custom fields", kind: .customFields)
     ]
 
+    // MARK: - Value suggestions
+
+    /// A selectable value chip under a text criterion. `value` is what goes to the server,
+    /// `label` what the chip shows (countries: ISO code vs. localized name).
+    struct ValueSuggestion: Identifiable, Hashable {
+        let value: String
+        let label: String
+        var id: String { value }
+        init(_ value: String, _ label: String? = nil) {
+            self.value = value
+            self.label = label ?? value
+        }
+    }
+
+    /// Common values for free-text criteria, per entity and field. Stash keeps these as plain
+    /// strings, so the lists are the conventions its own UI and scrapers produce; the text
+    /// field stays open for anything else.
+    static func valueSuggestions(key: String, mode: StashDBViewModel.FilterMode) -> [ValueSuggestion] {
+        switch (mode, key) {
+        case (.performers, "hair_color"):
+            return ["Blonde", "Brunette", "Brown", "Black", "Red", "Auburn", "Grey", "White", "Bald", "Various"].map { .init($0) }
+        case (.performers, "eye_color"):
+            return ["Blue", "Brown", "Green", "Grey", "Hazel", "Amber"].map { .init($0) }
+        case (.performers, "ethnicity"):
+            return ["Caucasian", "Black", "Asian", "Indian", "Latin", "Middle Eastern", "Mixed", "Other"].map { .init($0) }
+        case (.performers, "fake_tits"):
+            return ["Natural", "Fake"].map { .init($0) }
+        case (.performers, "country"):
+            return countrySuggestions
+        case (.scenes, "video_codec"):
+            return ["h264", "hevc", "av1", "vp9", "vp8", "mpeg4", "wmv3", "mpeg2video"].map { .init($0) }
+        case (.scenes, "audio_codec"):
+            return ["aac", "mp3", "ac3", "eac3", "opus", "vorbis", "flac", "pcm_s16le"].map { .init($0) }
+        case (.scenes, "captions"):
+            return ["en", "de", "fr", "es", "it", "ja", "ru", "pt"].map { .init($0) }
+        default:
+            return []
+        }
+    }
+
+    /// ISO 3166-1 alpha-2 codes (what Stash stores), shown with their localized names. The most
+    /// common production countries first, then the rest alphabetically by name.
+    private static let countrySuggestions: [ValueSuggestion] = {
+        let preferred = ["US", "GB", "DE", "CZ", "HU", "RU", "FR", "ES", "IT", "BR", "CA", "AU", "JP", "NL", "PL", "UA", "CO", "MX", "SE", "AT", "CH"]
+        let locale = Locale.current
+        func name(_ code: String) -> String { locale.localizedString(forRegionCode: code) ?? code }
+        let rest = Locale.Region.isoRegions
+            .map(\.identifier)
+            .filter { $0.count == 2 && !preferred.contains($0) }
+            .map { ValueSuggestion($0, name($0)) }
+            .sorted { $0.label.localizedCaseInsensitiveCompare($1.label) == .orderedAscending }
+        return preferred.map { ValueSuggestion($0, name($0)) } + rest
+    }()
+
     // MARK: - is_missing
 
     /// Property names Stash accepts for `is_missing`, per entity — mirrors the option lists in
