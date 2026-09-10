@@ -1199,7 +1199,7 @@ struct TagDetailView: View {
             tagDetailNavBar
         }
         .sheet(isPresented: $showingEditTagSheet) {
-            EditTagSheet(tag: selectedTag, viewModel: viewModel) { updated in
+            EditTagSheet(tag: selectedTag, viewModel: viewModel, onDeleted: { dismiss() }) { updated in
                 selectedTag = updated
             }
         }
@@ -1707,6 +1707,7 @@ struct TagDetailView: View {
 struct EditTagSheet: View {
     let tag: Tag
     @ObservedObject var viewModel: StashDBViewModel
+    var onDeleted: (() -> Void)? = nil
     var onComplete: (Tag) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -1715,6 +1716,8 @@ struct EditTagSheet: View {
     @State private var name: String = ""
     @State private var descriptionText: String = ""
     @State private var isSaving = false
+    @State private var isDeleting = false
+    @State private var showingDeleteConfirmation = false
 
     var body: some View {
         NavigationView {
@@ -1727,6 +1730,26 @@ struct EditTagSheet: View {
                 Section("Description") {
                     TextEditor(text: $descriptionText)
                         .frame(minHeight: 120)
+                }
+                .listRowBackground(Color.secondaryAppBackground)
+
+                Section {
+                    Button(role: .destructive) {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        HStack {
+                            Spacer()
+                            if isDeleting {
+                                InlineSpinner(tint: .red)
+                            } else {
+                                Label("Delete Tag", systemImage: "trash")
+                                    .foregroundStyle(.red)
+                            }
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .disabled(isSaving || isDeleting)
                 }
                 .listRowBackground(Color.secondaryAppBackground)
             }
@@ -1742,6 +1765,31 @@ struct EditTagSheet: View {
             .onAppear {
                 name = tag.name
                 descriptionText = tag.description ?? ""
+            }
+            .alert("Delete Tag", isPresented: $showingDeleteConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) { performDelete() }
+            } message: {
+                Text("Delete '\(tag.name)'? This cannot be undone.")
+            }
+        }
+    }
+
+    private func performDelete() {
+        isDeleting = true
+        viewModel.deleteTag(tagId: tag.id) { result in
+            DispatchQueue.main.async {
+                isDeleting = false
+                switch result {
+                case .success:
+                    ToastManager.shared.show("Tag deleted", icon: "trash", style: .success)
+                    dismiss()
+                    // Pop the detail only once the sheet is gone — both in one runloop
+                    // leaves the navigation stack inconsistent.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { onDeleted?() }
+                case .failure(let error):
+                    ToastManager.shared.show(error.localizedDescription, icon: "exclamationmark.triangle", style: .error)
+                }
             }
         }
     }

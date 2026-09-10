@@ -1227,7 +1227,7 @@ struct GroupDetailView: View {
             groupDetailNavBar
         }
         .sheet(isPresented: $showingEditGroupSheet) {
-            EditGroupSheet(group: selectedGroup, viewModel: viewModel) { updated in
+            EditGroupSheet(group: selectedGroup, viewModel: viewModel, onDeleted: { dismiss() }) { updated in
                 selectedGroup = updated
             }
         }
@@ -1708,6 +1708,7 @@ struct GroupDetailView: View {
 struct EditGroupSheet: View {
     let group: StashGroup
     @ObservedObject var viewModel: StashDBViewModel
+    var onDeleted: (() -> Void)? = nil
     var onComplete: (StashGroup) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -1718,6 +1719,8 @@ struct EditGroupSheet: View {
     @State private var ratingText: String = ""
     @State private var synopsis: String = ""
     @State private var isSaving = false
+    @State private var isDeleting = false
+    @State private var showingDeleteConfirmation = false
 
     var body: some View {
         NavigationView {
@@ -1739,6 +1742,26 @@ struct EditGroupSheet: View {
                         .frame(minHeight: 120)
                 }
                 .listRowBackground(Color.secondaryAppBackground)
+
+                Section {
+                    Button(role: .destructive) {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        HStack {
+                            Spacer()
+                            if isDeleting {
+                                InlineSpinner(tint: .red)
+                            } else {
+                                Label("Delete Group", systemImage: "trash")
+                                    .foregroundStyle(.red)
+                            }
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .disabled(isSaving || isDeleting)
+                }
+                .listRowBackground(Color.secondaryAppBackground)
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
@@ -1754,6 +1777,31 @@ struct EditGroupSheet: View {
                 date = group.date ?? ""
                 ratingText = group.rating100.map(String.init) ?? ""
                 synopsis = group.synopsis ?? ""
+            }
+            .alert("Delete Group", isPresented: $showingDeleteConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) { performDelete() }
+            } message: {
+                Text("Delete '\(group.name)'? This cannot be undone.")
+            }
+        }
+    }
+
+    private func performDelete() {
+        isDeleting = true
+        viewModel.deleteGroup(groupId: group.id) { result in
+            DispatchQueue.main.async {
+                isDeleting = false
+                switch result {
+                case .success:
+                    ToastManager.shared.show("Group deleted", icon: "trash", style: .success)
+                    dismiss()
+                    // Pop the detail only once the sheet is gone — both in one runloop
+                    // leaves the navigation stack inconsistent.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { onDeleted?() }
+                case .failure(let error):
+                    ToastManager.shared.show(error.localizedDescription, icon: "exclamationmark.triangle", style: .error)
+                }
             }
         }
     }

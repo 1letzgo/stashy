@@ -515,7 +515,7 @@ struct StudioDetailView: View {
             studioDetailNavBar
         }
         .sheet(isPresented: $showingEditStudioSheet) {
-            EditStudioSheet(studio: studio, viewModel: viewModel) { updated in
+            EditStudioSheet(studio: studio, viewModel: viewModel, onDeleted: { dismiss() }) { updated in
                 studio = updated
             }
         }
@@ -1152,6 +1152,7 @@ struct StudioDetailView: View {
 struct EditStudioSheet: View {
     let studio: Studio
     @ObservedObject var viewModel: StashDBViewModel
+    var onDeleted: (() -> Void)? = nil
     var onComplete: (Studio) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -1162,6 +1163,8 @@ struct EditStudioSheet: View {
     @State private var details: String = ""
     @State private var ratingText: String = ""
     @State private var isSaving = false
+    @State private var isDeleting = false
+    @State private var showingDeleteConfirmation = false
 
     var body: some View {
         NavigationView {
@@ -1182,6 +1185,26 @@ struct EditStudioSheet: View {
                         .frame(minHeight: 120)
                 }
                 .listRowBackground(Color.secondaryAppBackground)
+
+                Section {
+                    Button(role: .destructive) {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        HStack {
+                            Spacer()
+                            if isDeleting {
+                                InlineSpinner(tint: .red)
+                            } else {
+                                Label("Delete Studio", systemImage: "trash")
+                                    .foregroundStyle(.red)
+                            }
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .disabled(isSaving || isDeleting)
+                }
+                .listRowBackground(Color.secondaryAppBackground)
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
@@ -1197,6 +1220,31 @@ struct EditStudioSheet: View {
                 url = studio.url ?? ""
                 details = studio.details ?? ""
                 ratingText = studio.rating100.map(String.init) ?? ""
+            }
+            .alert("Delete Studio", isPresented: $showingDeleteConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) { performDelete() }
+            } message: {
+                Text("Delete '\(studio.name)'? This cannot be undone.")
+            }
+        }
+    }
+
+    private func performDelete() {
+        isDeleting = true
+        viewModel.deleteStudio(studioId: studio.id) { result in
+            DispatchQueue.main.async {
+                isDeleting = false
+                switch result {
+                case .success:
+                    ToastManager.shared.show("Studio deleted", icon: "trash", style: .success)
+                    dismiss()
+                    // Pop the detail only once the sheet is gone — both in one runloop
+                    // leaves the navigation stack inconsistent.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { onDeleted?() }
+                case .failure(let error):
+                    ToastManager.shared.show(error.localizedDescription, icon: "exclamationmark.triangle", style: .error)
+                }
             }
         }
     }

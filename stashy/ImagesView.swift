@@ -421,7 +421,7 @@ private struct ImagesViewBody: View {
         })
         .sheet(isPresented: $showingEditGallerySheet) {
             if let gallery {
-                EditGallerySheet(gallery: gallery, viewModel: viewModel) { updated in
+                EditGallerySheet(gallery: gallery, viewModel: viewModel, onDeleted: { dismiss() }) { updated in
                     self.gallery = updated
                 }
             }
@@ -1827,6 +1827,7 @@ private struct OpenedGalleryDetailChrome<Chrome: View>: ViewModifier {
 struct EditGallerySheet: View {
     let gallery: Gallery
     @ObservedObject var viewModel: StashDBViewModel
+    var onDeleted: (() -> Void)? = nil
     var onComplete: (Gallery) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -1836,6 +1837,8 @@ struct EditGallerySheet: View {
     @State private var date: String = ""
     @State private var details: String = ""
     @State private var isSaving = false
+    @State private var isDeleting = false
+    @State private var showingDeleteConfirmation = false
 
     var body: some View {
         NavigationView {
@@ -1854,6 +1857,26 @@ struct EditGallerySheet: View {
                         .frame(minHeight: 120)
                 }
                 .listRowBackground(Color.secondaryAppBackground)
+
+                Section {
+                    Button(role: .destructive) {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        HStack {
+                            Spacer()
+                            if isDeleting {
+                                InlineSpinner(tint: .red)
+                            } else {
+                                Label("Delete Gallery", systemImage: "trash")
+                                    .foregroundStyle(.red)
+                            }
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .disabled(isSaving || isDeleting)
+                }
+                .listRowBackground(Color.secondaryAppBackground)
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
@@ -1868,6 +1891,31 @@ struct EditGallerySheet: View {
                 title = gallery.title
                 date = gallery.date ?? ""
                 details = gallery.details ?? ""
+            }
+            .alert("Delete Gallery", isPresented: $showingDeleteConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) { performDelete() }
+            } message: {
+                Text("Delete '\(gallery.title)'? This cannot be undone.")
+            }
+        }
+    }
+
+    private func performDelete() {
+        isDeleting = true
+        viewModel.deleteGallery(galleryId: gallery.id) { result in
+            DispatchQueue.main.async {
+                isDeleting = false
+                switch result {
+                case .success:
+                    ToastManager.shared.show("Gallery deleted", icon: "trash", style: .success)
+                    dismiss()
+                    // Pop the detail only once the sheet is gone — both in one runloop
+                    // leaves the navigation stack inconsistent.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { onDeleted?() }
+                case .failure(let error):
+                    ToastManager.shared.show(error.localizedDescription, icon: "exclamationmark.triangle", style: .error)
+                }
             }
         }
     }

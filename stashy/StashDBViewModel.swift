@@ -356,6 +356,8 @@ class StashDBViewModel: ObservableObject {
     private var sceneUpdatedObserver: NSObjectProtocol?
     private var tagImageUpdatedObserver: NSObjectProtocol?
     private var sceneCoverUpdatedObserver: NSObjectProtocol?
+    /// Tokens für „<Entity>Deleted“ (Performer/Studio/Tag/Group/Gallery) — analog zu `"SceneDeleted"`.
+    private var entityDeletedObservers: [NSObjectProtocol] = []
 
     init() {
         NotificationCenter.default.addObserver(self, selector: #selector(handleServerChange), name: NSNotification.Name("ServerConfigChanged"), object: nil)
@@ -503,7 +505,23 @@ class StashDBViewModel: ObservableObject {
                 viewModel?.mergeSceneListMetadata(scene)
             }
         }
-        
+
+        // Entity-Löschungen aus den Edit-Sheets — Listen räumen sich selbst auf.
+        for (notificationName, key) in StashDBViewModel.entityDeletedNotificationKeys {
+            let token = NotificationCenter.default.addObserver(
+                forName: NSNotification.Name(notificationName),
+                object: nil,
+                queue: .main
+            ) { [weak self] notification in
+                guard let id = notification.userInfo?[key] as? String else { return }
+                let viewModel = self
+                Task { @MainActor in
+                    viewModel?.applyEntityDeletion(notificationName: notificationName, id: id)
+                }
+            }
+            entityDeletedObservers.append(token)
+        }
+
         // Initial connection test if config exists (throttled — many VM instances
         // are created across tabs; the version is stable per session)
         if ServerConfigManager.shared.loadConfig()?.hasValidConfig == true {
@@ -547,6 +565,9 @@ class StashDBViewModel: ObservableObject {
         }
         if let sceneCoverUpdatedObserver {
             NotificationCenter.default.removeObserver(sceneCoverUpdatedObserver)
+        }
+        for token in entityDeletedObservers {
+            NotificationCenter.default.removeObserver(token)
         }
         NotificationCenter.default.removeObserver(self)
     }
@@ -8064,6 +8085,175 @@ struct GenerateData: Codable {
         }
     }
 }
+
+// MARK: - Entity Deletion (Performer / Studio / Tag / Group / Gallery)
+
+extension StashDBViewModel {
+
+    /// Notification-Name → userInfo-Key für die „<Entity>Deleted“-Benachrichtigungen.
+    /// Spiegelt `"SceneDeleted"` / `userInfo["sceneId"]`.
+    static let entityDeletedNotificationKeys: [(String, String)] = [
+        ("PerformerDeleted", "performerId"),
+        ("StudioDeleted", "studioId"),
+        ("TagDeleted", "tagId"),
+        ("GroupDeleted", "groupId"),
+        ("GalleryDeleted", "galleryId")
+    ]
+
+    /// Entfernt eine gelöschte Entity aus allen Listen dieses ViewModels.
+    func applyEntityDeletion(notificationName: String, id: String) {
+        switch notificationName {
+        case "PerformerDeleted":
+            performers.removeAll { $0.id == id }
+            detailPerformers.removeAll { $0.id == id }
+            totalPerformers = max(0, totalPerformers - 1)
+            for rowType in homeRowPerformers.keys {
+                homeRowPerformers[rowType]?.removeAll { $0.id == id }
+            }
+        case "StudioDeleted":
+            studios.removeAll { $0.id == id }
+            detailStudios.removeAll { $0.id == id }
+            totalStudios = max(0, totalStudios - 1)
+            for rowType in homeRowStudios.keys {
+                homeRowStudios[rowType]?.removeAll { $0.id == id }
+            }
+        case "TagDeleted":
+            tags.removeAll { $0.id == id }
+            detailTags.removeAll { $0.id == id }
+            totalTags = max(0, totalTags - 1)
+        case "GroupDeleted":
+            groups.removeAll { $0.id == id }
+            detailGroups.removeAll { $0.id == id }
+            totalGroups = max(0, totalGroups - 1)
+        case "GalleryDeleted":
+            galleries.removeAll { $0.id == id }
+            totalGalleries = max(0, totalGalleries - 1)
+            performerGalleries.removeAll { $0.id == id }
+            studioGalleries.removeAll { $0.id == id }
+            tagGalleries.removeAll { $0.id == id }
+            groupGalleries.removeAll { $0.id == id }
+            for rowType in homeRowGalleries.keys {
+                homeRowGalleries[rowType]?.removeAll { $0.id == id }
+            }
+        default:
+            break
+        }
+    }
+
+    /// Führt eine `*Destroy`-Mutation aus und meldet Erfolg/Fehler zurück.
+    /// Der Fehlertext ist bereits benutzerlesbar (für den Error-Toast).
+    private func performEntityDestroy(
+        mutation: String,
+        variables: [String: Any],
+        resultField: String,
+        notificationName: String,
+        userInfoKey: String,
+        entityId: String,
+        completion: @escaping (Result<Void, Error>) -> Void
+    ) {
+        Task { @MainActor in
+            do {
+                let data = try await GraphQLClient.shared.executeRaw(query: mutation, variables: variables)
+                let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any]
+
+                if let errors = json?["errors"] as? [[String: Any]],
+                   let message = errors.compactMap({ $0["message"] as? String }).first {
+                    completion(.failure(GraphQLNetworkError.graphQLError(message: message)))
+                    return
+                }
+
+                guard let payload = json?["data"] as? [String: Any],
+                      let value = payload[resultField],
+                      !(value is NSNull) else {
+                    completion(.failure(GraphQLNetworkError.graphQLError(message: "Delete failed")))
+                    return
+                }
+
+                if let ok = value as? Bool, ok == false {
+                    completion(.failure(GraphQLNetworkError.graphQLError(message: "Delete failed")))
+                    return
+                }
+
+                NotificationCenter.default.post(
+                    name: NSNotification.Name(notificationName),
+                    object: nil,
+                    userInfo: [userInfoKey: entityId]
+                )
+                completion(.success(()))
+            } catch {
+                AppLog.error("Entity delete failed (\(resultField)): \(error.localizedDescription)")
+                completion(.failure(error))
+            }
+        }
+    }
+
+    func deletePerformer(performerId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        performEntityDestroy(
+            mutation: GraphQLQueries.performerDestroyMutation,
+            variables: ["id": performerId],
+            resultField: "performerDestroy",
+            notificationName: "PerformerDeleted",
+            userInfoKey: "performerId",
+            entityId: performerId,
+            completion: completion
+        )
+    }
+
+    func deleteStudio(studioId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        performEntityDestroy(
+            mutation: GraphQLQueries.studioDestroyMutation,
+            variables: ["id": studioId],
+            resultField: "studioDestroy",
+            notificationName: "StudioDeleted",
+            userInfoKey: "studioId",
+            entityId: studioId,
+            completion: completion
+        )
+    }
+
+    func deleteTag(tagId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        performEntityDestroy(
+            mutation: GraphQLQueries.tagDestroyMutation,
+            variables: ["id": tagId],
+            resultField: "tagDestroy",
+            notificationName: "TagDeleted",
+            userInfoKey: "tagId",
+            entityId: tagId,
+            completion: completion
+        )
+    }
+
+    func deleteGroup(groupId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        performEntityDestroy(
+            mutation: GraphQLQueries.groupDestroyMutation,
+            variables: ["id": groupId],
+            resultField: "groupDestroy",
+            notificationName: "GroupDeleted",
+            userInfoKey: "groupId",
+            entityId: groupId,
+            completion: completion
+        )
+    }
+
+    /// Löscht nur den Gallery-Datensatz: `delete_file` bleibt bewusst `false`,
+    /// generierte Artefakte werden aufgeräumt.
+    func deleteGallery(galleryId: String, completion: @escaping (Result<Void, Error>) -> Void) {
+        performEntityDestroy(
+            mutation: GraphQLQueries.galleryDestroyMutation,
+            variables: [
+                "ids": [galleryId],
+                "deleteFile": false,
+                "deleteGenerated": true
+            ],
+            resultField: "galleryDestroy",
+            notificationName: "GalleryDeleted",
+            userInfoKey: "galleryId",
+            entityId: galleryId,
+            completion: completion
+        )
+    }
+}
+
 
 // MARK: - Scene Deletion
 extension StashDBViewModel {

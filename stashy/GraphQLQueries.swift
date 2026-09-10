@@ -276,6 +276,39 @@ class GraphQLQueries {
         }
         """
 
+    // MARK: - Entity Deletion
+
+    static let performerDestroyMutation = """
+        mutation PerformerDestroy($id: ID!) {
+          performerDestroy(input: { id: $id })
+        }
+        """
+
+    static let studioDestroyMutation = """
+        mutation StudioDestroy($id: ID!) {
+          studioDestroy(input: { id: $id })
+        }
+        """
+
+    static let tagDestroyMutation = """
+        mutation TagDestroy($id: ID!) {
+          tagDestroy(input: { id: $id })
+        }
+        """
+
+    static let groupDestroyMutation = """
+        mutation GroupDestroy($id: ID!) {
+          groupDestroy(input: { id: $id })
+        }
+        """
+
+    /// `delete_file` must stay `false` — stashy never removes media from disk.
+    static let galleryDestroyMutation = """
+        mutation GalleryDestroy($ids: [ID!]!, $deleteFile: Boolean, $deleteGenerated: Boolean) {
+          galleryDestroy(input: { ids: $ids, delete_file: $deleteFile, delete_generated: $deleteGenerated })
+        }
+        """
+
     static let metadataScanMutation = """
         {
           "query": "mutation { metadataScan(input: {}) }"

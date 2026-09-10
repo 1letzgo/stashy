@@ -542,7 +542,7 @@ struct PerformerDetailView: View {
             performerDetailNavBar
         }
         .sheet(isPresented: $showingEditPerformerSheet) {
-            EditPerformerSheet(performer: displayPerformer, viewModel: viewModel) { updated in
+            EditPerformerSheet(performer: displayPerformer, viewModel: viewModel, onDeleted: { dismiss() }) { updated in
                 applyEditedPerformer(updated)
             }
         }
@@ -1136,6 +1136,7 @@ struct PerformerDetailView: View {
 struct EditPerformerSheet: View {
     let performer: Performer
     @ObservedObject var viewModel: StashDBViewModel
+    var onDeleted: (() -> Void)? = nil
     var onComplete: (Performer) -> Void
 
     @Environment(\.dismiss) private var dismiss
@@ -1158,6 +1159,8 @@ struct EditPerformerSheet: View {
     @State private var aliasesText: String = ""
     @State private var ratingText: String = ""
     @State private var isSaving = false
+    @State private var isDeleting = false
+    @State private var showingDeleteConfirmation = false
 
     var body: some View {
         NavigationView {
@@ -1197,6 +1200,26 @@ struct EditPerformerSheet: View {
                         .numericKeyboardDoneBar()
                 }
                 .listRowBackground(Color.secondaryAppBackground)
+
+                Section {
+                    Button(role: .destructive) {
+                        showingDeleteConfirmation = true
+                    } label: {
+                        HStack {
+                            Spacer()
+                            if isDeleting {
+                                InlineSpinner(tint: .red)
+                            } else {
+                                Label("Delete Performer", systemImage: "trash")
+                                    .foregroundStyle(.red)
+                            }
+                            Spacer()
+                        }
+                        .frame(maxWidth: .infinity)
+                    }
+                    .disabled(isSaving || isDeleting)
+                }
+                .listRowBackground(Color.secondaryAppBackground)
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
@@ -1208,6 +1231,31 @@ struct EditPerformerSheet: View {
                 ) { save() }
             }
             .onAppear { hydrate() }
+            .alert("Delete Performer", isPresented: $showingDeleteConfirmation) {
+                Button("Cancel", role: .cancel) { }
+                Button("Delete", role: .destructive) { performDelete() }
+            } message: {
+                Text("Delete '\(performer.name)'? This cannot be undone.")
+            }
+        }
+    }
+
+    private func performDelete() {
+        isDeleting = true
+        viewModel.deletePerformer(performerId: performer.id) { result in
+            DispatchQueue.main.async {
+                isDeleting = false
+                switch result {
+                case .success:
+                    ToastManager.shared.show("Performer deleted", icon: "trash", style: .success)
+                    dismiss()
+                    // Pop the detail only once the sheet is gone — both in one runloop
+                    // leaves the navigation stack inconsistent.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.45) { onDeleted?() }
+                case .failure(let error):
+                    ToastManager.shared.show(error.localizedDescription, icon: "exclamationmark.triangle", style: .error)
+                }
+            }
         }
     }
 
