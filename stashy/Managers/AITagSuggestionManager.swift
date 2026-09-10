@@ -336,12 +336,12 @@ final class AITagSuggestionManager: ObservableObject {
     // MARK: - Building
 
     /// Called when either consumer switch flips: switching one on builds missing or stale
-    /// statistics, switching the last one off stops a running build.
+    /// statistics, switching the last one off deletes them from the device.
     func statisticsConsumerChanged() {
         if needsStatistics {
             Task { await ensureStatistics() }
         } else {
-            cancelWork()
+            deleteModel()
         }
     }
 
@@ -375,11 +375,6 @@ final class AITagSuggestionManager: ObservableObject {
         state = .idle
         if let url = Self.modelURL() {
             try? FileManager.default.removeItem(at: url)
-        }
-        // With a consumer still on, the statistics are rebuilt right away — delete acts as
-        // a fresh start, not as a way to run without them.
-        if needsStatistics {
-            Task { await ensureStatistics() }
         }
     }
 

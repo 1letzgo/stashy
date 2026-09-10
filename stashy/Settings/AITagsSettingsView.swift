@@ -16,7 +16,6 @@ struct AITagsSettingsView: View {
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
 
-    @State private var showingDeleteConfirmation = false
 
     private var isUnlocked: Bool { stashyPlus.isUnlocked }
 
@@ -39,14 +38,6 @@ struct AITagsSettingsView: View {
         .applyAppBackground()
         .stashySettingsDetailChrome("Suggestions")
         .task { await manager.loadIfNeeded() }
-        .alert("Delete statistics?", isPresented: $showingDeleteConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) { manager.deleteModel() }
-        } message: {
-            Text(manager.needsStatistics
-                 ? "The statistics for this server are removed from the device and built again from scratch."
-                 : "The statistics for this server are removed from the device. Suggestions stop until you build them again.")
-        }
     }
 
     // MARK: - Sections
@@ -88,7 +79,7 @@ struct AITagsSettingsView: View {
                     .foregroundColor(.secondary)
                     .multilineTextAlignment(.trailing)
             }
-            .stashyGroupedBlockRow(index: 0, count: 3)
+            .stashyGroupedBlockRow(index: 0, count: isBuilding ? 3 : 2)
 
             if case .building(let processed, let total) = manager.state {
                 VStack(alignment: .leading, spacing: 6) {
@@ -100,6 +91,14 @@ struct AITagsSettingsView: View {
                 }
                 .padding(.vertical, 4)
                 .stashyGroupedBlockRow(index: 1, count: 3)
+
+                Button(role: .destructive) {
+                    manager.cancelWork()
+                } label: {
+                    Label("Stop", systemImage: "stop.circle")
+                        .foregroundColor(.red)
+                }
+                .stashyGroupedBlockRow(index: 2, count: 3)
             } else {
                 Button {
                     manager.rebuild()
@@ -108,23 +107,10 @@ struct AITagsSettingsView: View {
                         .foregroundColor(appearanceManager.tintColor)
                 }
                 .disabled(!manager.needsStatistics)
-                .stashyGroupedBlockRow(index: 1, count: 3)
+                .stashyGroupedBlockRow(index: 1, count: 2)
             }
 
-            Button(role: .destructive) {
-                if case .building = manager.state {
-                    manager.cancelWork()
-                } else {
-                    showingDeleteConfirmation = true
-                }
-            } label: {
-                Label(isBuilding ? "Stop" : "Delete statistics", systemImage: isBuilding ? "stop.circle" : "trash")
-                    .foregroundColor(.red)
-            }
-            .disabled(!isBuilding && !manager.hasModel)
-            .stashyGroupedBlockRow(index: 2, count: 3)
-
-            stashyScrollingSectionFooter("Built automatically when Tag suggestions or Similar scenes is on, and refreshed at app start once the statistics are older than 12 hours.")
+            stashyScrollingSectionFooter("Built automatically when Tag suggestions or Similar scenes is on, refreshed at app start once older than 12 hours, and removed from the device when both are off.")
         }
     }
 
