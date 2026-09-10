@@ -184,18 +184,6 @@ struct SettingsView: View {
         }
 
         Section {
-            stashyScrollingSectionHeader("Logo")
-            Toggle(isOn: Binding(
-                get: { appearanceManager.studioLogoStyle == .white },
-                set: { appearanceManager.studioLogoStyle = $0 ? .white : .original }
-            )) {
-                Label("Studio logo b/w", systemImage: "building.2")
-            }
-            .tint(appearanceManager.tintColor)
-            .stashyGroupedSettingsRow()
-        }
-
-        Section {
             stashyScrollingSectionHeader("Security")
             NavigationLink(destination: SecuritySettingsView()) {
                 Label("Security", systemImage: "lock.shield")

@@ -679,7 +679,6 @@ private struct StudiosViewContent: View {
 /// gerastert, dann aus dem Cache. Kein WebView, kein eigener Request.
 struct StudioImageView: View {
     let studio: Studio
-    @ObservedObject private var appearanceManager = AppearanceManager.shared
     @State private var imageLoadState: ImageLoadState = .loading
 
     enum ImageLoadState {
@@ -710,7 +709,7 @@ struct StudioImageView: View {
                 placeholderView
             }
         }
-        .task(id: "\(studio.id)|\(studio.updatedAt ?? "")|\(appearanceManager.studioLogoStyle.rawValue)") {
+        .task(id: "\(studio.id)|\(studio.updatedAt ?? "")") {
             await loadImage()
         }
     }
@@ -742,8 +741,7 @@ struct StudioImageView: View {
         }
         if let image = await StudioLogoStore.shared.image(
             studioId: studio.id, updatedAt: studio.updatedAt,
-            height: Self.rasterHeight, maxWidth: Self.rasterMaxWidth,
-            style: appearanceManager.studioLogoStyle
+            height: Self.rasterHeight, maxWidth: Self.rasterMaxWidth
         ) {
             imageLoadState = .success(Image(uiImage: image))
         } else {

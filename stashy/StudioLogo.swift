@@ -24,7 +24,6 @@ struct SceneStudioBadge: View {
     var uppercased: Bool = false
 
     @ObservedObject private var tabManager = TabManager.shared
-    @ObservedObject private var appearanceManager = AppearanceManager.shared
     @State private var logo: UIImage?
 
     var body: some View {
@@ -47,7 +46,7 @@ struct SceneStudioBadge: View {
         .frame(minHeight: logoHeight + 8)
         // Gleiche Glasoptik wie die Player-Elemente in der Scene-Detailansicht.
         .stashyGlass(shape: Capsule())
-        .task(id: "\(studio.logoCacheKey)|\(tabManager.sceneCardsShowStudioLogo)|\(appearanceManager.studioLogoStyle.rawValue)") {
+        .task(id: "\(studio.logoCacheKey)|\(tabManager.sceneCardsShowStudioLogo)") {
             guard tabManager.sceneCardsShowStudioLogo, studio.hasCustomImage else {
                 logo = nil
                 return
@@ -56,8 +55,7 @@ struct SceneStudioBadge: View {
                 studioId: studio.id,
                 updatedAt: studio.updatedAt,
                 height: StudioLogoStore.badgeHeight,
-                maxWidth: StudioLogoStore.badgeMaxWidth,
-                style: appearanceManager.studioLogoStyle
+                maxWidth: StudioLogoStore.badgeMaxWidth
             )
         }
     }

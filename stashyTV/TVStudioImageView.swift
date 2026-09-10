@@ -7,7 +7,6 @@ struct TVStudioImageView: View {
     let studioName: String
     var contentMode: ContentMode = .fit
 
-    @ObservedObject private var appearanceManager = AppearanceManager.shared
     @State private var imageLoadState: ImageLoadState = .loading
 
     enum ImageLoadState {
@@ -42,7 +41,7 @@ struct TVStudioImageView: View {
                 placeholderView
             }
         }
-        .task(id: "\(studioId)|\(appearanceManager.studioLogoStyle.rawValue)") {
+        .task(id: studioId) {
             await loadImage()
         }
     }
@@ -62,8 +61,7 @@ struct TVStudioImageView: View {
         // 30-day TTL and clears from Settings, which is enough for a studio logo.
         if let image = await StudioLogoStore.shared.image(
             studioId: studioId, updatedAt: nil,
-            height: Self.rasterHeight, maxWidth: Self.rasterMaxWidth,
-            style: appearanceManager.studioLogoStyle
+            height: Self.rasterHeight, maxWidth: Self.rasterMaxWidth
         ) {
             imageLoadState = .success(Image(uiImage: image))
         } else {

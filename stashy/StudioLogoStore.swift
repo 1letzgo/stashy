@@ -38,24 +38,21 @@ actor StudioLogoStore {
 
     /// Cache-Schlüssel; `updatedAt` sorgt dafür, dass ein neues Studio-Bild den
     /// alten Eintrag nicht überlebt. Version hochzählen, wenn sich die Rasterung ändert.
-    static func cacheKey(studioId: String, updatedAt: String?, height: CGFloat, style: StudioLogoStyle = .original) -> String {
-        "v10|\(studioId)|\(updatedAt ?? "")|\(Int(height))|\(style.rawValue)"
+    static func cacheKey(studioId: String, updatedAt: String?, height: CGFloat) -> String {
+        "v10|\(studioId)|\(updatedAt ?? "")|\(Int(height))"
     }
 
-    /// `style`: `.white` liefert das Logo als weiße Silhouette (Template) statt in
-    /// Originalfarben — Settings › Design › Logo.
     func image(
-        studioId: String, updatedAt: String?, height: CGFloat, maxWidth: CGFloat,
-        style: StudioLogoStyle = .original
+        studioId: String, updatedAt: String?, height: CGFloat, maxWidth: CGFloat
     ) async -> UIImage? {
-        let key = Self.cacheKey(studioId: studioId, updatedAt: updatedAt, height: height, style: style)
+        let key = Self.cacheKey(studioId: studioId, updatedAt: updatedAt, height: height)
 
         if let cached = memory.object(forKey: key as NSString) { return cached }
         if missing.contains(key) { return nil }
         if let running = inFlight[key] { return await running.value }
 
         let task = Task<UIImage?, Never> {
-            await Self.load(studioId: studioId, key: key, height: height, maxWidth: maxWidth, style: style)
+            await Self.load(studioId: studioId, key: key, height: height, maxWidth: maxWidth)
         }
         inFlight[key] = task
         let image = await task.value
@@ -81,7 +78,7 @@ actor StudioLogoStore {
         NSURL(string: "stashy-studio-logo://\(key)")
     }
 
-    private static func load(studioId: String, key: String, height: CGFloat, maxWidth: CGFloat, style: StudioLogoStyle) async -> UIImage? {
+    private static func load(studioId: String, key: String, height: CGFloat, maxWidth: CGFloat) async -> UIImage? {
         // 1. Platte: schon einmal gerastert?
         if let diskKey = diskKey(key),
            let data = await ImageCache.shared.loadData(forKey: diskKey),
@@ -120,7 +117,7 @@ actor StudioLogoStore {
                 }
             }
             guard let image else { return nil }
-            return style == .white ? StudioLogoRasterizer.whiteTemplate(image) : image
+            return image
         }.value
 
         if let rendered, let diskKey = diskKey(key), let png = rendered.pngData() {
@@ -173,26 +170,6 @@ nonisolated enum StudioLogoRasterizer {
             width: visible.width * factor, height: visible.height * factor
         )
         return crop(second, to: scaledVisible.intersection(CGRect(origin: .zero, size: secondSize)))
-    }
-
-    /// Weiße Silhouette: die Alpha-Maske des Logos, mit Weiß gefüllt. Farbige
-    /// Logos werden so zu einem einheitlichen Template.
-    static func whiteTemplate(_ image: UIImage) -> UIImage {
-        guard let cg = image.cgImage else { return image }
-        let format = UIGraphicsImageRendererFormat.default()
-        format.scale = image.scale
-        format.opaque = false
-        let size = image.size
-        return UIGraphicsImageRenderer(size: size, format: format).image { ctx in
-            let c = ctx.cgContext
-            let rect = CGRect(origin: .zero, size: size)
-            // CoreGraphics zeichnet Bilder gespiegelt — für die Maske umdrehen.
-            c.translateBy(x: 0, y: size.height)
-            c.scaleBy(x: 1, y: -1)
-            c.clip(to: rect, mask: cg)
-            c.setFillColor(UIColor.white.cgColor)
-            c.fill(rect)
-        }
     }
 
     static func fit(_ source: CGSize, height: CGFloat, maxWidth: CGFloat) -> CGSize {
