@@ -8645,9 +8645,12 @@ struct Scene: Codable, Identifiable, Equatable {
     
     // Computed property for thumbnail URL
     var thumbnailURL: URL? {
-        // 0. Check local first
+        // 0. Check local first — but only for downloaded scenes. A `fileExists`
+        //    per card per body evaluation is a disk stat on the main thread while
+        //    scrolling; the download index answers the same question from memory.
         let fileManager = FileManager.default
-        if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+        if DownloadManager.downloadedSceneIDs.contains(id),
+           let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
             let localURL = docs.appendingPathComponent("Downloads/\(id)/thumbnail.jpg")
             if fileManager.fileExists(atPath: localURL.path) {
                 return localURL
@@ -9061,9 +9064,12 @@ struct MarkerScene: Codable, Identifiable, Equatable {
     }
 
     var thumbnailURL: URL? {
-        // 0. Check local first
+        // 0. Check local first — but only for downloaded scenes. A `fileExists`
+        //    per card per body evaluation is a disk stat on the main thread while
+        //    scrolling; the download index answers the same question from memory.
         let fileManager = FileManager.default
-        if let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
+        if DownloadManager.downloadedSceneIDs.contains(id),
+           let docs = fileManager.urls(for: .documentDirectory, in: .userDomainMask).first {
             let localURL = docs.appendingPathComponent("Downloads/\(id)/thumbnail.jpg")
             if fileManager.fileExists(atPath: localURL.path) {
                 return localURL
@@ -9184,10 +9190,19 @@ struct SceneStudio: Codable, Identifiable, Equatable {
     let id: String
     let name: String
     let updatedAt: String?
+    /// Stash liefert für Studios ohne eigenes Bild einen generischen Platzhalter
+    /// (`…&default=true`); daran erkennen Karten, ob es ein Logo zu zeigen gibt.
+    var imagePath: String? = nil
 
     enum CodingKeys: String, CodingKey {
         case id, name
         case updatedAt = "updated_at"
+        case imagePath = "image_path"
+    }
+
+    var hasCustomImage: Bool {
+        guard let imagePath, !imagePath.isEmpty else { return false }
+        return !imagePath.contains("default=true")
     }
 
     var thumbnailURL: URL? {
@@ -10283,11 +10298,33 @@ final class DownloadTaskMap: Sendable {
     }
 }
 
+/// Lock-guarded id set; see `DownloadManager.downloadedSceneIDs`.
+final class DownloadedSceneIDIndex: @unchecked Sendable {
+    private var ids: Set<String> = []
+    private let lock = NSLock()
+
+    func contains(_ id: String) -> Bool {
+        lock.lock(); defer { lock.unlock() }
+        return ids.contains(id)
+    }
+
+    func replace(with newIDs: [String]) {
+        lock.lock(); defer { lock.unlock() }
+        ids = Set(newIDs)
+    }
+}
+
 @MainActor
 class DownloadManager: NSObject, ObservableObject {
     static let shared = DownloadManager()
-    
-    @Published var downloads: [DownloadedScene] = []
+
+    /// Thread-safe mirror of the downloaded scene ids, readable off the main
+    /// actor (model computed properties such as `Scene.thumbnailURL`).
+    nonisolated static let downloadedSceneIDs = DownloadedSceneIDIndex()
+
+    @Published var downloads: [DownloadedScene] = [] {
+        didSet { Self.downloadedSceneIDs.replace(with: downloads.map(\.id)) }
+    }
     @Published var galleryDownloads: [DownloadedGallery] = []
     @Published var activeDownloads: [String: ActiveDownload] = [:] // id: info
     

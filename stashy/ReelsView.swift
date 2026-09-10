@@ -4318,7 +4318,7 @@ struct ReelsViewBody: View {
     private func reelsTitleText(item: ReelItemData) -> some View {
         if let title = item.title, !title.isEmpty {
             if let scene = item.underlyingScene {
-                NavigationLink(destination: SceneDetailView(scene: scene)) {
+                NavigationLink(destination: LazyView { SceneDetailView(scene: scene) }) {
                     Text(title)
                         .font(.system(size: 15, weight: .medium))
                         .foregroundColor(.white.opacity(0.85))
@@ -4463,39 +4463,6 @@ struct ReelsViewBody: View {
                                 if showsTagRow {
                                     ScrollView(.horizontal, showsIndicators: false) {
                                         HStack(spacing: 6) {
-                                            ForEach(tags) { tag in
-                                                Button(action: {
-                                                    var newTags = selectedTags
-                                                    if newTags.contains(where: { $0.id == tag.id }) {
-                                                        newTags.removeAll { $0.id == tag.id }
-                                                    } else {
-                                                        newTags.append(tag)
-                                                    }
-                                                    applyTagsChange(newTags)
-                                                }) {
-                                                    Text("#\(tag.name)")
-                                                        .font(.system(size: 11, weight: .semibold))
-                                                        .foregroundColor(.white.opacity(0.8))
-                                                        .padding(.horizontal, 8)
-                                                        .padding(.vertical, 3)
-                                                        .background(Color.black.opacity(0.3))
-                                                        .clipShape(Capsule())
-                                                        .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
-                                                }
-                                                .buttonStyle(.plain)
-                                                .contextMenu {
-                                                    let target = item.aiTagTarget
-                                                    if appearanceManager.isEditModeEnabled,
-                                                       tag.id != target.primaryTagId {
-                                                        Button(role: .destructive) {
-                                                            removeTag(tag, from: target)
-                                                        } label: {
-                                                            Label("Remove tag", systemImage: "trash")
-                                                        }
-                                                    }
-                                                }
-                                            }
-
                                             if appearanceManager.isEditModeEnabled {
                                                 Button {
                                                     tagEditorTarget = item.aiTagTarget
@@ -4513,6 +4480,37 @@ struct ReelsViewBody: View {
                                                 }
                                                 .buttonStyle(.plain)
                                                 .accessibilityLabel("Add tags")
+                                            }
+
+                                            ForEach(tags) { tag in
+                                                Button(action: {
+                                                    var newTags = selectedTags
+                                                    if newTags.contains(where: { $0.id == tag.id }) {
+                                                        newTags.removeAll { $0.id == tag.id }
+                                                    } else {
+                                                        newTags.append(tag)
+                                                    }
+                                                    applyTagsChange(newTags)
+                                                }) {
+                                                    Text("#\(tag.name)")
+                                                        .font(.system(size: 11, weight: .semibold))
+                                                        .foregroundColor(.white.opacity(0.8))
+                                                        .padding(.horizontal, 8)
+                                                        .padding(.vertical, 3)
+                                                        .stashyGlass(shape: Capsule())
+                                                }
+                                                .buttonStyle(.plain)
+                                                .contextMenu {
+                                                    let target = item.aiTagTarget
+                                                    if appearanceManager.isEditModeEnabled,
+                                                       tag.id != target.primaryTagId {
+                                                        Button(role: .destructive) {
+                                                            removeTag(tag, from: target)
+                                                        } label: {
+                                                            Label("Remove tag", systemImage: "trash")
+                                                        }
+                                                    }
+                                                }
                                             }
 
                                             // Tag Suggestion (stashy+, off by default).
@@ -5401,7 +5399,7 @@ extension ReelItemView {
         if let title = item.title, !title.isEmpty {
             Group {
                 if let scene = item.underlyingScene {
-                    NavigationLink(destination: SceneDetailView(scene: scene)) {
+                    NavigationLink(destination: LazyView { SceneDetailView(scene: scene) }) {
                         titleText(title, item: item)
                     }
                     .buttonStyle(.plain)
@@ -5548,6 +5546,12 @@ extension ReelItemView {
 
         engineErrorMessage = nil
         aether.isMuted = isMuted
+        // Only full scenes have server transcodes to fall back to; markers, clips and previews
+        // are their own clip and keep the ladder empty.
+        if case .scene(let scene) = item {
+            aether.fallbackSources = scene.transcodeFallbackURLs
+            aether.fallbackDeclaredDuration = scene.sceneDuration
+        }
         aether.loopsAtEnd = !TabManager.shared.reelsContinuousPlay
         aether.setVideoGravity(shouldFill ? .resizeAspectFill : .resizeAspect)
         bindAetherCallbacks(on: aether)

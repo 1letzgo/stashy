@@ -17,6 +17,8 @@ struct StashyTopNavNameDropdownRow: View {
     var titleColor: Color = .primary
     var menuAccessibilityLabel: String = "Section"
     var menuAccessibilityHint: String = "Chooses which section to show"
+    /// Bleibt links stehen statt mitzuscrollen (z. B. der Weg zurück zur Übersicht).
+    var pinnedItemID: String? = nil
     let onSelect: (String) -> Void
 
     var body: some View {
@@ -25,6 +27,7 @@ struct StashyTopNavNameDropdownRow: View {
             selectionID: selectionID,
             accessibilityLabel: menuAccessibilityLabel,
             accessibilityHint: menuAccessibilityHint,
+            pinnedItemID: pinnedItemID,
             onSelect: onSelect
         )
         // Keep a little air toward content: below when top-placed, above when bottom-placed (iPad).
@@ -135,31 +138,63 @@ struct StashyExpandingDockBrowseStrip: View {
     var accessibilityLabel: String = "Section"
     var accessibilityHint: String = "Chooses which section to show"
     var palette: StashyExpandingDockPalette = .chrome
+    /// Dieses Item steht fest am linken Rand, der Rest scrollt daran vorbei.
+    var pinnedItemID: String? = nil
     let onSelect: (String) -> Void
 
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
+    private var pinnedItem: StashyNavMenuItem? {
+        guard let pinnedItemID else { return nil }
+        return items.first { $0.id == pinnedItemID }
+    }
+
+    private var scrollingItems: [StashyNavMenuItem] {
+        guard let pinnedItemID else { return items }
+        return items.filter { $0.id != pinnedItemID }
+    }
+
+    private func select(_ item: StashyNavMenuItem) {
+        guard item.id != selectionID else { return }
+        HapticManager.light()
+        // Do not wrap `onSelect` in `withAnimation` — that fades the catalog root
+        // (Scenes / Images). Chip expand is driven by `.animation(..., value:)` below.
+        onSelect(item.id)
+    }
+
     var body: some View {
+        HStack(spacing: StashyExpandingDock.itemSpacing) {
+            if let pinnedItem {
+                StashyExpandingDockChip(
+                    item: pinnedItem,
+                    isSelected: pinnedItem.id == selectionID,
+                    palette: palette,
+                    onSelect: { select(pinnedItem) }
+                )
+                .animation(reduceMotion ? nil : StashyExpandingDock.selectionAnimation, value: selectionID)
+            }
+
+            strip
+        }
+        .accessibilityHint(accessibilityHint)
+        .accessibilityLabel(accessibilityLabel)
+    }
+
+    private var strip: some View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: StashyExpandingDock.itemSpacing) {
-                    ForEach(items) { item in
+                    ForEach(scrollingItems) { item in
                         StashyExpandingDockChip(
                             item: item,
                             isSelected: item.id == selectionID,
                             palette: palette,
-                            onSelect: {
-                                guard item.id != selectionID else { return }
-                                HapticManager.light()
-                                // Do not wrap `onSelect` in `withAnimation` — that fades the catalog root
-                                // (Scenes / Images). Chip expand is driven by `.animation(..., value:)` below.
-                                onSelect(item.id)
-                            }
+                            onSelect: { select(item) }
                         )
                         .id(item.id)
                     }
                 }
-                .frame(maxWidth: items.count < StashyExpandingDock.centerWhenFewThreshold ? .infinity : nil)
+                .frame(maxWidth: scrollingItems.count < StashyExpandingDock.centerWhenFewThreshold ? .infinity : nil)
                 .animation(reduceMotion ? nil : StashyExpandingDock.selectionAnimation, value: selectionID)
             }
             .scrollContentBackground(.hidden)
@@ -170,8 +205,6 @@ struct StashyExpandingDockBrowseStrip: View {
                 proxy.scrollTo(selectionID, anchor: .center)
             }
         }
-        .accessibilityHint(accessibilityHint)
-        .accessibilityLabel(accessibilityLabel)
     }
 }
 

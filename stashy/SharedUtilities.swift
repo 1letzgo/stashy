@@ -2294,3 +2294,21 @@ struct StashSyncSheet: View {
     }
 }
 #endif
+
+// MARK: - Lazy navigation destination
+
+/// `NavigationLink(destination:)` baut sein Ziel sofort mit, in einem Grid also für
+/// jede sichtbare Zelle beim Scrollen. Für schwere Ziele (Detailseiten mit eigenem
+/// `StashDBViewModel`) ist das der Unterschied zwischen flüssig und stockend.
+/// `LazyView` hält nur die Closure; das Ziel entsteht erst beim Push.
+struct LazyView<Content: View>: View {
+    let build: () -> Content
+
+    init(_ build: @escaping () -> Content) {
+        self.build = build
+    }
+
+    var body: Content {
+        build()
+    }
+}

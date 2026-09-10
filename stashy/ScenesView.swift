@@ -918,6 +918,22 @@ private struct ScenesViewContent: View {
     }
     
     // Search function with debouncing
+    /// Setzt den in Settings gewählten Standardfilter, sofern für diese Liste einer
+    /// gilt und noch keiner aktiv ist. Gibt zurück, ob etwas gesetzt wurde.
+    @discardableResult
+    private func applySettingsDefaultFilterIfNeeded() -> Bool {
+        guard scope == .catalog, !hasInjectedFilter, selectedFilter == nil else { return false }
+        guard !coordinator.noDefaultFilter else { return false }
+        guard let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes),
+              let filter = viewModel.savedFilters[defaultId] else { return false }
+
+        selectedFilter = filter
+        // Keep the sheet's preset row in sync so the default shows as selected.
+        liveSheetPresetSelection = SceneLivePresetTag.serverRow(filter.id)
+        syncLiveChipsToMatchSelectedFilter()
+        return true
+    }
+
     private func performSearch() {
         switch scope {
         case .catalog:
@@ -1205,10 +1221,12 @@ private struct ScenesViewContent: View {
             viewModel.fetchSavedFilters()
             refreshLivePresets()
             
-            // If no default filter is set, fetch immediately ONLY if we don't have scenes yet.
-            // Detail scopes and injected filters never take the Settings default, so they must
-            // not wait for it either.
-            if isSceneListDetailScope || hasInjectedFilter || TabManager.shared.getDefaultFilterId(for: .scenes) == nil {
+            // Waren die Filter schon geladen, feuert `onChange(of: savedFilters)` nie —
+            // dann bliebe der Standardfilter ungenutzt. Hier direkt anwenden.
+            if applySettingsDefaultFilterIfNeeded() {
+                performSearch()
+            } else if isSceneListDetailScope || hasInjectedFilter || TabManager.shared.getDefaultFilterId(for: .scenes) == nil {
+                // Ohne Standardfilter (oder in einem Detail-Scope) muss nicht darauf gewartet werden.
                 if primarySceneListIsEmpty {
                     performSearch()
                 }
@@ -1274,10 +1292,10 @@ private struct ScenesViewContent: View {
                     // Keep the sheet's preset row in sync so the default shows as selected.
                     liveSheetPresetSelection = SceneLivePresetTag.serverRow(filter.id)
                     syncLiveChipsToMatchSelectedFilter()
-                    // Only fetch if we don't have scenes yet (e.g., initial app load)
-                    if primarySceneListIsEmpty {
-                        performSearch()
-                    }
+                    // Immer nachladen: `CatalogsView` hält ein ViewModel über alle Sub-Tabs
+                    // warm, die Liste ist beim Öffnen also selten leer. Unter der alten
+                    // Bedingung stand der Filter nur in der Variable und wirkte nie.
+                    performSearch()
                     // Reset flag after using injected sort with default filter
                     if hasInjectedSort {
                         hasInjectedSort = false
@@ -1362,7 +1380,7 @@ private struct ScenesViewContent: View {
                     }
                     LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(primaryScenes) { scene in
-                            NavigationLink(destination: SceneDetailView(scene: scene)) {
+                            NavigationLink(destination: LazyView { SceneDetailView(scene: scene) }) {
                                 SceneCardView(
                                     scene: scene,
                                     aspectRatio: cardColumns.cardAspectRatio

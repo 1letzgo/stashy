@@ -30,6 +30,7 @@ class KeychainManager {
     /// Save API key for a server (add-or-update, atomic)
     func saveAPIKey(_ apiKey: String, forServerID serverID: UUID) -> Bool {
         let key = "apikey_\(serverID.uuidString)"
+        invalidateAPIKeyCache(forServerID: serverID)
 
         guard let data = apiKey.data(using: .utf8) else { return false }
 
@@ -47,8 +48,35 @@ class KeychainManager {
         return SecItemAdd(addQuery as CFDictionary, nil) == errSecSuccess
     }
 
+    /// In-memory copy of the API keys. `SecItemCopyMatching` costs around a
+    /// millisecond and every signed image URL asked for it — once per card per
+    /// body evaluation, which is what made the scene grid stutter.
+    private var apiKeyCache: [UUID: String?] = [:]
+    private let apiKeyCacheLock = NSLock()
+
+    private func invalidateAPIKeyCache(forServerID serverID: UUID) {
+        apiKeyCacheLock.lock()
+        apiKeyCache[serverID] = nil
+        apiKeyCacheLock.unlock()
+    }
+
     /// Load API key for a server
     func loadAPIKey(forServerID serverID: UUID) -> String? {
+        apiKeyCacheLock.lock()
+        if let cached = apiKeyCache[serverID] {
+            apiKeyCacheLock.unlock()
+            return cached
+        }
+        apiKeyCacheLock.unlock()
+
+        let loaded = loadAPIKeyFromKeychain(forServerID: serverID)
+        apiKeyCacheLock.lock()
+        apiKeyCache[serverID] = .some(loaded)
+        apiKeyCacheLock.unlock()
+        return loaded
+    }
+
+    private func loadAPIKeyFromKeychain(forServerID serverID: UUID) -> String? {
         let key = "apikey_\(serverID.uuidString)"
 
         var query = baseQuery(account: key)
@@ -70,6 +98,7 @@ class KeychainManager {
     @discardableResult
     func deleteAPIKey(forServerID serverID: UUID) -> Bool {
         let key = "apikey_\(serverID.uuidString)"
+        invalidateAPIKeyCache(forServerID: serverID)
         return deleteRaw(account: key)
     }
     

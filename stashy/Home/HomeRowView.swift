@@ -330,12 +330,14 @@ struct HomeRowView: View {
         .scrollContentBackground(.hidden)
     }
 
+    /// `destination` ist eine Autoclosure: die Detailseite entsteht erst beim Push,
+    /// nicht für jede Karte der Reihe beim Scrollen.
     @ViewBuilder
     private func cardLink<Dest: View, Card: View>(
-        destination: Dest, id: String, width: CGFloat,
+        destination: @autoclosure @escaping () -> Dest, id: String, width: CGFloat,
         @ViewBuilder card: () -> Card
     ) -> some View {
-        NavigationLink(destination: destination) { card() }
+        NavigationLink(destination: LazyView(destination)) { card() }
             .buttonStyle(.plain)
             .frame(width: width)
             .id(id)

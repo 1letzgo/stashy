@@ -95,6 +95,8 @@
 		DF06EF262F18EC1300299105 /* SceneCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF06EF252F18EC1100299105 /* SceneCardView.swift */; };
 		DF22BB152F167223007C2090 /* CatalogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB142F167223007C2090 /* CatalogsView.swift */; };
 		DF22BB1E2F16743C007C2090 /* TagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1D2F16743C007C2090 /* TagsView.swift */; };
+		C7F3A10200000000000000E2 /* TagMergeToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10100000000000000E1 /* TagMergeToolsView.swift */; };
+		C7F3A10400000000000000E4 /* StudioLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10300000000000000E3 /* StudioLogo.swift */; };
 		DF22BB1F2F16743C007C2090 /* DownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB172F16743C007C2090 /* DownloadsView.swift */; };
 		DF22BB202F16743C007C2090 /* GalleriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB182F16743C007C2090 /* GalleriesView.swift */; };
 		DF22BB222F16743C007C2090 /* ReelsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1B2F16743C007C2090 /* ReelsView.swift */; };
@@ -159,6 +161,8 @@
 		DFUI000052F3AUDIT005 /* ToastManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFUI000062F3AUDIT006 /* ToastManager.swift */; };
 		E909C6E8F4744C4D939F78BD /* GraphQLQueries.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFGQ000042F28A0000000004 /* GraphQLQueries.swift */; };
 		AE7E00000000000000000003 /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = AE7E00000000000000000002 /* AetherEngine */; };
+		C7F3A20100000000000000F1 /* PocketSVG in Frameworks */ = {isa = PBXBuildFile; productRef = C7F3A20300000000000000F3 /* PocketSVG */; };
+		C7F3A20200000000000000F2 /* PocketSVG in Embed Frameworks */ = {isa = PBXBuildFile; productRef = C7F3A20300000000000000F3 /* PocketSVG */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
 		AE7E0000000000000000B012 /* AetherSceneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B011 /* AetherSceneEngine.swift */; };
 		AE7E0000000000000000B022 /* Scene+AetherPlayback.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */; };
 		AE7E0000000000000000B042 /* AetherSceneSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B041 /* AetherSceneSurface.swift */; };
@@ -199,6 +203,17 @@
 			dstSubfolderSpec = 10;
 			files = (
 				F0A11E1B0B0B0B0B0B0B0B02 /* PocketSVG in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		C7F3A20400000000000000F4 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+				C7F3A20200000000000000F2 /* PocketSVG in Embed Frameworks */,
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -253,6 +268,8 @@
 		DF22BB1B2F16743C007C2090 /* ReelsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReelsView.swift; sourceTree = "<group>"; };
 		DF22BB1C2F16743C007C2090 /* SharedUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedUtilities.swift; sourceTree = "<group>"; };
 		DF22BB1D2F16743C007C2090 /* TagsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagsView.swift; sourceTree = "<group>"; };
+		C7F3A10100000000000000E1 /* TagMergeToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagMergeToolsView.swift; sourceTree = "<group>"; };
+		C7F3A10300000000000000E3 /* StudioLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioLogo.swift; sourceTree = "<group>"; };
 		DF22BB262F167CDC007C2090 /* ImageCacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheManager.swift; sourceTree = "<group>"; };
 		DF22BB312F1831C7007C2090 /* AppearanceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceManager.swift; sourceTree = "<group>"; };
 		DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsView.swift; sourceTree = "<group>"; };
@@ -336,6 +353,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AE7E00000000000000000003 /* AetherEngine in Frameworks */,
+				C7F3A20100000000000000F1 /* PocketSVG in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -438,6 +456,8 @@
 				DFE504612E8A8C4000323FF0 /* StudiosView.swift */,
 				DFF7EE402F0D3D2800344A8B /* TabManager.swift */,
 				DF22BB1D2F16743C007C2090 /* TagsView.swift */,
+				C7F3A10100000000000000E1 /* TagMergeToolsView.swift */,
+				C7F3A10300000000000000E3 /* StudioLogo.swift */,
 				DFUI000062F3AUDIT006 /* ToastManager.swift */,
 				DF90B7652F1B72E5003ED852 /* UniversalSearchView.swift */,
 			);
@@ -583,6 +603,7 @@
 				08FB778DFE84155DC02AAC07 /* Sources */,
 				08FB7791FE84155DC02AAC07 /* Frameworks */,
 				08FB7792FE84155DC02AAC07 /* Resources */,
+				C7F3A20400000000000000F4 /* Embed Frameworks */,
 			);
 			buildRules = (
 			);
@@ -591,6 +612,7 @@
 			name = stashy;
 			packageProductDependencies = (
 				AE7E00000000000000000002 /* AetherEngine */,
+				C7F3A20300000000000000F3 /* PocketSVG */,
 			);
 			productName = stashy;
 			productReference = DFE504602E8A8E6F00323FF0 /* stashy.app */;
@@ -769,6 +791,8 @@
 				CA7A10E12F500010 /* DetailLinkedCatalogControllers.swift in Sources */,
 				DF22BB152F167223007C2090 /* CatalogsView.swift in Sources */,
 				DF22BB1E2F16743C007C2090 /* TagsView.swift in Sources */,
+				C7F3A10200000000000000E2 /* TagMergeToolsView.swift in Sources */,
+				C7F3A10400000000000000E4 /* StudioLogo.swift in Sources */,
 				DF90B75E2F1A5ECF003ED852 /* StarRatingView.swift in Sources */,
 				DF22BB1F2F16743C007C2090 /* DownloadsView.swift in Sources */,
 				DF4A022C2F1E8B6900E5EAFB /* ImagesView.swift in Sources */,
@@ -1022,7 +1046,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 332;
+				CURRENT_PROJECT_VERSION = 334;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1052,7 +1076,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 332;
+				CURRENT_PROJECT_VERSION = 334;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1195,7 +1219,7 @@
 			repositoryURL = "https://github.com/superuser404notfound/AetherEngine";
 			requirement = {
 				kind = upToNextMinorVersion;
-				minimumVersion = 6.76.0;
+				minimumVersion = 6.78.0;
 			};
 		};
 		0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "PocketSVG" */ = {
@@ -1220,6 +1244,11 @@
 			productName = AetherEngine;
 		};
 		1A2B3C4D5E6F708192A3B4C5 /* PocketSVG */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "PocketSVG" */;
+			productName = PocketSVG;
+		};
+		C7F3A20300000000000000F3 /* PocketSVG */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = 0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "PocketSVG" */;
 			productName = PocketSVG;

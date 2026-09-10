@@ -16,7 +16,9 @@ struct SceneDetailView: View {
     let scene: Scene
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @State private var activeScene: Scene
-    @ObservedObject var viewModel = StashDBViewModel()
+    // `@StateObject`: als `@ObservedObject` mit Inline-Initializer entstand bei jedem
+    // Neuaufbau der Struct ein weiteres 12k-Zeilen-ViewModel samt Observern.
+    @StateObject private var viewModel = StashDBViewModel()
     @ObservedObject var handyManager = HandyManager.shared
     @ObservedObject var buttplugManager = ButtplugManager.shared
     @ObservedObject var loveSpouseManager = LoveSpouseManager.shared

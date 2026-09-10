@@ -391,11 +391,9 @@ private struct TagsViewContent: View {
                 refreshTagLocalPresets()
                 performSearch()
             }
-            .onChange(of: viewModel.savedFilters) { oldValue, newValue in
+            .onChange(of: viewModel.savedFilters) { _, _ in
                 if selectedFilter == nil {
-                    if let defaultId = TabManager.shared.getDefaultFilterId(for: .tags),
-                       let filter = newValue[defaultId] {
-                        selectedFilter = filter
+                    if applySettingsDefaultFilterIfNeeded() {
                         performSearch()
                     } else if !viewModel.isLoadingSavedFilters {
                         performSearch()
@@ -506,6 +504,26 @@ private struct TagsViewContent: View {
         }
     }
 
+    /// Sets the Settings-configured default filter for this tab, if one is configured and no
+    /// filter is active yet. Mirrors the state assignments of `applyServerTagSavedFilter`
+    /// (minus the fetch) so the preset row and chips stay in sync. Returns whether it applied one.
+    @discardableResult
+    private func applySettingsDefaultFilterIfNeeded() -> Bool {
+        guard selectedFilter == nil else { return false }
+        guard let defaultId = TabManager.shared.getDefaultFilterId(for: .tags),
+              let filter = viewModel.savedFilters[defaultId] else { return false }
+
+        selectedFilter = filter
+        catalogPresetRowSelection = ListLivePresetTag.serverRow(filter.id)
+        if CatalogLiveChipFilterSupport.tagSavedFilterSupportsLiveEditor(filter), let raw = filter.filterDict {
+            mapTagLiveFragmentToChips(raw)
+        } else {
+            clearTagLiveChipsOnly()
+        }
+        loadCriteriaDocument(from: filter)
+        return true
+    }
+
     private func handleTagCatalogPresetSelectionChange(_ newId: String) {
         guard showFilterSortSheet else { return }
         if newId.isEmpty {
@@ -534,7 +552,11 @@ private struct TagsViewContent: View {
             viewModel.fetchSavedFilters()
             return
         }
-        if TabManager.shared.getDefaultFilterId(for: .tags) == nil || !viewModel.savedFilters.isEmpty {
+        // Were saved filters already loaded (warm view model from another catalog sub-tab),
+        // `onChange(of: savedFilters)` below never fires - apply the default here instead.
+        if applySettingsDefaultFilterIfNeeded() {
+            performSearch()
+        } else if TabManager.shared.getDefaultFilterId(for: .tags) == nil || !viewModel.savedFilters.isEmpty {
             if viewModel.tags.isEmpty {
                 performSearch()
             }

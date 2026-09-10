@@ -409,6 +409,20 @@ private struct PerformersViewContent: View {
         viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: fetchBaseFilter, liveFilter: effectiveLiveFilter)
     }
 
+    /// Setzt den in Settings gewählten Standardfilter, sofern für diese Liste einer
+    /// gilt und noch keiner aktiv ist. Gibt zurück, ob etwas gesetzt wurde.
+    @discardableResult
+    private func applySettingsDefaultFilterIfNeeded() -> Bool {
+        guard selectedFilter == nil else { return false }
+        guard let defaultId = TabManager.shared.getDefaultFilterId(for: .performers),
+              let filter = viewModel.savedFilters[defaultId] else { return false }
+
+        selectedFilter = filter
+        // Keep the sheet's preset row in sync so the default shows as selected.
+        catalogPresetRowSelection = ListLivePresetTag.serverRow(filter.id)
+        return true
+    }
+
     var body: some View {
         performersCoreChrome
             .sheet(isPresented: $showFilterSortSheet, content: performersFilterSortSheet)
@@ -466,9 +480,10 @@ private struct PerformersViewContent: View {
                     if let defaultId = TabManager.shared.getDefaultFilterId(for: .performers),
                        let filter = newValue[defaultId] {
                         selectedFilter = filter
-                        if viewModel.performers.isEmpty {
-                            viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: filter)
-                        }
+                        // Immer nachladen: `CatalogsView` hält ein ViewModel über alle Sub-Tabs
+                        // warm, die Liste ist beim Öffnen also selten leer. Unter der alten
+                        // Bedingung stand der Filter nur in der Variable und wirkte nie.
+                        viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: filter)
                     } else if !viewModel.isLoadingSavedFilters {
                         if viewModel.performers.isEmpty {
                             viewModel.fetchPerformers(sortBy: selectedSortOption, searchQuery: searchText, filter: nil)
@@ -624,7 +639,12 @@ private struct PerformersViewContent: View {
             viewModel.fetchSavedFilters()
             return
         }
-        if TabManager.shared.getDefaultFilterId(for: .performers) == nil || !viewModel.savedFilters.isEmpty {
+        // Waren die Filter schon geladen, feuert `onChange(of: savedFilters)` nie —
+        // dann bliebe der Standardfilter ungenutzt. Hier direkt anwenden.
+        if applySettingsDefaultFilterIfNeeded() {
+            performSearch()
+        } else if TabManager.shared.getDefaultFilterId(for: .performers) == nil || !viewModel.savedFilters.isEmpty {
+            // Ohne Standardfilter muss nicht darauf gewartet werden.
             if forceRefresh || viewModel.performers.isEmpty {
                 performSearch()
             }
@@ -646,7 +666,7 @@ private struct PerformersViewContent: View {
             ScrollView {
                 LazyVGrid(columns: columns, spacing: 12) {
                     ForEach(viewModel.performers) { performer in
-                        NavigationLink(destination: PerformerDetailView(performer: performer)) {
+                        NavigationLink(destination: LazyView { PerformerDetailView(performer: performer) }) {
                             PerformerCardView(
                                 performer: performer,
                                 badgeType: .forSort(selectedSortOption)

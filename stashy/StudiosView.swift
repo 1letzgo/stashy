@@ -352,6 +352,20 @@ private struct StudiosViewContent: View {
         viewModel.fetchStudios(sortBy: selectedSortOption, searchQuery: searchText, filter: fetchBaseFilter, liveFilter: effectiveLiveFilter)
     }
 
+    /// Setzt den in Settings gewählten Standardfilter, sofern für diese Liste einer
+    /// gilt und noch keiner aktiv ist. Gibt zurück, ob etwas gesetzt wurde.
+    @discardableResult
+    private func applySettingsDefaultFilterIfNeeded() -> Bool {
+        guard !hideTitle, selectedFilter == nil else { return false }
+        guard let defaultId = TabManager.shared.getDefaultFilterId(for: .studios),
+              let filter = viewModel.savedFilters[defaultId] else { return false }
+
+        selectedFilter = filter
+        // Keep the sheet's preset row in sync so the default shows as selected.
+        catalogPresetRowSelection = ListLivePresetTag.serverRow(filter.id)
+        return true
+    }
+
     var body: some View {
         studiosCoreChrome
             .sheet(isPresented: $showFilterSortSheet, content: studiosFilterSortSheet)
@@ -562,7 +576,12 @@ private struct StudiosViewContent: View {
             return
         }
         
-        if TabManager.shared.getDefaultFilterId(for: .studios) == nil || !viewModel.savedFilters.isEmpty {
+        // Waren die Filter schon geladen, feuert `onChange(of: savedFilters)` nie —
+        // dann bliebe der Standardfilter ungenutzt. Hier direkt anwenden.
+        if applySettingsDefaultFilterIfNeeded() {
+            performSearch()
+        } else if TabManager.shared.getDefaultFilterId(for: .studios) == nil || !viewModel.savedFilters.isEmpty {
+            // Ohne Standardfilter muss nicht darauf gewartet werden.
             if forceRefresh || viewModel.studios.isEmpty {
                 performSearch()
             }
@@ -575,10 +594,10 @@ private struct StudiosViewContent: View {
             if let defaultId = TabManager.shared.getDefaultFilterId(for: .studios),
                let filter = newValue[defaultId] {
                 selectedFilter = filter
-                // Only fetch if empty to avoid resetting scroll
-                if viewModel.studios.isEmpty {
-                    viewModel.fetchStudios(sortBy: selectedSortOption, searchQuery: searchText, filter: filter)
-                }
+                // Immer nachladen: `CatalogsView` hält ein ViewModel über alle Sub-Tabs
+                // warm, die Liste ist beim Öffnen also selten leer. Unter der alten
+                // Bedingung stand der Filter nur in der Variable und wirkte nie.
+                viewModel.fetchStudios(sortBy: selectedSortOption, searchQuery: searchText, filter: filter)
             } else if !viewModel.isLoadingSavedFilters {
                 // Default filter was set but not found, or filters finished loading and none match
                 // Only fetch if empty
@@ -708,9 +727,26 @@ struct StudioImageView: View {
             )
     }
 
+    /// Kartengröße in Punkten; Detail-Header ist nicht viel größer.
+    private static let rasterHeight: CGFloat = 220
+    private static let rasterMaxWidth: CGFloat = 660
+
     private func loadImage() async {
         guard let url = imageURL else {
             imageLoadState = .failure
+            return
+        }
+
+        // Erst der gemeinsame Logo-Store (Speicher + Platte, SVG gerastert, kein
+        // WebView pro Karte). Platzhalter-Bilder (`default=true`) und SVGs mit
+        // Gradients/Filtern laufen weiter über den alten Weg unten.
+        let isDefaultImage = studio.imagePath?.contains("default=true") == true
+        if !isDefaultImage,
+           let cached = await StudioLogoStore.shared.image(
+               studioId: studio.id, updatedAt: studio.updatedAt,
+               height: Self.rasterHeight, maxWidth: Self.rasterMaxWidth
+           ) {
+            imageLoadState = .success(Image(uiImage: cached))
             return
         }
 

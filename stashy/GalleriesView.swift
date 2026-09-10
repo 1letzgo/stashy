@@ -461,7 +461,7 @@ private struct GalleriesViewContent: View {
         return ScrollView {
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(viewModel.galleries) { gallery in
-                    NavigationLink(destination: ImagesView(gallery: gallery)) {
+                    NavigationLink(destination: LazyView { ImagesView(gallery: gallery) }) {
                         GalleryCardView(
                             gallery: gallery,
                             aspectRatio: cardColumns.cardAspectRatio
@@ -1623,26 +1623,6 @@ struct FullScreenImageView: View {
                                 if showsTagRow {
                                     ScrollView(.horizontal, showsIndicators: false) {
                                         HStack(spacing: 6) {
-                                            ForEach(tags) { tag in
-                                                Text("#\(tag.name)")
-                                                    .font(.system(size: 11, weight: .semibold))
-                                                    .foregroundColor(.white.opacity(0.8))
-                                                    .padding(.horizontal, 8)
-                                                    .padding(.vertical, 3)
-                                                    .background(Color.black.opacity(0.3))
-                                                    .clipShape(Capsule())
-                                                    .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
-                                                    .contextMenu {
-                                                        if appearanceManager.isEditModeEnabled {
-                                                            Button(role: .destructive) {
-                                                                removeTag(tag, from: image)
-                                                            } label: {
-                                                                Label("Remove tag", systemImage: "trash")
-                                                            }
-                                                        }
-                                                    }
-                                            }
-
                                             if appearanceManager.isEditModeEnabled {
                                                 Button {
                                                     tagEditorImage = image
@@ -1656,12 +1636,28 @@ struct FullScreenImageView: View {
                                                         .foregroundColor(.white.opacity(0.8))
                                                         .padding(.horizontal, 8)
                                                         .padding(.vertical, 3)
-                                                        .background(Color.black.opacity(0.3))
-                                                        .clipShape(Capsule())
-                                                        .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                                                        .stashyGlass(shape: Capsule())
                                                 }
                                                 .buttonStyle(.plain)
                                                 .accessibilityLabel("Add tags")
+                                            }
+
+                                            ForEach(tags) { tag in
+                                                Text("#\(tag.name)")
+                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .foregroundColor(.white.opacity(0.8))
+                                                    .padding(.horizontal, 8)
+                                                    .padding(.vertical, 3)
+                                                    .stashyGlass(shape: Capsule())
+                                                    .contextMenu {
+                                                        if appearanceManager.isEditModeEnabled {
+                                                            Button(role: .destructive) {
+                                                                removeTag(tag, from: image)
+                                                            } label: {
+                                                                Label("Remove tag", systemImage: "trash")
+                                                            }
+                                                        }
+                                                    }
                                             }
 
                                             AITagSuggestionBar(target: .image(image)) { newTags in

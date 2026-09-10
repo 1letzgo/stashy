@@ -202,12 +202,22 @@ class ImageCache {
             return image
         }
         let fileURL = cacheFileURL(for: key)
-        let data = await Task.detached(priority: .utility) {
-            try? Data(contentsOf: fileURL)
+        // Decode off the main thread too: `UIImage(data:)` is lazy, the actual
+        // decode would otherwise happen during the first draw while scrolling.
+        let image = await Task.detached(priority: .utility) { () -> UIImage? in
+            guard let data = try? Data(contentsOf: fileURL) else { return nil }
+            return ImageCache.decodedForDisplay(data)
         }.value
-        guard let data, let image = UIImage(data: data) else { return nil }
+        guard let image else { return nil }
         memoryCache.setObject(image, forKey: stableKey, cost: imageCost(image))
         return image
+    }
+
+    /// `UIImage(data:)` plus an eager decode (`preparingForDisplay`), so the
+    /// bitmap is ready before SwiftUI draws it. Call off the main thread.
+    nonisolated static func decodedForDisplay(_ data: Data) -> UIImage? {
+        guard let image = UIImage(data: data) else { return nil }
+        return image.preparingForDisplay() ?? image
     }
 
     func loadData(forKey key: NSURL) async -> Data? {
@@ -576,7 +586,11 @@ class ImageLoader: ObservableObject {
                 if Task.isCancelled { return }
                 
                 self.imageData = data
-                if let uiImage = UIImage(data: data) {
+                let decoded = await Task.detached(priority: .userInitiated) {
+                    ImageCache.decodedForDisplay(data)
+                }.value
+                if Task.isCancelled { return }
+                if let uiImage = decoded {
                     // Save to cache
                     ImageCache.shared.setData(data, forKey: url as NSURL)
                     self.image = Image(uiImage: uiImage)

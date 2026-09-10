@@ -839,7 +839,7 @@ struct TopScenesToolsView: View {
                         hasMore: viewModel.hasMoreScenes,
                         loadMore: { Task { await viewModel.loadMoreScenes() } }
                     ) { index, scene in
-                        NavigationLink(destination: SceneDetailView(scene: scene)) {
+                        NavigationLink(destination: LazyView { SceneDetailView(scene: scene) }) {
                             TopListsSceneCard(
                                 scene: scene,
                                 place: index + 1,
@@ -910,7 +910,7 @@ struct TopPerformersToolsView: View {
                         hasMore: viewModel.hasMorePerformers,
                         loadMore: { Task { await viewModel.loadMorePerformers() } }
                     ) { index, performer in
-                        NavigationLink(destination: PerformerDetailView(performer: performer)) {
+                        NavigationLink(destination: LazyView { PerformerDetailView(performer: performer) }) {
                             TopListsPerformerCard(
                                 performer: performer,
                                 place: index + 1,
@@ -981,7 +981,7 @@ struct TopStudiosToolsView: View {
                         hasMore: viewModel.hasMoreStudios,
                         loadMore: { Task { await viewModel.loadMoreStudios() } }
                     ) { index, studio in
-                        NavigationLink(destination: StudioDetailView(studio: studio)) {
+                        NavigationLink(destination: LazyView { StudioDetailView(studio: studio) }) {
                             TopListsStudioCard(
                                 studio: studio,
                                 place: index + 1,

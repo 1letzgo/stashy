@@ -287,6 +287,7 @@ struct ToolsView: View {
         case timeline = "Timeline"
         case topLists = "Charts"
         case filters = "Filters"
+        case mergeTags = "Merge Tags"
         case hotOrNot = "Match"
         case rateMe = "RateMe"
         
@@ -298,6 +299,7 @@ struct ToolsView: View {
             case .timeline: return "calendar.day.timeline.left"
             case .topLists: return "list.number"
             case .filters: return "line.3.horizontal.decrease.circle"
+            case .mergeTags: return "arrow.triangle.merge"
             case .hotOrNot: return "flame.fill"
             case .rateMe: return "star.fill"
             }
@@ -308,7 +310,7 @@ struct ToolsView: View {
     /// hand-sorted flat list stopped being a good way in once Tools grew — the grid needs stable
     /// categories, so the order is part of the design now rather than a setting.
     static let toolGroups: [(title: String, tools: [ToolsTab])] = [
-        ("Library", [.downloads, .filters]),
+        ("Library", [.downloads, .filters, .mergeTags]),
         ("Insights", [.overview, .topLists, .oCount, .timeline]),
         ("Discover", [.hotOrNot, .rateMe])
     ]
@@ -357,6 +359,8 @@ struct ToolsView: View {
                 TopListsToolsContainerView(viewModel: topListsViewModel)
             case .filters:
                 FiltersToolsView()
+            case .mergeTags:
+                TagMergeToolsView()
             case .hotOrNot:
                 HotOrNotToolsView()
             case .rateMe:
@@ -375,7 +379,7 @@ struct ToolsView: View {
         }
     }
 
-    /// Only the dropdown — its "All Tools" entry is the way back to the grid. A separate button
+    /// Only the dropdown — its pinned "Tools" entry is the way back to the grid. A separate button
     /// beside it repeated the same icon in the same bar.
     private var toolsCategoryRow: some View {
         toolsDropdown
@@ -389,7 +393,7 @@ struct ToolsView: View {
             items: [
                 StashyNavMenuItem(
                     id: Self.allToolsMenuID,
-                    title: "All Tools",
+                    title: "Tools",
                     systemImage: "square.grid.2x2"
                 )
             ] + sortedTabs.map {
@@ -398,7 +402,9 @@ struct ToolsView: View {
             selectionID: showsLanding ? Self.allToolsMenuID : effectiveTab.rawValue,
             titleColor: .white,
             menuAccessibilityLabel: "Tool",
-            menuAccessibilityHint: "Chooses which tool to show"
+            menuAccessibilityHint: "Chooses which tool to show",
+            // Der Weg zurück zur Übersicht darf nicht wegscrollen.
+            pinnedItemID: Self.allToolsMenuID
         ) { id in
             if id == Self.allToolsMenuID {
                 coordinator.toolsSubTab = ""
@@ -507,7 +513,12 @@ struct ToolsServerView: View {
     @State private var alertMessage = ""
     @State private var showAlert = false
     @State private var runningTask: String? = nil
-    
+    /// Gefundene ungenutzte Tags, warten auf die Bestätigung.
+    @State private var unusedTags: [Tag] = []
+    @State private var showUnusedTagsConfirmation = false
+
+    private let tagRepository = TagRepository()
+
     private var activeServer: ServerConfig? { configManager.activeConfig }
     
     var body: some View {
@@ -598,6 +609,13 @@ struct ToolsServerView: View {
                     }
 
                     Section {
+                        stashyScrollingSectionHeader("Library Cleanup")
+                        taskRow(label: "Remove Unused Tags", icon: "tag.slash", taskId: "tags_unused", index: 0, count: 1) {
+                            findUnusedTags()
+                        }
+                    }
+
+                    Section {
                         stashyScrollingSectionHeader("Cache")
                         taskRow(label: "Clear Image Cache", icon: "internaldrive", taskId: "cache_clear", index: 0, count: 1) {
                             ImageCache.shared.clearCurrentServerCache()
@@ -632,6 +650,12 @@ struct ToolsServerView: View {
             Button("OK", role: .cancel) { }
         } message: {
             Text(alertMessage)
+        }
+        .alert("Remove unused tags?", isPresented: $showUnusedTagsConfirmation) {
+            Button("Delete \(unusedTags.count)", role: .destructive) { deleteUnusedTags() }
+            Button("Cancel", role: .cancel) { runningTask = nil }
+        } message: {
+            Text(unusedTagsConfirmationMessage)
         }
         .onAppear {
             if activeServer != nil {
@@ -673,6 +697,71 @@ struct ToolsServerView: View {
         .stashyGroupedBlockRow(index: index, count: count)
     }
     
+    // MARK: - Unused tags
+
+    private var unusedTagsConfirmationMessage: String {
+        // Ein paar Namen zeigen, damit die Zahl nachvollziehbar ist.
+        let preview = unusedTags.prefix(8).map(\.name).joined(separator: ", ")
+        let rest = unusedTags.count > 8 ? " and \(unusedTags.count - 8) more" : ""
+        return "\(unusedTags.count) tags are not used anywhere: \(preview)\(rest). Deleting them cannot be undone."
+    }
+
+    /// Zählt ein Tag nirgends, ist es ungenutzt. Alle fünf Zähler kommen aus `TagFields`.
+    private func isUnused(_ tag: Tag) -> Bool {
+        (tag.sceneCount ?? 0) == 0
+            && (tag.imageCount ?? 0) == 0
+            && (tag.galleryCount ?? 0) == 0
+            && (tag.performerCount ?? 0) == 0
+            && (tag.sceneMarkerCount ?? 0) == 0
+    }
+
+    private func findUnusedTags() {
+        Task {
+            do {
+                let all = try await tagRepository.fetchEveryTag()
+                let unused = all.filter(isUnused)
+                await MainActor.run {
+                    guard !unused.isEmpty else {
+                        showResult(title: "Remove Unused Tags", message: "No unused tags found.")
+                        return
+                    }
+                    unusedTags = unused
+                    showUnusedTagsConfirmation = true
+                }
+            } catch {
+                AppLog.error("❌ Scanning tags failed: \(error.localizedDescription)")
+                await MainActor.run {
+                    showResult(title: "Remove Unused Tags", message: "Could not load the tag list.")
+                }
+            }
+        }
+    }
+
+    private func deleteUnusedTags() {
+        let ids = unusedTags.map(\.id)
+        let count = ids.count
+        Task {
+            do {
+                let ok = try await tagRepository.deleteTags(ids: ids)
+                await MainActor.run {
+                    unusedTags = []
+                    // Gelöschte Tags dürfen in Filter-Pickern nicht weiterleben.
+                    FilterPickerOptionsStore.shared.invalidate()
+                    showResult(
+                        title: "Remove Unused Tags",
+                        message: ok ? "\(count) unused tags deleted." : "The server rejected the deletion."
+                    )
+                }
+            } catch {
+                AppLog.error("❌ Deleting unused tags failed: \(error.localizedDescription)")
+                await MainActor.run {
+                    unusedTags = []
+                    showResult(title: "Remove Unused Tags", message: "Could not delete the tags.")
+                }
+            }
+        }
+    }
+
     private func showResult(title: String, message: String) {
         DispatchQueue.main.async {
             runningTask = nil

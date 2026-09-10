@@ -1,0 +1,6 @@
+mutation TagsMerge($input: TagsMergeInput!) {
+  tagsMerge(input: $input) {
+    id
+    name
+  }
+}

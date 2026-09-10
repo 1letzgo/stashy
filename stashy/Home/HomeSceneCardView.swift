@@ -61,12 +61,14 @@ struct HomeSceneCardView: View {
             VStack {
                 HStack(alignment: .top) {
                     if let studio = scene.studio {
-                        Text(studio.name.uppercased())
-                            .font(.system(size: isLarge ? 9 : 8, weight: .bold))
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 8).padding(.vertical, 4)
-                            .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                            .clipShape(Capsule())
+                        SceneStudioBadge(
+                            studio: studio,
+                            logoHeight: isLarge ? 14 : 12,
+                            maxLogoWidth: isLarge ? 130 : 100,
+                            font: .system(size: isLarge ? 9 : 8),
+                            fontWeight: .bold,
+                            uppercased: true
+                        )
                     }
                     Spacer()
                     if let duration = scene.files?.first?.duration ?? scene.sceneDuration {

@@ -295,6 +295,22 @@ private struct GroupsViewContent: View {
         }
     }
 
+    /// Setzt den in Settings gewählten Standardfilter, sofern noch keiner aktiv ist.
+    /// Gibt zurück, ob etwas gesetzt wurde.
+    @discardableResult
+    private func applySettingsDefaultFilterIfNeeded() -> Bool {
+        guard !hideTitle, selectedFilter == nil else { return false }
+        guard !coordinator.noDefaultFilter else { return false }
+        guard let defaultId = TabManager.shared.getDefaultFilterId(for: .groups),
+              let filter = viewModel.savedFilters[defaultId] else { return false }
+
+        selectedFilter = filter
+        // Keep the sheet's preset row in sync so the default shows as selected.
+        groupsPresetRowSelection = ListLivePresetTag.serverRow(filter.id)
+        groupsCriteriaDocument.load(filter.criteriaObjectFilter())
+        return true
+    }
+
     // Search function
     private func performSearch(isInitialLoad: Bool = true) {
         viewModel.fetchGroups(
@@ -512,10 +528,13 @@ private struct GroupsViewContent: View {
                 coordinator.activeSearchText = ""
             }
 
-            // Initial fetch if empty
-            if viewModel.groups.isEmpty {
-                // If no default filter is set, fetch immediately
-                if TabManager.shared.getDefaultFilterId(for: .groups) == nil {
+            // Waren die Filter schon geladen, feuert `onChange(of: savedFilters)` nie -
+            // dann bliebe der Standardfilter ungenutzt. Hier direkt anwenden.
+            if applySettingsDefaultFilterIfNeeded() {
+                performSearch()
+            } else if TabManager.shared.getDefaultFilterId(for: .groups) == nil {
+                // Ohne Standardfilter muss nicht darauf gewartet werden.
+                if viewModel.groups.isEmpty {
                     performSearch()
                 }
             }
@@ -523,12 +542,11 @@ private struct GroupsViewContent: View {
         .onChange(of: viewModel.savedFilters) { oldValue, newValue in
             // Apply default filter if set and none selected yet
             if selectedFilter == nil {
-                if let defaultId = TabManager.shared.getDefaultFilterId(for: .groups),
-                   let filter = newValue[defaultId] {
-                    selectedFilter = filter
-                    if viewModel.groups.isEmpty {
-                        performSearch()
-                    }
+                if applySettingsDefaultFilterIfNeeded() {
+                    // Immer nachladen: `CatalogsView` hält ein ViewModel über alle Sub-Tabs
+                    // warm, die Liste ist beim Öffnen also selten leer. Unter der alten
+                    // Bedingung stand der Filter nur in der Variable und wirkte nie.
+                    performSearch()
                 } else if !viewModel.isLoadingSavedFilters && viewModel.groups.isEmpty {
                     performSearch()
                 }

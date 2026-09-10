@@ -18,6 +18,9 @@ struct SceneCardView: View {
     @StateObject private var previewPlayer = AetherPreviewPlayer()
     @State private var isPreviewing = false
     @State private var isPressing = false
+    /// Nur nach einem echten Start den Pool freigeben; `onDisappear` feuert beim
+    /// Scrollen für jede Zelle, die meisten haben nie eine Vorschau gestartet.
+    @State private var didStartPreview = false
     
     var body: some View {
 
@@ -76,16 +79,9 @@ struct SceneCardView: View {
             // Top Overlay (Studio and Date)
             VStack {
                 HStack(alignment: .top) {
-                    // Studio - Top Left
+                    // Studio - Top Left (logo when the studio has one, otherwise the name)
                     if let studio = scene.studio {
-                        Text(studio.name)
-                            .font(.caption)
-                            .fontWeight(.medium)
-                            .foregroundColor(.white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 4)
-                            .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                            .clipShape(Capsule())
+                        SceneStudioBadge(studio: studio)
                     }
                     
                     Spacer()
@@ -198,6 +194,7 @@ struct SceneCardView: View {
         guard let previewURL = scene.previewURL else { return }
         
         previewPlayer.start(url: previewURL)
+        didStartPreview = true
 
         withAnimation(.easeIn(duration: 0.2)) {
             isPreviewing = true
@@ -205,6 +202,8 @@ struct SceneCardView: View {
     }
     
     private func stopPreview() {
+        guard didStartPreview else { return }
+        didStartPreview = false
         withAnimation(.easeOut(duration: 0.2)) {
             isPreviewing = false
         }

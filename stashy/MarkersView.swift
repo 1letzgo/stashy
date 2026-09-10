@@ -354,6 +354,21 @@ private struct MarkersViewContent: View {
         markerLiveChips = m
     }
 
+    /// Sets the Settings-configured default filter for this tab, if one is configured and no
+    /// filter is active yet. Mirrors the state assignments of the manual server-filter selection
+    /// path (minus the fetch) so the preset row and chips stay in sync. Returns whether it applied one.
+    @discardableResult
+    private func applySettingsDefaultFilterIfNeeded() -> Bool {
+        guard selectedFilter == nil else { return false }
+        guard let defaultId = TabManager.shared.getDefaultMarkerFilterId(for: .markers),
+              let filter = viewModel.savedFilters[defaultId] else { return false }
+
+        selectedFilter = filter
+        liveSheetPresetSelection = SceneLivePresetTag.serverRow(filter.id)
+        syncMarkerChipsFromSelectedFilter()
+        return true
+    }
+
     private var markerLiveMinRating: Binding<Int> {
         Binding(get: { markerLiveChips.minRating }, set: { markerLiveChips.minRating = $0 })
     }
@@ -553,7 +568,11 @@ private struct MarkersViewContent: View {
                 return
             }
             
-            if TabManager.shared.getDefaultMarkerFilterId(for: .markers) == nil || !viewModel.savedFilters.isEmpty {
+            // Were saved filters already loaded (warm view model from another catalog sub-tab),
+            // `onChange(of: savedFilters)` below never fires - apply the default here instead.
+            if applySettingsDefaultFilterIfNeeded() {
+                performSearch()
+            } else if TabManager.shared.getDefaultMarkerFilterId(for: .markers) == nil || !viewModel.savedFilters.isEmpty {
                 if viewModel.sceneMarkers.isEmpty {
                     performSearch()
                 }
@@ -587,12 +606,9 @@ private struct MarkersViewContent: View {
             performSearch()
         }
         .sceneLiveUpdates(using: viewModel)
-        .onChange(of: viewModel.savedFilters) { oldValue, newValue in
+        .onChange(of: viewModel.savedFilters) { _, _ in
             if selectedFilter == nil {
-                if let defaultId = TabManager.shared.getDefaultMarkerFilterId(for: .markers),
-                   let filter = newValue[defaultId] {
-                    selectedFilter = filter
-                    syncMarkerChipsFromSelectedFilter()
+                if applySettingsDefaultFilterIfNeeded() {
                     performSearch()
                 } else if !viewModel.isLoadingSavedFilters {
                     performSearch()
@@ -632,7 +648,7 @@ private struct MarkersViewContent: View {
                 ForEach(viewModel.sceneMarkers) { marker in
                     if let markerScene = marker.scene {
                         let mappedScene = markerScene.toScene().withResumeTime(marker.seconds)
-                        NavigationLink(destination: SceneDetailView(scene: mappedScene, autoPlay: true)) {
+                        NavigationLink(destination: LazyView { SceneDetailView(scene: mappedScene, autoPlay: true) }) {
                             MarkerCardView(marker: marker)
                         }
                         .buttonStyle(.plain)
