@@ -23,7 +23,7 @@ struct AITagsSettingsView: View {
         List {
             if !isUnlocked {
                 Section {
-                    Label("Suggestions require stashy+", systemImage: "lock.fill")
+                    Label("Tag Suggestions & Similar Scenes require stashy+", systemImage: "lock.fill")
                         .foregroundColor(.secondary)
                         .stashyGroupedSettingsRow()
                     stashyScrollingSectionFooter("Unlock stashy+ to use this feature.")
@@ -36,7 +36,7 @@ struct AITagsSettingsView: View {
         }
         .stashySettingsList()
         .applyAppBackground()
-        .stashySettingsDetailChrome("Suggestions")
+        .stashySettingsDetailChrome("Tag Suggestions & Similar Scenes")
         .task { await manager.loadIfNeeded() }
     }
 
@@ -44,7 +44,7 @@ struct AITagsSettingsView: View {
 
     private var togglesSection: some View {
         Section {
-            stashyScrollingSectionHeader("Suggestions", isBeta: true)
+            stashyScrollingSectionHeader("Features", isBeta: true)
 
             Toggle(isOn: enabledBinding) {
                 Label("Tag suggestions", systemImage: "tag")
