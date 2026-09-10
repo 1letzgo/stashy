@@ -373,6 +373,13 @@ struct TVChannelPlayerView: View {
             } else if session.isLoading || session.isSwitching {
                 ProgressView()
                     .scaleEffect(1.6)
+                // Der Ladezweig ist nur ein Spinner auf Schwarz; ohne Fokus-Ziel erreicht
+                // die Menu-Taste kein `onExitCommand`. Nur hier — sobald der Player da
+                // ist, gehört der Fokus ihm (Transport, Panel).
+                Color.clear
+                    .contentShape(Rectangle())
+                    .focusable(true)
+                    .onExitCommand { close() }
             }
 
             if let errorMessage = session.errorMessage {
@@ -386,19 +393,15 @@ struct TVChannelPlayerView: View {
                     Button("Close") { close() }
                         .font(.title3)
                 }
+                .onExitCommand { close() }
             }
         }
-        // Nur solange keine Engine läuft: der Ladezweig ist nur ein Spinner auf
-        // Schwarz, ohne Fokus-Ziel erreicht die Menu-Taste `onExitCommand` nicht.
-        //
-        // Sobald der Player da ist, **muss** der Fokus bei ihm liegen — ein
-        // fokussierbarer Container darüber nimmt ihm die Transport-Steuerung,
-        // also Pause, Scrubbing und „Up Next". Im Fehlerzweig übernimmt der
-        // Close-Button die Rolle des Ankers.
-        .focusable(!session.player.hasEngine && session.errorMessage == nil)
+        // Kein `focusable`/`onExitCommand` am Container: ein Fokus-Wrapper über dem
+        // Player blockierte die Richtungstasten im ausgeklappten Panel (Fokus blieb
+        // auf „Next" hängen). Menu behandelt der Player selbst (`onExit`), der
+        // Fehlerzweig über den Close-Button, der Ladezweig über seinen Fokus-Anker.
         .onAppear { session.start() }
         .onDisappear { session.teardown() }
-        .onExitCommand { close() }
     }
 
     /// Channel name plus position, shown in the player's native info panel.

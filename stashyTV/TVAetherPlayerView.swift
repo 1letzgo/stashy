@@ -55,6 +55,8 @@ struct TVAetherPlayerView<Panel: View>: View {
             }
         }
         .ignoresSafeArea()
+        // Sonst schließt tvOS das Cover bei Menu selbst, bevor `onExitCommand` dran ist.
+        .interactiveDismissDisabled()
         .onDisappear { onDisappear?() }
     }
 
@@ -149,6 +151,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     @FocusState private var panelFocus: PanelFocusTarget?
     @Namespace private var panelScope
     @State private var isPanelOpen = false
+    @State private var panelOpenedAt = Date.distantPast
     @State private var showTransport = true
     @State private var hideWork: DispatchWorkItem?
 
@@ -206,6 +209,16 @@ private struct TVAetherPlayerContent<Panel: View>: View {
         .onChange(of: engine.hasFirstFrame) { _, ready in
             if ready && !isPanelOpen { isPlayerFocused = true }
         }
+        .onChange(of: panelFocus) { _, new in
+            guard new == .closer, isPanelOpen else { return }
+            // Direkt nach dem Öffnen kann der Fokus-Engine zuerst auf der Schließ-Zeile
+            // landen — dann nicht schließen, sondern auf die Einstiegsreihe schieben.
+            if Date().timeIntervalSince(panelOpenedAt) < 0.6 {
+                if let target = firstPanelTarget { panelFocus = target }
+                return
+            }
+            closePanel()
+        }
         .onChange(of: isPanelOpen) { _, open in
             if open {
                 focusPanelEntry()
@@ -217,6 +230,9 @@ private struct TVAetherPlayerContent<Panel: View>: View {
         }
         .animation(.easeInOut(duration: 0.2), value: showTransport)
         .animation(.easeInOut(duration: 0.2), value: isPanelOpen)
+        // Menu einmal an der Wurzel: gilt für den Input-Layer wie für die Panel-Buttons
+        // (alle sind Nachfahren). Bei offenem Panel schließt `handleExit` nur das Panel.
+        .onExitCommand { handleExit() }
     }
 
     /// Das einzige Fokus-Ziel bei geschlossenem Panel: `AetherPlayerSurface` kann
@@ -230,7 +246,6 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             .onTapGesture { handleSelect() }
             .onPlayPauseCommand { handlePlayPause() }
             .onMoveCommand { handleMove($0) }
-            .onExitCommand { handleExit() }
             .ignoresSafeArea()
     }
 
@@ -453,6 +468,15 @@ private struct TVAetherPlayerContent<Panel: View>: View {
         VStack {
             Spacer()
             VStack(alignment: .leading, spacing: 26) {
+                // „Nach oben" aus der obersten Reihe: der Fokus wandert hierher und
+                // `onChange(of: panelFocus)` schließt das Panel. Ein `onMoveCommand`
+                // am Panel würde stattdessen alle Richtungstasten schlucken.
+                Color.clear
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 1)
+                    .focusable(true)
+                    .focused($panelFocus, equals: .closer)
+
                 if canGoPrevious || canGoNext {
                     HStack(spacing: 24) {
                         if canGoPrevious {
@@ -514,16 +538,17 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             .focusScope(panelScope)
         }
         .ignoresSafeArea()
-        // Menu schließt das Panel. Kein `onMoveCommand` hier: dessen Recognizer läge
-        // über den Buttons und würde die Richtungstasten schlucken, statt — wie der
-        // frühere Kommentar annahm — nur die von keiner Reihe genommenen zu sehen.
-        .onExitCommand { closePanel() }
+        // Kein `onMoveCommand`/`onExitCommand` hier: die Recognizer lägen über den
+        // Buttons. Menu wird am Wurzel-Container behandelt (`handleExit`).
     }
 
     /// Fokus-Anker des Panels. `nil` als `equals`-Wert gibt es bei `@FocusState` nicht,
     /// also wird der Modifier nur auf dem Einstiegs-Button gesetzt.
     fileprivate enum PanelFocusTarget: Hashable {
         case nav, audio, subtitles
+        /// Unsichtbare Zeile über der obersten Reihe: landet der Fokus dort, hat der
+        /// Nutzer „nach oben" aus dem Panel gedrückt — das Panel geht zu.
+        case closer
     }
 
     @ViewBuilder
@@ -617,6 +642,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
         switch direction {
         case .down:
             cancelScrub()
+            panelOpenedAt = Date()
             isPanelOpen = true
             cancelAutoHide()
         case .up:
