@@ -52,7 +52,8 @@ struct SceneVideoPlayerCard: View {
                                 liveCaptionText: subtitleController.isLiveCaptionsActive
                                     ? subtitleController.currentText
                                     : "",
-                                onToggleFullscreen: { isFullscreen = true }
+                                onToggleFullscreen: { isFullscreen = true },
+                                markerSeconds: (activeScene.sceneMarkers ?? []).map(\.seconds)
                             )
                         }
                     }

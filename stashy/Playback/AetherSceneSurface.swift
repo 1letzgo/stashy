@@ -27,6 +27,8 @@ struct AetherSceneSurface: View {
     var onToggleFullscreen: (() -> Void)?
     /// Only drives the button's glyph — the host owns the actual presentation state.
     var isFullscreen: Bool = false
+    /// Marker positions (seconds) drawn as dots on the time bar. Empty hides them.
+    var markerSeconds: [Double] = []
 
     @ObservedObject private var tabManager = TabManager.shared
     @StateObject private var pip = AetherPictureInPictureCoordinator()
@@ -309,6 +311,7 @@ struct AetherSceneSurface: View {
                         }
                     }
                     HStack(spacing: 8) {
+                        if isFullscreen { rotateButton }
                         Spacer(minLength: 0)
                         if engine.isUsingTranscodeFallback { transcodeTag }
                         bottomTrailingControls
@@ -432,6 +435,50 @@ struct AetherSceneSurface: View {
     }
 
     // MARK: Bottom trailing
+
+    /// Fullscreen only: flips the interface between portrait and landscape through the window
+    /// scene, so it works with the device's orientation lock on — the reason it exists.
+    @ViewBuilder
+    private var rotateButton: some View {
+        Button {
+            HapticManager.light()
+            toggleInterfaceOrientation()
+            revealControls()
+        } label: {
+            glassCircle(systemName: "rotate.right", diameter: chromeButtonSize)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Rotate")
+    }
+
+    private func toggleInterfaceOrientation() {
+        guard let scene = UIApplication.shared.connectedScenes
+            .compactMap({ $0 as? UIWindowScene })
+            .first(where: { $0.activationState == .foregroundActive })
+            ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first
+        else { return }
+        let target: UIInterfaceOrientationMask = scene.interfaceOrientation.isLandscape ? .portrait : .landscapeRight
+        // The override keeps the new orientation until the player leaves fullscreen; a bare
+        // geometry request alone snaps back on the next orientation pass.
+        AppDelegate.orientationOverride = target
+        scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+        scene.requestGeometryUpdate(.iOS(interfaceOrientations: target)) { error in
+            AppLog.debug("Rotate request failed: \(error)")
+        }
+    }
+
+    /// Back to following the device once fullscreen goes away.
+    static func releaseOrientationOverride() {
+        guard AppDelegate.orientationOverride != .all else { return }
+        AppDelegate.orientationOverride = .all
+        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
+        scenes.forEach { $0.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations() }
+        // With the device's lock on, the phone would otherwise stay in landscape after the
+        // player is gone; the rest of the app is a portrait UI there.
+        if UIDevice.current.userInterfaceIdiom == .phone {
+            scenes.forEach { $0.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { _ in } }
+        }
+    }
 
     @ViewBuilder
     private var bottomTrailingControls: some View {
@@ -736,6 +783,9 @@ struct AetherSceneSurface: View {
                     Capsule()
                         .fill(Color.white)
                         .frame(width: width * CGFloat(progress))
+                    if duration > 0 {
+                        markerDots(barWidth: width, duration: duration)
+                    }
                 }
                 .frame(height: 4)
                 .frame(maxHeight: .infinity)
@@ -774,6 +824,22 @@ struct AetherSceneSurface: View {
         .padding(.horizontal, 16)
         .frame(height: timeBarHeight)
         .stashyGlass(shape: Capsule())
+    }
+
+    /// One small dot per marker on the track; markers outside the duration are skipped.
+    @ViewBuilder
+    private func markerDots(barWidth: CGFloat, duration: Double) -> some View {
+        let dot: CGFloat = isCompact ? 5 : 6
+        ForEach(Array(markerSeconds.enumerated()), id: \.offset) { _, seconds in
+            if seconds >= 0, seconds <= duration {
+                Circle()
+                    .fill(Color.white)
+                    .overlay(Circle().stroke(Color.black.opacity(0.35), lineWidth: 0.5))
+                    .frame(width: dot, height: dot)
+                    .offset(x: min(max(0, barWidth * CGFloat(seconds / duration) - dot / 2), barWidth - dot))
+            }
+        }
+        .allowsHitTesting(false)
     }
 
     /// Floating still above the scrub thumb, clamped to the bar so it never leaves the surface.

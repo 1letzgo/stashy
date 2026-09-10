@@ -579,7 +579,8 @@ struct SceneDetailView: View {
                         ? subtitleController.currentText
                         : "",
                     onToggleFullscreen: { isFullscreen = false },
-                    isFullscreen: true
+                    isFullscreen: true,
+                    markerSeconds: (activeScene.sceneMarkers ?? []).map(\.seconds)
                 )
                 // Only the black backdrop bleeds under the notch and home indicator; the
                 // surface (and with it the transport) stays inside the safe area so every
@@ -587,6 +588,7 @@ struct SceneDetailView: View {
             }
         }
         .statusBarHidden(true)
+        .onDisappear { AetherSceneSurface.releaseOrientationOverride() }
         // Best effort: an attached keyboard (iPad / Mac) skips ±15 s. Deliberately without
         // `.focusable()` — that steals the taps the transport needs.
         .onKeyPress(.leftArrow) {

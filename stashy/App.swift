@@ -13,6 +13,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var backgroundSessionCompletionHandler: (() -> Void)?
 
+    /// Temporary orientation override (fullscreen player's rotate button). `.all` = follow the
+    /// device. Held here because SwiftUI has no supported-orientations hook of its own.
+    static var orientationOverride: UIInterfaceOrientationMask = .all
+
+    func application(_ application: UIApplication, supportedInterfaceOrientationsFor window: UIWindow?) -> UIInterfaceOrientationMask {
+        Self.orientationOverride
+    }
+
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         _ = AppIconManager.shared
         // Entitlements (lifetime IAP, paid-app grandfathering) must sync at launch,
