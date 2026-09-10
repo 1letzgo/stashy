@@ -78,11 +78,22 @@ class NavigationCoordinator: ObservableObject {
         if let debugSubTab = UserDefaults.standard.string(forKey: "stashyDebugCatalogueSubTab"), !debugSubTab.isEmpty {
             catalogueSubTab = debugSubTab
         }
-        // `-stashyDebugOpenStudio "<id>|<name>"` pushes that studio detail from the Studios catalogue.
+        // `-stashyDebugOpenStudio "<id>|<name>[|scenes|galleries|images|performers]"` pushes that
+        // studio detail from the Studios catalogue; the optional counts mimic a real grid object.
         if let raw = UserDefaults.standard.string(forKey: "stashyDebugOpenStudio"), !raw.isEmpty {
-            let parts = raw.split(separator: "|", maxSplits: 1).map(String.init)
+            let parts = raw.split(separator: "|", omittingEmptySubsequences: false).map(String.init)
+            func count(_ i: Int) -> Int? { parts.count > i ? Int(parts[i]) : nil }
             catalogueSubTab = "Studios"
-            studioToOpen = Studio(id: parts[0], name: parts.count > 1 ? parts[1] : "Studio")
+            studioToOpen = Studio(
+                id: parts[0], name: parts.count > 1 ? parts[1] : "Studio",
+                sceneCount: count(2) ?? 0, performerCount: count(5), galleryCount: count(3), imageCount: count(4)
+            )
+        }
+        // `-stashyDebugStudiosSort nameDesc` (StudioSortOption raw value) sets the persistent
+        // Studios sort, so a specific studio can be brought to the top of the grid.
+        if let raw = UserDefaults.standard.string(forKey: "stashyDebugStudiosSort"),
+           StashDBViewModel.StudioSortOption(rawValue: raw) != nil {
+            TabManager.shared.setPersistentSortOption(for: .studios, option: raw)
         }
         // `-stashyDebugSelectedTab settings` (AppTab raw value) selects that main tab at launch.
         if let raw = UserDefaults.standard.string(forKey: "stashyDebugSelectedTab"), let tab = AppTab(rawValue: raw) {

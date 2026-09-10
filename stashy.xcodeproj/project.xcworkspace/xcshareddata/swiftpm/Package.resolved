@@ -1,5 +1,5 @@
 {
-  "originHash" : "241bb01975ac49dcd222bf7d5a7833248f0e5a78b74b24becaee99faa70abb79",
+  "originHash" : "cf68f451986d41aa806707fcba6fc7b4f07760d1cbab47e4913aeabfbacba855",
   "pins" : [
     {
       "identity" : "aetherengine",
@@ -29,21 +29,21 @@
       }
     },
     {
-      "identity" : "pocketsvg",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/pocketsvg/PocketSVG.git",
-      "state" : {
-        "revision" : "890a94e60c59cdf055b4d549dd246f60c6b25b5e",
-        "version" : "2.8.0"
-      }
-    },
-    {
       "identity" : "smbclient",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/kishikawakatsumi/SMBClient",
       "state" : {
         "revision" : "e636c2b2458930770932a36d311ec9d478575b90",
         "version" : "0.3.1"
+      }
+    },
+    {
+      "identity" : "swiftdraw",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/swhitty/SwiftDraw",
+      "state" : {
+        "revision" : "82699f4bdf2f075793cfa0d392eb27c59b41a3fe",
+        "version" : "0.29.0"
       }
     }
   ],

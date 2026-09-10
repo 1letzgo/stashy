@@ -75,7 +75,7 @@ No test target is wired into the Xcode project. `stashyTests/` holds Swift Testi
 
 Shared code with `#if !os(tvOS)` guards. Many iOS-only files guard their *entire* contents, so a new iOS-only file still compiles into the tvOS target harmlessly — but tvOS UI is a separate hand-written surface in `stashyTV/` (`TV*` views, focus-based navigation, remote input, simplified layouts). tvOS lacks Keychain, haptics, UIKit scene delegates, and gesture-heavy components.
 
-`PocketSVG` (SPM) is linked to the **stashyTV target only**.
+`SwiftDraw` (SPM) is linked to **both** targets. Every studio image (PNG/JPG/SVG) goes through `StudioLogoStore` (`stashy/StudioLogoStore.swift`: fetch → SwiftDraw raster → alpha trim → memory + disk cache). Never render an SVG live in a `WKWebView` or per-card.
 
 ## Key Components
 

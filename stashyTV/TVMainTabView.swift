@@ -29,6 +29,29 @@ struct TVMainTabView: View {
     @State private var navigationStore = TVNavigationStore()
     @State private var selectedTab: TVRootTab = .home
 
+    init() {
+        #if DEBUG
+        // Simulator automation (UserDefaults argument domain), no remote input needed:
+        // `-stashyDebugTVTab studios` selects a root tab, `-stashyDebugStudiosSort nameDesc`
+        // sets the persistent Studios sort, `-stashyDebugTVOpenStudio "<id>|<name>"` pushes
+        // that studio detail onto the Studios stack.
+        if let raw = UserDefaults.standard.string(forKey: "stashyDebugTVTab"), let tab = TVRootTab(rawValue: raw) {
+            _selectedTab = State(initialValue: tab)
+        }
+        if let raw = UserDefaults.standard.string(forKey: "stashyDebugStudiosSort"),
+           StashDBViewModel.StudioSortOption(rawValue: raw) != nil {
+            TabManager.shared.setPersistentSortOption(for: .studios, option: raw)
+        }
+        if let raw = UserDefaults.standard.string(forKey: "stashyDebugTVOpenStudio"), !raw.isEmpty {
+            let parts = raw.split(separator: "|", maxSplits: 1).map(String.init)
+            let store = TVNavigationStore()
+            store.binding(for: .studios).wrappedValue.append(TVStudioLink(id: parts[0], name: parts.count > 1 ? parts[1] : "Studio"))
+            _navigationStore = State(initialValue: store)
+            _selectedTab = State(initialValue: .studios)
+        }
+        #endif
+    }
+
     /// Rückfalltür auf die alte obere Leiste. Das Sidebar-Verhalten lässt sich
     /// ohne Gerät nicht verifizieren — bleibt sie unbrauchbar, kommt der Nutzer
     /// hierüber zurück, ohne dass neu gebaut werden muss.

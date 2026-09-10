@@ -25,6 +25,21 @@ enum AppTheme: String, CaseIterable, Identifiable {
     }
 }
 
+/// How studio logos are rendered everywhere (scene cards, studio tiles, tvOS).
+enum StudioLogoStyle: String, CaseIterable, Identifiable {
+    case original
+    case white
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .original: return "Original"
+        case .white: return "White"
+        }
+    }
+}
+
 class AppearanceManager: ObservableObject {
     static let shared = AppearanceManager()
     
@@ -53,6 +68,13 @@ class AppearanceManager: ObservableObject {
         }
     }
 
+    /// Studio logos: original colours or a white template (Settings › Design › Logo).
+    @Published var studioLogoStyle: StudioLogoStyle {
+        didSet {
+            UserDefaults.standard.set(studioLogoStyle.rawValue, forKey: kStudioLogoStyle)
+        }
+    }
+
 
     var currentTheme: AppTheme {
         if preferredTheme == .system {
@@ -76,6 +98,7 @@ class AppearanceManager: ObservableObject {
     private let kOCounterIcon = "kOCounterIcon"
     private let kPreferredTheme = "kPreferredTheme"
     private let kEditModeEnabled = "kEditModeEnabled"
+    private let kStudioLogoStyle = "kStudioLogoStyle"
 
 
     private init() {
@@ -87,6 +110,7 @@ class AppearanceManager: ObservableObject {
         self.preferredTheme = AppTheme(rawValue: savedTheme) ?? .darkBlue
         let editKeyExists = UserDefaults.standard.object(forKey: "kEditModeEnabled") != nil
         self.isEditModeEnabled = editKeyExists ? UserDefaults.standard.bool(forKey: "kEditModeEnabled") : true
+        self.studioLogoStyle = StudioLogoStyle(rawValue: UserDefaults.standard.string(forKey: "kStudioLogoStyle") ?? "") ?? .original
 
         self.loadColor()
     }

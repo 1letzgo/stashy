@@ -53,13 +53,14 @@ extension View {
         @ViewBuilder _ content: @escaping () -> Content
     ) -> some View {
         let showBar = catalogChrome?.floatingBarVisible(isPresented: isPresented) ?? isPresented
-        return Group {
+        // Immer dieselbe Struktur: nur die Bar ist bedingt, nicht der `safeAreaInset`.
+        // Ein `if showBar { self.safeAreaInset… } else { self }` wechselt den View-Zweig
+        // und reißt damit alles unter `self` ab — inklusive gepushter Detailseiten
+        // (`navigationDestination` / `NavigationLink`), die dann sofort neu gepusht
+        // werden: Endlosschleife aus Laden und Verschwinden bei leeren Listen.
+        return self.safeAreaInset(edge: .bottom, spacing: 0) {
             if showBar {
-                self.safeAreaInset(edge: .bottom, spacing: 0) {
-                    FloatingActionBar(content: content)
-                }
-            } else {
-                self
+                FloatingActionBar(content: content)
             }
         }
     }

@@ -807,10 +807,6 @@ private struct ImagesViewBody: View {
         return list
     }
 
-    private var imagesFilterMenuActive: Bool {
-        imageListFilters.selectedFilter != nil || !imageListFilters.catalogPresetRowSelection.isEmpty
-    }
-
     /// Download / sync control for the gallery currently being browsed.
     private func galleryDownloadSlot(_ gallery: Gallery) -> CatalogChromeSlot {
         let isDownloading = downloadManager.activeDownloads[gallery.id] != nil
@@ -839,59 +835,6 @@ private struct ImagesViewBody: View {
         )
     }
 
-    @ViewBuilder
-    private var quickFilterMenuContent: some View {
-        let serverFilters = imageListFilters.sortedServerImageFilters(viewModel: viewModel)
-        let selection = imageListFilters.catalogPresetRowSelection
-        Group {
-            Button {
-                imageListFilters.catalogPresetRowSelection = ""
-            } label: {
-                HStack {
-                    Text("No Filter")
-                    if selection.isEmpty && imageListFilters.selectedFilter == nil {
-                        Image(systemName: "checkmark")
-                    }
-                }
-            }
-
-            if !serverFilters.isEmpty {
-                Section("Saved Filters") {
-                    ForEach(serverFilters) { filter in
-                        Button {
-                            imageListFilters.catalogPresetRowSelection = ListLivePresetTag.serverRow(filter.id)
-                        } label: {
-                            HStack {
-                                Text(filter.name)
-                                if selection == ListLivePresetTag.serverRow(filter.id)
-                                    || (selection.isEmpty && imageListFilters.selectedFilter?.id == filter.id) {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if !imageListFilters.localCatalogPresets.isEmpty {
-                Section("Presets") {
-                    ForEach(imageListFilters.localCatalogPresets) { preset in
-                        Button {
-                            imageListFilters.catalogPresetRowSelection = ListLivePresetTag.localRow(preset.id)
-                        } label: {
-                            HStack {
-                                Text(preset.name)
-                                if selection == ListLivePresetTag.localRow(preset.id) {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     /// Single chrome call site: legacy floating bar or native toolbar, decided by the environment flag.
     private var imagesChromeConfig: CatalogChromeConfig {
         let cardColumns = effectiveCardColumns
@@ -916,12 +859,6 @@ private struct ImagesViewBody: View {
                         tabManager.toggleCatalogCardColumns(for: cardColumnScope)
                     }
                 }
-            ),
-            // Feeds → Pics: quick filter lives in the Reels navbar.
-            quickFilter: feedsEmbedded ? nil : CatalogQuickFilterMenuModel(
-                isActive: imagesFilterMenuActive,
-                accessibilityLabel: "Filter",
-                menuContent: AnyView(quickFilterMenuContent)
             ),
             filterSort: CatalogChromeSlot(
                 systemImage: "slider.horizontal.3",
@@ -1308,8 +1245,7 @@ struct ImageGroupCatalogCell: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                        .clipShape(Capsule())
+                        .stashyGlass(shape: Capsule())
                         .padding(8)
                         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                         .allowsHitTesting(false)
@@ -1707,8 +1643,7 @@ struct ImageThumbnailCard: View {
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                                .clipShape(Capsule())
+                                .stashyGlass(shape: Capsule())
                         }
 
                         Spacer()
@@ -1720,8 +1655,7 @@ struct ImageThumbnailCard: View {
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                                .clipShape(Capsule())
+                                .stashyGlass(shape: Capsule())
                         }
                     }
                     .padding(8)
@@ -1751,8 +1685,7 @@ struct ImageThumbnailCard: View {
                                 .foregroundColor(.white.opacity(0.9))
                                 .padding(.horizontal, 6)
                                 .padding(.vertical, 3)
-                                .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                                .clipShape(Capsule())
+                                .stashyGlass(shape: Capsule())
                         }
                     }
                 }

@@ -95,8 +95,7 @@ struct SceneCardView: View {
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 8)
                                 .padding(.vertical, 4)
-                                .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                                .clipShape(Capsule())
+                                .stashyGlass(shape: Capsule())
                         }
                         
                         if DownloadManager.shared.isDownloaded(id: scene.id) {
@@ -143,8 +142,7 @@ struct SceneCardView: View {
                         .foregroundColor(.white.opacity(0.9))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
-                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                        .clipShape(Capsule())
+                        .stashyGlass(shape: Capsule())
                     }
 
                     // Performers Count - Bottom Right
@@ -157,8 +155,7 @@ struct SceneCardView: View {
                         .foregroundColor(.white.opacity(0.9))
                         .padding(.horizontal, 6)
                         .padding(.vertical, 3)
-                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                        .clipShape(Capsule())
+                        .stashyGlass(shape: Capsule())
                     }
 
                 }

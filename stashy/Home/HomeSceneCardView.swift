@@ -76,8 +76,7 @@ struct HomeSceneCardView: View {
                             .font(.system(size: isLarge ? 10 : 10, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 8).padding(.vertical, 4)
-                            .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                            .clipShape(Capsule())
+                            .stashyGlass(shape: Capsule())
                     }
                     if DownloadManager.shared.isDownloaded(id: scene.id) {
                         Image(systemName: "checkmark.circle.fill")

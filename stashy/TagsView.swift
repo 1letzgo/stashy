@@ -1783,7 +1783,6 @@ struct TagImageView: View {
     enum ImageLoadState {
         case loading
         case success(Image)
-        case successSVG(Data, String)
         case failure
     }
 
@@ -1803,12 +1802,8 @@ struct TagImageView: View {
                     .resizable()
                     .scaledToFill()
             } else if let data = loader.imageData, isSVG(data) {
-                let dataString = String(data: data, encoding: .utf8) ?? ""
-                ZStack {
-                    SVGWebView(svgData: data, svgString: dataString)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    Color.clear.contentShape(Rectangle())
-                }
+                RasterizedSVGImage(data: data)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 Rectangle()
                     .fill(appearanceManager.tintColor)

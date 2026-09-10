@@ -27,11 +27,14 @@ struct TVApp: App {
         // - `.playback`: erlaubt Audio, auch wenn der Silent-Switch aktiv ist (irrelevant auf tvOS,
         //   wichtig aber für Audio-Routing/Mixing-Verhalten)
         // - dadurch wird Hintergrund-/System-Audio ordnungsgemäß unterbrochen statt zu konkurrieren.
-        do {
-            try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
-            try AVAudioSession.sharedInstance().setActive(true, options: [])
-        } catch {
-            print("⚠️ AVAudioSession setup failed: \(error)")
+        // `setActive` blockiert; auf dem Main Thread meldet Xcode ein Hang-Risiko.
+        Task.detached(priority: .userInitiated) {
+            do {
+                try AVAudioSession.sharedInstance().setCategory(.playback, mode: .moviePlayback, options: [])
+                try AVAudioSession.sharedInstance().setActive(true, options: [])
+            } catch {
+                AppLog.error("AVAudioSession setup failed: \(error)")
+            }
         }
     }
 

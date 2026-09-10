@@ -35,10 +35,10 @@ struct AcknowledgementsView: View {
               license: "BSD-2-Clause",
               note: nil,
               urlString: "https://code.videolan.org/videolan/dav1d"),
-        Entry(name: "PocketSVG",
-              license: "MIT",
+        Entry(name: "SwiftDraw",
+              license: "zlib",
               note: nil,
-              urlString: "https://github.com/pocketsvg/PocketSVG")
+              urlString: "https://github.com/swhitty/SwiftDraw")
     ]
 
     private let footerText = "stashy uses the components above. Their licenses apply in addition to stashy's own terms."

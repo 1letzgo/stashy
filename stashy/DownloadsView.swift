@@ -168,8 +168,7 @@ struct DownloadedSceneCard: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 4)
                         .padding(.vertical, 2)
-                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                        .clipShape(Capsule())
+                        .stashyGlass(shape: Capsule())
                         .padding(4)
                         .frame(maxWidth: 130, maxHeight: 100, alignment: .bottomTrailing)
                 }
@@ -1019,8 +1018,7 @@ struct DownloadedGalleryDetailView: View {
                                         .foregroundColor(.white)
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 4)
-                                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                                        .clipShape(Capsule())
+                                        .stashyGlass(shape: Capsule())
                                 }
                             }
                             .padding(8)

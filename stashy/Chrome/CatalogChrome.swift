@@ -52,9 +52,9 @@ struct CatalogSlotSet {
     var isPresented: Bool = true
     var columns: CatalogChromeSlot? = nil              // slot 1
     var quickFilter: CatalogQuickFilterMenuModel? = nil // slot 2
-    var filterSort: CatalogChromeSlot? = nil            // slot 3
-    var contextual: CatalogChromeSlot? = nil            // slot 4
-    var secondaryContextual: CatalogChromeSlot? = nil   // slot 5
+    var filterSort: CatalogChromeSlot? = nil            // always rendered last (far right)
+    var contextual: CatalogChromeSlot? = nil            // slot 3
+    var secondaryContextual: CatalogChromeSlot? = nil   // slot 4
 }
 
 struct CatalogChromeConfig {
@@ -201,14 +201,6 @@ struct CatalogSlotBar: View {
                     .accessibilityLabel(quick.accessibilityLabel)
                     .frame(maxWidth: .infinity)
                 }
-                if let filterSort = slots.filterSort {
-                    CatalogFilterFABButton(
-                        isActive: filterSort.isActive,
-                        accessibilityLabel: filterSort.accessibilityLabel,
-                        action: filterSort.action
-                    )
-                    .frame(maxWidth: .infinity)
-                }
                 if let contextual = slots.contextual {
                     slotButton(contextual)
                         .frame(maxWidth: .infinity)
@@ -216,6 +208,15 @@ struct CatalogSlotBar: View {
                 if let secondary = slots.secondaryContextual {
                     slotButton(secondary)
                         .frame(maxWidth: .infinity)
+                }
+                // Filter & sort ("Settings") always sits at the far right, whatever else the screen adds.
+                if let filterSort = slots.filterSort {
+                    CatalogFilterFABButton(
+                        isActive: filterSort.isActive,
+                        accessibilityLabel: filterSort.accessibilityLabel,
+                        action: filterSort.action
+                    )
+                    .frame(maxWidth: .infinity)
                 }
             }
         }

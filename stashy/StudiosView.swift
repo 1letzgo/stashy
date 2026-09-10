@@ -7,14 +7,24 @@
 
 #if !os(tvOS)
 import SwiftUI
-import WebKit
+
+/// Simulator automation: `-stashyDebugStudiosSearch naughty` pre-fills the studios search.
+private enum StudiosDebug {
+    static var initialSearch: String {
+        #if DEBUG
+        UserDefaults.standard.string(forKey: "stashyDebugStudiosSearch") ?? ""
+        #else
+        ""
+        #endif
+    }
+}
 
 private struct StudiosViewContent: View {
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var configManager = ServerConfigManager.shared
     @State private var selectedSortOption: StashDBViewModel.StudioSortOption
     @State private var isChangingSort = false
-    @State private var searchText = ""
+    @State private var searchText = StudiosDebug.initialSearch
     @State private var isSearchVisible = false
     @State private var selectedFilter: StashDBViewModel.SavedFilter? = nil
     @State private var lastOpenedStudioId: String?
@@ -442,8 +452,12 @@ private struct StudiosViewContent: View {
     }
 
     @ViewBuilder
+    /// `ZStack`, nicht `Group`: an einer `Group` hängen die Modifier (`navigationDestination`,
+    /// Sheets, `onAppear`) an jedem Zweig einzeln. Wechselt der Zweig (Laden → Liste), wird die
+    /// gepushte Detailseite mit abgerissen und neu gepusht — bei leeren Studios eine Endlosschleife
+    /// aus Erscheinen, Laden, Verschwinden.
     private var studiosCoreChrome: some View {
-        Group {
+        ZStack {
             if configManager.activeConfig == nil {
                 ConnectionErrorView { performSearch() }
             } else if viewModel.isLoading && viewModel.studios.isEmpty {
@@ -661,23 +675,22 @@ private struct StudiosViewContent: View {
     
 }
 
-// Studio image view with fallback URL support for SVG handling
-// Studio image view with hybrid support (PNG/JPG + SVG)
+/// Studio-Bild (PNG/JPG/SVG) über den gemeinsamen `StudioLogoStore`: einmal
+/// gerastert, dann aus dem Cache. Kein WebView, kein eigener Request.
 struct StudioImageView: View {
     let studio: Studio
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
     @State private var imageLoadState: ImageLoadState = .loading
 
     enum ImageLoadState {
         case loading
         case success(Image)
-        case successSVG(Data, String)
         case failure
     }
 
-    private var imageURL: URL? {
-        guard let config = ServerConfigManager.shared.loadConfig() else { return nil }
-        return URL(string: "\(config.baseURL)/studio/\(studio.id)/image")
-    }
+    /// Kachel-/Header-Größe in Punkten; das größte Ziel ist der Studio-Detail-Header.
+    private static let rasterHeight: CGFloat = 220
+    private static let rasterMaxWidth: CGFloat = 660
 
     var body: some View {
         Group {
@@ -693,26 +706,19 @@ struct StudioImageView: View {
                     .scaledToFit()
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
 
-            case .successSVG(let svgData, let svgString):
-                 ZStack {
-                    SVGWebView(svgData: svgData, svgString: svgString)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    // Transparent overlay to catch touches if needed, or let them pass usually
-                    Color.clear.contentShape(Rectangle())
-                 }
-
             case .failure:
                 placeholderView
             }
         }
-        .task {
+        .task(id: "\(studio.id)|\(studio.updatedAt ?? "")|\(appearanceManager.studioLogoStyle.rawValue)") {
             await loadImage()
         }
     }
-    
+
+    /// Kein eigener Hintergrund — die Kachel bringt ihren mit; ein zweiter Grauton
+    /// darüber sah wie ein Bildfehler aus.
     private var placeholderView: some View {
-        Rectangle()
-            .fill(Color.gray.opacity(DesignTokens.Opacity.placeholder))
+        Color.clear
             .overlay(
                 VStack(spacing: 4) {
                     Image(systemName: "building.2")
@@ -727,75 +733,20 @@ struct StudioImageView: View {
             )
     }
 
-    /// Kartengröße in Punkten; Detail-Header ist nicht viel größer.
-    private static let rasterHeight: CGFloat = 220
-    private static let rasterMaxWidth: CGFloat = 660
-
     private func loadImage() async {
-        guard let url = imageURL else {
+        // Stash liefert für Studios ohne Bild einen generischen Platzhalter
+        // (`…&default=true`) — dafür lieber der eigene mit Namen.
+        if studio.imagePath?.contains("default=true") == true {
             imageLoadState = .failure
             return
         }
-
-        // Erst der gemeinsame Logo-Store (Speicher + Platte, SVG gerastert, kein
-        // WebView pro Karte). Platzhalter-Bilder (`default=true`) und SVGs mit
-        // Gradients/Filtern laufen weiter über den alten Weg unten.
-        let isDefaultImage = studio.imagePath?.contains("default=true") == true
-        if !isDefaultImage,
-           let cached = await StudioLogoStore.shared.image(
-               studioId: studio.id, updatedAt: studio.updatedAt,
-               height: Self.rasterHeight, maxWidth: Self.rasterMaxWidth
-           ) {
-            imageLoadState = .success(Image(uiImage: cached))
-            return
-        }
-
-        do {
-            var request = URLRequest(url: url)
-            request.timeoutInterval = 30.0
-            
-            if let config = ServerConfigManager.shared.loadConfig(),
-               let apiKey = config.secureApiKey, !apiKey.isEmpty {
-                request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
-            }
-            
-            let (data, response) = try await URLSession.shared.data(for: request)
-
-            guard let httpResponse = response as? HTTPURLResponse,
-                  httpResponse.statusCode == 200 else {
-                AppLog.error("❌ Studio Image HTTP Error: \((response as? HTTPURLResponse)?.statusCode ?? 0)")
-                imageLoadState = .failure
-                return
-            }
-
-            // 1. Try generic Image (PNG, JPG)
-            if let uiImage = UIImage(data: data) {
-                imageLoadState = .success(Image(uiImage: uiImage))
-                return
-            }
-
-            // 2. Try SVG
-            // Check header or content
-            let contentType = httpResponse.allHeaderFields["Content-Type"] as? String
-            let isSVGHeader = contentType?.contains("svg") == true
-            
-            // Also peek at data
-            let dataString = String(data: data, encoding: .utf8) ?? ""
-            let isSVGContent = dataString.contains("<svg")
-            
-            if isSVGHeader || isSVGContent {
-                if !dataString.isEmpty {
-                    imageLoadState = .successSVG(data, dataString)
-                    return
-                }
-            }
-
-            // Fail
-            AppLog.error("❌ Failed to decode studio image for \(studio.name)")
-            imageLoadState = .failure
-            
-        } catch {
-            AppLog.error("❌ Error loading studio image: \(error.localizedDescription)")
+        if let image = await StudioLogoStore.shared.image(
+            studioId: studio.id, updatedAt: studio.updatedAt,
+            height: Self.rasterHeight, maxWidth: Self.rasterMaxWidth,
+            style: appearanceManager.studioLogoStyle
+        ) {
+            imageLoadState = .success(Image(uiImage: image))
+        } else {
             imageLoadState = .failure
         }
     }
@@ -901,76 +852,6 @@ struct StudioCardView: View {
         .background(Color.secondaryAppBackground(for: appearance.currentTheme))
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
-    }
-}
-
-// SVG WebView for displaying SVG images
-struct SVGWebView: UIViewRepresentable {
-    let svgData: Data
-    let svgString: String?
-
-    func makeUIView(context: Context) -> WKWebView {
-        let config = WKWebViewConfiguration()
-        config.userContentController = WKUserContentController()
-        let webView = WKWebView(frame: .zero, configuration: config)
-        webView.isOpaque = false
-        webView.backgroundColor = .clear
-        webView.scrollView.isScrollEnabled = false
-        webView.scrollView.bouncesZoom = false
-        webView.scrollView.minimumZoomScale = 1.0
-        webView.scrollView.maximumZoomScale = 1.0
-        webView.isUserInteractionEnabled = false
-        return webView
-    }
-
-    func updateUIView(_ webView: WKWebView, context: Context) {
-        if let svgString = svgString {
-            let html = """
-            <!DOCTYPE html>
-            <html>
-            <head>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-                <style>
-                    * { box-sizing: border-box; margin: 0; padding: 0; }
-                    html, body {
-                        width: 100vw;
-                        height: 100vh;
-                        background: transparent;
-                        overflow: hidden;
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                    }
-                    svg {
-                        width: 100vw !important;
-                        height: 100vh !important;
-                        max-width: 100vw !important;
-                        max-height: 100vh !important;
-                        display: block;
-                        object-fit: contain;
-                    }
-                </style>
-            </head>
-            <body>
-                \(svgString)
-                <script>
-                    var svg = document.querySelector('svg');
-                    if (svg) {
-                        if (!svg.getAttribute('viewBox')) {
-                            var w = svg.getAttribute('width') || '100';
-                            var h = svg.getAttribute('height') || '100';
-                            svg.setAttribute('viewBox', '0 0 ' + parseFloat(w) + ' ' + parseFloat(h));
-                        }
-                        svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
-                        svg.removeAttribute('width');
-                        svg.removeAttribute('height');
-                    }
-                </script>
-            </body>
-            </html>
-            """
-            webView.loadHTMLString(html, baseURL: nil)
-        }
     }
 }
 

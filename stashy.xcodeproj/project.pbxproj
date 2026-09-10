@@ -42,9 +42,8 @@
 		42AECC4BE2264997B0333A90 /* HomeSceneCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E5E2F2A46A1004CA019 /* HomeSceneCardView.swift */; };
 		4641A386019F4F5F81B587A8 /* StashDBViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB77A2FE84155DC02AAC07 /* StashDBViewModel.swift */; };
 		4FA2DDB674AB41BC92ACAB15 /* FilterCriteriaDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2195D672B4B04628BD280AA1 /* FilterCriteriaDocument.swift */; };
-		C4B0E00200000000000000B1 /* NativeChromeSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A1 /* NativeChromeSupport.swift */; };
-		C4B0E00200000000000000B2 /* CatalogChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A2 /* CatalogChrome.swift */; };
-		C4B0E00200000000000000B3 /* StashyDetailToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A3 /* StashyDetailToolbar.swift */; };
+		5115C0010000000000000001 /* SimilarScenesFinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5115C0020000000000000002 /* SimilarScenesFinder.swift */; };
+		5115C0050000000000000005 /* SceneSimilarScenesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5115C0060000000000000006 /* SceneSimilarScenesCard.swift */; };
 		51487CAA64DF4CC3B986B68C /* SceneStudioCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E752F2A6392004CA019 /* SceneStudioCard.swift */; };
 		5B0100661A854DEDA5E55778 /* CatalogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB142F167223007C2090 /* CatalogsView.swift */; };
 		5B3249B4152046408B964DDC /* StarRatingView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */; };
@@ -81,12 +80,40 @@
 		A8FA63740E8A43609EDB1AAD /* AppearanceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB312F1831C7007C2090 /* AppearanceManager.swift */; };
 		AA0000012E8A9C0000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0000022E8A9C0000000001 /* Assets.xcassets */; };
 		AAB8EA012D744BBCB254F7D6 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7798FE84155DC02AAC07 /* MainTabView.swift */; };
+		AE7E00000000000000000003 /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = AE7E00000000000000000002 /* AetherEngine */; };
+		AE7E00000000000000000013 /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = AE7E00000000000000000012 /* AetherEngine */; };
+		AE7E0000000000000000B012 /* AetherSceneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B011 /* AetherSceneEngine.swift */; };
+		AE7E0000000000000000B013 /* AetherSceneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B011 /* AetherSceneEngine.swift */; };
+		AE7E0000000000000000B022 /* Scene+AetherPlayback.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */; };
+		AE7E0000000000000000B023 /* Scene+AetherPlayback.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */; };
+		AE7E0000000000000000B032 /* AcknowledgementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B031 /* AcknowledgementsView.swift */; };
+		AE7E0000000000000000B033 /* AcknowledgementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B031 /* AcknowledgementsView.swift */; };
+		AE7E0000000000000000B042 /* AetherSceneSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B041 /* AetherSceneSurface.swift */; };
+		AE7E0000000000000000B043 /* AetherSceneSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B041 /* AetherSceneSurface.swift */; };
+		AE7E0000000000000000B052 /* LocalDownloadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B051 /* LocalDownloadStore.swift */; };
+		AE7E0000000000000000B053 /* LocalDownloadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B051 /* LocalDownloadStore.swift */; };
+		AE7E0000000000000000B062 /* AetherVideoSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B061 /* AetherVideoSurface.swift */; };
+		AE7E0000000000000000B063 /* AetherVideoSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B061 /* AetherVideoSurface.swift */; };
+		AE7E0000000000000000B072 /* AetherPreviewPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B071 /* AetherPreviewPlayer.swift */; };
+		AE7E0000000000000000B073 /* AetherPreviewPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B071 /* AetherPreviewPlayer.swift */; };
+		AITAG00012F70A00000000001 /* AITagSuggestionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00022F70A00000000002 /* AITagSuggestionManager.swift */; };
+		AITAG00032F70A00000000003 /* AITagSuggestionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00042F70A00000000004 /* AITagSuggestionBar.swift */; };
+		AITAG00052F70A00000000005 /* AITagsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00062F70A00000000006 /* AITagsSettingsView.swift */; };
+		AITAG00092F70A00000000009 /* AddTagsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG000A2F70A0000000000A /* AddTagsSheet.swift */; };
 		B981A60AAA104A77A56B0923 /* FiltersToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 130472FFD9E64071BF78EDAE /* FiltersToolsView.swift */; };
 		BB58741767674753BACDD0BA /* HomeRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E5D2F2A46A1004CA019 /* HomeRowView.swift */; };
 		BEBA9D663C334D69A68E2935 /* SceneGroupsCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = FA617C2A62174FFFB0912B44 /* SceneGroupsCard.swift */; };
 		BFC1A2B5C2414AB6B3120A34 /* HomeChannelsRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFC1A2B32F3A46A1004CA019 /* HomeChannelsRowView.swift */; };
 		BFFDBA13C2414AB6B3120A34 /* HomeStatisticsRowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E5F2F2A46A1004CA019 /* HomeStatisticsRowView.swift */; };
 		C047CE6380F048858A91E6C9 /* GraphQLClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFGQ000022F28A0000000002 /* GraphQLClient.swift */; };
+		C4B0E00200000000000000B1 /* NativeChromeSupport.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A1 /* NativeChromeSupport.swift */; };
+		C4B0E00200000000000000B2 /* CatalogChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A2 /* CatalogChrome.swift */; };
+		C4B0E00200000000000000B3 /* StashyDetailToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A3 /* StashyDetailToolbar.swift */; };
+		C7F3A10200000000000000E2 /* TagMergeToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10100000000000000E1 /* TagMergeToolsView.swift */; };
+		C7F3A10400000000000000E4 /* StudioLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10300000000000000E3 /* StudioLogo.swift */; };
+		C7F3A10600000000000000E6 /* StudioLogoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10500000000000000E5 /* StudioLogoStore.swift */; };
+		C7F3A10700000000000000E7 /* StudioLogoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10500000000000000E5 /* StudioLogoStore.swift */; };
+		C7F3A20100000000000000F1 /* SwiftDraw in Frameworks */ = {isa = PBXBuildFile; productRef = C7F3A20300000000000000F3 /* SwiftDraw */; };
 		CA7A10D12F500001 /* ListCatalogFilterSortModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7A10D02F500000 /* ListCatalogFilterSortModels.swift */; };
 		CA7A10D42F500003 /* ListCatalogFilterSortSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7A10D32F500002 /* ListCatalogFilterSortSheets.swift */; };
 		CA7A10E12F500010 /* DetailLinkedCatalogControllers.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7A10E02F500011 /* DetailLinkedCatalogControllers.swift */; };
@@ -95,8 +122,6 @@
 		DF06EF262F18EC1300299105 /* SceneCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF06EF252F18EC1100299105 /* SceneCardView.swift */; };
 		DF22BB152F167223007C2090 /* CatalogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB142F167223007C2090 /* CatalogsView.swift */; };
 		DF22BB1E2F16743C007C2090 /* TagsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1D2F16743C007C2090 /* TagsView.swift */; };
-		C7F3A10200000000000000E2 /* TagMergeToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10100000000000000E1 /* TagMergeToolsView.swift */; };
-		C7F3A10400000000000000E4 /* StudioLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10300000000000000E3 /* StudioLogo.swift */; };
 		DF22BB1F2F16743C007C2090 /* DownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB172F16743C007C2090 /* DownloadsView.swift */; };
 		DF22BB202F16743C007C2090 /* GalleriesView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB182F16743C007C2090 /* GalleriesView.swift */; };
 		DF22BB222F16743C007C2090 /* ReelsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB1B2F16743C007C2090 /* ReelsView.swift */; };
@@ -138,12 +163,6 @@
 		DFGQGRAPHQLBUILD001 /* graphql in Resources */ = {isa = PBXBuildFile; fileRef = DFGQGRAPHQLREF001 /* graphql */; };
 		DFSEC0012F2A000100000001 /* SecurityManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSEC0022F2A000100000002 /* SecurityManager.swift */; };
 		DFSEC0032F2A000100000003 /* PasscodeEntryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSEC0042F2A000100000004 /* PasscodeEntryView.swift */; };
-		AITAG00012F70A00000000001 /* AITagSuggestionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00022F70A00000000002 /* AITagSuggestionManager.swift */; };
-		5115C0010000000000000001 /* SimilarScenesFinder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5115C0020000000000000002 /* SimilarScenesFinder.swift */; };
-		5115C0050000000000000005 /* SceneSimilarScenesCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5115C0060000000000000006 /* SceneSimilarScenesCard.swift */; };
-		AITAG00032F70A00000000003 /* AITagSuggestionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00042F70A00000000004 /* AITagSuggestionBar.swift */; };
-		AITAG00092F70A00000000009 /* AddTagsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG000A2F70A0000000000A /* AddTagsSheet.swift */; };
-		AITAG00052F70A00000000005 /* AITagsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00062F70A00000000006 /* AITagsSettingsView.swift */; };
 		DFSEC0052F2A000100000005 /* SecuritySettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSEC0062F2A000100000006 /* SecuritySettingsView.swift */; };
 		DFSM000012F2NEWFILE001 /* KeychainManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSM000022F2NEWFILE002 /* KeychainManager.swift */; };
 		DFSM000052F2NEWFILE005 /* ServerFormViewNew.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFSM000062F2NEWFILE006 /* ServerFormViewNew.swift */; };
@@ -160,26 +179,7 @@
 		DFUI000032F3AUDIT003 /* HapticManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFUI000042F3AUDIT004 /* HapticManager.swift */; };
 		DFUI000052F3AUDIT005 /* ToastManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFUI000062F3AUDIT006 /* ToastManager.swift */; };
 		E909C6E8F4744C4D939F78BD /* GraphQLQueries.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFGQ000042F28A0000000004 /* GraphQLQueries.swift */; };
-		AE7E00000000000000000003 /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = AE7E00000000000000000002 /* AetherEngine */; };
-		C7F3A20100000000000000F1 /* PocketSVG in Frameworks */ = {isa = PBXBuildFile; productRef = C7F3A20300000000000000F3 /* PocketSVG */; };
-		C7F3A20200000000000000F2 /* PocketSVG in Embed Frameworks */ = {isa = PBXBuildFile; productRef = C7F3A20300000000000000F3 /* PocketSVG */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
-		AE7E0000000000000000B012 /* AetherSceneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B011 /* AetherSceneEngine.swift */; };
-		AE7E0000000000000000B022 /* Scene+AetherPlayback.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */; };
-		AE7E0000000000000000B042 /* AetherSceneSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B041 /* AetherSceneSurface.swift */; };
-		AE7E00000000000000000013 /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = AE7E00000000000000000012 /* AetherEngine */; };
-		AE7E0000000000000000B013 /* AetherSceneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B011 /* AetherSceneEngine.swift */; };
-		AE7E0000000000000000B023 /* Scene+AetherPlayback.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */; };
-		AE7E0000000000000000B043 /* AetherSceneSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B041 /* AetherSceneSurface.swift */; };
-		AE7E0000000000000000B052 /* LocalDownloadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B051 /* LocalDownloadStore.swift */; };
-		AE7E0000000000000000B053 /* LocalDownloadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B051 /* LocalDownloadStore.swift */; };
-		AE7E0000000000000000B062 /* AetherVideoSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B061 /* AetherVideoSurface.swift */; };
-		AE7E0000000000000000B063 /* AetherVideoSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B061 /* AetherVideoSurface.swift */; };
-		AE7E0000000000000000B072 /* AetherPreviewPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B071 /* AetherPreviewPlayer.swift */; };
-		AE7E0000000000000000B073 /* AetherPreviewPlayer.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B071 /* AetherPreviewPlayer.swift */; };
-		AE7E0000000000000000B032 /* AcknowledgementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B031 /* AcknowledgementsView.swift */; };
-		AE7E0000000000000000B033 /* AcknowledgementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B031 /* AcknowledgementsView.swift */; };
-		F0A11E1B0B0B0B0B0B0B0B01 /* PocketSVG in Frameworks */ = {isa = PBXBuildFile; productRef = 1A2B3C4D5E6F708192A3B4C5 /* PocketSVG */; };
-		F0A11E1B0B0B0B0B0B0B0B02 /* PocketSVG in Embed Frameworks */ = {isa = PBXBuildFile; productRef = 1A2B3C4D5E6F708192A3B4C5 /* PocketSVG */; settings = {ATTRIBUTES = (CodeSignOnCopy, RemoveHeadersOnCopy, ); }; };
+		F0A11E1B0B0B0B0B0B0B0B01 /* SwiftDraw in Frameworks */ = {isa = PBXBuildFile; productRef = 1A2B3C4D5E6F708192A3B4C5 /* SwiftDraw */; };
 		F21C93AC1160498EB0A17AF4 /* GalleryRepository.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E672F2A6386004CA019 /* GalleryRepository.swift */; };
 		F3FAA876F0564E51BFE25096 /* FilterFieldCatalog.swift in Sources */ = {isa = PBXBuildFile; fileRef = FEA1E8DCB9534BA393BDCA09 /* FilterFieldCatalog.swift */; };
 		F4BF2858338E42E6AA292FCC /* PerformersView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB392F1832E8007C2090 /* PerformersView.swift */; };
@@ -196,24 +196,22 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
-		F0A11E1B0B0B0B0B0B0B0B03 /* Embed Frameworks */ = {
-			isa = PBXCopyFilesBuildPhase;
-			buildActionMask = 2147483647;
-			dstPath = "";
-			dstSubfolderSpec = 10;
-			files = (
-				F0A11E1B0B0B0B0B0B0B0B02 /* PocketSVG in Embed Frameworks */,
-			);
-			name = "Embed Frameworks";
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		C7F3A20400000000000000F4 /* Embed Frameworks */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 10;
 			files = (
-				C7F3A20200000000000000F2 /* PocketSVG in Embed Frameworks */,
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F0A11E1B0B0B0B0B0B0B0B03 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
 			);
 			name = "Embed Frameworks";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -229,9 +227,6 @@
 		0D91ABA114F544C390FD6F8E /* FilterCriteriaEditorView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterCriteriaEditorView.swift; sourceTree = "<group>"; };
 		130472FFD9E64071BF78EDAE /* FiltersToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FiltersToolsView.swift; sourceTree = "<group>"; };
 		2195D672B4B04628BD280AA1 /* FilterCriteriaDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterCriteriaDocument.swift; sourceTree = "<group>"; };
-		C4B0E00100000000000000A1 /* NativeChromeSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeChromeSupport.swift; sourceTree = "<group>"; };
-		C4B0E00100000000000000A2 /* CatalogChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogChrome.swift; sourceTree = "<group>"; };
-		C4B0E00100000000000000A3 /* StashyDetailToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyDetailToolbar.swift; sourceTree = "<group>"; };
 		372E2D692F6339EE00603361 /* LoginAuthHelper.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LoginAuthHelper.swift; sourceTree = "<group>"; };
 		372E2D982F64272300603361 /* VideoAnalysisManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VideoAnalysisManager.swift; sourceTree = "<group>"; };
 		372E2D9A2F64425000603361 /* StashSyncManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashSyncManager.swift; sourceTree = "<group>"; };
@@ -244,6 +239,8 @@
 		37D092D52F8980B400DB7A08 /* MarkersView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MarkersView.swift; sourceTree = "<group>"; };
 		37D3E24E2F3932C400AB8FAD /* stashyTV.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = stashyTV.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		37D3E4912F3A305D00AB8FAD /* SceneHeatmapCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneHeatmapCard.swift; sourceTree = "<group>"; };
+		5115C0020000000000000002 /* SimilarScenesFinder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimilarScenesFinder.swift; sourceTree = "<group>"; };
+		5115C0060000000000000006 /* SceneSimilarScenesCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneSimilarScenesCard.swift; sourceTree = "<group>"; };
 		971A00022F999002 /* HotOrNotToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HotOrNotToolsView.swift; sourceTree = "<group>"; };
 		971A00042F999004 /* RateMeToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RateMeToolsView.swift; sourceTree = "<group>"; };
 		971A00062F999006 /* TopListsToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TopListsToolsView.swift; sourceTree = "<group>"; };
@@ -256,6 +253,23 @@
 		A1PLUS022F30B00000000002 /* StashyPlusManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyPlusManager.swift; sourceTree = "<group>"; };
 		A1PLUS032F30B00000000003 /* Configuration.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Configuration.storekit; sourceTree = "<group>"; };
 		AA0000022E8A9C0000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AE7E0000000000000000B011 /* AetherSceneEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherSceneEngine.swift; sourceTree = "<group>"; };
+		AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Scene+AetherPlayback.swift"; sourceTree = "<group>"; };
+		AE7E0000000000000000B031 /* AcknowledgementsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcknowledgementsView.swift; sourceTree = "<group>"; };
+		AE7E0000000000000000B041 /* AetherSceneSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherSceneSurface.swift; sourceTree = "<group>"; };
+		AE7E0000000000000000B051 /* LocalDownloadStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDownloadStore.swift; sourceTree = "<group>"; };
+		AE7E0000000000000000B061 /* AetherVideoSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherVideoSurface.swift; sourceTree = "<group>"; };
+		AE7E0000000000000000B071 /* AetherPreviewPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherPreviewPlayer.swift; sourceTree = "<group>"; };
+		AITAG00022F70A00000000002 /* AITagSuggestionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagSuggestionManager.swift; sourceTree = "<group>"; };
+		AITAG00042F70A00000000004 /* AITagSuggestionBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagSuggestionBar.swift; sourceTree = "<group>"; };
+		AITAG00062F70A00000000006 /* AITagsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagsSettingsView.swift; sourceTree = "<group>"; };
+		AITAG000A2F70A0000000000A /* AddTagsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTagsSheet.swift; sourceTree = "<group>"; };
+		C4B0E00100000000000000A1 /* NativeChromeSupport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NativeChromeSupport.swift; sourceTree = "<group>"; };
+		C4B0E00100000000000000A2 /* CatalogChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogChrome.swift; sourceTree = "<group>"; };
+		C4B0E00100000000000000A3 /* StashyDetailToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyDetailToolbar.swift; sourceTree = "<group>"; };
+		C7F3A10100000000000000E1 /* TagMergeToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagMergeToolsView.swift; sourceTree = "<group>"; };
+		C7F3A10300000000000000E3 /* StudioLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioLogo.swift; sourceTree = "<group>"; };
+		C7F3A10500000000000000E5 /* StudioLogoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioLogoStore.swift; sourceTree = "<group>"; };
 		CA7A10D02F500000 /* ListCatalogFilterSortModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListCatalogFilterSortModels.swift; sourceTree = "<group>"; };
 		CA7A10D32F500002 /* ListCatalogFilterSortSheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListCatalogFilterSortSheets.swift; sourceTree = "<group>"; };
 		CA7A10E02F500011 /* DetailLinkedCatalogControllers.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DetailLinkedCatalogControllers.swift; sourceTree = "<group>"; };
@@ -268,8 +282,6 @@
 		DF22BB1B2F16743C007C2090 /* ReelsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ReelsView.swift; sourceTree = "<group>"; };
 		DF22BB1C2F16743C007C2090 /* SharedUtilities.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedUtilities.swift; sourceTree = "<group>"; };
 		DF22BB1D2F16743C007C2090 /* TagsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagsView.swift; sourceTree = "<group>"; };
-		C7F3A10100000000000000E1 /* TagMergeToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagMergeToolsView.swift; sourceTree = "<group>"; };
-		C7F3A10300000000000000E3 /* StudioLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioLogo.swift; sourceTree = "<group>"; };
 		DF22BB262F167CDC007C2090 /* ImageCacheManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImageCacheManager.swift; sourceTree = "<group>"; };
 		DF22BB312F1831C7007C2090 /* AppearanceManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceManager.swift; sourceTree = "<group>"; };
 		DF22BB332F1831C7007C2090 /* AppearanceSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppearanceSettingsView.swift; sourceTree = "<group>"; };
@@ -307,12 +319,6 @@
 		DFGQGRAPHQLREF001 /* graphql */ = {isa = PBXFileReference; lastKnownFileType = folder; path = graphql; sourceTree = "<group>"; };
 		DFSEC0022F2A000100000002 /* SecurityManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecurityManager.swift; sourceTree = "<group>"; };
 		DFSEC0042F2A000100000004 /* PasscodeEntryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PasscodeEntryView.swift; sourceTree = "<group>"; };
-		AITAG00022F70A00000000002 /* AITagSuggestionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagSuggestionManager.swift; sourceTree = "<group>"; };
-		5115C0020000000000000002 /* SimilarScenesFinder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SimilarScenesFinder.swift; sourceTree = "<group>"; };
-		5115C0060000000000000006 /* SceneSimilarScenesCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneSimilarScenesCard.swift; sourceTree = "<group>"; };
-		AITAG00042F70A00000000004 /* AITagSuggestionBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagSuggestionBar.swift; sourceTree = "<group>"; };
-		AITAG000A2F70A0000000000A /* AddTagsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTagsSheet.swift; sourceTree = "<group>"; };
-		AITAG00062F70A00000000006 /* AITagsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagsSettingsView.swift; sourceTree = "<group>"; };
 		DFSEC0062F2A000100000006 /* SecuritySettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SecuritySettingsView.swift; sourceTree = "<group>"; };
 		DFSM000022F2NEWFILE002 /* KeychainManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainManager.swift; sourceTree = "<group>"; };
 		DFSM000062F2NEWFILE006 /* ServerFormViewNew.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerFormViewNew.swift; sourceTree = "<group>"; };
@@ -334,13 +340,6 @@
 		LIMG000022345678901234AB /* LinkedImagesCatalogGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkedImagesCatalogGrid.swift; sourceTree = "<group>"; };
 		SCHR000022345678901234AB /* SharedChromeComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedChromeComponents.swift; sourceTree = "<group>"; };
 		STNV000022345678901234AB /* StashyTopNavStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyTopNavStrip.swift; sourceTree = "<group>"; };
-		AE7E0000000000000000B011 /* AetherSceneEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherSceneEngine.swift; sourceTree = "<group>"; };
-		AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Scene+AetherPlayback.swift"; sourceTree = "<group>"; };
-		AE7E0000000000000000B041 /* AetherSceneSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherSceneSurface.swift; sourceTree = "<group>"; };
-		AE7E0000000000000000B051 /* LocalDownloadStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDownloadStore.swift; sourceTree = "<group>"; };
-		AE7E0000000000000000B061 /* AetherVideoSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherVideoSurface.swift; sourceTree = "<group>"; };
-		AE7E0000000000000000B071 /* AetherPreviewPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherPreviewPlayer.swift; sourceTree = "<group>"; };
-		AE7E0000000000000000B031 /* AcknowledgementsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcknowledgementsView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -353,7 +352,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AE7E00000000000000000003 /* AetherEngine in Frameworks */,
-				C7F3A20100000000000000F1 /* PocketSVG in Frameworks */,
+				C7F3A20100000000000000F1 /* SwiftDraw in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -361,7 +360,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				F0A11E1B0B0B0B0B0B0B0B01 /* PocketSVG in Frameworks */,
+				F0A11E1B0B0B0B0B0B0B0B01 /* SwiftDraw in Frameworks */,
 				AE7E00000000000000000013 /* AetherEngine in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -380,19 +379,6 @@
 				37D3E24E2F3932C400AB8FAD /* stashyTV.app */,
 				37D3E24F2F3932C400AB8FAD /* stashyTV */,
 			);
-			sourceTree = "<group>";
-		};
-		AE7E0000000000000000C001 /* Playback */ = {
-			isa = PBXGroup;
-			children = (
-				AE7E0000000000000000B011 /* AetherSceneEngine.swift */,
-				AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */,
-				AE7E0000000000000000B041 /* AetherSceneSurface.swift */,
-				AE7E0000000000000000B051 /* LocalDownloadStore.swift */,
-				AE7E0000000000000000B061 /* AetherVideoSurface.swift */,
-				AE7E0000000000000000B071 /* AetherPreviewPlayer.swift */,
-			);
-			path = Playback;
 			sourceTree = "<group>";
 		};
 		08FB77A8FE84155DC02AAC07 /* stashy */ = {
@@ -458,6 +444,7 @@
 				DF22BB1D2F16743C007C2090 /* TagsView.swift */,
 				C7F3A10100000000000000E1 /* TagMergeToolsView.swift */,
 				C7F3A10300000000000000E3 /* StudioLogo.swift */,
+				C7F3A10500000000000000E5 /* StudioLogoStore.swift */,
 				DFUI000062F3AUDIT006 /* ToastManager.swift */,
 				DF90B7652F1B72E5003ED852 /* UniversalSearchView.swift */,
 			);
@@ -491,16 +478,6 @@
 			path = Managers;
 			sourceTree = "<group>";
 		};
-		C4B0E00300000000000000C1 /* Chrome */ = {
-			isa = PBXGroup;
-			children = (
-				C4B0E00100000000000000A1 /* NativeChromeSupport.swift */,
-				C4B0E00100000000000000A2 /* CatalogChrome.swift */,
-				C4B0E00100000000000000A3 /* StashyDetailToolbar.swift */,
-			);
-			path = Chrome;
-			sourceTree = "<group>";
-		};
 		A1F11TER50F11TER50F11TER /* Filters */ = {
 			isa = PBXGroup;
 			children = (
@@ -512,6 +489,29 @@
 				130472FFD9E64071BF78EDAE /* FiltersToolsView.swift */,
 			);
 			path = Filters;
+			sourceTree = "<group>";
+		};
+		AE7E0000000000000000C001 /* Playback */ = {
+			isa = PBXGroup;
+			children = (
+				AE7E0000000000000000B011 /* AetherSceneEngine.swift */,
+				AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */,
+				AE7E0000000000000000B041 /* AetherSceneSurface.swift */,
+				AE7E0000000000000000B051 /* LocalDownloadStore.swift */,
+				AE7E0000000000000000B061 /* AetherVideoSurface.swift */,
+				AE7E0000000000000000B071 /* AetherPreviewPlayer.swift */,
+			);
+			path = Playback;
+			sourceTree = "<group>";
+		};
+		C4B0E00300000000000000C1 /* Chrome */ = {
+			isa = PBXGroup;
+			children = (
+				C4B0E00100000000000000A1 /* NativeChromeSupport.swift */,
+				C4B0E00100000000000000A2 /* CatalogChrome.swift */,
+				C4B0E00100000000000000A3 /* StashyDetailToolbar.swift */,
+			);
+			path = Chrome;
 			sourceTree = "<group>";
 		};
 		DF675E612F2A46A1004CA019 /* Home */ = {
@@ -612,7 +612,7 @@
 			name = stashy;
 			packageProductDependencies = (
 				AE7E00000000000000000002 /* AetherEngine */,
-				C7F3A20300000000000000F3 /* PocketSVG */,
+				C7F3A20300000000000000F3 /* SwiftDraw */,
 			);
 			productName = stashy;
 			productReference = DFE504602E8A8E6F00323FF0 /* stashy.app */;
@@ -636,7 +636,7 @@
 			);
 			name = stashyTV;
 			packageProductDependencies = (
-				1A2B3C4D5E6F708192A3B4C5 /* PocketSVG */,
+				1A2B3C4D5E6F708192A3B4C5 /* SwiftDraw */,
 				AE7E00000000000000000012 /* AetherEngine */,
 			);
 			productName = stashyTV;
@@ -668,7 +668,7 @@
 			);
 			mainGroup = 08FB778CFE84155DC02AAC07;
 			packageReferences = (
-				0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "PocketSVG" */,
+				0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "SwiftDraw" */,
 				AE7E00000000000000000001 /* XCRemoteSwiftPackageReference "AetherEngine" */,
 			);
 			productRefGroup = 08FB778CFE84155DC02AAC07;
@@ -793,6 +793,7 @@
 				DF22BB1E2F16743C007C2090 /* TagsView.swift in Sources */,
 				C7F3A10200000000000000E2 /* TagMergeToolsView.swift in Sources */,
 				C7F3A10400000000000000E4 /* StudioLogo.swift in Sources */,
+				C7F3A10600000000000000E6 /* StudioLogoStore.swift in Sources */,
 				DF90B75E2F1A5ECF003ED852 /* StarRatingView.swift in Sources */,
 				DF22BB1F2F16743C007C2090 /* DownloadsView.swift in Sources */,
 				DF4A022C2F1E8B6900E5EAFB /* ImagesView.swift in Sources */,
@@ -861,6 +862,7 @@
 				4641A386019F4F5F81B587A8 /* StashDBViewModel.swift in Sources */,
 				372E2DB22F64C10000603361 /* OCountHeatmapLoader.swift in Sources */,
 				91CF530080674BF98FF154C4 /* SceneCardView.swift in Sources */,
+				C7F3A10700000000000000E7 /* StudioLogoStore.swift in Sources */,
 				5B0100661A854DEDA5E55778 /* CatalogsView.swift in Sources */,
 				02B19A59AAFE4A16B45A861F /* DownloadsView.swift in Sources */,
 				5BC6653D5C9D4675881F40BA /* GalleriesView.swift in Sources */,
@@ -1046,7 +1048,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 334;
+				CURRENT_PROJECT_VERSION = 337;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1076,7 +1078,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 334;
+				CURRENT_PROJECT_VERSION = 337;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1110,7 +1112,7 @@
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 316;
+				CURRENT_PROJECT_VERSION = 317;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -1152,7 +1154,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 316;
+				CURRENT_PROJECT_VERSION = 317;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -1214,6 +1216,14 @@
 /* End XCConfigurationList section */
 
 /* Begin XCRemoteSwiftPackageReference section */
+		0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "SwiftDraw" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/swhitty/SwiftDraw";
+			requirement = {
+				kind = upToNextMinorVersion;
+				minimumVersion = 0.29.0;
+			};
+		};
 		AE7E00000000000000000001 /* XCRemoteSwiftPackageReference "AetherEngine" */ = {
 			isa = XCRemoteSwiftPackageReference;
 			repositoryURL = "https://github.com/superuser404notfound/AetherEngine";
@@ -1222,17 +1232,14 @@
 				minimumVersion = 6.78.0;
 			};
 		};
-		0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "PocketSVG" */ = {
-			isa = XCRemoteSwiftPackageReference;
-			repositoryURL = "https://github.com/pocketsvg/PocketSVG.git";
-			requirement = {
-				kind = upToNextMajorVersion;
-				minimumVersion = 2.6.0;
-			};
-		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
+		1A2B3C4D5E6F708192A3B4C5 /* SwiftDraw */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = 0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "SwiftDraw" */;
+			productName = SwiftDraw;
+		};
 		AE7E00000000000000000002 /* AetherEngine */ = {
 			isa = XCSwiftPackageProductDependency;
 			package = AE7E00000000000000000001 /* XCRemoteSwiftPackageReference "AetherEngine" */;
@@ -1243,15 +1250,10 @@
 			package = AE7E00000000000000000001 /* XCRemoteSwiftPackageReference "AetherEngine" */;
 			productName = AetherEngine;
 		};
-		1A2B3C4D5E6F708192A3B4C5 /* PocketSVG */ = {
+		C7F3A20300000000000000F3 /* SwiftDraw */ = {
 			isa = XCSwiftPackageProductDependency;
-			package = 0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "PocketSVG" */;
-			productName = PocketSVG;
-		};
-		C7F3A20300000000000000F3 /* PocketSVG */ = {
-			isa = XCSwiftPackageProductDependency;
-			package = 0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "PocketSVG" */;
-			productName = PocketSVG;
+			package = 0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "SwiftDraw" */;
+			productName = SwiftDraw;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

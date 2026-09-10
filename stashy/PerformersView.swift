@@ -509,8 +509,10 @@ private struct PerformersViewContent: View {
     }
 
     @ViewBuilder
+    /// `ZStack` statt `Group` — siehe `StudiosView.studiosCoreChrome`: Modifier müssen an einem
+    /// stabilen Container hängen, sonst reißt ein Zweigwechsel die gepushte Detailseite ab.
     private var performersCoreChrome: some View {
-        Group {
+        ZStack {
             if configManager.activeConfig == nil {
                 ConnectionErrorView { performSearch() }
             } else if viewModel.isLoading && viewModel.performers.isEmpty {
@@ -849,8 +851,7 @@ struct PerformerCardView: View {
         .foregroundColor(.white)
         .padding(.horizontal, 8)
         .padding(.vertical, 4)
-        .background(Color.black.opacity(DesignTokens.Opacity.badge))
-        .clipShape(Capsule())
+        .stashyGlass(shape: Capsule())
         .shadow(color: .black.opacity(0.2), radius: 2)
     }
 }

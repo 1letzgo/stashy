@@ -737,8 +737,7 @@ struct MarkerCardView: View {
                             .font(.system(size: 10, weight: .bold))
                             .foregroundColor(.white)
                             .padding(.horizontal, 8).padding(.vertical, 4)
-                            .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                            .clipShape(Capsule())
+                            .stashyGlass(shape: Capsule())
                             .lineLimit(1)
                         
                         Spacer()
@@ -753,8 +752,7 @@ struct MarkerCardView: View {
                             }
                             .foregroundColor(.white)
                             .padding(.horizontal, 8).padding(.vertical, 4)
-                            .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                            .clipShape(Capsule())
+                            .stashyGlass(shape: Capsule())
                         }
                     }
                     

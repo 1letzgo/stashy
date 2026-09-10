@@ -445,6 +445,12 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(reelsShowsDeleteButton, forKey: reelsShowsDeleteButtonKey)
         }
     }
+    /// Scene cards: studio logo instead of the studio name (Settings → Dashboard → Scenes).
+    @Published var sceneCardsShowStudioLogo: Bool = true {
+        didSet {
+            UserDefaults.standard.set(sceneCardsShowStudioLogo, forKey: sceneCardsShowStudioLogoKey)
+        }
+    }
     @Published var dashboardHeroSize: DashboardHeroSize = .big {
         didSet {
             UserDefaults.standard.set(dashboardHeroSize.rawValue, forKey: dashboardHeroSizeKey)
@@ -485,6 +491,7 @@ class TabManager: ObservableObject {
     private let isPiPEnabledKey = "isPiPEnabled"
     private let reelsShowsDeleteButtonKey = "ReelsShowsDeleteButton"
     private let dashboardHeroSizeKey = "DashboardHeroSize"
+    private let sceneCardsShowStudioLogoKey = "SceneCardsShowStudioLogo"
     private let useCompactStatisticsKey = "useCompactStatistics"
     private let showDashboardHeroBackgroundKey = "showDashboardHeroBackground"
     private let useColoredStatisticsKey = "useColoredStatistics"
@@ -523,6 +530,7 @@ class TabManager: ObservableObject {
         self.reelsContinuousPlay = UserDefaults.standard.bool(forKey: reelsContinuousPlayKey)
         self.isPiPEnabled = UserDefaults.standard.object(forKey: isPiPEnabledKey) as? Bool ?? true
         self.reelsShowsDeleteButton = UserDefaults.standard.bool(forKey: reelsShowsDeleteButtonKey)
+        self.sceneCardsShowStudioLogo = UserDefaults.standard.object(forKey: sceneCardsShowStudioLogoKey) as? Bool ?? true
         if let heroSizeRaw = UserDefaults.standard.string(forKey: dashboardHeroSizeKey),
            let heroSize = DashboardHeroSize(rawValue: heroSizeRaw) {
             self.dashboardHeroSize = heroSize

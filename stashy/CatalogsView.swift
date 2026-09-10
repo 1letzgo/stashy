@@ -697,8 +697,7 @@ struct GroupCardView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                        .clipShape(Capsule())
+                        .stashyGlass(shape: Capsule())
                         .shadow(color: .black.opacity(0.2), radius: 2)
                     }
 
@@ -713,8 +712,7 @@ struct GroupCardView: View {
                         .foregroundColor(.white)
                         .padding(.horizontal, 8)
                         .padding(.vertical, 4)
-                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                        .clipShape(Capsule())
+                        .stashyGlass(shape: Capsule())
                         .shadow(color: .black.opacity(0.2), radius: 2)
                     }
                 }

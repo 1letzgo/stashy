@@ -1000,8 +1000,7 @@ struct StudioDetailView: View {
         .foregroundColor(.white)
         .padding(.horizontal, 6)
         .padding(.vertical, 3)
-        .background(Color.black.opacity(DesignTokens.Opacity.badge))
-        .clipShape(Capsule())
+        .stashyGlass(shape: Capsule())
     }
     
     private func labelBadge(icon: String, text: String) -> some View {

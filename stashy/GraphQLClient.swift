@@ -136,19 +136,21 @@ actor GraphQLClient {
 
     // MARK: - Async/Await API
 
-    /// Execute a GraphQL query and decode the response
-    func execute<T: Decodable>(
+    /// Execute a GraphQL query and decode the response.
+    ///
+    /// `nonisolated`: the network round trip stays on the actor (`executeRaw`), but the
+    /// decode runs in the caller's isolation. The tvOS target defaults every type to
+    /// `@MainActor`, so a `Decodable` conformance decoded *inside* this actor would be an
+    /// isolated-conformance violation (an error in Swift 6 mode).
+    nonisolated func execute<T: Decodable>(
         query: String,
         variables: [String: Any]? = nil
     ) async throws -> T {
-        try await Self.withDatabaseRetry {
-            let request = try await buildRequest(query: query, variables: variables)
-            let data = try await performRequest(request)
-            do {
-                return try JSONDecoder().decode(T.self, from: data)
-            } catch {
-                throw GraphQLNetworkError.decodingError(error)
-            }
+        let data = try await executeRaw(query: query, variables: variables)
+        do {
+            return try JSONDecoder().decode(T.self, from: data)
+        } catch {
+            throw GraphQLNetworkError.decodingError(error)
         }
     }
 

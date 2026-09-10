@@ -5061,6 +5061,11 @@ class StashDBViewModel: ObservableObject {
                 DispatchQueue.main.async {
                     if isInitialLoad {
                         self.studios = studiosResult.studios
+                        #if DEBUG
+                        if UserDefaults.standard.string(forKey: "stashyDebugStudiosSearch") != nil {
+                            AppLog.debug("StudiosDebug: " + self.studios.map { "\($0.id)=\($0.name)[\($0.sceneCount)]" }.joined(separator: ", "))
+                        }
+                        #endif
                         self.totalStudios = studiosResult.count
                     } else {
                         self.studios.append(contentsOf: studiosResult.studios)
@@ -10299,7 +10304,7 @@ final class DownloadTaskMap: Sendable {
 }
 
 /// Lock-guarded id set; see `DownloadManager.downloadedSceneIDs`.
-final class DownloadedSceneIDIndex: @unchecked Sendable {
+nonisolated final class DownloadedSceneIDIndex: @unchecked Sendable {
     private var ids: Set<String> = []
     private let lock = NSLock()
 
@@ -10607,14 +10612,14 @@ class DownloadManager: NSObject, ObservableObject {
     /// Writes a downscaled JPEG next to the original. Uses ImageIO / AVAssetImageGenerator so a
     /// full-resolution bitmap never has to be held in memory.
     @discardableResult
-    private static func makeThumbnail(from source: URL, isVideo: Bool, to destination: URL) -> Bool {
+    private static func makeThumbnail(from source: URL, isVideo: Bool, to destination: URL) async -> Bool {
         let cgImage: CGImage?
         if isVideo {
             let asset = AVURLAsset(url: source)
             let generator = AVAssetImageGenerator(asset: asset)
             generator.appliesPreferredTrackTransform = true
             generator.maximumSize = CGSize(width: thumbnailMaxPixel, height: thumbnailMaxPixel)
-            cgImage = try? generator.copyCGImage(at: CMTime(seconds: 0.5, preferredTimescale: 600), actualTime: nil)
+            cgImage = try? await generator.image(at: CMTime(seconds: 0.5, preferredTimescale: 600)).image
         } else {
             guard let imageSource = CGImageSourceCreateWithURL(source as CFURL, nil) else { return false }
             let options: [CFString: Any] = [
@@ -10690,7 +10695,7 @@ class DownloadManager: NSObject, ObservableObject {
         let galleryId = gallery.id
         guard !isGalleryDownloaded(id: galleryId), activeDownloads[galleryId] == nil else { return }
 
-        let title = gallery.title ?? "Gallery"
+        let title = gallery.title.isEmpty ? "Gallery" : gallery.title
         activeDownloads[galleryId] = ActiveDownload(id: galleryId, title: title, progress: 0.02, totalSize: 0, downloadedSize: 0)
 
         fetchGalleryImagesForDownload(galleryId: galleryId, limit: limit) { [weak self] images, total in
@@ -11003,33 +11008,35 @@ class DownloadManager: NSObject, ObservableObject {
 
             downloadFile(id: entryId + "_img_" + image.id, from: remote, to: destination) { _, _, _ in
             } completion: { success in
-                if success {
-                    let thumbName = "\(image.id)_thumb.jpg"
-                    let thumbDestination = folder.appendingPathComponent(thumbName)
-                    let thumbRelative = Self.makeThumbnail(
-                        from: destination,
-                        isVideo: image.isVideo,
-                        to: thumbDestination
-                    ) ? Self.galleryFolderName(for: entryId) + "/" + thumbName : nil
-
-                    stored.append(DownloadedGalleryImage(
-                        id: image.id,
-                        localPath: relativePath,
-                        title: image.title,
-                        createdAt: image.createdAt,
-                        isVideo: image.isVideo,
-                        thumbnailPath: thumbRelative,
-                        performerNames: (image.performers ?? []).map(\.name),
-                        tagNames: (image.tags ?? []).map(\.name)
-                    ))
-                }
+                // Thumbnail generation is async (AVAssetImageGenerator); the chain continues
+                // once it is written so `stored` keeps its order.
                 Task { @MainActor in
+                    if success {
+                        let thumbName = "\(image.id)_thumb.jpg"
+                        let thumbDestination = folder.appendingPathComponent(thumbName)
+                        let thumbRelative = await Self.makeThumbnail(
+                            from: destination,
+                            isVideo: image.isVideo,
+                            to: thumbDestination
+                        ) ? Self.galleryFolderName(for: entryId) + "/" + thumbName : nil
+
+                        stored.append(DownloadedGalleryImage(
+                            id: image.id,
+                            localPath: relativePath,
+                            title: image.title,
+                            createdAt: image.createdAt,
+                            isVideo: image.isVideo,
+                            thumbnailPath: thumbRelative,
+                            performerNames: (image.performers ?? []).map(\.name),
+                            tagNames: (image.tags ?? []).map(\.name)
+                        ))
+                    }
                     if var active = self.activeDownloads[entryId] {
                         active.progress = max(0.02, Double(index + 1) / Double(max(total, 1)))
                         self.activeDownloads[entryId] = active
                     }
+                    next(index + 1)
                 }
-                next(index + 1)
             }
         }
         next(0)

@@ -200,6 +200,18 @@ struct DashboardSettingsView: View {
                     .padding(.bottom, 4)
                 }
 
+                if tab.id == .scenes {
+                    settingRow("Studio Logos") {
+                        Toggle("", isOn: Binding(
+                            get: { tabManager.sceneCardsShowStudioLogo },
+                            set: { tabManager.sceneCardsShowStudioLogo = $0 }
+                        ))
+                        .labelsHidden()
+                        .tint(appearanceManager.tintColor)
+                    }
+                    .padding(.bottom, 4)
+                }
+
                 settingRow("Default Sort") {
                     CatalogDefaultSortMenu(tab: tab.id)
                 }

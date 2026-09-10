@@ -425,8 +425,7 @@ struct HomePerformerCardView: View {
                     .foregroundColor(.white)
                     .padding(.horizontal, 5)
                     .padding(.vertical, 3)
-                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                    .clipShape(Capsule())
+                    .stashyGlass(shape: Capsule())
                 }
                 Spacer()
                 Text(performer.name)

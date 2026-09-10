@@ -190,6 +190,23 @@ struct SceneDetailView: View {
                     newScene = newScene.withUpdatedAt(Scene.newerUpdatedAt(newScene.updatedAt, self.activeScene.updatedAt))
                     self.activeScene = newScene
                     self.activeScene.postListMetadataUpdated()
+
+                    if jobSuccess {
+                        // Identify usually replaces the cover, but the cache key strips the
+                        // timestamp — so bust like "Set as cover" does: the cache drops the
+                        // stale screenshot, loaders refetch, lists patch their thumbnails.
+                        let bust = String(Int(Date().timeIntervalSince1970 * 1000))
+                        self.activeScene = self.activeScene.withUpdatedAt(bust)
+                        NotificationCenter.default.post(
+                            name: NSNotification.Name("SceneCoverUpdated"),
+                            object: nil,
+                            userInfo: [
+                                "sceneId": self.activeScene.id,
+                                "updatedAt": bust,
+                                "screenshotPath": self.activeScene.paths?.screenshot as Any
+                            ]
+                        )
+                    }
                 }
 
                 self.isIdentifying = false
@@ -336,19 +353,7 @@ struct SceneDetailView: View {
                         SceneSimilarScenesCard(scene: activeScene)
                             .gridCellColumns(2)
 
-                        // Item 1: Galleries — always visible (full width)
-                        SceneGalleriesCard(
-                            sceneId: activeScene.id,
-                            galleries: activeScene.galleries,
-                            performers: activeScene.performers,
-                            onGalleriesUpdated: { updated in
-                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: updated, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                            },
-                            viewModel: viewModel
-                        )
-                        .gridCellColumns(2)
-
-                        // Item 2: Performers (+ Director, full scroll row, spans both columns)
+                        // Item 1: Performers (+ Director, full scroll row, spans both columns)
                         ScenePerformersCard(
                             sceneId: activeScene.id,
                             sceneDate: activeScene.date,
@@ -361,7 +366,7 @@ struct SceneDetailView: View {
                         )
                         .gridCellColumns(2)
 
-                        // Item 3: Studio
+                        // Item 2: Studio
                         SceneStudioCard(
                             sceneId: activeScene.id,
                             studio: activeScene.studio,
@@ -371,7 +376,7 @@ struct SceneDetailView: View {
                             viewModel: viewModel
                         )
 
-                        // Item 4: Groups
+                        // Item 3: Groups
                         SceneGroupsCard(
                             sceneId: activeScene.id,
                             groups: activeScene.groups ?? [],
@@ -381,7 +386,7 @@ struct SceneDetailView: View {
                             viewModel: viewModel
                         )
 
-                        // Item 5: Tags — always visible
+                        // Item 4: Tags — always visible
                         SceneTagsCard(
                             sceneId: activeScene.id,
                             tags: activeScene.tags,
@@ -392,6 +397,18 @@ struct SceneDetailView: View {
                             isTagsExpanded: $isTagsExpanded,
                             tagsTotalHeight: $tagsTotalHeight
                         )
+
+                        // Item 5: Galleries — always visible (full width)
+                        SceneGalleriesCard(
+                            sceneId: activeScene.id,
+                            galleries: activeScene.galleries,
+                            performers: activeScene.performers,
+                            onGalleriesUpdated: { updated in
+                                applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: updated, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                            },
+                            viewModel: viewModel
+                        )
+                        .gridCellColumns(2)
 
                         // Item 6: Delete Button
                         Button(role: .destructive) {
@@ -413,18 +430,7 @@ struct SceneDetailView: View {
                     // stashy+ — hides itself when Suggestions is off or nothing is similar.
                     SceneSimilarScenesCard(scene: activeScene)
 
-                    // Row 1: Galleries — always visible
-                    SceneGalleriesCard(
-                        sceneId: activeScene.id,
-                        galleries: activeScene.galleries,
-                        performers: activeScene.performers,
-                        onGalleriesUpdated: { updated in
-                            applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: updated, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
-                        },
-                        viewModel: viewModel
-                    )
-
-                    // Row 2: Performers (+ Director, full width, horizontal scroll)
+                    // Row 1: Performers (+ Director, full width, horizontal scroll)
                     ScenePerformersCard(
                         sceneId: activeScene.id,
                         sceneDate: activeScene.date,
@@ -436,7 +442,7 @@ struct SceneDetailView: View {
                         viewModel: viewModel
                     )
 
-                    // Row 3: Studio + Groups side by side
+                    // Row 2: Studio + Groups side by side
                     HStack(alignment: .top, spacing: 12) {
                         SceneStudioCard(
                             sceneId: activeScene.id,
@@ -456,7 +462,7 @@ struct SceneDetailView: View {
                         )
                     }
 
-                    // Row 4: Tags — always visible
+                    // Row 3: Tags — always visible
                     SceneTagsCard(
                         sceneId: activeScene.id,
                         tags: activeScene.tags,
@@ -466,6 +472,17 @@ struct SceneDetailView: View {
                         viewModel: viewModel,
                         isTagsExpanded: $isTagsExpanded,
                         tagsTotalHeight: $tagsTotalHeight
+                    )
+
+                    // Row 4: Galleries — always visible
+                    SceneGalleriesCard(
+                        sceneId: activeScene.id,
+                        galleries: activeScene.galleries,
+                        performers: activeScene.performers,
+                        onGalleriesUpdated: { updated in
+                            applyLocalSceneEdit(Scene(id: activeScene.id, title: activeScene.title, details: activeScene.details, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: updated, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
+                        },
+                        viewModel: viewModel
                     )
 
                     // Delete Scene Button (Card Style)

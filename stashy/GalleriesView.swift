@@ -497,60 +497,9 @@ private struct GalleriesViewContent: View {
         )
     }
 
-    @ViewBuilder
-    private var quickFilterMenuContent: some View {
-            Button {
-                catalogPresetRowSelection = ""
-            } label: {
-                HStack {
-                    Text("No Filter")
-                    if catalogPresetRowSelection.isEmpty && selectedFilter == nil {
-                        Image(systemName: "checkmark")
-                    }
-                }
-            }
-
-            let serverFilters = sortedServerGalleryFilters
-            if !serverFilters.isEmpty {
-                Section("Saved Filters") {
-                    ForEach(serverFilters) { filter in
-                        Button {
-                            catalogPresetRowSelection = ListLivePresetTag.serverRow(filter.id)
-                        } label: {
-                            HStack {
-                                Text(filter.name)
-                                if catalogPresetRowSelection == ListLivePresetTag.serverRow(filter.id)
-                                    || (catalogPresetRowSelection.isEmpty && selectedFilter?.id == filter.id) {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            if !localCatalogPresets.isEmpty {
-                Section("Presets") {
-                    ForEach(localCatalogPresets) { preset in
-                        Button {
-                            catalogPresetRowSelection = ListLivePresetTag.localRow(preset.id)
-                        } label: {
-                            HStack {
-                                Text(preset.name)
-                                if catalogPresetRowSelection == ListLivePresetTag.localRow(preset.id) {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-    }
-
     /// Single source for nav bar + slot chrome. The legacy/native branch lives in `stashyCatalogChrome`.
     private var catalogChromeConfig: CatalogChromeConfig {
         let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.galleries)
-        let filterMenuActive = selectedFilter != nil || !catalogPresetRowSelection.isEmpty
         return CatalogChromeConfig(
             title: "Galleries",
             ownsNavigationBar: !hideTitle,
@@ -565,11 +514,6 @@ private struct GalleriesViewContent: View {
                         tabManager.toggleCatalogCardColumns(for: CatalogCardColumnScope.galleries)
                     }
                 }
-            ),
-            quickFilter: CatalogQuickFilterMenuModel(
-                isActive: filterMenuActive,
-                accessibilityLabel: "Filter",
-                menuContent: AnyView(quickFilterMenuContent)
             ),
             filterSort: CatalogChromeSlot(
                 systemImage: "slider.horizontal.3",
@@ -853,8 +797,7 @@ struct GalleryCardView: View {
                                         .foregroundColor(.white)
                                         .padding(.horizontal, 8)
                                         .padding(.vertical, 4)
-                                        .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                                        .clipShape(Capsule())
+                                        .stashyGlass(shape: Capsule())
                                 }
                                 
                                 Spacer()
@@ -871,8 +814,7 @@ struct GalleryCardView: View {
                                     .foregroundColor(.white)
                                     .padding(.horizontal, 8)
                                     .padding(.vertical, 4)
-                                    .background(Color.black.opacity(DesignTokens.Opacity.badge))
-                                    .clipShape(Capsule())
+                                    .stashyGlass(shape: Capsule())
                                 }
                             }
                             .padding(8)
