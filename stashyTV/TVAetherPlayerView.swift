@@ -143,6 +143,11 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     let onExit: () -> Void
 
     @FocusState private var isPlayerFocused: Bool
+    /// Fokus-Einstieg fürs ausgeklappte Panel. Ohne ihn lässt der Fokus-Engine den
+    /// Fokus beim Öffnen ins Leere laufen — der Container gibt ihn ab, das Panel
+    /// nimmt ihn nicht, und die Fernbedienung tut gar nichts mehr.
+    @FocusState private var panelFocus: PanelFocusTarget?
+    @Namespace private var panelScope
     @State private var isPanelOpen = false
     @State private var showTransport = true
     @State private var hideWork: DispatchWorkItem?
@@ -178,15 +183,22 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                     .transition(.opacity)
             }
 
+            // Der Fernbedienungs-Layer ist bewusst ein **Geschwister** des Panels und
+            // existiert nur, solange das Panel zu ist. Lagen `onTapGesture`,
+            // `onMoveCommand` & Co. am gemeinsamen Container, hingen ihre
+            // Gesten-Recognizer über den Buttons des Panels und schluckten Select
+            // und die Richtungstasten — auch dann, wenn der Closure-Körper wegen
+            // `guard !isPanelOpen` gar nichts tat. Genau daran scheiterte die
+            // Navigation im ausgeklappten Panel.
+            if !isPanelOpen {
+                remoteInputLayer
+            }
+
             if isPanelOpen {
                 panelOverlay
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
         }
-        // The one focus target: `AetherPlayerSurface` cannot take focus itself, and any
-        // second focusable element would steal the remote's transport commands.
-        .focusable(!isPanelOpen)
-        .focused($isPlayerFocused)
         .onAppear {
             isPlayerFocused = true
             scheduleAutoHide()
@@ -195,17 +207,63 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             if ready && !isPanelOpen { isPlayerFocused = true }
         }
         .onChange(of: isPanelOpen) { _, open in
-            if !open {
-                isPlayerFocused = true
+            if open {
+                focusPanelEntry()
+            } else {
+                panelFocus = nil
+                restorePlayerFocus()
                 reveal()
             }
         }
-        .onTapGesture { handleSelect() }
-        .onPlayPauseCommand { handlePlayPause() }
-        .onMoveCommand { handleMove($0) }
-        .onExitCommand { handleExit() }
         .animation(.easeInOut(duration: 0.2), value: showTransport)
         .animation(.easeInOut(duration: 0.2), value: isPanelOpen)
+    }
+
+    /// Das einzige Fokus-Ziel bei geschlossenem Panel: `AetherPlayerSurface` kann
+    /// selbst keinen Fokus nehmen, und ein zweites fokussierbares Element würde ihm
+    /// die Transport-Kommandos wegnehmen.
+    private var remoteInputLayer: some View {
+        Color.clear
+            .contentShape(Rectangle())
+            .focusable(true)
+            .focused($isPlayerFocused)
+            .onTapGesture { handleSelect() }
+            .onPlayPauseCommand { handlePlayPause() }
+            .onMoveCommand { handleMove($0) }
+            .onExitCommand { handleExit() }
+            .ignoresSafeArea()
+    }
+
+    // MARK: - Panel focus
+
+    /// Die Reihe, die den Fokus bekommt, wenn das Panel aufgeht. `nil` heißt: es gibt
+    /// weder Prev/Next noch Spuren, also übernimmt `panelExtra` per
+    /// `prefersDefaultFocus`.
+    private var firstPanelTarget: PanelFocusTarget? {
+        if canGoPrevious || canGoNext { return .nav }
+        if !engine.audioTracks.isEmpty { return .audio }
+        if !engine.subtitleTracks.isEmpty { return .subtitles }
+        return nil
+    }
+
+    /// Erst nach der Einblend-Animation: vorher existieren die Buttons noch nicht und
+    /// die `@FocusState`-Zuweisung verpufft.
+    private func focusPanelEntry() {
+        guard let target = firstPanelTarget else { return }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            guard isPanelOpen else { return }
+            panelFocus = target
+        }
+    }
+
+    /// Gegenstück: der Input-Layer wird beim Schließen neu eingesetzt, die Zuweisung
+    /// muss also warten, bis er wieder im Baum ist.
+    private func restorePlayerFocus() {
+        isPlayerFocused = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            guard !isPanelOpen else { return }
+            isPlayerFocused = true
+        }
     }
 
     // MARK: - Poster / error
@@ -398,25 +456,31 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                 if canGoPrevious || canGoNext {
                     HStack(spacing: 24) {
                         if canGoPrevious {
-                            panelButton(title: "Previous", icon: "backward.end.fill") {
+                            panelButton(title: "Previous",
+                                        icon: "backward.end.fill",
+                                        focusTarget: .nav) {
                                 closePanel()
                                 onPrevious?()
                             }
                         }
                         if canGoNext {
-                            panelButton(title: "Next", icon: "forward.end.fill") {
+                            panelButton(title: "Next",
+                                        icon: "forward.end.fill",
+                                        focusTarget: canGoPrevious ? nil : .nav) {
                                 closePanel()
                                 onNext?()
                             }
                         }
                     }
+                    .focusSection()
                 }
 
                 if !engine.audioTracks.isEmpty {
                     trackRow(heading: "Audio",
                              tracks: engine.audioTracks,
                              activeIndex: engine.activeAudioTrackIndex,
-                             allowsOff: false) { index in
+                             allowsOff: false,
+                             focusTarget: firstPanelTarget == .audio ? .audio : nil) { index in
                         if let index { engine.selectAudioTrack(index: index) }
                     }
                 }
@@ -425,7 +489,8 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                     trackRow(heading: "Subtitles",
                              tracks: engine.subtitleTracks,
                              activeIndex: engine.activeSubtitleTrackIndex,
-                             allowsOff: true) { index in
+                             allowsOff: true,
+                             focusTarget: firstPanelTarget == .subtitles ? .subtitles : nil) { index in
                         if let index {
                             engine.selectSubtitleTrack(index: index)
                         } else {
@@ -436,23 +501,37 @@ private struct TVAetherPlayerContent<Panel: View>: View {
 
                 panelExtra()
                     .focusSection()
+                    // Gibt es weder Prev/Next noch Spuren, ist der Extra-Inhalt die
+                    // einzige Reihe — dann muss der Fokus-Engine ihn als Einstieg
+                    // nehmen, denn `@FocusState` erreicht fremden Inhalt nicht.
+                    .prefersDefaultFocus(firstPanelTarget == nil, in: panelScope)
                     .environment(\.tvPlayerClosePanel, { closePanel() })
             }
             .padding(.horizontal, 60)
             .padding(.vertical, 40)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(Color.black.opacity(0.9))
+            .focusScope(panelScope)
         }
         .ignoresSafeArea()
-        // Reaches us only for an up no row could take, i.e. from the topmost row.
-        .onMoveCommand { direction in
-            if direction == .up { closePanel() }
-        }
+        // Menu schließt das Panel. Kein `onMoveCommand` hier: dessen Recognizer läge
+        // über den Buttons und würde die Richtungstasten schlucken, statt — wie der
+        // frühere Kommentar annahm — nur die von keiner Reihe genommenen zu sehen.
+        .onExitCommand { closePanel() }
+    }
+
+    /// Fokus-Anker des Panels. `nil` als `equals`-Wert gibt es bei `@FocusState` nicht,
+    /// also wird der Modifier nur auf dem Einstiegs-Button gesetzt.
+    fileprivate enum PanelFocusTarget: Hashable {
+        case nav, audio, subtitles
     }
 
     @ViewBuilder
-    private func panelButton(title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
+    private func panelButton(title: String,
+                             icon: String,
+                             focusTarget: PanelFocusTarget? = nil,
+                             action: @escaping () -> Void) -> some View {
+        let button = Button(action: action) {
             HStack(spacing: 12) {
                 Image(systemName: icon)
                 Text(title)
@@ -462,6 +541,12 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             .padding(.vertical, 14)
         }
         .buttonStyle(.card)
+
+        if let focusTarget {
+            button.focused($panelFocus, equals: focusTarget)
+        } else {
+            button
+        }
     }
 
     @ViewBuilder
@@ -469,6 +554,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                           tracks: [TrackInfo],
                           activeIndex: Int?,
                           allowsOff: Bool,
+                          focusTarget: PanelFocusTarget? = nil,
                           select: @escaping (Int?) -> Void) -> some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(heading)
@@ -477,13 +563,16 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 18) {
                     if allowsOff {
-                        panelButton(title: activeIndex == nil ? "✓ Off" : "Off", icon: "captions.bubble") {
+                        panelButton(title: activeIndex == nil ? "✓ Off" : "Off",
+                                    icon: "captions.bubble",
+                                    focusTarget: focusTarget) {
                             select(nil)
                         }
                     }
-                    ForEach(tracks) { track in
+                    ForEach(Array(tracks.enumerated()), id: \.element.id) { offset, track in
                         panelButton(title: label(for: track, isActive: track.id == activeIndex),
-                                    icon: heading == "Audio" ? "speaker.wave.2.fill" : "captions.bubble.fill") {
+                                    icon: heading == "Audio" ? "speaker.wave.2.fill" : "captions.bubble.fill",
+                                    focusTarget: (!allowsOff && offset == 0) ? focusTarget : nil) {
                             select(track.id)
                         }
                     }

@@ -80,6 +80,9 @@ struct TVSettingsView: View {
     @ObservedObject private var appearanceManager = AppearanceManager.shared
     @AppStorage("tvUseSidebar") private var useSidebar = true
     @FocusState private var focusedEntry: TVSettingsEntry?
+    /// Wird an die gepushten Unterseiten weitergereicht, damit `tvExitDismissable()`
+    /// dort den Pfad kennt und die Menu-Taste eine Ebene zurückgeht.
+    @Environment(\.tvNavigationPath) private var navigationPath
     /// Der Fokus verlässt die Liste, sobald er in die Sidebar wandert. Ohne
     /// gemerkten Eintrag stünde die rechte Spalte dann leer.
     @State private var detailEntry: TVSettingsEntry = .servers
@@ -103,23 +106,28 @@ struct TVSettingsView: View {
         .onChange(of: focusedEntry) { _, entry in
             if let entry { detailEntry = entry }
         }
+        .navigationDestination(for: TVSettingsEntry.self) { entry in
+            destination(for: entry)
+                .tvExitDismissable()
+                .environment(\.tvNavigationPath, navigationPath)
+        }
     }
 
     private var entryList: some View {
         List {
             Section {
-                link(.servers) { TVServersSettingsView() }
-                link(.appearance) { TVAppearanceSettingsView() }
-                link(.security) { TVSecuritySettingsView() }
-                link(.stashyPlus) { TVStashyPlusSettingsView() }
+                link(.servers)
+                link(.appearance)
+                link(.security)
+                link(.stashyPlus)
             } header: {
                 Text("General")
             }
 
             Section {
-                link(.defaultSort) { TVDefaultSortSettingsView() }
-                link(.defaultFilters) { TVDefaultFilterSettingsView() }
-                link(.visibleTabs) { TVTabVisibilitySettingsView() }
+                link(.defaultSort)
+                link(.defaultFilters)
+                link(.visibleTabs)
             } header: {
                 Text("Content")
             }
@@ -136,8 +144,8 @@ struct TVSettingsView: View {
             }
 
             Section {
-                link(.maintenance) { TVMaintenanceSettingsView() }
-                link(.about) { TVAboutSettingsView() }
+                link(.maintenance)
+                link(.about)
             }
         }
         .safeAreaInset(edge: .bottom) {
@@ -145,17 +153,33 @@ struct TVSettingsView: View {
         }
     }
 
-    @ViewBuilder
-    private func link<Destination: View>(
-        _ entry: TVSettingsEntry,
-        @ViewBuilder destination: @escaping () -> Destination
-    ) -> some View {
-        NavigationLink {
-            destination().tvExitDismissable()
-        } label: {
+    /// Wert-basiert statt ziel-basiert: nur so landet die Unterseite im
+    /// `NavigationPath` des Settings-Tabs. Ein `NavigationLink(destination:)` schiebt
+    /// zwar auch, taucht im gebundenen Pfad aber nie auf — dann ließ sich die
+    /// Unterseite von außen nicht mehr schließen, und beim Wechsel in einen anderen
+    /// Sidebar-Eintrag blieb sie stehen.
+    private func link(_ entry: TVSettingsEntry) -> some View {
+        NavigationLink(value: entry) {
             row(entry)
         }
         .focused($focusedEntry, equals: entry)
+    }
+
+    @ViewBuilder
+    private func destination(for entry: TVSettingsEntry) -> some View {
+        switch entry {
+        case .servers: TVServersSettingsView()
+        case .appearance: TVAppearanceSettingsView()
+        case .security: TVSecuritySettingsView()
+        case .stashyPlus: TVStashyPlusSettingsView()
+        case .defaultSort: TVDefaultSortSettingsView()
+        case .defaultFilters: TVDefaultFilterSettingsView()
+        case .visibleTabs: TVTabVisibilitySettingsView()
+        case .maintenance: TVMaintenanceSettingsView()
+        case .about: TVAboutSettingsView()
+        // Kein Link, sondern ein Toggle in der Liste.
+        case .sidebar: EmptyView()
+        }
     }
 
     /// Nur Text, Wert rechtsbündig — die tvOS-Form. Icons und Untertitel in

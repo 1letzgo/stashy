@@ -73,6 +73,13 @@ struct TVMainTabView: View {
                 if newValue == selectedTab {
                     navigationStore.popToRoot(newValue)
                 } else {
+                    // Settings-Unterseiten sind nicht klebrig. Auf tvOS überlebt eine
+                    // gepushte Seite den Wechsel des Sidebar-Eintrags, der Nutzer sah
+                    // nach „Home" also weiter die Settings-Unterseite. Beim Verlassen
+                    // deshalb zurück zur Settings-Wurzel.
+                    if selectedTab == .settings {
+                        navigationStore.popToRoot(.settings)
+                    }
                     selectedTab = newValue
                 }
             }
