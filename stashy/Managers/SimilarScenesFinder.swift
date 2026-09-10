@@ -28,7 +28,11 @@ final class SimilarScenesFinder: ObservableObject {
 
     /// Own kill switch — independent of tag suggestions.
     @Published var isEnabled: Bool {
-        didSet { UserDefaults.standard.set(isEnabled, forKey: Self.enabledKey) }
+        didSet {
+            UserDefaults.standard.set(isEnabled, forKey: Self.enabledKey)
+            // Shares the tag statistics — switching on builds them if missing.
+            AITagSuggestionManager.shared.statisticsConsumerChanged()
+        }
     }
 
     /// How many to show. The card is only worth the space with a handful of entries.

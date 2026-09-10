@@ -147,7 +147,7 @@ final class AITagSuggestionManager: ObservableObject {
     @Published var isEnabled: Bool {
         didSet {
             UserDefaults.standard.set(isEnabled, forKey: Keys.enabled)
-            if !isEnabled { cancelWork() }
+            statisticsConsumerChanged()
         }
     }
 
@@ -164,6 +164,15 @@ final class AITagSuggestionManager: ObservableObject {
 
     /// Available and allowed to run right now.
     var isActive: Bool { isEnabled && StashyPlusManager.isUnlockedNow }
+
+    /// Someone consumes the statistics: tag suggestions or Similar Scenes. Building is allowed
+    /// (and happens automatically) as long as either switch is on.
+    var needsStatistics: Bool {
+        StashyPlusManager.isUnlockedNow && (isEnabled || SimilarScenesFinder.shared.isEnabled)
+    }
+
+    /// Statistics older than this are rebuilt on app start.
+    static let staleAfter: TimeInterval = 12 * 60 * 60
 
     var hasModel: Bool {
         if case .ready = state { return true }
@@ -205,6 +214,7 @@ final class AITagSuggestionManager: ObservableObject {
     private var persistTask: Task<Void, Never>?
     private var didLoadFromDisk = false
     private var serverObserver: NSObjectProtocol?
+    private var serverReadyObserver: NSObjectProtocol?
 
     /// Tags the user waved away. Ignoring one takes it out of the suggestions until it
     /// is accepted somewhere — the alternative is being wrong about the same tag on
@@ -243,11 +253,23 @@ final class AITagSuggestionManager: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor in self?.handleServerChange() }
         }
+        // App start (and every server switch that finishes initialising): keep the
+        // statistics fresh without a visit to Settings.
+        serverReadyObserver = NotificationCenter.default.addObserver(
+            forName: .stashServerInitializationFinished,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in await self?.ensureStatistics() }
+        }
     }
 
     deinit {
         if let serverObserver {
             NotificationCenter.default.removeObserver(serverObserver)
+        }
+        if let serverReadyObserver {
+            NotificationCenter.default.removeObserver(serverReadyObserver)
         }
     }
 
@@ -313,8 +335,30 @@ final class AITagSuggestionManager: ObservableObject {
 
     // MARK: - Building
 
+    /// Called when either consumer switch flips: switching one on builds missing or stale
+    /// statistics, switching the last one off stops a running build.
+    func statisticsConsumerChanged() {
+        if needsStatistics {
+            Task { await ensureStatistics() }
+        } else {
+            cancelWork()
+        }
+    }
+
+    /// Builds the statistics when a consumer is on and there is no model yet or the model is
+    /// older than `staleAfter`. No-op while a build is running.
+    func ensureStatistics() async {
+        guard needsStatistics else { return }
+        await loadIfNeeded()
+        if case .building = state { return }
+        if let builtAt = lastBuiltAt, hasModel, Date().timeIntervalSince(builtAt) < Self.staleAfter {
+            return
+        }
+        rebuild()
+    }
+
     func rebuild() {
-        guard isActive, buildTask == nil else { return }
+        guard needsStatistics, buildTask == nil else { return }
         buildTask = Task { [weak self] in
             await self?.performBuild()
             await MainActor.run { self?.buildTask = nil }

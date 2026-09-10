@@ -105,7 +105,7 @@ struct AITagsSettingsView: View {
                     Label(buildButtonTitle, systemImage: "arrow.triangle.2.circlepath")
                         .foregroundColor(appearanceManager.tintColor)
                 }
-                .disabled(!isUnlocked || !manager.isEnabled)
+                .disabled(!manager.needsStatistics)
                 .stashyGroupedBlockRow(index: 1, count: 3)
             }
 
@@ -122,6 +122,7 @@ struct AITagsSettingsView: View {
             .disabled(!isBuilding && !manager.hasModel)
             .stashyGroupedBlockRow(index: 2, count: 3)
 
+            stashyScrollingSectionFooter("Built automatically when Tag suggestions or Similar scenes is on, and refreshed at app start once the statistics are older than 12 hours.")
         }
     }
 
@@ -179,9 +180,6 @@ struct AITagsSettingsView: View {
             set: { newValue in
                 guard isUnlocked else { return }
                 manager.isEnabled = newValue
-                if newValue {
-                    Task { await manager.loadIfNeeded() }
-                }
             }
         )
     }
