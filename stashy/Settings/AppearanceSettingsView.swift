@@ -51,9 +51,67 @@ struct AppearanceSettingsView: View {
                 Slider(value: $appearanceManager.glassTransparency, in: 0.2...1, step: 0.05)
                     .tint(appearanceManager.tintColor)
             }
-            .stashyGroupedBlockRow(index: 0, count: 1)
+            .stashyGroupedBlockRow(index: 0, count: 2)
+
+            glassDemo
+                .stashyGroupedBlockRow(index: 1, count: 2)
             stashyScrollingSectionFooter("How much of the content shows through buttons, pills and bars. Applies to all glass chrome.")
         }
+    }
+
+    /// Live preview: the three chrome shapes on a busy backdrop, redrawn with the slider.
+    private var glassDemo: some View {
+        ZStack {
+            LinearGradient(
+                colors: [.orange, .pink, .purple, .blue, .teal, .green],
+                startPoint: .topLeading, endPoint: .bottomTrailing
+            )
+            VStack(spacing: 6) {
+                ForEach(0..<4, id: \.self) { row in
+                    HStack(spacing: 6) {
+                        ForEach(0..<8, id: \.self) { col in
+                            RoundedRectangle(cornerRadius: 3)
+                                .fill(Color.white.opacity((row + col) % 2 == 0 ? 0.55 : 0.1))
+                                .frame(height: 10)
+                        }
+                    }
+                }
+            }
+            .padding(10)
+
+            HStack(spacing: 10) {
+                Button {} label: {
+                    HStack(spacing: StashyExpandingDock.iconLabelSpacing) {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        Text("Back")
+                            .font(.subheadline.weight(.semibold))
+                    }
+                    .foregroundColor(.white)
+                    .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight, accent: true))
+                }
+                Button {} label: {
+                    Text("Demo")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundColor(.white)
+                        .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
+                }
+                Button {} label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundColor(.white)
+                        .frame(width: 42, height: 42)
+                        .stashyGlass(shape: Circle())
+                }
+            }
+            .buttonStyle(.plain)
+            .colorScheme(.dark)
+            .allowsHitTesting(false)
+        }
+        .frame(height: 96)
+        .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .padding(.vertical, 4)
+        .accessibilityLabel("Glass preview")
     }
 
     private var accentColorSection: some View {
