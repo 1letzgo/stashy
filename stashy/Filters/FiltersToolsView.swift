@@ -131,9 +131,9 @@ struct FiltersToolsView: View {
     private var filtersList: some View {
         List {
             ForEach(grouped, id: \.mode) { section in
+                // Real section header, not a first row: as a row it would own the group's
+                // rounded top and leave the first filter with square corners.
                 Section {
-                    // Same small caps header the other Tools views and Settings use.
-                    stashyScrollingSectionHeader(Self.modeTitle(section.mode))
                     ForEach(section.filters) { filter in
                         Button {
                             editingFilter = filter
@@ -172,6 +172,12 @@ struct FiltersToolsView: View {
                         .listRowBackground(Color.secondaryAppBackground(for: appearance.currentTheme))
                         .listRowSeparatorTint(Color.primary.opacity(0.15))
                     }
+                } header: {
+                    // Same small caps header the other Tools views and Settings use.
+                    Text(Self.modeTitle(section.mode))
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .textCase(.uppercase)
                 }
             }
         }
