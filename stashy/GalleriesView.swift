@@ -1554,70 +1554,6 @@ struct FullScreenImageView: View {
                         VStack(alignment: .leading, spacing: 4) {
                             fullScreenNameTitleLine(image: image)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-
-                            let tags = image.tags ?? []
-                            // Tag Suggestion (stashy+, off by default) and the manual "+"
-                            // share this row, so it also has to exist for an untagged item.
-                            let showsTagRow = !tags.isEmpty
-                                || appearanceManager.isEditModeEnabled
-                                || AITagSuggestionManager.shared.isActive
-                            Group {
-                                if showsTagRow {
-                                    ScrollView(.horizontal, showsIndicators: false) {
-                                        HStack(spacing: 6) {
-                                            if appearanceManager.isEditModeEnabled {
-                                                Button {
-                                                    tagEditorImage = image
-                                                } label: {
-                                                    // A bare symbol is shorter than a line of
-                                                    // text, which made this pill smaller than
-                                                    // the tag chips beside it.
-                                                    Image(systemName: "plus")
-                                                        .font(.system(size: 12, weight: .bold))
-                                                        .frame(height: tagChipGlyphHeight)
-                                                        .foregroundColor(.white.opacity(0.8))
-                                                        .padding(.horizontal, 9)
-                                                        .padding(.vertical, 4)
-                                                        .stashyGlass(shape: Capsule())
-                                                }
-                                                .buttonStyle(.plain)
-                                                .accessibilityLabel("Add tags")
-                                            }
-
-                                            ForEach(tags) { tag in
-                                                Text("#\(tag.name)")
-                                                    .font(.system(size: 12, weight: .semibold))
-                                                    .foregroundColor(.white.opacity(0.8))
-                                                    .padding(.horizontal, 9)
-                                                    .padding(.vertical, 4)
-                                                    .stashyGlass(shape: Capsule())
-                                                    .contextMenu {
-                                                        if appearanceManager.isEditModeEnabled {
-                                                            Button(role: .destructive) {
-                                                                removeTag(tag, from: image)
-                                                            } label: {
-                                                                Label("Remove tag", systemImage: "trash")
-                                                            }
-                                                        }
-                                                    }
-                                            }
-
-                                            AITagSuggestionBar(target: .image(image)) { newTags in
-                                                if let position = images.firstIndex(where: { $0.id == image.id }) {
-                                                    images[position] = images[position].withTags(newTags)
-                                                }
-                                            }
-                                        }
-                                    }
-                                    // Fresh identity per image: without it SwiftUI reuses the
-                                    // row and the next picture inherits however far the
-                                    // previous one was scrolled sideways.
-                                    .id(image.id)
-                                } else {
-                                    Color.clear.opacity(0)
-                                }
-                            }
-                            .frame(height: 24)
                         }
                     }
                     Spacer(minLength: 8)
@@ -1646,6 +1582,74 @@ struct FullScreenImageView: View {
                         }
                     }
                 }
+                .padding(.horizontal, StashyExpandingDock.edgePadding)
+
+                // Hashtags on their own full-width row under the title/controls row —
+                // the trailing button stack no longer squeezes them.
+                let tags = image.tags ?? []
+                // Tag Suggestion (stashy+, off by default) and the manual "+"
+                // share this row, so it also has to exist for an untagged item.
+                let showsTagRow = !tags.isEmpty
+                    || appearanceManager.isEditModeEnabled
+                    || AITagSuggestionManager.shared.isActive
+                Group {
+                    if showsTagRow {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                if appearanceManager.isEditModeEnabled {
+                                    Button {
+                                        tagEditorImage = image
+                                    } label: {
+                                        // A bare symbol is shorter than a line of
+                                        // text, which made this pill smaller than
+                                        // the tag chips beside it.
+                                        Image(systemName: "plus")
+                                            .font(.system(size: 12, weight: .bold))
+                                            .frame(height: tagChipGlyphHeight)
+                                            .foregroundColor(.white.opacity(0.8))
+                                            .padding(.horizontal, 9)
+                                            .padding(.vertical, 4)
+                                            .stashyGlass(shape: Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Add tags")
+                                }
+
+                                ForEach(tags) { tag in
+                                    Text("#\(tag.name)")
+                                        .font(.system(size: 12, weight: .semibold))
+                                        .foregroundColor(.white.opacity(0.8))
+                                        .padding(.horizontal, 9)
+                                        .padding(.vertical, 4)
+                                        .stashyGlass(shape: Capsule())
+                                        .contextMenu {
+                                            if appearanceManager.isEditModeEnabled {
+                                                Button(role: .destructive) {
+                                                    removeTag(tag, from: image)
+                                                } label: {
+                                                    Label("Remove tag", systemImage: "trash")
+                                                }
+                                            }
+                                        }
+                                }
+
+                                AITagSuggestionBar(target: .image(image)) { newTags in
+                                    if let position = images.firstIndex(where: { $0.id == image.id }) {
+                                        images[position] = images[position].withTags(newTags)
+                                    }
+                                }
+                            }
+                        }
+                        // Fresh identity per image: without it SwiftUI reuses the
+                        // row and the next picture inherits however far the
+                        // previous one was scrolled sideways.
+                        .id(image.id)
+                    } else {
+                        Color.clear.opacity(0)
+                    }
+                }
+                .frame(height: 24)
+                .padding(.top, 8)
                 .padding(.horizontal, StashyExpandingDock.edgePadding)
             }
         }

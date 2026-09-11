@@ -4452,80 +4452,6 @@ struct ReelsViewBody: View {
                         VStack(alignment: .leading, spacing: 4) {
                             reelsNameTitleLine(item: item)
                                 .frame(maxWidth: .infinity, alignment: .leading)
-
-                            let tags = item.tags
-                            // Tag Suggestion (stashy+, off by default) shares this row, so
-                            // it also has to exist for an untagged clip.
-                            let showsTagRow = !tags.isEmpty
-                                || appearanceManager.isEditModeEnabled
-                                || AITagSuggestionManager.shared.isActive
-                            Group {
-                                if showsTagRow {
-                                    ScrollView(.horizontal, showsIndicators: false) {
-                                        HStack(spacing: 6) {
-                                            if appearanceManager.isEditModeEnabled {
-                                                Button {
-                                                    tagEditorTarget = item.aiTagTarget
-                                                } label: {
-                                                    // A bare symbol is shorter than a line
-                                                    // of text, which made this pill smaller
-                                                    // than the tag chips beside it.
-                                                    Image(systemName: "plus")
-                                                        .font(.system(size: 12, weight: .bold))
-                                                        .frame(height: tagChipGlyphHeight)
-                                                        .foregroundColor(.white.opacity(0.8))
-                                                        .padding(.horizontal, 9)
-                                                        .padding(.vertical, 4)
-                                                        .stashyGlass(shape: Capsule())
-                                                }
-                                                .buttonStyle(.plain)
-                                                .accessibilityLabel("Add tags")
-                                            }
-
-                                            ForEach(tags) { tag in
-                                                Button(action: {
-                                                    var newTags = selectedTags
-                                                    if newTags.contains(where: { $0.id == tag.id }) {
-                                                        newTags.removeAll { $0.id == tag.id }
-                                                    } else {
-                                                        newTags.append(tag)
-                                                    }
-                                                    applyTagsChange(newTags)
-                                                }) {
-                                                    Text("#\(tag.name)")
-                                                        .font(.system(size: 12, weight: .semibold))
-                                                        .foregroundColor(.white.opacity(0.8))
-                                                        .padding(.horizontal, 9)
-                                                        .padding(.vertical, 4)
-                                                        .stashyGlass(shape: Capsule())
-                                                }
-                                                .buttonStyle(.plain)
-                                                .contextMenu {
-                                                    let target = item.aiTagTarget
-                                                    if appearanceManager.isEditModeEnabled,
-                                                       tag.id != target.primaryTagId {
-                                                        Button(role: .destructive) {
-                                                            removeTag(tag, from: target)
-                                                        } label: {
-                                                            Label("Remove tag", systemImage: "trash")
-                                                        }
-                                                    }
-                                                }
-                                            }
-
-                                            // Tag Suggestion (stashy+, off by default).
-                                            AITagSuggestionBar(target: item.aiTagTarget) { _ in }
-                                        }
-                                    }
-                                    // Fresh identity per item: without it SwiftUI reuses the
-                                    // row and the next clip inherits however far the previous
-                                    // one was scrolled sideways.
-                                    .id(item.id)
-                                } else {
-                                    Color.clear.opacity(0)
-                                }
-                            }
-                            .frame(height: 24)
                         }
                     }
                     Spacer(minLength: 8)
@@ -4565,6 +4491,84 @@ struct ReelsViewBody: View {
                         }
                     }
                 }
+                .padding(.horizontal, StashyExpandingDock.edgePadding)
+
+                // Hashtags on their own full-width row under the title/controls row —
+                // the trailing button stack no longer squeezes them.
+                let tags = item.tags
+                // Tag Suggestion (stashy+, off by default) shares this row, so
+                // it also has to exist for an untagged clip.
+                let showsTagRow = !tags.isEmpty
+                    || appearanceManager.isEditModeEnabled
+                    || AITagSuggestionManager.shared.isActive
+                Group {
+                    if showsTagRow {
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 6) {
+                                if appearanceManager.isEditModeEnabled {
+                                    Button {
+                                        tagEditorTarget = item.aiTagTarget
+                                    } label: {
+                                        // A bare symbol is shorter than a line
+                                        // of text, which made this pill smaller
+                                        // than the tag chips beside it.
+                                        Image(systemName: "plus")
+                                            .font(.system(size: 12, weight: .bold))
+                                            .frame(height: tagChipGlyphHeight)
+                                            .foregroundColor(.white.opacity(0.8))
+                                            .padding(.horizontal, 9)
+                                            .padding(.vertical, 4)
+                                            .stashyGlass(shape: Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("Add tags")
+                                }
+
+                                ForEach(tags) { tag in
+                                    Button(action: {
+                                        var newTags = selectedTags
+                                        if newTags.contains(where: { $0.id == tag.id }) {
+                                            newTags.removeAll { $0.id == tag.id }
+                                        } else {
+                                            newTags.append(tag)
+                                        }
+                                        applyTagsChange(newTags)
+                                    }) {
+                                        Text("#\(tag.name)")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundColor(.white.opacity(0.8))
+                                            .padding(.horizontal, 9)
+                                            .padding(.vertical, 4)
+                                            .stashyGlass(shape: Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                    .contextMenu {
+                                        let target = item.aiTagTarget
+                                        if appearanceManager.isEditModeEnabled,
+                                           tag.id != target.primaryTagId {
+                                            Button(role: .destructive) {
+                                                removeTag(tag, from: target)
+                                            } label: {
+                                                Label("Remove tag", systemImage: "trash")
+                                            }
+                                        }
+                                    }
+                                }
+
+                                // Tag Suggestion (stashy+, off by default).
+                                AITagSuggestionBar(target: item.aiTagTarget) { _ in }
+                            }
+                        }
+                        // Fresh identity per item: without it SwiftUI reuses the
+                        // row and the next clip inherits however far the previous
+                        // one was scrolled sideways.
+                        .id(item.id)
+                    } else {
+                        Color.clear.opacity(0)
+                    }
+                }
+                .frame(height: 24)
+                .padding(.top, 8)
                 .padding(.horizontal, StashyExpandingDock.edgePadding)
             }
         }
@@ -6074,7 +6078,8 @@ struct IsolatedScrubberBar: View {
         .padding(.horizontal, 16)
         // Same gap to the tag row as between the trailing chrome buttons (8pt).
         .padding(.top, 8)
-        .padding(.bottom, 6)
+        // …and the same 8pt down to the tab bar.
+        .padding(.bottom, 8)
         .opacity(isUIVisible ? 1 : 0)
         .allowsHitTesting(isUIVisible)
         .animation(.easeInOut(duration: 0.2), value: isUIVisible)
