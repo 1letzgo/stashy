@@ -289,10 +289,12 @@ struct AetherSceneSurface: View {
             // Opacity instead of structural insertion: a conditional `if` plus a transition
             // proved unreliable over the UIKit-hosted player view (the re-inserted controls
             // never became visible), while a plain opacity change always renders.
+            // Marker jumps flank play/pause (only when the scene has markers); ±10 s lives
+            // on the double-tap regions left and right of the centre.
             HStack(spacing: centerSpacing) {
-                skipButton(-10)
+                if !markerSeconds.isEmpty { markerJumpButton(forward: false, large: true) }
                 playPauseGlyph
-                skipButton(10)
+                if !markerSeconds.isEmpty { markerJumpButton(forward: true, large: true) }
             }
             .autoHiding(areControlsVisible)
 
@@ -320,13 +322,10 @@ struct AetherSceneSurface: View {
                         if engine.isUsingTranscodeFallback { transcodeTag }
                         bottomTrailingControls
                     }
-                    // Marker controls flank the time bar: previous · add on the left, next on
-                    // the right.
+                    // Add marker on the left of the time bar.
                     HStack(spacing: 8) {
-                        if !markerSeconds.isEmpty { markerJumpButton(forward: false) }
                         if onAddMarker != nil { addMarkerButton }
                         timeBar
-                        if !markerSeconds.isEmpty { markerJumpButton(forward: true) }
                     }
                 }
                 .padding(.horizontal, 16)
@@ -478,7 +477,7 @@ struct AetherSceneSurface: View {
     }
 
     @ViewBuilder
-    private func markerJumpButton(forward: Bool) -> some View {
+    private func markerJumpButton(forward: Bool, large: Bool = false) -> some View {
         let target = forward ? nextMarkerSeconds : previousMarkerSeconds
         Button {
             guard let target else { return }
@@ -487,7 +486,8 @@ struct AetherSceneSurface: View {
             revealControls()
         } label: {
             glassCircle(systemName: forward ? "forward.end.fill" : "backward.end.fill",
-                        diameter: chromeButtonSize)
+                        diameter: large ? skipButtonSize : chromeButtonSize,
+                        glyphSize: large ? (isCompact ? 18 : 24) : nil)
                 .opacity(target == nil ? 0.4 : 1)
         }
         .buttonStyle(.plain)
@@ -582,7 +582,9 @@ struct AetherSceneSurface: View {
 
         items.append(.submenu(
             id: "player.speed",
-            title: "Playback Speed (\(Self.speedLabel(playbackRate)))",
+            title: abs(playbackRate - 1) > 0.001
+                ? "Playback Speed (\(Self.speedLabel(playbackRate)))"
+                : "Playback Speed",
             systemImage: "gauge.with.dots.needle.67percent",
             items: availableSpeedOptions.map { option in
                 .action(
@@ -753,19 +755,6 @@ struct AetherSceneSurface: View {
         withAnimation(.easeInOut(duration: 0.2)) {
             areControlsVisible = false
         }
-    }
-
-    @ViewBuilder
-    private func skipButton(_ delta: Double) -> some View {
-        Button {
-            skip(by: delta)
-        } label: {
-            glassCircle(systemName: delta < 0 ? "gobackward.10" : "goforward.10",
-                        diameter: skipButtonSize,
-                        glyphSize: isCompact ? 18 : 24)
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(delta < 0 ? "Back 10 seconds" : "Forward 10 seconds")
     }
 
     /// Seeks through the host's `onSeek`, so the coalesced engine seek, the device sync and
