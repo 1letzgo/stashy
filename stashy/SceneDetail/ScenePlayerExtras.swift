@@ -450,6 +450,7 @@ struct ScenePlayerExtrasMenuItems: View {
     @ObservedObject private var stashSyncManager = StashSyncManager.shared
 
     var body: some View {
+        // Every action in its own section, so the menu draws a separator between them.
         Section {
             Button {
                 controller.requestSceneCoverReplacement()
@@ -457,7 +458,9 @@ struct ScenePlayerExtrasMenuItems: View {
                 Label("Set as scene cover", systemImage: "photo")
             }
             .disabled(controller.isBusyCapturing)
+        }
 
+        Section {
             Button {
                 controller.captureTagImageFrameAndPresentSheet()
             } label: {
@@ -468,6 +471,9 @@ struct ScenePlayerExtrasMenuItems: View {
 
         Section {
             aiSubtitlesMenu
+        }
+
+        Section {
             #if canImport(AetherEngine)
             // AI Motion braucht ein echtes Player-Item zum Abtasten (`.loopback` /
             // `.remoteBypass`); die Software-Route hat keins.
