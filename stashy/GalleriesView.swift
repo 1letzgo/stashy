@@ -1617,7 +1617,7 @@ struct FullScreenImageView: View {
                                     Color.clear.opacity(0)
                                 }
                             }
-                            .frame(height: 22)
+                            .frame(height: 24)
                         }
                     }
                     Spacer(minLength: 8)
@@ -1649,7 +1649,7 @@ struct FullScreenImageView: View {
                 .padding(.horizontal, StashyExpandingDock.edgePadding)
             }
         }
-        .padding(.bottom, 2)
+        .padding(.bottom, 0)
         .colorScheme(.dark)
         .opacity(showUI ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: showUI)

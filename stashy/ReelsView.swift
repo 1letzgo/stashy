@@ -4525,7 +4525,7 @@ struct ReelsViewBody: View {
                                     Color.clear.opacity(0)
                                 }
                             }
-                            .frame(height: 22)
+                            .frame(height: 24)
                         }
                     }
                     Spacer(minLength: 8)
@@ -4568,7 +4568,7 @@ struct ReelsViewBody: View {
                 .padding(.horizontal, StashyExpandingDock.edgePadding)
             }
         }
-        .padding(.bottom, 2)
+        .padding(.bottom, 0)
         .colorScheme(.dark)
         .opacity(isUIVisible ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: isUIVisible)
@@ -6072,6 +6072,8 @@ struct IsolatedScrubberBar: View {
             }
         )
         .padding(.horizontal, 16)
+        // Same gap to the tag row as between the trailing chrome buttons (8pt).
+        .padding(.top, 8)
         .padding(.bottom, 6)
         .opacity(isUIVisible ? 1 : 0)
         .allowsHitTesting(isUIVisible)
