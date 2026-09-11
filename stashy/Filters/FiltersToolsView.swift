@@ -174,10 +174,13 @@ struct FiltersToolsView: View {
                     }
                 } header: {
                     // Same small caps header the other Tools views and Settings use.
+                    // Zero row insets: insetGrouped would otherwise indent the header
+                    // further than the card edge it belongs to.
                     Text(Self.modeTitle(section.mode))
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .textCase(.uppercase)
+                        .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
                 }
             }
         }
@@ -186,6 +189,8 @@ struct FiltersToolsView: View {
         // keeps the room reserved for them and the first group floats far below the search.
         .listSectionSpacing(DesignTokens.Spacing.md)
         .contentMargins(.top, DesignTokens.Spacing.sm, for: .scrollContent)
+        // insetGrouped insets at 20pt; the other Tools sit at 16pt.
+        .contentMargins(.horizontal, DesignTokens.Tools.contentPadding, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(Color.appBackground(for: appearance.currentTheme))
         .refreshable { viewModel.fetchSavedFilters() }
@@ -309,7 +314,8 @@ private struct FiltersToolsSearchChromeModifier<MenuItems: View>: ViewModifier {
                     .accessibilityLabel("New filter")
                 }
                 .padding(.horizontal, DesignTokens.Tools.contentPadding)
-                .padding(.vertical, DesignTokens.Spacing.xs + 2)
+                .padding(.top, DesignTokens.Tools.menuTopPadding)
+                .padding(.bottom, DesignTokens.Spacing.xs + 2)
                 .background(Color.appBackground(for: appearance.currentTheme))
             }
     }

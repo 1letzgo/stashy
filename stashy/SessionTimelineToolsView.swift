@@ -42,47 +42,52 @@ struct SessionTimelineToolsView: View {
 
     private var timelineList: some View {
         ScrollView {
-            LazyVStack(alignment: horizontalSizeClass == .regular ? .center : .leading, spacing: 28) {
+            VStack(spacing: 0) {
                 // Scrolls with the content (same as the Charts tool) instead of floating in a
-                // `safeAreaInset` above it.
+                // `safeAreaInset` above it. Außerhalb des 28er-Rasters, damit die Reihe exakt
+                // wie `ToolsPillMenuRow` sitzt: 12pt oben, 12pt unten.
                 TimelineFilterChipRow(enabled: $enabledKinds)
                     .padding(.top, DesignTokens.Tools.menuTopPadding)
+                    .padding(.bottom, DesignTokens.Tools.menuBottomPadding)
 
-                if loader.isLoading && loader.sessions.isEmpty {
-                    StandardLoadingView(message: "Loading timeline...")
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 40)
-                } else if loader.didFail && loader.sessions.isEmpty {
-                    Text("Could not load play history from this server.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 40)
-                } else if visibleDays.isEmpty {
-                    Text(loader.sessions.isEmpty
-                         ? "No plays, O-counts, or markers in the last 24 hours."
-                         : "No matching activity for the selected filters.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                        .frame(maxWidth: .infinity)
-                        .padding(.top, 40)
-                } else {
-                    ForEach(visibleDays) { day in
-                        TimelineDayBlock(day: day)
+                LazyVStack(alignment: horizontalSizeClass == .regular ? .center : .leading, spacing: 28) {
+                    if loader.isLoading && loader.sessions.isEmpty {
+                        StandardLoadingView(message: "Loading timeline...")
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 40)
+                    } else if loader.didFail && loader.sessions.isEmpty {
+                        Text("Could not load play history from this server.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 40)
+                    } else if visibleDays.isEmpty {
+                        Text(loader.sessions.isEmpty
+                             ? "No plays, O-counts, or markers in the last 24 hours."
+                             : "No matching activity for the selected filters.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .frame(maxWidth: .infinity)
+                            .padding(.top, 40)
+                    } else {
+                        ForEach(visibleDays) { day in
+                            TimelineDayBlock(day: day)
+                        }
+                    }
+
+                    if loader.isLoadingMore {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 16)
+                    } else if loader.hasMore, !loader.isLoading, !loader.sessions.isEmpty {
+                        Color.clear
+                            .frame(height: 1)
+                            .onAppear {
+                                Task { await loader.loadMore() }
+                            }
                     }
                 }
-
-                if loader.isLoadingMore {
-                    ProgressView()
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                } else if loader.hasMore, !loader.isLoading, !loader.sessions.isEmpty {
-                    Color.clear
-                        .frame(height: 1)
-                        .onAppear {
-                            Task { await loader.loadMore() }
-                        }
-                }
+                .frame(maxWidth: .infinity, alignment: horizontalSizeClass == .regular ? .center : .leading)
             }
             .toolsHorizontalPadding(horizontalSizeClass)
             .padding(.bottom, DesignTokens.Tools.menuBottomPadding + 12)

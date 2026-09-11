@@ -90,9 +90,10 @@ struct OCountHeatmapCard: View {
     private var canGoForward: Bool { monthsBack > 0 }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        // 16pt zwischen den Karten — gleicher Kartenabstand wie in Tools → Overview.
+        VStack(alignment: .leading, spacing: DesignTokens.Spacing.md) {
             if isRegularWidth {
-                HStack(alignment: .top, spacing: 12) {
+                HStack(alignment: .top, spacing: DesignTokens.Spacing.md) {
                     calendarCard
                         .frame(maxWidth: isRegularWidth ? 520 : .infinity, alignment: .leading)
                     summaryCard

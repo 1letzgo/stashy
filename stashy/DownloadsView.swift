@@ -51,9 +51,7 @@ struct DownloadsView: View {
                         // Active Downloads Section
                         if !downloadManager.activeDownloads.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("Active Downloads")
-                                    .font(.headline)
-                                    .padding(.horizontal, DesignTokens.Tools.contentPadding)
+                                downloadsSectionHeading("Active Downloads")
 
                                 LazyVGrid(columns: columns, spacing: 12) {
                                     ForEach(Array(downloadManager.activeDownloads.values).sorted { $0.title < $1.title }, id: \.id) { download in
@@ -89,15 +87,12 @@ struct DownloadsView: View {
                                 .measuresGridWidth($gridWidth)
                                 .padding(.horizontal, DesignTokens.Tools.contentPadding)
                             }
-                            .padding(.top, DesignTokens.Tools.menuTopPadding)
                         }
                         
                         // Completed Downloads Section
                         if !downloadManager.downloads.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
-                                Text("Scenes")
-                                    .font(.headline)
-                                    .padding(.horizontal, DesignTokens.Tools.contentPadding)
+                                downloadsSectionHeading("Scenes")
                                 
                                 LazyVGrid(columns: columns, spacing: 12) {
                                     ForEach(downloadManager.downloads) { downloaded in
@@ -110,7 +105,6 @@ struct DownloadsView: View {
                                 .measuresGridWidth($gridWidth)
                                 .padding(.horizontal, DesignTokens.Tools.contentPadding)
                             }
-                            .padding(.top, downloadManager.activeDownloads.isEmpty ? DesignTokens.Tools.menuTopPadding : 0)
                         }
 
                         let galleryEntries = downloadManager.galleryDownloads.filter { $0.resolvedKind != .tag }
@@ -123,6 +117,7 @@ struct DownloadsView: View {
                             downloadSection("Tags", entries: tagEntries)
                         }
                     }
+                    .padding(.top, DesignTokens.Tools.menuTopPadding)
                     .padding(.bottom, DesignTokens.Tools.menuBottomPadding)
                 }
             }
@@ -690,9 +685,7 @@ extension DownloadsView {
     @ViewBuilder
     func downloadSection(_ title: String, entries: [DownloadedGallery]) -> some View {
         VStack(alignment: .leading, spacing: 12) {
-            Text(title)
-                .font(.headline)
-                .padding(.horizontal, DesignTokens.Tools.contentPadding)
+            downloadsSectionHeading(title)
 
             LazyVGrid(columns: columns, spacing: 12) {
                 ForEach(entries) { entry in
@@ -704,7 +697,16 @@ extension DownloadsView {
             }
             .padding(.horizontal, DesignTokens.Tools.contentPadding)
         }
-        .padding(.top, DesignTokens.Tools.menuTopPadding)
+    }
+
+    /// Small caps footnote, flush with the content edge — same header look as the other Tools.
+    @ViewBuilder
+    func downloadsSectionHeading(_ title: String) -> some View {
+        Text(title)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+            .padding(.horizontal, DesignTokens.Tools.contentPadding)
     }
 }
 

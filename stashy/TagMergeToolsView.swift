@@ -153,11 +153,12 @@ struct TagMergeToolsView: View {
         .background(Color.appBackground(for: appearance.currentTheme))
     }
 
+    /// Gleicher Small-Caps-Header wie in den anderen Tools (`stashyScrollingSectionHeader`),
+    /// bündig mit der Kartenkante — kein zusätzlicher Einzug.
     private func sectionHeading(_ title: String) -> some View {
         Text(title.uppercased())
-            .font(.caption)
-            .foregroundColor(.secondary)
-            .padding(.leading, DesignTokens.Spacing.xs)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
     }
 
     // MARK: - Tag list
