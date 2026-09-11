@@ -1,0 +1,3 @@
+mutation BulkStudioUpdateParent($ids: [ID!]!, $parentId: ID!) {
+  bulkStudioUpdate(input: { ids: $ids, parent_id: $parentId }) { id }
+}

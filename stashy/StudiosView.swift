@@ -382,7 +382,7 @@ private struct StudiosViewContent: View {
             .onChange(of: catalogPresetRowSelection) { _, newId in
                 handleCatalogPresetSelectionChange(newId)
             }
-            .alert("Save As", isPresented: $showSaveAsCatalogPresetAlert) {
+            .alert("Save as new", isPresented: $showSaveAsCatalogPresetAlert) {
                 TextField("Name", text: $catalogPresetNameInput)
                 Button("Save") { saveStudioCatalogPresetAs(name: catalogPresetNameInput) }
                 Button("Cancel", role: .cancel) {}

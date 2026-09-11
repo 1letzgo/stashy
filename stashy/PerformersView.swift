@@ -429,7 +429,7 @@ private struct PerformersViewContent: View {
             .onChange(of: catalogPresetRowSelection) { _, newId in
                 handlePerformerCatalogPresetSelectionChange(newId)
             }
-            .alert("Save As", isPresented: $showSaveAsCatalogPresetAlert) {
+            .alert("Save as new", isPresented: $showSaveAsCatalogPresetAlert) {
                 TextField("Name", text: $catalogPresetNameInput)
                 Button("Save") { savePerformerCatalogPresetAs(name: catalogPresetNameInput) }
                 Button("Cancel", role: .cancel) {}

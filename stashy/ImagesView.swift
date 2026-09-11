@@ -278,7 +278,7 @@ private struct ImagesViewBody: View {
             .onChange(of: imageListFilters.catalogPresetRowSelection) { _, newId in
                 imageListFilters.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save As", isPresented: $imageListFilters.showSaveAsCatalogPresetAlert) {
+            .alert("Save as new", isPresented: $imageListFilters.showSaveAsCatalogPresetAlert) {
                 TextField("Name", text: $imageListFilters.catalogPresetNameInput)
                 Button("Save") { imageListFilters.savePresetAs(name: imageListFilters.catalogPresetNameInput, viewModel: viewModel) }
                 Button("Cancel", role: .cancel) {}
@@ -1038,10 +1038,23 @@ private struct ImagesViewBody: View {
             currentGalleryId: gallery?.id,
             autoplayVideoImageId: feedAutoplayGateOpen ? autoplayVideoImageId : nil,
             reportsFeedVideoFrame: feedAutoplayGateOpen,
+            viewModel: viewModel,
             onLoadMore: { loadMoreImagesIfNeeded() },
-            onOpened: { openFullscreen(id: $0) }
+            onOpened: { openFullscreen(id: $0) },
+            onImageUpdated: { patchFeedImage($0) }
         )
         .id(images[0].id)
+    }
+
+    /// Optimistic rating / O-counter edits from a feed post land on the source list.
+    private func patchFeedImage(_ image: StashImage) {
+        if gallery != nil {
+            if let index = viewModel.galleryImages.firstIndex(where: { $0.id == image.id }) {
+                viewModel.galleryImages[index] = image
+            }
+        } else if let index = viewModel.allImages.firstIndex(where: { $0.id == image.id }) {
+            viewModel.allImages[index] = image
+        }
     }
 
     @ViewBuilder
@@ -1181,26 +1194,37 @@ struct ImageGroupCatalogCell: View {
     var autoplayVideoImageId: String? = nil
     /// Disable while scrolling — PreferenceKey geometry probes cause scroll jank.
     var reportsFeedVideoFrame: Bool = false
+    /// Rating + O-counter buttons (same as Feeds › Clips) need a view model for the mutations;
+    /// without one the buttons are hidden.
+    var viewModel: StashDBViewModel? = nil
     let onLoadMore: () -> Void
     /// Tapped to open fullscreen — the parent owns the push.
     let onOpened: (String) -> Void
+    /// Optimistic rating / O-counter edit — the parent writes it back to its source list.
+    var onImageUpdated: ((StashImage) -> Void)? = nil
 
     @State private var visibleImageId: String
+    @State private var tagEditorImage: StashImage?
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
 
     init(
         images: [StashImage],
         currentGalleryId: String? = nil,
         autoplayVideoImageId: String? = nil,
         reportsFeedVideoFrame: Bool = false,
+        viewModel: StashDBViewModel? = nil,
         onLoadMore: @escaping () -> Void,
-        onOpened: @escaping (String) -> Void
+        onOpened: @escaping (String) -> Void,
+        onImageUpdated: ((StashImage) -> Void)? = nil
     ) {
         self.images = images
         self.currentGalleryId = currentGalleryId
         self.autoplayVideoImageId = autoplayVideoImageId
         self.reportsFeedVideoFrame = reportsFeedVideoFrame
+        self.viewModel = viewModel
         self.onLoadMore = onLoadMore
         self.onOpened = onOpened
+        self.onImageUpdated = onImageUpdated
         _visibleImageId = State(initialValue: images[0].id)
     }
 
@@ -1222,36 +1246,41 @@ struct ImageGroupCatalogCell: View {
                 // The push is owned by the parent's `navigationDestination`, not by this row:
                 // a `NavigationLink` here dies with its cell, so deleting the open image from
                 // fullscreen would pop the viewer.
-                Button {
-                    onOpened(visibleImageId)
-                } label: {
-                    ImageThumbnailCard(
-                        image: visibleImage,
-                        aspectRatio: visibleImage.oneColumnFeedAspectRatio,
-                        showsOverlayChrome: false,
-                        allowsVideoAutoplay: allowsVisibleVideoAutoplay,
-                        reportsFeedVideoFrame: reportsFeedVideoFrame
-                    )
+                if images.count > 1 {
+                    // Grouped set: swipe through the images; the thumb strip below follows.
+                    TabView(selection: $visibleImageId) {
+                        ForEach(images) { img in
+                            heroButton(for: img).tag(img.id)
+                        }
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .aspectRatio(visibleImage.oneColumnFeedAspectRatio, contentMode: .fit)
                     .animation(.easeInOut(duration: 0.2), value: visibleImage.oneColumnFeedAspectRatio)
-                    .id(visibleImage.id)
+                } else {
+                    heroButton(for: visibleImage)
                 }
-                .buttonStyle(.plain)
 
                 ImageCatalogFeedHeader(image: visibleImage, currentGalleryId: currentGalleryId)
 
-                if images.count > 1 {
-                    Text("\(visibleIndex + 1)/\(images.count)")
-                        .font(.caption2).fontWeight(.semibold)
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 8)
-                        .padding(.vertical, 4)
-                        .stashyGlass(shape: Capsule())
-                        .padding(8)
-                        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                        .allowsHitTesting(false)
-                        .accessibilityLabel("Image \(visibleIndex + 1) of \(images.count)")
+                HStack(alignment: .bottom, spacing: 8) {
+                    if images.count > 1 {
+                        Text("\(visibleIndex + 1)/\(images.count)")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundColor(.white)
+                            .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, hashtagColors: true, glass: true))
+                            .allowsHitTesting(false)
+                            .accessibilityLabel("Image \(visibleIndex + 1) of \(images.count)")
+                    }
+                    Spacer(minLength: 0)
+                    if viewModel != nil {
+                        rateChrome
+                    }
                 }
+                .padding(8)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
             }
+
+            tagRow(for: visibleImage)
 
             if images.count > 1 {
                 ScrollViewReader { proxy in
@@ -1291,6 +1320,204 @@ struct ImageGroupCatalogCell: View {
         .onChange(of: images.map(\.id)) { _, ids in
             if !ids.contains(visibleImageId) {
                 visibleImageId = images.first?.id ?? visibleImageId
+            }
+        }
+        .sheet(item: $tagEditorImage) { image in
+            if let viewModel {
+                AddTagsSheet(target: .image(image), viewModel: viewModel) { updated in
+                    onImageUpdated?(image.withTags(updated))
+                }
+            }
+        }
+    }
+}
+
+extension ImageGroupCatalogCell {
+    // MARK: Tags (same row as Feeds: pinned "+", scrolling chips)
+
+    @ViewBuilder
+    fileprivate func tagRow(for image: StashImage) -> some View {
+        let tags = image.tags ?? []
+        let canEdit = appearanceManager.isEditModeEnabled && viewModel != nil
+        let showsTagRow = !tags.isEmpty || canEdit || AITagSuggestionManager.shared.isActive
+        if showsTagRow {
+            HStack(spacing: 6) {
+                if canEdit {
+                    Button {
+                        tagEditorImage = image
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 12, weight: .bold))
+                            .frame(height: tagChipGlyphHeight)
+                            .foregroundColor(.primary.opacity(0.8))
+                            .padding(.horizontal, 9)
+                            .padding(.vertical, 4)
+                            .stashyGlass(shape: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Add tags")
+                }
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 6) {
+                        ForEach(tags) { tag in
+                            Text("#\(tag.name)")
+                                .font(.system(size: 12, weight: .semibold))
+                                .foregroundColor(.primary.opacity(0.8))
+                                .padding(.horizontal, 9)
+                                .padding(.vertical, 4)
+                                .stashyGlass(shape: Capsule())
+                                .contextMenu {
+                                    if canEdit {
+                                        Button(role: .destructive) {
+                                            removeTag(tag, from: image)
+                                        } label: {
+                                            Label("Remove tag", systemImage: "trash")
+                                        }
+                                    }
+                                }
+                        }
+
+                        AITagSuggestionBar(target: .image(image)) { newTags in
+                            onImageUpdated?(image.withTags(newTags))
+                        }
+                    }
+                }
+                // Fresh identity per image, otherwise the next picture inherits the
+                // previous horizontal scroll offset.
+                .id(image.id)
+            }
+            .frame(height: 24)
+            .padding(.horizontal, 12)
+            .padding(.top, 8)
+            .padding(.bottom, images.count > 1 ? 0 : 8)
+        }
+    }
+
+    private func removeTag(_ tag: Tag, from image: StashImage) {
+        let remaining = (image.tags ?? []).filter { $0.id != tag.id }
+        Task {
+            let success = await AITagSuggestionManager.shared.write(tags: remaining, to: .image(image))
+            if success {
+                onImageUpdated?(image.withTags(remaining))
+                HapticManager.success()
+                ToastManager.shared.show("Removed #\(tag.name)")
+            } else {
+                HapticManager.error()
+                ToastManager.shared.show("Could not remove tag", icon: "exclamationmark.triangle.fill", style: .error)
+            }
+        }
+    }
+
+    @ViewBuilder
+    fileprivate func heroButton(for image: StashImage) -> some View {
+        let isVisible = image.id == visibleImageId
+        Button {
+            onOpened(image.id)
+        } label: {
+            ImageThumbnailCard(
+                image: image,
+                // All pages share the visible image's frame so a swipe never letterboxes.
+                aspectRatio: visibleImage.oneColumnFeedAspectRatio,
+                showsOverlayChrome: false,
+                allowsVideoAutoplay: isVisible && allowsVisibleVideoAutoplay,
+                reportsFeedVideoFrame: reportsFeedVideoFrame && isVisible
+            )
+            .animation(.easeInOut(duration: 0.2), value: visibleImage.oneColumnFeedAspectRatio)
+            .id(image.id)
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: Rating + O-counter (same buttons as Feeds › Clips)
+
+    @ViewBuilder
+    fileprivate var rateChrome: some View {
+        let image = visibleImage
+        let oCounter = image.o_counter ?? 0
+        let stars = max(0, min(5, Int(round(Double(image.rating100 ?? 0) / 20.0))))
+
+        // Side by side: rating left, O-counter right.
+        HStack(alignment: .bottom, spacing: 8) {
+            Menu {
+                Button {
+                    setRating(of: image, stars: 0)
+                } label: {
+                    HStack {
+                        Text("Clear Rating")
+                        if stars == 0 { Image(systemName: "checkmark") }
+                    }
+                }
+                Divider()
+                ForEach(1...5, id: \.self) { s in
+                    Button {
+                        setRating(of: image, stars: s)
+                    } label: {
+                        HStack {
+                            Text(String(repeating: "★", count: s))
+                            if stars == s { Image(systemName: "checkmark") }
+                        }
+                    }
+                }
+            } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: "star.fill")
+                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        .foregroundColor(.white.opacity(stars > 0 ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
+                    Text("\(stars)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                }
+                .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true, glass: true))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Rating")
+            Button {
+                incrementOCounter(of: image)
+            } label: {
+                VStack(spacing: 2) {
+                    Image(systemName: oCounter > 0 ? AppearanceManager.shared.oCounterIconFilled : AppearanceManager.shared.oCounterIcon)
+                        .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+                        .foregroundColor(.white.opacity(oCounter > 0 ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
+                    Text("\(oCounter)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                }
+                .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true, glass: true))
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("O-Counter")
+        }
+        .fixedSize()
+    }
+
+    private func incrementOCounter(of image: StashImage) {
+        guard let viewModel else { return }
+        let original = image.o_counter ?? 0
+        onImageUpdated?(image.withOCounter(original + 1))
+        HapticManager.light()
+        viewModel.incrementImageOCounter(imageId: image.id) { returnedCount in
+            DispatchQueue.main.async {
+                if let count = returnedCount {
+                    onImageUpdated?(image.withOCounter(count))
+                } else {
+                    onImageUpdated?(image.withOCounter(original))
+                    ToastManager.shared.show("Failed to update O-Counter", icon: "exclamationmark.triangle", style: .error)
+                }
+            }
+        }
+    }
+
+    private func setRating(of image: StashImage, stars: Int) {
+        guard let viewModel else { return }
+        let original = image.rating100
+        let rating100: Int? = stars > 0 ? stars * 20 : nil
+        onImageUpdated?(image.withRating(rating100))
+        viewModel.updateImageRating(imageId: image.id, rating100: rating100) { success in
+            if !success {
+                DispatchQueue.main.async {
+                    onImageUpdated?(image.withRating(original))
+                    ToastManager.shared.show("Failed to save rating", icon: "exclamationmark.triangle", style: .error)
+                }
             }
         }
     }

@@ -11,6 +11,9 @@ import SwiftUI
 struct ReelsModeSettingsView: View {
     @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var appearanceManager = AppearanceManager.shared
+    /// Feeds → Pics / Images 1-Spalten-Feed: Bilder einer Session bzw. gleicher Metadaten als Set.
+    @AppStorage("stashline_group_sets") private var groupIntoSets = true
+    @AppStorage("stashline_group_fallback") private var groupFallbackRaw = StashImageSetGroupingPolicy.sessionThenMeta.rawValue
     @StateObject private var viewModel = StashDBViewModel()
 
     @ViewBuilder
@@ -79,6 +82,32 @@ struct ReelsModeSettingsView: View {
                                 filterPicker(for: modeConfig.type)
                             }
                             .padding(.top, 4)
+
+                            // Pics: Bilder zu Sets bündeln (gleiche Prefs wie die 1-Spalten-Ansicht in Images).
+                            if modeConfig.type == .pics {
+                                reelsSettingRow(title: "Group into sets") {
+                                    Toggle("", isOn: $groupIntoSets)
+                                        .labelsHidden()
+                                        .tint(appearanceManager.tintColor)
+                                }
+                                .padding(.top, 4)
+
+                                if groupIntoSets {
+                                    reelsSettingRow(title: "Grouping") {
+                                        let current = StashImageSetGroupingPolicy(rawValue: groupFallbackRaw) ?? .sessionThenMeta
+                                        Menu {
+                                            ForEach(StashImageSetGroupingPolicy.allCases, id: \.self) { policy in
+                                                Button(action: { groupFallbackRaw = policy.rawValue }) {
+                                                    HStack { Text(policy.displayName); if policy == current { Image(systemName: "checkmark") } }
+                                                }
+                                            }
+                                        } label: {
+                                            pickerLabelText(current.displayName)
+                                        }
+                                    }
+                                    .padding(.top, 4)
+                                }
+                            }
                         }
                     }
                     .padding(.vertical, 6)

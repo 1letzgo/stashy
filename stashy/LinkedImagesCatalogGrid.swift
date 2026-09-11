@@ -20,6 +20,8 @@ struct LinkedImagesCatalogGrid: View {
     var multiColumnGridItems: [GridItem]
     /// Parent ScrollView drag/decelerate state (same gate as Images catalog).
     var isFeedScrolling: Bool = false
+    /// Rating + O-counter buttons on 1/row posts; hidden when nil.
+    var viewModel: StashDBViewModel? = nil
 
     @ObservedObject private var tabManager = TabManager.shared
     @AppStorage("stashline_group_sets") private var groupIntoSets = true
@@ -131,8 +133,14 @@ struct LinkedImagesCatalogGrid: View {
                         images: post.images,
                         autoplayVideoImageId: feedAutoplayGateOpen ? autoplayVideoImageId : nil,
                         reportsFeedVideoFrame: shouldProbeVideoFrames,
+                        viewModel: viewModel,
                         onLoadMore: onLoadMore,
-                        onOpened: { fullscreenImageId = $0 }
+                        onOpened: { fullscreenImageId = $0 },
+                        onImageUpdated: { updated in
+                            if let index = images.firstIndex(where: { $0.id == updated.id }) {
+                                images[index] = updated
+                            }
+                        }
                     )
                     .onAppear {
                         if post.id == posts.last?.id {

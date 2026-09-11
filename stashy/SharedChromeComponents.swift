@@ -322,6 +322,8 @@ struct StashyChromeBackButton: View {
 struct CatalogSettingsSheetChromeBar: View {
     var title: String = "Settings"
     var hasSelectedPreset: Bool
+    /// Name der gewählten Vorlage für "Update ‹Name›" im Speichern-Dialog.
+    var selectedPresetName: String? = nil
     var onReset: () -> Void
     var onRequestSave: () -> Void
     var onRequestSaveAs: () -> Void
@@ -329,6 +331,7 @@ struct CatalogSettingsSheetChromeBar: View {
     var onRequestDelete: () -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @State private var showSaveChoice = false
 
     var body: some View {
         StashySectionChromeBar(isOpaque: true) {
@@ -348,32 +351,29 @@ struct CatalogSettingsSheetChromeBar: View {
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                // Save / Save As / Rename / Delete behind one pill, matching Tools → Filters.
-                // Three separate circles crowded the bar and put Delete next to Save.
-                Menu {
-                    Button { onRequestSave() } label: {
-                        Label("Save", systemImage: "arrow.down.doc")
-                    }
-                    .disabled(!hasSelectedPreset)
-                    Button { onRequestSaveAs() } label: {
-                        Label("Save as…", systemImage: "doc.badge.plus")
-                    }
-                    if hasSelectedPreset {
-                        Button { onRequestRename() } label: {
-                            Label("Rename", systemImage: "pencil")
-                        }
-                        Divider()
-                        Button(role: .destructive) { onRequestDelete() } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
+                // Ein Speichern-Dialog (Alert) wie bei Merge Tags/Studios: Update der
+                // gewählten Vorlage, neu anlegen, umbenennen, löschen.
+                Button {
+                    showSaveChoice = true
                 } label: {
                     Text("Save")
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.white)
                         .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
                 }
+                .buttonStyle(.plain)
                 .accessibilityLabel("Save filter")
+                .alert("Save filter", isPresented: $showSaveChoice) {
+                    if hasSelectedPreset {
+                        Button(selectedPresetName.map { "Update \"\($0)\"" } ?? "Update") { onRequestSave() }
+                    }
+                    Button("Save as new") { onRequestSaveAs() }
+                    if hasSelectedPreset {
+                        Button("Rename") { onRequestRename() }
+                        Button("Delete", role: .destructive) { onRequestDelete() }
+                    }
+                    Button("Cancel", role: .cancel) {}
+                }
 
                 // Closing the sheet was swipe-only, which is awkward right after tapping Done in
                 // the advanced editor one level up.
@@ -397,6 +397,7 @@ struct CatalogSettingsSheetChromeBar: View {
 
 private struct CatalogSettingsSheetChromeModifier: ViewModifier {
     var hasSelectedPreset: Bool
+    var selectedPresetName: String? = nil
     var onReset: () -> Void
     var onRequestSave: () -> Void
     var onRequestSaveAs: () -> Void
@@ -410,6 +411,7 @@ private struct CatalogSettingsSheetChromeModifier: ViewModifier {
             .safeAreaInset(edge: .top, spacing: 16) {
                 CatalogSettingsSheetChromeBar(
                     hasSelectedPreset: hasSelectedPreset,
+                    selectedPresetName: selectedPresetName,
                     onReset: onReset,
                     onRequestSave: onRequestSave,
                     onRequestSaveAs: onRequestSaveAs,
@@ -526,6 +528,7 @@ extension View {
     /// Catalog filter/sort modal: custom “Settings” chrome instead of the system nav bar.
     func catalogSettingsSheetChrome(
         hasSelectedPreset: Bool,
+        selectedPresetName: String? = nil,
         onReset: @escaping () -> Void,
         onRequestSave: @escaping () -> Void,
         onRequestSaveAs: @escaping () -> Void,
@@ -535,6 +538,7 @@ extension View {
         modifier(
             CatalogSettingsSheetChromeModifier(
                 hasSelectedPreset: hasSelectedPreset,
+            selectedPresetName: selectedPresetName,
                 onReset: onReset,
                 onRequestSave: onRequestSave,
                 onRequestSaveAs: onRequestSaveAs,

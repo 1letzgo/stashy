@@ -4294,8 +4294,10 @@ struct ReelsViewBody: View {
 
     /// "Name - Title" on one line, plain text. Name applies the performer filter.
     @ViewBuilder
+    /// Performer und Titel untereinander — nebeneinander mit "-" war der Titel
+    /// bei längeren Namen fast immer abgeschnitten.
     private func reelsNameTitleLine(item: ReelItemData) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
+        VStack(alignment: .leading, spacing: 2) {
             if let performer = item.performers.first {
                 Button(action: { applyPerformerFilter(performer) }) {
                     Text(performer.name)
@@ -4304,11 +4306,7 @@ struct ReelsViewBody: View {
                         .lineLimit(1)
                 }
                 .buttonStyle(.plain)
-                .layoutPriority(1)
                 .accessibilityLabel("Filter by \(performer.name)")
-                Text("-")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
             }
             reelsTitleText(item: item)
         }

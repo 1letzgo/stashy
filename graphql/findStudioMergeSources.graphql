@@ -1,0 +1,7 @@
+query FindStudioMergeSources($studios: [ID!]!, $page: Int!, $perPage: Int!) {
+  findScenes(filter: { page: $page, per_page: $perPage }, scene_filter: { studios: { value: $studios, modifier: INCLUDES, depth: 0 } }) { count scenes { id } }
+  findGalleries(filter: { page: $page, per_page: $perPage }, gallery_filter: { studios: { value: $studios, modifier: INCLUDES, depth: 0 } }) { count galleries { id } }
+  findImages(filter: { page: $page, per_page: $perPage }, image_filter: { studios: { value: $studios, modifier: INCLUDES, depth: 0 } }) { count images { id } }
+  findGroups(filter: { page: $page, per_page: $perPage }, group_filter: { studios: { value: $studios, modifier: INCLUDES, depth: 0 } }) { count groups { id } }
+  findStudios(filter: { page: $page, per_page: $perPage }, studio_filter: { parents: { value: $studios, modifier: INCLUDES } }) { count studios { id } }
+}

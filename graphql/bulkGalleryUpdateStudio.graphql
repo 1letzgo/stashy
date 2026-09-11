@@ -1,0 +1,3 @@
+mutation BulkGalleryUpdateStudio($ids: [ID!]!, $studioId: ID!) {
+  bulkGalleryUpdate(input: { ids: $ids, studio_id: $studioId }) { id }
+}

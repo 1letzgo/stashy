@@ -537,7 +537,7 @@ private struct MarkersViewContent: View {
         .sheet(isPresented: $showFilterSortSheet) {
             markersFilterSortSheet
         }
-        .alert("Save As", isPresented: $showSaveAsPresetAlert) {
+        .alert("Save as new", isPresented: $showSaveAsPresetAlert) {
             TextField("Name", text: $presetNameInput)
             Button("Save") { saveMarkerPresetAs(name: presetNameInput) }
             Button("Cancel", role: .cancel) { }

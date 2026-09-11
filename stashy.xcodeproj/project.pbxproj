@@ -112,6 +112,7 @@
 		C4B0E00200000000000000B2 /* CatalogChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A2 /* CatalogChrome.swift */; };
 		C4B0E00200000000000000B3 /* StashyDetailToolbar.swift in Sources */ = {isa = PBXBuildFile; fileRef = C4B0E00100000000000000A3 /* StashyDetailToolbar.swift */; };
 		C7F3A10200000000000000E2 /* TagMergeToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10100000000000000E1 /* TagMergeToolsView.swift */; };
+		C7F3A10900000000000000E9 /* MergeTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10800000000000000E8 /* MergeTools.swift */; };
 		C7F3A10400000000000000E4 /* StudioLogo.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10300000000000000E3 /* StudioLogo.swift */; };
 		C7F3A10600000000000000E6 /* StudioLogoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10500000000000000E5 /* StudioLogoStore.swift */; };
 		C7F3A10700000000000000E7 /* StudioLogoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10500000000000000E5 /* StudioLogoStore.swift */; };
@@ -271,6 +272,7 @@
 		C4B0E00100000000000000A2 /* CatalogChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogChrome.swift; sourceTree = "<group>"; };
 		C4B0E00100000000000000A3 /* StashyDetailToolbar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyDetailToolbar.swift; sourceTree = "<group>"; };
 		C7F3A10100000000000000E1 /* TagMergeToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TagMergeToolsView.swift; sourceTree = "<group>"; };
+		C7F3A10800000000000000E8 /* MergeTools.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MergeTools.swift; sourceTree = "<group>"; };
 		C7F3A10300000000000000E3 /* StudioLogo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioLogo.swift; sourceTree = "<group>"; };
 		C7F3A10500000000000000E5 /* StudioLogoStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StudioLogoStore.swift; sourceTree = "<group>"; };
 		CA7A10D02F500000 /* ListCatalogFilterSortModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ListCatalogFilterSortModels.swift; sourceTree = "<group>"; };
@@ -446,6 +448,7 @@
 				DFF7EE402F0D3D2800344A8B /* TabManager.swift */,
 				DF22BB1D2F16743C007C2090 /* TagsView.swift */,
 				C7F3A10100000000000000E1 /* TagMergeToolsView.swift */,
+				C7F3A10800000000000000E8 /* MergeTools.swift */,
 				C7F3A10300000000000000E3 /* StudioLogo.swift */,
 				C7F3A10500000000000000E5 /* StudioLogoStore.swift */,
 				DFUI000062F3AUDIT006 /* ToastManager.swift */,
@@ -797,6 +800,7 @@
 				DF22BB152F167223007C2090 /* CatalogsView.swift in Sources */,
 				DF22BB1E2F16743C007C2090 /* TagsView.swift in Sources */,
 				C7F3A10200000000000000E2 /* TagMergeToolsView.swift in Sources */,
+				C7F3A10900000000000000E9 /* MergeTools.swift in Sources */,
 				C7F3A10400000000000000E4 /* StudioLogo.swift in Sources */,
 				C7F3A10600000000000000E6 /* StudioLogoStore.swift in Sources */,
 				DF90B75E2F1A5ECF003ED852 /* StarRatingView.swift in Sources */,
@@ -1054,7 +1058,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 339;
+				CURRENT_PROJECT_VERSION = 340;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1084,7 +1088,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 339;
+				CURRENT_PROJECT_VERSION = 340;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;

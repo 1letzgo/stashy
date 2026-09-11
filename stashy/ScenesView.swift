@@ -1176,7 +1176,7 @@ private struct ScenesViewContent: View {
                 }
             }
         }
-        .alert("Save As", isPresented: $showSaveAsPresetAlert) {
+        .alert("Save as new", isPresented: $showSaveAsPresetAlert) {
             TextField("Name", text: $presetNameInput)
             Button("Save") { saveLivePresetAs(name: presetNameInput) }
             Button("Cancel", role: .cancel) { }
@@ -1621,6 +1621,15 @@ struct SceneLiveFilterSheet: View {
     @Environment(\.dismiss) private var dismiss
 
     private var hasSelectedPreset: Bool { !selectedPresetId.isEmpty }
+    private var selectedPresetName: String? {
+        if let sid = SceneLivePresetTag.parseServerId(selectedPresetId) {
+            return serverSceneFilters.first { $0.id == sid }?.name
+        }
+        if let ls = SceneLivePresetTag.parseLocalUUIDString(selectedPresetId), let uuid = UUID(uuidString: ls) {
+            return localPresets.first { $0.id == uuid }?.name
+        }
+        return nil
+    }
 
     var body: some View {
         NavigationStack {
@@ -1683,6 +1692,7 @@ struct SceneLiveFilterSheet: View {
             .background(Color.appBackground)
             .catalogSettingsSheetChrome(
                 hasSelectedPreset: hasSelectedPreset,
+                selectedPresetName: selectedPresetName,
                 onReset: onReset,
                 onRequestSave: onRequestSave,
                 onRequestSaveAs: onRequestSaveAs,

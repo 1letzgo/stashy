@@ -414,7 +414,7 @@ private struct GalleriesViewContent: View {
             .onChange(of: catalogPresetRowSelection) { _, newId in
                 handleGalleryCatalogPresetSelectionChange(newId)
             }
-            .alert("Save As", isPresented: $showSaveAsCatalogPresetAlert) {
+            .alert("Save as new", isPresented: $showSaveAsCatalogPresetAlert) {
                 TextField("Name", text: $catalogPresetNameInput)
                 Button("Save") { saveGalleryCatalogPresetAs(name: catalogPresetNameInput) }
                 Button("Cancel", role: .cancel) {}
@@ -1429,8 +1429,9 @@ struct FullScreenImageView: View {
 
     /// "Name - Title" on one line, plain text. Name opens the performer detail.
     @ViewBuilder
+    /// Performer und Titel untereinander — wie in Feeds.
     private func fullScreenNameTitleLine(image: StashImage) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 6) {
+        VStack(alignment: .leading, spacing: 2) {
             if let performer = image.performers?.first {
                 NavigationLink(destination: PerformerDetailView(performer: performer.toPerformer())) {
                     Text(performer.name)
@@ -1439,10 +1440,6 @@ struct FullScreenImageView: View {
                         .lineLimit(1)
                 }
                 .buttonStyle(.plain)
-                .layoutPriority(1)
-                Text("-")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundColor(.white.opacity(0.6))
             }
             fullScreenTitleText(image: image)
         }
@@ -1655,7 +1652,9 @@ struct FullScreenImageView: View {
                 .padding(.horizontal, StashyExpandingDock.edgePadding)
             }
         }
-        .padding(.bottom, 0)
+        // Bei Videos liefert die Scrubbar darunter den Abstand zur Tab-Bar; bei Fotos
+        // gibt es keine, also hier — wie das Bar-Padding in `IsolatedScrubberBar`.
+        .padding(.bottom, isVideo ? 0 : 8)
         .colorScheme(.dark)
         .opacity(showUI ? 1 : 0)
         .animation(.easeInOut(duration: 0.2), value: showUI)
@@ -1681,14 +1680,11 @@ struct FullScreenImageView: View {
     /// Matches `ReelsView.reelsScrubberBar` / `IsolatedScrubberBar`.
     @ViewBuilder
     private func feedsStyleScrubberBar(currentImage: StashImage?) -> some View {
-        if let image = currentImage {
-            // Stills and animations have nothing to scrub, but the bar still has to occupy its
-            // height — dropping it shortens the bottom inset and pushes the info row down, so the
-            // chrome would jump every time the feed moves between a photo and a video.
-            let scrubbable = image.isVideo && !image.isAnimated
+        // Stills and animations have nothing to scrub — no bar, no placeholder. The info
+        // row moves down by the bar's height between photo and video; that beats an
+        // empty band under every photo.
+        if let image = currentImage, image.isVideo, !image.isAnimated {
             IsolatedScrubberBar(state: scrubberState, isUIVisible: showUI)
-                .opacity(scrubbable ? 1 : 0)
-                .allowsHitTesting(scrubbable)
         }
     }
 

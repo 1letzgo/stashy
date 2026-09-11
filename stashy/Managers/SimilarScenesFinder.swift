@@ -98,6 +98,15 @@ final class SimilarScenesFinder: ObservableObject {
         totalSceneCount = nil
     }
 
+    /// Angezeigte Treffer verwerfen (Cache bleibt). Die Detailseite ruft das beim
+    /// Schließen — sonst zeigt die nächste Szene erst die alten Treffer, bis ihre
+    /// eigene Suche fertig ist.
+    func clear() {
+        scenes = []
+        isLoading = false
+        currentKey = ""
+    }
+
     /// Rarity of a tag, 0.15…1. A tag on three scenes identifies a theme; one on almost every
     /// scene identifies nothing. Classic IDF: `log(N / df) / log(N)`.
     ///
@@ -138,6 +147,7 @@ final class SimilarScenesFinder: ObservableObject {
     /// arrives. Everything the card shows comes from here.
     func load(for scene: Scene) async {
         let key = Self.signature(for: scene)
+        let isNewLookup = key != currentKey
         currentKey = key
         guard isActive else {
             scenes = []
@@ -147,6 +157,8 @@ final class SimilarScenesFinder: ObservableObject {
             scenes = cached
             return
         }
+        // Neue Szene: alte Treffer sofort raus, nicht erst wenn die Suche zurück ist.
+        if isNewLookup { scenes = [] }
         isLoading = true
         let found = await similarScenes(for: scene)
         guard currentKey == key else { return }

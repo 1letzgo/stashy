@@ -869,6 +869,15 @@ struct PerformersCatalogFilterSortSheet: View {
     @ObservedObject private var appearance = AppearanceManager.shared
 
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
+    private var selectedPresetName: String? {
+        if let sid = ListLivePresetTag.parseServerId(selectedPresetRowId) {
+            return serverFilters.first { $0.id == sid }?.name
+        }
+        if let ls = ListLivePresetTag.parseLocalUUIDString(selectedPresetRowId), let uuid = UUID(uuidString: ls) {
+            return localPresets.first { $0.id == uuid }?.name
+        }
+        return nil
+    }
     /// Chip value for "field is not set" — see `CatalogLiveChipFilterSupport.noneChipValue`.
     private let noneChip = CatalogLiveChipFilterSupport.noneChipValue
 
@@ -884,6 +893,7 @@ struct PerformersCatalogFilterSortSheet: View {
             .background(Color.appBackground.ignoresSafeArea())
             .catalogSettingsSheetChrome(
                 hasSelectedPreset: hasSelectedPreset,
+                selectedPresetName: selectedPresetName,
                 onReset: onReset,
                 onRequestSave: onRequestSave,
                 onRequestSaveAs: onRequestSaveAs,
@@ -1006,6 +1016,15 @@ struct TagsCatalogFilterSortSheet: View {
 
     @ObservedObject private var appearance = AppearanceManager.shared
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
+    private var selectedPresetName: String? {
+        if let sid = ListLivePresetTag.parseServerId(selectedPresetRowId) {
+            return serverFilters.first { $0.id == sid }?.name
+        }
+        if let ls = ListLivePresetTag.parseLocalUUIDString(selectedPresetRowId), let uuid = UUID(uuidString: ls) {
+            return localPresets.first { $0.id == uuid }?.name
+        }
+        return nil
+    }
 
     var body: some View {
         NavigationStack {
@@ -1019,6 +1038,7 @@ struct TagsCatalogFilterSortSheet: View {
             .background(Color.appBackground.ignoresSafeArea())
             .catalogSettingsSheetChrome(
                 hasSelectedPreset: hasSelectedPreset,
+                selectedPresetName: selectedPresetName,
                 onReset: onReset,
                 onRequestSave: onRequestSave,
                 onRequestSaveAs: onRequestSaveAs,
@@ -1136,6 +1156,15 @@ struct StudiosCatalogFilterSortSheet: View {
 
     @ObservedObject private var appearance = AppearanceManager.shared
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
+    private var selectedPresetName: String? {
+        if let sid = ListLivePresetTag.parseServerId(selectedPresetRowId) {
+            return serverFilters.first { $0.id == sid }?.name
+        }
+        if let ls = ListLivePresetTag.parseLocalUUIDString(selectedPresetRowId), let uuid = UUID(uuidString: ls) {
+            return localPresets.first { $0.id == uuid }?.name
+        }
+        return nil
+    }
 
     var body: some View {
         NavigationStack {
@@ -1149,6 +1178,7 @@ struct StudiosCatalogFilterSortSheet: View {
             .background(Color.appBackground.ignoresSafeArea())
             .catalogSettingsSheetChrome(
                 hasSelectedPreset: hasSelectedPreset,
+                selectedPresetName: selectedPresetName,
                 onReset: onReset,
                 onRequestSave: onRequestSave,
                 onRequestSaveAs: onRequestSaveAs,
@@ -1335,6 +1365,15 @@ struct GalleriesCatalogFilterSortSheet: View {
 
     @ObservedObject private var appearance = AppearanceManager.shared
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
+    private var selectedPresetName: String? {
+        if let sid = ListLivePresetTag.parseServerId(selectedPresetRowId) {
+            return serverFilters.first { $0.id == sid }?.name
+        }
+        if let ls = ListLivePresetTag.parseLocalUUIDString(selectedPresetRowId), let uuid = UUID(uuidString: ls) {
+            return localPresets.first { $0.id == uuid }?.name
+        }
+        return nil
+    }
 
     var body: some View {
         NavigationStack {
@@ -1348,6 +1387,7 @@ struct GalleriesCatalogFilterSortSheet: View {
             .background(Color.appBackground.ignoresSafeArea())
             .catalogSettingsSheetChrome(
                 hasSelectedPreset: hasSelectedPreset,
+                selectedPresetName: selectedPresetName,
                 onReset: onReset,
                 onRequestSave: onRequestSave,
                 onRequestSaveAs: onRequestSaveAs,
@@ -1539,6 +1579,15 @@ struct ImagesCatalogFilterSortSheet: View {
 
     @ObservedObject private var appearance = AppearanceManager.shared
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
+    private var selectedPresetName: String? {
+        if let sid = ListLivePresetTag.parseServerId(selectedPresetRowId) {
+            return serverFilters.first { $0.id == sid }?.name
+        }
+        if let ls = ListLivePresetTag.parseLocalUUIDString(selectedPresetRowId), let uuid = UUID(uuidString: ls) {
+            return localPresets.first { $0.id == uuid }?.name
+        }
+        return nil
+    }
 
     private var filterMenuCollapsedTitle: String {
         if selectedPresetRowId.isEmpty { return "None" }
@@ -1578,6 +1627,7 @@ struct ImagesCatalogFilterSortSheet: View {
             .background(Color.appBackground.ignoresSafeArea())
             .catalogSettingsSheetChrome(
                 hasSelectedPreset: hasSelectedPreset,
+                selectedPresetName: selectedPresetName,
                 onReset: onReset,
                 onRequestSave: onRequestSave,
                 onRequestSaveAs: onRequestSaveAs,
@@ -1932,6 +1982,12 @@ struct GroupsCatalogFilterSortSheet: View {
 
     @ObservedObject private var appearance = AppearanceManager.shared
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
+    private var selectedPresetName: String? {
+        if let sid = ListLivePresetTag.parseServerId(selectedPresetRowId) {
+            return serverFilters.first { $0.id == sid }?.name
+        }
+        return nil
+    }
 
     var body: some View {
         NavigationStack {
@@ -1977,6 +2033,7 @@ struct GroupsCatalogFilterSortSheet: View {
             .background(Color.appBackground.ignoresSafeArea())
             .catalogSettingsSheetChrome(
                 hasSelectedPreset: hasSelectedPreset,
+                selectedPresetName: selectedPresetName,
                 onReset: onReset,
                 onRequestSave: onRequestSave,
                 onRequestSaveAs: onRequestSaveAs,

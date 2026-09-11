@@ -1,0 +1,3 @@
+mutation BulkSceneUpdateStudio($ids: [ID!]!, $studioId: ID!) {
+  bulkSceneUpdate(input: { ids: $ids, studio_id: $studioId }) { id }
+}

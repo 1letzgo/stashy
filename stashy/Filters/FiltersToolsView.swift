@@ -332,6 +332,7 @@ private struct FiltersToolsEditorSheet: View {
     @StateObject private var document: FilterCriteriaDocument
     @State private var name: String
     @State private var showSaveAs = false
+    @State private var showSaveChoice = false
     @State private var saveAsName = ""
     @State private var showDelete = false
     @State private var isSaving = false
@@ -438,39 +439,43 @@ private struct FiltersToolsEditorSheet: View {
                     ProgressView()
                         .tint(.white)
                 } else {
-                    Menu {
-                        Button {
-                            save(existingId: filter?.id, saveName: trimmedName)
-                        } label: {
-                            Label("Save", systemImage: "arrow.down.doc")
-                        }
-                        .disabled(trimmedName.isEmpty)
-                        Button {
-                            saveAsName = trimmedName.isEmpty ? "" : trimmedName + " copy"
-                            showSaveAs = true
-                        } label: {
-                            Label("Save as…", systemImage: "doc.badge.plus")
-                        }
-                        if isExisting {
-                            Divider()
-                            Button(role: .destructive) { showDelete = true } label: {
-                                Label("Delete", systemImage: "trash")
-                            }
-                        }
+                    Button {
+                        showSaveChoice = true
                     } label: {
                         Text("Save")
                             .font(.subheadline.weight(.semibold))
                             .foregroundColor(trimmedName.isEmpty ? .white.opacity(0.4) : .white)
                             .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
                     }
+                    .buttonStyle(.plain)
                     .disabled(trimmedName.isEmpty && !isExisting)
+                    // Gleicher Speichern-Dialog wie in den Filter-Sheets und bei Merge Tags/Studios.
+                    .alert("Save filter", isPresented: $showSaveChoice) {
+                        if isExisting {
+                            Button("Update \"\(filter?.name ?? trimmedName)\"") {
+                                save(existingId: filter?.id, saveName: trimmedName)
+                            }
+                            .disabled(trimmedName.isEmpty)
+                        } else {
+                            Button("Save") { save(existingId: nil, saveName: trimmedName) }
+                                .disabled(trimmedName.isEmpty)
+                        }
+                        Button("Save as new") {
+                            saveAsName = trimmedName.isEmpty ? "" : trimmedName + " copy"
+                            showSaveAs = true
+                        }
+                        if isExisting {
+                            Button("Delete", role: .destructive) { showDelete = true }
+                        }
+                        Button("Cancel", role: .cancel) {}
+                    }
                 }
             }
         }
         .presentationDetents([.large])
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
-        .alert("Save as", isPresented: $showSaveAs) {
+        .alert("Save as new", isPresented: $showSaveAs) {
             TextField("Name", text: $saveAsName)
             Button("Save") { save(existingId: nil, saveName: saveAsName) }
             Button("Cancel", role: .cancel) {}

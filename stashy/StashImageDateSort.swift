@@ -37,9 +37,11 @@ enum StashImageFilenameKeys {
            let match = filename.range(of: #"(?<=_-_).+(?=_\d+$)"#, options: .regularExpression) {
             return String(filename[match])
         }
-        // Importer: "wolke11-2026-06-24_07-42-44_0" -> "2026-06-24_07-42-44"
+        // Importer: "wolke11-2026-06-24_07-42-44_0" -> "2026-06-24_07". Bewusst nur Tag + Stunde:
+        // ein Importlauf liefert Dateien mit leicht abweichenden Sekunden/Minuten, die trotzdem
+        // ein Set sind.
         if let match = filename.range(
-            of: #"(\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2})(?=_\d+$)"#,
+            of: #"(\d{4}-\d{2}-\d{2}_\d{2})(?=-\d{2}-\d{2}_\d+$)"#,
             options: .regularExpression
         ) {
             return String(filename[match])

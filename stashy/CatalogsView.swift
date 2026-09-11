@@ -1004,7 +1004,7 @@ struct GroupDetailView: View {
             .onChange(of: linkedPerformers.catalogPresetRowSelection) { _, newId in
                 linkedPerformers.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save As", isPresented: $linkedPerformers.showSaveAsCatalogPresetAlert) {
+            .alert("Save as new", isPresented: $linkedPerformers.showSaveAsCatalogPresetAlert) {
                 TextField("Name", text: $linkedPerformers.catalogPresetNameInput)
                 Button("Save") { linkedPerformers.savePresetAs(name: linkedPerformers.catalogPresetNameInput, viewModel: viewModel) }
                 Button("Cancel", role: .cancel) {}
@@ -1034,7 +1034,7 @@ struct GroupDetailView: View {
             .onChange(of: linkedTags.catalogPresetRowSelection) { _, newId in
                 linkedTags.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save As", isPresented: $linkedTags.showSaveAsCatalogPresetAlert) {
+            .alert("Save as new", isPresented: $linkedTags.showSaveAsCatalogPresetAlert) {
                 TextField("Name", text: $linkedTags.catalogPresetNameInput)
                 Button("Save") { linkedTags.savePresetAs(name: linkedTags.catalogPresetNameInput, viewModel: viewModel) }
                 Button("Cancel", role: .cancel) {}
@@ -1064,7 +1064,7 @@ struct GroupDetailView: View {
             .onChange(of: linkedStudios.catalogPresetRowSelection) { _, newId in
                 linkedStudios.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save As", isPresented: $linkedStudios.showSaveAsCatalogPresetAlert) {
+            .alert("Save as new", isPresented: $linkedStudios.showSaveAsCatalogPresetAlert) {
                 TextField("Name", text: $linkedStudios.catalogPresetNameInput)
                 Button("Save") { linkedStudios.savePresetAs(name: linkedStudios.catalogPresetNameInput, viewModel: viewModel) }
                 Button("Cancel", role: .cancel) {}
@@ -1094,7 +1094,7 @@ struct GroupDetailView: View {
             .onChange(of: linkedGalleries.catalogPresetRowSelection) { _, newId in
                 linkedGalleries.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save As", isPresented: $linkedGalleries.showSaveAsCatalogPresetAlert) {
+            .alert("Save as new", isPresented: $linkedGalleries.showSaveAsCatalogPresetAlert) {
                 TextField("Name", text: $linkedGalleries.catalogPresetNameInput)
                 Button("Save") { linkedGalleries.savePresetAs(name: linkedGalleries.catalogPresetNameInput, viewModel: viewModel) }
                 Button("Cancel", role: .cancel) {}
@@ -1120,7 +1120,7 @@ struct GroupDetailView: View {
             .onChange(of: linkedImages.catalogPresetRowSelection) { _, newId in
                 linkedImages.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save As", isPresented: $linkedImages.showSaveAsCatalogPresetAlert) {
+            .alert("Save as new", isPresented: $linkedImages.showSaveAsCatalogPresetAlert) {
                 TextField("Name", text: $linkedImages.catalogPresetNameInput)
                 Button("Save") { linkedImages.savePresetAs(name: linkedImages.catalogPresetNameInput, viewModel: viewModel) }
                 Button("Cancel", role: .cancel) {}

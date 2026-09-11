@@ -567,6 +567,11 @@ struct SceneDetailView: View {
             .task(id: SimilarScenesFinder.signature(for: activeScene)) {
                 await SimilarScenesFinder.shared.load(for: activeScene)
             }
+            .onDisappear {
+                // Beim Zurückgehen die Treffer dieser Szene verwerfen. Beim Push einer
+                // ähnlichen Szene lädt deren Detailseite ohnehin neu.
+                SimilarScenesFinder.shared.clear()
+            }
     }
 
     /// Own fullscreen presentation: the same engine, rebound to a full-bleed surface.

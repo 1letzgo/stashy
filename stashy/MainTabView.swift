@@ -288,6 +288,7 @@ struct ToolsView: View {
         case topLists = "Charts"
         case filters = "Filters"
         case mergeTags = "Merge Tags"
+        case mergeStudios = "Merge Studios"
         case hotOrNot = "Match"
         case rateMe = "RateMe"
         
@@ -300,6 +301,7 @@ struct ToolsView: View {
             case .topLists: return "list.number"
             case .filters: return "line.3.horizontal.decrease.circle"
             case .mergeTags: return "arrow.triangle.merge"
+            case .mergeStudios: return "building.2"
             case .hotOrNot: return "flame.fill"
             case .rateMe: return "star.fill"
             }
@@ -310,7 +312,7 @@ struct ToolsView: View {
     /// hand-sorted flat list stopped being a good way in once Tools grew — the grid needs stable
     /// categories, so the order is part of the design now rather than a setting.
     static let toolGroups: [(title: String, tools: [ToolsTab])] = [
-        ("Library", [.downloads, .filters, .mergeTags]),
+        ("Library", [.downloads, .filters, .mergeTags, .mergeStudios]),
         ("Insights", [.overview, .topLists, .oCount, .timeline]),
         ("Discover", [.hotOrNot, .rateMe])
     ]
@@ -361,6 +363,8 @@ struct ToolsView: View {
                 FiltersToolsView()
             case .mergeTags:
                 TagMergeToolsView()
+            case .mergeStudios:
+                StudioMergeToolsView()
             case .hotOrNot:
                 HotOrNotToolsView()
             case .rateMe:

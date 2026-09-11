@@ -217,7 +217,7 @@ struct PerformerDetailView: View {
             .onChange(of: linkedStudios.catalogPresetRowSelection) { _, newId in
                 linkedStudios.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save As", isPresented: $linkedStudios.showSaveAsCatalogPresetAlert) {
+            .alert("Save as new", isPresented: $linkedStudios.showSaveAsCatalogPresetAlert) {
                 TextField("Name", text: $linkedStudios.catalogPresetNameInput)
                 Button("Save") { linkedStudios.savePresetAs(name: linkedStudios.catalogPresetNameInput, viewModel: viewModel) }
                 Button("Cancel", role: .cancel) {}
@@ -247,7 +247,7 @@ struct PerformerDetailView: View {
             .onChange(of: linkedTags.catalogPresetRowSelection) { _, newId in
                 linkedTags.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save As", isPresented: $linkedTags.showSaveAsCatalogPresetAlert) {
+            .alert("Save as new", isPresented: $linkedTags.showSaveAsCatalogPresetAlert) {
                 TextField("Name", text: $linkedTags.catalogPresetNameInput)
                 Button("Save") { linkedTags.savePresetAs(name: linkedTags.catalogPresetNameInput, viewModel: viewModel) }
                 Button("Cancel", role: .cancel) {}
@@ -277,7 +277,7 @@ struct PerformerDetailView: View {
             .onChange(of: linkedGalleries.catalogPresetRowSelection) { _, newId in
                 linkedGalleries.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save As", isPresented: $linkedGalleries.showSaveAsCatalogPresetAlert) {
+            .alert("Save as new", isPresented: $linkedGalleries.showSaveAsCatalogPresetAlert) {
                 TextField("Name", text: $linkedGalleries.catalogPresetNameInput)
                 Button("Save") { linkedGalleries.savePresetAs(name: linkedGalleries.catalogPresetNameInput, viewModel: viewModel) }
                 Button("Cancel", role: .cancel) {}
@@ -303,7 +303,7 @@ struct PerformerDetailView: View {
             .onChange(of: linkedImages.catalogPresetRowSelection) { _, newId in
                 linkedImages.handlePresetSelection(newId, viewModel: viewModel)
             }
-            .alert("Save As", isPresented: $linkedImages.showSaveAsCatalogPresetAlert) {
+            .alert("Save as new", isPresented: $linkedImages.showSaveAsCatalogPresetAlert) {
                 TextField("Name", text: $linkedImages.catalogPresetNameInput)
                 Button("Save") { linkedImages.savePresetAs(name: linkedImages.catalogPresetNameInput, viewModel: viewModel) }
                 Button("Cancel", role: .cancel) {}
@@ -905,7 +905,8 @@ struct PerformerDetailView: View {
             hasMore: viewModel.hasMoreDetailImages,
             onLoadMore: { linkedImages.refetchImages(viewModel: viewModel, initial: false) },
             multiColumnGridItems: galleryColumns,
-            isFeedScrolling: imagesFeedScrolling
+            isFeedScrolling: imagesFeedScrolling,
+            viewModel: viewModel
         )
     }
     
