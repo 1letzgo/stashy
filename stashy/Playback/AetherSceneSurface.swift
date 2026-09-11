@@ -29,7 +29,7 @@ struct AetherSceneSurface: View {
     var isFullscreen: Bool = false
     /// Marker positions (seconds) drawn as dots on the time bar. Empty hides them.
     var markerSeconds: [Double] = []
-    /// Fullscreen only: opens the host's add-marker flow at the current time. nil hides the button.
+    /// Opens the host's add-marker flow at the current time. nil hides the button.
     var onAddMarker: (() -> Void)? = nil
 
     @ObservedObject private var tabManager = TabManager.shared
@@ -312,7 +312,7 @@ struct AetherSceneSurface: View {
                         }
                     }
                     HStack(spacing: 8) {
-                        if isFullscreen { bottomLeadingControls }
+                        bottomLeadingControls
                         Spacer(minLength: 0)
                         if engine.isUsingTranscodeFallback { transcodeTag }
                         bottomTrailingControls
@@ -437,13 +437,13 @@ struct AetherSceneSurface: View {
 
     // MARK: Bottom trailing
 
-    /// Fullscreen, bottom-left: rotate, then previous marker · add marker · next marker.
-    /// The marker jumps only exist when the scene has markers; add is there whenever the
-    /// host offers it (the inline card no longer has its own Marker pill).
+    /// Bottom-left: rotate (fullscreen only), then previous marker · add marker · next
+    /// marker. The marker jumps only exist when the scene has markers; add is there
+    /// whenever the host offers it (the inline card no longer has its own Marker pill).
     @ViewBuilder
     private var bottomLeadingControls: some View {
-        HStack(spacing: 8) {
-            rotateButton
+        HStack(spacing: isCompact ? 6 : 8) {
+            if isFullscreen { rotateButton }
             if !markerSeconds.isEmpty {
                 markerJumpButton(forward: false)
             }
