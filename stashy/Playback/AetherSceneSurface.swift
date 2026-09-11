@@ -105,10 +105,10 @@ struct AetherSceneSurface: View {
         }
         .onAppear {
             HardwareVolumeMonitor.shared.start()
-            // The slider is the system volume, so it follows the hardware buttons; the
-            // engine plays at full level underneath.
+            // The slider is the system volume, so it follows the hardware buttons. The
+            // engine's own level is left alone: writing it here cleared the host's mute
+            // (the volume setter un-mutes), so a muted scene started with sound.
             volumeLevel = AVAudioSession.sharedInstance().outputVolume
-            engine.volume = 1
             playbackRate = engine.rate
             pip.update(layer: engine.pipPlayerLayer)
             pip.onActiveChange = { [weak engine] active in
