@@ -4559,7 +4559,6 @@ struct ReelsViewBody: View {
                                     // Tag Suggestion (stashy+, off by default).
                                     AITagSuggestionBar(target: item.aiTagTarget) { _ in }
                                 }
-                                }
                             }
                             // Fresh identity per item: without it SwiftUI reuses the
                             // row and the next clip inherits however far the previous
