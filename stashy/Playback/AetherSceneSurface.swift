@@ -291,11 +291,14 @@ struct AetherSceneSurface: View {
             // never became visible), while a plain opacity change always renders.
             // Marker jumps flank play/pause (only when the scene has markers); ±10 s lives
             // on the double-tap regions left and right of the centre.
+            // The jumps wait for the first frame: while the scene loads, `markerSeconds`
+            // and the playhead settle in steps, which made the buttons blink in and out.
             HStack(spacing: centerSpacing) {
-                if !markerSeconds.isEmpty { markerJumpButton(forward: false, large: true) }
+                if showsMarkerJumps { markerJumpButton(forward: false, large: true) }
                 playPauseGlyph
-                if !markerSeconds.isEmpty { markerJumpButton(forward: true, large: true) }
+                if showsMarkerJumps { markerJumpButton(forward: true, large: true) }
             }
+            .transaction { $0.animation = nil }
             .autoHiding(areControlsVisible)
 
             // Top row: dismiss / expand plus the output-route capsule on the left, the volume
@@ -464,6 +467,8 @@ struct AetherSceneSurface: View {
 
     // MARK: Markers
 
+    private var showsMarkerJumps: Bool { !markerSeconds.isEmpty && engine.hasPresentedFrame }
+
     private var sortedMarkerSeconds: [Double] { markerSeconds.sorted() }
 
     /// Previous = the last marker that starts at least a second before the playhead, so
@@ -489,6 +494,7 @@ struct AetherSceneSurface: View {
                         diameter: large ? skipButtonSize : chromeButtonSize,
                         glyphSize: large ? (isCompact ? 18 : 24) : nil)
                 .opacity(target == nil ? 0.4 : 1)
+                .animation(nil, value: target == nil)
         }
         .buttonStyle(.plain)
         .disabled(target == nil)
