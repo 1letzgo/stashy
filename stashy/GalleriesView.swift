@@ -1038,8 +1038,11 @@ struct GalleryItemView: View {
             guard isActiveItem else { return }
             if playing {
                 engine?.play()
+                // Continuous play on a still: pause/play drives the advance timer.
+                if !image.isVideo { startStillAdvanceTimer() }
             } else {
                 engine?.pause()
+                cancelAnimationAdvanceTimer()
             }
         }
         .onChange(of: continuousPlay) { _, enabled in
@@ -1125,7 +1128,7 @@ struct GalleryItemView: View {
 
     /// Continuous: stills use the Dauer setting; animated GIFs/WebP use file duration (fallback: Dauer).
     private func startStillAdvanceTimer() {
-        guard continuousPlay, !image.isVideo, isActiveItem else { return }
+        guard continuousPlay, !image.isVideo, isActiveItem, isPlaying else { return }
         cancelAnimationAdvanceTimer()
         let fallback = TimeInterval(max(1, continuousDurationSeconds))
         let duration: TimeInterval
@@ -1251,6 +1254,8 @@ struct FullScreenImageView: View {
     @State private var wasPlayingBeforeTagEditor = false
     @State private var performerImageTargetPerformers: [GalleryPerformer] = []
     @State private var currentItemIsPlaying = true
+    /// Same setting the item views read; here it decides whether pause applies to stills.
+    @AppStorage("images_fullscreen_continuous") private var continuousPlay = false
     @State private var scrubberState = ScrubberState()
     /// Triggers UIKit pop when `dismiss()` is a no-op under `safeAreaInset` chrome.
     @State private var navigationBackTrigger: UUID?
@@ -1365,7 +1370,9 @@ struct FullScreenImageView: View {
             }
             .animation(.easeInOut(duration: 0.2), value: showUI)
             .onChange(of: activeImageId) { _, _ in
-                currentItemIsPlaying = true
+                // A paused continuous run stays paused across swipes; videos otherwise
+                // always start playing on a new item.
+                if !continuousPlay { currentItemIsPlaying = true }
                 scrubberState.time = 0
                 scrubberState.duration = 1
                 scrubberState.seeking = false
@@ -1570,12 +1577,14 @@ struct FullScreenImageView: View {
                             }
                         }
 
+                        // Also live for stills while continuous play is on: pausing there
+                        // stops the auto-advance.
                         ChromePillIconButton(
                             systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
-                            enabled: isVideo,
+                            enabled: isVideo || continuousPlay,
                             accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
                         ) {
-                            if isVideo { currentItemIsPlaying.toggle() }
+                            if isVideo || continuousPlay { currentItemIsPlaying.toggle() }
                         }
                     }
                 }
