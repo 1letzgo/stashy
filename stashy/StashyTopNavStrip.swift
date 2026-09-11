@@ -91,11 +91,9 @@ struct StashyChromePillStyle: ViewModifier {
             .frame(minWidth: StashyExpandingDock.circleSize, minHeight: StashyExpandingDock.circleSize)
             .frame(width: iconOnly ? StashyExpandingDock.circleSize : width)
 
-        // Accent pills stay a solid tint fill; every other neutral pill is glass.
+        // Accent pills are tinted glass; every other neutral pill is plain glass.
         if accent {
-            sized
-                .background(appearance.tintColor)
-                .clipShape(Capsule(style: .continuous))
+            sized.stashyGlass(shape: Capsule(style: .continuous), tint: appearance.tintColor)
         } else if glass {
             sized.stashyGlass(shape: Capsule(style: .continuous))
         } else {
@@ -236,22 +234,29 @@ private struct StashyExpandingDockChipBackground: ViewModifier {
 
     func body(content: Content) -> some View {
         let shape = Capsule(style: .continuous)
-        let filled = content
-            .background {
-                shape
-                    .fill(isSelected ? activeColor : (glassInactive ? Color.clear : inactiveColor))
-                    .shadow(
-                        color: isSelected ? activeColor.opacity(0.35) : .clear,
-                        radius: 6,
-                        x: 0,
-                        y: 3
-                    )
-            }
-
         if glassInactive {
-            filled.stashyGlass(shape: shape)
+            // Glass chrome: selected = tinted glass, inactive = plain glass.
+            content
+                .stashyChromeFill(shape: shape, activeColor: isSelected ? activeColor : nil)
+                .shadow(
+                    color: isSelected ? activeColor.opacity(0.35) : .clear,
+                    radius: 6,
+                    x: 0,
+                    y: 3
+                )
         } else {
-            filled.clipShape(shape)
+            content
+                .background {
+                    shape
+                        .fill(isSelected ? activeColor : inactiveColor)
+                        .shadow(
+                            color: isSelected ? activeColor.opacity(0.35) : .clear,
+                            radius: 6,
+                            x: 0,
+                            y: 3
+                        )
+                }
+                .clipShape(shape)
         }
     }
 }

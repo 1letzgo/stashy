@@ -23,14 +23,26 @@ extension View {
         }
     }
 
-    /// Chrome chip fill: a selected chip keeps its tinted shape, an inactive one turns to glass.
+    /// Tinted glass — the same material as `stashyGlass`, coloured with `tint` (accent Back
+    /// pills, selected chrome chips). Pre-26 fallback: material plus a translucent tint wash.
+    @ViewBuilder
+    func stashyGlass<S: Shape>(shape: S, tint: Color) -> some View {
+        if #available(iOS 26.0, *) {
+            self.glassEffect(.regular.tint(tint), in: shape)
+        } else {
+            self
+                .background(.ultraThinMaterial, in: shape)
+                .background(shape.fill(tint.opacity(0.6)))
+                .overlay(shape.stroke(Color.white.opacity(0.25), lineWidth: 0.5))
+        }
+    }
+
+    /// Chrome chip fill: a selected chip is tinted glass, an inactive one plain glass.
     /// `activeColor == nil` means "not selected".
     @ViewBuilder
     func stashyChromeFill<S: Shape>(shape: S, activeColor: Color?) -> some View {
         if let activeColor {
-            self
-                .background(shape.fill(activeColor))
-                .clipShape(shape)
+            self.stashyGlass(shape: shape, tint: activeColor)
         } else {
             self.stashyGlass(shape: shape)
         }

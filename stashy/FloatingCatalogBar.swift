@@ -30,15 +30,9 @@ struct FloatingActionBar<Content: View>: View {
             .font(.system(size: 17))
             .frame(maxWidth: .infinity, maxHeight: .infinity)
             .padding(.horizontal, DesignTokens.Chrome.fabInnerPadding)
-            .background(
-                Capsule()
-                    .fill(.ultraThinMaterial)
-                    .floatingShadow()
-            )
-            .overlay(
-                Capsule()
-                    .stroke(Color.primary.opacity(DesignTokens.Chrome.strokeOpacity), lineWidth: 0.5)
-            )
+            // Same Liquid Glass as the rest of the chrome (material + hairline before iOS 26).
+            .stashyGlass(shape: Capsule())
+            .floatingShadow()
             .frame(height: DesignTokens.Chrome.fabHeight)
             .padding(.horizontal, DesignTokens.Chrome.fabOuterPadding)
             .padding(.bottom, DesignTokens.Chrome.fabBottomPadding)
