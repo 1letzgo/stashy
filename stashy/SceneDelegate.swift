@@ -46,7 +46,13 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
         privacyBlurView = nil
     }
 
+    /// Set while a system picker (AirPlay routes) is up: presenting it resigns the app
+    /// active, but it belongs to the app's own flow — covering the player with the
+    /// privacy blur there is wrong.
+    static var suppressesPrivacyBlur = false
+
     func sceneWillResignActive(_ scene: UIScene) {
+        guard !Self.suppressesPrivacyBlur else { return }
         guard privacyBlurView == nil, let window else { return }
         let blur = UIVisualEffectView(effect: UIBlurEffect(style: .systemMaterial))
         blur.frame = window.bounds

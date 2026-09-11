@@ -1047,16 +1047,31 @@ enum AetherTrackLabel {
 #if os(iOS)
 /// System route picker. UIKit-only control, so it is bridged rather than redrawn.
 private struct AetherRoutePickerView: UIViewRepresentable {
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
     func makeUIView(context: Context) -> AVRoutePickerView {
         let view = AVRoutePickerView()
         view.activeTintColor = .white
         view.tintColor = .white
         view.prioritizesVideoDevices = true
         view.backgroundColor = .clear
+        view.delegate = context.coordinator
         return view
     }
 
     func updateUIView(_ uiView: AVRoutePickerView, context: Context) {}
+
+    /// The system route sheet resigns the app active; without this the privacy blur
+    /// would slide over the player behind the sheet.
+    final class Coordinator: NSObject, AVRoutePickerViewDelegate {
+        func routePickerViewWillBeginPresentingRoutes(_ routePickerView: AVRoutePickerView) {
+            SceneDelegate.suppressesPrivacyBlur = true
+        }
+
+        func routePickerViewDidEndPresentingRoutes(_ routePickerView: AVRoutePickerView) {
+            SceneDelegate.suppressesPrivacyBlur = false
+        }
+    }
 }
 #endif
 
