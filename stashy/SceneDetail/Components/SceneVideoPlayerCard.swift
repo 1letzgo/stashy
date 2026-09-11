@@ -16,6 +16,8 @@ struct SceneVideoPlayerCard: View {
     @Binding var isPreviewing: Bool
     /// Owned by SceneDetailView; the engine surface draws its own mute button.
     @Binding var isMuted: Bool
+    /// Add-marker flow (the detail view owns the sheet); nil hides the button.
+    var onAddMarker: (() -> Void)? = nil
 
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var subtitleController: SubtitleController
@@ -54,10 +56,7 @@ struct SceneVideoPlayerCard: View {
                                     : "",
                                 onToggleFullscreen: { isFullscreen = true },
                                 markerSeconds: (activeScene.sceneMarkers ?? []).map(\.seconds),
-                                onAddMarker: {
-                                    capturedMarkerTime = aether.currentTime
-                                    showingAddMarkerSheet = true
-                                }
+                                onAddMarker: onAddMarker
                             )
                         }
                     }

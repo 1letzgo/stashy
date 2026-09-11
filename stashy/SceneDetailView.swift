@@ -297,6 +297,10 @@ struct SceneDetailView: View {
                         isFullscreen: $isFullscreen,
                         isPreviewing: $isPreviewing,
                         isMuted: $isMuted,
+                        onAddMarker: {
+                            capturedMarkerTime = aetherEngine?.currentTime ?? 0
+                            showingAddMarkerSheet = true
+                        },
                         subtitleController: subtitleController,
                         transcriptionController: transcriptionController,
                         onSeek: { seconds in seekTo(seconds) },
