@@ -84,6 +84,15 @@ struct SceneVideoPlayerCard: View {
     }
 
     @ViewBuilder
+    /// File height → short quality label (`4K`, `1080p`, …), same rule as the player menu.
+    private var coverResolutionLabel: String? {
+        guard let height = activeScene.files?.first?.height, height > 0 else { return nil }
+        if height >= 2160 { return "4K" }
+        if height >= 1080 { return "1080p" }
+        if height >= 720 { return "720p" }
+        return "\(height)p"
+    }
+
     private var thumbnailWithOverlay: some View {
         ZStack {
             // Background / Thumbnail
@@ -131,6 +140,24 @@ struct SceneVideoPlayerCard: View {
                 } else {
                     largePlayButton
                 }
+            }
+        }
+        .overlay(alignment: .topTrailing) {
+            // Source quality on the cover, before playback starts (the player shows it in
+            // its options menu once running).
+            if !isPreviewing, let resolution = coverResolutionLabel {
+                HStack(spacing: 4) {
+                    Image(systemName: "video.fill")
+                        .font(.system(size: 10, weight: .bold))
+                    Text(resolution)
+                        .font(.system(size: 11, weight: .bold))
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 9)
+                .frame(height: 24)
+                .stashyGlass(shape: Capsule())
+                .padding(10)
+                .allowsHitTesting(false)
             }
         }
         .overlay(alignment: .bottom) {

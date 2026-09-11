@@ -13,6 +13,7 @@
 import SwiftUI
 import AVFoundation
 import AVKit
+import MediaPlayer
 import AetherEngine
 
 struct AetherSceneSurface: View {
@@ -37,6 +38,7 @@ struct AetherSceneSurface: View {
     @ObservedObject private var tabManager = TabManager.shared
     @StateObject private var pip = AetherPictureInPictureCoordinator()
     @State private var airPlayTrigger = AetherAirPlayTrigger()
+    @State private var systemVolume = AetherSystemVolumeControl()
 
     @State private var areControlsVisible = true
     /// Fullscreen only: crop to fill the whole screen instead of letterboxing.
@@ -98,8 +100,15 @@ struct AetherSceneSurface: View {
         .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
             surfaceHeight = height
         }
+        .onReceive(NotificationCenter.default.publisher(for: .stashyHardwareVolumeChanged)) { _ in
+            volumeLevel = AVAudioSession.sharedInstance().outputVolume
+        }
         .onAppear {
-            volumeLevel = engine.volume > 0 ? engine.volume : 1
+            HardwareVolumeMonitor.shared.start()
+            // The slider is the system volume, so it follows the hardware buttons; the
+            // engine plays at full level underneath.
+            volumeLevel = AVAudioSession.sharedInstance().outputVolume
+            engine.volume = 1
             playbackRate = engine.rate
             pip.update(layer: engine.pipPlayerLayer)
             pip.onActiveChange = { [weak engine] active in
@@ -375,6 +384,12 @@ struct AetherSceneSurface: View {
             .frame(height: chromeButtonSize)
             .stashyGlass(shape: Capsule())
         }
+        // Hidden MPVolumeView: the only way to set the system volume from the slider.
+        AetherSystemVolumeView(control: systemVolume)
+            .frame(width: 1, height: 1)
+            .opacity(0.01)
+            .allowsHitTesting(false)
+            .accessibilityHidden(true)
         // AirPlay is an entry in the options menu; the system picker still needs a live
         // AVRoutePickerView to present from, so one sits here invisibly.
         if showsAirPlayButton {
@@ -437,11 +452,12 @@ struct AetherSceneSurface: View {
         .accessibilityLabel("Volume")
     }
 
-    /// Dragging the slider is an unmute: the level is what the user asked for.
+    /// Dragging the slider is an unmute: the level is what the user asked for. The level is
+    /// pushed to the system volume through the hidden MPVolumeView.
     private func setVolume(_ level: Float) {
         volumeLevel = level
         if level > 0, isMuted { isMuted = false }
-        engine.volume = level
+        systemVolume.set(level)
         revealControls()
     }
 
@@ -994,6 +1010,35 @@ enum AetherTrackLabel {
 
 #if os(iOS)
 /// System route picker. UIKit-only control, so it is bridged rather than redrawn.
+/// Sets the system output volume through MPVolumeView's slider — the supported route
+/// for apps; the hardware buttons and other apps see the same value.
+final class AetherSystemVolumeControl {
+    weak var slider: UISlider?
+    func set(_ level: Float) {
+        guard let slider else { return }
+        DispatchQueue.main.async {
+            slider.setValue(level, animated: false)
+            slider.sendActions(for: .touchUpInside)
+        }
+    }
+}
+
+private struct AetherSystemVolumeView: UIViewRepresentable {
+    var control: AetherSystemVolumeControl
+    func makeUIView(context: Context) -> MPVolumeView {
+        let view = MPVolumeView(frame: CGRect(x: 0, y: 0, width: 1, height: 1))
+        view.showsVolumeSlider = true
+        view.alpha = 0.01
+        control.slider = view.subviews.compactMap { $0 as? UISlider }.first
+        return view
+    }
+    func updateUIView(_ uiView: MPVolumeView, context: Context) {
+        if control.slider == nil {
+            control.slider = uiView.subviews.compactMap { $0 as? UISlider }.first
+        }
+    }
+}
+
 /// Lets a menu action open the system AirPlay sheet: the picker's own button is tapped
 /// programmatically, which is the only supported way to present it.
 final class AetherAirPlayTrigger {
