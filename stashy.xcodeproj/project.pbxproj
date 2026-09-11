@@ -121,6 +121,8 @@
 		CA7A10D42F500003 /* ListCatalogFilterSortSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7A10D32F500002 /* ListCatalogFilterSortSheets.swift */; };
 		CA7A10E12F500010 /* DetailLinkedCatalogControllers.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7A10E02F500011 /* DetailLinkedCatalogControllers.swift */; };
 		CD4CA6C2CB694838903FF516 /* graphql in Resources */ = {isa = PBXBuildFile; fileRef = DFGQGRAPHQLREF001 /* graphql */; };
+		DFEA0012F2A6392000000002 /* ScenePlayerExtras.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFEA0012F2A6392000000001 /* ScenePlayerExtras.swift */; };
+		DFEA0012F2A6392000000003 /* ScenePlayerExtras.swift in Sources */ = {isa = PBXBuildFile; fileRef = DFEA0012F2A6392000000001 /* ScenePlayerExtras.swift */; };
 		DED26B5AB7A04A979AF74BAE /* SceneVideoPlayerCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF675E772F2A6392004CA019 /* SceneVideoPlayerCard.swift */; };
 		DF06EF262F18EC1300299105 /* SceneCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF06EF252F18EC1100299105 /* SceneCardView.swift */; };
 		DF22BB152F167223007C2090 /* CatalogsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB142F167223007C2090 /* CatalogsView.swift */; };
@@ -305,6 +307,7 @@
 		DF675E742F2A6392004CA019 /* ScenePerformersCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenePerformersCard.swift; sourceTree = "<group>"; };
 		DF675E752F2A6392004CA019 /* SceneStudioCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneStudioCard.swift; sourceTree = "<group>"; };
 		DF675E762F2A6392004CA019 /* SceneTagsCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneTagsCard.swift; sourceTree = "<group>"; };
+		DFEA0012F2A6392000000001 /* ScenePlayerExtras.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenePlayerExtras.swift; sourceTree = "<group>"; };
 		DF675E772F2A6392004CA019 /* SceneVideoPlayerCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneVideoPlayerCard.swift; sourceTree = "<group>"; };
 		DF90B75D2F1A5ECE003ED852 /* StarRatingView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StarRatingView.swift; sourceTree = "<group>"; };
 		DF90B7632F1ACEA3003ED852 /* ServerSetupWizardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSetupWizardView.swift; sourceTree = "<group>"; };
@@ -563,6 +566,7 @@
 			isa = PBXGroup;
 			children = (
 				DF675E782F2A6392004CA019 /* Components */,
+				DFEA0012F2A6392000000001 /* ScenePlayerExtras.swift */,
 			);
 			path = SceneDetail;
 			sourceTree = "<group>";
@@ -745,6 +749,7 @@
 				AE7E0000000000000000B032 /* AcknowledgementsView.swift in Sources */,
 				DF675E7A2F2A6392004CA019 /* SceneGalleriesCard.swift in Sources */,
 				DF675E7B2F2A6392004CA019 /* SceneVideoPlayerCard.swift in Sources */,
+				DFEA0012F2A6392000000002 /* ScenePlayerExtras.swift in Sources */,
 				DF675E7C2F2A6392004CA019 /* SceneStudioCard.swift in Sources */,
 				DF675E7D2F2A6392004CA019 /* ScenePerformersCard.swift in Sources */,
 				DFA1B2C62F3A6500004CA019 /* DirectorDetailView.swift in Sources */,
@@ -909,6 +914,7 @@
 				37D3E4932F3A305D00AB8FAD /* SceneHeatmapCard.swift in Sources */,
 				372E2D6B2F633DB400603361 /* LoginAuthHelper.swift in Sources */,
 				DED26B5AB7A04A979AF74BAE /* SceneVideoPlayerCard.swift in Sources */,
+				DFEA0012F2A6392000000003 /* ScenePlayerExtras.swift in Sources */,
 				5B3249B4152046408B964DDC /* StarRatingView.swift in Sources */,
 				11A2D778BDD54ABE859A5F1D /* ServerSetupWizardView.swift in Sources */,
 				1998A3883F7C4601AC6BFE39 /* UniversalSearchView.swift in Sources */,

@@ -15,7 +15,7 @@ import AVFoundation
 import AVKit
 import AetherEngine
 
-struct AetherSceneSurface: View {
+struct AetherSceneSurface<ExtraItems: View>: View {
     @ObservedObject var engine: AetherSceneEngine
     let posterURL: URL?
     @Binding var isMuted: Bool
@@ -31,6 +31,8 @@ struct AetherSceneSurface: View {
     var markerSeconds: [Double] = []
     /// Opens the host's add-marker flow at the current time. nil hides the button.
     var onAddMarker: (() -> Void)? = nil
+    /// Host-provided rows for the "…" menu (Set Image, AI Subtitles, AI Motion, …).
+    @ViewBuilder var extraMenuItems: () -> ExtraItems
 
     @ObservedObject private var tabManager = TabManager.shared
     @StateObject private var pip = AetherPictureInPictureCoordinator()
@@ -51,9 +53,6 @@ struct AetherSceneSurface: View {
     /// Mirrors of engine state that is not observable, so the slider and the speed menu redraw.
     @State private var volumeLevel: Float = 1
     @State private var playbackRate: Float = 1
-    /// Inline speed picker (replaces a UIKit `Menu`, which did not take selections inside the
-    /// glass capsule); keeps the transport visible while open.
-    @State private var showsSpeedPicker = false
     #if DEBUG
     @State private var showsDebugStats = false
     #endif
@@ -278,14 +277,12 @@ struct AetherSceneSurface: View {
             // Opacity instead of structural insertion: a conditional `if` plus a transition
             // proved unreliable over the UIKit-hosted player view (the re-inserted controls
             // never became visible), while a plain opacity change always renders.
-            // Inline the picker needs the room, so the centre row yields to it; fullscreen has
-            // space for both.
             HStack(spacing: centerSpacing) {
                 skipButton(-10)
                 playPauseGlyph
                 skipButton(10)
             }
-            .autoHiding(areControlsVisible && !(showsSpeedPicker && !isFullscreen))
+            .autoHiding(areControlsVisible)
 
             // Top row: dismiss / expand plus the output-route capsule on the left, the volume
             // capsule on the right.
@@ -305,12 +302,6 @@ struct AetherSceneSurface: View {
             VStack {
                 Spacer()
                 VStack(spacing: 10) {
-                    if showsSpeedPicker {
-                        HStack {
-                            Spacer(minLength: 0)
-                            speedPicker
-                        }
-                    }
                     HStack(spacing: 8) {
                         bottomLeadingControls
                         Spacer(minLength: 0)
@@ -544,8 +535,7 @@ struct AetherSceneSurface: View {
     @ViewBuilder
     private var bottomTrailingControls: some View {
         HStack(spacing: 4) {
-            speedMenu
-            if hasTrackChoices { tracksMenu }
+            optionsMenu
             if isFullscreen { fillButton }
         }
         .padding(.horizontal, 6)
@@ -565,79 +555,37 @@ struct AetherSceneSurface: View {
             .allowsHitTesting(false)
     }
 
-    private static let speedOptions: [Float] = [0.5, 0.75, 1, 1.25, 1.5, 2]
-
     private var availableSpeedOptions: [Float] {
         let cap = min(engine.engine.maxSupportedRate, 2.0)
-        return Self.speedOptions.filter { $0 <= cap + 0.001 }
+        return AetherSceneSurfaceConstants.speedOptions.filter { $0 <= cap + 0.001 }
     }
 
+    /// Every special function of this player in one menu: speed, tracks and whatever the
+    /// host hangs in through `extraMenuItems`.
     @ViewBuilder
-    private var speedMenu: some View {
-        Button {
-            HapticManager.light()
-            showsSpeedPicker.toggle()
-            revealControls()
-        } label: {
-            glyph("gauge.with.dots.needle.67percent")
-                .overlay(alignment: .bottom) {
-                    if abs(playbackRate - 1) > 0.001 {
-                        Text(Self.speedLabel(playbackRate))
-                            .font(.system(size: 8, weight: .bold).monospacedDigit())
-                            .foregroundStyle(.white)
-                            .padding(.bottom, 2)
+    private var optionsMenu: some View {
+        Menu {
+            Menu {
+                ForEach(availableSpeedOptions, id: \.self) { option in
+                    Button {
+                        engine.rate = option
+                        playbackRate = engine.rate
+                        revealControls()
+                    } label: {
+                        Label {
+                            Text(Self.speedLabel(option))
+                        } icon: {
+                            if abs(playbackRate - option) < 0.001 {
+                                Image(systemName: "checkmark")
+                            }
+                        }
                     }
                 }
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel("Playback speed")
-    }
-
-    /// Glass capsule with every selectable speed; sits above the bottom-right controls.
-    @ViewBuilder
-    private var speedPicker: some View {
-        HStack(spacing: 2) {
-            ForEach(availableSpeedOptions, id: \.self) { option in
-                let selected = abs(playbackRate - option) < 0.001
-                Button {
-                    HapticManager.light()
-                    engine.rate = option
-                    playbackRate = engine.rate
-                    showsSpeedPicker = false
-                    revealControls()
-                } label: {
-                    Text(Self.speedLabel(option))
-                        .font(.system(size: isCompact ? 12 : 14, weight: selected ? .bold : .semibold).monospacedDigit())
-                        .foregroundStyle(.white)
-                        .padding(.horizontal, isCompact ? 8 : 11)
-                        .frame(height: chromeButtonSize - 8)
-                        .background(selected ? Color.white.opacity(0.28) : Color.clear, in: Capsule())
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
+            } label: {
+                Label("Playback Speed (\(Self.speedLabel(playbackRate)))",
+                      systemImage: "gauge.with.dots.needle.67percent")
             }
-        }
-        .padding(.horizontal, 6)
-        .frame(height: chromeButtonSize)
-        .stashyGlass(shape: Capsule())
-    }
 
-    private static func speedLabel(_ rate: Float) -> String {
-        let rounded = (rate * 100).rounded() / 100
-        let text = rounded == rounded.rounded()
-            ? String(format: "%.0f", rounded)
-            : String(format: "%g", rounded)
-        return "\(text)×"
-    }
-
-    private var hasTrackChoices: Bool {
-        engine.audioTracks.count > 1 || !engine.subtitleTracks.isEmpty
-    }
-
-    /// One button for both track kinds: a flat menu with an Audio and a Subtitles section.
-    @ViewBuilder
-    private var tracksMenu: some View {
-        Menu {
             if engine.audioTracks.count > 1 {
                 Section("Audio") {
                     ForEach(engine.audioTracks) { track in
@@ -686,10 +634,28 @@ struct AetherSceneSurface: View {
                     }
                 }
             }
+
+            extraMenuItems()
         } label: {
-            glyph("waveform")
+            glyph("ellipsis")
+                .overlay(alignment: .bottom) {
+                    if abs(playbackRate - 1) > 0.001 {
+                        Text(Self.speedLabel(playbackRate))
+                            .font(.system(size: 8, weight: .bold).monospacedDigit())
+                            .foregroundStyle(.white)
+                            .padding(.bottom, 2)
+                    }
+                }
         }
-        .accessibilityLabel("Audio and subtitles")
+        .accessibilityLabel("More options")
+    }
+
+    private static func speedLabel(_ rate: Float) -> String {
+        let rounded = (rate * 100).rounded() / 100
+        let text = rounded == rounded.rounded()
+            ? String(format: "%.0f", rounded)
+            : String(format: "%g", rounded)
+        return "\(text)×"
     }
 
     @ViewBuilder
@@ -741,7 +707,6 @@ struct AetherSceneSurface: View {
     }
 
     private func hideControls() {
-        showsSpeedPicker = false
         controlsHideToken = UUID()
         withAnimation(.easeInOut(duration: 0.2)) {
             areControlsVisible = false
@@ -944,17 +909,46 @@ struct AetherSceneSurface: View {
         controlsHideToken = token
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
             guard controlsHideToken == token, !isScrubbing else { return }
-            if showsSpeedPicker {
-                // Keep the transport while a choice is pending; re-arm and check again.
-                scheduleControlsHide()
-                return
-            }
             withAnimation(.easeInOut(duration: 0.2)) {
                 areControlsVisible = false
             }
         }
     }
 
+}
+
+extension AetherSceneSurface where ExtraItems == EmptyView {
+    /// Call sites without extra menu rows (Downloads, …) keep the old signature.
+    init(
+        engine: AetherSceneEngine,
+        posterURL: URL?,
+        isMuted: Binding<Bool>,
+        onSeek: @escaping (Double) -> Void,
+        liveCaptionText: String = "",
+        onToggleFullscreen: (() -> Void)? = nil,
+        isFullscreen: Bool = false,
+        markerSeconds: [Double] = [],
+        onAddMarker: (() -> Void)? = nil
+    ) {
+        self.init(
+            engine: engine,
+            posterURL: posterURL,
+            isMuted: isMuted,
+            onSeek: onSeek,
+            liveCaptionText: liveCaptionText,
+            onToggleFullscreen: onToggleFullscreen,
+            isFullscreen: isFullscreen,
+            markerSeconds: markerSeconds,
+            onAddMarker: onAddMarker,
+            extraMenuItems: { EmptyView() }
+        )
+    }
+}
+
+/// Nicht-generischer Ablageort: eine generische View darf keine statischen Stored Properties
+/// haben.
+enum AetherSceneSurfaceConstants {
+    static let speedOptions: [Float] = [0.5, 0.75, 1, 1.25, 1.5, 2]
 }
 
 // MARK: - Glass and auto-hiding

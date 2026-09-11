@@ -28,6 +28,8 @@ struct SceneDetailView: View {
     @StateObject private var subtitleController = SubtitleController()
     @StateObject private var transcriptionController = SceneLiveTranscriptionController()
     @StateObject private var captionTranslator = SceneCaptionTranslator()
+    /// Sonderfunktionen im "…"-Menü des Players — geteilt von Inline-Karte und Fullscreen.
+    @StateObject private var extrasController = ScenePlayerExtrasController()
     
     let autoPlay: Bool
     
@@ -303,6 +305,7 @@ struct SceneDetailView: View {
                         },
                         subtitleController: subtitleController,
                         transcriptionController: transcriptionController,
+                        extrasController: extrasController,
                         onSeek: { seconds in seekTo(seconds) },
                         onStartPlayback: { resume in startPlayback(resume: resume) }
                     )
@@ -315,9 +318,6 @@ struct SceneDetailView: View {
                         capturedMarkerTime: $capturedMarkerTime,
                         playbackSpeed: $playbackSpeed,
                         viewModel: viewModel,
-                        subtitleController: subtitleController,
-                        transcriptionController: transcriptionController,
-                        captionTranslator: captionTranslator,
                         onSeek: { seconds in seekTo(seconds) },
                         onTitleUpdated: { newTitle, newDetails in
                             applyLocalSceneEdit(Scene(id: activeScene.id, title: newTitle, details: newDetails, director: activeScene.director, date: activeScene.date, duration: activeScene.duration, studio: activeScene.studio, performers: activeScene.performers, files: activeScene.files, tags: activeScene.tags, galleries: activeScene.galleries, groups: activeScene.groups, organized: activeScene.organized, resumeTime: activeScene.resumeTime, playCount: activeScene.playCount, oCounter: activeScene.oCounter, rating100: activeScene.rating100, createdAt: activeScene.createdAt, updatedAt: activeScene.updatedAt, paths: activeScene.paths, sceneMarkers: activeScene.sceneMarkers, interactive: activeScene.interactive, stashIds: activeScene.stashIds, captions: activeScene.captions, customFields: activeScene.customFields))
@@ -546,6 +546,13 @@ struct SceneDetailView: View {
             .fullScreenCover(isPresented: $isFullscreen) {
                 fullscreenPlayer
             }
+            .onAppear { configureExtrasController() }
+            .onChange(of: aetherEngine.map(ObjectIdentifier.init)) { _, _ in
+                configureExtrasController()
+            }
+            .onChange(of: isFullscreen) { _, value in
+                extrasController.isFullscreenActive = value
+            }
             .onChange(of: playbackSpeed) { _, speed in
                 aetherEngine?.rate = Float(speed)
             }
@@ -596,15 +603,17 @@ struct SceneDetailView: View {
                     onAddMarker: {
                         capturedMarkerTime = aetherEngine?.currentTime ?? 0
                         showingFullscreenAddMarkerSheet = true
-                    }
+                    },
+                    extraMenuItems: { extrasController.menuItems() }
                 )
                 // Only the black backdrop bleeds under the notch and home indicator; the
                 // surface (and with it the transport) stays inside the safe area so every
                 // control is reachable.
             }
         }
+        .scenePlayerExtrasSheets(controller: extrasController, scope: .fullscreen)
         .statusBarHidden(true)
-        .onDisappear { AetherSceneSurface.releaseOrientationOverride() }
+        .onDisappear { AetherSceneSurface<EmptyView>.releaseOrientationOverride() }
         .sheet(isPresented: $showingFullscreenAddMarkerSheet) {
             AddMarkerSheet(
                 sceneId: activeScene.id,
@@ -628,6 +637,27 @@ struct SceneDetailView: View {
             skipFullscreen(by: 15)
             return .handled
         }
+    }
+
+    private func configureExtrasController() {
+        #if canImport(AetherEngine)
+        extrasController.configure(
+            scene: $activeScene,
+            engine: aetherEngine,
+            viewModel: viewModel,
+            subtitleController: subtitleController,
+            transcriptionController: transcriptionController,
+            captionTranslator: captionTranslator
+        )
+        #else
+        extrasController.configure(
+            scene: $activeScene,
+            viewModel: viewModel,
+            subtitleController: subtitleController,
+            transcriptionController: transcriptionController,
+            captionTranslator: captionTranslator
+        )
+        #endif
     }
 
     private func skipFullscreen(by delta: Double) {
