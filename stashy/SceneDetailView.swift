@@ -98,7 +98,7 @@ struct SceneDetailView: View {
                         Text("Back")
                             .font(.subheadline.weight(.semibold))
                     }
-                    .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                    .foregroundColor(AppearanceManager.shared.tintColor)  // Back is always in the accent colour.
                     .modifier(StashyChromePillStyle(height: chromePillHeight))
                 }
                 .buttonStyle(.plain)
