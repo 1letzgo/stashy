@@ -29,7 +29,6 @@ struct PlaybackSettingsSection: View {
                 Label("Double-tap skip", systemImage: "goforward")
             }
             .stashyGroupedBlockRow(index: 1, count: 2)
-            stashyScrollingSectionFooter("Seconds a double tap on the left or right side of the player jumps back or forward.")
             #endif
         }
     }
