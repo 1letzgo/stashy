@@ -7,6 +7,10 @@ struct PasscodeEntryView: View {
     @State private var passcode: String = ""
     @State private var errorMessage: String?
     @State private var shakeTrigger: Bool = false
+    /// One Face ID / Touch ID prompt at a time — `onAppear` and the foreground transition
+    /// can both fire for the same lock.
+    @State private var isAuthenticating = false
+    @Environment(\.scenePhase) private var scenePhase
     
     private var isLockedOut: Bool {
         securityManager.lockoutRemainingSeconds > 0
@@ -69,7 +73,11 @@ struct PasscodeEntryView: View {
                     Group {
                         if securityManager.isBiometricsEnabled && !isLockedOut {
                             Button(action: {
-                                securityManager.authenticateWithBiometrics { _ in }
+                                guard !isAuthenticating else { return }
+                                isAuthenticating = true
+                                securityManager.authenticateWithBiometrics { _ in
+                                    isAuthenticating = false
+                                }
                             }) {
                                 Image(systemName: securityManager.biometryType == .faceID ? "faceid" : "touchid")
                                     .font(.title)
@@ -128,10 +136,33 @@ struct PasscodeEntryView: View {
         }
         .onAppear {
             securityManager.startLockoutTimerIfNeeded()
-            if securityManager.isBiometricsEnabled && !isLockedOut {
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
-                    securityManager.authenticateWithBiometrics { _ in }
-                }
+            // With auto-lock the view appears while the app is still in the background
+            // (the lock fires in `sceneDidEnterBackground`); a prompt there is dropped by
+            // the system. Only prompt now when the app is already active — otherwise the
+            // scene-phase change below does it on the way back to the foreground.
+            if UIApplication.shared.applicationState == .active {
+                promptBiometricsSoon()
+            }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                promptBiometricsSoon()
+            }
+        }
+    }
+
+    /// Asks for biometrics after the lock view has settled; no-op while a prompt is up,
+    /// biometrics are off, or the passcode is in lockout.
+    private func promptBiometricsSoon() {
+        guard securityManager.isBiometricsEnabled, !isLockedOut, !isAuthenticating else { return }
+        isAuthenticating = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+            guard securityManager.isAppLocked else {
+                isAuthenticating = false
+                return
+            }
+            securityManager.authenticateWithBiometrics { _ in
+                isAuthenticating = false
             }
         }
     }
