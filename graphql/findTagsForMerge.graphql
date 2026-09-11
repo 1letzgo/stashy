@@ -1,0 +1,10 @@
+query FindTagsForMerge($filter: FindFilterType) {
+  findTags(filter: $filter) {
+    count
+    tags {
+      id name description image_path scene_count image_count gallery_count scene_marker_count performer_count favorite created_at updated_at
+      aliases
+      stash_ids { endpoint stash_id }
+    }
+  }
+}

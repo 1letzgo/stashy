@@ -29,6 +29,10 @@ protocol TagRepositoryProtocol {
     /// Every tag on the server, paged until exhausted.
     func fetchEveryTag() async throws -> [Tag]
 
+    /// Wie `fetchEveryTag`, zusätzlich mit `aliases` und `stash_ids` — die
+    /// Merge-Vorlagen finden einen neu angelegten Tag nur über diese Merkmale wieder.
+    func fetchEveryTagForMerge() async throws -> [Tag]
+
     /// Deletes the given tags.
     @discardableResult
     func deleteTags(ids: [String]) async throws -> Bool
@@ -143,6 +147,46 @@ class TagRepository: TagRepositoryProtocol {
             if page > 60 { break }
         }
 
+        return collected
+    }
+
+    /// Eine Seite mit Merge-Feldern. Ältere Server kennen `stash_ids` auf Tag
+    /// unter Umständen nicht — der Aufrufer fällt dann auf die schmale Abfrage zurück.
+    private func fetchTagsForMerge(page: Int, perPage: Int) async throws -> (tags: [Tag], total: Int) {
+        let query = GraphQLQueries.loadQuery(named: "findTagsForMerge")
+        let variables: [String: Any] = [
+            "filter": [
+                "page": page,
+                "per_page": perPage,
+                "sort": "name",
+                "direction": "ASC"
+            ]
+        ]
+        let response: TagsResponse = try await graphQLClient.execute(query: query, variables: variables)
+        return (response.data?.findTags.tags ?? [], response.data?.findTags.count ?? 0)
+    }
+
+    func fetchEveryTagForMerge() async throws -> [Tag] {
+        var collected: [Tag] = []
+        var page = 1
+        let perPage = 500
+
+        while true {
+            let result: (tags: [Tag], total: Int)
+            do {
+                result = try await fetchTagsForMerge(page: page, perPage: perPage)
+            } catch {
+                // Server ohne diese Felder: lieber die Liste ohne Identitätsmerkmale
+                // als gar keine.
+                AppLog.error("⚠️ findTagsForMerge failed, falling back: \(error.localizedDescription)")
+                return try await fetchEveryTag()
+            }
+            collected.append(contentsOf: result.tags)
+            if result.tags.count < perPage { break }
+            if result.total > 0 && collected.count >= result.total { break }
+            page += 1
+            if page > 60 { break }
+        }
         return collected
     }
 

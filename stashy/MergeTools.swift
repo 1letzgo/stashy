@@ -16,9 +16,16 @@ import SwiftUI
 protocol MergeableItem: Identifiable where ID == String {
     var name: String { get }
     var mergeUsageSummary: String { get }
+    /// Stabile Merkmale für Vorlagen: nach einem Merge legt ein Scraper den Eintrag
+    /// unter neuer ID wieder an — wiedererkennbar ist er dann nur hierüber.
+    var mergeStashIds: [MergePresetStashId] { get }
+    var mergeAliases: [String] { get }
 }
 
 extension Tag: MergeableItem {
+    var mergeStashIds: [MergePresetStashId] { MergePresetStashId.from(stashIds) }
+    var mergeAliases: [String] { aliases ?? [] }
+
     var mergeUsageSummary: String {
         var parts: [String] = []
         MergeUsage.append(&parts, sceneCount, "scene")
@@ -31,6 +38,9 @@ extension Tag: MergeableItem {
 }
 
 extension Studio: MergeableItem {
+    var mergeStashIds: [MergePresetStashId] { MergePresetStashId.from(stashIds) }
+    var mergeAliases: [String] { aliases ?? [] }
+
     var mergeUsageSummary: String {
         var parts: [String] = []
         MergeUsage.append(&parts, sceneCount, "scene")
@@ -50,13 +60,136 @@ enum MergeUsage {
 
 // MARK: - Presets (local)
 
+/// Ein `stash_id` eines Eintrags (StashDB o. Ä.) — endpoint + ID zusammen sind die
+/// einzige Kennung, die einen Neuanlage-durch-Scraper überlebt.
+struct MergePresetStashId: Codable, Equatable {
+    var endpoint: String
+    var stashId: String
+
+    /// Aus dem GraphQL-Modell; Einträge ohne endpoint oder ID sind wertlos.
+    static func from(_ ids: [StashID]?) -> [MergePresetStashId] {
+        (ids ?? []).compactMap { id in
+            guard let endpoint = id.endpoint, !endpoint.isEmpty,
+                  let stashId = id.stashId, !stashId.isEmpty else { return nil }
+            return MergePresetStashId(endpoint: endpoint, stashId: stashId)
+        }
+    }
+}
+
+/// Ein Eintrag in einer Vorlage. Die Stash-ID allein reicht nicht: nach dem Merge ist
+/// die Quelle gelöscht, und der Scraper legt sie beim nächsten Mal unter neuer ID an.
+/// Deshalb stehen Name und `stash_ids` mit in der Vorlage.
+struct MergePresetEntry: Codable, Equatable {
+    var id: String
+    var name: String
+    var stashIds: [MergePresetStashId]
+
+    init(id: String, name: String = "", stashIds: [MergePresetStashId] = []) {
+        self.id = id
+        self.name = name
+        self.stashIds = stashIds
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(String.self, forKey: .id) ?? ""
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        stashIds = try container.decodeIfPresent([MergePresetStashId].self, forKey: .stashIds) ?? []
+    }
+
+    /// Für Anzeige und Toasts: Name, solange einer bekannt ist.
+    var displayName: String { name.isEmpty ? id : name }
+}
+
 /// Gespeicherte Merge-Vorlage: Ziel + Quellen. Liegt nur auf dem Gerät, pro Server.
 struct MergePreset: Codable, Identifiable, Equatable {
     var id = UUID()
     var name: String
-    var destinationId: String
-    var destinationName: String
-    var sourceIds: [String]
+    var destination: MergePresetEntry
+    var sources: [MergePresetEntry]
+
+    init(id: UUID = UUID(), name: String, destination: MergePresetEntry, sources: [MergePresetEntry]) {
+        self.id = id
+        self.name = name
+        self.destination = destination
+        self.sources = sources
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, destination, sources
+        // Altes Format (nur Stash-IDs).
+        case destinationId, destinationName, sourceIds
+    }
+
+    /// Vorlagen aus älteren Versionen kennen nur IDs. Sie werden gelesen, als hätten
+    /// die Einträge keine Identitätsmerkmale — beim nächsten Speichern sind sie dabei.
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
+        name = try container.decodeIfPresent(String.self, forKey: .name) ?? ""
+        if let destination = try container.decodeIfPresent(MergePresetEntry.self, forKey: .destination) {
+            self.destination = destination
+            sources = try container.decodeIfPresent([MergePresetEntry].self, forKey: .sources) ?? []
+        } else {
+            let legacyId = try container.decodeIfPresent(String.self, forKey: .destinationId) ?? ""
+            let legacyName = try container.decodeIfPresent(String.self, forKey: .destinationName) ?? ""
+            destination = MergePresetEntry(id: legacyId, name: legacyName)
+            sources = (try container.decodeIfPresent([String].self, forKey: .sourceIds) ?? [])
+                .map { MergePresetEntry(id: $0) }
+        }
+    }
+
+    /// Geschrieben wird immer das neue Format.
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(name, forKey: .name)
+        try container.encode(destination, forKey: .destination)
+        try container.encode(sources, forKey: .sources)
+    }
+}
+
+// MARK: - Resolving preset entries
+
+/// Nachschlagewerk über die geladene Liste: ID → Eintrag, stash_id → Eintrag,
+/// Name/Alias (klein geschrieben) → Eintrag. Einmal pro Ladevorgang gebaut.
+struct MergeItemIndex<Item: MergeableItem> {
+    private var byId: [String: Item] = [:]
+    private var byStashId: [String: Item] = [:]
+    private var byName: [String: Item] = [:]
+    private var byAlias: [String: Item] = [:]
+
+    init(items: [Item] = []) {
+        for item in items {
+            byId[item.id] = item
+            for stashId in item.mergeStashIds {
+                let key = Self.key(stashId)
+                if byStashId[key] == nil { byStashId[key] = item }
+            }
+            let name = item.name.lowercased()
+            if !name.isEmpty, byName[name] == nil { byName[name] = item }
+            for alias in item.mergeAliases {
+                let key = alias.lowercased()
+                if !key.isEmpty, byAlias[key] == nil { byAlias[key] = item }
+            }
+        }
+    }
+
+    private static func key(_ stashId: MergePresetStashId) -> String {
+        "\(stashId.endpoint)\u{1}\(stashId.stashId)"
+    }
+
+    /// Reihenfolge: exakte ID, dann stash_id, dann Name, dann Alias. Der erste Treffer gilt.
+    func resolve(_ entry: MergePresetEntry) -> Item? {
+        if !entry.id.isEmpty, let hit = byId[entry.id] { return hit }
+        for stashId in entry.stashIds {
+            if let hit = byStashId[Self.key(stashId)] { return hit }
+        }
+        let name = entry.name.lowercased()
+        guard !name.isEmpty else { return nil }
+        if let hit = byName[name] { return hit }
+        return byAlias[name]
+    }
 }
 
 /// UserDefaults-Ablage unter `MergePresets_<kind>_<serverID>` — Tags und Studios
@@ -95,11 +228,10 @@ final class MergePresetStore: ObservableObject {
     }
 
     /// Ziel/Quellen einer bestehenden Vorlage ersetzen, Name und ID bleiben.
-    func update(_ id: UUID, destinationId: String, destinationName: String, sourceIds: [String]) {
+    func update(_ id: UUID, destination: MergePresetEntry, sources: [MergePresetEntry]) {
         guard let index = presets.firstIndex(where: { $0.id == id }) else { return }
-        presets[index].destinationId = destinationId
-        presets[index].destinationName = destinationName
-        presets[index].sourceIds = sourceIds
+        presets[index].destination = destination
+        presets[index].sources = sources
         persist()
     }
 
@@ -143,6 +275,8 @@ struct MergeToolsView<Item: MergeableItem>: View {
     @StateObject private var presets: MergePresetStore
 
     @State private var allItems: [Item] = []
+    /// Wird mit `allItems` gesetzt; Vorlagen schlagen darüber ihre Einträge nach.
+    @State private var itemIndex = MergeItemIndex<Item>()
     @State private var isLoading = false
     /// Wächst beim Scrollen. Alle Treffer auf einmal zu rendern macht die Liste zäh.
     @State private var visibleCount = MergeToolsLayout.pageSize
@@ -195,10 +329,9 @@ struct MergeToolsView<Item: MergeableItem>: View {
 
     /// Einträge der geladenen Vorlage, die es auf dem Server nicht (mehr) gibt.
     /// Sie bleiben in der Vorlage — auch beim Überspeichern — statt still zu verschwinden.
-    private var missingPresetSourceIds: [String] {
+    private var missingPresetSources: [MergePresetEntry] {
         guard let activePreset else { return [] }
-        let known = Set(allItems.map(\.id))
-        return activePreset.sourceIds.filter { !known.contains($0) }
+        return activePreset.sources.filter { itemIndex.resolve($0) == nil }
     }
 
     private var hasSelection: Bool {
@@ -331,15 +464,26 @@ struct MergeToolsView<Item: MergeableItem>: View {
             HStack(spacing: DesignTokens.Spacing.xs) {
                 ForEach(presets.presets) { preset in
                     let isActive = isPresetActive(preset)
+                    let missing = unresolvedSources(of: preset).count
                     Button {
                         apply(preset)
                     } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "bookmark.fill")
-                                .font(.caption2)
-                            Text(preset.name)
-                                .font(.footnote.weight(.medium))
-                                .lineLimit(1)
+                        VStack(alignment: .leading, spacing: 1) {
+                            HStack(spacing: 4) {
+                                Image(systemName: "bookmark.fill")
+                                    .font(.caption2)
+                                Text(preset.name)
+                                    .font(.footnote.weight(.medium))
+                                    .lineLimit(1)
+                            }
+                            // Nach einem Merge legt ein Scraper die Quelle neu an — bis dahin
+                            // fehlt sie hier, bleibt aber in der Vorlage.
+                            if missing > 0 {
+                                Text("\(missing) of \(preset.sources.count) sources not on the server right now")
+                                    .font(.caption2)
+                                    .lineLimit(1)
+                                    .opacity(0.75)
+                            }
                         }
                         .foregroundColor(isActive ? .white : .primary)
                         .padding(.horizontal, DesignTokens.Spacing.sm)
@@ -509,22 +653,56 @@ struct MergeToolsView<Item: MergeableItem>: View {
 
     // MARK: Presets
 
+    /// Aufgelöste Quellen einer Vorlage (ohne das Ziel selbst) und die Einträge,
+    /// die es auf dem Server gerade nicht gibt.
+    private func resolveSources(of preset: MergePreset) -> (resolved: [Item], unresolved: [MergePresetEntry]) {
+        let destinationId = itemIndex.resolve(preset.destination)?.id
+        var resolved: [Item] = []
+        var unresolved: [MergePresetEntry] = []
+        var seen: Set<String> = []
+        for entry in preset.sources {
+            guard let item = itemIndex.resolve(entry) else {
+                unresolved.append(entry)
+                continue
+            }
+            // Was auf das Ziel zeigt, ist bereits zusammengeführt.
+            guard item.id != destinationId, seen.insert(item.id).inserted else { continue }
+            resolved.append(item)
+        }
+        return (resolved, unresolved)
+    }
+
+    private func unresolvedSources(of preset: MergePreset) -> [MergePresetEntry] {
+        resolveSources(of: preset).unresolved
+    }
+
+    private func entry(for item: Item) -> MergePresetEntry {
+        MergePresetEntry(id: item.id, name: item.name, stashIds: item.mergeStashIds)
+    }
+
     private func isPresetActive(_ preset: MergePreset) -> Bool {
-        destination?.id == preset.destinationId && sources == Set(preset.sourceIds)
+        guard let destination, let resolvedDestination = itemIndex.resolve(preset.destination),
+              destination.id == resolvedDestination.id else { return false }
+        return sources == Set(resolveSources(of: preset).resolved.map(\.id))
     }
 
     /// Ziel und Quellen aus der Vorlage übernehmen — nur, was es auf dem Server noch gibt.
     private func apply(_ preset: MergePreset) {
         HapticManager.selection()
-        let byId = Dictionary(uniqueKeysWithValues: allItems.map { ($0.id, $0) })
-        destination = byId[preset.destinationId]
-        sources = Set(preset.sourceIds.filter { byId[$0] != nil && $0 != preset.destinationId })
+        let resolution = resolveSources(of: preset)
+        let resolvedDestination = itemIndex.resolve(preset.destination)
+        destination = resolvedDestination
+        sources = Set(resolution.resolved.map(\.id))
         searchText = ""
         activePreset = preset
-        let missing = preset.sourceIds.count - sources.count + (destination == nil ? 1 : 0)
-        if missing > 0 {
+
+        var missingNames = resolution.unresolved.map(\.displayName)
+        if resolvedDestination == nil { missingNames.insert(preset.destination.displayName, at: 0) }
+        if !missingNames.isEmpty {
+            let shown = missingNames.prefix(3).joined(separator: ", ")
+            let rest = missingNames.count - min(3, missingNames.count)
             ToastManager.shared.show(
-                "\(missing) \(missing == 1 ? config.noun : config.nounPlural) from this template not on this server (kept in template)",
+                "Not on this server (kept in template): \(shown)\(rest > 0 ? " +\(rest) more" : "")",
                 icon: "info.circle",
                 style: .info
             )
@@ -537,9 +715,8 @@ struct MergeToolsView<Item: MergeableItem>: View {
         guard !name.isEmpty else { return }
         let preset = MergePreset(
             name: name,
-            destinationId: destination.id,
-            destinationName: destination.name,
-            sourceIds: Array(sources) + missingPresetSourceIds
+            destination: entry(for: destination),
+            sources: selectedSources.map(entry(for:)) + missingPresetSources
         )
         presets.save(preset)
         activePreset = preset
@@ -550,13 +727,11 @@ struct MergeToolsView<Item: MergeableItem>: View {
     private func updateActivePreset() {
         guard let activePreset, !sources.isEmpty else { return }
         // Fehlt das Ziel auf dem Server, bleibt das gespeicherte stehen.
-        let destinationId = destination?.id ?? activePreset.destinationId
-        let destinationName = destination?.name ?? activePreset.destinationName
+        let destinationEntry = destination.map(entry(for:)) ?? activePreset.destination
         presets.update(
             activePreset.id,
-            destinationId: destinationId,
-            destinationName: destinationName,
-            sourceIds: Array(sources) + missingPresetSourceIds
+            destination: destinationEntry,
+            sources: selectedSources.map(entry(for:)) + missingPresetSources
         )
         self.activePreset = presets.presets.first { $0.id == activePreset.id }
         HapticManager.light()
@@ -595,6 +770,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                 let items = try await config.loadAll()
                 await MainActor.run {
                     allItems = items.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+                    itemIndex = MergeItemIndex(items: allItems)
                     isLoading = false
                 }
             } catch {
@@ -621,6 +797,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                     isMerging = false
                     sources.removeAll()
                     allItems.removeAll { sourceIds.contains($0.id) }
+                    itemIndex = MergeItemIndex(items: allItems)
                     config.didMerge()
                     ToastManager.shared.show(
                         "\(mergedCount) \(mergedCount == 1 ? config.noun : config.nounPlural) merged into \(destination.name)",
@@ -755,7 +932,7 @@ struct StudioMergeToolsView: View {
             kind: "studios",
             noun: "studio",
             nounPlural: "studios",
-            loadAll: { try await Self.repository.fetchEveryStudio() },
+            loadAll: { try await Self.repository.fetchEveryStudioForMerge() },
             merge: { sources, destination in
                 try await Self.repository.mergeStudios(sourceIds: sources, destinationId: destination)
             },

@@ -20,7 +20,7 @@ struct TagMergeToolsView: View {
             kind: "tags",
             noun: "tag",
             nounPlural: "tags",
-            loadAll: { try await Self.repository.fetchEveryTag() },
+            loadAll: { try await Self.repository.fetchEveryTagForMerge() },
             merge: { sources, destination in
                 try await Self.repository.mergeTags(sourceIds: sources, destinationId: destination)
             },

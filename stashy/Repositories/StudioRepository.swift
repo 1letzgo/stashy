@@ -26,6 +26,10 @@ protocol StudioRepositoryProtocol {
     /// Every studio on the server, paged until exhausted.
     func fetchEveryStudio() async throws -> [Studio]
 
+    /// Wie `fetchEveryStudio`, zusätzlich mit `aliases` und `stash_ids` — die
+    /// Merge-Vorlagen finden ein neu angelegtes Studio nur über diese Merkmale wieder.
+    func fetchEveryStudioForMerge() async throws -> [Studio]
+
     /// Re-points everything attached to `sourceIds` (scenes, galleries, images,
     /// groups, child studios) at `destinationId`, then deletes the sources.
     func mergeStudios(sourceIds: [String], destinationId: String) async throws
@@ -109,6 +113,46 @@ extension StudioRepository {
             if result.total > 0 && collected.count >= result.total { break }
             page += 1
             // Sicherheitsventil gegen ein Backend, das immer volle Seiten liefert.
+            if page > 60 { break }
+        }
+        return collected
+    }
+
+    /// Eine Seite mit Merge-Feldern. Ältere Server kennen `aliases`/`stash_ids` auf
+    /// Studio unter Umständen nicht — der Aufrufer fällt dann auf die schmale Abfrage zurück.
+    private func fetchStudiosForMerge(page: Int, perPage: Int) async throws -> (studios: [Studio], total: Int) {
+        let query = GraphQLQueries.loadQuery(named: "findStudiosForMerge")
+        let variables: [String: Any] = [
+            "filter": [
+                "page": page,
+                "per_page": perPage,
+                "sort": "name",
+                "direction": "ASC"
+            ]
+        ]
+        let response: StudiosResponse = try await graphQLClient.execute(query: query, variables: variables)
+        return (response.data?.findStudios.studios ?? [], response.data?.findStudios.count ?? 0)
+    }
+
+    func fetchEveryStudioForMerge() async throws -> [Studio] {
+        var collected: [Studio] = []
+        var page = 1
+        let perPage = 500
+
+        while true {
+            let result: (studios: [Studio], total: Int)
+            do {
+                result = try await fetchStudiosForMerge(page: page, perPage: perPage)
+            } catch {
+                // Server ohne diese Felder: lieber die Liste ohne Identitätsmerkmale
+                // als gar keine.
+                AppLog.error("⚠️ findStudiosForMerge failed, falling back: \(error.localizedDescription)")
+                return try await fetchEveryStudio()
+            }
+            collected.append(contentsOf: result.studios)
+            if result.studios.count < perPage { break }
+            if result.total > 0 && collected.count >= result.total { break }
+            page += 1
             if page > 60 { break }
         }
         return collected

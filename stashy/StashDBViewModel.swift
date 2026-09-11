@@ -9763,9 +9763,13 @@ struct Studio: Codable, Identifiable, Equatable {
     var rating100: Int?
     let createdAt: String?
     let updatedAt: String?
+    /// Nur von Abfragen gefüllt, die sie anfordern (Merge-Tools) — sonst nil.
+    var aliases: [String]?
+    var stashIds: [StashID]?
     
     enum CodingKeys: String, CodingKey {
-        case id, name, url, details, favorite, rating100
+        case id, name, url, details, favorite, rating100, aliases
+        case stashIds = "stash_ids"
         case sceneCount = "scene_count"
         case performerCount = "performer_count"
         case galleryCount = "gallery_count"
@@ -9775,7 +9779,7 @@ struct Studio: Codable, Identifiable, Equatable {
         case updatedAt = "updated_at"
     }
     
-    init(id: String, name: String, url: String? = nil, sceneCount: Int = 0, performerCount: Int? = nil, galleryCount: Int? = nil, imageCount: Int? = nil, details: String? = nil, imagePath: String? = nil, favorite: Bool? = nil, rating100: Int? = nil, createdAt: String? = nil, updatedAt: String? = nil) {
+    init(id: String, name: String, url: String? = nil, sceneCount: Int = 0, performerCount: Int? = nil, galleryCount: Int? = nil, imageCount: Int? = nil, details: String? = nil, imagePath: String? = nil, favorite: Bool? = nil, rating100: Int? = nil, createdAt: String? = nil, updatedAt: String? = nil, aliases: [String]? = nil, stashIds: [StashID]? = nil) {
         self.id = id
         self.name = name
         self.url = url
@@ -9789,6 +9793,8 @@ struct Studio: Codable, Identifiable, Equatable {
         self.rating100 = rating100
         self.createdAt = createdAt
         self.updatedAt = updatedAt
+        self.aliases = aliases
+        self.stashIds = stashIds
     }
     
     init(from galleryStudio: GalleryStudio) {
@@ -9836,9 +9842,13 @@ struct Tag: Codable, Identifiable, Equatable {
     var favorite: Bool?
     let createdAt: String?
     var updatedAt: String?
+    /// Nur von Abfragen gefüllt, die sie anfordern (Merge-Tools) — sonst nil.
+    var aliases: [String]?
+    var stashIds: [StashID]?
     
     enum CodingKeys: String, CodingKey {
-        case id, name, favorite, description
+        case id, name, favorite, description, aliases
+        case stashIds = "stash_ids"
         case imagePath = "image_path"
         case sceneCount = "scene_count"
         case imageCount = "image_count"

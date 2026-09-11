@@ -1,0 +1,10 @@
+query FindStudiosForMerge($filter: FindFilterType) {
+  findStudios(filter: $filter) {
+    count
+    studios {
+      id name url details image_path scene_count performer_count gallery_count image_count favorite rating100 created_at updated_at
+      aliases
+      stash_ids { endpoint stash_id }
+    }
+  }
+}
