@@ -128,21 +128,23 @@ private struct TimelineFilterChipRow: View {
                     HapticManager.selection()
                     toggle(kind)
                 } label: {
+                    // Mirrors `ToolsPillMenuRow` (Charts' section pills) — same font, height
+                    // and shadow, only multi-select.
                     Text(kind.label)
-                        .font(.caption.weight(.semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.85))
                         .lineLimit(1)
                         .minimumScaleFactor(0.65)
                         .frame(maxWidth: .infinity)
-                        .frame(height: 28)
+                        .frame(height: StashyExpandingDock.activeHeight)
                         .background(
                             Capsule(style: .continuous)
                                 .fill(selected ? appearance.tintColor : Color.secondaryAppBackground)
                                 .shadow(
                                     color: selected ? appearance.tintColor.opacity(0.35) : .clear,
-                                    radius: 4,
+                                    radius: 6,
                                     x: 0,
-                                    y: 2
+                                    y: 3
                                 )
                         )
                         .clipShape(Capsule(style: .continuous))

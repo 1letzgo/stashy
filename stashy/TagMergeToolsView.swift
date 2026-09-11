@@ -148,6 +148,7 @@ struct TagMergeToolsView: View {
             TagMergeSearchField(text: $searchText)
         }
         .padding(.horizontal, DesignTokens.Tools.contentPadding)
+        .padding(.top, DesignTokens.Tools.menuTopPadding)
         .padding(.bottom, DesignTokens.Spacing.sm)
         .background(Color.appBackground(for: appearance.currentTheme))
     }

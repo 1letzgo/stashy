@@ -131,7 +131,9 @@ struct FiltersToolsView: View {
     private var filtersList: some View {
         List {
             ForEach(grouped, id: \.mode) { section in
-                Section(Self.modeTitle(section.mode)) {
+                Section {
+                    // Same small caps header the other Tools views and Settings use.
+                    stashyScrollingSectionHeader(Self.modeTitle(section.mode))
                     ForEach(section.filters) { filter in
                         Button {
                             editingFilter = filter
@@ -174,6 +176,10 @@ struct FiltersToolsView: View {
             }
         }
         .listStyle(.insetGrouped)
+        // Custom header rows replace the grouped section headers; without this the list
+        // keeps the room reserved for them and the first group floats far below the search.
+        .listSectionSpacing(DesignTokens.Spacing.md)
+        .contentMargins(.top, DesignTokens.Spacing.sm, for: .scrollContent)
         .scrollContentBackground(.hidden)
         .background(Color.appBackground(for: appearance.currentTheme))
         .refreshable { viewModel.fetchSavedFilters() }

@@ -99,6 +99,10 @@ class NavigationCoordinator: ObservableObject {
         if let raw = UserDefaults.standard.string(forKey: "stashyDebugSelectedTab"), let tab = AppTab(rawValue: raw) {
             selectedTab = tab
         }
+        // `-stashyDebugToolsSubTab timeline` (ToolsView tool raw value) opens that tool at launch.
+        if let raw = UserDefaults.standard.string(forKey: "stashyDebugToolsSubTab"), !raw.isEmpty {
+            toolsSubTab = raw
+        }
         #endif
         
         // Listen for server changes to reset all stacks
