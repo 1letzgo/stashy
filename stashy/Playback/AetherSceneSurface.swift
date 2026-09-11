@@ -317,7 +317,12 @@ struct AetherSceneSurface: View {
                         if engine.isUsingTranscodeFallback { transcodeTag }
                         bottomTrailingControls
                     }
-                    timeBar
+                    // Marker jumps flank the time bar: previous on the left, next on the right.
+                    HStack(spacing: 8) {
+                        if !markerSeconds.isEmpty { markerJumpButton(forward: false) }
+                        timeBar
+                        if !markerSeconds.isEmpty { markerJumpButton(forward: true) }
+                    }
                 }
                 .padding(.horizontal, 16)
                 .padding(.bottom, 12)
@@ -437,21 +442,14 @@ struct AetherSceneSurface: View {
 
     // MARK: Bottom trailing
 
-    /// Bottom-left: rotate (fullscreen only), then previous marker · add marker · next
-    /// marker. The marker jumps only exist when the scene has markers; add is there
-    /// whenever the host offers it (the inline card no longer has its own Marker pill).
+    /// Bottom-left: rotate (fullscreen only) and add marker — whenever the host offers it
+    /// (the inline card no longer has its own Marker pill).
     @ViewBuilder
     private var bottomLeadingControls: some View {
         HStack(spacing: isCompact ? 6 : 8) {
             if isFullscreen { rotateButton }
-            if !markerSeconds.isEmpty {
-                markerJumpButton(forward: false)
-            }
             if onAddMarker != nil {
                 addMarkerButton
-            }
-            if !markerSeconds.isEmpty {
-                markerJumpButton(forward: true)
             }
         }
     }
