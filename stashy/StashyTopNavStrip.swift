@@ -72,8 +72,8 @@ struct StashyChromePillStyle: ViewModifier {
     var width: CGFloat? = nil
     /// Overlay buttons use the hashtag chip colours instead of the dock fill.
     var hashtagColors: Bool = false
-    /// Feeds overlay chrome: Liquid Glass instead of the flat fill. Sizes stay identical.
-    var glass: Bool = false
+    /// Liquid Glass fill — the default for every neutral chrome pill. Sizes stay identical.
+    var glass: Bool = true
     /// Filled with the app accent colour (Back pills); content should be white.
     var accent: Bool = false
 
@@ -91,12 +91,16 @@ struct StashyChromePillStyle: ViewModifier {
             .frame(minWidth: StashyExpandingDock.circleSize, minHeight: StashyExpandingDock.circleSize)
             .frame(width: iconOnly ? StashyExpandingDock.circleSize : width)
 
-        if glass {
+        // Accent pills stay a solid tint fill; every other neutral pill is glass.
+        if accent {
+            sized
+                .background(appearance.tintColor)
+                .clipShape(Capsule(style: .continuous))
+        } else if glass {
             sized.stashyGlass(shape: Capsule(style: .continuous))
         } else {
             sized
-                .background(accent ? appearance.tintColor
-                            : hashtagColors ? StashyExpandingDock.hashtagFill
+                .background(hashtagColors ? StashyExpandingDock.hashtagFill
                             : StashyExpandingDock.inactiveBackground)
                 .clipShape(Capsule(style: .continuous))
                 .overlay {
@@ -119,6 +123,14 @@ enum StashyExpandingDockPalette {
         switch self {
         case .chrome: return StashyExpandingDock.inactiveBackground
         case .surface: return Color.secondaryAppBackground
+        }
+    }
+
+    /// Chrome floats over artwork — its inactive chips use Liquid Glass instead of the flat fill.
+    var usesGlassInactiveBackground: Bool {
+        switch self {
+        case .chrome: return true
+        case .surface: return false
         }
     }
 
@@ -214,6 +226,36 @@ struct StashyExpandingDockBrowseStrip: View {
     }
 }
 
+/// Chip fill: the selected chip keeps its tinted capsule, an inactive chrome chip turns to glass.
+/// `glassInactive` is constant per strip, so the tint fades in/out without swapping view identity.
+private struct StashyExpandingDockChipBackground: ViewModifier {
+    let isSelected: Bool
+    let activeColor: Color
+    let inactiveColor: Color
+    let glassInactive: Bool
+
+    func body(content: Content) -> some View {
+        let shape = Capsule(style: .continuous)
+        let filled = content
+            .background {
+                shape
+                    .fill(isSelected ? activeColor : (glassInactive ? Color.clear : inactiveColor))
+                    .shadow(
+                        color: isSelected ? activeColor.opacity(0.35) : .clear,
+                        radius: 6,
+                        x: 0,
+                        y: 3
+                    )
+            }
+
+        if glassInactive {
+            filled.stashyGlass(shape: shape)
+        } else {
+            filled.clipShape(shape)
+        }
+    }
+}
+
 private struct StashyExpandingDockChip: View {
     let item: StashyNavMenuItem
     let isSelected: Bool
@@ -257,17 +299,14 @@ private struct StashyExpandingDockChip: View {
             .frame(height: StashyExpandingDock.activeHeight)
             .frame(width: isSelected ? nil : StashyExpandingDock.circleSize)
             .frame(minWidth: StashyExpandingDock.circleSize, minHeight: StashyExpandingDock.circleSize)
-            .background {
-                Capsule(style: .continuous)
-                    .fill(isSelected ? activeBackground : inactiveBackground)
-                    .shadow(
-                        color: isSelected ? activeBackground.opacity(0.35) : .clear,
-                        radius: 6,
-                        x: 0,
-                        y: 3
-                    )
-            }
-            .clipShape(Capsule(style: .continuous))
+            .modifier(
+                StashyExpandingDockChipBackground(
+                    isSelected: isSelected,
+                    activeColor: activeBackground,
+                    inactiveColor: inactiveBackground,
+                    glassInactive: palette.usesGlassInactiveBackground
+                )
+            )
             .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(StashyExpandingDockButtonStyle())

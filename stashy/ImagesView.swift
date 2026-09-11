@@ -643,8 +643,7 @@ private struct ImagesViewBody: View {
                                 width: StashyExpandingDock.circleSize,
                                 height: StashyExpandingDock.circleSize
                             )
-                            .background(StashyExpandingDock.inactiveBackground)
-                            .clipShape(Capsule(style: .continuous))
+                            .stashyGlass(shape: Capsule(style: .continuous))
                             .contentShape(Capsule(style: .continuous))
                     }
                     .buttonStyle(.plain)
@@ -1267,7 +1266,7 @@ struct ImageGroupCatalogCell: View {
                         Text("\(visibleIndex + 1)/\(images.count)")
                             .font(.caption2.weight(.semibold))
                             .foregroundColor(.white)
-                            .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, hashtagColors: true, glass: true))
+                            .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
                             .allowsHitTesting(false)
                             .accessibilityLabel("Image \(visibleIndex + 1) of \(images.count)")
                     }
@@ -1467,7 +1466,7 @@ extension ImageGroupCatalogCell {
                         .font(.caption2.weight(.semibold))
                         .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
                 }
-                .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true, glass: true))
+                .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("Rating")
@@ -1482,7 +1481,7 @@ extension ImageGroupCatalogCell {
                         .font(.caption2.weight(.semibold))
                         .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
                 }
-                .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true, glass: true))
+                .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
             }
             .buttonStyle(.plain)
             .accessibilityLabel("O-Counter")

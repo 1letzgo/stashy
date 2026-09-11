@@ -4353,7 +4353,7 @@ struct ReelsViewBody: View {
                         .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
                 }
                 .opacity(currentItem == nil ? 0.35 : 1.0)
-                .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true, glass: true))
+                .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
             }
             .buttonStyle(.plain)
             .disabled(currentItem == nil)
@@ -4390,7 +4390,7 @@ struct ReelsViewBody: View {
                                 .font(.caption2.weight(.semibold))
                                 .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
                         }
-                        .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true, glass: true))
+                        .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
                     }
                     .buttonStyle(.plain)
                 } else {
@@ -4401,7 +4401,7 @@ struct ReelsViewBody: View {
                             .font(.caption2.weight(.semibold))
                     }
                     .foregroundColor(.white.opacity(0.35))
-                    .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true, glass: true))
+                    .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
                 }
             }
             .accessibilityLabel("Rating")
@@ -4461,7 +4461,7 @@ struct ReelsViewBody: View {
                         }
 
                         if tabManager.reelsShowsDeleteButton, reelsItemSupportsDelete(item) {
-                            ChromePillIconButton(systemImage: "trash", accessibilityLabel: "Delete", glass: true) {
+                            ChromePillIconButton(systemImage: "trash", accessibilityLabel: "Delete") {
                                 reelsItemToDelete = item
                                 showDeleteConfirmation = true
                             }
@@ -4470,8 +4470,7 @@ struct ReelsViewBody: View {
                         ChromePillIconButton(
                             systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
                             enabled: isVideo,
-                            accessibilityLabel: isMuted ? "Ton an" : "Stumm",
-                            glass: true
+                            accessibilityLabel: isMuted ? "Ton an" : "Stumm"
                         ) {
                             if isVideo {
                                 isMuted.toggle()
@@ -4482,8 +4481,7 @@ struct ReelsViewBody: View {
                         ChromePillIconButton(
                             systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
                             enabled: isVideo,
-                            accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play",
-                            glass: true
+                            accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
                         ) {
                             if isVideo { currentItemIsPlaying.toggle() }
                         }
@@ -4693,7 +4691,7 @@ struct ReelsViewBody: View {
                         : .white.opacity(StashyExpandingDock.inactiveIconOpacity)
                 )
                 .frame(width: StashyExpandingDock.iconSize, height: StashyExpandingDock.iconSize)
-                .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight, iconOnly: true, glass: true))
+                .modifier(StashyChromePillStyle(height: reelsTopChromePillHeight, iconOnly: true))
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Filter")
@@ -4796,7 +4794,7 @@ private struct ReelsAIMotionPill: View {
                     .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
                     .foregroundColor(.white.opacity(isActive ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
                     .frame(width: StashyExpandingDock.iconSize, height: StashyExpandingDock.iconSize)
-                    .modifier(StashyChromePillStyle(height: pillHeight, iconOnly: true, glass: true))
+                    .modifier(StashyChromePillStyle(height: pillHeight, iconOnly: true))
             }
             .buttonStyle(.plain)
             .accessibilityLabel(AIMotionCopy.name)

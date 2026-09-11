@@ -147,8 +147,7 @@ struct SceneDetailView: View {
                         width: StashyExpandingDock.circleSize,
                         height: StashyExpandingDock.circleSize
                     )
-                    .background(StashyExpandingDock.inactiveBackground)
-                    .clipShape(Capsule(style: .continuous))
+                    .stashyGlass(shape: Capsule(style: .continuous))
                     .contentShape(Capsule(style: .continuous))
             }
             .buttonStyle(.plain)
@@ -275,8 +274,7 @@ struct SceneDetailView: View {
                         width: StashyExpandingDock.circleSize,
                         height: StashyExpandingDock.circleSize
                     )
-                    .background(StashyExpandingDock.inactiveBackground)
-                    .clipShape(Capsule(style: .continuous))
+                    .stashyGlass(shape: Capsule(style: .continuous))
                     .contentShape(Capsule(style: .continuous))
             }
             .buttonStyle(.plain)

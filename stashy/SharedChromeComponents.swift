@@ -22,6 +22,19 @@ extension View {
                 .overlay(shape.stroke(Color.white.opacity(0.25), lineWidth: 0.5))
         }
     }
+
+    /// Chrome chip fill: a selected chip keeps its tinted shape, an inactive one turns to glass.
+    /// `activeColor == nil` means "not selected".
+    @ViewBuilder
+    func stashyChromeFill<S: Shape>(shape: S, activeColor: Color?) -> some View {
+        if let activeColor {
+            self
+                .background(shape.fill(activeColor))
+                .clipShape(shape)
+        } else {
+            self.stashyGlass(shape: shape)
+        }
+    }
 }
 
 // MARK: - Swipe-back with hidden system navigation bar
@@ -710,8 +723,6 @@ struct ChromePillIconButton: View {
     let systemImage: String
     var enabled: Bool = true
     var accessibilityLabel: String? = nil
-    /// Feeds overlay uses the glass capsule; every other caller keeps the flat chip fill.
-    var glass: Bool = false
     let action: () -> Void
 
     var body: some View {
@@ -719,7 +730,7 @@ struct ChromePillIconButton: View {
             Image(systemName: systemImage)
                 .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
                 .foregroundColor(enabled ? StashyExpandingDock.hashtagForeground : .white.opacity(0.35))
-                .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true, glass: glass))
+                .modifier(StashyChromePillStyle(height: StashyExpandingDock.stackedButtonSize, width: StashyExpandingDock.stackedButtonSize, hashtagColors: true))
         }
         .buttonStyle(.plain)
         .disabled(!enabled)
@@ -743,8 +754,7 @@ struct ChromeCircleButton: View {
                         : .white.opacity(0.35)
                 )
                 .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
-                .background(StashyExpandingDock.inactiveBackground)
-                .clipShape(Circle())
+                .stashyGlass(shape: Circle())
         }
         .buttonStyle(.plain)
         .disabled(!enabled)

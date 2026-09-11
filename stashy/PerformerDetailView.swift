@@ -381,15 +381,10 @@ struct PerformerDetailView: View {
                                         width: StashyExpandingDock.circleSize,
                                         height: StashyExpandingDock.circleSize
                                     )
-                                    .background {
-                                        Capsule(style: .continuous)
-                                            .fill(
-                                                isSelected
-                                                    ? appearanceManager.tintColor
-                                                    : StashyExpandingDock.inactiveBackground
-                                            )
-                                    }
-                                    .clipShape(Capsule(style: .continuous))
+                                    .stashyChromeFill(
+                                        shape: Capsule(style: .continuous),
+                                        activeColor: isSelected ? appearanceManager.tintColor : nil
+                                    )
                                     .contentShape(Capsule(style: .continuous))
                             }
                             .buttonStyle(.plain)
@@ -419,8 +414,7 @@ struct PerformerDetailView: View {
                                 width: StashyExpandingDock.circleSize,
                                 height: StashyExpandingDock.circleSize
                             )
-                            .background(StashyExpandingDock.inactiveBackground)
-                            .clipShape(Capsule(style: .continuous))
+                            .stashyGlass(shape: Capsule(style: .continuous))
                             .contentShape(Capsule(style: .continuous))
                     }
                     .buttonStyle(.plain)
@@ -439,8 +433,7 @@ struct PerformerDetailView: View {
                                     width: StashyExpandingDock.circleSize,
                                     height: StashyExpandingDock.circleSize
                                 )
-                                .background(StashyExpandingDock.inactiveBackground)
-                                .clipShape(Capsule(style: .continuous))
+                                .stashyGlass(shape: Capsule(style: .continuous))
                                 .contentShape(Capsule(style: .continuous))
                         }
                         .buttonStyle(.plain)
