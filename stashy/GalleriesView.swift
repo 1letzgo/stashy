@@ -1741,8 +1741,8 @@ struct FullScreenImageView: View {
                             .font(.subheadline.weight(.semibold))
                     }
                     .fixedSize()
-                    .foregroundColor(AppearanceManager.shared.tintColor)  // Back is always in the accent colour.
-                    .modifier(StashyChromePillStyle(height: chromePillHeight))
+                    .foregroundColor(.white)
+                    .modifier(StashyChromePillStyle(height: chromePillHeight, accent: true))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Back")

@@ -310,8 +310,8 @@ struct StashyChromeBackButton: View {
                 Text(title)
                     .font(.subheadline.weight(.semibold))
             }
-            .foregroundColor(AppearanceManager.shared.tintColor)  // Back is always in the accent colour.
-            .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
+            .foregroundColor(.white)
+            .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight, accent: true))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(title)

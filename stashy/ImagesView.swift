@@ -623,8 +623,8 @@ private struct ImagesViewBody: View {
                         Text("Back")
                             .font(.subheadline.weight(.semibold))
                     }
-                    .foregroundColor(AppearanceManager.shared.tintColor)  // Back is always in the accent colour.
-                    .modifier(StashyChromePillStyle(height: chromePillHeight))
+                    .foregroundColor(.white)
+                    .modifier(StashyChromePillStyle(height: chromePillHeight, accent: true))
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Back")

@@ -74,6 +74,10 @@ struct StashyChromePillStyle: ViewModifier {
     var hashtagColors: Bool = false
     /// Feeds overlay chrome: Liquid Glass instead of the flat fill. Sizes stay identical.
     var glass: Bool = false
+    /// Filled with the app accent colour (Back pills); content should be white.
+    var accent: Bool = false
+
+    @ObservedObject private var appearance = AppearanceManager.shared
 
     func body(content: Content) -> some View {
         let sized = content
@@ -91,7 +95,9 @@ struct StashyChromePillStyle: ViewModifier {
             sized.stashyGlass(shape: Capsule(style: .continuous))
         } else {
             sized
-                .background(hashtagColors ? StashyExpandingDock.hashtagFill : StashyExpandingDock.inactiveBackground)
+                .background(accent ? appearance.tintColor
+                            : hashtagColors ? StashyExpandingDock.hashtagFill
+                            : StashyExpandingDock.inactiveBackground)
                 .clipShape(Capsule(style: .continuous))
                 .overlay {
                     if hashtagColors {
