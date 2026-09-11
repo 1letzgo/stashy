@@ -9,15 +9,27 @@ let tagChipGlyphHeight: CGFloat = UIFont.systemFont(ofSize: 12, weight: .semibol
 
 // MARK: - Glass
 
+/// Central glass transparency (Settings › Appearance). 1 = pure glass, lower values lay a
+/// wash under the glass content so less of the backdrop shows through.
+enum StashyGlass {
+    static var dimOpacity: Double {
+        let t = AppearanceManager.shared.glassTransparency
+        return max(0, min(1, 1 - t)) * 0.85
+    }
+}
+
 extension View {
     /// Liquid Glass where the system has it, a material fill with a hairline everywhere else.
     /// Shared by the Aether transport surface and the Feeds overlay chrome.
     @ViewBuilder
     func stashyGlass<S: Shape>(shape: S) -> some View {
         if #available(iOS 26.0, *) {
-            self.glassEffect(.regular, in: shape)
+            self
+                .background(shape.fill(Color.black.opacity(StashyGlass.dimOpacity)))
+                .glassEffect(.regular, in: shape)
         } else {
             self
+                .background(shape.fill(Color.black.opacity(StashyGlass.dimOpacity)))
                 .background(.ultraThinMaterial, in: shape)
                 .overlay(shape.stroke(Color.white.opacity(0.25), lineWidth: 0.5))
         }
@@ -28,11 +40,13 @@ extension View {
     @ViewBuilder
     func stashyGlass<S: Shape>(shape: S, tint: Color) -> some View {
         if #available(iOS 26.0, *) {
-            self.glassEffect(.regular.tint(tint), in: shape)
+            self
+                .background(shape.fill(tint.opacity(StashyGlass.dimOpacity)))
+                .glassEffect(.regular.tint(tint), in: shape)
         } else {
             self
+                .background(shape.fill(tint.opacity(0.6 + 0.4 * StashyGlass.dimOpacity)))
                 .background(.ultraThinMaterial, in: shape)
-                .background(shape.fill(tint.opacity(0.6)))
                 .overlay(shape.stroke(Color.white.opacity(0.25), lineWidth: 0.5))
         }
     }

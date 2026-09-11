@@ -40,6 +40,15 @@ class AppearanceManager: ObservableObject {
             UserDefaults.standard.set(oCounterIcon, forKey: kOCounterIcon)
         }
     }
+
+    /// How see-through the glass chrome is, 0.2 (nearly opaque) … 1 (pure glass).
+    /// Applied by `stashyGlass` as a dark wash under the content.
+    @Published var glassTransparency: Double {
+        didSet {
+            UserDefaults.standard.set(glassTransparency, forKey: kGlassTransparency)
+        }
+    }
+    static let defaultGlassTransparency = 1.0
     
     @Published var preferredTheme: AppTheme {
         didSet {
@@ -74,6 +83,7 @@ class AppearanceManager: ObservableObject {
     private let kTintColorBlue = "kTintColorBlue"
     private let kTintColorAlpha = "kTintColorAlpha"
     private let kOCounterIcon = "kOCounterIcon"
+    private let kGlassTransparency = "kGlassTransparency"
     private let kPreferredTheme = "kPreferredTheme"
     private let kEditModeEnabled = "kEditModeEnabled"
 
@@ -82,6 +92,8 @@ class AppearanceManager: ObservableObject {
         // Load from UserDefaults or use fresh-install defaults (Dark Blue + Gray).
         self.tintColor = .appDefaultTint
         self.oCounterIcon = UserDefaults.standard.string(forKey: "kOCounterIcon") ?? "heart"
+        let storedGlass = UserDefaults.standard.object(forKey: "kGlassTransparency") as? Double
+        self.glassTransparency = min(1, max(0.2, storedGlass ?? Self.defaultGlassTransparency))
 
         let savedTheme = UserDefaults.standard.string(forKey: kPreferredTheme) ?? AppTheme.darkBlue.rawValue
         self.preferredTheme = AppTheme(rawValue: savedTheme) ?? .darkBlue

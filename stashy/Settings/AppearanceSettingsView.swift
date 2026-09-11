@@ -15,6 +15,7 @@ struct AppearanceSettingsView: View {
         List {
             themeSection
             accentColorSection
+            glassSection
             counterIconSection
         }
         .stashySettingsList()
@@ -33,6 +34,25 @@ struct AppearanceSettingsView: View {
             .pickerStyle(.segmented)
             .stashyGroupedSettingsRow()
             stashyScrollingSectionFooter("Choose the appearance of the app.")
+        }
+    }
+
+    private var glassSection: some View {
+        Section {
+            stashyScrollingSectionHeader("Glass")
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label("Transparency", systemImage: "circle.lefthalf.filled")
+                    Spacer()
+                    Text("\(Int((appearanceManager.glassTransparency * 100).rounded())) %")
+                        .foregroundColor(.secondary)
+                        .monospacedDigit()
+                }
+                Slider(value: $appearanceManager.glassTransparency, in: 0.2...1, step: 0.05)
+                    .tint(appearanceManager.tintColor)
+            }
+            .stashyGroupedBlockRow(index: 0, count: 1)
+            stashyScrollingSectionFooter("How much of the content shows through buttons, pills and bars. Applies to all glass chrome.")
         }
     }
 
