@@ -36,6 +36,7 @@ struct AetherSceneSurface: View {
 
     @ObservedObject private var tabManager = TabManager.shared
     @StateObject private var pip = AetherPictureInPictureCoordinator()
+    @State private var airPlayTrigger = AetherAirPlayTrigger()
 
     @State private var areControlsVisible = true
     /// Fullscreen only: crop to fill the whole screen instead of letterboxing.
@@ -292,6 +293,7 @@ struct AetherSceneSurface: View {
                 HStack(alignment: .top, spacing: 10) {
                     topLeadingControls
                     Spacer(minLength: 12)
+                    optionsMenu
                     volumeControls
                 }
                 .padding(.horizontal, 16)
@@ -305,7 +307,6 @@ struct AetherSceneSurface: View {
                 Spacer()
                 VStack(spacing: 10) {
                     HStack(spacing: 8) {
-                        bottomLeadingControls
                         Spacer(minLength: 0)
                         if engine.isUsingTranscodeFallback { transcodeTag }
                         bottomTrailingControls
@@ -334,6 +335,7 @@ struct AetherSceneSurface: View {
             if onToggleFullscreen != nil {
                 dismissOrExpandButton
             }
+            if isFullscreen { rotateButton }
             routeCapsule
         }
     }
@@ -365,14 +367,22 @@ struct AetherSceneSurface: View {
 
     @ViewBuilder
     private var routeCapsule: some View {
-        if showsPiPButton || showsAirPlayButton {
+        if showsPiPButton {
             HStack(spacing: 2) {
-                if showsPiPButton { pipButton }
-                if showsAirPlayButton { airPlayButton }
+                pipButton
             }
             .padding(.horizontal, 6)
             .frame(height: chromeButtonSize)
             .stashyGlass(shape: Capsule())
+        }
+        // AirPlay is an entry in the options menu; the system picker still needs a live
+        // AVRoutePickerView to present from, so one sits here invisibly.
+        if showsAirPlayButton {
+            AetherRoutePickerView(trigger: airPlayTrigger)
+                .frame(width: 1, height: 1)
+                .opacity(0.01)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
         }
     }
 
@@ -437,14 +447,7 @@ struct AetherSceneSurface: View {
 
     // MARK: Bottom trailing
 
-    /// Bottom-left: rotate (fullscreen only) and add marker — whenever the host offers it
-    /// (the inline card no longer has its own Marker pill).
-    @ViewBuilder
-    private var bottomLeadingControls: some View {
-        HStack(spacing: isCompact ? 6 : 8) {
-            if isFullscreen { rotateButton }
-        }
-    }
+    // MARK: Markers
 
     private var sortedMarkerSeconds: [Double] { markerSeconds.sorted() }
 
@@ -533,13 +536,10 @@ struct AetherSceneSurface: View {
         }
     }
 
+    /// Fullscreen only: the fill toggle. (Options live next to the volume capsule.)
     @ViewBuilder
-    /// Round glass buttons like the rest of the transport: options menu, fill (fullscreen).
     private var bottomTrailingControls: some View {
-        HStack(spacing: 8) {
-            optionsMenu
-            if isFullscreen { fillButton }
-        }
+        if isFullscreen { fillButton }
     }
 
     /// Non-interactive marker: this session is not playing the original file.
@@ -626,6 +626,13 @@ struct AetherSceneSurface: View {
                 systemImage: "captions.bubble",
                 items: subtitleItems
             ))
+        }
+
+        if showsAirPlayButton {
+            items.append(.separator(id: "player.airplay.break"))
+            items.append(.action(id: "player.airplay", title: "AirPlay", systemImage: "airplayvideo") {
+                airPlayTrigger.present()
+            })
         }
 
         let extras = extraMenuItems()
@@ -787,14 +794,6 @@ struct AetherSceneSurface: View {
         .accessibilityLabel(fillsScreen ? "Fit to screen" : "Fill screen")
     }
 
-    #if os(iOS)
-    @ViewBuilder
-    private var airPlayButton: some View {
-        AetherRoutePickerView()
-            .frame(width: chromeButtonSize - 8, height: chromeButtonSize - 8)
-            .accessibilityLabel("AirPlay")
-    }
-    #endif
 
     @ViewBuilder
     private var pipButton: some View {
@@ -995,7 +994,25 @@ enum AetherTrackLabel {
 
 #if os(iOS)
 /// System route picker. UIKit-only control, so it is bridged rather than redrawn.
+/// Lets a menu action open the system AirPlay sheet: the picker's own button is tapped
+/// programmatically, which is the only supported way to present it.
+final class AetherAirPlayTrigger {
+    weak var pickerView: AVRoutePickerView?
+
+    func present() {
+        guard let pickerView else { return }
+        // The picker still needs the layer to be attached; a detached view presents nothing.
+        DispatchQueue.main.async {
+            if let button = pickerView.subviews.compactMap({ $0 as? UIButton }).first {
+                button.sendActions(for: .touchUpInside)
+            }
+        }
+    }
+}
+
 private struct AetherRoutePickerView: UIViewRepresentable {
+    var trigger: AetherAirPlayTrigger
+
     func makeCoordinator() -> Coordinator { Coordinator() }
 
     func makeUIView(context: Context) -> AVRoutePickerView {
@@ -1005,6 +1022,7 @@ private struct AetherRoutePickerView: UIViewRepresentable {
         view.prioritizesVideoDevices = true
         view.backgroundColor = .clear
         view.delegate = context.coordinator
+        trigger.pickerView = view
         return view
     }
 

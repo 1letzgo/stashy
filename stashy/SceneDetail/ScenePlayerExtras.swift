@@ -121,26 +121,6 @@ final class ScenePlayerExtrasController: ObservableObject {
     func menuItems() -> [PlayerMenuItem] {
         var items: [PlayerMenuItem] = []
 
-        items.append(.action(
-            id: "extras.sceneCover",
-            title: "Set as scene cover",
-            systemImage: "photo",
-            isDisabled: isBusyCapturing
-        ) { [weak self] in
-            self?.requestSceneCoverReplacement()
-        })
-
-        items.append(.separator(id: "extras.break.tagImage"))
-        items.append(.action(
-            id: "extras.tagImage",
-            title: "Set as tag image",
-            systemImage: "tag.fill",
-            isDisabled: isBusyCapturing
-        ) { [weak self] in
-            self?.captureTagImageFrameAndPresentSheet()
-        })
-
-        items.append(.separator(id: "extras.break.aiSubtitles"))
         items.append(aiSubtitlesItem())
 
         #if canImport(AetherEngine)
@@ -160,6 +140,27 @@ final class ScenePlayerExtrasController: ObservableObject {
             })
         }
         #endif
+
+        // "Set as …" at the bottom, each with its own separator.
+        items.append(.separator(id: "extras.break.sceneCover"))
+        items.append(.action(
+            id: "extras.sceneCover",
+            title: "Set as scene cover",
+            systemImage: "photo",
+            isDisabled: isBusyCapturing
+        ) { [weak self] in
+            self?.requestSceneCoverReplacement()
+        })
+
+        items.append(.separator(id: "extras.break.tagImage"))
+        items.append(.action(
+            id: "extras.tagImage",
+            title: "Set as tag image",
+            systemImage: "tag.fill",
+            isDisabled: isBusyCapturing
+        ) { [weak self] in
+            self?.captureTagImageFrameAndPresentSheet()
+        })
 
         if let resolution = sourceResolutionLabel {
             items.append(.separator(id: "extras.break.resolution"))
