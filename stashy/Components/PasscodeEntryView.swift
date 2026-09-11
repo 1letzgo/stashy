@@ -10,7 +10,6 @@ struct PasscodeEntryView: View {
     /// One Face ID / Touch ID prompt at a time — `onAppear` and the foreground transition
     /// can both fire for the same lock.
     @State private var isAuthenticating = false
-    @Environment(\.scenePhase) private var scenePhase
     
     private var isLockedOut: Bool {
         securityManager.lockoutRemainingSeconds > 0
@@ -144,10 +143,10 @@ struct PasscodeEntryView: View {
                 promptBiometricsSoon()
             }
         }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .active {
-                promptBiometricsSoon()
-            }
+        // UIKit lifecycle (AppDelegate + UIHostingController): `scenePhase` is not reliable
+        // here, the notification is. Fires on cold start and on every return from background.
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            promptBiometricsSoon()
         }
     }
 
