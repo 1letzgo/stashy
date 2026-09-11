@@ -281,9 +281,9 @@ struct AetherSceneSurface: View {
             // middle third keeps a plain single tap so the most common play/pause tap never
             // waits out a double-tap window.
             HStack(spacing: 0) {
-                tapRegion(doubleTapSkip: -10)
+                tapRegion(doubleTapSkip: -tabManager.playerSkipSeconds)
                 tapRegion(doubleTapSkip: nil)
-                tapRegion(doubleTapSkip: 10)
+                tapRegion(doubleTapSkip: tabManager.playerSkipSeconds)
             }
 
             // Opacity instead of structural insertion: a conditional `if` plus a transition

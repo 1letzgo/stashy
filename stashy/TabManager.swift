@@ -434,6 +434,14 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(reelsContinuousPlay, forKey: reelsContinuousPlayKey)
         }
     }
+    /// Seconds a double tap on the player's outer thirds skips (Settings › Playback).
+    @Published var playerSkipSeconds: Double = 10 {
+        didSet {
+            UserDefaults.standard.set(playerSkipSeconds, forKey: playerSkipSecondsKey)
+        }
+    }
+    static let playerSkipOptions: [Double] = [5, 10, 15, 30]
+
     @Published var isPiPEnabled: Bool = true {
         didSet {
             UserDefaults.standard.set(isPiPEnabled, forKey: isPiPEnabledKey)
@@ -489,6 +497,7 @@ class TabManager: ObservableObject {
     private let reelsFillHeightKey = "ReelsFillHeight"
     private let reelsContinuousPlayKey = "ReelsContinuousPlay"
     private let isPiPEnabledKey = "isPiPEnabled"
+    private let playerSkipSecondsKey = "playerSkipSeconds"
     private let reelsShowsDeleteButtonKey = "ReelsShowsDeleteButton"
     private let dashboardHeroSizeKey = "DashboardHeroSize"
     private let sceneCardsShowStudioLogoKey = "SceneCardsShowStudioLogo"
@@ -529,6 +538,8 @@ class TabManager: ObservableObject {
         self.reelsFillHeight = UserDefaults.standard.object(forKey: reelsFillHeightKey) as? Bool ?? true
         self.reelsContinuousPlay = UserDefaults.standard.bool(forKey: reelsContinuousPlayKey)
         self.isPiPEnabled = UserDefaults.standard.object(forKey: isPiPEnabledKey) as? Bool ?? true
+        let storedSkip = UserDefaults.standard.object(forKey: playerSkipSecondsKey) as? Double ?? 10
+        self.playerSkipSeconds = Self.playerSkipOptions.contains(storedSkip) ? storedSkip : 10
         self.reelsShowsDeleteButton = UserDefaults.standard.bool(forKey: reelsShowsDeleteButtonKey)
         self.sceneCardsShowStudioLogo = UserDefaults.standard.object(forKey: sceneCardsShowStudioLogoKey) as? Bool ?? true
         if let heroSizeRaw = UserDefaults.standard.string(forKey: dashboardHeroSizeKey),

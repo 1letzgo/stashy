@@ -19,7 +19,17 @@ struct PlaybackSettingsSection: View {
                 Label("Picture-in-Picture", systemImage: "pip")
             }
             .tint(appearanceManager.tintColor)
-            .stashyGroupedBlockRow(index: 0, count: 1)
+            .stashyGroupedBlockRow(index: 0, count: 2)
+
+            Picker(selection: $tabManager.playerSkipSeconds) {
+                ForEach(TabManager.playerSkipOptions, id: \.self) { seconds in
+                    Text("\(Int(seconds)) s").tag(seconds)
+                }
+            } label: {
+                Label("Double-tap skip", systemImage: "goforward")
+            }
+            .stashyGroupedBlockRow(index: 1, count: 2)
+            stashyScrollingSectionFooter("Seconds a double tap on the left or right side of the player jumps back or forward.")
             #endif
         }
     }
