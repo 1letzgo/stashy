@@ -464,7 +464,7 @@ struct ScenePlayerExtrasMenuItems: View {
             Button {
                 controller.captureTagImageFrameAndPresentSheet()
             } label: {
-                Label("Set as tag image…", systemImage: "tag.fill")
+                Label("Set as tag image", systemImage: "tag.fill")
             }
             .disabled(controller.isBusyCapturing)
         }
