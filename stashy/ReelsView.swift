@@ -4503,66 +4503,69 @@ struct ReelsViewBody: View {
                     || AITagSuggestionManager.shared.isActive
                 Group {
                     if showsTagRow {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                if appearanceManager.isEditModeEnabled {
-                                    Button {
-                                        tagEditorTarget = item.aiTagTarget
-                                    } label: {
-                                        // A bare symbol is shorter than a line
-                                        // of text, which made this pill smaller
-                                        // than the tag chips beside it.
-                                        Image(systemName: "plus")
-                                            .font(.system(size: 12, weight: .bold))
-                                            .frame(height: tagChipGlyphHeight)
-                                            .foregroundColor(.white.opacity(0.8))
-                                            .padding(.horizontal, 9)
-                                            .padding(.vertical, 4)
-                                            .stashyGlass(shape: Capsule())
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel("Add tags")
+                        // "+" stays put at the leading edge; only the tags scroll.
+                        HStack(spacing: 6) {
+                            if appearanceManager.isEditModeEnabled {
+                                Button {
+                                    tagEditorTarget = item.aiTagTarget
+                                } label: {
+                                    // A bare symbol is shorter than a line
+                                    // of text, which made this pill smaller
+                                    // than the tag chips beside it.
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .frame(height: tagChipGlyphHeight)
+                                        .foregroundColor(.white.opacity(0.8))
+                                        .padding(.horizontal, 9)
+                                        .padding(.vertical, 4)
+                                        .stashyGlass(shape: Capsule())
                                 }
-
-                                ForEach(tags) { tag in
-                                    Button(action: {
-                                        var newTags = selectedTags
-                                        if newTags.contains(where: { $0.id == tag.id }) {
-                                            newTags.removeAll { $0.id == tag.id }
-                                        } else {
-                                            newTags.append(tag)
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Add tags")
+                            }
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(tags) { tag in
+                                        Button(action: {
+                                            var newTags = selectedTags
+                                            if newTags.contains(where: { $0.id == tag.id }) {
+                                                newTags.removeAll { $0.id == tag.id }
+                                            } else {
+                                                newTags.append(tag)
+                                            }
+                                            applyTagsChange(newTags)
+                                        }) {
+                                            Text("#\(tag.name)")
+                                                .font(.system(size: 12, weight: .semibold))
+                                                .foregroundColor(.white.opacity(0.8))
+                                                .padding(.horizontal, 9)
+                                                .padding(.vertical, 4)
+                                                .stashyGlass(shape: Capsule())
                                         }
-                                        applyTagsChange(newTags)
-                                    }) {
-                                        Text("#\(tag.name)")
-                                            .font(.system(size: 12, weight: .semibold))
-                                            .foregroundColor(.white.opacity(0.8))
-                                            .padding(.horizontal, 9)
-                                            .padding(.vertical, 4)
-                                            .stashyGlass(shape: Capsule())
-                                    }
-                                    .buttonStyle(.plain)
-                                    .contextMenu {
-                                        let target = item.aiTagTarget
-                                        if appearanceManager.isEditModeEnabled,
-                                           tag.id != target.primaryTagId {
-                                            Button(role: .destructive) {
-                                                removeTag(tag, from: target)
-                                            } label: {
-                                                Label("Remove tag", systemImage: "trash")
+                                        .buttonStyle(.plain)
+                                        .contextMenu {
+                                            let target = item.aiTagTarget
+                                            if appearanceManager.isEditModeEnabled,
+                                               tag.id != target.primaryTagId {
+                                                Button(role: .destructive) {
+                                                    removeTag(tag, from: target)
+                                                } label: {
+                                                    Label("Remove tag", systemImage: "trash")
+                                                }
                                             }
                                         }
                                     }
-                                }
 
-                                // Tag Suggestion (stashy+, off by default).
-                                AITagSuggestionBar(target: item.aiTagTarget) { _ in }
+                                    // Tag Suggestion (stashy+, off by default).
+                                    AITagSuggestionBar(target: item.aiTagTarget) { _ in }
+                                }
+                                }
                             }
+                            // Fresh identity per item: without it SwiftUI reuses the
+                            // row and the next clip inherits however far the previous
+                            // one was scrolled sideways.
+                            .id(item.id)
                         }
-                        // Fresh identity per item: without it SwiftUI reuses the
-                        // row and the next clip inherits however far the previous
-                        // one was scrolled sideways.
-                        .id(item.id)
                     } else {
                         Color.clear.opacity(0)
                     }

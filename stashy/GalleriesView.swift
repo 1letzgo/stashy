@@ -1594,56 +1594,59 @@ struct FullScreenImageView: View {
                     || AITagSuggestionManager.shared.isActive
                 Group {
                     if showsTagRow {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                if appearanceManager.isEditModeEnabled {
-                                    Button {
-                                        tagEditorImage = image
-                                    } label: {
-                                        // A bare symbol is shorter than a line of
-                                        // text, which made this pill smaller than
-                                        // the tag chips beside it.
-                                        Image(systemName: "plus")
-                                            .font(.system(size: 12, weight: .bold))
-                                            .frame(height: tagChipGlyphHeight)
-                                            .foregroundColor(.white.opacity(0.8))
-                                            .padding(.horizontal, 9)
-                                            .padding(.vertical, 4)
-                                            .stashyGlass(shape: Capsule())
-                                    }
-                                    .buttonStyle(.plain)
-                                    .accessibilityLabel("Add tags")
-                                }
-
-                                ForEach(tags) { tag in
-                                    Text("#\(tag.name)")
-                                        .font(.system(size: 12, weight: .semibold))
+                        // "+" stays put at the leading edge; only the tags scroll.
+                        HStack(spacing: 6) {
+                            if appearanceManager.isEditModeEnabled {
+                                Button {
+                                    tagEditorImage = image
+                                } label: {
+                                    // A bare symbol is shorter than a line of
+                                    // text, which made this pill smaller than
+                                    // the tag chips beside it.
+                                    Image(systemName: "plus")
+                                        .font(.system(size: 12, weight: .bold))
+                                        .frame(height: tagChipGlyphHeight)
                                         .foregroundColor(.white.opacity(0.8))
                                         .padding(.horizontal, 9)
                                         .padding(.vertical, 4)
                                         .stashyGlass(shape: Capsule())
-                                        .contextMenu {
-                                            if appearanceManager.isEditModeEnabled {
-                                                Button(role: .destructive) {
-                                                    removeTag(tag, from: image)
-                                                } label: {
-                                                    Label("Remove tag", systemImage: "trash")
+                                }
+                                .buttonStyle(.plain)
+                                .accessibilityLabel("Add tags")
+                            }
+                            ScrollView(.horizontal, showsIndicators: false) {
+                                HStack(spacing: 6) {
+                                    ForEach(tags) { tag in
+                                        Text("#\(tag.name)")
+                                            .font(.system(size: 12, weight: .semibold))
+                                            .foregroundColor(.white.opacity(0.8))
+                                            .padding(.horizontal, 9)
+                                            .padding(.vertical, 4)
+                                            .stashyGlass(shape: Capsule())
+                                            .contextMenu {
+                                                if appearanceManager.isEditModeEnabled {
+                                                    Button(role: .destructive) {
+                                                        removeTag(tag, from: image)
+                                                    } label: {
+                                                        Label("Remove tag", systemImage: "trash")
+                                                    }
                                                 }
                                             }
-                                        }
-                                }
+                                    }
 
-                                AITagSuggestionBar(target: .image(image)) { newTags in
-                                    if let position = images.firstIndex(where: { $0.id == image.id }) {
-                                        images[position] = images[position].withTags(newTags)
+                                    AITagSuggestionBar(target: .image(image)) { newTags in
+                                        if let position = images.firstIndex(where: { $0.id == image.id }) {
+                                            images[position] = images[position].withTags(newTags)
+                                        }
                                     }
                                 }
+                                }
                             }
+                            // Fresh identity per image: without it SwiftUI reuses the
+                            // row and the next picture inherits however far the
+                            // previous one was scrolled sideways.
+                            .id(image.id)
                         }
-                        // Fresh identity per image: without it SwiftUI reuses the
-                        // row and the next picture inherits however far the
-                        // previous one was scrolled sideways.
-                        .id(image.id)
                     } else {
                         Color.clear.opacity(0)
                     }
