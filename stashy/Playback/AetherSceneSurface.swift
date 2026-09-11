@@ -29,6 +29,8 @@ struct AetherSceneSurface: View {
     var isFullscreen: Bool = false
     /// Marker positions (seconds) drawn as dots on the time bar. Empty hides them.
     var markerSeconds: [Double] = []
+    /// Fullscreen only: opens the host's add-marker flow at the current time. nil hides the button.
+    var onAddMarker: (() -> Void)? = nil
 
     @ObservedObject private var tabManager = TabManager.shared
     @StateObject private var pip = AetherPictureInPictureCoordinator()
@@ -310,7 +312,7 @@ struct AetherSceneSurface: View {
                         }
                     }
                     HStack(spacing: 8) {
-                        if isFullscreen { rotateButton }
+                        if isFullscreen { bottomLeadingControls }
                         Spacer(minLength: 0)
                         if engine.isUsingTranscodeFallback { transcodeTag }
                         bottomTrailingControls
@@ -434,6 +436,68 @@ struct AetherSceneSurface: View {
     }
 
     // MARK: Bottom trailing
+
+    /// Fullscreen, bottom-left: rotate, then previous marker · add marker · next marker.
+    /// The marker jumps only exist when the scene has markers; add is there whenever the
+    /// host offers it (the inline card no longer has its own Marker pill).
+    @ViewBuilder
+    private var bottomLeadingControls: some View {
+        HStack(spacing: 8) {
+            rotateButton
+            if !markerSeconds.isEmpty {
+                markerJumpButton(forward: false)
+            }
+            if onAddMarker != nil {
+                addMarkerButton
+            }
+            if !markerSeconds.isEmpty {
+                markerJumpButton(forward: true)
+            }
+        }
+    }
+
+    private var sortedMarkerSeconds: [Double] { markerSeconds.sorted() }
+
+    /// Previous = the last marker that starts at least a second before the playhead, so
+    /// repeated taps walk backwards instead of re-hitting the current one.
+    private var previousMarkerSeconds: Double? {
+        sortedMarkerSeconds.last { $0 < displayedTime - 1 }
+    }
+
+    private var nextMarkerSeconds: Double? {
+        sortedMarkerSeconds.first { $0 > displayedTime + 0.5 }
+    }
+
+    @ViewBuilder
+    private func markerJumpButton(forward: Bool) -> some View {
+        let target = forward ? nextMarkerSeconds : previousMarkerSeconds
+        Button {
+            guard let target else { return }
+            HapticManager.light()
+            onSeek(target)
+            revealControls()
+        } label: {
+            glassCircle(systemName: forward ? "forward.end.fill" : "backward.end.fill",
+                        diameter: chromeButtonSize)
+                .opacity(target == nil ? 0.4 : 1)
+        }
+        .buttonStyle(.plain)
+        .disabled(target == nil)
+        .accessibilityLabel(forward ? "Next marker" : "Previous marker")
+    }
+
+    @ViewBuilder
+    private var addMarkerButton: some View {
+        Button {
+            HapticManager.light()
+            onAddMarker?()
+            revealControls()
+        } label: {
+            glassCircle(systemName: "plus.square.fill.on.square.fill", diameter: chromeButtonSize)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Add marker")
+    }
 
     /// Fullscreen only: flips the interface between portrait and landscape through the window
     /// scene, so it works with the device's orientation lock on — the reason it exists.

@@ -55,6 +55,9 @@ struct SceneDetailView: View {
     /// The transcode-fallback toast is shown once per screen, not once per rung.
     @State private var didAnnounceTranscodeFallback = false
     @State private var showingAddMarkerSheet = false
+    /// Own flag for the fullscreen cover: a sheet must be presented from the cover's content,
+    /// and sharing `showingAddMarkerSheet` would also fire the covered detail's sheet.
+    @State private var showingFullscreenAddMarkerSheet = false
     @State private var capturedMarkerTime: Double = 0
     @State private var playbackSpeed: Double = 1.0
     @State private var currentPlaybackTime: Double = 0
@@ -580,7 +583,11 @@ struct SceneDetailView: View {
                         : "",
                     onToggleFullscreen: { isFullscreen = false },
                     isFullscreen: true,
-                    markerSeconds: (activeScene.sceneMarkers ?? []).map(\.seconds)
+                    markerSeconds: (activeScene.sceneMarkers ?? []).map(\.seconds),
+                    onAddMarker: {
+                        capturedMarkerTime = aetherEngine?.currentTime ?? 0
+                        showingFullscreenAddMarkerSheet = true
+                    }
                 )
                 // Only the black backdrop bleeds under the notch and home indicator; the
                 // surface (and with it the transport) stays inside the safe area so every
@@ -589,6 +596,19 @@ struct SceneDetailView: View {
         }
         .statusBarHidden(true)
         .onDisappear { AetherSceneSurface.releaseOrientationOverride() }
+        .sheet(isPresented: $showingFullscreenAddMarkerSheet) {
+            AddMarkerSheet(
+                sceneId: activeScene.id,
+                sceneTitle: activeScene.displayTitle ?? "Unknown Title",
+                sceneTagIds: Set((activeScene.tags ?? []).map(\.id)),
+                seconds: capturedMarkerTime,
+                videoURL: activeScene.aetherVideoURL,
+                aetherEngine: aetherEngine,
+                viewModel: viewModel
+            ) {
+                refreshSceneDetails()
+            }
+        }
         // Best effort: an attached keyboard (iPad / Mac) skips ±15 s. Deliberately without
         // `.focusable()` — that steals the taps the transport needs.
         .onKeyPress(.leftArrow) {

@@ -528,8 +528,6 @@ struct SceneDetailMetadataCard: View {
                     }
                 }
                 #endif
-                addMarkerButton
-                Spacer(minLength: 4)
                 setImageMenu
                 if let res = sourceResolutionLabel {
                     Spacer(minLength: 4)
@@ -581,17 +579,6 @@ struct SceneDetailMetadataCard: View {
         .buttonStyle(.plain)
         .accessibilityLabel(AIMotionCopy.name)
         .accessibilityValue(stashSyncManager.isSyncing ? "On" : "Off")
-    }
-
-    @ViewBuilder
-    private var addMarkerButton: some View {
-        Button(action: {
-            capturedMarkerTime = aetherEngine?.currentTime ?? 0
-            showingAddMarkerSheet = true
-        }) {
-            infoPill(icon: "plus.square.fill.on.square.fill", text: "Marker", color: .green)
-        }
-        .buttonStyle(.plain)
     }
 
     @ViewBuilder
