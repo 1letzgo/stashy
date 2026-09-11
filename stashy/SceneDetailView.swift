@@ -613,7 +613,7 @@ struct SceneDetailView: View {
         }
         .scenePlayerExtrasSheets(controller: extrasController, scope: .fullscreen)
         .statusBarHidden(true)
-        .onDisappear { AetherSceneSurface<EmptyView>.releaseOrientationOverride() }
+        .onDisappear { AetherSceneSurface.releaseOrientationOverride() }
         .sheet(isPresented: $showingFullscreenAddMarkerSheet) {
             AddMarkerSheet(
                 sceneId: activeScene.id,

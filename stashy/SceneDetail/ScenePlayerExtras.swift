@@ -116,9 +116,175 @@ final class ScenePlayerExtrasController: ObservableObject {
 
     // MARK: Menu
 
-    @ViewBuilder
-    func menuItems() -> some View {
-        ScenePlayerExtrasMenuItems(controller: self)
+    /// Die Zeilen, die der Player in sein "…"-Menü einhängt — als Daten, nicht als View:
+    /// das Menü wird von UIKit präsentiert (siehe `PlayerMenuButton`).
+    func menuItems() -> [PlayerMenuItem] {
+        var items: [PlayerMenuItem] = []
+
+        items.append(.action(
+            id: "extras.sceneCover",
+            title: "Set as scene cover",
+            systemImage: "photo",
+            isDisabled: isBusyCapturing
+        ) { [weak self] in
+            self?.requestSceneCoverReplacement()
+        })
+
+        items.append(.separator(id: "extras.break.tagImage"))
+        items.append(.action(
+            id: "extras.tagImage",
+            title: "Set as tag image",
+            systemImage: "tag.fill",
+            isDisabled: isBusyCapturing
+        ) { [weak self] in
+            self?.captureTagImageFrameAndPresentSheet()
+        })
+
+        items.append(.separator(id: "extras.break.aiSubtitles"))
+        items.append(aiSubtitlesItem())
+
+        #if canImport(AetherEngine)
+        // AI Motion braucht ein echtes Player-Item zum Abtasten (`.loopback` /
+        // `.remoteBypass`); die Software-Route hat keins.
+        let sync = StashSyncManager.shared
+        if let engine, engine.analysisPlayerItem != nil, sync.isStashSyncEnabled {
+            let isSyncing = sync.isSyncing
+            items.append(.separator(id: "extras.break.aiMotion"))
+            items.append(.action(
+                id: "extras.aiMotion",
+                title: isSyncing ? "AI Motion: On" : "AI Motion: Off",
+                systemImage: isSyncing ? "bolt.horizontal.fill" : "bolt.horizontal"
+            ) {
+                HapticManager.selection()
+                StashSyncManager.shared.setSyncing(!isSyncing)
+            })
+        }
+        #endif
+
+        if let resolution = sourceResolutionLabel {
+            items.append(.separator(id: "extras.break.resolution"))
+            items.append(.info(id: "extras.resolution", title: resolution, systemImage: "video.fill"))
+        }
+
+        return items
+    }
+
+    // MARK: AI Subtitles submenu
+
+    /// 1:1-Abbild der früheren SwiftUI-Zeilen: AI Captions, Scene Language, Captions Off.
+    private func aiSubtitlesItem() -> PlayerMenuItem {
+        let transcription = transcriptionController
+        let translator = captionTranslator
+        let subtitles = subtitleController
+        let userLanguage = SubtitleTargetLanguage.load()
+        let languageOptions = speechSupportedLanguageOptions
+        let selectedLanguage = SpeechTranscriberAvailability.matchingPickerId(
+            stored: scene?.spokenLanguageCode,
+            optionIds: languageOptions.map(\.id)
+        )
+        let isActive = transcription?.isTeleprompterModeActive ?? false
+        let mode = transcription?.mode ?? .off
+        let isSceneLanguageSet = selectedLanguage != nil
+
+        // --- AI Captions rows
+        var captionRows: [PlayerMenuItem] = [
+            .action(
+                id: "extras.captions.off",
+                title: SceneTeleprompterMode.off.title,
+                isChecked: mode == .off
+            ) { [weak self] in self?.setTeleprompterMode(.off) },
+            .action(
+                id: "extras.captions.english",
+                title: SceneTeleprompterMode.english.title,
+                isChecked: mode.captionTargetCode == "en"
+            ) { [weak self] in self?.setTeleprompterMode(.english) }
+        ]
+        if SubtitleTargetLanguage.languageCode(from: userLanguage)?.lowercased() != "en" {
+            captionRows.append(.action(
+                id: "extras.captions.userLanguage",
+                title: SubtitleTargetLanguage.displayName(for: userLanguage),
+                isChecked: mode == .userLanguage
+            ) { [weak self] in self?.setTeleprompterMode(.userLanguage) })
+        }
+        if transcription?.needsSpeechModelDownload == true {
+            let name = transcription?.downloadingModelLanguage ?? "speech"
+            captionRows.append(.action(
+                id: "extras.captions.downloadSpeechModel",
+                title: "Download \(name) speech model",
+                systemImage: "arrow.down.circle"
+            ) { transcription?.approveSpeechModelDownload() })
+        }
+        if translator?.needsLanguageDownload == true {
+            captionRows.append(.action(
+                id: "extras.captions.downloadPack",
+                title: "Download \(userLanguage.uppercased()) language pack",
+                systemImage: "arrow.down.circle"
+            ) { translator?.approveDownload() })
+        }
+
+        let selectedCaptionModeLabel: String = {
+            switch mode {
+            case .off: return SceneTeleprompterMode.off.title
+            case .english, .sceneLanguage: return SceneTeleprompterMode.english.title
+            case .userLanguage: return SubtitleTargetLanguage.displayName(for: userLanguage)
+            }
+        }()
+
+        // --- Scene Language rows
+        let languageRows: [PlayerMenuItem] = languageOptions.map { option in
+            .action(
+                id: "extras.language.\(option.id)",
+                title: option.label,
+                isChecked: selectedLanguage == option.id
+            ) { [weak self] in self?.applySceneLanguage(option.id) }
+        }
+        let selectedLanguageLabel = languageOptions.first(where: { $0.id == selectedLanguage })?.label
+            ?? selectedLanguage?.uppercased()
+            ?? "Language"
+
+        var children: [PlayerMenuItem] = [.separator(id: "extras.section.aiCaptions", title: "AI Captions")]
+        if isSceneLanguageSet {
+            children.append(.submenu(
+                id: "extras.captions.collapsed",
+                title: selectedCaptionModeLabel,
+                systemImage: "captions.bubble",
+                items: captionRows
+            ))
+        } else {
+            children.append(contentsOf: captionRows)
+        }
+
+        children.append(.separator(id: "extras.section.sceneLanguage", title: "Scene Language"))
+        if isSceneLanguageSet {
+            children.append(.submenu(
+                id: "extras.language.collapsed",
+                title: selectedLanguageLabel,
+                systemImage: "globe",
+                items: languageRows
+            ))
+        } else if languageOptions.isEmpty {
+            children.append(.info(id: "extras.language.loading", title: "Loading languages…"))
+        } else {
+            children.append(contentsOf: languageRows)
+        }
+
+        let showsCaptionsOffRow = (scene?.hasCaptions ?? false) || (subtitles?.isLiveCaptionsActive ?? false)
+        if showsCaptionsOffRow {
+            let hasSelection = (subtitles?.selectedCaption != nil) || (subtitles?.isLiveCaptionsActive ?? false)
+            children.append(.separator(id: "extras.section.captions", title: "Captions"))
+            children.append(.action(
+                id: "extras.captions.none",
+                title: "Off",
+                isChecked: !hasSelection
+            ) { [weak self] in self?.selectNoCaption() })
+        }
+
+        return .submenu(
+            id: "extras.aiSubtitles",
+            title: isActive ? "AI Subtitles: On" : "AI Subtitles",
+            systemImage: isActive ? "captions.bubble.fill" : "captions.bubble",
+            items: children
+        )
     }
 
     /// Dateihöhe → kurzer Qualitäts-Text (`4K`, `1080p`, …).
@@ -440,280 +606,6 @@ final class ScenePlayerExtrasController: ObservableObject {
         }
     }
 }
-
-// MARK: - Menu rows
-
-/// Die Zeilen, die der Player in sein "…"-Menü einhängt. Eigene View, damit sie den
-/// Controller beobachten, ohne dass die Player-Oberfläche das tun muss.
-struct ScenePlayerExtrasMenuItems: View {
-    @ObservedObject var controller: ScenePlayerExtrasController
-    @ObservedObject private var stashSyncManager = StashSyncManager.shared
-
-    var body: some View {
-        // Every action in its own section, so the menu draws a separator between them.
-        Section {
-            Button {
-                controller.requestSceneCoverReplacement()
-            } label: {
-                Label("Set as scene cover", systemImage: "photo")
-            }
-            .disabled(controller.isBusyCapturing)
-        }
-
-        Section {
-            Button {
-                controller.captureTagImageFrameAndPresentSheet()
-            } label: {
-                Label("Set as tag image", systemImage: "tag.fill")
-            }
-            .disabled(controller.isBusyCapturing)
-        }
-
-        Section {
-            aiSubtitlesMenu
-        }
-
-        Section {
-            #if canImport(AetherEngine)
-            // AI Motion braucht ein echtes Player-Item zum Abtasten (`.loopback` /
-            // `.remoteBypass`); die Software-Route hat keins.
-            if let engine = controller.engine, stashSyncManager.isStashSyncEnabled {
-                ScenePlayerAnalysisGate(engine: engine) {
-                    Button {
-                        HapticManager.selection()
-                        stashSyncManager.setSyncing(!stashSyncManager.isSyncing)
-                    } label: {
-                        Label {
-                            Text(stashSyncManager.isSyncing ? "AI Motion: On" : "AI Motion: Off")
-                        } icon: {
-                            Image(systemName: stashSyncManager.isSyncing
-                                  ? "bolt.horizontal.fill"
-                                  : "bolt.horizontal")
-                        }
-                    }
-                }
-            }
-            #endif
-        }
-
-        if let resolution = controller.sourceResolutionLabel {
-            Section {
-                Button {} label: {
-                    Label(resolution, systemImage: "video.fill")
-                }
-                .disabled(true)
-            }
-        }
-    }
-
-    @ViewBuilder
-    private var aiSubtitlesMenu: some View {
-        let transcription = controller.transcriptionController
-        let translator = controller.captionTranslator
-        let subtitles = controller.subtitleController
-        let userLang = SubtitleTargetLanguage.load()
-        let selected = SpeechTranscriberAvailability.matchingPickerId(
-            stored: controller.scene?.spokenLanguageCode,
-            optionIds: controller.speechSupportedLanguageOptions.map(\.id)
-        )
-        let isActive = transcription?.isTeleprompterModeActive ?? false
-
-        Menu {
-            ScenePlayerCaptionsMenuContent(
-                languageOptions: controller.speechSupportedLanguageOptions,
-                selectedLanguageCode: selected,
-                onSelectLanguage: { controller.applySceneLanguage($0) },
-                mode: transcription?.mode ?? .off,
-                userLanguage: userLang,
-                needsSpeechModelDownload: transcription?.needsSpeechModelDownload ?? false,
-                speechModelName: transcription?.downloadingModelLanguage,
-                needsTranslationPack: translator?.needsLanguageDownload ?? false,
-                showsCaptionsOffRow: (controller.scene?.hasCaptions ?? false)
-                    || (subtitles?.isLiveCaptionsActive ?? false),
-                hasCaptionSelection: (subtitles?.selectedCaption != nil)
-                    || (subtitles?.isLiveCaptionsActive ?? false),
-                onSelectMode: { controller.setTeleprompterMode($0) },
-                onCaptionsOff: { controller.selectNoCaption() },
-                onDownloadSpeechModel: { transcription?.approveSpeechModelDownload() },
-                onDownloadTranslationPack: { translator?.approveDownload() }
-            )
-        } label: {
-            Label {
-                Text(isActive ? "AI Subtitles: On" : "AI Subtitles")
-            } icon: {
-                Image(systemName: isActive ? "captions.bubble.fill" : "captions.bubble")
-            }
-        }
-    }
-}
-
-/// Szenensprache + AI Captions als Menüinhalt (ohne eigenes Label) — dieselben Optionen,
-/// die früher die "AI Subs"-Pille unter dem Player angeboten hat.
-private struct ScenePlayerCaptionsMenuContent: View {
-    let languageOptions: [(id: String, label: String)]
-    let selectedLanguageCode: String?
-    let onSelectLanguage: (String) -> Void
-
-    let mode: SceneTeleprompterMode
-    let userLanguage: String
-    let needsSpeechModelDownload: Bool
-    let speechModelName: String?
-    let needsTranslationPack: Bool
-    let showsCaptionsOffRow: Bool
-    let hasCaptionSelection: Bool
-    let onSelectMode: (SceneTeleprompterMode) -> Void
-    let onCaptionsOff: () -> Void
-    let onDownloadSpeechModel: () -> Void
-    let onDownloadTranslationPack: () -> Void
-
-    private var showUserLanguageRow: Bool {
-        SubtitleTargetLanguage.languageCode(from: userLanguage)?.lowercased() != "en"
-    }
-
-    private var isSceneLanguageSet: Bool { selectedLanguageCode != nil }
-
-    private var selectedLanguageLabel: String {
-        guard let selectedLanguageCode,
-              let label = languageOptions.first(where: { $0.id == selectedLanguageCode })?.label
-        else { return selectedLanguageCode?.uppercased() ?? "Language" }
-        return label
-    }
-
-    var body: some View {
-        Section("AI Captions") {
-            aiCaptionsPicker(collapsed: !isSceneLanguageSet)
-        }
-
-        Section("Scene Language") {
-            if isSceneLanguageSet {
-                sceneLanguagePicker(collapsed: true)
-            } else if languageOptions.isEmpty {
-                Text("Loading languages…")
-            } else {
-                sceneLanguagePicker(collapsed: false)
-            }
-        }
-
-        if showsCaptionsOffRow {
-            Section("Captions") {
-                Button(action: onCaptionsOff) {
-                    Label {
-                        Text("Off")
-                    } icon: {
-                        if !hasCaptionSelection { Image(systemName: "checkmark") }
-                    }
-                }
-            }
-        }
-    }
-
-    private var selectedCaptionModeLabel: String {
-        switch mode {
-        case .off:
-            return SceneTeleprompterMode.off.title
-        case .english, .sceneLanguage:
-            return SceneTeleprompterMode.english.title
-        case .userLanguage:
-            return SubtitleTargetLanguage.displayName(for: userLanguage)
-        }
-    }
-
-    @ViewBuilder
-    private func aiCaptionsPicker(collapsed: Bool) -> some View {
-        let picker = Group {
-            Button { onSelectMode(.off) } label: {
-                Label {
-                    Text(SceneTeleprompterMode.off.title)
-                } icon: {
-                    if mode == .off { Image(systemName: "checkmark") }
-                }
-            }
-            Button { onSelectMode(.english) } label: {
-                Label {
-                    Text(SceneTeleprompterMode.english.title)
-                } icon: {
-                    if mode.captionTargetCode == "en" { Image(systemName: "checkmark") }
-                }
-            }
-            if showUserLanguageRow {
-                Button { onSelectMode(.userLanguage) } label: {
-                    Label {
-                        Text(SubtitleTargetLanguage.displayName(for: userLanguage))
-                    } icon: {
-                        if mode == .userLanguage { Image(systemName: "checkmark") }
-                    }
-                }
-            }
-            if needsSpeechModelDownload {
-                Button(action: onDownloadSpeechModel) {
-                    Label(
-                        "Download \(speechModelName ?? "speech") speech model",
-                        systemImage: "arrow.down.circle"
-                    )
-                }
-            }
-            if needsTranslationPack {
-                Button(action: onDownloadTranslationPack) {
-                    Label(
-                        "Download \(userLanguage.uppercased()) language pack",
-                        systemImage: "arrow.down.circle"
-                    )
-                }
-            }
-        }
-
-        if collapsed {
-            Menu {
-                picker
-            } label: {
-                Label(selectedCaptionModeLabel, systemImage: "captions.bubble")
-            }
-        } else {
-            picker
-        }
-    }
-
-    @ViewBuilder
-    private func sceneLanguagePicker(collapsed: Bool) -> some View {
-        let picker = Group {
-            ForEach(languageOptions, id: \.id) { option in
-                Button {
-                    onSelectLanguage(option.id)
-                } label: {
-                    Label {
-                        Text(option.label)
-                    } icon: {
-                        if selectedLanguageCode == option.id {
-                            Image(systemName: "checkmark")
-                        }
-                    }
-                }
-            }
-        }
-
-        if collapsed {
-            Menu {
-                picker
-            } label: {
-                Label(selectedLanguageLabel, systemImage: "globe")
-            }
-        } else {
-            picker
-        }
-    }
-}
-
-#if canImport(AetherEngine)
-/// Zeigt seinen Inhalt nur, solange die Engine auf einer Route mit echtem Player-Item läuft.
-private struct ScenePlayerAnalysisGate<Content: View>: View {
-    @ObservedObject var engine: AetherSceneEngine
-    @ViewBuilder let content: () -> Content
-
-    var body: some View {
-        if engine.analysisPlayerItem != nil { content() }
-    }
-}
-#endif
 
 // MARK: - Sheets / alerts
 

@@ -92,6 +92,8 @@
 		AE7E0000000000000000B043 /* AetherSceneSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B041 /* AetherSceneSurface.swift */; };
 		AE7E0000000000000000B0B2 /* AetherTimeBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B0B1 /* AetherTimeBar.swift */; };
 		AE7E0000000000000000B0B3 /* AetherTimeBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B0B1 /* AetherTimeBar.swift */; };
+		AE7E0000000000000000B0C2 /* PlayerMenuButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B0C1 /* PlayerMenuButton.swift */; };
+		AE7E0000000000000000B0C3 /* PlayerMenuButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B0C1 /* PlayerMenuButton.swift */; };
 		AE7E0000000000000000B052 /* LocalDownloadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B051 /* LocalDownloadStore.swift */; };
 		AE7E0000000000000000B053 /* LocalDownloadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B051 /* LocalDownloadStore.swift */; };
 		AE7E0000000000000000B062 /* AetherVideoSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B061 /* AetherVideoSurface.swift */; };
@@ -263,6 +265,7 @@
 		AE7E0000000000000000B031 /* AcknowledgementsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcknowledgementsView.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B041 /* AetherSceneSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherSceneSurface.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B0B1 /* AetherTimeBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherTimeBar.swift; sourceTree = "<group>"; };
+		AE7E0000000000000000B0C1 /* PlayerMenuButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerMenuButton.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B051 /* LocalDownloadStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDownloadStore.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B061 /* AetherVideoSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherVideoSurface.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B071 /* AetherPreviewPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherPreviewPlayer.swift; sourceTree = "<group>"; };
@@ -507,6 +510,7 @@
 				AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */,
 				AE7E0000000000000000B041 /* AetherSceneSurface.swift */,
 				AE7E0000000000000000B0B1 /* AetherTimeBar.swift */,
+				AE7E0000000000000000B0C1 /* PlayerMenuButton.swift */,
 				AE7E0000000000000000B051 /* LocalDownloadStore.swift */,
 				AE7E0000000000000000B061 /* AetherVideoSurface.swift */,
 				AE7E0000000000000000B071 /* AetherPreviewPlayer.swift */,
@@ -743,6 +747,7 @@
 				AE7E0000000000000000B022 /* Scene+AetherPlayback.swift in Sources */,
 				AE7E0000000000000000B042 /* AetherSceneSurface.swift in Sources */,
 				AE7E0000000000000000B0B2 /* AetherTimeBar.swift in Sources */,
+				AE7E0000000000000000B0C2 /* PlayerMenuButton.swift in Sources */,
 				AE7E0000000000000000B052 /* LocalDownloadStore.swift in Sources */,
 				AE7E0000000000000000B062 /* AetherVideoSurface.swift in Sources */,
 				AE7E0000000000000000B072 /* AetherPreviewPlayer.swift in Sources */,
@@ -868,6 +873,7 @@
 				AE7E0000000000000000B023 /* Scene+AetherPlayback.swift in Sources */,
 				AE7E0000000000000000B043 /* AetherSceneSurface.swift in Sources */,
 				AE7E0000000000000000B0B3 /* AetherTimeBar.swift in Sources */,
+				AE7E0000000000000000B0C3 /* PlayerMenuButton.swift in Sources */,
 				AE7E0000000000000000B053 /* LocalDownloadStore.swift in Sources */,
 				AE7E0000000000000000B063 /* AetherVideoSurface.swift in Sources */,
 				AE7E0000000000000000B073 /* AetherPreviewPlayer.swift in Sources */,

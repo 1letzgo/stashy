@@ -15,7 +15,7 @@ import AVFoundation
 import AVKit
 import AetherEngine
 
-struct AetherSceneSurface<ExtraItems: View>: View {
+struct AetherSceneSurface: View {
     @ObservedObject var engine: AetherSceneEngine
     let posterURL: URL?
     @Binding var isMuted: Bool
@@ -32,7 +32,7 @@ struct AetherSceneSurface<ExtraItems: View>: View {
     /// Opens the host's add-marker flow at the current time. nil hides the button.
     var onAddMarker: (() -> Void)? = nil
     /// Host-provided rows for the "…" menu (Set Image, AI Subtitles, AI Motion, …).
-    @ViewBuilder var extraMenuItems: () -> ExtraItems
+    var extraMenuItems: () -> [PlayerMenuItem] = { [] }
 
     @ObservedObject private var tabManager = TabManager.shared
     @StateObject private var pip = AetherPictureInPictureCoordinator()
@@ -41,6 +41,8 @@ struct AetherSceneSurface<ExtraItems: View>: View {
     /// Fullscreen only: crop to fill the whole screen instead of letterboxing.
     @State private var fillsScreen = false
     @State private var controlsHideToken = UUID()
+    /// True while the UIKit "…" menu is on screen — the auto-hide timer rests until it goes.
+    @State private var isOptionsMenuOpen = false
     @State private var isScrubbing = false
     @State private var scrubSeconds: Double = 0
     /// Last good scrub still. A nil result from the engine is transient, so it is never
@@ -308,9 +310,11 @@ struct AetherSceneSurface<ExtraItems: View>: View {
                         if engine.isUsingTranscodeFallback { transcodeTag }
                         bottomTrailingControls
                     }
-                    // Marker jumps flank the time bar: previous on the left, next on the right.
+                    // Marker controls flank the time bar: previous · add on the left, next on
+                    // the right.
                     HStack(spacing: 8) {
                         if !markerSeconds.isEmpty { markerJumpButton(forward: false) }
+                        if onAddMarker != nil { addMarkerButton }
                         timeBar
                         if !markerSeconds.isEmpty { markerJumpButton(forward: true) }
                     }
@@ -439,9 +443,6 @@ struct AetherSceneSurface<ExtraItems: View>: View {
     private var bottomLeadingControls: some View {
         HStack(spacing: isCompact ? 6 : 8) {
             if isFullscreen { rotateButton }
-            if onAddMarker != nil {
-                addMarkerButton
-            }
         }
     }
 
@@ -533,14 +534,12 @@ struct AetherSceneSurface<ExtraItems: View>: View {
     }
 
     @ViewBuilder
+    /// Round glass buttons like the rest of the transport: options menu, fill (fullscreen).
     private var bottomTrailingControls: some View {
-        HStack(spacing: 4) {
+        HStack(spacing: 8) {
             optionsMenu
             if isFullscreen { fillButton }
         }
-        .padding(.horizontal, 6)
-        .frame(height: chromeButtonSize)
-        .stashyGlass(shape: Capsule())
     }
 
     /// Non-interactive marker: this session is not playing the original file.
@@ -562,82 +561,86 @@ struct AetherSceneSurface<ExtraItems: View>: View {
 
     /// Every special function of this player in one menu: speed, tracks and whatever the
     /// host hangs in through `extraMenuItems`.
+    private var playerMenuItems: [PlayerMenuItem] {
+        var items: [PlayerMenuItem] = []
+
+        items.append(.submenu(
+            id: "player.speed",
+            title: "Playback Speed (\(Self.speedLabel(playbackRate)))",
+            systemImage: "gauge.with.dots.needle.67percent",
+            items: availableSpeedOptions.map { option in
+                .action(
+                    id: "player.speed.\(option)",
+                    title: Self.speedLabel(option),
+                    isChecked: abs(playbackRate - option) < 0.001
+                ) {
+                    engine.rate = option
+                    playbackRate = engine.rate
+                    revealControls()
+                }
+            }
+        ))
+
+        if engine.audioTracks.count > 1 {
+            items.append(.submenu(
+                id: "player.audio",
+                title: "Audio",
+                systemImage: "waveform",
+                items: engine.audioTracks.map { track in
+                    .action(
+                        id: "player.audio.\(track.id)",
+                        title: AetherTrackLabel.audio(track),
+                        isChecked: engine.activeAudioTrackIndex == track.id
+                    ) {
+                        engine.selectAudioTrack(index: track.id)
+                        revealControls()
+                    }
+                }
+            ))
+        }
+
+        if !engine.subtitleTracks.isEmpty {
+            var subtitleItems: [PlayerMenuItem] = [
+                .action(
+                    id: "player.subtitle.off",
+                    title: "Off",
+                    isChecked: engine.activeSubtitleTrackIndex == nil
+                ) {
+                    engine.clearSubtitle()
+                    revealControls()
+                }
+            ]
+            subtitleItems.append(contentsOf: engine.subtitleTracks.map { track in
+                .action(
+                    id: "player.subtitle.\(track.id)",
+                    title: AetherTrackLabel.subtitle(track),
+                    isChecked: engine.activeSubtitleTrackIndex == track.id
+                ) {
+                    engine.selectSubtitleTrack(index: track.id)
+                    revealControls()
+                }
+            })
+            items.append(.submenu(
+                id: "player.subtitles",
+                title: "Subtitles",
+                systemImage: "captions.bubble",
+                items: subtitleItems
+            ))
+        }
+
+        let extras = extraMenuItems()
+        if !extras.isEmpty {
+            items.append(.separator(id: "player.extras.break"))
+            items.append(contentsOf: extras)
+        }
+        return items
+    }
+
+    /// The glass circle stays pure SwiftUI; the transparent `UIButton` on top owns the menu.
     @ViewBuilder
     private var optionsMenu: some View {
-        Menu {
-            Menu {
-                ForEach(availableSpeedOptions, id: \.self) { option in
-                    Button {
-                        engine.rate = option
-                        playbackRate = engine.rate
-                        revealControls()
-                    } label: {
-                        Label {
-                            Text(Self.speedLabel(option))
-                        } icon: {
-                            if abs(playbackRate - option) < 0.001 {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                }
-            } label: {
-                Label("Playback Speed (\(Self.speedLabel(playbackRate)))",
-                      systemImage: "gauge.with.dots.needle.67percent")
-            }
-
-            if engine.audioTracks.count > 1 {
-                Section("Audio") {
-                    ForEach(engine.audioTracks) { track in
-                        Button {
-                            engine.selectAudioTrack(index: track.id)
-                            revealControls()
-                        } label: {
-                            Label {
-                                Text(AetherTrackLabel.audio(track))
-                            } icon: {
-                                if engine.activeAudioTrackIndex == track.id {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-            if !engine.subtitleTracks.isEmpty {
-                Section("Subtitles") {
-                    Button {
-                        engine.clearSubtitle()
-                        revealControls()
-                    } label: {
-                        Label {
-                            Text("Off")
-                        } icon: {
-                            if engine.activeSubtitleTrackIndex == nil {
-                                Image(systemName: "checkmark")
-                            }
-                        }
-                    }
-                    ForEach(engine.subtitleTracks) { track in
-                        Button {
-                            engine.selectSubtitleTrack(index: track.id)
-                            revealControls()
-                        } label: {
-                            Label {
-                                Text(AetherTrackLabel.subtitle(track))
-                            } icon: {
-                                if engine.activeSubtitleTrackIndex == track.id {
-                                    Image(systemName: "checkmark")
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-
-            extraMenuItems()
-        } label: {
-            glyph("ellipsis")
+        ZStack {
+            glassCircle(systemName: "slider.horizontal.3", diameter: chromeButtonSize)
                 .overlay(alignment: .bottom) {
                     if abs(playbackRate - 1) > 0.001 {
                         Text(Self.speedLabel(playbackRate))
@@ -646,7 +649,22 @@ struct AetherSceneSurface<ExtraItems: View>: View {
                             .padding(.bottom, 2)
                     }
                 }
+                .allowsHitTesting(false)
+
+            PlayerMenuButton(
+                items: playerMenuItems,
+                onWillPresent: {
+                    isOptionsMenuOpen = true
+                    revealControls()
+                },
+                onDidDismiss: {
+                    isOptionsMenuOpen = false
+                    revealControls()
+                }
+            )
+            .frame(width: chromeButtonSize, height: chromeButtonSize)
         }
+        .frame(width: chromeButtonSize, height: chromeButtonSize)
         .accessibilityLabel("More options")
     }
 
@@ -699,6 +717,7 @@ struct AetherSceneSurface<ExtraItems: View>: View {
     /// A tap on free surface never changes the transport: hidden controls come up, visible
     /// controls go away. Play/pause is the glyph's job.
     private func toggleControls() {
+        if isOptionsMenuOpen { return }
         if areControlsVisible {
             hideControls()
         } else {
@@ -759,9 +778,10 @@ struct AetherSceneSurface<ExtraItems: View>: View {
             fillsScreen.toggle()
             revealControls()
         } label: {
-            glyph(fillsScreen
-                  ? "rectangle.arrowtriangle.2.inward"
-                  : "rectangle.arrowtriangle.2.outward")
+            glassCircle(systemName: fillsScreen
+                        ? "rectangle.arrowtriangle.2.inward"
+                        : "rectangle.arrowtriangle.2.outward",
+                        diameter: chromeButtonSize)
         }
         .buttonStyle(.plain)
         .accessibilityLabel(fillsScreen ? "Fit to screen" : "Fill screen")
@@ -907,8 +927,11 @@ struct AetherSceneSurface<ExtraItems: View>: View {
     private func scheduleControlsHide() {
         let token = UUID()
         controlsHideToken = token
+        // While the UIKit menu is up the controls must not fade out from under it — the
+        // fresh token also cancels whatever hide was already in flight.
+        guard !isOptionsMenuOpen else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-            guard controlsHideToken == token, !isScrubbing else { return }
+            guard controlsHideToken == token, !isScrubbing, !isOptionsMenuOpen else { return }
             withAnimation(.easeInOut(duration: 0.2)) {
                 areControlsVisible = false
             }
@@ -917,36 +940,6 @@ struct AetherSceneSurface<ExtraItems: View>: View {
 
 }
 
-extension AetherSceneSurface where ExtraItems == EmptyView {
-    /// Call sites without extra menu rows (Downloads, …) keep the old signature.
-    init(
-        engine: AetherSceneEngine,
-        posterURL: URL?,
-        isMuted: Binding<Bool>,
-        onSeek: @escaping (Double) -> Void,
-        liveCaptionText: String = "",
-        onToggleFullscreen: (() -> Void)? = nil,
-        isFullscreen: Bool = false,
-        markerSeconds: [Double] = [],
-        onAddMarker: (() -> Void)? = nil
-    ) {
-        self.init(
-            engine: engine,
-            posterURL: posterURL,
-            isMuted: isMuted,
-            onSeek: onSeek,
-            liveCaptionText: liveCaptionText,
-            onToggleFullscreen: onToggleFullscreen,
-            isFullscreen: isFullscreen,
-            markerSeconds: markerSeconds,
-            onAddMarker: onAddMarker,
-            extraMenuItems: { EmptyView() }
-        )
-    }
-}
-
-/// Nicht-generischer Ablageort: eine generische View darf keine statischen Stored Properties
-/// haben.
 enum AetherSceneSurfaceConstants {
     static let speedOptions: [Float] = [0.5, 0.75, 1, 1.25, 1.5, 2]
 }
