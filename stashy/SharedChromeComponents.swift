@@ -5,7 +5,7 @@ import ObjectiveC
 
 /// Line height of a tag chip's label. A symbol-only pill (the "+" in the tag rows)
 /// would otherwise render shorter than the chips it sits next to.
-let tagChipGlyphHeight: CGFloat = UIFont.systemFont(ofSize: 11, weight: .semibold).lineHeight
+let tagChipGlyphHeight: CGFloat = UIFont.systemFont(ofSize: 12, weight: .semibold).lineHeight
 
 // MARK: - Glass
 

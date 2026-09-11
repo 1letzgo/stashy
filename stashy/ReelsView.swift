@@ -4471,11 +4471,11 @@ struct ReelsViewBody: View {
                                                     // of text, which made this pill smaller
                                                     // than the tag chips beside it.
                                                     Image(systemName: "plus")
-                                                        .font(.system(size: 11, weight: .bold))
+                                                        .font(.system(size: 12, weight: .bold))
                                                         .frame(height: tagChipGlyphHeight)
                                                         .foregroundColor(.white.opacity(0.8))
-                                                        .padding(.horizontal, 8)
-                                                        .padding(.vertical, 3)
+                                                        .padding(.horizontal, 9)
+                                                        .padding(.vertical, 4)
                                                         .stashyGlass(shape: Capsule())
                                                 }
                                                 .buttonStyle(.plain)
@@ -4493,10 +4493,10 @@ struct ReelsViewBody: View {
                                                     applyTagsChange(newTags)
                                                 }) {
                                                     Text("#\(tag.name)")
-                                                        .font(.system(size: 11, weight: .semibold))
+                                                        .font(.system(size: 12, weight: .semibold))
                                                         .foregroundColor(.white.opacity(0.8))
-                                                        .padding(.horizontal, 8)
-                                                        .padding(.vertical, 3)
+                                                        .padding(.horizontal, 9)
+                                                        .padding(.vertical, 4)
                                                         .stashyGlass(shape: Capsule())
                                                 }
                                                 .buttonStyle(.plain)
@@ -6044,90 +6044,35 @@ final class ReelsScrubThumbnailProvider: ObservableObject {
     }
 }
 
+/// Die Feeds-/Vollbild-Scrub-Leiste. Rendert dieselbe `AetherTimeBar` wie Scene Detail und
+/// übersetzt deren Scrub-Callbacks in den `ScrubberState`-Vertrag: `seeking` zuerst (die
+/// aktive Zeile entscheidet daran, ob sie ein Vorschau-Still dekodiert), dann `time` und
+/// `seekTarget`. Das Still kommt umgekehrt über `state.previewImage` zurück.
 struct IsolatedScrubberBar: View {
     @ObservedObject var state: ScrubberState
     var isUIVisible: Bool
 
     var body: some View {
-        scrubber
-            .overlay(alignment: .top) {
-                GeometryReader { geo in
-                    if state.seeking, state.duration > 0 {
-                        scrubPreviewOverlay(barWidth: max(geo.size.width, 1))
-                    }
-                }
-                .allowsHitTesting(false)
-                .opacity(isUIVisible ? 1 : 0)
-            }
-    }
-
-    /// Floating still above the scrub position, clamped to the bar so it never leaves the screen.
-    /// Matches the scene-detail overlay: 120 pt, 16:9, radius 6, white hairline, time label.
-    @ViewBuilder
-    private func scrubPreviewOverlay(barWidth: CGFloat) -> some View {
-        let previewWidth: CGFloat = 120
-        let previewHeight: CGFloat = previewWidth * 9 / 16
-        let half = previewWidth / 2
-        let progress = CGFloat(min(1, max(0, state.time / max(state.duration, 0.001))))
-        let rawCenter = barWidth * progress
-        let center = barWidth > previewWidth
-            ? min(max(half, rawCenter), barWidth - half)
-            : barWidth / 2
-
-        VStack(spacing: 3) {
-            // No frame yet (first decode, or a source without stills): only the time label,
-            // never an empty black box.
-            if let image = state.previewImage {
-                Image(uiImage: image)
-                    .resizable()
-                    .scaledToFill()
-                    .frame(width: previewWidth, height: previewHeight)
-                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 6, style: .continuous)
-                            .stroke(Color.white.opacity(0.75), lineWidth: 0.5)
-                    )
-                    .shadow(color: .black.opacity(0.55), radius: 6, x: 0, y: 2)
-            }
-
-            Text(Self.formatTime(state.time))
-                .font(.system(size: 10, weight: .semibold).monospacedDigit())
-                .foregroundStyle(.white)
-        }
-        .frame(width: previewWidth)
-        .offset(x: center - half, y: -(previewHeight + 28))
-        .allowsHitTesting(false)
-    }
-
-    private static func formatTime(_ seconds: Double) -> String {
-        guard seconds.isFinite, seconds >= 0 else { return "0:00" }
-        let total = Int(seconds)
-        let h = total / 3600
-        let m = (total % 3600) / 60
-        let s = total % 60
-        return h > 0
-            ? String(format: "%d:%02d:%02d", h, m, s)
-            : String(format: "%d:%02d", m, s)
-    }
-
-    @ViewBuilder
-    private var scrubber: some View {
-        CustomVideoScrubber(
-            value: Binding(
-                get: { state.time },
-                set: { val in
-                    state.time = val
-                    state.seekTarget = val
-                }
-            ),
-            total: max(state.duration, 0.001),
-            onEditingChanged: { editing in
-                state.seeking = editing
+        AetherTimeBar(
+            currentTime: state.time,
+            duration: state.duration,
+            isScrubbing: state.seeking,
+            previewImage: state.previewImage,
+            markerSeconds: [],
+            isCompact: false,
+            onScrubChanged: { seconds in
+                state.seeking = true
+                state.time = seconds
+                state.seekTarget = seconds
+            },
+            onScrubEnded: { seconds in
+                state.time = seconds
+                state.seekTarget = seconds
+                state.seeking = false
             }
         )
-        // Keep a bit more space below the scrubber so it sits ~5px higher.
-        .padding(.bottom, 11)
-        .colorScheme(.dark)
+        .padding(.horizontal, 16)
+        .padding(.bottom, 6)
         .opacity(isUIVisible ? 1 : 0)
         .allowsHitTesting(isUIVisible)
         .animation(.easeInOut(duration: 0.2), value: isUIVisible)

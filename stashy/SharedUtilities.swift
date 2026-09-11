@@ -1457,54 +1457,6 @@ struct BottomBarButton: View {
     }
 }
 
-struct CustomVideoScrubber: View {
-    @Binding var value: Double
-    var total: Double
-    var onEditingChanged: (Bool) -> Void
-    
-    var body: some View {
-        GeometryReader { geometry in
-            ZStack(alignment: .bottomLeading) {
-                // Background Track (Interactive Area)
-                Rectangle()
-                    .fill(Color.white.opacity(0.3)) // Slight visible track
-                    .frame(height: 2) // Very thin default
-                
-                // Progress Bar
-                Rectangle()
-                    .fill(Color.white)
-                    .frame(width: max(0, min(geometry.size.width, geometry.size.width * (value / total))), height: 2)
-                
-                // Expanded Touch Area (Invisible) for easier scrubbing
-                Rectangle()
-                    .fill(Color.clear)
-                    .frame(height: 20)
-                    .contentShape(Rectangle())
-                    #if !os(tvOS)
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { value in
-                                onEditingChanged(true)
-                                let percentage = min(max(0, value.location.x / geometry.size.width), 1)
-                                self.value = percentage * total
-                            }
-                            .onEnded { _ in
-                                onEditingChanged(false)
-                            }
-                    )
-                    #endif
-            }
-            .frame(maxHeight: .infinity, alignment: .bottom)
-        }
-        .frame(height: 20) // Match touch area height
-        .focusable(false)
-        #if !os(tvOS)
-        .focusEffectDisabled()
-        #endif
-    }
-}
-
-
 // MARK: - Center Play Button
 struct CenterPlayButton: View {
     var action: () -> Void

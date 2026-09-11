@@ -259,7 +259,6 @@ struct AetherSceneSurface: View {
     private var playButtonSize: CGFloat { isCompact ? 64 : 96 }
     private var centerSpacing: CGFloat { isCompact ? 24 : 70 }
     private var chromeButtonSize: CGFloat { isCompact ? 34 : 42 }
-    private var timeBarHeight: CGFloat { isCompact ? 36 : 44 }
     private var showsVolumeSlider: Bool { !isCompact }
 
     @ViewBuilder
@@ -767,116 +766,27 @@ struct AetherSceneSurface: View {
     /// time (`-mm:ss`) on the right.
     @ViewBuilder
     private var timeBar: some View {
-        let duration = max(engine.duration, 0)
-        let remaining = max(0, duration - displayedTime)
-        HStack(spacing: 12) {
-            Text(formatTime(displayedTime))
-                .font(.system(size: isCompact ? 10 : 12, weight: .semibold).monospacedDigit())
-                .foregroundStyle(.white.opacity(0.7))
-
-            GeometryReader { geo in
-                let width = max(geo.size.width, 1)
-                let progress = duration > 0 ? min(1, max(0, displayedTime / duration)) : 0
-                ZStack(alignment: .leading) {
-                    Capsule()
-                        .fill(Color.white.opacity(0.28))
-                    Capsule()
-                        .fill(Color.white)
-                        .frame(width: width * CGFloat(progress))
-                    if duration > 0 {
-                        markerDots(barWidth: width, duration: duration)
-                    }
-                }
-                .frame(height: 4)
-                .frame(maxHeight: .infinity)
-                .contentShape(Rectangle())
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            guard duration > 0 else { return }
-                            isScrubbing = true
-                            scrubSeconds = Double(min(max(0, value.location.x), width) / width) * duration
-                            requestScrubPreview(at: scrubSeconds)
-                            revealControls()
-                        }
-                        .onEnded { value in
-                            guard duration > 0 else { isScrubbing = false; return }
-                            let seconds = Double(min(max(0, value.location.x), width) / width) * duration
-                            scrubSeconds = seconds
-                            isScrubbing = false
-                            endScrubPreview()
-                            onSeek(seconds)
-                            revealControls()
-                        }
-                )
-                .overlay(alignment: .topLeading) {
-                    if isScrubbing, duration > 0 {
-                        scrubPreviewOverlay(barWidth: width, progress: CGFloat(progress))
-                    }
-                }
+        AetherTimeBar(
+            currentTime: displayedTime,
+            duration: max(engine.duration, 0),
+            isScrubbing: isScrubbing,
+            previewImage: scrubPreviewImage,
+            markerSeconds: markerSeconds,
+            isCompact: isCompact,
+            onScrubChanged: { seconds in
+                isScrubbing = true
+                scrubSeconds = seconds
+                requestScrubPreview(at: seconds)
+                revealControls()
+            },
+            onScrubEnded: { seconds in
+                scrubSeconds = seconds
+                isScrubbing = false
+                endScrubPreview()
+                onSeek(seconds)
+                revealControls()
             }
-            .frame(maxHeight: .infinity)
-
-            Text("-\(formatTime(remaining))")
-                .font(.system(size: isCompact ? 10 : 12, weight: .semibold).monospacedDigit())
-                .foregroundStyle(.white.opacity(0.7))
-        }
-        .padding(.horizontal, 16)
-        .frame(height: timeBarHeight)
-        .stashyGlass(shape: Capsule())
-    }
-
-    /// One small dot per marker on the track; markers outside the duration are skipped.
-    @ViewBuilder
-    private func markerDots(barWidth: CGFloat, duration: Double) -> some View {
-        let dot: CGFloat = isCompact ? 5 : 6
-        ForEach(Array(markerSeconds.enumerated()), id: \.offset) { _, seconds in
-            if seconds >= 0, seconds <= duration {
-                Circle()
-                    .fill(Color.white)
-                    .overlay(Circle().stroke(Color.black.opacity(0.35), lineWidth: 0.5))
-                    .frame(width: dot, height: dot)
-                    .offset(x: min(max(0, barWidth * CGFloat(seconds / duration) - dot / 2), barWidth - dot))
-            }
-        }
-        .allowsHitTesting(false)
-    }
-
-    /// Floating still above the scrub thumb, clamped to the bar so it never leaves the surface.
-    @ViewBuilder
-    private func scrubPreviewOverlay(barWidth: CGFloat, progress: CGFloat) -> some View {
-        let previewWidth: CGFloat = 120
-        let previewHeight: CGFloat = previewWidth * 9 / 16
-        let half = previewWidth / 2
-        let rawCenter = barWidth * progress
-        let center = barWidth > previewWidth
-            ? min(max(half, rawCenter), barWidth - half)
-            : barWidth / 2
-
-        VStack(spacing: 3) {
-            ZStack {
-                Color.black.opacity(0.7)
-                if let image = scrubPreviewImage {
-                    Image(uiImage: image)
-                        .resizable()
-                        .scaledToFill()
-                }
-            }
-            .frame(width: previewWidth, height: previewHeight)
-            .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-            .overlay(
-                RoundedRectangle(cornerRadius: 6, style: .continuous)
-                    .stroke(Color.white.opacity(0.75), lineWidth: 0.5)
-            )
-            .shadow(color: .black.opacity(0.55), radius: 6, x: 0, y: 2)
-
-            Text(formatTime(scrubSeconds))
-                .font(.system(size: 10, weight: .semibold).monospacedDigit())
-                .foregroundStyle(.white)
-        }
-        .frame(width: previewWidth)
-        .offset(x: center - half, y: -(previewHeight + 24))
-        .allowsHitTesting(false)
+        )
     }
 
     /// One decode in flight at a time; while it runs, the newest finger position is parked
@@ -983,16 +893,6 @@ struct AetherSceneSurface: View {
         }
     }
 
-    private func formatTime(_ seconds: Double) -> String {
-        guard seconds.isFinite, seconds >= 0 else { return "0:00" }
-        let total = Int(seconds)
-        let h = total / 3600
-        let m = (total % 3600) / 60
-        let s = total % 60
-        return h > 0
-            ? String(format: "%d:%02d:%02d", h, m, s)
-            : String(format: "%d:%02d", m, s)
-    }
 }
 
 // MARK: - Glass and auto-hiding

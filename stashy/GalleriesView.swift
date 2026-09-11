@@ -1573,11 +1573,11 @@ struct FullScreenImageView: View {
                                                     // text, which made this pill smaller than
                                                     // the tag chips beside it.
                                                     Image(systemName: "plus")
-                                                        .font(.system(size: 11, weight: .bold))
+                                                        .font(.system(size: 12, weight: .bold))
                                                         .frame(height: tagChipGlyphHeight)
                                                         .foregroundColor(.white.opacity(0.8))
-                                                        .padding(.horizontal, 8)
-                                                        .padding(.vertical, 3)
+                                                        .padding(.horizontal, 9)
+                                                        .padding(.vertical, 4)
                                                         .stashyGlass(shape: Capsule())
                                                 }
                                                 .buttonStyle(.plain)
@@ -1586,10 +1586,10 @@ struct FullScreenImageView: View {
 
                                             ForEach(tags) { tag in
                                                 Text("#\(tag.name)")
-                                                    .font(.system(size: 11, weight: .semibold))
+                                                    .font(.system(size: 12, weight: .semibold))
                                                     .foregroundColor(.white.opacity(0.8))
-                                                    .padding(.horizontal, 8)
-                                                    .padding(.vertical, 3)
+                                                    .padding(.horizontal, 9)
+                                                    .padding(.vertical, 4)
                                                     .stashyGlass(shape: Capsule())
                                                     .contextMenu {
                                                         if appearanceManager.isEditModeEnabled {
