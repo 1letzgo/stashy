@@ -700,7 +700,7 @@ struct SetTagImageFromFrameSheet: View {
             }
             .applyAppBackground()
             .scrollContentBackground(.hidden)
-            .stashyModalSheetChrome("Set Tag Image", onBack: { dismiss() }) {
+            .stashyModalSheetChrome("Generate Tag Cover", onBack: { dismiss() }) {
                 StashyChromeTrailingTextButton(
                     title: "Apply",
                     enabled: selectedTagId != nil,

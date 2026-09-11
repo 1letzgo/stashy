@@ -145,7 +145,7 @@ final class ScenePlayerExtrasController: ObservableObject {
         items.append(.separator(id: "extras.break.sceneCover"))
         items.append(.action(
             id: "extras.sceneCover",
-            title: "Set as scene cover",
+            title: "Generate scene cover",
             systemImage: "photo",
             isDisabled: isBusyCapturing
         ) { [weak self] in
@@ -155,7 +155,7 @@ final class ScenePlayerExtrasController: ObservableObject {
         items.append(.separator(id: "extras.break.tagImage"))
         items.append(.action(
             id: "extras.tagImage",
-            title: "Set as tag image",
+            title: "Generate tag cover",
             systemImage: "tag.fill",
             isDisabled: isBusyCapturing
         ) { [weak self] in
