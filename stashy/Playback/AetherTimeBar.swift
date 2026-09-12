@@ -113,7 +113,7 @@ struct AetherTimeBar: View {
 
     /// The marker the scrub position belongs to: the last one that started at most
     /// `markerLabelWindow` seconds before `time`. Further along, the label goes away.
-    private static let markerLabelWindow: Double = 90
+    private static let markerLabelWindow: Double = 60
 
     private func marker(at time: Double) -> AetherTimeBarMarker? {
         let sorted = markers.sorted { $0.seconds < $1.seconds }
