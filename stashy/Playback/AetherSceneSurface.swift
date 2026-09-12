@@ -765,7 +765,7 @@ struct AetherSceneSurface: View {
     private func tapRegion(doubleTapSkip: Double?) -> some View {
         let region = Color.clear
             .contentShape(Rectangle())
-            .onLongPressGesture(minimumDuration: 0.4, pressing: { pressing in
+            .onLongPressGesture(minimumDuration: 0.6, pressing: { pressing in
                 setFastForwarding(pressing)
             }, perform: {})
         if let doubleTapSkip {

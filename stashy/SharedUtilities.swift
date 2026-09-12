@@ -1295,7 +1295,7 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         
         // Add long press
         let longPress = UILongPressGestureRecognizer(target: context.coordinator, action: #selector(Coordinator.handleLongPress(_:)))
-        longPress.minimumPressDuration = 0.3
+        longPress.minimumPressDuration = 0.6
         scrollView.addGestureRecognizer(longPress)
         
         return scrollView
