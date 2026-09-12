@@ -550,44 +550,44 @@ struct ToolsServerView: View {
                                 showResult(title: "Scene covers", message: message)
                             }
                         }
-                        taskRow(label: "Previews", icon: "play.rectangle.fill", taskId: "gen_previews", index: 1, count: 13) {
+                        taskRow(label: "Video perceptual hashes", icon: "number.square.fill", taskId: "gen_phashes", index: 1, count: 13) {
+                            viewModel.triggerGenerate(phashes: true) { _, message in
+                                showResult(title: "Video perceptual hashes", message: message)
+                            }
+                        }
+                        taskRow(label: "Previews", icon: "play.rectangle.fill", taskId: "gen_previews", index: 2, count: 13) {
                             viewModel.triggerGenerate(previews: true) { _, message in
                                 showResult(title: "Previews", message: message)
                             }
                         }
-                        taskRow(label: "Animated image previews", icon: "photo.on.rectangle.angled", taskId: "gen_imagePreviews", index: 2, count: 13) {
+                        taskRow(label: "Animated image previews", icon: "photo.on.rectangle.angled", taskId: "gen_imagePreviews", index: 3, count: 13) {
                             viewModel.triggerGenerate(imagePreviews: true) { _, message in
                                 showResult(title: "Animated image previews", message: message)
                             }
                         }
-                        taskRow(label: "Scene scrubber sprites", icon: "square.grid.3x3.fill", taskId: "gen_sprites", index: 3, count: 13) {
+                        taskRow(label: "Scene scrubber sprites", icon: "square.grid.3x3.fill", taskId: "gen_sprites", index: 4, count: 13) {
                             viewModel.triggerGenerate(sprites: true) { _, message in
                                 showResult(title: "Scene scrubber sprites", message: message)
                             }
                         }
-                        taskRow(label: "Marker previews", icon: "mappin.and.ellipse", taskId: "gen_markers", index: 4, count: 13) {
+                        taskRow(label: "Marker previews", icon: "mappin.and.ellipse", taskId: "gen_markers", index: 5, count: 13) {
                             viewModel.triggerGenerate(markers: true) { _, message in
                                 showResult(title: "Marker previews", message: message)
                             }
                         }
-                        taskRow(label: "Marker animated image previews", icon: "mappin.and.ellipse.circle.fill", taskId: "gen_markerImagePreviews", index: 5, count: 13) {
+                        taskRow(label: "Marker animated image previews", icon: "mappin.and.ellipse.circle.fill", taskId: "gen_markerImagePreviews", index: 6, count: 13) {
                             viewModel.triggerGenerate(markerImagePreviews: true) { _, message in
                                 showResult(title: "Marker animated image previews", message: message)
                             }
                         }
-                        taskRow(label: "Marker screenshots", icon: "camera.fill", taskId: "gen_markerScreenshots", index: 6, count: 13) {
+                        taskRow(label: "Marker screenshots", icon: "camera.fill", taskId: "gen_markerScreenshots", index: 7, count: 13) {
                             viewModel.triggerGenerate(markerScreenshots: true) { _, message in
                                 showResult(title: "Marker screenshots", message: message)
                             }
                         }
-                        taskRow(label: "Transcodes", icon: "film.stack", taskId: "gen_transcodes", index: 7, count: 13) {
+                        taskRow(label: "Transcodes", icon: "film.stack", taskId: "gen_transcodes", index: 8, count: 13) {
                             viewModel.triggerGenerate(transcodes: true) { _, message in
                                 showResult(title: "Transcodes", message: message)
-                            }
-                        }
-                        taskRow(label: "Video perceptual hashes", icon: "number.square.fill", taskId: "gen_phashes", index: 8, count: 13) {
-                            viewModel.triggerGenerate(phashes: true) { _, message in
-                                showResult(title: "Video perceptual hashes", message: message)
                             }
                         }
                         taskRow(label: "Generate heatmaps and speeds for interactive scenes", icon: "waveform.path.ecg", taskId: "gen_heatmaps", index: 9, count: 13) {
