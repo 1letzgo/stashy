@@ -108,6 +108,8 @@ struct AetherSceneSurface: View {
             #endif
         }
         .contentShape(Rectangle())
+        // Keyboard insets (a sheet's text field over this surface) must not resize the surface.
+        .ignoresSafeArea(.keyboard)
         .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
             surfaceHeight = size.height
             surfaceSize = size

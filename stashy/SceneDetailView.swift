@@ -609,6 +609,10 @@ struct SceneDetailView: View {
                 // control is reachable.
             }
         }
+        // The cover stays on screen under the landscape form sheet, and every keyboard frame
+        // would re-lay it out (safe-area churn -> surface geometry -> engine layer). A video
+        // player never avoids the keyboard.
+        .ignoresSafeArea(.keyboard)
         .scenePlayerExtrasSheets(controller: extrasController, scope: .fullscreen)
         .statusBarHidden(true)
         .onDisappear { AetherSceneSurface.releaseOrientationOverride() }
@@ -1233,7 +1237,7 @@ struct AddMarkerSheet: View {
     }
 
     var body: some View {
-        NavigationView {
+        NavigationStack {
             Form {
                 Section(header: Text("Marker Details")) {
                     TextField("Name", text: $title)
