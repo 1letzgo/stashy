@@ -111,11 +111,14 @@ struct AetherTimeBar: View {
         markers.isEmpty ? markerSeconds : markers.map(\.seconds)
     }
 
-    /// The marker whose range holds `time` (a marker runs until the next one starts).
+    /// The marker the scrub position belongs to: the last one that started at most
+    /// `markerLabelWindow` seconds before `time`. Further along, the label goes away.
+    private static let markerLabelWindow: Double = 90
+
     private func marker(at time: Double) -> AetherTimeBarMarker? {
         let sorted = markers.sorted { $0.seconds < $1.seconds }
-        guard let index = sorted.lastIndex(where: { $0.seconds <= time }) else { return nil }
-        return sorted[index]
+        guard let last = sorted.last(where: { $0.seconds <= time }) else { return nil }
+        return time - last.seconds <= Self.markerLabelWindow ? last : nil
     }
 
     /// Schwebendes Still über dem Scrub-Daumen, an die Leiste geklemmt, damit es nie
