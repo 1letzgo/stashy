@@ -278,7 +278,10 @@ struct AetherSceneSurface: View {
     //
     // One layout for both surfaces; the inline card is simply too short for the fullscreen
     // sizes, so the same groups shrink and the volume slider drops out (mute stays).
-    private var isCompact: Bool { surfaceHeight > 0 && surfaceHeight < 260 }
+    /// Compact control sizes for the inline card and for fullscreen — the large set was
+    /// out of proportion next to the inline player. The regular set stays for big inline
+    /// surfaces (iPad).
+    private var isCompact: Bool { isFullscreen || (surfaceHeight > 0 && surfaceHeight < 260) }
     private var skipButtonSize: CGFloat { isCompact ? 44 : 66 }
     private var playButtonSize: CGFloat { isCompact ? 64 : 96 }
     private var centerSpacing: CGFloat { isCompact ? 24 : 70 }
@@ -293,7 +296,7 @@ struct AetherSceneSurface: View {
     }
 
     private var chromeButtonSize: CGFloat { isCompact ? 34 : 42 }
-    private var showsVolumeSlider: Bool { !isCompact }
+    private var showsVolumeSlider: Bool { !isCompact || isFullscreen }
 
     @ViewBuilder
     private var transportOverlay: some View {
