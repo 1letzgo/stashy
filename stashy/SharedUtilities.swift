@@ -1014,6 +1014,9 @@ extension View {
             .listSectionSpacing(24)
             .contentMargins(.horizontal, 20, for: .scrollContent)
             .contentMargins(.top, 20, for: .scrollContent)
+            // Luft unter der letzten Card: die schwebende Tabbar (und ihr Glas-Schatten)
+            // sitzt sonst direkt auf ihr, auch wenn die Liste ganz unten ist.
+            .contentMargins(.bottom, 28, for: .scrollContent)
             .environment(\.defaultMinListRowHeight, 0)
             .scrollContentBackground(.hidden)
     }
