@@ -868,6 +868,8 @@ struct GalleryItemView: View {
     // Playback State — one engine per page, reused across item changes.
     @State private var engine: AetherSceneEngine?
     @State private var animationAdvanceTimer: Timer?
+    @State private var isFastForwarding = false
+    @State private var rateBeforeFastForward: Float = 1
 
     private var isActiveItem: Bool {
         image.id == (currentVisibleId ?? fallbackActiveId)
@@ -932,6 +934,8 @@ struct GalleryItemView: View {
                 ZoomableScrollView(isZoomed: $isZoomed, onTap: { _ in
                     withAnimation(.easeInOut(duration: 0.4)) { showUI.toggle() }
                     if showUI { onInteraction() }
+                }, onLongPress: { pressing in
+                    setFastForwarding(pressing)
                 }) {
                     if let engine {
                         AetherVideoSurface(
@@ -992,9 +996,44 @@ struct GalleryItemView: View {
     }
 
 
+    /// Same press-and-hold 2× as Feeds: only for videos, previous rate restored on release.
+    private func setFastForwarding(_ active: Bool) {
+        guard image.isVideo, !isAnimatedImage, let engine, active != isFastForwarding else { return }
+        if active {
+            guard isPlaying else { return }
+            HapticManager.selection()
+            rateBeforeFastForward = engine.rate
+            engine.rate = 2
+        } else {
+            engine.rate = rateBeforeFastForward
+        }
+        withAnimation(.easeInOut(duration: 0.15)) { isFastForwarding = active }
+        onInteraction()
+    }
+
+    @ViewBuilder
+    private var fastForwardOverlay: some View {
+        if isFastForwarding {
+            VStack {
+                Image(systemName: "chevron.right.2")
+                    .font(.system(size: 32, weight: .black))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 22)
+                    .padding(.vertical, 14)
+                    .stashyGlass(shape: Capsule())
+                    .padding(.top, 130)
+                Spacer()
+            }
+            .allowsHitTesting(false)
+            .transition(.opacity)
+        }
+    }
+
     var body: some View {
         ZStack {
             mediaLayer
+
+            fastForwardOverlay
 
             // Center Play Icon (only for videos, not animations)
             if !isAnimatedImage && image.isVideo && !isPlaying && showUI {

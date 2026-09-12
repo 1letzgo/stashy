@@ -56,6 +56,9 @@ struct AetherSceneSurface: View {
     /// Surface height, so the inline card can use the same layout at smaller sizes.
     @State private var surfaceHeight: CGFloat = 0
     @State private var surfaceSize: CGSize = .zero
+    /// Hold anywhere on the picture: 2× while pressed (same as Feeds), previous rate after.
+    @State private var isFastForwarding = false
+    @State private var rateBeforeFastForward: Float = 1
     /// Mirrors of engine state that is not observable, so the slider and the speed menu redraw.
     @State private var volumeLevel: Float = 1
     @State private var playbackRate: Float = 1
@@ -88,6 +91,8 @@ struct AetherSceneSurface: View {
             }
 
             subtitleOverlay
+
+            fastForwardOverlay
 
             transportOverlay
                 // Fullscreen: keep the controls inside the picture. A 16:9 file in landscape
@@ -744,12 +749,9 @@ struct AetherSceneSurface: View {
     private func tapRegion(doubleTapSkip: Double?) -> some View {
         let region = Color.clear
             .contentShape(Rectangle())
-            .onLongPressGesture(minimumDuration: 0.6) {
-                #if DEBUG
-                showsDebugStats.toggle()
-                #endif
-                revealControls()
-            }
+            .onLongPressGesture(minimumDuration: 0.4, pressing: { pressing in
+                setFastForwarding(pressing)
+            }, perform: {})
         if let doubleTapSkip {
             region
                 .onTapGesture(count: 2) { skip(by: doubleTapSkip) }
@@ -775,6 +777,39 @@ struct AetherSceneSurface: View {
         controlsHideToken = UUID()
         withAnimation(.easeInOut(duration: 0.2)) {
             areControlsVisible = false
+        }
+    }
+
+    /// Press-and-hold fast forward: 2× while the finger is down, the previous rate afterwards.
+    private func setFastForwarding(_ active: Bool) {
+        guard active != isFastForwarding else { return }
+        if active {
+            guard engine.isPlaying else { return }
+            HapticManager.selection()
+            rateBeforeFastForward = engine.rate
+            engine.rate = 2
+        } else {
+            engine.rate = rateBeforeFastForward
+        }
+        playbackRate = engine.rate
+        withAnimation(.easeInOut(duration: 0.15)) { isFastForwarding = active }
+    }
+
+    @ViewBuilder
+    private var fastForwardOverlay: some View {
+        if isFastForwarding {
+            VStack {
+                Image(systemName: "chevron.right.2")
+                    .font(.system(size: isCompact ? 22 : 32, weight: .black))
+                    .foregroundColor(.white)
+                    .padding(.horizontal, isCompact ? 16 : 22)
+                    .padding(.vertical, isCompact ? 10 : 14)
+                    .stashyGlass(shape: Capsule())
+                    .padding(.top, isCompact ? 56 : 90)
+                Spacer()
+            }
+            .allowsHitTesting(false)
+            .transition(.opacity)
         }
     }
 
