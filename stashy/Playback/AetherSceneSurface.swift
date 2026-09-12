@@ -60,6 +60,7 @@ struct AetherSceneSurface: View {
     /// Hold anywhere on the picture: 2× while pressed (same as Feeds), previous rate after.
     @State private var isFastForwarding = false
     @State private var rateBeforeFastForward: Float = 1
+    @State private var fastForwardArmTask: DispatchWorkItem?
     /// Mirrors of engine state that is not observable, so the slider and the speed menu redraw.
     @State private var volumeLevel: Float = 1
     @State private var playbackRate: Float = 1
@@ -765,8 +766,20 @@ struct AetherSceneSurface: View {
     private func tapRegion(doubleTapSkip: Double?) -> some View {
         let region = Color.clear
             .contentShape(Rectangle())
+            // `pressing` fires on touch-down, not after the minimum duration, so the hold is
+            // armed with a timer: only a finger still down after 0.6 s starts 2×, and a
+            // double tap never reaches it.
             .onLongPressGesture(minimumDuration: 0.6, pressing: { pressing in
-                setFastForwarding(pressing)
+                if pressing {
+                    fastForwardArmTask?.cancel()
+                    let task = DispatchWorkItem { setFastForwarding(true) }
+                    fastForwardArmTask = task
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: task)
+                } else {
+                    fastForwardArmTask?.cancel()
+                    fastForwardArmTask = nil
+                    setFastForwarding(false)
+                }
             }, perform: {})
         if let doubleTapSkip {
             region
