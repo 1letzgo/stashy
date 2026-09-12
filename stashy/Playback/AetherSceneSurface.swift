@@ -121,7 +121,7 @@ struct AetherSceneSurface: View {
             // (the volume setter un-mutes), so a muted scene started with sound.
             volumeLevel = AVAudioSession.sharedInstance().outputVolume
             playbackRate = engine.rate
-            pip.update(layer: engine.pipPlayerLayer)
+            pip.update(layer: pipLayerIfEnabled)
             pip.onActiveChange = { [weak engine] active in
                 engine?.setPictureInPictureActive(active)
             }
@@ -134,7 +134,12 @@ struct AetherSceneSurface: View {
         }
         // The engine swaps its layer on every load, so the controller has to follow it.
         .onChange(of: engine.pipPlayerLayer.map(ObjectIdentifier.init)) { _, _ in
-            pip.update(layer: engine.pipPlayerLayer)
+            pip.update(layer: pipLayerIfEnabled)
+        }
+        // Setting off → no controller at all, so the system can never start PiP on its own
+        // (it did when the app resigned active, e.g. for the share sheet).
+        .onChange(of: tabManager.isPiPEnabled) { _, _ in
+            pip.update(layer: pipLayerIfEnabled)
         }
         .onAppear {
             // The gravity lives on the engine and outlives this view; every surface starts
@@ -388,6 +393,11 @@ struct AetherSceneSurface: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel(isFullscreen ? "Close" : "Full screen")
+    }
+
+    /// The layer the PiP controller may bind to — nil while PiP is switched off in Settings.
+    private var pipLayerIfEnabled: AVPlayerLayer? {
+        tabManager.isPiPEnabled ? engine.pipPlayerLayer : nil
     }
 
     private var showsPiPButton: Bool {
@@ -1153,6 +1163,9 @@ private final class AetherPictureInPictureCoordinator: NSObject, ObservableObjec
 
     func update(layer: AVPlayerLayer?) {
         guard let layer else {
+            if let controller, controller.isPictureInPictureActive {
+                controller.stopPictureInPicture()
+            }
             controller = nil
             boundLayer = nil
             if isAvailable { isAvailable = false }
@@ -1163,6 +1176,8 @@ private final class AetherPictureInPictureCoordinator: NSObject, ObservableObjec
         boundLayer = layer
         let created = AVPictureInPictureController(playerLayer: layer)
         created?.delegate = self
+        // PiP starts only from the button, never because the app left the foreground.
+        created?.canStartPictureInPictureAutomaticallyFromInline = false
         controller = created
         isAvailable = created != nil
     }
