@@ -1,0 +1,3 @@
+mutation PerformersDestroy($ids: [ID!]!) {
+  performersDestroy(ids: $ids)
+}

@@ -1,0 +1,6 @@
+query CleanupStudiosBasic($page: Int!, $perPage: Int!) {
+  findStudios(filter: { page: $page, per_page: $perPage, sort: "name", direction: ASC }) {
+    count
+    studios { id name scene_count image_count gallery_count performer_count child_studios { id } }
+  }
+}

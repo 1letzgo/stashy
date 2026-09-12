@@ -517,15 +517,36 @@ struct ToolsServerView: View {
     @State private var alertMessage = ""
     @State private var showAlert = false
     @State private var runningTask: String? = nil
-    /// Gefundene ungenutzte Tags, warten auf die Bestätigung.
-    @State private var unusedTags: [Tag] = []
-    @State private var showUnusedTagsConfirmation = false
+    /// Gefundene ungenutzte Einträge (Tags, Performer oder Studios), warten auf die Bestätigung.
+    @State private var cleanupKind: CleanupKind = .tags
+    @State private var cleanupCandidates: [LibraryCleanupCandidate] = []
+    @State private var showCleanupConfirmation = false
     /// Server-Job-Queue, alle 2 s aktualisiert, solange die Seite sichtbar ist.
     @State private var jobs: [StashQueuedJob] = []
     @State private var jobsLoaded = false
     @State private var stoppingJobIds: Set<String> = []
 
     private let tagRepository = TagRepository()
+    private let cleanupRepository = LibraryCleanupRepository()
+
+    enum CleanupKind {
+        case tags, performers, studios
+
+        var title: String {
+            switch self {
+            case .tags: return "Remove Unused Tags"
+            case .performers: return "Remove Unused Performers"
+            case .studios: return "Remove Unused Studios"
+            }
+        }
+        var noun: String {
+            switch self {
+            case .tags: return "tags"
+            case .performers: return "performers"
+            case .studios: return "studios"
+            }
+        }
+    }
 
     private var activeServer: ServerConfig? { configManager.activeConfig }
     
@@ -623,8 +644,14 @@ struct ToolsServerView: View {
 
                     Section {
                         stashyScrollingSectionHeader("Library Cleanup")
-                        taskRow(label: "Remove Unused Tags", icon: "tag.slash", taskId: "tags_unused", index: 0, count: 1) {
-                            findUnusedTags()
+                        taskRow(label: "Remove Unused Tags", icon: "tag.slash", taskId: "tags_unused", index: 0, count: 3) {
+                            findUnused(.tags)
+                        }
+                        taskRow(label: "Remove Unused Performers", icon: "person.slash", taskId: "performers_unused", index: 1, count: 3) {
+                            findUnused(.performers)
+                        }
+                        taskRow(label: "Remove Unused Studios", icon: "building.2.crop.circle", taskId: "studios_unused", index: 2, count: 3) {
+                            findUnused(.studios)
                         }
                     }
 
@@ -664,11 +691,11 @@ struct ToolsServerView: View {
         } message: {
             Text(alertMessage)
         }
-        .alert("Remove unused tags?", isPresented: $showUnusedTagsConfirmation) {
-            Button("Delete \(unusedTags.count)", role: .destructive) { deleteUnusedTags() }
+        .alert("Remove unused \(cleanupKind.noun)?", isPresented: $showCleanupConfirmation) {
+            Button("Delete \(cleanupCandidates.count)", role: .destructive) { deleteUnused() }
             Button("Cancel", role: .cancel) { runningTask = nil }
         } message: {
-            Text(unusedTagsConfirmationMessage)
+            Text(cleanupConfirmationMessage)
         }
         .onAppear {
             if activeServer != nil {
@@ -847,13 +874,13 @@ struct ToolsServerView: View {
         .stashyGroupedBlockRow(index: index, count: count)
     }
     
-    // MARK: - Unused tags
+    // MARK: - Library cleanup
 
-    private var unusedTagsConfirmationMessage: String {
+    private var cleanupConfirmationMessage: String {
         // Ein paar Namen zeigen, damit die Zahl nachvollziehbar ist.
-        let preview = unusedTags.prefix(8).map(\.name).joined(separator: ", ")
-        let rest = unusedTags.count > 8 ? " and \(unusedTags.count - 8) more" : ""
-        return "\(unusedTags.count) tags are not used anywhere: \(preview)\(rest). Deleting them cannot be undone."
+        let preview = cleanupCandidates.prefix(8).map(\.name).joined(separator: ", ")
+        let rest = cleanupCandidates.count > 8 ? " and \(cleanupCandidates.count - 8) more" : ""
+        return "\(cleanupCandidates.count) \(cleanupKind.noun) are not used anywhere: \(preview)\(rest). Deleting them cannot be undone."
     }
 
     /// Zählt ein Tag nirgends, ist es ungenutzt. Alle fünf Zähler kommen aus `TagFields`.
@@ -865,48 +892,63 @@ struct ToolsServerView: View {
             && (tag.sceneMarkerCount ?? 0) == 0
     }
 
-    private func findUnusedTags() {
+    private func findUnused(_ kind: CleanupKind) {
+        cleanupKind = kind
         Task {
             do {
-                let all = try await tagRepository.fetchEveryTag()
-                let unused = all.filter(isUnused)
+                let unused: [LibraryCleanupCandidate]
+                switch kind {
+                case .tags:
+                    unused = try await tagRepository.fetchEveryTag().filter(isUnused)
+                        .map { LibraryCleanupCandidate(id: $0.id, name: $0.name, isUnused: true) }
+                case .performers:
+                    unused = try await cleanupRepository.fetchEveryPerformer().filter(\.isUnused)
+                case .studios:
+                    unused = try await cleanupRepository.fetchEveryStudio().filter(\.isUnused)
+                }
                 await MainActor.run {
                     guard !unused.isEmpty else {
-                        showResult(title: "Remove Unused Tags", message: "No unused tags found.")
+                        showResult(title: kind.title, message: "No unused \(kind.noun) found.")
                         return
                     }
-                    unusedTags = unused
-                    showUnusedTagsConfirmation = true
+                    cleanupCandidates = unused
+                    showCleanupConfirmation = true
                 }
             } catch {
-                AppLog.error("❌ Scanning tags failed: \(error.localizedDescription)")
+                AppLog.error("❌ Scanning \(kind.noun) failed: \(error.localizedDescription)")
                 await MainActor.run {
-                    showResult(title: "Remove Unused Tags", message: "Could not load the tag list.")
+                    showResult(title: kind.title, message: "Could not load the \(kind.noun) list.")
                 }
             }
         }
     }
 
-    private func deleteUnusedTags() {
-        let ids = unusedTags.map(\.id)
+    private func deleteUnused() {
+        let kind = cleanupKind
+        let ids = cleanupCandidates.map(\.id)
         let count = ids.count
         Task {
             do {
-                let ok = try await tagRepository.deleteTags(ids: ids)
+                let ok: Bool
+                switch kind {
+                case .tags: ok = try await tagRepository.deleteTags(ids: ids)
+                case .performers: ok = try await cleanupRepository.deletePerformers(ids: ids)
+                case .studios: ok = try await cleanupRepository.deleteStudios(ids: ids)
+                }
                 await MainActor.run {
-                    unusedTags = []
-                    // Gelöschte Tags dürfen in Filter-Pickern nicht weiterleben.
+                    cleanupCandidates = []
+                    // Gelöschte Einträge dürfen in Filter-Pickern nicht weiterleben.
                     FilterPickerOptionsStore.shared.invalidate()
                     showResult(
-                        title: "Remove Unused Tags",
-                        message: ok ? "\(count) unused tags deleted." : "The server rejected the deletion."
+                        title: kind.title,
+                        message: ok ? "\(count) unused \(kind.noun) deleted." : "The server rejected the deletion."
                     )
                 }
             } catch {
-                AppLog.error("❌ Deleting unused tags failed: \(error.localizedDescription)")
+                AppLog.error("❌ Deleting unused \(kind.noun) failed: \(error.localizedDescription)")
                 await MainActor.run {
-                    unusedTags = []
-                    showResult(title: "Remove Unused Tags", message: "Could not delete the tags.")
+                    cleanupCandidates = []
+                    showResult(title: kind.title, message: "Could not delete the \(kind.noun).")
                 }
             }
         }

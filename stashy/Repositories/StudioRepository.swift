@@ -280,3 +280,126 @@ private struct StudiosDestroyResponse: Codable {
     let data: DataPart?
 }
 
+
+// MARK: - Library cleanup (unused performers / studios)
+
+/// Ein Eintrag, den die Aufräum-Funktion löschen würde: nur Name und ob er
+/// irgendwo verknüpft ist. Die Zähler kommen direkt aus `find*`.
+struct LibraryCleanupCandidate: Identifiable, Equatable {
+    let id: String
+    let name: String
+    let isUnused: Bool
+}
+
+/// Findet und löscht Performer und Studios, an denen nichts mehr hängt. Tags
+/// laufen über `TagRepository`. Server, die `group_count` noch nicht kennen,
+/// bekommen die schmale Abfrage ohne Gruppen-Zähler.
+final class LibraryCleanupRepository {
+    private let graphQLClient: GraphQLClient
+
+    init(graphQLClient: GraphQLClient = .shared) {
+        self.graphQLClient = graphQLClient
+    }
+
+    private struct Counted: Codable {
+        struct Ref: Codable { let id: String }
+        let id: String
+        let name: String
+        let scene_count: Int?
+        let image_count: Int?
+        let gallery_count: Int?
+        let performer_count: Int?
+        let group_count: Int?
+        let child_studios: [Ref]?
+
+        var candidate: LibraryCleanupCandidate {
+            let unused = (scene_count ?? 0) == 0
+                && (image_count ?? 0) == 0
+                && (gallery_count ?? 0) == 0
+                && (performer_count ?? 0) == 0
+                && (group_count ?? 0) == 0
+                && (child_studios ?? []).isEmpty
+            return LibraryCleanupCandidate(id: id, name: name, isUnused: unused)
+        }
+    }
+
+    private struct PerformersPage: Codable {
+        struct Data: Codable {
+            struct Find: Codable { let count: Int; let performers: [Counted] }
+            let findPerformers: Find
+        }
+        let data: Data?
+    }
+
+    private struct StudiosPage: Codable {
+        struct Data: Codable {
+            struct Find: Codable { let count: Int; let studios: [Counted] }
+            let findStudios: Find
+        }
+        let data: Data?
+    }
+
+    private struct DestroyResponse: Codable {
+        let data: [String: Bool?]?
+    }
+
+    func fetchEveryPerformer() async throws -> [LibraryCleanupCandidate] {
+        try await fetchAll(full: "cleanupPerformers", basic: "cleanupPerformersBasic") { (page: PerformersPage) in
+            (page.data?.findPerformers.performers ?? [], page.data?.findPerformers.count ?? 0)
+        }
+    }
+
+    func fetchEveryStudio() async throws -> [LibraryCleanupCandidate] {
+        try await fetchAll(full: "cleanupStudios", basic: "cleanupStudiosBasic") { (page: StudiosPage) in
+            (page.data?.findStudios.studios ?? [], page.data?.findStudios.count ?? 0)
+        }
+    }
+
+    func deletePerformers(ids: [String]) async throws -> Bool {
+        try await destroy(mutation: "performersDestroy", ids: ids)
+    }
+
+    func deleteStudios(ids: [String]) async throws -> Bool {
+        try await destroy(mutation: "studiosDestroy", ids: ids)
+    }
+
+    private func destroy(mutation: String, ids: [String]) async throws -> Bool {
+        guard !ids.isEmpty else { return true }
+        let query = GraphQLQueries.loadQuery(named: mutation)
+        let response: DestroyResponse = try await graphQLClient.execute(query: query, variables: ["ids": ids])
+        return response.data?[mutation] as? Bool ?? false
+    }
+
+    private func fetchAll<Page: Decodable>(
+        full: String, basic: String,
+        unpack: @escaping (Page) -> ([Counted], Int)
+    ) async throws -> [LibraryCleanupCandidate] {
+        var queryName = full
+        var collected: [Counted] = []
+        var page = 1
+        let perPage = 500
+
+        while true {
+            let query = GraphQLQueries.loadQuery(named: queryName)
+            let variables: [String: Any] = ["page": page, "perPage": perPage]
+            let result: ([Counted], Int)
+            do {
+                let response: Page = try await graphQLClient.execute(query: query, variables: variables)
+                result = unpack(response)
+            } catch where queryName == full {
+                // Älterer Server ohne `group_count`: von vorn mit der schmalen Abfrage.
+                AppLog.error("⚠️ \(full) failed, falling back to \(basic): \(error.localizedDescription)")
+                queryName = basic
+                collected = []
+                page = 1
+                continue
+            }
+            collected.append(contentsOf: result.0)
+            if result.0.count < perPage { break }
+            if result.1 > 0 && collected.count >= result.1 { break }
+            page += 1
+            if page > 60 { break }
+        }
+        return collected.map(\.candidate)
+    }
+}

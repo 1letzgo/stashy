@@ -1,0 +1,6 @@
+query CleanupPerformers($page: Int!, $perPage: Int!) {
+  findPerformers(filter: { page: $page, per_page: $perPage, sort: "name", direction: ASC }) {
+    count
+    performers { id name scene_count image_count gallery_count group_count }
+  }
+}
