@@ -103,6 +103,19 @@ class NavigationCoordinator: ObservableObject {
         if let raw = UserDefaults.standard.string(forKey: "stashyDebugToolsSubTab"), !raw.isEmpty {
             toolsSubTab = raw
         }
+        // `-stashyDebugGraphQL "{ version { version } }"` runs one raw query against the
+        // active server after launch and logs the response (dev aid for schema checks).
+        if let query = UserDefaults.standard.string(forKey: "stashyDebugGraphQL"), !query.isEmpty {
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                do {
+                    let data = try await GraphQLClient.shared.executeRaw(query: query, variables: [:])
+                    AppLog.debug("[DebugGraphQL] \(String(data: data, encoding: .utf8) ?? "<binary>")")
+                } catch {
+                    AppLog.debug("[DebugGraphQL] error: \(error)")
+                }
+            }
+        }
         #endif
         
         // Listen for server changes to reset all stacks

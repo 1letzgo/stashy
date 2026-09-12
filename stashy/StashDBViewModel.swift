@@ -6713,14 +6713,61 @@ class StashDBViewModel: ObservableObject {
     
     // MARK: - Library Actions
     
-    func triggerLibraryScan(completion: @escaping (Bool, String) -> Void) {
-        let scanMutation = GraphQLQueries.metadataScanMutation
+    /// Felder von `ScanMetadataInput`, die aus den Server-Defaults übernommen werden.
+    private static let scanOptionKeys: Set<String> = [
+        "rescan", "scanGenerateCovers", "scanGeneratePreviews", "scanGenerateImagePreviews",
+        "scanGenerateSprites", "scanGeneratePhashes", "scanGenerateImagePhashes",
+        "scanGenerateThumbnails", "scanGenerateClipPreviews"
+    ]
 
-        performGraphQLQuery(query: scanMutation) { (response: GenericMutationResponse?) in
-            if response != nil {
-                completion(true, "Library scan started successfully!")
-            } else {
-                completion(false, "Failed to start library scan. Please check your server configuration.")
+    /// Scan-Optionen, wie sie der Server unter Settings › Library › Scan gespeichert
+    /// hat. Neuere Stash-Versionen legen sie in `configuration.ui.taskDefaults.scan`
+    /// ab, ältere in `configuration.defaults.scan`. Ohne sie würde
+    /// `metadataScan(input: {})` mit den Stash-Defaults laufen und alles ignorieren,
+    /// was der Nutzer dort ein- oder ausgeschaltet hat.
+    private func fetchServerScanOptions() async -> [String: Bool] {
+        let query = GraphQLQueries.loadQuery(named: "configurationScanDefaults")
+        guard let data = try? await GraphQLClient.shared.executeRaw(query: query, variables: [:]),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let configuration = (json["data"] as? [String: Any])?["configuration"] as? [String: Any]
+        else { return [:] }
+
+        func bools(_ dict: Any?) -> [String: Bool] {
+            guard let dict = dict as? [String: Any] else { return [:] }
+            var out: [String: Bool] = [:]
+            for (key, value) in dict where Self.scanOptionKeys.contains(key) {
+                if let flag = value as? Bool { out[key] = flag }
+            }
+            return out
+        }
+
+        let ui = configuration["ui"] as? [String: Any]
+        let fromUI = bools((ui?["taskDefaults"] as? [String: Any])?["scan"])
+        if !fromUI.isEmpty { return fromUI }
+        return bools((configuration["defaults"] as? [String: Any])?["scan"])
+    }
+
+    /// Startet den Library-Scan mit den Scan-Optionen des Servers (Settings › Library
+    /// › Scan). Sind keine gespeichert, läuft der Scan mit `{}` wie bisher.
+    func triggerLibraryScan(completion: @escaping (Bool, String) -> Void) {
+        Task { @MainActor in
+            let options = await fetchServerScanOptions()
+            let scanQuery = GraphQLQueries.loadQuery(named: "metadataScan")
+            let body: [String: Any] = ["query": scanQuery, "variables": ["input": options]]
+            guard let bodyData = try? JSONSerialization.data(withJSONObject: body),
+                  let bodyString = String(data: bodyData, encoding: .utf8) else {
+                completion(false, "Failed to build scan request.")
+                return
+            }
+
+            self.performGraphQLQuery(query: bodyString) { (response: GenericMutationResponse?) in
+                if let jobId = response?.data?["metadataScan"], !jobId.isEmpty {
+                    let enabled = options.values.filter { $0 }.count
+                    let suffix = options.isEmpty ? "" : " (\(enabled) server options applied)"
+                    completion(true, "Library scan started successfully!" + suffix)
+                } else {
+                    completion(false, "Failed to start library scan. Please check your server configuration.")
+                }
             }
         }
     }

@@ -1,0 +1,3 @@
+mutation MetadataScan($input: ScanMetadataInput!) {
+  metadataScan(input: $input)
+}

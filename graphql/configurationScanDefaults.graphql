@@ -1,0 +1,17 @@
+query ConfigurationScanDefaults {
+  configuration {
+    ui
+    defaults {
+      scan {
+        rescan
+        scanGenerateCovers
+        scanGeneratePreviews
+        scanGenerateImagePreviews
+        scanGenerateSprites
+        scanGeneratePhashes
+        scanGenerateThumbnails
+        scanGenerateClipPreviews
+      }
+    }
+  }
+}

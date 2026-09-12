@@ -309,12 +309,6 @@ class GraphQLQueries {
         }
         """
 
-    static let metadataScanMutation = """
-        {
-          "query": "mutation { metadataScan(input: {}) }"
-        }
-        """
-
     static let sceneAddPlayMutation = """
         mutation SceneAddPlay($id: ID!, $times: [Timestamp!]) {
           sceneAddPlay(id: $id, times: $times) {
