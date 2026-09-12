@@ -341,9 +341,9 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             if let text = engine.currentSubtitleText, !text.isEmpty {
                 VStack {
                     Spacer()
-                    // Style comes from Settings → Playback → Subtitles (set on iOS, shared store).
+                    // Look comes from Settings → Playback → Subtitles (tvOS: Settings › Subtitles).
                     StashySubtitleText(text: text,
-                                       scale: 2.1,
+                                       scale: TVSubtitleMetrics.playerScale,
                                        style: TabManager.shared.subtitleStyle)
                         .padding(.horizontal, 80)
                         .padding(.bottom, showTransport ? 260 : 90)

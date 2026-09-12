@@ -16,6 +16,7 @@ import UIKit
 private enum TVSettingsEntry: Hashable {
     case servers, appearance, security, stashyPlus
     case defaultSort, defaultFilters, visibleTabs
+    case subtitles
     case sidebar
     case maintenance
     case about
@@ -29,6 +30,7 @@ private enum TVSettingsEntry: Hashable {
         case .defaultSort: return "Default Sorting"
         case .defaultFilters: return "Default Filters"
         case .visibleTabs: return "Visible Tabs"
+        case .subtitles: return "Subtitles"
         case .sidebar: return "Sidebar Navigation"
         case .maintenance: return "Maintenance"
         case .about: return "About"
@@ -44,6 +46,7 @@ private enum TVSettingsEntry: Hashable {
         case .defaultSort: return "arrow.up.arrow.down"
         case .defaultFilters: return "line.3.horizontal.decrease.circle"
         case .visibleTabs: return "rectangle.3.group.fill"
+        case .subtitles: return "captions.bubble.fill"
         case .sidebar: return "sidebar.leading"
         case .maintenance: return "internaldrive"
         case .about: return "info.circle"
@@ -66,6 +69,8 @@ private enum TVSettingsEntry: Hashable {
             return "A saved server filter to apply automatically when a section opens."
         case .visibleTabs:
             return "Hide sections you do not use. They disappear from the sidebar."
+        case .subtitles:
+            return "Turn subtitles on automatically, choose the language a scene should start with, and set how the cues look."
         case .sidebar:
             return "The left sidebar is the standard for Apple TV. Turn it off to go back to the classic tab bar along the top."
         case .maintenance:
@@ -133,6 +138,12 @@ struct TVSettingsView: View {
             }
 
             Section {
+                link(.subtitles)
+            } header: {
+                Text("Playback")
+            }
+
+            Section {
                 // Kein eigener Wert-Text: tvOS zeichnet den Toggle-Zustand
                 // rechts selbst an, sonst steht dort zweimal „On".
                 Toggle(isOn: $useSidebar) {
@@ -175,6 +186,7 @@ struct TVSettingsView: View {
         case .defaultSort: TVDefaultSortSettingsView()
         case .defaultFilters: TVDefaultFilterSettingsView()
         case .visibleTabs: TVTabVisibilitySettingsView()
+        case .subtitles: TVSubtitleSettingsView()
         case .maintenance: TVMaintenanceSettingsView()
         case .about: TVAboutSettingsView()
         // Kein Link, sondern ein Toggle in der Liste.
@@ -652,6 +664,183 @@ private struct TVTabVisibilitySettingsView: View {
             }
         }
         .tint(appearanceManager.tintColor)
+    }
+}
+
+// MARK: - Subtitles
+
+/// Untertitel-Defaults und -Look für tvOS. Schreibt genau dieselben
+/// UserDefaults-Keys wie die iOS-Seite (Settings → Playback → Subtitles), damit
+/// `TabManager.subtitleStyle` und der Auto-Pick in `AetherSceneEngine` hier
+/// identisch lesen. Zwei getrennte Stores (iPhone/Apple TV) — deshalb braucht
+/// die TV-App ihre eigene Oberfläche, nicht nur der Renderer.
+private struct TVSubtitleSettingsView: View {
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+    @ObservedObject private var tabManager = TabManager.shared
+    /// Die Sprachliste ist zu lang für einen `confirmationDialog` — eigene Seite.
+    @State private var showingLanguagePicker = false
+
+    var body: some View {
+        List {
+            Section {
+                Toggle("Show subtitles automatically", isOn: $tabManager.subtitlesAutoEnabled)
+                    .tint(appearanceManager.tintColor)
+
+                Button {
+                    showingLanguagePicker = true
+                } label: {
+                    HStack {
+                        Text("Preferred language")
+                        Spacer()
+                        Text(languageLabel)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+            } header: {
+                Text("Defaults")
+            }
+
+            Section {
+                TVSettingsPickerRow(
+                    title: "Size",
+                    options: SubtitleFontSize.allCases.map { TVPickerOption($0, $0.label) },
+                    selection: $tabManager.subtitleFontSize
+                )
+
+                TVSettingsPickerRow(
+                    title: "Font",
+                    options: SubtitleFontFamily.allCases.map { TVPickerOption($0, $0.label) },
+                    selection: $tabManager.subtitleFontFamily
+                )
+
+                TVSettingsPickerRow(
+                    title: "Text color",
+                    options: SubtitleTextColorChoice.allCases.map { TVPickerOption($0, $0.label) },
+                    selection: $tabManager.subtitleTextColor
+                )
+
+                Toggle("Background box", isOn: $tabManager.subtitleBoxEnabled)
+                    .tint(appearanceManager.tintColor)
+
+                TVSettingsPickerRow(
+                    title: "Background color",
+                    options: SubtitleBackgroundChoice.allCases.map { TVPickerOption($0, $0.label) },
+                    selection: $tabManager.subtitleBackgroundColor
+                )
+                .disabled(!tabManager.subtitleBoxEnabled)
+            } header: {
+                Text("Appearance")
+            }
+
+            Section {
+                preview
+            } header: {
+                Text("Preview")
+            }
+        }
+        .fullScreenCover(isPresented: $showingLanguagePicker) {
+            TVSubtitleLanguagePickerView(selection: $tabManager.subtitlePreferredLanguage)
+        }
+        .tvSettingsPage("Subtitles",
+                        description: "Subtitles start on the preferred language as soon as a scene's tracks are known. The look applies to every player on this Apple TV.")
+    }
+
+    private var languageLabel: String {
+        let code = SubtitlePreferredLanguage.normalized(tabManager.subtitlePreferredLanguage)
+        return SubtitlePreferredLanguage.pickerOptions().first { $0.id == code }?.label ?? "Any"
+    }
+
+    /// Cue wie der Player ihn zeichnet — mit demselben TV-Scale, damit die
+    /// Größenwahl hier so aussieht wie später im Vollbild.
+    private var preview: some View {
+        ZStack {
+            LinearGradient(colors: [Color(white: 0.22), Color(white: 0.06)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+            StashySubtitleText(text: "Sample subtitle",
+                               scale: TVSubtitleMetrics.previewScale,
+                               lineLimit: 2,
+                               style: tabManager.subtitleStyle)
+                .padding(.horizontal, 24)
+                .frame(maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, 24)
+        }
+        .frame(height: 220)
+        .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+        .allowsHitTesting(false)
+        .focusable(false)
+        .accessibilityLabel("Subtitle preview")
+    }
+}
+
+/// Scale-Faktoren für die Untertitel auf tvOS an einer Stelle: Der Player
+/// zeichnet auf die volle 1920pt-Bühne, die Vorschau in eine 900pt-Spalte.
+enum TVSubtitleMetrics {
+    /// Vollbild-Player. 18pt (Medium) landen damit bei ~38pt auf 1080p.
+    static let playerScale: CGFloat = 2.1
+    /// Vorschau in den Settings — halbe Bühnenbreite, also halber Faktor.
+    static let previewScale: CGFloat = 1.2
+}
+
+/// Eigene Seite für die Sprachwahl: "Any", dann die gängigen Sprachen, dann
+/// der Rest. Ein `confirmationDialog` mit ~180 Zeilen wäre mit der
+/// Fernbedienung nicht bedienbar.
+private struct TVSubtitleLanguagePickerView: View {
+    @Binding var selection: String
+    @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+
+    private var options: [(id: String, label: String)] { SubtitlePreferredLanguage.pickerOptions() }
+
+    private var common: [(id: String, label: String)] {
+        let wanted = Set([SubtitlePreferredLanguage.anyValue] + SubtitlePreferredLanguage.commonCodes)
+        return options.filter { wanted.contains($0.id) }
+    }
+
+    private var rest: [(id: String, label: String)] {
+        let wanted = Set([SubtitlePreferredLanguage.anyValue] + SubtitlePreferredLanguage.commonCodes)
+        return options.filter { !wanted.contains($0.id) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                Section {
+                    ForEach(common, id: \.id) { option in
+                        row(option)
+                    }
+                } header: {
+                    Text("Common")
+                }
+
+                Section {
+                    ForEach(rest, id: \.id) { option in
+                        row(option)
+                    }
+                } header: {
+                    Text("All Languages")
+                }
+            }
+            .tvSettingsPage("Preferred Language",
+                            description: "The language a scene's subtitles start with. \"Any\" takes the first ordinary track in the file.")
+        }
+        .background(Color.appBackground)
+    }
+
+    private func row(_ option: (id: String, label: String)) -> some View {
+        let isSelected = SubtitlePreferredLanguage.normalized(selection) == option.id
+        return Button {
+            selection = option.id
+            dismiss()
+        } label: {
+            HStack {
+                Text(option.label)
+                Spacer()
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .foregroundColor(appearanceManager.tintColor)
+                }
+            }
+        }
     }
 }
 
