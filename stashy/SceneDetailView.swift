@@ -626,16 +626,9 @@ struct SceneDetailView: View {
                 refreshSceneDetails()
             }
         }
-        // Best effort: an attached keyboard (iPad / Mac) skips ±15 s. Deliberately without
-        // `.focusable()` — that steals the taps the transport needs.
-        .onKeyPress(.leftArrow) {
-            skipFullscreen(by: -15)
-            return .handled
-        }
-        .onKeyPress(.rightArrow) {
-            skipFullscreen(by: 15)
-            return .handled
-        }
+        // No `onKeyPress` here: the key handlers on the cover sat in the keyboard event chain
+        // of the add-marker sheet and froze the app in landscape as soon as the keyboard
+        // came up. (The ±15 s arrow-key skip for hardware keyboards went with it.)
     }
 
     private func configureExtrasController() {
@@ -657,13 +650,6 @@ struct SceneDetailView: View {
             captionTranslator: captionTranslator
         )
         #endif
-    }
-
-    private func skipFullscreen(by delta: Double) {
-        guard let aether = aetherEngine else { return }
-        let duration = aether.duration
-        let raw = aether.currentTime + delta
-        seekTo(duration > 0 ? min(max(0, raw), duration) : max(0, raw))
     }
 
     private var lifecycleModifier: SceneDetailLifecycleModifier {
