@@ -271,6 +271,10 @@ struct AetherSceneSurface: View {
     private var skipButtonSize: CGFloat { isCompact ? 44 : 66 }
     private var playButtonSize: CGFloat { isCompact ? 64 : 96 }
     private var centerSpacing: CGFloat { isCompact ? 24 : 70 }
+    /// Fullscreen in landscape has no top/bottom safe area, so the rows would hug the screen
+    /// edge and read as cut off; give them room there. Inline keeps the tight 12pt.
+    private var fullscreenEdgePadding: CGFloat { isFullscreen ? 24 : 12 }
+
     private var chromeButtonSize: CGFloat { isCompact ? 34 : 42 }
     private var showsVolumeSlider: Bool { !isCompact }
 
@@ -311,7 +315,7 @@ struct AetherSceneSurface: View {
                     volumeControls
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, 12)
+                .padding(.top, fullscreenEdgePadding)
                 Spacer()
             }
             .autoHiding(areControlsVisible)
@@ -332,7 +336,7 @@ struct AetherSceneSurface: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, 12)
+                .padding(.bottom, fullscreenEdgePadding)
             }
             .autoHiding(areControlsVisible)
         }

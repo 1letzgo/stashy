@@ -34,10 +34,11 @@ struct AetherTimeBar: View {
         let duration = max(self.duration, 0)
         let displayedTime = max(0, currentTime)
         let remaining = max(0, duration - displayedTime)
+        // Labels reserve the width of the longest value the scene can show, so the track does
+        // not jump when the elapsed time gains a digit (9:59 → 10:00).
+        let template = AetherTimeBar.widestLabel(for: duration)
         HStack(spacing: 12) {
-            Text(AetherTimeBar.formatTime(displayedTime))
-                .font(.system(size: isCompact ? 10 : 12, weight: .semibold).monospacedDigit())
-                .foregroundStyle(.white.opacity(0.7))
+            timeLabel(AetherTimeBar.formatTime(displayedTime), template: template)
 
             GeometryReader { geo in
                 let width = max(geo.size.width, 1)
@@ -78,9 +79,7 @@ struct AetherTimeBar: View {
             }
             .frame(maxHeight: .infinity)
 
-            Text("-\(AetherTimeBar.formatTime(remaining))")
-                .font(.system(size: isCompact ? 10 : 12, weight: .semibold).monospacedDigit())
-                .foregroundStyle(.white.opacity(0.7))
+            timeLabel("-\(AetherTimeBar.formatTime(remaining))", template: "-" + template)
         }
         .padding(.horizontal, 16)
         .frame(height: barHeight)
@@ -142,6 +141,28 @@ struct AetherTimeBar: View {
     }
 
     /// `h:mm:ss` ab einer Stunde, sonst `m:ss`.
+    /// Fixed-width label: the template sits invisibly underneath and defines the frame.
+    private func timeLabel(_ text: String, template: String) -> some View {
+        Text(template)
+            .font(.system(size: isCompact ? 10 : 12, weight: .semibold).monospacedDigit())
+            .hidden()
+            .overlay(
+                Text(text)
+                    .font(.system(size: isCompact ? 10 : 12, weight: .semibold).monospacedDigit())
+                    .foregroundStyle(.white.opacity(0.7))
+                    .lineLimit(1)
+                    .fixedSize()
+            )
+    }
+
+    /// `0:00` / `00:00` / `0:00:00` … — the widest string `formatTime` can produce for this duration.
+    static func widestLabel(for duration: Double) -> String {
+        if duration >= 36000 { return "00:00:00" }
+        if duration >= 3600 { return "0:00:00" }
+        if duration >= 600 { return "00:00" }
+        return "0:00"
+    }
+
     static func formatTime(_ seconds: Double) -> String {
         guard seconds.isFinite, seconds >= 0 else { return "0:00" }
         let total = Int(seconds)
