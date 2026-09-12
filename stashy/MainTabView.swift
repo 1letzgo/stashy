@@ -520,6 +520,10 @@ struct ToolsServerView: View {
     /// Gefundene ungenutzte Tags, warten auf die Bestätigung.
     @State private var unusedTags: [Tag] = []
     @State private var showUnusedTagsConfirmation = false
+    /// Server-Job-Queue, alle 2 s aktualisiert, solange die Seite sichtbar ist.
+    @State private var jobs: [StashQueuedJob] = []
+    @State private var jobsLoaded = false
+    @State private var stoppingJobIds: Set<String> = []
 
     private let tagRepository = TagRepository()
 
@@ -529,6 +533,11 @@ struct ToolsServerView: View {
         Group {
             if activeServer != nil {
                 List {
+                    Section {
+                        stashyScrollingSectionHeader("Jobs")
+                        jobsBlock
+                    }
+
                     Section {
                         stashyScrollingSectionHeader("Scan & Identify")
                         taskRow(label: "Scan Library", icon: "arrow.triangle.2.circlepath", taskId: "scan", index: 0, count: 2) {
@@ -666,8 +675,142 @@ struct ToolsServerView: View {
                 viewModel.testConnection()
             }
         }
+        // Job-Queue wie im Web-UI: solange die Seite sichtbar ist, alle 2 s nachfragen.
+        .task(id: activeServer?.id) {
+            guard activeServer != nil else { return }
+            while !Task.isCancelled {
+                await refreshJobs()
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+            }
+        }
     }
     
+    // MARK: - Jobs
+
+    @ViewBuilder
+    private var jobsBlock: some View {
+        if jobs.isEmpty {
+            HStack {
+                Label {
+                    Text(jobsLoaded ? "No jobs running" : "Loading jobs…")
+                        .foregroundColor(.secondary)
+                } icon: {
+                    Image(systemName: "tray")
+                        .foregroundColor(.secondary)
+                        .frame(width: 24, alignment: .center)
+                }
+                Spacer()
+            }
+            .stashyGroupedBlockRow(index: 0, count: 1)
+        } else {
+            ForEach(Array(jobs.enumerated()), id: \.element.id) { index, job in
+                jobRow(job, index: index, count: jobs.count)
+            }
+        }
+    }
+
+    private func jobRow(_ job: StashQueuedJob, index: Int, count: Int) -> some View {
+        HStack(alignment: .center, spacing: 12) {
+            jobStatusIcon(job)
+                .frame(width: 24, alignment: .center)
+
+            VStack(alignment: .leading, spacing: 4) {
+                Text(job.description ?? "Job \(job.id)")
+                    .foregroundColor(.primary)
+                    .lineLimit(2)
+                if let detail = jobDetailLine(job) {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                }
+                if job.isRunning, let progress = job.progress, progress >= 0 {
+                    ProgressView(value: min(max(progress, 0), 1))
+                        .tint(appearanceManager.tintColor)
+                }
+            }
+
+            Spacer(minLength: 0)
+
+            if job.isRunning, let progress = job.progress, progress >= 0 {
+                Text("\(Int((min(max(progress, 0), 1) * 100).rounded()))%")
+                    .font(.caption.monospacedDigit())
+                    .foregroundColor(.secondary)
+            }
+
+            if job.isActive {
+                if stoppingJobIds.contains(job.id) || job.status == "STOPPING" {
+                    ProgressView()
+                        .padding(.trailing, 4)
+                } else {
+                    Button {
+                        stopJob(job)
+                    } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .foregroundColor(.secondary)
+                            .font(.title2)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Cancel \(job.description ?? "job")")
+                }
+            }
+        }
+        .stashyGroupedBlockRow(index: index, count: count)
+    }
+
+    @ViewBuilder
+    private func jobStatusIcon(_ job: StashQueuedJob) -> some View {
+        switch job.status {
+        case "RUNNING":
+            ProgressView()
+        case "READY":
+            Image(systemName: "clock")
+                .foregroundColor(appearanceManager.tintColor)
+        case "FINISHED":
+            Image(systemName: "checkmark.circle.fill")
+                .foregroundColor(.green)
+        case "FAILED":
+            Image(systemName: "exclamationmark.triangle.fill")
+                .foregroundColor(.red)
+        case "CANCELLED", "STOPPING":
+            Image(systemName: "stop.circle")
+                .foregroundColor(.secondary)
+        default:
+            Image(systemName: "circle")
+                .foregroundColor(.secondary)
+        }
+    }
+
+    private func jobDetailLine(_ job: StashQueuedJob) -> String? {
+        if let error = job.error, !error.isEmpty { return error }
+        if job.isRunning, let sub = job.subTasks?.first, !sub.isEmpty { return sub }
+        switch job.status {
+        case "READY": return "Queued"
+        case "STOPPING": return "Stopping…"
+        case "FINISHED": return "Finished"
+        case "CANCELLED": return "Cancelled"
+        case "FAILED": return "Failed"
+        default: return nil
+        }
+    }
+
+    private func refreshJobs() async {
+        guard let fetched = await viewModel.fetchJobQueue() else { return }
+        if fetched != jobs { jobs = fetched }
+        jobsLoaded = true
+        // Aufgeräumt, sobald der Server den Job nicht mehr führt.
+        stoppingJobIds = stoppingJobIds.filter { id in fetched.contains { $0.id == id } }
+    }
+
+    private func stopJob(_ job: StashQueuedJob) {
+        stoppingJobIds.insert(job.id)
+        Task {
+            let ok = await viewModel.stopJob(id: job.id)
+            if !ok { stoppingJobIds.remove(job.id) }
+            await refreshJobs()
+        }
+    }
+
     @ViewBuilder
     private func taskRow(label: String, icon: String, taskId: String, index: Int, count: Int, action: @escaping () -> Void) -> some View {
         HStack {
@@ -688,6 +831,9 @@ struct ToolsServerView: View {
                     runningTask = taskId
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
                         action()
+                    }
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                        Task { await refreshJobs() }
                     }
                 }) {
                     Image(systemName: "play.circle.fill")

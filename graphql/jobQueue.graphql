@@ -1,0 +1,13 @@
+query JobQueue {
+  jobQueue {
+    id
+    status
+    subTasks
+    description
+    progress
+    startTime
+    endTime
+    addTime
+    error
+  }
+}

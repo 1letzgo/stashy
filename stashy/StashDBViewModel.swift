@@ -6940,6 +6940,32 @@ class StashDBViewModel: ObservableObject {
         poll()
     }
 
+    /// Die komplette Job-Queue des Servers, laufende zuerst, dann wartende.
+    func fetchJobQueue() async -> [StashQueuedJob]? {
+        struct Response: Codable {
+            struct Data: Codable { let jobQueue: [StashQueuedJob]? }
+            let data: Data?
+        }
+        let query = GraphQLQueries.loadQuery(named: "jobQueue")
+        guard let data = try? await GraphQLClient.shared.executeRaw(query: query, variables: [:]),
+              let response = try? JSONDecoder().decode(Response.self, from: data)
+        else { return nil }
+        let rank: (StashQueuedJob) -> Int = { $0.isRunning ? 0 : ($0.status == "STOPPING" ? 1 : ($0.isQueued ? 2 : 3)) }
+        return (response.data?.jobQueue ?? []).sorted {
+            let (a, b) = (rank($0), rank($1))
+            return a != b ? a < b : (Int($0.id) ?? 0) < (Int($1.id) ?? 0)
+        }
+    }
+
+    /// Bricht einen laufenden oder wartenden Job ab.
+    func stopJob(id jobId: String) async -> Bool {
+        let query = GraphQLQueries.loadQuery(named: "stopJob")
+        guard let data = try? await GraphQLClient.shared.executeRaw(query: query, variables: ["id": jobId]),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
+        else { return false }
+        return ((json["data"] as? [String: Any])?["stopJob"] as? Bool) ?? false
+    }
+
     private func fetchJob(id jobId: String, completion: @escaping (StashJob?) -> Void) {
         let query = GraphQLQueries.loadQuery(named: "findJob")
         let body: [String: Any] = ["query": query, "variables": ["input": ["id": jobId]]]
@@ -8420,6 +8446,25 @@ struct StashJob: Codable {
     let description: String?
     let progress: Double?
     let error: String?
+}
+
+/// Eintrag der Server-Job-Queue (`jobQueue`): laufende, wartende und gerade
+/// beendete Tasks, wie sie das Web-UI oben rechts anzeigt.
+struct StashQueuedJob: Codable, Identifiable, Equatable {
+    let id: String
+    let status: String
+    let subTasks: [String]?
+    let description: String?
+    let progress: Double?
+    let startTime: String?
+    let endTime: String?
+    let addTime: String?
+    let error: String?
+
+    var isRunning: Bool { status == "RUNNING" }
+    var isQueued: Bool { status == "READY" }
+    /// Läuft oder wartet — kann noch abgebrochen werden.
+    var isActive: Bool { isRunning || isQueued || status == "STOPPING" }
 }
 
 struct StashConfigurationResponse: Codable {
