@@ -1261,10 +1261,13 @@ struct AddMarkerSheet: View {
                     HStack {
                         Text("End Time (optional):")
                         Spacer()
+                        // No keyboard toolbar here: the SwiftUI `.keyboard` toolbar inside a
+                        // sheet over the fullscreen cover froze the app in landscape (layout
+                        // loop). The numbers-and-punctuation keyboard has its own Return key.
                         TextField("Seconds or MM:SS", text: $endTimeString)
                             .multilineTextAlignment(.trailing)
                             .keyboardType(.numbersAndPunctuation)
-                            .numericKeyboardDoneBar()
+                            .submitLabel(.done)
                     }
                 }
                 .listRowBackground(Color.secondaryAppBackground)
