@@ -597,7 +597,7 @@ struct SceneDetailView: View {
                         : "",
                     onToggleFullscreen: { isFullscreen = false },
                     isFullscreen: true,
-                    markerSeconds: (activeScene.sceneMarkers ?? []).map(\.seconds),
+                    markers: activeScene.timeBarMarkers,
                     onAddMarker: {
                         capturedMarkerTime = aetherEngine?.currentTime ?? 0
                         showingFullscreenAddMarkerSheet = true

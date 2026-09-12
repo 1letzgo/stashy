@@ -28,8 +28,9 @@ struct AetherSceneSurface: View {
     var onToggleFullscreen: (() -> Void)?
     /// Only drives the button's glyph — the host owns the actual presentation state.
     var isFullscreen: Bool = false
-    /// Marker positions (seconds) drawn as dots on the time bar. Empty hides them.
-    var markerSeconds: [Double] = []
+    /// Markers (start + title) drawn on the time bar and used by the marker jumps. Empty hides them.
+    var markers: [AetherTimeBarMarker] = []
+    private var markerSeconds: [Double] { markers.map(\.seconds) }
     /// Opens the host's add-marker flow at the current time. nil hides the button.
     var onAddMarker: (() -> Void)? = nil
     /// Host-provided rows for the "…" menu (Set Image, AI Subtitles, AI Motion, …).
@@ -879,7 +880,7 @@ struct AetherSceneSurface: View {
             duration: max(engine.duration, 0),
             isScrubbing: isScrubbing,
             previewImage: scrubPreviewImage,
-            markerSeconds: markerSeconds,
+            markers: markers,
             isCompact: isCompact,
             onScrubChanged: { seconds in
                 isScrubbing = true

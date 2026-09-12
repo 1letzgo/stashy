@@ -49,3 +49,17 @@ extension Scene {
         ].compactMap { signedURL($0) }
     }
 }
+
+#if !os(tvOS)
+extension Scene {
+    /// Markers for the player's time bar: start time plus the title, falling back to the
+    /// primary tag's name.
+    var timeBarMarkers: [AetherTimeBarMarker] {
+        (sceneMarkers ?? []).map { marker in
+            let title = marker.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return AetherTimeBarMarker(seconds: marker.seconds,
+                                       title: title.isEmpty ? marker.primaryTag?.name : title)
+        }
+    }
+}
+#endif

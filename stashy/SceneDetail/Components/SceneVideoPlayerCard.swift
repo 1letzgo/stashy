@@ -58,7 +58,7 @@ struct SceneVideoPlayerCard: View {
                                     ? subtitleController.currentText
                                     : "",
                                 onToggleFullscreen: { isFullscreen = true },
-                                markerSeconds: (activeScene.sceneMarkers ?? []).map(\.seconds),
+                                markers: activeScene.timeBarMarkers,
                                 onAddMarker: onAddMarker,
                                 extraMenuItems: { extrasController.menuItems() }
                             )

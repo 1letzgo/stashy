@@ -24,6 +24,9 @@ struct AetherTimeBar: View {
     var previewImage: UIImage?
     /// Marker-Positionen (Sekunden) als Punkte auf dem Track. Leer blendet sie aus.
     var markerSeconds: [Double] = []
+    /// Marker positions with titles: the dots take the accent colour and the scrub preview
+    /// names the marker the finger is in. Wins over `markerSeconds` when non-empty.
+    var markers: [AetherTimeBarMarker] = []
     var isCompact: Bool = false
     var onScrubChanged: (Double) -> Void
     var onScrubEnded: (Double) -> Void
@@ -89,17 +92,30 @@ struct AetherTimeBar: View {
     /// Ein kleiner Punkt pro Marker; Marker außerhalb der Laufzeit werden übersprungen.
     @ViewBuilder
     private func markerDots(barWidth: CGFloat, duration: Double) -> some View {
-        let dot: CGFloat = isCompact ? 5 : 6
-        ForEach(Array(markerSeconds.enumerated()), id: \.offset) { _, seconds in
+        let dot: CGFloat = isCompact ? 6 : 8
+        let tint = AppearanceManager.shared.tintColor
+        ForEach(Array(allMarkerSeconds.enumerated()), id: \.offset) { _, seconds in
             if seconds >= 0, seconds <= duration {
                 Circle()
-                    .fill(Color.white)
-                    .overlay(Circle().stroke(Color.black.opacity(0.35), lineWidth: 0.5))
+                    .fill(tint)
+                    .overlay(Circle().stroke(Color.white, lineWidth: 1))
+                    .shadow(color: .black.opacity(0.4), radius: 1, x: 0, y: 0.5)
                     .frame(width: dot, height: dot)
                     .offset(x: min(max(0, barWidth * CGFloat(seconds / duration) - dot / 2), barWidth - dot))
             }
         }
         .allowsHitTesting(false)
+    }
+
+    private var allMarkerSeconds: [Double] {
+        markers.isEmpty ? markerSeconds : markers.map(\.seconds)
+    }
+
+    /// The marker whose range holds `time` (a marker runs until the next one starts).
+    private func marker(at time: Double) -> AetherTimeBarMarker? {
+        let sorted = markers.sorted { $0.seconds < $1.seconds }
+        guard let index = sorted.lastIndex(where: { $0.seconds <= time }) else { return nil }
+        return sorted[index]
     }
 
     /// Schwebendes Still über dem Scrub-Daumen, an die Leiste geklemmt, damit es nie
@@ -134,6 +150,23 @@ struct AetherTimeBar: View {
             Text(AetherTimeBar.formatTime(time))
                 .font(.system(size: 10, weight: .semibold).monospacedDigit())
                 .foregroundStyle(.white)
+
+            // Which marker the finger is in.
+            if let marker = marker(at: time), let title = marker.title, !title.isEmpty {
+                HStack(spacing: 4) {
+                    Circle()
+                        .fill(AppearanceManager.shared.tintColor)
+                        .frame(width: 6, height: 6)
+                    Text(title)
+                        .font(.system(size: 10, weight: .semibold))
+                        .lineLimit(1)
+                }
+                .foregroundStyle(.white)
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(Color.black.opacity(0.6), in: Capsule())
+                .frame(maxWidth: previewWidth + 40)
+            }
         }
         .frame(width: previewWidth)
         .offset(x: center - half, y: -(previewHeight + 24))
@@ -173,6 +206,12 @@ struct AetherTimeBar: View {
             ? String(format: "%d:%02d:%02d", h, m, s)
             : String(format: "%d:%02d", m, s)
     }
+}
+
+/// A marker on the time bar: where it starts and what it is called.
+struct AetherTimeBarMarker: Equatable {
+    var seconds: Double
+    var title: String?
 }
 
 #endif
