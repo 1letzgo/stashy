@@ -72,8 +72,10 @@ extension Color {
         pillAccent(for: AppearanceManager.shared.currentTheme)
     }
 
+    /// Logo / image block of studio and tag cards — one step lighter than the card body so
+    /// the block reads as its own area instead of blending into the background.
     static func studioHeaderGray(for theme: AppTheme) -> Color {
-        theme == .darkBlue ? Color(hex: "#1E293B") : Color(red: 44/255.0, green: 44/255.0, blue: 46/255.0)
+        theme == .darkBlue ? Color(hex: "#2A3A52") : Color(red: 58/255.0, green: 58/255.0, blue: 60/255.0)
     }
 
     static var studioHeaderGray: Color {
