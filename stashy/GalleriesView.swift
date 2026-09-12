@@ -936,6 +936,8 @@ struct GalleryItemView: View {
                     if showUI { onInteraction() }
                 }, onLongPress: { pressing in
                     setFastForwarding(pressing)
+                }, onDoubleTap: { location in
+                    handleDoubleTapSkip(at: location)
                 }) {
                     if let engine {
                         AetherVideoSurface(
@@ -995,6 +997,29 @@ struct GalleryItemView: View {
         .ignoresSafeArea()
     }
 
+
+    /// Double tap on the outer thirds skips by the Settings › Playback interval; the middle
+    /// third keeps zooming.
+    private func handleDoubleTapSkip(at location: CGPoint) -> Bool {
+        guard image.isVideo, !isAnimatedImage, let engine else { return false }
+        let width = UIScreen.main.bounds.width
+        let third = width / 3
+        let delta: Double
+        if location.x < third {
+            delta = -TabManager.shared.playerSkipSeconds
+        } else if location.x > width - third {
+            delta = TabManager.shared.playerSkipSeconds
+        } else {
+            return false
+        }
+        HapticManager.light()
+        let duration = engine.duration
+        let raw = engine.currentTime + delta
+        let target = duration > 0 ? min(max(0, raw), duration) : max(0, raw)
+        Task { await engine.seek(to: target) }
+        onInteraction()
+        return true
+    }
 
     /// Same press-and-hold 2× as Feeds: only for videos, previous rate restored on release.
     private func setFastForwarding(_ active: Bool) {

@@ -5200,7 +5200,7 @@ extension ReelItemView {
     @ViewBuilder
     private var mediaLayer: some View {
         let bottomInset = immersiveBottomInset
-        ZoomableScrollView(isZoomed: $isZoomed, onTap: handleMediaTap, onLongPress: handleLongPress) {
+        ZoomableScrollView(isZoomed: $isZoomed, onTap: handleMediaTap, onLongPress: handleLongPress, onDoubleTap: handleDoubleTap) {
             ZStack {
                 Color.black
                 Group {
@@ -5265,6 +5265,29 @@ extension ReelItemView {
             isUIVisible.toggle()
         }
         onInteraction()
+    }
+
+    /// Double tap on the outer thirds of a video skips by the Settings › Playback interval
+    /// (like the scene player); the middle third keeps zooming.
+    private func handleDoubleTap(at location: CGPoint) -> Bool {
+        guard !item.isAnimated, item.videoURL != nil, let aether = aetherEngine else { return false }
+        let width = UIScreen.main.bounds.width
+        let third = width / 3
+        let delta: Double
+        if location.x < third {
+            delta = -TabManager.shared.playerSkipSeconds
+        } else if location.x > width - third {
+            delta = TabManager.shared.playerSkipSeconds
+        } else {
+            return false
+        }
+        HapticManager.light()
+        let duration = aether.duration
+        let raw = aether.currentTime + delta
+        let target = duration > 0 ? min(max(0, raw), duration) : max(0, raw)
+        Task { await aether.seek(to: target) }
+        onInteraction()
+        return true
     }
 
     private func handleLongPress(_ isPressed: Bool) {

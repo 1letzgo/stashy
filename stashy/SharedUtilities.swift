@@ -1037,12 +1037,16 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
     private var content: Content
     private var onTap: ((CGPoint) -> Void)?
     private var onLongPress: ((Bool) -> Void)?
+    /// Called with the window location first; returning `true` claims the double tap
+    /// (e.g. skip), `false` lets it zoom as usual.
+    private var onDoubleTap: ((CGPoint) -> Bool)?
     @Binding var isZoomed: Bool
     
-    init(isZoomed: Binding<Bool> = .constant(false), onTap: ((CGPoint) -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil, @ViewBuilder content: () -> Content) {
+    init(isZoomed: Binding<Bool> = .constant(false), onTap: ((CGPoint) -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil, onDoubleTap: ((CGPoint) -> Bool)? = nil, @ViewBuilder content: () -> Content) {
         self._isZoomed = isZoomed
         self.onTap = onTap
         self.onLongPress = onLongPress
+        self.onDoubleTap = onDoubleTap
         self.content = content()
     }
     
@@ -1094,6 +1098,7 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         context.coordinator.hostingController.rootView = content
         context.coordinator.onTap = onTap
         context.coordinator.onLongPress = onLongPress
+        context.coordinator.onDoubleTap = onDoubleTap
         context.coordinator.isZoomed = $isZoomed
         // Parent clears `isZoomed` on page/mode change — reset scale so pan pass-through works again.
         if !isZoomed, uiView.zoomScale != uiView.minimumZoomScale {
@@ -1102,7 +1107,7 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
     }
     
     func makeCoordinator() -> Coordinator {
-        Coordinator(hostingController: UIHostingController(rootView: content), isZoomed: $isZoomed, onTap: onTap, onLongPress: onLongPress)
+        Coordinator(hostingController: UIHostingController(rootView: content), isZoomed: $isZoomed, onTap: onTap, onLongPress: onLongPress, onDoubleTap: onDoubleTap)
     }
     
     class Coordinator: NSObject, UIScrollViewDelegate {
@@ -1110,12 +1115,14 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         var isZoomed: Binding<Bool>
         var onTap: ((CGPoint) -> Void)?
         var onLongPress: ((Bool) -> Void)?
+        var onDoubleTap: ((CGPoint) -> Bool)?
         
-        init(hostingController: UIHostingController<Content>, isZoomed: Binding<Bool>, onTap: ((CGPoint) -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil) {
+        init(hostingController: UIHostingController<Content>, isZoomed: Binding<Bool>, onTap: ((CGPoint) -> Void)? = nil, onLongPress: ((Bool) -> Void)? = nil, onDoubleTap: ((CGPoint) -> Bool)? = nil) {
             self.hostingController = hostingController
             self.isZoomed = isZoomed
             self.onTap = onTap
             self.onLongPress = onLongPress
+            self.onDoubleTap = onDoubleTap
         }
         
         func viewForZooming(in scrollView: UIScrollView) -> UIView? {
@@ -1154,6 +1161,10 @@ struct ZoomableScrollView<Content: View>: UIViewRepresentable {
         
         @objc func handleDoubleTap(_ gesture: UITapGestureRecognizer) {
             guard let scrollView = gesture.view as? UIScrollView else { return }
+            if scrollView.zoomScale <= scrollView.minimumZoomScale,
+               let onDoubleTap, onDoubleTap(gesture.location(in: gesture.view?.window)) {
+                return
+            }
             
             if scrollView.zoomScale > scrollView.minimumZoomScale {
                 scrollView.setZoomScale(scrollView.minimumZoomScale, animated: true)
