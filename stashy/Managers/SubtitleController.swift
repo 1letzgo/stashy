@@ -288,41 +288,18 @@ final class SubtitleController: ObservableObject {
         return nil
     }
 
+    /// Caption URL for a scene without needing a configured controller — the engine path
+    /// registers Stash's server captions as external subtitle tracks. Shared with tvOS.
+    static func captionURL(for caption: VideoCaption, scene: Scene) -> URL? {
+        StashCaptionURL.url(for: caption, scene: scene)
+    }
+
     private static func resolveCaptionBaseURL(_ path: String?) -> URL? {
-        guard let path = path?.trimmingCharacters(in: .whitespacesAndNewlines), !path.isEmpty else {
-            return nil
-        }
-        if path.hasPrefix("http://") || path.hasPrefix("https://"), let url = URL(string: path) {
-            return url
-        }
-        guard let config = ServerConfigManager.shared.activeConfig ?? ServerConfigManager.shared.loadConfig() else {
-            return URL(string: path)
-        }
-        let trimmed = path.hasPrefix("/") ? String(path.dropFirst()) : path
-        return URL(string: "\(config.baseURL)/\(trimmed)")
+        StashCaptionURL.resolveBase(path)
     }
 
     private static func fallbackCaptionBaseURL(sceneID: String) -> URL? {
-        guard let config = ServerConfigManager.shared.activeConfig ?? ServerConfigManager.shared.loadConfig() else {
-            return nil
-        }
-        return URL(string: "\(config.baseURL)/scene/\(sceneID)/caption")
-    }
-
-    /// Caption URL for a scene without needing a configured controller — the engine path
-    /// registers Stash's server captions as external subtitle tracks.
-    static func captionURL(for caption: VideoCaption, scene: Scene) -> URL? {
-        let base = resolveCaptionBaseURL(scene.paths?.caption)
-            ?? fallbackCaptionBaseURL(sceneID: scene.id)
-        guard let base, var components = URLComponents(url: base, resolvingAgainstBaseURL: false) else { return nil }
-        var items = (components.queryItems ?? []).filter {
-            let name = $0.name.lowercased()
-            return name != "lang" && name != "type" && name != "apikey"
-        }
-        items.append(URLQueryItem(name: "lang", value: caption.languageCode))
-        items.append(URLQueryItem(name: "type", value: caption.captionType))
-        components.queryItems = items
-        return signedURL(components.url)
+        StashCaptionURL.fallbackBase(sceneID: sceneID)
     }
 
     private static func parseCaptionFile(_ raw: String) -> [SubtitleCue] {

@@ -85,7 +85,8 @@ final class TVAetherPlaybackModel: ObservableObject {
                subtitle: String? = nil,
                artworkURL: URL? = nil,
                fallbackSources: [URL] = [],
-               fallbackDeclaredDuration: Double? = nil) {
+               fallbackDeclaredDuration: Double? = nil,
+               scene: Scene? = nil) {
         AppLog.debug("🚀 TV PLAYBACK: setup \(redactedURLString(url)) at \(startAt)s")
         self.sceneId = sceneId
         self.viewModel = viewModel
@@ -105,7 +106,11 @@ final class TVAetherPlaybackModel: ObservableObject {
         engine.fallbackDeclaredDuration = fallbackDeclaredDuration
 
         let start = max(0, startAt)
-        Task { await engine.load(url: url, startAt: start > 0.25 ? start : nil, autoplay: true) }
+        Task {
+            await engine.load(url: url, startAt: start > 0.25 ? start : nil, autoplay: true)
+            // Server captions (.srt sidecars) as subtitle tracks — iOS does the same.
+            if let scene { engine.registerCaptions(for: scene) }
+        }
     }
 
     /// Channel hand-over: same engine, next item. Keeps the session (and the HDMI display mode)
@@ -117,12 +122,14 @@ final class TVAetherPlaybackModel: ObservableObject {
                   subtitle: String? = nil,
                   artworkURL: URL? = nil,
                   fallbackSources: [URL] = [],
-                  fallbackDeclaredDuration: Double? = nil) {
+                  fallbackDeclaredDuration: Double? = nil,
+                  scene: Scene? = nil) {
         guard let engine else {
             setup(url: url, sceneId: sceneId, viewModel: viewModel,
                   title: title, subtitle: subtitle, artworkURL: artworkURL,
                   fallbackSources: fallbackSources,
-                  fallbackDeclaredDuration: fallbackDeclaredDuration)
+                  fallbackDeclaredDuration: fallbackDeclaredDuration,
+                  scene: scene)
             return
         }
         saveProgress()
@@ -138,7 +145,10 @@ final class TVAetherPlaybackModel: ObservableObject {
         engine.fallbackDeclaredDuration = fallbackDeclaredDuration
 
         engine.prepareForItemReplacement()
-        Task { await engine.load(url: url, startAt: nil, autoplay: true) }
+        Task {
+            await engine.load(url: url, startAt: nil, autoplay: true)
+            if let scene { engine.registerCaptions(for: scene) }
+        }
     }
 
     // MARK: - Now Playing

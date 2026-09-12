@@ -8,6 +8,56 @@
 
 import Foundation
 
+/// Stash's server-side captions (`.en.srt` next to the file) as URLs the engine can load —
+/// shared by the iOS scene detail and the tvOS player.
+enum StashCaptionURL {
+    static func url(for caption: VideoCaption, scene: Scene) -> URL? {
+        let base = resolveBase(scene.paths?.caption) ?? fallbackBase(sceneID: scene.id)
+        guard let base, var components = URLComponents(url: base, resolvingAgainstBaseURL: false) else { return nil }
+        var items = (components.queryItems ?? []).filter {
+            let name = $0.name.lowercased()
+            return name != "lang" && name != "type" && name != "apikey"
+        }
+        items.append(URLQueryItem(name: "lang", value: caption.languageCode))
+        items.append(URLQueryItem(name: "type", value: caption.captionType))
+        components.queryItems = items
+        return signedURL(components.url)
+    }
+
+    static func resolveBase(_ path: String?) -> URL? {
+        guard let path = path?.trimmingCharacters(in: .whitespacesAndNewlines), !path.isEmpty else { return nil }
+        if path.hasPrefix("http://") || path.hasPrefix("https://"), let url = URL(string: path) { return url }
+        guard let config = ServerConfigManager.shared.activeConfig ?? ServerConfigManager.shared.loadConfig() else {
+            return URL(string: path)
+        }
+        let trimmed = path.hasPrefix("/") ? String(path.dropFirst()) : path
+        return URL(string: "\(config.baseURL)/\(trimmed)")
+    }
+
+    static func fallbackBase(sceneID: String) -> URL? {
+        guard let config = ServerConfigManager.shared.activeConfig ?? ServerConfigManager.shared.loadConfig() else { return nil }
+        return URL(string: "\(config.baseURL)/scene/\(sceneID)/caption")
+    }
+}
+
+#if canImport(AetherEngine)
+extension AetherSceneEngine {
+    /// Registers the scene's server captions as external subtitle tracks. Call after `load`;
+    /// republishes `subtitleTracks`, so the automatic selection can pick one.
+    func registerCaptions(for scene: Scene) {
+        guard let captions = scene.captions, !captions.isEmpty else { return }
+        for caption in captions {
+            guard let url = StashCaptionURL.url(for: caption, scene: scene) else { continue }
+            let language = caption.languageCode.isEmpty || caption.languageCode == "00" ? nil : caption.languageCode
+            let name = language.flatMap { Locale.current.localizedString(forIdentifier: $0) }
+                ?? language?.uppercased()
+                ?? "Captions"
+            _ = addExternalSubtitleTrack(url: url, name: name, language: language, formatHint: caption.captionType)
+        }
+    }
+}
+#endif
+
 extension Scene {
     /// Original-file URL for the playback engine, or nil when no source is known.
     var aetherVideoURL: URL? {
