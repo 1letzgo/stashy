@@ -156,15 +156,10 @@ struct AetherTimeBar: View {
 
             // Which marker the finger is in.
             if let marker = marker(at: time), let title = marker.title, !title.isEmpty {
-                HStack(spacing: 4) {
-                    Circle()
-                        .fill(AppearanceManager.shared.tintColor)
-                        .frame(width: 6, height: 6)
-                    Text(title)
-                        .font(.system(size: 10, weight: .semibold))
-                        .lineLimit(1)
-                }
-                .foregroundStyle(.white)
+                Text(title)
+                    .font(.system(size: 10, weight: .semibold))
+                    .lineLimit(1)
+                    .foregroundStyle(.white)
                 .padding(.horizontal, 7)
                 .padding(.vertical, 3)
                 .background(Color.black.opacity(0.6), in: Capsule())
