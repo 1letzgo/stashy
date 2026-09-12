@@ -239,6 +239,8 @@ struct TVSettingsView: View {
 struct TVSettingsPageChrome: ViewModifier {
     let title: String
     let description: String?
+    /// Optional unter der Beschreibung in der rechten Spalte, z.B. eine Vorschau.
+    var detail: AnyView? = nil
 
     /// Knapp halbe Bildbreite. Eine Einstellungszeile über die volle Breite ist
     /// der Hauptgrund, warum diese Seiten vorher nach iOS aussahen.
@@ -259,14 +261,22 @@ struct TVSettingsPageChrome: ViewModifier {
             .frame(width: Self.contentWidth)
             .focusSection()
 
-            if let description {
-                Text(description)
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: 620, alignment: .leading)
-                    // Auf Höhe der ersten Listenzeile, nicht des Titels.
-                    .padding(.top, 96)
+            if description != nil || detail != nil {
+                VStack(alignment: .leading, spacing: 32) {
+                    if let description {
+                        Text(description)
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                    if let detail {
+                        detail
+                    }
+                }
+                .frame(maxWidth: 620, alignment: .leading)
+                // Auf Höhe der ersten Listenzeile, nicht des Titels.
+                .padding(.top, 96)
+                .focusable(false)
             }
 
             Spacer(minLength: 0)
@@ -288,6 +298,12 @@ extension View {
     /// Titel + zweispaltiges Layout für eine Settings-Unterseite.
     func tvSettingsPage(_ title: String, description: String? = nil) -> some View {
         modifier(TVSettingsPageChrome(title: title, description: description))
+    }
+
+    func tvSettingsPage<Detail: View>(_ title: String, description: String? = nil,
+                                      @ViewBuilder detail: () -> Detail) -> some View {
+        modifier(TVSettingsPageChrome(title: title, description: description,
+                                      detail: AnyView(detail())))
     }
 }
 
@@ -731,18 +747,16 @@ private struct TVSubtitleSettingsView: View {
             } header: {
                 Text("Appearance")
             }
-
-            Section {
-                preview
-            } header: {
-                Text("Preview")
-            }
         }
         .fullScreenCover(isPresented: $showingLanguagePicker) {
             TVSubtitleLanguagePickerView(selection: $tabManager.subtitlePreferredLanguage)
         }
+        // Die Vorschau steht rechts neben der Liste: unter der Liste wäre sie nicht
+        // fokussierbar und damit nie ganz im Bild.
         .tvSettingsPage("Subtitles",
-                        description: "Subtitles start on the preferred language as soon as a scene's tracks are known. The look applies to every player on this Apple TV.")
+                        description: "Subtitles start on the preferred language as soon as a scene's tracks are known. The look applies to every player on this Apple TV.") {
+            preview
+        }
     }
 
     private var languageLabel: String {
@@ -764,7 +778,7 @@ private struct TVSubtitleSettingsView: View {
                 .frame(maxHeight: .infinity, alignment: .bottom)
                 .padding(.bottom, 24)
         }
-        .frame(height: 220)
+        .frame(width: 620, height: 300)
         .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
         .allowsHitTesting(false)
         .focusable(false)
@@ -777,8 +791,8 @@ private struct TVSubtitleSettingsView: View {
 enum TVSubtitleMetrics {
     /// Vollbild-Player. 18pt (Medium) landen damit bei ~38pt auf 1080p.
     static let playerScale: CGFloat = 2.1
-    /// Vorschau in den Settings — halbe Bühnenbreite, also halber Faktor.
-    static let previewScale: CGFloat = 1.2
+    /// Vorschau in den Settings — 620pt-Kachel, also gut ein Drittel der Bühne.
+    static let previewScale: CGFloat = 1.7
 }
 
 /// Eigene Seite für die Sprachwahl: "Any", dann die gängigen Sprachen, dann
