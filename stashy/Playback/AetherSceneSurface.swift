@@ -570,26 +570,26 @@ struct AetherSceneSurface: View {
             ?? UIApplication.shared.connectedScenes.compactMap({ $0 as? UIWindowScene }).first
         else { return }
         let target: UIInterfaceOrientationMask = scene.interfaceOrientation.isLandscape ? .portrait : .landscapeRight
-        // The override keeps the new orientation until the player leaves fullscreen; a bare
-        // geometry request alone snaps back on the next orientation pass.
-        AppDelegate.orientationOverride = target
-        scene.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations()
+        // Only the geometry request: the app's supported orientations stay `.all`. Narrowing
+        // them to one orientation crashed UIKit as soon as a sheet + keyboard came up in
+        // landscape ("no common orientation with the application"). With the device's
+        // orientation lock on there is no rotation event, so the new orientation holds anyway.
+        Self.didRotateInFullscreen = true
         scene.requestGeometryUpdate(.iOS(interfaceOrientations: target)) { error in
             AppLog.debug("Rotate request failed: \(error)")
         }
     }
 
-    /// Back to following the device once fullscreen goes away.
+    private static var didRotateInFullscreen = false
+
+    /// Back to portrait on the phone once fullscreen goes away, if the button rotated it.
     static func releaseOrientationOverride() {
-        guard AppDelegate.orientationOverride != .all else { return }
-        AppDelegate.orientationOverride = .all
-        let scenes = UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }
-        scenes.forEach { $0.keyWindow?.rootViewController?.setNeedsUpdateOfSupportedInterfaceOrientations() }
-        // With the device's lock on, the phone would otherwise stay in landscape after the
-        // player is gone; the rest of the app is a portrait UI there.
-        if UIDevice.current.userInterfaceIdiom == .phone {
-            scenes.forEach { $0.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { _ in } }
-        }
+        guard didRotateInFullscreen else { return }
+        didRotateInFullscreen = false
+        guard UIDevice.current.userInterfaceIdiom == .phone else { return }
+        UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .forEach { $0.requestGeometryUpdate(.iOS(interfaceOrientations: .portrait)) { _ in } }
     }
 
     /// Fullscreen only: the fill toggle. (Options live next to the volume capsule.)

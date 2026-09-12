@@ -622,6 +622,7 @@ struct SceneDetailView: View {
                 aetherEngine: aetherEngine,
                 viewModel: viewModel
             ) {
+                showingFullscreenAddMarkerSheet = false
                 refreshSceneDetails()
             }
         }
@@ -1384,8 +1385,11 @@ struct AddMarkerSheet: View {
                         self.seedMarkerThumbnailCache(marker: createdMarker, dataURL: frameDataURL)
                     }
 
-                    self.onComplete()
+                    // Dismiss first: `onComplete` refetches the scene and rebuilds the host,
+                    // which could leave the sheet standing when the environment dismiss
+                    // came second.
                     self.dismiss()
+                    self.onComplete()
 
                     // Persist on the server: Stash has no marker image upload field
                     // (unlike scene `cover_image`), so generate the still at start time.
