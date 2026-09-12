@@ -691,8 +691,7 @@ struct TagCardView: View {
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
         }
-        // Trial: glass card instead of the flat secondary fill.
-        .stashyGlass(shape: RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
         .cardShadow()
     }
