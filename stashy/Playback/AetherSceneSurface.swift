@@ -805,7 +805,8 @@ struct AetherSceneSurface: View {
                     .padding(.horizontal, isCompact ? 16 : 22)
                     .padding(.vertical, isCompact ? 10 : 14)
                     .stashyGlass(shape: Capsule())
-                    .padding(.top, isCompact ? 56 : 90)
+                    // Right under the top row, clear of the centre play/pause button.
+                    .padding(.top, isCompact ? 12 : 16)
                 Spacer()
             }
             .allowsHitTesting(false)
