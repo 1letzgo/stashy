@@ -116,6 +116,9 @@ struct AetherSceneSurface: View {
         }
         .onAppear {
             HardwareVolumeMonitor.shared.start()
+            // This surface draws cues, so it is the one that may auto-pick a track
+            // ("Show subtitles automatically"); card previews never set this.
+            engine.autoSelectsPreferredSubtitleTrack = true
             // The slider is the system volume, so it follows the hardware buttons. The
             // engine's own level is left alone: writing it here cleared the host's mute
             // (the volume setter un-mutes), so a muted scene started with sound.
@@ -207,6 +210,10 @@ struct AetherSceneSurface: View {
         return live.isEmpty ? nil : live
     }
 
+    /// Cue size multiplier: the configured point size is meant for the inline card, fullscreen
+    /// gets the same step up the rest of the chrome takes.
+    private var subtitleScale: CGFloat { isFullscreen ? 1.3 : 1 }
+
     /// The engine draws nothing itself: the host renders the cue covering the current source time.
     @ViewBuilder
     private var subtitleOverlay: some View {
@@ -217,14 +224,9 @@ struct AetherSceneSurface: View {
             if let text = displayedSubtitleText {
                 VStack {
                     Spacer()
-                    Text(text)
-                        .font(.system(size: 16, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(3)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(Color.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+                    StashySubtitleText(text: text,
+                                       scale: subtitleScale,
+                                       style: tabManager.subtitleStyle)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 14)
                         .transition(.opacity)

@@ -205,6 +205,8 @@ private struct TVAetherPlayerContent<Panel: View>: View {
         .onAppear {
             isPlayerFocused = true
             scheduleAutoHide()
+            // Diese Oberfläche zeichnet die Cues, also darf sie auch automatisch eine Spur wählen.
+            engine.autoSelectsPreferredSubtitleTrack = true
         }
         .onChange(of: engine.hasFirstFrame) { _, ready in
             if ready && !isPanelOpen { isPlayerFocused = true }
@@ -339,14 +341,10 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             if let text = engine.currentSubtitleText, !text.isEmpty {
                 VStack {
                     Spacer()
-                    Text(text)
-                        .font(.system(size: 38, weight: .semibold))
-                        .foregroundStyle(.white)
-                        .multilineTextAlignment(.center)
-                        .lineLimit(3)
-                        .padding(.horizontal, 26)
-                        .padding(.vertical, 14)
-                        .background(Color.black.opacity(0.55), in: RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    // Style comes from Settings → Playback → Subtitles (set on iOS, shared store).
+                    StashySubtitleText(text: text,
+                                       scale: 2.1,
+                                       style: TabManager.shared.subtitleStyle)
                         .padding(.horizontal, 80)
                         .padding(.bottom, showTransport ? 260 : 90)
                 }

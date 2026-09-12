@@ -235,6 +235,213 @@ enum SubtitleTargetLanguage {
               let b = b.flatMap({ languageCode(from: $0) }) else { return false }
         return a == b
     }
+
+    /// Exposes the language-name table (`"english"` → `"en"`) so callers can resolve a word
+    /// out of a track title without running the `prefix(2)` fallback on it (that turns
+    /// "forced" into Faroese).
+    static func aliasCode(forName name: String) -> String? {
+        languageAliases[name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()]
+    }
+}
+
+// MARK: - Subtitle defaults and styling (Settings → Playback)
+
+/// Which subtitle track a scene should start with. `any` takes the first available one.
+enum SubtitlePreferredLanguage {
+    static let anyValue = "any"
+
+    /// Languages most subtitle tracks carry, shown at the top of the picker.
+    static let commonCodes: [String] = ["en", "de", "es", "fr", "it", "pt", "nl", "ru", "ja", "zh", "ko"]
+
+    static func normalized(_ raw: String?) -> String {
+        guard let raw = raw?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(), !raw.isEmpty else {
+            return anyValue
+        }
+        if raw == anyValue { return anyValue }
+        return SubtitleTargetLanguage.canonicalCode(from: raw) ?? anyValue
+    }
+
+    /// "Any" first, then the common languages, then everything else by localized name.
+    static func pickerOptions(locale: Locale = .current) -> [(id: String, label: String)] {
+        var options: [(id: String, label: String)] = [(id: anyValue, label: "Any")]
+        let common = commonCodes
+        options += common.map { (id: $0, label: SubtitleTargetLanguage.displayName(for: $0, locale: locale)) }
+        let rest = Set(SubtitleTargetLanguage.selectableLanguageCodes).subtracting(common)
+        options += rest
+            .map { (id: $0, label: SubtitleTargetLanguage.displayName(for: $0, locale: locale)) }
+            .sorted { $0.label < $1.label }
+        return options
+    }
+
+    /// Does a track (its declared language and its title) speak the preferred language?
+    /// Accepts `de`, `de-DE`, `deu`/`ger` and plain names like "German" on either side.
+    static func matches(preferred code: String, language: String?, name: String?) -> Bool {
+        let normalizedCode = normalized(code)
+        guard normalizedCode != anyValue else { return true }
+        if let declared = SubtitleTargetLanguage.canonicalCode(from: language), declared == normalizedCode {
+            return true
+        }
+        guard let name, !name.isEmpty else { return false }
+        if let whole = SubtitleTargetLanguage.canonicalCode(from: name), whole == normalizedCode { return true }
+        // Titles read like "English SDH" or "ger (forced)", so every word is tried — short
+        // words as codes, longer ones only against the language-name table.
+        for token in name.lowercased().split(whereSeparator: { !$0.isLetter }) {
+            let word = String(token)
+            if word.count >= 4 {
+                if SubtitleTargetLanguage.aliasCode(forName: word) == normalizedCode { return true }
+            } else if word.count >= 2,
+                      SubtitleTargetLanguage.canonicalCode(from: word) == normalizedCode {
+                return true
+            }
+        }
+        return false
+    }
+}
+
+enum SubtitleFontSize: String, CaseIterable, Identifiable {
+    case small, medium, large, extraLarge
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .small: return "Small"
+        case .medium: return "Medium"
+        case .large: return "Large"
+        case .extraLarge: return "Extra large"
+        }
+    }
+
+    /// Point size on a compact (inline) surface; fullscreen and tvOS scale it up.
+    var pointSize: CGFloat {
+        switch self {
+        case .small: return 14
+        case .medium: return 18
+        case .large: return 22
+        case .extraLarge: return 28
+        }
+    }
+}
+
+enum SubtitleFontFamily: String, CaseIterable, Identifiable {
+    case system, rounded, serif, monospaced
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .system: return "System"
+        case .rounded: return "Rounded"
+        case .serif: return "Serif"
+        case .monospaced: return "Monospaced"
+        }
+    }
+
+    var design: Font.Design {
+        switch self {
+        case .system: return .default
+        case .rounded: return .rounded
+        case .serif: return .serif
+        case .monospaced: return .monospaced
+        }
+    }
+}
+
+enum SubtitleTextColorChoice: String, CaseIterable, Identifiable {
+    case white, yellow, cyan, green, black
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .white: return "White"
+        case .yellow: return "Yellow"
+        case .cyan: return "Cyan"
+        case .green: return "Green"
+        case .black: return "Black"
+        }
+    }
+
+    var color: Color {
+        switch self {
+        case .white: return .white
+        case .yellow: return Color(red: 1.0, green: 0.87, blue: 0.25)
+        case .cyan: return Color(red: 0.45, green: 0.9, blue: 1.0)
+        case .green: return Color(red: 0.45, green: 0.95, blue: 0.5)
+        case .black: return .black
+        }
+    }
+}
+
+enum SubtitleBackgroundChoice: String, CaseIterable, Identifiable {
+    case black, darkGray, white, none
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .black: return "Black"
+        case .darkGray: return "Dark grey"
+        case .white: return "White"
+        case .none: return "None"
+        }
+    }
+
+    /// nil means "draw no box at all", same as the box toggle being off.
+    var color: Color? {
+        switch self {
+        case .black: return Color.black.opacity(0.65)
+        case .darkGray: return Color(white: 0.25).opacity(0.75)
+        case .white: return Color.white.opacity(0.75)
+        case .none: return nil
+        }
+    }
+}
+
+/// The subtitle look every player overlay draws with (Settings → Playback → Subtitles).
+struct SubtitleOverlayStyle {
+    var size: SubtitleFontSize = .medium
+    var family: SubtitleFontFamily = .system
+    var textColor: SubtitleTextColorChoice = .white
+    var background: SubtitleBackgroundChoice = .black
+    var isBoxEnabled: Bool = true
+
+    /// Resolved box fill, or nil when the cue is drawn with a shadow only.
+    var boxColor: Color? { isBoxEnabled ? background.color : nil }
+
+    func font(scale: CGFloat) -> Font {
+        .system(size: max(10, size.pointSize * scale), weight: .semibold, design: family.design)
+    }
+}
+
+/// A subtitle cue drawn with the user's style. Single place every overlay (scene detail,
+/// downloads, tvOS) goes through, so a style change lands everywhere at once.
+struct StashySubtitleText: View {
+    let text: String
+    /// Multiplier on the configured point size: 1 inline, larger in fullscreen / on tvOS.
+    var scale: CGFloat = 1
+    var lineLimit: Int = 3
+    var style: SubtitleOverlayStyle
+
+    var body: some View {
+        let content = Text(text)
+            .font(style.font(scale: scale))
+            .foregroundStyle(style.textColor.color)
+            .multilineTextAlignment(.center)
+            .lineLimit(lineLimit)
+
+        if let boxColor = style.boxColor {
+            content
+                .padding(.horizontal, 12 * scale)
+                .padding(.vertical, 7 * scale)
+                .background(boxColor, in: RoundedRectangle(cornerRadius: 8 * scale, style: .continuous))
+        } else {
+            // No box: a dark halo keeps the text legible over a bright picture.
+            content
+                .shadow(color: .black.opacity(0.9), radius: 1, x: 0, y: 0)
+                .shadow(color: .black.opacity(0.7), radius: 3 * scale, x: 0, y: 1)
+        }
+    }
 }
 
 // MARK: - Global Helper Functions

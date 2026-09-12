@@ -128,6 +128,18 @@ final class AetherSceneEngine: ObservableObject {
     /// session from a playing scene.
     var audioSessionPolicy: AetherAudioSessionPolicy = .playback
 
+    /// Surfaces that actually draw subtitles switch this on, so "Show subtitles automatically"
+    /// (Settings → Playback) picks the preferred track once a load's tracks are known. Muted
+    /// card previews leave it off — they render no cues at all.
+    var autoSelectsPreferredSubtitleTrack: Bool = false {
+        didSet {
+            guard autoSelectsPreferredSubtitleTrack, !oldValue else { return }
+            // The tracks of the running load may already be published, so the switch itself
+            // has to make the attempt; the sink alone would never fire again.
+            autoSelectPreferredSubtitleIfNeeded()
+        }
+    }
+
     /// Whether the engine owns the system Now-Playing session for the native video path.
     /// Must be set before the first `load` — the native host is built with this value.
     var ownsNowPlaying: Bool {
@@ -223,6 +235,10 @@ final class AetherSceneEngine: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
     /// Guards against a superseded load's completion touching newer state.
     private var loadGeneration: Int = 0
+    /// The load whose subtitle selection is already settled — either by the auto-pick or by the
+    /// user. Compared against `loadGeneration`, so every new load starts undecided again and a
+    /// manual pick (including "Off") is never overridden within the same playback.
+    private var subtitleDecisionGeneration: Int?
     private var pendingSeek: Double?
     private var loopSeekInFlight = false
     private var isLoading = false
@@ -327,7 +343,13 @@ final class AetherSceneEngine: ObservableObject {
 
         engine.$subtitleTracks
             .receive(on: RunLoop.main)
-            .sink { [weak self] tracks in self?.subtitleTracks = tracks }
+            .sink { [weak self] tracks in
+                guard let self else { return }
+                self.subtitleTracks = tracks
+                // Embedded tracks arrive with the probe, sidecars are registered afterwards —
+                // both land here, which is the only reliable "tracks are known now" signal.
+                self.autoSelectPreferredSubtitleIfNeeded()
+            }
             .store(in: &cancellables)
 
         engine.$activeSubtitleTrackIndex
@@ -877,13 +899,47 @@ final class AetherSceneEngine: ObservableObject {
     }
 
     func selectSubtitleTrack(index: Int) {
+        subtitleDecisionGeneration = loadGeneration
         engine.selectSubtitleTrack(index: index)
     }
 
     func clearSubtitle() {
+        subtitleDecisionGeneration = loadGeneration
         engine.clearSubtitle()
         currentSubtitleText = nil
         currentSubtitleImage = nil
+    }
+
+    /// Turns "Show subtitles automatically" into a real selection, once per load.
+    private func autoSelectPreferredSubtitleIfNeeded() {
+        guard autoSelectsPreferredSubtitleTrack,
+              TabManager.shared.subtitlesAutoEnabled,
+              subtitleDecisionGeneration != loadGeneration,
+              activeSubtitleTrackIndex == nil,
+              !subtitleTracks.isEmpty,
+              let track = Self.preferredSubtitleTrack(in: subtitleTracks,
+                                                      preferredLanguage: TabManager.shared.subtitlePreferredLanguage)
+        else { return }
+
+        AppLog.debug("🔤 Auto-selecting subtitle track \(track.id) (\(track.language ?? "?") / \(track.name))")
+        selectSubtitleTrack(index: track.id)
+    }
+
+    /// The track the preferred language asks for: a language match (plain dialogue before
+    /// forced / SDH / commentary variants), the first ordinary track for "Any", nil when the
+    /// preferred language is not in the file.
+    static func preferredSubtitleTrack(in tracks: [TrackInfo], preferredLanguage: String) -> TrackInfo? {
+        let code = SubtitlePreferredLanguage.normalized(preferredLanguage)
+        let ordinary: (TrackInfo) -> Bool = { !$0.isForced && !$0.isCommentary && !$0.isHearingImpaired }
+
+        guard code != SubtitlePreferredLanguage.anyValue else {
+            return tracks.first(where: ordinary) ?? tracks.first
+        }
+
+        let matches = tracks.filter {
+            SubtitlePreferredLanguage.matches(preferred: code, language: $0.language, name: $0.name)
+        }
+        return matches.first(where: ordinary) ?? matches.first
     }
 
     /// Registers a sidecar file (Stash's server captions) as a selectable track. Overlay-only —

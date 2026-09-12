@@ -442,6 +442,41 @@ class TabManager: ObservableObject {
     }
     static let playerSkipOptions: [Double] = [5, 10, 15, 30]
 
+    // MARK: Subtitles (Settings → Playback → Subtitles)
+
+    /// Pick the preferred subtitle track as soon as a scene's tracks are known.
+    @Published var subtitlesAutoEnabled: Bool = false {
+        didSet { UserDefaults.standard.set(subtitlesAutoEnabled, forKey: subtitlesAutoEnabledKey) }
+    }
+    /// ISO 639-1 code, or `SubtitlePreferredLanguage.anyValue` for "first available track".
+    @Published var subtitlePreferredLanguage: String = SubtitlePreferredLanguage.anyValue {
+        didSet { UserDefaults.standard.set(subtitlePreferredLanguage, forKey: subtitlePreferredLanguageKey) }
+    }
+    @Published var subtitleFontSize: SubtitleFontSize = .medium {
+        didSet { UserDefaults.standard.set(subtitleFontSize.rawValue, forKey: subtitleFontSizeKey) }
+    }
+    @Published var subtitleFontFamily: SubtitleFontFamily = .system {
+        didSet { UserDefaults.standard.set(subtitleFontFamily.rawValue, forKey: subtitleFontFamilyKey) }
+    }
+    @Published var subtitleTextColor: SubtitleTextColorChoice = .white {
+        didSet { UserDefaults.standard.set(subtitleTextColor.rawValue, forKey: subtitleTextColorKey) }
+    }
+    @Published var subtitleBackgroundColor: SubtitleBackgroundChoice = .black {
+        didSet { UserDefaults.standard.set(subtitleBackgroundColor.rawValue, forKey: subtitleBackgroundColorKey) }
+    }
+    @Published var subtitleBoxEnabled: Bool = true {
+        didSet { UserDefaults.standard.set(subtitleBoxEnabled, forKey: subtitleBoxEnabledKey) }
+    }
+
+    /// What the player overlays draw with. Read on every cue, so it stays a cheap value.
+    var subtitleStyle: SubtitleOverlayStyle {
+        SubtitleOverlayStyle(size: subtitleFontSize,
+                             family: subtitleFontFamily,
+                             textColor: subtitleTextColor,
+                             background: subtitleBackgroundColor,
+                             isBoxEnabled: subtitleBoxEnabled)
+    }
+
     @Published var isPiPEnabled: Bool = true {
         didSet {
             UserDefaults.standard.set(isPiPEnabled, forKey: isPiPEnabledKey)
@@ -498,6 +533,13 @@ class TabManager: ObservableObject {
     private let reelsContinuousPlayKey = "ReelsContinuousPlay"
     private let isPiPEnabledKey = "isPiPEnabled"
     private let playerSkipSecondsKey = "playerSkipSeconds"
+    private let subtitlesAutoEnabledKey = "subtitle_auto_enabled"
+    private let subtitlePreferredLanguageKey = "subtitle_preferred_language"
+    private let subtitleFontSizeKey = "subtitle_font_size"
+    private let subtitleFontFamilyKey = "subtitle_font_family"
+    private let subtitleTextColorKey = "subtitle_text_color"
+    private let subtitleBackgroundColorKey = "subtitle_background_color"
+    private let subtitleBoxEnabledKey = "subtitle_box_enabled"
     private let reelsShowsDeleteButtonKey = "ReelsShowsDeleteButton"
     private let dashboardHeroSizeKey = "DashboardHeroSize"
     private let sceneCardsShowStudioLogoKey = "SceneCardsShowStudioLogo"
@@ -540,6 +582,7 @@ class TabManager: ObservableObject {
         self.isPiPEnabled = UserDefaults.standard.object(forKey: isPiPEnabledKey) as? Bool ?? true
         let storedSkip = UserDefaults.standard.object(forKey: playerSkipSecondsKey) as? Double ?? 10
         self.playerSkipSeconds = Self.playerSkipOptions.contains(storedSkip) ? storedSkip : 10
+        loadSubtitleSettings()
         self.reelsShowsDeleteButton = UserDefaults.standard.bool(forKey: reelsShowsDeleteButtonKey)
         self.sceneCardsShowStudioLogo = UserDefaults.standard.object(forKey: sceneCardsShowStudioLogoKey) as? Bool ?? true
         if let heroSizeRaw = UserDefaults.standard.string(forKey: dashboardHeroSizeKey),
@@ -552,6 +595,23 @@ class TabManager: ObservableObject {
         self.showDashboardHeroBackground = UserDefaults.standard.object(forKey: showDashboardHeroBackgroundKey) as? Bool ?? true
         self.useColoredStatistics = UserDefaults.standard.object(forKey: useColoredStatisticsKey) as? Bool ?? true
         loadCatalogCardColumns()
+    }
+
+    // MARK: - Subtitle settings
+
+    private func loadSubtitleSettings() {
+        let defaults = UserDefaults.standard
+        self.subtitlesAutoEnabled = defaults.bool(forKey: subtitlesAutoEnabledKey)
+        self.subtitlePreferredLanguage = SubtitlePreferredLanguage.normalized(defaults.string(forKey: subtitlePreferredLanguageKey))
+        self.subtitleFontSize = defaults.string(forKey: subtitleFontSizeKey)
+            .flatMap(SubtitleFontSize.init(rawValue:)) ?? .medium
+        self.subtitleFontFamily = defaults.string(forKey: subtitleFontFamilyKey)
+            .flatMap(SubtitleFontFamily.init(rawValue:)) ?? .system
+        self.subtitleTextColor = defaults.string(forKey: subtitleTextColorKey)
+            .flatMap(SubtitleTextColorChoice.init(rawValue:)) ?? .white
+        self.subtitleBackgroundColor = defaults.string(forKey: subtitleBackgroundColorKey)
+            .flatMap(SubtitleBackgroundChoice.init(rawValue:)) ?? .black
+        self.subtitleBoxEnabled = defaults.object(forKey: subtitleBoxEnabledKey) as? Bool ?? true
     }
 
     // MARK: - Catalog card columns (1 / 2 per row)
