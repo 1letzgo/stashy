@@ -55,6 +55,7 @@ struct AetherSceneSurface: View {
     @State private var scrubPreviewPendingSeconds: Double?
     /// Surface height, so the inline card can use the same layout at smaller sizes.
     @State private var surfaceHeight: CGFloat = 0
+    @State private var surfaceSize: CGSize = .zero
     /// Mirrors of engine state that is not observable, so the slider and the speed menu redraw.
     @State private var volumeLevel: Float = 1
     @State private var playbackRate: Float = 1
@@ -89,6 +90,9 @@ struct AetherSceneSurface: View {
             subtitleOverlay
 
             transportOverlay
+                // Fullscreen: keep the controls inside the picture. A 16:9 file in landscape
+                // is pillarboxed, and controls hanging into the black bars read as clipped.
+                .padding(.horizontal, videoHorizontalInset)
 
             #if DEBUG
             if showsDebugStats {
@@ -97,8 +101,9 @@ struct AetherSceneSurface: View {
             #endif
         }
         .contentShape(Rectangle())
-        .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { height in
-            surfaceHeight = height
+        .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+            surfaceHeight = size.height
+            surfaceSize = size
         }
         .onReceive(NotificationCenter.default.publisher(for: .stashyHardwareVolumeChanged)) { _ in
             volumeLevel = AVAudioSession.sharedInstance().outputVolume
@@ -271,9 +276,15 @@ struct AetherSceneSurface: View {
     private var skipButtonSize: CGFloat { isCompact ? 44 : 66 }
     private var playButtonSize: CGFloat { isCompact ? 64 : 96 }
     private var centerSpacing: CGFloat { isCompact ? 24 : 70 }
-    /// Fullscreen in landscape has no top/bottom safe area, so the rows would hug the screen
-    /// edge and read as cut off; give them room there. Inline keeps the tight 12pt.
-    private var fullscreenEdgePadding: CGFloat { isFullscreen ? 24 : 12 }
+    /// Width of the pillarbox on each side in fullscreen (aspect-fit), 0 when the picture
+    /// spans the surface, is cropped to fill, or inline.
+    private var videoHorizontalInset: CGFloat {
+        guard isFullscreen, !fillsScreen, let source = engine.sourceSize,
+              source.width > 0, source.height > 0,
+              surfaceSize.width > 0, surfaceSize.height > 0 else { return 0 }
+        let videoWidth = min(surfaceSize.width, surfaceSize.height * source.width / source.height)
+        return max(0, (surfaceSize.width - videoWidth) / 2)
+    }
 
     private var chromeButtonSize: CGFloat { isCompact ? 34 : 42 }
     private var showsVolumeSlider: Bool { !isCompact }
@@ -315,7 +326,7 @@ struct AetherSceneSurface: View {
                     volumeControls
                 }
                 .padding(.horizontal, 16)
-                .padding(.top, fullscreenEdgePadding)
+                .padding(.top, 12)
                 Spacer()
             }
             .autoHiding(areControlsVisible)
@@ -336,7 +347,7 @@ struct AetherSceneSurface: View {
                     }
                 }
                 .padding(.horizontal, 16)
-                .padding(.bottom, fullscreenEdgePadding)
+                .padding(.bottom, 12)
             }
             .autoHiding(areControlsVisible)
         }
