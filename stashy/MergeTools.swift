@@ -285,6 +285,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
     @State private var destination: Item?
     @State private var showingDestinationPicker = false
     @State private var showingConfirmation = false
+    @State private var showingRunAllConfirmation = false
     @State private var showingSavePrompt = false
     @State private var showingSaveChoice = false
     @State private var presetName = ""
@@ -373,6 +374,12 @@ struct MergeToolsView<Item: MergeableItem>: View {
         } message: {
             Text(confirmationMessage)
         }
+        .alert("Run all templates?", isPresented: $showingRunAllConfirmation) {
+            Button("Merge all", role: .destructive) { runAllPresets() }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text(runAllConfirmationMessage)
+        }
         .alert("Save template", isPresented: $showingSavePrompt) {
             TextField("Name", text: $presetName)
             Button("Save") { savePreset() }
@@ -459,8 +466,37 @@ struct MergeToolsView<Item: MergeableItem>: View {
     }
 
     /// Gespeicherte Vorlagen als Pills: Tippen lädt Ziel + Quellen, langes Drücken löscht.
+    /// Davor, fest und nicht mitscrollend: der Knopf, der alle Vorlagen nacheinander
+    /// ausführt (mit Rückfrage).
     private var presetRow: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
+        HStack(spacing: DesignTokens.Spacing.xs) {
+            runAllButton
+            ScrollView(.horizontal, showsIndicators: false) {
+                presetPills
+            }
+        }
+    }
+
+    /// Nur Symbol, kein Text: die Pills daneben tragen die Namen, der Knopf soll nicht
+    /// wie eine weitere Vorlage aussehen.
+    private var runAllButton: some View {
+        let runnable = runnablePresets.count
+        return Button {
+            showingRunAllConfirmation = true
+        } label: {
+            Image(systemName: "play.square.stack.fill")
+                .font(.footnote.weight(.semibold))
+                .foregroundColor(runnable > 0 ? appearance.tintColor : .secondary)
+                .frame(width: 34, height: 30)
+                .background(Color.secondaryAppBackground)
+                .clipShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .disabled(runnable == 0 || isMerging)
+        .accessibilityLabel("Run all templates")
+    }
+
+    private var presetPills: some View {
             HStack(spacing: DesignTokens.Spacing.xs) {
                 ForEach(presets.presets) { preset in
                     let isActive = isPresetActive(preset)
@@ -502,7 +538,6 @@ struct MergeToolsView<Item: MergeableItem>: View {
                     )
                 }
             }
-        }
     }
 
     /// Gleicher Small-Caps-Header wie in den anderen Tools (`stashyScrollingSectionHeader`),
@@ -674,6 +709,82 @@ struct MergeToolsView<Item: MergeableItem>: View {
 
     private func unresolvedSources(of preset: MergePreset) -> [MergePresetEntry] {
         resolveSources(of: preset).unresolved
+    }
+
+    /// Vorlagen, für die es gerade etwas zu tun gibt: Ziel vorhanden und mindestens
+    /// eine Quelle auf dem Server.
+    private var runnablePresets: [(preset: MergePreset, destination: Item, sources: [Item])] {
+        presets.presets.compactMap { preset in
+            guard let destination = itemIndex.resolve(preset.destination) else { return nil }
+            let resolved = resolveSources(of: preset).resolved
+            guard !resolved.isEmpty else { return nil }
+            return (preset, destination, resolved)
+        }
+    }
+
+    private var runAllConfirmationMessage: String {
+        let runnable = runnablePresets
+        let sourceCount = runnable.reduce(0) { $0 + $1.sources.count }
+        let skipped = presets.presets.count - runnable.count
+        var text = "\(runnable.count) of \(presets.presets.count) templates have something to merge: "
+            + "\(sourceCount) \(sourceCount == 1 ? config.noun : config.nounPlural) will be merged into their destinations, one template after another."
+        if skipped > 0 {
+            text += " \(skipped) \(skipped == 1 ? "template has" : "templates have") nothing to do right now and will be skipped."
+        }
+        return text + " This cannot be undone."
+    }
+
+    /// Führt alle Vorlagen nacheinander aus. Nach jeder wird der Index aktualisiert,
+    /// damit eine spätere Vorlage keine schon zusammengeführte Quelle mehr sieht.
+    private func runAllPresets() {
+        let jobs = runnablePresets
+        guard !jobs.isEmpty, !isMerging else { return }
+        isMerging = true
+        HapticManager.light()
+        sources.removeAll()
+        destination = nil
+        activePreset = nil
+
+        Task {
+            var mergedTotal = 0
+            var failed: [String] = []
+            for job in jobs {
+                // Der Index wandert mit den vorherigen Merges; deshalb pro Vorlage neu auflösen.
+                let resolvedNow = await MainActor.run { resolveSources(of: job.preset).resolved }
+                guard !resolvedNow.isEmpty else { continue }
+                let sourceIds = resolvedNow.map(\.id)
+                do {
+                    try await config.merge(sourceIds, job.destination.id)
+                    mergedTotal += sourceIds.count
+                    await MainActor.run {
+                        allItems.removeAll { sourceIds.contains($0.id) }
+                        itemIndex = MergeItemIndex(items: allItems)
+                    }
+                } catch {
+                    AppLog.error("❌ \(config.kind) merge (template \(job.preset.name)) failed: \(error.localizedDescription)")
+                    failed.append(job.preset.name)
+                }
+            }
+            let merged = mergedTotal
+            await MainActor.run {
+                isMerging = false
+                if merged > 0 { config.didMerge() }
+                if failed.isEmpty {
+                    ToastManager.shared.show(
+                        "\(merged) \(merged == 1 ? config.noun : config.nounPlural) merged from \(jobs.count) templates",
+                        icon: "arrow.triangle.merge",
+                        style: .success
+                    )
+                } else {
+                    ToastManager.shared.show(
+                        "\(merged) merged, failed: \(failed.prefix(3).joined(separator: ", "))\(failed.count > 3 ? " +\(failed.count - 3)" : "")",
+                        icon: "exclamationmark.triangle",
+                        style: .error
+                    )
+                }
+                load()
+            }
+        }
     }
 
     private func entry(for item: Item) -> MergePresetEntry {
