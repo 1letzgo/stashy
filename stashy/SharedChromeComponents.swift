@@ -23,15 +23,20 @@ extension View {
     /// Shared by the Aether transport surface and the Feeds overlay chrome.
     @ViewBuilder
     func stashyGlass<S: Shape>(shape: S) -> some View {
+        // `contentShape` on both branches: at 100 % transparency the wash has opacity 0
+        // and a fully transparent fill is not hit-testable, so taps on the chrome fell
+        // through to whatever lay underneath.
         if #available(iOS 26.0, *) {
             self
                 .background(shape.fill(Color.black.opacity(StashyGlass.dimOpacity)))
                 .glassEffect(.regular, in: shape)
+                .contentShape(shape)
         } else {
             self
                 .background(shape.fill(Color.black.opacity(StashyGlass.dimOpacity)))
                 .background(.ultraThinMaterial, in: shape)
                 .overlay(shape.stroke(Color.white.opacity(0.25), lineWidth: 0.5))
+                .contentShape(shape)
         }
     }
 
@@ -43,11 +48,13 @@ extension View {
             self
                 .background(shape.fill(tint.opacity(StashyGlass.dimOpacity)))
                 .glassEffect(.regular.tint(tint), in: shape)
+                .contentShape(shape)
         } else {
             self
                 .background(shape.fill(tint.opacity(0.6 + 0.4 * StashyGlass.dimOpacity)))
                 .background(.ultraThinMaterial, in: shape)
                 .overlay(shape.stroke(Color.white.opacity(0.25), lineWidth: 0.5))
+                .contentShape(shape)
         }
     }
 
