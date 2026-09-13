@@ -715,7 +715,9 @@ struct MergeToolsView<Item: MergeableItem>: View {
     private func presetSubtitle(_ preset: MergePreset, missing: Int) -> String {
         let total = preset.sources.count
         let noun = total == 1 ? "source" : "sources"
-        if allItems.isEmpty || missing == 0 { return "\(total) \(noun)" }
+        // Vor dem Laden ist nichts aufgelöst — dann nur die Gesamtzahl. Danach immer
+        // "K of N", auch wenn alle da sind, damit die Pill ihre Form nicht wechselt.
+        if allItems.isEmpty { return "\(total) \(noun)" }
         return "\(total - missing) of \(total) \(noun) on the server"
     }
 
