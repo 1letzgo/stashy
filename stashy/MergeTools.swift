@@ -485,9 +485,10 @@ struct MergeToolsView<Item: MergeableItem>: View {
             showingRunAllConfirmation = true
         } label: {
             Image(systemName: "play.square.stack.fill")
-                .font(.footnote.weight(.semibold))
+                .font(.subheadline.weight(.semibold))
                 .foregroundColor(runnable > 0 ? appearance.tintColor : .secondary)
-                .frame(width: 34, height: 30)
+                // Gleiche Höhe wie eine zweizeilige Pill (Name + Quellenzahl).
+                .frame(width: 40, height: MergeToolsLayout.presetPillHeight)
                 .background(Color.secondaryAppBackground)
                 .clipShape(Capsule())
         }
@@ -523,7 +524,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                         }
                         .foregroundColor(isActive ? .white : .primary)
                         .padding(.horizontal, DesignTokens.Spacing.sm)
-                        .padding(.vertical, 6)
+                        .frame(height: MergeToolsLayout.presetPillHeight)
                         .background(isActive ? appearance.tintColor : Color.secondaryAppBackground)
                         .clipShape(Capsule())
                     }
@@ -938,6 +939,8 @@ struct MergeToolsView<Item: MergeableItem>: View {
 enum MergeToolsLayout {
     /// Zeilen, die pro Nachladeschritt dazukommen.
     static let pageSize = 50
+    /// Vorlagen-Pills und der Alle-ausführen-Knopf davor: eine feste Höhe für beide.
+    static let presetPillHeight: CGFloat = 44
 }
 
 // MARK: - Destination picker
