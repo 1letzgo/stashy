@@ -416,7 +416,7 @@ struct SceneDetailView: View {
                         .gridCellColumns(2)
 
                         // Item 6: Delete Button
-                        Button(role: .destructive) {
+                        Button {
                             showDeleteWithFilesConfirmation = true
                         } label: {
                             HStack {
@@ -429,6 +429,7 @@ struct SceneDetailView: View {
                             .foregroundColor(Color.pillAccent)
                             .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                         }
+                        .buttonStyle(.plain)
                     }
                 } else {
                     // Portrait Mode: Vertical Stack
@@ -491,7 +492,7 @@ struct SceneDetailView: View {
                     )
 
                     // Delete Scene Button (Card Style)
-                    Button(role: .destructive) {
+                    Button {
                         showDeleteWithFilesConfirmation = true
                     } label: {
                         HStack {
@@ -504,6 +505,7 @@ struct SceneDetailView: View {
                         .foregroundColor(Color.pillAccent)
                         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                     }
+                    .buttonStyle(.plain)
                     .padding(.top, 10)
                 }
             }
@@ -970,8 +972,9 @@ struct SceneDetailView: View {
         }
     }
 
-    /// Stash's server captions as selectable external subtitle tracks on the engine. Nothing is
-    /// auto-selected — the user picks from the Audio & Subtitles menu.
+    /// Stash's server captions as selectable external subtitle tracks on the engine. Registering
+    /// them republishes `subtitleTracks`, so "Show subtitles automatically" (Settings → Playback)
+    /// can pick one; otherwise the user picks from the Audio & Subtitles menu.
     private func registerAetherCaptions(on engine: AetherSceneEngine, scene: Scene) {
         guard let captions = scene.captions, !captions.isEmpty else { return }
         for caption in captions {
