@@ -512,14 +512,14 @@ struct MergeToolsView<Item: MergeableItem>: View {
                                     .font(.footnote.weight(.medium))
                                     .lineLimit(1)
                             }
-                            // Nach einem Merge legt ein Scraper die Quelle neu an — bis dahin
-                            // fehlt sie hier, bleibt aber in der Vorlage.
-                            if missing > 0 {
-                                Text("\(missing) of \(preset.sources.count) sources not on the server right now")
-                                    .font(.caption2)
-                                    .lineLimit(1)
-                                    .opacity(0.75)
-                            }
+                            // Immer die Quellenzahl; solange die Liste lädt, ist noch nichts
+                            // aufgelöst, also kein "fehlt"-Hinweis. Nach einem Merge legt ein
+                            // Scraper die Quelle neu an — bis dahin fehlt sie hier, bleibt
+                            // aber in der Vorlage.
+                            Text(presetSubtitle(preset, missing: missing))
+                                .font(.caption2)
+                                .lineLimit(1)
+                                .opacity(0.75)
                         }
                         .foregroundColor(isActive ? .white : .primary)
                         .padding(.horizontal, DesignTokens.Spacing.sm)
@@ -709,6 +709,13 @@ struct MergeToolsView<Item: MergeableItem>: View {
 
     private func unresolvedSources(of preset: MergePreset) -> [MergePresetEntry] {
         resolveSources(of: preset).unresolved
+    }
+
+    private func presetSubtitle(_ preset: MergePreset, missing: Int) -> String {
+        let total = preset.sources.count
+        let noun = total == 1 ? "source" : "sources"
+        if allItems.isEmpty || missing == 0 { return "\(total) \(noun)" }
+        return "\(total - missing) of \(total) \(noun) on the server"
     }
 
     /// Vorlagen, für die es gerade etwas zu tun gibt: Ziel vorhanden und mindestens
