@@ -215,6 +215,7 @@ final class AITagSuggestionManager: ObservableObject {
     private var didLoadFromDisk = false
     private var serverObserver: NSObjectProtocol?
     private var serverReadyObserver: NSObjectProtocol?
+    private var foregroundObserver: NSObjectProtocol?
 
     /// Tags the user waved away. Ignoring one takes it out of the suggestions until it
     /// is accepted somewhere — the alternative is being wrong about the same tag on
@@ -262,6 +263,17 @@ final class AITagSuggestionManager: ObservableObject {
         ) { [weak self] _ in
             Task { @MainActor in await self?.ensureStatistics() }
         }
+        // An app that stays in memory for days never sees another server start; the
+        // 12-hour check has to run when it comes back to the foreground as well.
+        #if !os(tvOS)
+        foregroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in await self?.ensureStatistics() }
+        }
+        #endif
     }
 
     deinit {
@@ -270,6 +282,9 @@ final class AITagSuggestionManager: ObservableObject {
         }
         if let serverReadyObserver {
             NotificationCenter.default.removeObserver(serverReadyObserver)
+        }
+        if let foregroundObserver {
+            NotificationCenter.default.removeObserver(foregroundObserver)
         }
     }
 

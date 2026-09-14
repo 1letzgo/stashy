@@ -18,6 +18,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         // Entitlements (lifetime IAP, paid-app grandfathering) must sync at launch,
         // not only when Settings is opened.
         _ = StoreManager.shared
+        // The statistics manager listens for the server-ready notification to refresh
+        // stale tag statistics; a lazy singleton nobody touches before that misses it.
+        _ = AITagSuggestionManager.shared
         #if !os(tvOS) && canImport(AetherEngine)
         AetherPlaybackBootstrap.installOnce()
         #endif
