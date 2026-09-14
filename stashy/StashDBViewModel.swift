@@ -2678,6 +2678,10 @@ class StashDBViewModel: ObservableObject {
                     AppLog.debug("📱 Server response: \(responseString.prefix(500))")
                 }
                 #endif
+                // A reachable host is not a connection: only Stash's version answer passes.
+                if case .failure(let message) = StashConnectionProbe.evaluate(data: data, response: response, error: nil) {
+                    throw StashConnectionProbeError(message: message)
+                }
                 return data
             }
             .decode(type: VersionResponse.self, decoder: JSONDecoder())
@@ -6690,6 +6694,11 @@ class StashDBViewModel: ObservableObject {
     private func handleError(_ error: Error) {
         AppLog.debug("📱 StashDB Error: \(error)")
         
+        if let probeError = error as? StashConnectionProbeError {
+            errorMessage = probeError.message
+            serverStatus = "Connection failed"
+            return
+        }
         if let urlError = error as? URLError {
             let urlContext = ServerConfigManager.shared.loadConfig()?.baseURL ?? "Unknown URL"
             switch urlError.code {

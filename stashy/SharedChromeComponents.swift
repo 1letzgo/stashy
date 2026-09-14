@@ -478,10 +478,13 @@ struct StashyChromeTrailingTextButton: View {
 
     var body: some View {
         Button(action: action) {
+            // Enabled = filled with the accent like the Back pill, so it never reads as greyed
+            // out; disabled stays plain glass with dimmed text.
             Text(isBusy ? "…" : title)
                 .font(.subheadline.weight(.semibold))
-                .foregroundColor(enabled && !isBusy ? appearance.tintColor : .white.opacity(0.35))
-                .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
+                .foregroundColor(enabled && !isBusy ? .white : .white.opacity(0.35))
+                .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight,
+                                                accent: enabled && !isBusy))
         }
         .buttonStyle(.plain)
         .disabled(!enabled || isBusy)

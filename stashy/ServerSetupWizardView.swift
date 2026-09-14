@@ -472,9 +472,7 @@ struct ServerSetupWizardView: View {
         request.timeoutInterval = 10
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         
-        // Simple query to test connection
-        let testQuery = ["query": "{ systemStatus { status } }"]
-        request.httpBody = try? JSONSerialization.data(withJSONObject: testQuery)
+        request.httpBody = StashConnectionProbe.versionQueryBody.data(using: .utf8)
         
         if (authMethod == .apiKey || authMethod == .login) && !apiKey.isEmpty {
             request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
@@ -484,24 +482,12 @@ struct ServerSetupWizardView: View {
         }
         
         URLSession.shared.dataTask(with: request) { data, response, error in
+            // Only a real Stash version answer is a success — not a reachable host, not a 401.
+            let outcome = StashConnectionProbe.evaluate(data: data, response: response, error: error)
             DispatchQueue.main.async {
-                if let error = error {
-                    connectionTestResult = .failure("Error: \(error.localizedDescription)")
-                    return
-                }
-                
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    connectionTestResult = .failure("No response from server")
-                    return
-                }
-                
-                if httpResponse.statusCode == 200 {
-                    connectionTestResult = .success
-                } else if httpResponse.statusCode == 401 {
-                    // Needs API key but server is reachable
-                    connectionTestResult = .success
-                } else {
-                    connectionTestResult = .failure("HTTP Error: \(httpResponse.statusCode)")
+                switch outcome {
+                case .stash: connectionTestResult = .success
+                case .failure(let message): connectionTestResult = .failure(message)
                 }
             }
         }.resume()

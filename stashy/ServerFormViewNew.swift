@@ -386,10 +386,7 @@ struct ServerFormViewNew: View {
             request.setValue(header.value, forHTTPHeaderField: header.name)
         }
         
-        let query = """
-        {"query": "{ version { version } }"}
-        """
-        request.httpBody = query.data(using: .utf8)
+        request.httpBody = StashConnectionProbe.versionQueryBody.data(using: .utf8)
         
         let sessionConfig = URLSessionConfiguration.ephemeral
         sessionConfig.timeoutIntervalForRequest = 15
@@ -397,50 +394,16 @@ struct ServerFormViewNew: View {
         let sessionForTest = URLSession(configuration: sessionConfig)
         
         sessionForTest.dataTask(with: request) { data, response, error in
+            let outcome = StashConnectionProbe.evaluate(data: data, response: response, error: error)
             DispatchQueue.main.async {
                 isTesting = false
-                
-                if let error = error {
-                    testResult = .failure
-                    if (error as NSError).code == NSURLErrorCannotConnectToHost {
-                        testMessage = "Cannot connect - check IP/Port"
-                    } else if (error as NSError).code == NSURLErrorTimedOut {
-                        testMessage = "Connection timed out"
-                    } else {
-                        testMessage = error.localizedDescription
-                    }
-                    return
-                }
-                
-                guard let httpResponse = response as? HTTPURLResponse else {
-                    testResult = .failure
-                    testMessage = "Invalid response"
-                    return
-                }
-                
-                if httpResponse.statusCode == 401 || httpResponse.statusCode == 403 {
-                    testResult = .failure
-                    testMessage = "Authentication failed"
-                    return
-                }
-                
-                if httpResponse.statusCode != 200 {
-                    testResult = .failure
-                    testMessage = "Server error: \(httpResponse.statusCode)"
-                    return
-                }
-                
-                // Try to parse version
-                if let data = data,
-                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                   let dataObj = json["data"] as? [String: Any],
-                   let versionObj = dataObj["version"] as? [String: Any],
-                   let version = versionObj["version"] as? String {
+                switch outcome {
+                case .stash(let version):
                     testResult = .success
                     testMessage = version
-                } else {
-                    testResult = .success
-                    testMessage = "Connected"
+                case .failure(let message):
+                    testResult = .failure
+                    testMessage = message
                 }
             }
         }.resume()

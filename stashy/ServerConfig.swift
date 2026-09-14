@@ -86,6 +86,64 @@ struct ServerHTTPHeader: Codable, Equatable, Hashable, Identifiable, Sendable {
     }
 }
 
+/// Decides whether a connection test actually reached Stash. A host that merely answers — an
+/// SSO login page, a reverse proxy's error page, some other service on that port — is a
+/// failure, not "Connected". Only a GraphQL response carrying Stash's version counts.
+enum StashConnectionProbe {
+    /// The query every test sends; `evaluate` looks for its answer.
+    nonisolated static let versionQueryBody = #"{"query":"{ version { version } }"}"#
+
+    enum Outcome: Equatable {
+        case stash(version: String)
+        case failure(String)
+    }
+
+    nonisolated static func evaluate(data: Data?, response: URLResponse?, error: Error?) -> Outcome {
+        if let error {
+            let code = (error as NSError).code
+            switch code {
+            case NSURLErrorCannotConnectToHost: return .failure("Cannot connect — check the address and port.")
+            case NSURLErrorTimedOut: return .failure("Connection timed out.")
+            case NSURLErrorCannotFindHost, NSURLErrorDNSLookupFailed: return .failure("Host not found.")
+            case NSURLErrorServerCertificateUntrusted, NSURLErrorSecureConnectionFailed:
+                return .failure("Secure connection failed — check HTTP/HTTPS.")
+            default: return .failure(error.localizedDescription)
+            }
+        }
+        guard let http = response as? HTTPURLResponse else {
+            return .failure("No response from the server.")
+        }
+        if http.statusCode == 401 || http.statusCode == 403 {
+            return .failure("Authentication failed — check the API key and custom headers.")
+        }
+
+        let json = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+        if let version = ((json?["data"] as? [String: Any])?["version"] as? [String: Any])?["version"] as? String,
+           !version.isEmpty {
+            return .stash(version: version)
+        }
+        // Stash answered, but refused (e.g. "not authorized" as a GraphQL error).
+        if let errors = json?["errors"] as? [[String: Any]],
+           let message = errors.first?["message"] as? String, !message.isEmpty {
+            return .failure("Stash rejected the request: \(message)")
+        }
+        guard (200...299).contains(http.statusCode) else {
+            return .failure("Server error: HTTP \(http.statusCode).")
+        }
+        let contentType = (http.value(forHTTPHeaderField: "Content-Type") ?? "").lowercased()
+        if contentType.contains("html") {
+            return .failure("The host answered with a web page, not Stash — likely a login or proxy page. Check the address and custom headers.")
+        }
+        return .failure("The host answered, but not as Stash. Check the address, subpath and custom headers.")
+    }
+}
+
+/// Thrown by the view model's test so its message reaches `errorMessage` unchanged.
+struct StashConnectionProbeError: LocalizedError {
+    let message: String
+    var errorDescription: String? { message }
+}
+
 struct ServerConfig: Codable, Identifiable, Equatable {
     var id: UUID = UUID()
     var name: String = "My Stash"
