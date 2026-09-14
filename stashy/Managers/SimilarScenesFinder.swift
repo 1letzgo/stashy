@@ -59,14 +59,6 @@ final class SimilarScenesFinder: ObservableObject {
     /// Keyed by what the ranking actually depends on, not by scene id: the detail view first
     /// renders the list version of a scene and swaps in the fully loaded one afterwards. Keying
     /// on the id alone cached the empty result of that first, incomplete pass forever.
-    /// Results for the scene currently on screen. The detail view drives this — the card only
-    /// renders it, so it can never show what an earlier scene loaded.
-    @Published private(set) var scenes: [Scene] = []
-    @Published private(set) var isLoading = false
-
-    /// Which lookup the published result belongs to; a late answer for an older scene is dropped.
-    private var currentKey = ""
-
     private var cache: [String: [Scene]] = [:]
 
     /// Identity of the inputs — same scene with more metadata means a different lookup.
@@ -93,18 +85,7 @@ final class SimilarScenesFinder: ObservableObject {
 
     func invalidate() {
         cache.removeAll()
-        scenes = []
-        currentKey = ""
         totalSceneCount = nil
-    }
-
-    /// Angezeigte Treffer verwerfen (Cache bleibt). Die Detailseite ruft das beim
-    /// Schließen — sonst zeigt die nächste Szene erst die alten Treffer, bis ihre
-    /// eigene Suche fertig ist.
-    func clear() {
-        scenes = []
-        isLoading = false
-        currentKey = ""
     }
 
     /// Rarity of a tag, 0.15…1. A tag on three scenes identifies a theme; one on almost every
@@ -141,29 +122,6 @@ final class SimilarScenesFinder: ObservableObject {
             totalSceneCount = 0
             return 0
         }
-    }
-
-    /// Called by `SceneDetailView` when it opens a scene and again once the full metadata
-    /// arrives. Everything the card shows comes from here.
-    func load(for scene: Scene) async {
-        let key = Self.signature(for: scene)
-        let isNewLookup = key != currentKey
-        currentKey = key
-        guard isActive else {
-            scenes = []
-            return
-        }
-        if let cached = cache[key] {
-            scenes = cached
-            return
-        }
-        // Neue Szene: alte Treffer sofort raus, nicht erst wenn die Suche zurück ist.
-        if isNewLookup { scenes = [] }
-        isLoading = true
-        let found = await similarScenes(for: scene)
-        guard currentKey == key else { return }
-        scenes = found
-        isLoading = false
     }
 
     // MARK: - Lookup

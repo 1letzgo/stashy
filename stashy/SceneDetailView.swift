@@ -60,6 +60,9 @@ struct SceneDetailView: View {
     /// Own flag for the fullscreen cover: a sheet must be presented from the cover's content,
     /// and sharing `showingAddMarkerSheet` would also fire the covered detail's sheet.
     @State private var showingFullscreenAddMarkerSheet = false
+    /// Similar Scenes for the scene on this page (see `loadSimilarScenes`).
+    @State private var similarScenes: [Scene] = []
+    @State private var isLoadingSimilarScenes = false
     @State private var capturedMarkerTime: Double = 0
     @State private var playbackSpeed: Double = 1.0
     @State private var currentPlaybackTime: Double = 0
@@ -355,7 +358,7 @@ struct SceneDetailView: View {
                     LazyVGrid(columns: [GridItem(.flexible(), alignment: .top), GridItem(.flexible(), alignment: .top)], spacing: 12) {
 
                         // stashy+ — hides itself when Suggestions is off or nothing is similar.
-                        SceneSimilarScenesCard(scene: activeScene)
+                        SceneSimilarScenesCard(scenes: similarScenes, isLoading: isLoadingSimilarScenes)
                             .gridCellColumns(2)
 
                         // Item 1: Performers (+ Director, full scroll row, spans both columns)
@@ -434,7 +437,7 @@ struct SceneDetailView: View {
                 } else {
                     // Portrait Mode: Vertical Stack
                     // stashy+ — hides itself when Suggestions is off or nothing is similar.
-                    SceneSimilarScenesCard(scene: activeScene)
+                    SceneSimilarScenesCard(scenes: similarScenes, isLoading: isLoadingSimilarScenes)
 
                     // Row 1: Performers (+ Director, full width, horizontal scroll)
                     ScenePerformersCard(
@@ -571,14 +574,32 @@ struct SceneDetailView: View {
             // Similar Scenes is loaded by the detail view for the scene it is showing, not by the
             // card for itself. Keyed on the metadata, so it runs again once `fetchSceneDetails`
             // replaces the slim list version of the scene with the full one.
+            // The results are this page's own `@State`: the shared finder only computes and
+            // caches. A shared published list was cleared by the page being left, which wiped
+            // the pushed scene's results and left the original empty on the way back.
             .task(id: SimilarScenesFinder.signature(for: activeScene)) {
-                await SimilarScenesFinder.shared.load(for: activeScene)
+                await loadSimilarScenes()
             }
-            .onDisappear {
-                // Beim Zurückgehen die Treffer dieser Szene verwerfen. Beim Push einer
-                // ähnlichen Szene lädt deren Detailseite ohnehin neu.
-                SimilarScenesFinder.shared.clear()
-            }
+    }
+
+    private func loadSimilarScenes() async {
+        let finder = SimilarScenesFinder.shared
+        guard finder.isActive else {
+            similarScenes = []
+            isLoadingSimilarScenes = false
+            return
+        }
+        let requested = activeScene
+        // Only spin when nothing is on screen yet; a refresh with fuller metadata keeps the
+        // current row until the new one is in.
+        if similarScenes.isEmpty { isLoadingSimilarScenes = true }
+        let found = await finder.similarScenes(for: requested)
+        // Not gated on cancellation: the finder caches the answer, and a page that was
+        // covered by a pushed scene should still hold it when it comes back.
+        guard SimilarScenesFinder.signature(for: activeScene) == SimilarScenesFinder.signature(for: requested)
+        else { return }
+        similarScenes = found
+        isLoadingSimilarScenes = false
     }
 
     /// Own fullscreen presentation: the same engine, rebound to a full-bleed surface.

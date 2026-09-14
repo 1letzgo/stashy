@@ -9,14 +9,18 @@
 import SwiftUI
 
 struct SceneSimilarScenesCard: View {
-    let scene: Scene
+    /// Results for this detail page. They live in the page, not in the shared finder: every
+    /// pushed `SceneDetailView` has its own list, so jumping to a similar scene and back
+    /// never shows (or wipes) another page's result.
+    let scenes: [Scene]
+    let isLoading: Bool
 
     @ObservedObject private var finder = SimilarScenesFinder.shared
     @ObservedObject private var suggestions = AITagSuggestionManager.shared
 
     var body: some View {
         Group {
-            if finder.isActive, finder.isLoading || !finder.scenes.isEmpty {
+            if finder.isActive, isLoading || !scenes.isEmpty {
                 content
             }
         }
@@ -29,18 +33,18 @@ struct SceneSimilarScenesCard: View {
                     .font(.title3)
                     .fontWeight(.semibold)
                 Spacer()
-                if finder.isLoading { ProgressView() }
+                if isLoading { ProgressView() }
             }
             .padding(.horizontal, 12)
             .padding(.top, 8)
 
-            if !finder.scenes.isEmpty {
+            if !scenes.isEmpty {
                 // No GeometryReader and no fixed height: `HomeSceneCardView` is a fixed
                 // 222×125 plus its title block when `isLarge` is false, so the row can size
                 // itself. Forcing a height only left dead space under the cards.
                 ScrollView(.horizontal, showsIndicators: false) {
                     HStack(spacing: 12) {
-                        ForEach(finder.scenes) { similar in
+                        ForEach(scenes) { similar in
                             NavigationLink(destination: SceneDetailView(scene: similar)) {
                                 HomeSceneCardView(scene: similar, screenWidth: 0)
                             }
