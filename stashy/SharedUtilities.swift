@@ -1842,11 +1842,27 @@ public struct FilterMapper {
     ///
     /// `labels` maps entity id → display name. Missing names fall back to the id, which the web UI
     /// re-resolves on load.
+    /// Scalar criteria the app keeps as a bare value (GraphQL shape: `is_missing: "stash_id"`,
+    /// `organized: true`). The web UI stores every criterion as `{ value, modifier }` and
+    /// ignores a bare value when it loads the filter, so they are wrapped on the way out.
+    private static let uiScalarCriterionFields: Set<String> = [
+        "is_missing", "has_markers", "has_chapters",
+        "interactive", "organized", "favorite", "performer_favorite", "studio_favorite",
+        "gallery_favorite", "filter_favorites", "has_image", "ignore_auto_tag"
+    ]
+
     public static func uiObjectFilter(from dict: [String: Any], labels: [String: String] = [:]) -> [String: Any] {
         var out: [String: Any] = [:]
         for (key, value) in dict {
             guard let criterion = value as? [String: Any] else {
-                out[key] = value
+                if uiScalarCriterionFields.contains(key) {
+                    let text: String
+                    if let b = value as? Bool { text = b ? "true" : "false" }
+                    else { text = "\(value)" }
+                    out[key] = ["value": text, "modifier": "EQUALS"]
+                } else {
+                    out[key] = value
+                }
                 continue
             }
             // Nested boolean groups / sub-filters keep the same treatment one level down.
@@ -1927,7 +1943,7 @@ public struct FilterMapper {
         
         // String extraction fields (Stash API expects simple String for these, not a criterion object)
         // Note: `has_image` is treated as boolean in practice (see booleanFields below).
-        let stringExtractionFields: Set<String> = ["is_missing", "has_markers"]
+        let stringExtractionFields: Set<String> = ["is_missing", "has_markers", "has_chapters"]
         if stringExtractionFields.contains(key) {
             if let vd = subDict["value"] as? [String: Any], let inner = vd["value"] as? String { return inner }
             if let valArray = subDict["value"] as? [Any], let first = valArray.first as? String { return first }
@@ -2000,7 +2016,7 @@ public struct FilterMapper {
         }
         
         // Boolean field flattening (Stash API expects simple Bool for these, not a criterion object)
-        let booleanFields: Set<String> = ["interactive", "organized", "favorite", "performer_favorite", "studio_favorite", "gallery_favorite", "filter_favorites", "has_image"]
+        let booleanFields: Set<String> = ["interactive", "organized", "favorite", "performer_favorite", "studio_favorite", "gallery_favorite", "filter_favorites", "has_image", "ignore_auto_tag"]
         if booleanFields.contains(key) {
             if let v = subDict["value"] {
                 return castToBool(v)
