@@ -102,6 +102,55 @@ class KeychainManager {
         return deleteRaw(account: key)
     }
     
+    // MARK: - Custom HTTP headers (per server)
+
+    /// JSON-encoded `[ServerHTTPHeader]`. Header values are often SSO bypass tokens, so they
+    /// get the same storage as the API key. Cached: every image request reads them.
+    private var headersCache: [UUID: [ServerHTTPHeader]] = [:]
+    private let headersCacheLock = NSLock()
+
+    @discardableResult
+    func saveCustomHeaders(_ headers: [ServerHTTPHeader], forServerID serverID: UUID) -> Bool {
+        let account = "headers_\(serverID.uuidString)"
+        headersCacheLock.lock(); headersCache[serverID] = nil; headersCacheLock.unlock()
+        guard !headers.isEmpty else { return deleteRaw(account: account) }
+        guard let data = try? JSONEncoder().encode(headers) else { return false }
+
+        let attributes: [String: Any] = [
+            kSecValueData as String: data,
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        ]
+        let updateStatus = SecItemUpdate(baseQuery(account: account) as CFDictionary, attributes as CFDictionary)
+        if updateStatus == errSecSuccess { return true }
+        guard updateStatus == errSecItemNotFound else { return false }
+        var addQuery = baseQuery(account: account)
+        attributes.forEach { addQuery[$0.key] = $0.value }
+        return SecItemAdd(addQuery as CFDictionary, nil) == errSecSuccess
+    }
+
+    func loadCustomHeaders(forServerID serverID: UUID) -> [ServerHTTPHeader] {
+        headersCacheLock.lock()
+        if let cached = headersCache[serverID] {
+            headersCacheLock.unlock()
+            return cached
+        }
+        headersCacheLock.unlock()
+
+        var loaded: [ServerHTTPHeader] = []
+        if let raw = loadRawString(account: "headers_\(serverID.uuidString)"),
+           let decoded = try? JSONDecoder().decode([ServerHTTPHeader].self, from: Data(raw.utf8)) {
+            loaded = decoded
+        }
+        headersCacheLock.lock(); headersCache[serverID] = loaded; headersCacheLock.unlock()
+        return loaded
+    }
+
+    @discardableResult
+    func deleteCustomHeaders(forServerID serverID: UUID) -> Bool {
+        headersCacheLock.lock(); headersCache[serverID] = nil; headersCacheLock.unlock()
+        return deleteRaw(account: "headers_\(serverID.uuidString)")
+    }
+
     // MARK: - App Passcode (salted hash only — never store plaintext PIN)
     
     private let passcodeAccount = "app_passcode_v1"

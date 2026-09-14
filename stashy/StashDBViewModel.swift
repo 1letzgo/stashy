@@ -10807,9 +10807,8 @@ class DownloadManager: NSObject, ObservableObject {
     private func downloadFile(id: String, from url: URL, to destination: URL, progressHandler: @escaping (Double, Int64, Int64) -> Void, completion: @escaping (Bool) -> Void) {
         var request = URLRequest(url: url)
         
-        if let config = ServerConfigManager.shared.loadConfig(),
-           let apiKey = config.secureApiKey, !apiKey.isEmpty {
-            request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
+        for (name, value) in ServerConfigManager.shared.loadConfig()?.requestHeaders(for: url) ?? [:] {
+            request.setValue(value, forHTTPHeaderField: name)
         }
         
         let task = session.downloadTask(with: request)

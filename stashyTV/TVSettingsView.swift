@@ -939,6 +939,8 @@ struct TVServerFormView: View {
     @State private var port: String = ""
     @State private var selectedProtocol: ServerProtocol = .https
     @State private var apiKey: String = ""
+    /// Custom HTTP headers (SSO / reverse proxy), stored with the config on tvOS.
+    @State private var customHeaders: [ServerHTTPHeader] = []
     
     // Auth State
     @State private var authMethod: AuthMethod = .none
@@ -1051,6 +1053,9 @@ struct TVServerFormView: View {
                     }
                     .frame(maxWidth: 800)
 
+                    TVCustomHeadersCard(headers: $customHeaders)
+                        .frame(maxWidth: 800)
+
                     HStack(spacing: 40) {
                         Button("Cancel") {
                             dismiss()
@@ -1073,6 +1078,7 @@ struct TVServerFormView: View {
                     port = server.port ?? ""
                     selectedProtocol = server.serverProtocol
                     apiKey = server.secureApiKey ?? ""
+                    customHeaders = server.secureCustomHeaders
                     
                     // Determine initial auth method
                     if let key = server.secureApiKey, !key.isEmpty {
@@ -1101,7 +1107,11 @@ struct TVServerFormView: View {
             serverAddress: finalAddress,
             port: finalPort,
             serverProtocol: selectedProtocol,
-            apiKey: authMethod == .none ? nil : (apiKey.isEmpty ? nil : apiKey)
+            apiKey: authMethod == .none ? nil : (apiKey.isEmpty ? nil : apiKey),
+            customHeaders: {
+                let usable = ServerHTTPHeader.sanitized(customHeaders)
+                return usable.isEmpty ? nil : usable
+            }()
         )
 
         onSave(config)
@@ -1127,7 +1137,9 @@ struct TVServerFormView: View {
                 let fetchedKey = try await LoginAuthHelper.shared.fetchAPIKey(
                     baseURL: config.baseURL,
                     username: username,
-                    password: password
+                    password: password,
+                    extraHeaders: ServerHTTPHeader.sanitized(customHeaders)
+                        .reduce(into: [:]) { $0[$1.name] = $1.value }
                 )
                 
                 await MainActor.run {
@@ -1146,6 +1158,54 @@ struct TVServerFormView: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Custom Headers
+
+/// Name/value pairs sent with every request to the server (SSO, reverse proxy). Used by the
+/// server form in Settings and by first-run setup.
+struct TVCustomHeadersCard: View {
+    @Binding var headers: [ServerHTTPHeader]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            Text("Custom Headers")
+                .font(.headline)
+                .foregroundStyle(.secondary)
+
+            // Stacked, not side by side: the form can be presented narrow, and a header
+            // name like `CF-Access-Client-Secret` has to stay readable.
+            ForEach($headers) { $header in
+                VStack(alignment: .leading, spacing: 12) {
+                    TextField("Header name", text: $header.name)
+                        .autocorrectionDisabled()
+                        .textInputAutocapitalization(.never)
+                    HStack(spacing: 16) {
+                        SecureField("Value", text: $header.value)
+                        Button {
+                            headers.removeAll { $0.id == header.id }
+                        } label: {
+                            Image(systemName: "minus.circle.fill")
+                        }
+                        .accessibilityLabel("Remove header")
+                    }
+                }
+            }
+
+            Button {
+                headers.append(ServerHTTPHeader(name: "", value: ""))
+            } label: {
+                Label("Add Header", systemImage: "plus.circle.fill")
+            }
+
+            Text("Sent with every request to this server, e.g. for SSO or a reverse proxy that needs its own token.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding()
+        .background(Color.white.opacity(0.05))
+        .cornerRadius(20)
     }
 }
 

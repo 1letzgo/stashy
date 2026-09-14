@@ -503,9 +503,8 @@ enum StashNetworking {
 func stashRequest(to url: URL, config: ServerConfig?, timeout: TimeInterval = 30) -> URLRequest {
     var request = URLRequest(url: url)
     request.timeoutInterval = timeout
-    if let apiKey = config?.secureApiKey?.trimmingCharacters(in: .whitespacesAndNewlines),
-       !apiKey.isEmpty {
-        request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
+    for (name, value) in config?.requestHeaders(for: url) ?? [:] {
+        request.setValue(value, forHTTPHeaderField: name)
     }
     return request
 }
@@ -514,10 +513,8 @@ func stashRequest(to url: URL, config: ServerConfig?, timeout: TimeInterval = 30
 func authenticatedStashRequest(for url: URL) -> URLRequest {
     let cleanURL = urlByRemovingApiKeyQuery(url)
     var request = URLRequest(url: cleanURL)
-    if let key = ServerConfigManager.shared.activeConfig?.secureApiKey?
-        .trimmingCharacters(in: .whitespacesAndNewlines),
-       !key.isEmpty {
-        request.setValue(key, forHTTPHeaderField: "ApiKey")
+    for (name, value) in ServerConfigManager.shared.activeConfig?.requestHeaders(for: cleanURL) ?? [:] {
+        request.setValue(value, forHTTPHeaderField: name)
     }
     return request
 }
@@ -617,11 +614,7 @@ extension View {
 /// authentication applied consistently. Single source of truth for asset creation.
 func makeAuthenticatedAsset(for url: URL) -> AVURLAsset {
     let authenticatedURL = signedURL(url) ?? url
-    var headers: [String: String] = [:]
-    if let config = ServerConfigManager.shared.loadConfig(),
-       let apiKey = config.secureApiKey, !apiKey.isEmpty {
-        headers["ApiKey"] = apiKey
-    }
+    let headers = ServerConfigManager.shared.loadConfig()?.requestHeaders(for: url) ?? [:]
     return AVURLAsset(url: authenticatedURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
 }
 

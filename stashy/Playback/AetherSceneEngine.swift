@@ -617,9 +617,10 @@ final class AetherSceneEngine: ObservableObject {
 
         var options = LoadOptions()
         options.autoplay = autoplay
-        if let key = ServerConfigManager.shared.activeConfig?.secureApiKey, !key.isEmpty,
-           requestURL.isFileURL == false {
-            options.httpHeaders["ApiKey"] = key
+        if requestURL.isFileURL == false {
+            for (name, value) in ServerConfigManager.shared.activeConfig?.requestHeaders(for: requestURL) ?? [:] {
+                options.httpHeaders[name] = value
+            }
         }
         switch kind {
         case .original:
@@ -873,11 +874,9 @@ final class AetherSceneEngine: ObservableObject {
         if let existing = scrubExtractor, scrubExtractorURL == signed { return existing }
         shutdownScrubExtractor()
 
-        var headers: [String: String] = [:]
-        if let key = ServerConfigManager.shared.activeConfig?.secureApiKey, !key.isEmpty,
-           url.isFileURL == false {
-            headers["ApiKey"] = key
-        }
+        let headers = url.isFileURL
+            ? [:]
+            : (ServerConfigManager.shared.activeConfig?.requestHeaders(for: url) ?? [:])
         let created = engine.makeFrameExtractor(url: signed, httpHeaders: headers)
         scrubExtractor = created
         scrubExtractorURL = signed
@@ -947,9 +946,10 @@ final class AetherSceneEngine: ObservableObject {
     @discardableResult
     func addExternalSubtitleTrack(url: URL, name: String?, language: String?, formatHint: String? = nil) -> Int? {
         var headers: [String: String]?
-        if let key = ServerConfigManager.shared.activeConfig?.secureApiKey, !key.isEmpty,
-           url.isFileURL == false {
-            headers = ["ApiKey": key]
+        if url.isFileURL == false,
+           let resolved = ServerConfigManager.shared.activeConfig?.requestHeaders(for: url),
+           !resolved.isEmpty {
+            headers = resolved
         }
         let track = ExternalSubtitleTrack(url: url,
                                           name: name,

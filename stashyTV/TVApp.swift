@@ -408,6 +408,8 @@ struct TVServerSetupView: View {
     @State private var port: String = ""
     @State private var selectedProtocol: ServerProtocol = .https
     @State private var apiKey: String = ""
+    /// Custom HTTP headers — a server behind SSO can't be reached without them.
+    @State private var customHeaders: [ServerHTTPHeader] = []
     
     // Auth State
     @State private var authMethod: AuthMethod = .none
@@ -534,6 +536,8 @@ struct TVServerSetupView: View {
                         .background(Color.white.opacity(0.05))
                         .cornerRadius(20)
 
+                        TVCustomHeadersCard(headers: $customHeaders)
+
                         if let errorMessage = errorMessage {
                             Text(errorMessage)
                                 .foregroundColor(.red)
@@ -574,7 +578,11 @@ struct TVServerSetupView: View {
             serverAddress: finalAddress,
             port: finalPort,
             serverProtocol: selectedProtocol,
-            apiKey: apiKey.isEmpty ? nil : apiKey
+            apiKey: apiKey.isEmpty ? nil : apiKey,
+            customHeaders: {
+                let usable = ServerHTTPHeader.sanitized(customHeaders)
+                return usable.isEmpty ? nil : usable
+            }()
         )
 
         isTesting = true
@@ -630,7 +638,9 @@ struct TVServerSetupView: View {
                 let fetchedKey = try await LoginAuthHelper.shared.fetchAPIKey(
                     baseURL: config.baseURL,
                     username: username,
-                    password: password
+                    password: password,
+                    extraHeaders: ServerHTTPHeader.sanitized(customHeaders)
+                        .reduce(into: [:]) { $0[$1.name] = $1.value }
                 )
                 
                 await MainActor.run {

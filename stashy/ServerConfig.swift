@@ -46,6 +46,46 @@ enum ConnectionType: String, Codable, CaseIterable {
     }
 }
 
+/// A user-defined HTTP header sent with every request to the Stash server — for setups behind
+/// SSO or a reverse proxy that expects its own token (e.g. `X-Auth-Token`, `CF-Access-Client-Id`).
+struct ServerHTTPHeader: Codable, Equatable, Hashable, Identifiable, Sendable {
+    var id: UUID = UUID()
+    var name: String
+    var value: String
+
+    init(id: UUID = UUID(), name: String, value: String) {
+        self.id = id
+        self.name = name
+        self.value = value
+    }
+
+    /// Headers URLSession / the player manage themselves; setting them breaks requests.
+    nonisolated static let reservedNames: Set<String> = [
+        "host", "content-length", "content-type", "connection", "transfer-encoding",
+        "upgrade", "range", "accept-encoding", "te", "trailer", "keep-alive", "proxy-connection"
+    ]
+
+    nonisolated var trimmedName: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
+    nonisolated var trimmedValue: String { value.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// RFC 7230 token characters only, not reserved, value present.
+    nonisolated var isUsable: Bool {
+        let n = trimmedName
+        guard !n.isEmpty, !trimmedValue.isEmpty else { return false }
+        guard !Self.reservedNames.contains(n.lowercased()) else { return false }
+        let token = CharacterSet(charactersIn: "!#$%&'*+-.^_`|~0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+        return n.unicodeScalars.allSatisfy { token.contains($0) }
+            && !trimmedValue.contains("\n") && !trimmedValue.contains("\r")
+    }
+
+    /// Empty rows are dropped silently; invalid names are reported by the form.
+    nonisolated static func sanitized(_ headers: [ServerHTTPHeader]) -> [ServerHTTPHeader] {
+        headers
+            .filter { $0.isUsable }
+            .map { ServerHTTPHeader(id: $0.id, name: $0.trimmedName, value: $0.trimmedValue) }
+    }
+}
+
 struct ServerConfig: Codable, Identifiable, Equatable {
     var id: UUID = UUID()
     var name: String = "My Stash"
@@ -54,6 +94,9 @@ struct ServerConfig: Codable, Identifiable, Equatable {
     var serverProtocol: ServerProtocol
     var apiKey: String?        // Optional API Key for authentication
     var subpath: String?       // Optional subpath (e.g. "/stash")
+    /// Custom headers. iOS keeps them in the Keychain (`secureCustomHeaders`) and leaves this
+    /// nil; tvOS has no Keychain here and stores them in the config like the API key.
+    var customHeaders: [ServerHTTPHeader]?
 
     var baseURL: String {
         let effectivePort = port ?? serverProtocol.defaultPort
@@ -98,6 +141,33 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         return apiKey?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
+    /// Custom headers from the Keychain (iOS) or the stored config (tvOS / not yet migrated).
+    nonisolated var secureCustomHeaders: [ServerHTTPHeader] {
+        #if !os(tvOS)
+        let stored = KeychainManager.shared.loadCustomHeaders(forServerID: id)
+        if !stored.isEmpty { return stored }
+        #endif
+        return ServerHTTPHeader.sanitized(customHeaders ?? [])
+    }
+
+    /// Everything a request to `url` needs to authenticate: the Stash `ApiKey` plus the custom
+    /// headers. Custom headers only go to this server's host, never to a third party (stash-box
+    /// artwork, funscript hosts); `nil` means "a request to the server itself".
+    nonisolated func requestHeaders(for url: URL? = nil) -> [String: String] {
+        if let url, url.isFileURL { return [:] }
+        var headers: [String: String] = [:]
+        if let key = secureApiKey, !key.isEmpty {
+            headers["ApiKey"] = key
+        }
+        let host = url?.host?.lowercased()
+        if host == nil || host == serverAddress.lowercased() {
+            for header in secureCustomHeaders {
+                headers[header.name] = header.value
+            }
+        }
+        return headers
+    }
+
     // Modern initializer
     init(
         id: UUID = UUID(),
@@ -106,7 +176,8 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         port: String? = nil,
         serverProtocol: ServerProtocol = .https,
         apiKey: String? = nil,
-        subpath: String? = nil
+        subpath: String? = nil,
+        customHeaders: [ServerHTTPHeader]? = nil
     ) {
         self.id = id
         self.name = name
@@ -115,6 +186,7 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         self.serverProtocol = serverProtocol
         self.apiKey = apiKey
         self.subpath = subpath
+        self.customHeaders = customHeaders
     }
     
     // Backward compatibility decoder
@@ -124,6 +196,7 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         id = try container.decodeIfPresent(UUID.self, forKey: .id) ?? UUID()
         name = try container.decodeIfPresent(String.self, forKey: .name) ?? "My Stash"
         apiKey = try container.decodeIfPresent(String.self, forKey: .apiKey)
+        customHeaders = try container.decodeIfPresent([ServerHTTPHeader].self, forKey: .customHeaders)
         
         // Try to decode new format first
         if let serverAddress = try? container.decode(String.self, forKey: .serverAddress),
@@ -163,10 +236,11 @@ struct ServerConfig: Codable, Identifiable, Equatable {
         try container.encode(serverProtocol, forKey: .serverProtocol)
         try container.encodeIfPresent(apiKey, forKey: .apiKey)
         try container.encodeIfPresent(subpath, forKey: .subpath)
+        try container.encodeIfPresent(customHeaders, forKey: .customHeaders)
     }
     
     enum CodingKeys: String, CodingKey {
-        case id, name, apiKey, subpath
+        case id, name, apiKey, subpath, customHeaders
         // New format keys
         case serverAddress, port, serverProtocol
         // Legacy format keys (for backward compatibility)
@@ -254,6 +328,7 @@ class ServerConfigManager: ObservableObject {
             let coreSettingsChanged = oldConfig == nil ||
                 oldConfig?.baseURL != config.baseURL ||
                 oldConfig?.secureApiKey != config.secureApiKey ||
+                oldConfig?.secureCustomHeaders != config.secureCustomHeaders ||
                 oldConfig?.id != config.id
 
             if coreSettingsChanged {
@@ -371,6 +446,7 @@ class ServerConfigManager: ObservableObject {
             let id = servers[index].id
             #if !os(tvOS)
             _ = KeychainManager.shared.deleteAPIKey(forServerID: id)
+            KeychainManager.shared.deleteCustomHeaders(forServerID: id)
             #endif
             ImageCache.shared.clearCache(forServerID: id)
         }
@@ -387,6 +463,7 @@ class ServerConfigManager: ObservableObject {
         
         #if !os(tvOS)
         _ = KeychainManager.shared.deleteAPIKey(forServerID: id)
+        KeychainManager.shared.deleteCustomHeaders(forServerID: id)
         #endif
         ImageCache.shared.clearCache(forServerID: id)
         

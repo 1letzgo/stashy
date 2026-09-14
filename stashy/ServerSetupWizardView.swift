@@ -20,6 +20,9 @@ struct ServerSetupWizardView: View {
     @State private var serverAddress = ""
     @State private var serverProtocol: ServerProtocol = .https
     @State private var apiKey = ""
+    /// Custom HTTP headers (SSO / reverse proxy); a server behind one can't pass the test without them.
+    @State private var customHeaders: [ServerHTTPHeader] = []
+    @State private var showsCustomHeaders = false
     @State private var serverName = "My Stash"
     
     // Auth State
@@ -231,6 +234,8 @@ struct ServerSetupWizardView: View {
                     .padding()
                     .background(Color.secondaryAppBackground)
                     .cornerRadius(DesignTokens.CornerRadius.card)
+
+                    customHeadersCard
                 }
                 .padding(.horizontal, 24)
                 
@@ -239,6 +244,74 @@ struct ServerSetupWizardView: View {
         }
     }
     
+    /// Collapsed by default — most servers need no extra headers.
+    private var customHeadersCard: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Button {
+                withAnimation { showsCustomHeaders.toggle() }
+            } label: {
+                HStack {
+                    Text("Custom Headers")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    if !ServerHTTPHeader.sanitized(customHeaders).isEmpty {
+                        Text("\(ServerHTTPHeader.sanitized(customHeaders).count)")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundColor(.secondary)
+                    }
+                    Spacer()
+                    Image(systemName: showsCustomHeaders ? "chevron.up" : "chevron.down")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .buttonStyle(.plain)
+
+            if showsCustomHeaders {
+                ForEach($customHeaders) { $header in
+                    HStack(spacing: 8) {
+                        VStack(spacing: 8) {
+                            TextField("Header name", text: $header.name)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .font(.body.monospaced())
+                                .padding(10)
+                                .background(Color.appBackground.opacity(0.3))
+                                .cornerRadius(DesignTokens.CornerRadius.button)
+                            SecureField("Value", text: $header.value)
+                                .textInputAutocapitalization(.never)
+                                .autocorrectionDisabled()
+                                .padding(10)
+                                .background(Color.appBackground.opacity(0.3))
+                                .cornerRadius(DesignTokens.CornerRadius.button)
+                        }
+                        Button {
+                            customHeaders.removeAll { $0.id == header.id }
+                        } label: {
+                            Image(systemName: "minus.circle.fill").foregroundColor(.red)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Remove header")
+                    }
+                }
+                Button {
+                    customHeaders.append(ServerHTTPHeader(name: "", value: ""))
+                } label: {
+                    Label("Add Header", systemImage: "plus.circle.fill")
+                }
+                .buttonStyle(.plain)
+                .foregroundColor(AppearanceManager.shared.tintColor)
+
+                Text("Sent with every request to this server, e.g. for SSO or a reverse proxy that needs its own token.")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding()
+        .background(Color.secondaryAppBackground)
+        .cornerRadius(DesignTokens.CornerRadius.card)
+    }
+
     // MARK: - Step 2: Connection Test
     
     private var step2Test: some View {
@@ -406,6 +479,9 @@ struct ServerSetupWizardView: View {
         if (authMethod == .apiKey || authMethod == .login) && !apiKey.isEmpty {
             request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
         }
+        for header in ServerHTTPHeader.sanitized(customHeaders) {
+            request.setValue(header.value, forHTTPHeaderField: header.name)
+        }
         
         URLSession.shared.dataTask(with: request) { data, response, error in
             DispatchQueue.main.async {
@@ -444,7 +520,10 @@ struct ServerSetupWizardView: View {
     }
     
     private func completeSetup() {
-        let config = buildConfig()
+        var config = buildConfig()
+        // Header values go to the Keychain, never into the UserDefaults config.
+        KeychainManager.shared.saveCustomHeaders(ServerHTTPHeader.sanitized(customHeaders), forServerID: config.id)
+        config.customHeaders = nil
         onComplete(config)
         dismiss()
     }
@@ -459,7 +538,9 @@ struct ServerSetupWizardView: View {
                 let fetchedKey = try await LoginAuthHelper.shared.fetchAPIKey(
                     baseURL: config.baseURL,
                     username: username,
-                    password: password
+                    password: password,
+                    extraHeaders: ServerHTTPHeader.sanitized(customHeaders)
+                        .reduce(into: [:]) { $0[$1.name] = $1.value }
                 )
                 
                 await MainActor.run {

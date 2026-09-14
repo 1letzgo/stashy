@@ -1921,8 +1921,8 @@ struct FullScreenImageView: View {
             sessionConfig.timeoutIntervalForRequest = 60
             let session = URLSession(configuration: sessionConfig)
             var request = URLRequest(url: url)
-            if let apiKey = ServerConfigManager.shared.activeConfig?.secureApiKey, !apiKey.isEmpty {
-                request.addValue(apiKey, forHTTPHeaderField: "ApiKey")
+            for (name, value) in ServerConfigManager.shared.activeConfig?.requestHeaders(for: url) ?? [:] {
+                request.setValue(value, forHTTPHeaderField: name)
             }
 
             guard let (data, response) = try? await session.data(for: request) else { return }

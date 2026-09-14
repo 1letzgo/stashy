@@ -265,12 +265,13 @@ actor GraphQLClient {
     }
 
     private func buildRequest(query: String, variables: [String: Any]?) async throws -> URLRequest {
-        let (urlString, apiKey) = await MainActor.run { () -> (String?, String?) in
+        let (urlString, authHeaders) = await MainActor.run { () -> (String?, [String: String]) in
             guard let config = ServerConfigManager.shared.loadConfig(),
                   config.hasValidConfig else {
-                return (nil, nil)
+                return (nil, [:])
             }
-            return ("\(config.baseURL)/graphql", config.secureApiKey)
+            // ApiKey plus the server's custom headers (SSO / reverse proxy).
+            return ("\(config.baseURL)/graphql", config.requestHeaders())
         }
 
         guard let urlString = urlString, let url = URL(string: urlString) else {
@@ -283,12 +284,14 @@ actor GraphQLClient {
         request.timeoutInterval = timeout
         request.cachePolicy = URLRequest.CachePolicy.reloadIgnoringLocalCacheData
 
-        if let apiKey = apiKey, !apiKey.isEmpty {
-            request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
-            #if DEBUG
-            AppLog.debug("📱 GraphQL: Using \(AppLog.redacted(apiKey, label: "ApiKey"))")
-            #endif
+        for (name, value) in authHeaders where name.caseInsensitiveCompare("Content-Type") != .orderedSame {
+            request.setValue(value, forHTTPHeaderField: name)
         }
+        #if DEBUG
+        if let apiKey = authHeaders["ApiKey"] {
+            AppLog.debug("📱 GraphQL: Using \(AppLog.redacted(apiKey, label: "ApiKey"))")
+        }
+        #endif
 
         if let variables = variables {
             let body: [String: Any] = [

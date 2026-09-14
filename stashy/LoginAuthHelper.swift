@@ -31,7 +31,7 @@ class LoginAuthHelper {
     }
     
     /// Authenticates with username/password and retrieves the API Key via GraphQL
-    func fetchAPIKey(baseURL: String, username: String, password: String) async throws -> String {
+    func fetchAPIKey(baseURL: String, username: String, password: String, extraHeaders: [String: String] = [:]) async throws -> String {
         let sessionConfig = URLSessionConfiguration.default
         sessionConfig.httpCookieAcceptPolicy = .always
         sessionConfig.httpShouldSetCookies = true
@@ -47,6 +47,8 @@ class LoginAuthHelper {
         var loginRequest = URLRequest(url: loginURL)
         loginRequest.httpMethod = "POST"
         loginRequest.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+        // Custom headers (SSO / reverse proxy) must reach the login endpoint too.
+        for (name, value) in extraHeaders { loginRequest.setValue(value, forHTTPHeaderField: name) }
         
         let loginBody = "username=\(username.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")&password=\(password.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")"
         loginRequest.httpBody = loginBody.data(using: .utf8)
@@ -70,6 +72,7 @@ class LoginAuthHelper {
         var gqlRequest = URLRequest(url: gqlURL)
         gqlRequest.httpMethod = "POST"
         gqlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        for (name, value) in extraHeaders { gqlRequest.setValue(value, forHTTPHeaderField: name) }
         
         let query = """
         {"query": "{ configuration { general { apiKey } } }"}

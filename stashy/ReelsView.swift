@@ -6058,9 +6058,8 @@ final class ReelsScrubThumbnailProvider: ObservableObject {
         if let extractor { Task { await extractor.shutdown() } }
 
         var headers: [String: String] = [:]
-        if !url.isFileURL, url.absoluteString.hasPrefix("http"),
-           let key = ServerConfigManager.shared.activeConfig?.secureApiKey, !key.isEmpty {
-            headers["ApiKey"] = key
+        if !url.isFileURL, url.absoluteString.hasPrefix("http") {
+            headers = ServerConfigManager.shared.activeConfig?.requestHeaders(for: url) ?? [:]
         }
         let created = FrameExtractor(url: signed, httpHeaders: headers)
         extractor = created

@@ -18,6 +18,9 @@ struct ServerFormViewNew: View {
     @State private var serverAddress: String = ""
     @State private var serverProtocol: ServerProtocol = .https
     @State private var apiKey: String = ""
+    /// Custom HTTP headers (SSO / reverse proxy). Kept in the Keychain on save.
+    @State private var customHeaders: [ServerHTTPHeader] = []
+    @State private var originalCustomHeaders: [ServerHTTPHeader] = []
     
     // Connection Test State
     @State private var isTesting: Bool = false
@@ -206,6 +209,11 @@ struct ServerFormViewNew: View {
             }
 
             Section {
+                stashyScrollingSectionHeader("Custom Headers")
+                ServerCustomHeadersEditor(headers: $customHeaders)
+            }
+
+            Section {
                 stashyScrollingSectionHeader("Connection")
                 Button(action: {
                     let detection = ServerConfig.detectProtocol(from: serverAddress)
@@ -300,6 +308,8 @@ struct ServerFormViewNew: View {
                 serverAddress = address
                 
                 serverProtocol = config.serverProtocol
+                customHeaders = config.secureCustomHeaders
+                originalCustomHeaders = customHeaders
                 
                 // Load API key from Keychain first, fallback to config
                 if let savedKey = KeychainManager.shared.loadAPIKey(forServerID: config.id) {
@@ -318,6 +328,7 @@ struct ServerFormViewNew: View {
             Button("Delete", role: .destructive) {
                 if let config = configToEdit {
                     KeychainManager.shared.deleteAPIKey(forServerID: config.id)
+                    KeychainManager.shared.deleteCustomHeaders(forServerID: config.id)
                 }
                 onDelete?()
                 presentationMode.wrappedValue.dismiss()
@@ -370,6 +381,10 @@ struct ServerFormViewNew: View {
                         request.setValue(apiKey, forHTTPHeaderField: "ApiKey")
                     }
                 }
+        // The proxy in front of Stash sees the test request too.
+        for header in ServerHTTPHeader.sanitized(customHeaders) {
+            request.setValue(header.value, forHTTPHeaderField: header.name)
+        }
         
         let query = """
         {"query": "{ version { version } }"}
@@ -446,6 +461,10 @@ struct ServerFormViewNew: View {
             KeychainManager.shared.deleteAPIKey(forServerID: serverID)
         }
         
+        let headers = ServerHTTPHeader.sanitized(customHeaders)
+        KeychainManager.shared.saveCustomHeaders(headers, forServerID: serverID)
+        let headersChanged = headers.map { [$0.name, $0.value] } != originalCustomHeaders.map { [$0.name, $0.value] }
+
         let parsed = ServerConfig.parseAddress(serverAddress)
         let newConfig = ServerConfig(
             id: serverID,
@@ -457,6 +476,13 @@ struct ServerFormViewNew: View {
             subpath: parsed.subpath
         )
         onSave(newConfig)
+
+        // The manager compares Keychain reads of the same server, so a header edit on the
+        // active server is invisible to it — reset explicitly so nothing keeps the old auth.
+        if headersChanged, ServerConfigManager.shared.activeConfig?.id == serverID {
+            URLCache.shared.removeAllCachedResponses()
+            NotificationCenter.default.post(name: NSNotification.Name("ServerConfigChanged"), object: nil)
+        }
     }
     
     private func fetchKeyViaLogin() {
@@ -470,7 +496,9 @@ struct ServerFormViewNew: View {
                 let fetchedKey = try await LoginAuthHelper.shared.fetchAPIKey(
                     baseURL: currentBaseURL,
                     username: username,
-                    password: password
+                    password: password,
+                    extraHeaders: ServerHTTPHeader.sanitized(customHeaders)
+                        .reduce(into: [:]) { $0[$1.name] = $1.value }
                 )
                 
                 await MainActor.run {
@@ -489,6 +517,80 @@ struct ServerFormViewNew: View {
                 }
             }
         }
+    }
+}
+
+// MARK: - Custom headers editor
+
+/// Name/value rows for the server's custom HTTP headers. Shared by the server form and the
+/// setup wizard. Values are secure fields — they are usually tokens.
+struct ServerCustomHeadersEditor: View {
+    @Binding var headers: [ServerHTTPHeader]
+    @ObservedObject private var appearanceManager = AppearanceManager.shared
+
+    private var rowCount: Int { headers.count + 1 }
+
+    var body: some View {
+        ForEach(Array(headers.enumerated()), id: \.element.id) { index, header in
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 10) {
+                    TextField("Header name", text: binding(for: header.id, \.name))
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                        .font(.body.monospaced())
+                    Button {
+                        headers.removeAll { $0.id == header.id }
+                    } label: {
+                        Image(systemName: "minus.circle.fill")
+                            .foregroundColor(.red)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Remove header")
+                }
+                SecureField("Value", text: binding(for: header.id, \.value))
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                if let problem = problem(for: header) {
+                    Text(problem)
+                        .font(.caption)
+                        .foregroundColor(.orange)
+                }
+            }
+            .padding(.vertical, 4)
+            .stashyGroupedBlockRow(index: index, count: rowCount)
+        }
+
+        Button {
+            headers.append(ServerHTTPHeader(name: "", value: ""))
+        } label: {
+            Label("Add Header", systemImage: "plus.circle.fill")
+                .foregroundColor(appearanceManager.tintColor)
+        }
+        .buttonStyle(.borderless)
+        .stashyGroupedBlockRow(index: headers.count, count: rowCount)
+
+        stashyScrollingSectionFooter("Sent with every request to this server, e.g. for SSO or a reverse proxy that needs its own token. Stored in the Keychain.")
+    }
+
+    private func binding(for id: UUID, _ keyPath: WritableKeyPath<ServerHTTPHeader, String>) -> Binding<String> {
+        Binding(
+            get: { headers.first { $0.id == id }?[keyPath: keyPath] ?? "" },
+            set: { newValue in
+                guard let index = headers.firstIndex(where: { $0.id == id }) else { return }
+                headers[index][keyPath: keyPath] = newValue
+            }
+        )
+    }
+
+    /// Only for rows the user has started filling in; empty rows are just ignored on save.
+    private func problem(for header: ServerHTTPHeader) -> String? {
+        let name = header.trimmedName
+        guard !name.isEmpty || !header.trimmedValue.isEmpty else { return nil }
+        if name.isEmpty { return "Enter a header name." }
+        if ServerHTTPHeader.reservedNames.contains(name.lowercased()) { return "\(name) is managed by the app and can't be set." }
+        if header.trimmedValue.isEmpty { return "Enter a value." }
+        if !header.isUsable { return "Header names may only contain letters, digits and - _ . ! # $ % & ' * + ^ ` | ~" }
+        return nil
     }
 }
 

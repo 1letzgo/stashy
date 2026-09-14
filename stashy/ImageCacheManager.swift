@@ -612,10 +612,9 @@ class ImageLoader: ObservableObject {
         request.timeoutInterval = 10.0 // Reduced timeout for faster failure
         request.cachePolicy = .reloadIgnoringLocalCacheData // Force check with server if not in own cache
 
-        // Add API Key if available
-        if let config = ServerConfigManager.shared.activeConfig,
-           let apiKey = config.secureApiKey, !apiKey.isEmpty {
-            request.addValue(apiKey, forHTTPHeaderField: "ApiKey")
+        // ApiKey plus the server's custom headers (SSO / reverse proxy).
+        for (name, value) in ServerConfigManager.shared.activeConfig?.requestHeaders(for: authenticatedURL) ?? [:] {
+            request.setValue(value, forHTTPHeaderField: name)
         }
 
         do {
