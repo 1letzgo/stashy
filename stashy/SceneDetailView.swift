@@ -428,8 +428,9 @@ struct SceneDetailView: View {
                             }
                             .frame(maxWidth: .infinity)
                             .padding()
-                            .background(appearanceManager.tintColor.opacity(0.15))
-                            .foregroundColor(Color.pillAccent)
+                            // Destructive, like the delete buttons in the edit sheets — never the accent.
+                            .background(Color.red.opacity(0.15))
+                            .foregroundColor(.red)
                             .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                         }
                         .buttonStyle(.plain)
@@ -504,8 +505,9 @@ struct SceneDetailView: View {
                         }
                         .frame(maxWidth: .infinity)
                         .padding()
-                        .background(appearanceManager.tintColor.opacity(0.15))
-                        .foregroundColor(Color.pillAccent)
+                        // Destructive, like the delete buttons in the edit sheets — never the accent.
+                        .background(Color.red.opacity(0.15))
+                        .foregroundColor(.red)
                         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                     }
                     .buttonStyle(.plain)
