@@ -442,6 +442,13 @@ class TabManager: ObservableObject {
     }
     static let playerSkipOptions: [Double] = [5, 10, 15, 30]
 
+    /// Settings › Playback › Dolby Vision. Off plays the HDR10 / HLG base layer of a Dolby Vision
+    /// file instead (AetherEngine `LoadOptions.dolbyVisionHandling = .baseLayerOnly`, 6.81) — for
+    /// remuxes whose Dolby Vision is broken (green / purple picture) while the base layer is fine.
+    @Published var playerDolbyVisionEnabled: Bool = true {
+        didSet { UserDefaults.standard.set(playerDolbyVisionEnabled, forKey: playerDolbyVisionEnabledKey) }
+    }
+
     // MARK: Subtitles (Settings → Playback → Subtitles)
 
     /// Pick the preferred subtitle track as soon as a scene's tracks are known.
@@ -533,6 +540,7 @@ class TabManager: ObservableObject {
     private let reelsContinuousPlayKey = "ReelsContinuousPlay"
     private let isPiPEnabledKey = "isPiPEnabled"
     private let playerSkipSecondsKey = "playerSkipSeconds"
+    private let playerDolbyVisionEnabledKey = "player_dolby_vision_enabled"
     private let subtitlesAutoEnabledKey = "subtitle_auto_enabled"
     private let subtitlePreferredLanguageKey = "subtitle_preferred_language"
     private let subtitleFontSizeKey = "subtitle_font_size"
@@ -582,6 +590,7 @@ class TabManager: ObservableObject {
         self.isPiPEnabled = UserDefaults.standard.object(forKey: isPiPEnabledKey) as? Bool ?? true
         let storedSkip = UserDefaults.standard.object(forKey: playerSkipSecondsKey) as? Double ?? 10
         self.playerSkipSeconds = Self.playerSkipOptions.contains(storedSkip) ? storedSkip : 10
+        self.playerDolbyVisionEnabled = UserDefaults.standard.object(forKey: playerDolbyVisionEnabledKey) as? Bool ?? true
         loadSubtitleSettings()
         self.reelsShowsDeleteButton = UserDefaults.standard.bool(forKey: reelsShowsDeleteButtonKey)
         self.sceneCardsShowStudioLogo = UserDefaults.standard.object(forKey: sceneCardsShowStudioLogoKey) as? Bool ?? true

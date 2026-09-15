@@ -20,7 +20,7 @@ struct PlaybackSettingsSection: View {
                     Label("Picture-in-Picture", systemImage: "pip")
                 }
                 .tint(appearanceManager.tintColor)
-                .stashyGroupedBlockRow(index: 0, count: 2)
+                .stashyGroupedBlockRow(index: 0, count: 3)
 
                 Picker(selection: $tabManager.playerSkipSeconds) {
                     ForEach(TabManager.playerSkipOptions, id: \.self) { seconds in
@@ -29,7 +29,15 @@ struct PlaybackSettingsSection: View {
                 } label: {
                     Label("Double-tap skip", systemImage: "goforward")
                 }
-                .stashyGroupedBlockRow(index: 1, count: 2)
+                .stashyGroupedBlockRow(index: 1, count: 3)
+
+                Toggle(isOn: $tabManager.playerDolbyVisionEnabled) {
+                    Label("Dolby Vision", systemImage: "sparkles.tv")
+                }
+                .tint(appearanceManager.tintColor)
+                .stashyGroupedBlockRow(index: 2, count: 3)
+
+                stashyScrollingSectionFooter("Turn off if a Dolby Vision scene shows green or purple colors. It then plays as HDR10.")
                 #endif
             }
 

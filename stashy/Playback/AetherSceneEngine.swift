@@ -617,6 +617,9 @@ final class AetherSceneEngine: ObservableObject {
 
         var options = LoadOptions()
         options.autoplay = autoplay
+        // Settings › Playback › Dolby Vision off: present the HDR10 / HLG base layer instead.
+        // A genuine Profile 5 has no base layer; the engine keeps its Dolby Vision route then.
+        options.dolbyVisionHandling = TabManager.shared.playerDolbyVisionEnabled ? .automatic : .baseLayerOnly
         if requestURL.isFileURL == false {
             for (name, value) in ServerConfigManager.shared.activeConfig?.requestHeaders(for: requestURL) ?? [:] {
                 options.httpHeaders[name] = value
