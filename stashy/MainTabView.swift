@@ -443,7 +443,11 @@ private struct ToolsLandingView: View {
 
     @ObservedObject private var appearance = AppearanceManager.shared
 
-    private let columns = [GridItem(.adaptive(minimum: 104), spacing: 12)]
+    /// Two columns like the Tags grid (three on a wide screen).
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
+    private var columns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 12), count: horizontalSizeClass == .regular ? 3 : 2)
+    }
 
     var body: some View {
         ScrollView {
@@ -477,31 +481,33 @@ private struct ToolsLandingView: View {
         .applyAppBackground()
     }
 
-    /// Built like `HomeChannelCardView` on the dashboard: the tinted glyph sits slightly above
-    /// centre on the card surface, the title centred at the bottom in 12pt bold. Same corner radius, and
-    /// no shadow — the channel cards carry none either.
+    /// Built like `TagCardView`: a grey header block at 2.2:1 carrying the tinted glyph, the name
+    /// in bold below it, card fill, corner radius and shadow of the Tags grid.
     private func tile(_ tool: ToolsView.ToolsTab) -> some View {
-        let height: CGFloat = 104
+        VStack(alignment: .leading, spacing: 0) {
+            Color.studioHeaderGray
+                .aspectRatio(2.2, contentMode: .fit)
+                .overlay(
+                    Image(systemName: tool.icon)
+                        .font(.system(size: 32, weight: .bold))
+                        .foregroundColor(appearance.tintColor)
+                )
+                .clipped()
 
-        return ZStack(alignment: .bottom) {
-            Color.secondaryAppBackground
-
-            Image(systemName: tool.icon)
-                .font(.system(size: height * 0.34, weight: .semibold))
-                .foregroundColor(appearance.tintColor)
-                .offset(y: -height * 0.06)
-                .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            Text(tool.rawValue)
-                .font(.system(size: 12, weight: .bold))
-                .foregroundColor(.primary)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: .infinity)
-                .padding(8)
+            HStack(spacing: 8) {
+                Text(tool.rawValue)
+                    .font(.subheadline)
+                    .fontWeight(.bold)
+                    .foregroundColor(.primary)
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
         }
-        .frame(height: height)
+        .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .cardShadow()
     }
 }
 
