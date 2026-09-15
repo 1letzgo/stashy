@@ -833,24 +833,16 @@ struct RateMeToolsView: View {
                     .padding(.horizontal, DesignTokens.Tools.contentPadding)
             }
 
-            // One row: Scenes / Images stay put on the left, the themes scroll behind them.
-            HStack(spacing: 8) {
-                HStack(spacing: 6) {
-                    ForEach(RateMeViewModel.Mode.allCases) { mode in
-                        themeChip(title: mode.label, icon: mode.emptyIcon, selected: model.mode == mode) {
-                            model.mode = mode
-                        }
-                    }
-                }
-                .padding(.leading, DesignTokens.Tools.contentPadding)
-                .disabled(model.isSubmitting)
-
-                Divider()
-                    .frame(height: 20)
-
+            // One row: the Scenes / Images switch stays put on the left, the themes scroll
+            // behind it. The switch is a segmented control, not another chip, so the two kinds
+            // of choice read differently.
+            HStack(spacing: 10) {
+                modeToggle
+                    .padding(.leading, DesignTokens.Tools.contentPadding)
                 themeChips
             }
-            .padding(.vertical, 8)
+            .padding(.top, 4)
+            .padding(.bottom, 12)
 
             content
         }
@@ -902,20 +894,22 @@ struct RateMeToolsView: View {
     @ViewBuilder
     private var content: some View {
         VStack(spacing: 12) {
-            if model.mode == .images {
-                imageMediaKindChrome
-            }
-
             if model.isLoading && model.item == nil {
                 StandardLoadingView(message: "Loading…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let item = model.item {
-                mediaCard(item)
-                    .layoutPriority(1)
-                    .frame(maxWidth: isRegular ? 720 : .infinity)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-
-                detailsAndActions(item)
+                // One block: media at the height it needs (up to what is free), rating and
+                // actions directly under it. Free space goes below the block, not between the
+                // picture and its controls.
+                VStack(spacing: 12) {
+                    mediaCard(item)
+                        .layoutPriority(1)
+                    ratingRow(item)
+                    actionRow(item)
+                    Spacer(minLength: 0)
+                }
+                .frame(maxWidth: isRegular ? 720 : .infinity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else {
                 ContentUnavailableView(
                     "Nothing to rate",
@@ -930,28 +924,58 @@ struct RateMeToolsView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    @ViewBuilder
-    private func detailsAndActions(_ item: RateMeViewModel.Item) -> some View {
-        detailsCard(item)
-        ratingRow(item)
+    /// Skip and open side by side, same height.
+    private func actionRow(_ item: RateMeViewModel.Item) -> some View {
+        HStack(spacing: 10) {
+            Button {
+                HapticManager.light()
+                Task { await model.skip() }
+            } label: {
+                Label("Skip", systemImage: "forward.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 46)
+                    .background(Color.secondaryAppBackground)
+                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
+                    .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
+            }
+            .buttonStyle(.plain)
+            .disabled(model.isSubmitting || model.isLoading)
 
-
-        if item.mode == .scenes {
-            watchSceneButton(for: item)
-        } else if item.mode == .images {
-            openImageButton(for: item)
+            if item.mode == .scenes {
+                watchSceneButton(for: item)
+            } else {
+                openImageButton(for: item)
+            }
         }
+    }
 
-        Button {
-            Task { await model.skip() }
-        } label: {
-            Label("Skip", systemImage: "forward.fill")
-                .font(.subheadline.weight(.semibold))
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
+    /// Scenes / Images as one segmented capsule with icons.
+    private var modeToggle: some View {
+        HStack(spacing: 2) {
+            ForEach(RateMeViewModel.Mode.allCases) { mode in
+                let selected = model.mode == mode
+                Button {
+                    guard !selected else { return }
+                    HapticManager.selection()
+                    model.mode = mode
+                } label: {
+                    Image(systemName: mode.emptyIcon)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.7))
+                        .frame(width: 38, height: 26)
+                        .background(Capsule(style: .continuous).fill(selected ? appearance.tintColor : Color.clear))
+                        .contentShape(Capsule(style: .continuous))
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel(mode.label)
+                .accessibilityAddTraits(selected ? .isSelected : [])
+            }
         }
-        .buttonStyle(.bordered)
-        .disabled(model.isSubmitting || model.isLoading)
+        .padding(2)
+        .background(Capsule(style: .continuous).fill(Color.secondaryAppBackground))
+        .disabled(model.isSubmitting)
     }
 
     // MARK: Themes
@@ -960,6 +984,9 @@ struct RateMeToolsView: View {
         ScrollViewReader { proxy in
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
+                    if model.mode == .images {
+                        mediaKindMenu
+                    }
                     ForEach(model.availableFixedThemes) { theme in
                         themeChip(title: theme.label, icon: theme.icon, selected: model.theme == theme) {
                             Task { await model.selectTheme(theme) }
@@ -1019,6 +1046,29 @@ struct RateMeToolsView: View {
 
     private func mediaCard(_ item: RateMeViewModel.Item) -> some View {
         RateMeMediaView(item: item)
+            .overlay(alignment: .bottomLeading) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(item.title)
+                        .font(.headline)
+                        .lineLimit(2)
+                    if let performers = item.performerNames {
+                        Text(performers)
+                            .font(.subheadline)
+                            .opacity(0.8)
+                            .lineLimit(1)
+                    }
+                }
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.5), radius: 2, y: 1)
+                .padding(.horizontal, 12)
+                .padding(.top, 28)
+                .padding(.bottom, 10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    LinearGradient(colors: [.clear, .black.opacity(0.7)], startPoint: .top, endPoint: .bottom)
+                )
+                .allowsHitTesting(false)
+            }
             .background(Color.secondaryAppBackground)
             .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
             .overlay(
@@ -1033,13 +1083,16 @@ struct RateMeToolsView: View {
         NavigationLink {
             SceneDetailView(scene: Self.stubScene(from: item))
         } label: {
-            Label("Watch Scene", systemImage: "play.rectangle.fill")
+            Label("Watch", systemImage: "play.fill")
                 .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.white)
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 10)
+                .frame(height: 46)
+                .background(appearance.tintColor)
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
+                .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
         }
-        .buttonStyle(.borderedProminent)
-        .tint(appearance.tintColor)
+        .buttonStyle(.plain)
         .simultaneousGesture(TapGesture().onEnded { HapticManager.light() })
         .disabled(model.isSubmitting || model.isLoading)
         .accessibilityLabel("Watch Scene")
@@ -1052,13 +1105,16 @@ struct RateMeToolsView: View {
                 NavigationLink {
                     FullScreenImageView(images: .constant([image]), selectedImageId: image.id)
                 } label: {
-                    Label("Open Image", systemImage: "photo.fill")
+                    Label("Open", systemImage: "arrow.up.left.and.arrow.down.right")
                         .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
+                        .frame(height: 46)
+                        .background(appearance.tintColor)
+                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
+                        .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(appearance.tintColor)
+                .buttonStyle(.plain)
                 .simultaneousGesture(TapGesture().onEnded { HapticManager.light() })
                 .disabled(model.isSubmitting || model.isLoading)
                 .accessibilityLabel("Open Image")
@@ -1183,6 +1239,38 @@ struct RateMeToolsView: View {
         )
         .cardShadow()
         .opacity(model.isSubmitting ? 0.85 : 1)
+    }
+
+    /// Any / Image / Video as a compact menu chip in the theme row (images mode only).
+    private var mediaKindMenu: some View {
+        Menu {
+            Picker("Media", selection: $model.imageMediaKind) {
+                ForEach(ImageListMediaKind.allCases) { kind in
+                    Text(Self.mediaKindTitle(kind)).tag(kind)
+                }
+            }
+        } label: {
+            HStack(spacing: 4) {
+                Text(Self.mediaKindTitle(model.imageMediaKind))
+                Image(systemName: "chevron.down")
+                    .font(.caption2.weight(.bold))
+            }
+            .font(.caption.weight(.semibold))
+            .foregroundStyle(model.imageMediaKind == .all ? Color.primary.opacity(0.85) : Color.white)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 12)
+            .frame(height: 30)
+            .background(Capsule(style: .continuous).fill(model.imageMediaKind == .all ? Color.secondaryAppBackground : appearance.tintColor))
+        }
+        .disabled(model.isSubmitting)
+    }
+
+    private static func mediaKindTitle(_ kind: ImageListMediaKind) -> String {
+        switch kind {
+        case .all: return "Any media"
+        case .stillImage: return "Images"
+        case .video: return "Videos"
+        }
     }
 
     private var imageMediaKindChrome: some View {
