@@ -61,6 +61,14 @@ struct AetherSceneSurface: View {
     @State private var isFastForwarding = false
     @State private var rateBeforeFastForward: Float = 1
     @State private var fastForwardArmTask: DispatchWorkItem?
+    /// Hold left of the play button: 2× backwards. The engine has no negative rate, so this is
+    /// a paused scrub — half a second back every quarter second — resumed on release.
+    @State private var isRewinding = false
+    @State private var wasPlayingBeforeRewind = false
+    @State private var rewindTimer: Timer?
+    /// Position the rewind has reached. Kept here rather than read back from the engine: a
+    /// landed seek reports its time a beat later, and reading it made each step shorter.
+    @State private var rewindPosition: Double = 0
     /// Mirrors of engine state that is not observable, so the slider and the speed menu redraw.
     @State private var volumeLevel: Float = 1
     @State private var playbackRate: Float = 1
@@ -157,6 +165,8 @@ struct AetherSceneSurface: View {
             engine.setVideoGravity(fills ? .resizeAspectFill : .resizeAspect)
         }
         .onDisappear {
+            rewindTimer?.invalidate()
+            rewindTimer = nil
             if isFullscreen { engine.setVideoGravity(.resizeAspect) }
             pip.update(layer: nil)
             endScrubPreview()
@@ -321,9 +331,9 @@ struct AetherSceneSurface: View {
             // middle third keeps a plain single tap so the most common play/pause tap never
             // waits out a double-tap window.
             HStack(spacing: 0) {
-                tapRegion(doubleTapSkip: -tabManager.playerSkipSeconds)
-                tapRegion(doubleTapSkip: nil)
-                tapRegion(doubleTapSkip: tabManager.playerSkipSeconds)
+                tapRegion(doubleTapSkip: -tabManager.playerSkipSeconds, holdRewinds: true)
+                tapRegion(doubleTapSkip: nil, holdRewinds: false)
+                tapRegion(doubleTapSkip: tabManager.playerSkipSeconds, holdRewinds: false)
             }
 
             // Opacity instead of structural insertion: a conditional `if` plus a transition
@@ -782,10 +792,11 @@ struct AetherSceneSurface: View {
         .accessibilityLabel(isMuted ? "Unmute" : "Mute")
     }
 
-    /// One third of the surface. Single tap toggles playback everywhere; the outer thirds
-    /// additionally take a double tap for the ±10 s jump.
+    /// One third of the surface. Single tap toggles the controls everywhere; the outer thirds
+    /// additionally take a double tap for the ±10 s jump. Holding runs 2× forward, or 2×
+    /// backwards on the left third.
     @ViewBuilder
-    private func tapRegion(doubleTapSkip: Double?) -> some View {
+    private func tapRegion(doubleTapSkip: Double?, holdRewinds: Bool) -> some View {
         let region = Color.clear
             .contentShape(Rectangle())
             // `pressing` fires on touch-down, not after the minimum duration, so the hold is
@@ -794,13 +805,16 @@ struct AetherSceneSurface: View {
             .onLongPressGesture(minimumDuration: 0.6, pressing: { pressing in
                 if pressing {
                     fastForwardArmTask?.cancel()
-                    let task = DispatchWorkItem { setFastForwarding(true) }
+                    let task = DispatchWorkItem {
+                        if holdRewinds { setRewinding(true) } else { setFastForwarding(true) }
+                    }
                     fastForwardArmTask = task
                     DispatchQueue.main.asyncAfter(deadline: .now() + 0.6, execute: task)
                 } else {
                     fastForwardArmTask?.cancel()
                     fastForwardArmTask = nil
                     setFastForwarding(false)
+                    setRewinding(false)
                 }
             }, perform: {})
         if let doubleTapSkip {
@@ -846,11 +860,39 @@ struct AetherSceneSurface: View {
         withAnimation(.easeInOut(duration: 0.15)) { isFastForwarding = active }
     }
 
+    /// Press-and-hold rewind: playback pauses and the position steps back 0.5 s every 0.25 s
+    /// (2× backwards); on release the previous play state comes back.
+    private func setRewinding(_ active: Bool) {
+        guard active != isRewinding else { return }
+        if active {
+            guard engine.hasFirstFrame, engine.currentTime > 0 else { return }
+            HapticManager.selection()
+            wasPlayingBeforeRewind = engine.isPlaying
+            engine.pause()
+            rewindPosition = engine.currentTime
+            let timer = Timer(timeInterval: 0.25, repeats: true) { _ in
+                Task { @MainActor in
+                    let target = max(0, rewindPosition - 0.5)
+                    rewindPosition = target
+                    onSeek(target)
+                    if target <= 0 { setRewinding(false) }
+                }
+            }
+            RunLoop.main.add(timer, forMode: .common)
+            rewindTimer = timer
+        } else {
+            rewindTimer?.invalidate()
+            rewindTimer = nil
+            if wasPlayingBeforeRewind { engine.play() }
+        }
+        withAnimation(.easeInOut(duration: 0.15)) { isRewinding = active }
+    }
+
     @ViewBuilder
     private var fastForwardOverlay: some View {
-        if isFastForwarding {
+        if isFastForwarding || isRewinding {
             VStack {
-                Image(systemName: "chevron.right.2")
+                Image(systemName: isRewinding ? "chevron.left.2" : "chevron.right.2")
                     .font(.system(size: isCompact ? 22 : 32, weight: .black))
                     .foregroundColor(.white)
                     .padding(.horizontal, isCompact ? 16 : 22)
