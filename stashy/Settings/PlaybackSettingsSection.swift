@@ -37,7 +37,6 @@ struct PlaybackSettingsSection: View {
                 .tint(appearanceManager.tintColor)
                 .stashyGroupedBlockRow(index: 2, count: 3)
 
-                stashyScrollingSectionFooter("Turn off if a Dolby Vision scene shows green or purple colors. It then plays as HDR10.")
                 #endif
             }
 
