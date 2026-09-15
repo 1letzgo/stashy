@@ -13,6 +13,14 @@ struct TVSceneCardView: View {
     var height: CGFloat = 230
     @Environment(\.isFocused) var isFocused
 
+    /// Muted preview once the card has held focus for 2 s, like the iOS cards. The pool keeps
+    /// one preview engine on tvOS, so moving focus hands it to the next card.
+    @StateObject private var previewPlayer = AetherPreviewPlayer()
+    @State private var previewTask: Task<Void, Never>?
+    @State private var isPreviewing = false
+
+    private static let previewDelayNanoseconds: UInt64 = 2_000_000_000
+
     var body: some View {
         // Thumbnail with overlays
         ZStack(alignment: .bottomLeading) {
@@ -21,6 +29,15 @@ struct TVSceneCardView: View {
                 .frame(width: width, height: height)
                 .clipped()
                 .clipShape(RoundedRectangle(cornerRadius: 10))
+
+            // Only once a frame is on screen, so focusing a card never flashes black.
+            if isPreviewing && previewPlayer.hasFirstFrame {
+                AetherPreviewSurface(player: previewPlayer, fill: true)
+                    .frame(width: width, height: height)
+                    .clipShape(RoundedRectangle(cornerRadius: 10))
+                    .allowsHitTesting(false)
+                    .transition(.opacity)
+            }
 
             // Gradient
             LinearGradient(
@@ -107,6 +124,34 @@ struct TVSceneCardView: View {
             }
         }
         .frame(width: width, height: height)
+        .animation(.easeInOut(duration: 0.25), value: isPreviewing && previewPlayer.hasFirstFrame)
+        .onChange(of: isFocused) { _, focused in
+            if focused { schedulePreview() } else { stopPreview() }
+        }
+        .onAppear { if isFocused { schedulePreview() } }
+        .onDisappear { stopPreview() }
+    }
+
+    // MARK: - Preview
+
+    private func schedulePreview() {
+        previewTask?.cancel()
+        guard let url = scene.previewURL else { return }
+        previewTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: Self.previewDelayNanoseconds)
+            guard !Task.isCancelled, isFocused else { return }
+            // AetherPreviewPlayer is always muted and uses the ambient audio policy.
+            previewPlayer.start(url: url)
+            isPreviewing = true
+        }
+    }
+
+    private func stopPreview() {
+        previewTask?.cancel()
+        previewTask = nil
+        guard isPreviewing else { return }
+        isPreviewing = false
+        previewPlayer.stop(release: true)
     }
 
     // MARK: - Thumbnail
