@@ -12,6 +12,11 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
     @State private var playingChannel: TVChannel?
     @ObservedObject private var stashyPlus = StashyPlusManager.shared
     @FocusState private var emptyFocus: Bool
+    /// Start focus in the header. Without it tvOS put the first scene card in focus and
+    /// scrolled the page down on open, cutting off the name and image.
+    @FocusState private var headerFocus: Bool
+    /// Set once focus has left the header; from then on loading never pulls focus back.
+    @State private var headerFocusReleased = false
     @Environment(\.tvContentWidth) private var contentWidth
 
     private var sceneSpec: TVGridSpec { .scenes }
@@ -82,6 +87,7 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                             } label: {
                                 Label("Play as Channel", systemImage: "play.tv.fill")
                             }
+                            .focused($headerFocus)
                         }
 
                         if isLoading {
@@ -107,6 +113,11 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 60)
                 .padding(.top, 40)
+                // Without the channel button the header has nothing focusable; this
+                // invisible anchor keeps the opening focus (and scroll) at the top.
+                .focusable(!showsChannelButton)
+                .focusEffectDisabled()
+                .focused($headerFocus)
 
                 // Additional Content (e.g. more metadata or specific views)
                 additionalContent()
@@ -142,10 +153,10 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                             Spacer()
                         }
                         .padding(.vertical, 60)
-                        // Fokussierbar, damit die Menu-Taste auch während des
-                        // Ladens ein Ziel hat — sonst hängt man bei einem
-                        // nicht antwortenden Server in der gepushten View fest.
-                        .focusable()
+                        // Not focusable: the header (channel button or anchor) already gives
+                        // the Menu key a target while loading. A focusable spinner took the
+                        // opening focus, and when the grid replaced it tvOS moved focus to the
+                        // first scene card and scrolled the page down.
                     } else if scenes.isEmpty {
                         HStack {
                             Spacer()
@@ -200,11 +211,27 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
             }
         }
         .background(Color.appBackground)
+        .defaultFocus($headerFocus, true)
+        // `defaultFocus` only applies to the first layout. When the item or its scenes
+        // arrive later, tvOS re-picks focus and lands on the first scene card, scrolling
+        // the page down — so re-claim the header until the user has moved away from it.
+        .onChange(of: headerFocus) { wasFocused, isFocused in
+            if wasFocused && !isFocused { headerFocusReleased = true }
+        }
+        .onAppear { claimHeaderFocusIfUntouched() }
+        .onChange(of: showsChannelButton) { _, _ in claimHeaderFocusIfUntouched() }
+        .onChange(of: isLoading) { _, _ in claimHeaderFocusIfUntouched() }
+        .onChange(of: scenes.isEmpty) { _, _ in claimHeaderFocusIfUntouched() }
         .fullScreenCover(item: $playingChannel, onDismiss: {
             playingChannel = nil
         }) { channel in
             TVChannelPlayerView(channel: channel)
         }
+    }
+
+    private func claimHeaderFocusIfUntouched() {
+        guard !headerFocusReleased else { return }
+        DispatchQueue.main.async { headerFocus = true }
     }
 
     @ViewBuilder
