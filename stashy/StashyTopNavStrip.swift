@@ -214,6 +214,9 @@ struct StashyExpandingDockBrowseStrip: View {
                 .animation(reduceMotion ? nil : StashyExpandingDock.selectionAnimation, value: selectionID)
             }
             .scrollContentBackground(.hidden)
+            // The glass effect draws a little past its capsule; clipped at the scroll bounds it
+            // showed as a faint rectangle around the active chip.
+            .scrollClipDisabled()
             .onChange(of: selectionID) { _, newID in
                 proxy.scrollTo(newID, anchor: .center)
             }
@@ -236,25 +239,15 @@ private struct StashyExpandingDockChipBackground: ViewModifier {
         let shape = Capsule(style: .continuous)
         if glassInactive {
             // Glass chrome: selected = tinted glass, inactive = plain glass.
+            // No selection glow: inside the horizontally scrolling strip it was cut into a
+            // visible rectangle around the active chip (Tools, Home, Feeds, ...).
             content
                 .stashyChromeFill(shape: shape, activeColor: isSelected ? activeColor : nil)
-                .shadow(
-                    color: isSelected ? activeColor.opacity(0.35) : .clear,
-                    radius: 6,
-                    x: 0,
-                    y: 3
-                )
         } else {
             content
                 .background {
                     shape
                         .fill(isSelected ? activeColor : inactiveColor)
-                        .shadow(
-                            color: isSelected ? activeColor.opacity(0.35) : .clear,
-                            radius: 6,
-                            x: 0,
-                            y: 3
-                        )
                 }
                 .clipShape(shape)
         }
