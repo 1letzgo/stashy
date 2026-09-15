@@ -78,7 +78,9 @@ struct CatalogCategoryRow: View {
             selectionID: selection.rawValue,
             titleColor: .white,
             menuAccessibilityLabel: "Catalog",
-            menuAccessibilityHint: "Chooses which catalog section to show"
+            menuAccessibilityHint: "Chooses which catalog section to show",
+            // Like Tools: the first entry (Dashboard) stays at the left, the rest scroll under it.
+            pinnedItemID: tabs.first?.rawValue
         ) { id in
             if let tab = CatalogsView.CatalogsTab(rawValue: id) {
                 selection = tab
