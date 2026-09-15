@@ -836,13 +836,15 @@ struct RateMeToolsView: View {
             // One row: the Scenes / Images switch stays put on the left, the themes scroll
             // behind it. The switch is a segmented control, not another chip, so the two kinds
             // of choice read differently.
-            HStack(spacing: 10) {
+            HStack(spacing: StashyExpandingDock.itemSpacing) {
                 modeToggle
                     .padding(.leading, DesignTokens.Tools.contentPadding)
                 themeChips
             }
-            .padding(.top, 4)
-            .padding(.bottom, 12)
+            // Same size and spacing as the pill rows in Charts and Match.
+            // The theme scroller carries 6 pt of vertical room for the selection glow.
+            .padding(.top, max(0, DesignTokens.Tools.menuTopPadding - 6))
+            .padding(.bottom, max(0, DesignTokens.Tools.menuBottomPadding - 6))
 
             content
         }
@@ -898,15 +900,14 @@ struct RateMeToolsView: View {
                 StandardLoadingView(message: "Loading…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let item = model.item {
-                // One block: media at the height it needs (up to what is free), rating and
-                // actions directly under it. Free space goes below the block, not between the
-                // picture and its controls.
+                // Media at the top, taking the height it needs (up to what is free). Rating and
+                // Skip / Open are pinned to the bottom so they never move between items.
                 VStack(spacing: 12) {
                     mediaCard(item)
                         .layoutPriority(1)
+                    Spacer(minLength: 0)
                     ratingRow(item)
                     actionRow(item)
-                    Spacer(minLength: 0)
                 }
                 .frame(maxWidth: isRegular ? 720 : .infinity)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -962,9 +963,9 @@ struct RateMeToolsView: View {
                     model.mode = mode
                 } label: {
                     Image(systemName: mode.emptyIcon)
-                        .font(.caption.weight(.semibold))
+                        .font(.subheadline.weight(.semibold))
                         .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.7))
-                        .frame(width: 38, height: 26)
+                        .frame(width: 46, height: StashyExpandingDock.activeHeight - 4)
                         .background(Capsule(style: .continuous).fill(selected ? appearance.tintColor : Color.clear))
                         .contentShape(Capsule(style: .continuous))
                 }
@@ -1002,6 +1003,7 @@ struct RateMeToolsView: View {
                     }
                 }
                 .padding(.trailing, DesignTokens.Tools.contentPadding)
+                .padding(.vertical, 6)
             }
             // A picked performer / studio / tag sits at the far end; bring its chip into view.
             .onChange(of: model.theme) { _, theme in
@@ -1025,19 +1027,26 @@ struct RateMeToolsView: View {
         }
     }
 
+    /// Fill and selection glow of the Charts / Match pills.
+    private func pillBackground(selected: Bool) -> some View {
+        Capsule(style: .continuous)
+            .fill(selected ? appearance.tintColor : Color.secondaryAppBackground)
+            .shadow(color: selected ? appearance.tintColor.opacity(0.35) : .clear, radius: 6, x: 0, y: 3)
+    }
+
     private func themeChip(title: String, icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
         Button {
             HapticManager.selection()
             action()
         } label: {
             Label(title, systemImage: icon)
-                .font(.caption.weight(.semibold))
+                .font(.subheadline.weight(.semibold))
                 .lineLimit(1)
                 .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.85))
-                .padding(.horizontal, 12)
-                .frame(height: 30)
-                .background(Capsule(style: .continuous).fill(selected ? appearance.tintColor : Color.secondaryAppBackground))
+                .padding(.horizontal, 16)
+                .frame(height: StashyExpandingDock.activeHeight)
+                .background(pillBackground(selected: selected))
                 .contentShape(Capsule(style: .continuous))
         }
         .buttonStyle(.plain)
@@ -1255,12 +1264,12 @@ struct RateMeToolsView: View {
                 Image(systemName: "chevron.down")
                     .font(.caption2.weight(.bold))
             }
-            .font(.caption.weight(.semibold))
+            .font(.subheadline.weight(.semibold))
             .foregroundStyle(model.imageMediaKind == .all ? Color.primary.opacity(0.85) : Color.white)
             .fixedSize(horizontal: true, vertical: false)
-            .padding(.horizontal, 12)
-            .frame(height: 30)
-            .background(Capsule(style: .continuous).fill(model.imageMediaKind == .all ? Color.secondaryAppBackground : appearance.tintColor))
+            .padding(.horizontal, 16)
+            .frame(height: StashyExpandingDock.activeHeight)
+            .background(pillBackground(selected: model.imageMediaKind != .all))
         }
         .disabled(model.isSubmitting)
     }
