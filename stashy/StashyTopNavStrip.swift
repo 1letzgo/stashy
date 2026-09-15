@@ -215,8 +215,11 @@ struct StashyExpandingDockBrowseStrip: View {
             }
             .scrollContentBackground(.hidden)
             // The glass effect draws a little past its capsule; clipped at the scroll bounds it
-            // showed as a faint rectangle around the active chip.
+            // showed as a faint rectangle around the active chip. So the strip does not clip,
+            // and a mask cuts only the sides: chips still pass under the pinned item and end at
+            // the strip's edges, while the glass keeps room above and below.
             .scrollClipDisabled()
+            .mask(Rectangle().padding(.vertical, -24))
             .onChange(of: selectionID) { _, newID in
                 proxy.scrollTo(newID, anchor: .center)
             }
