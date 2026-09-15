@@ -165,6 +165,13 @@ private enum HotOrNotSwissMath {
         return items.last
     }
 
+    /// Elo spread for the 1–100 `rating100` scale. Chess uses 400 on a ~0–3000 scale; kept at
+    /// 400 here the expected score stayed near 50 % for any pair (20 vs 80 read as an even
+    /// match), so every duel swung about K/2 regardless of the gap. 40 keeps the chess shape on
+    /// this scale: a 10-point gap is a ~64 % favourite, 40 points ~91 %.
+    /// Deliberate deviation from the Ascension plugin, which still divides by 400.
+    static let eloScale: Double = 40
+
     /// Match count for Ascension `getProgressiveKFactor` (`total_matches` with fallback to played games).
     static func matchCountForProgressive(_ stats: HotOrNotStats) -> Int {
         max(stats.total_matches, stats.wins + stats.losses + stats.draws)
@@ -222,13 +229,16 @@ private enum HotOrNotSwissMath {
         isSpecialChallenge: Bool = false
     ) -> (winnerGain: Int, loserLoss: Int) {
         let ratingDiff = loserRating - winnerRating
-        let expectedWinner = 1 / (1 + pow(10, ratingDiff / 400))
+        let expectedWinner = 1 / (1 + pow(10, ratingDiff / eloScale))
         let winnerK = Double(getProgressiveKFactor(rating: winnerRating, matchCount: winnerMatchCount, mode: mode))
         let loserK = Double(getProgressiveKFactor(rating: loserRating, matchCount: loserMatchCount, mode: mode))
         let winnerUnderdogMult = getUnderdogMultiplier(winnerRating: winnerRating, loserRating: loserRating)
         let lossProtection = isSpecialChallenge ? 0.1 : getChallengeProtectionMultiplier(loserRating: loserRating, winnerRating: winnerRating)
         var winnerGain = (winnerK * (1 - expectedWinner) * winnerUnderdogMult).rounded()
-        var loserLoss = (loserK * expectedWinner * lossProtection).rounded()
+        // Elo: the loser gives up what their own expected score was worth, K × (1 − E_winner).
+        // The plugin used K × E_winner, which punished losing to a favourite hardest and an
+        // upset least; with the old 400 spread E sat at ~0.5 and hid that, at 40 it would not.
+        var loserLoss = (loserK * (1 - expectedWinner) * lossProtection).rounded()
 
         if mode == "gauntlet" {
             let currentStreak = winnerStats.current_streak
@@ -276,7 +286,7 @@ private enum HotOrNotSwissMath {
         rightMatchCount: Int
     ) -> (leftGain: Int, rightLoss: Int) {
         let ratingDiff = rightRating - leftRating
-        let expectedWinner = 1 / (1 + pow(10, ratingDiff / 400))
+        let expectedWinner = 1 / (1 + pow(10, ratingDiff / eloScale))
         let wK = Double(getProgressiveKFactor(rating: leftRating, matchCount: leftMatchCount, mode: "swiss"))
         let lK = Double(getProgressiveKFactor(rating: rightRating, matchCount: rightMatchCount, mode: "swiss"))
         let leftGain = Int(round(wK * (0.5 - expectedWinner)))
@@ -301,7 +311,7 @@ private enum HotOrNotSwissMath {
         let mcW = matchCountForProgressive(winnerStats)
         let mcL = matchCountForProgressive(loserStats)
         let ratingDiff = loserRating - winnerRating
-        let ew = 1 / (1 + pow(10, ratingDiff / 400))
+        let ew = 1 / (1 + pow(10, ratingDiff / eloScale))
         let eStr = String(format: "%.4f", ew)
         let wK = getProgressiveKFactor(rating: winnerRating, matchCount: mcW, mode: ascensionMode)
         let lK = getProgressiveKFactor(rating: loserRating, matchCount: mcL, mode: ascensionMode)
@@ -324,7 +334,7 @@ private enum HotOrNotSwissMath {
         let mcL = matchCountForProgressive(leftStats)
         let mcR = matchCountForProgressive(rightStats)
         let ratingDiff = rightRating - leftRating
-        let ew = 1 / (1 + pow(10, ratingDiff / 400))
+        let ew = 1 / (1 + pow(10, ratingDiff / eloScale))
         let eStr = String(format: "%.4f", ew)
         let kLeft = getProgressiveKFactor(rating: leftRating, matchCount: mcL, mode: "swiss")
         let kRight = getProgressiveKFactor(rating: rightRating, matchCount: mcR, mode: "swiss")
