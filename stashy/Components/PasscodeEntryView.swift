@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct PasscodeEntryView: View {
+    @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @ObservedObject var securityManager = SecurityManager.shared
     @ObservedObject var appearanceManager = AppearanceManager.shared
     
@@ -106,12 +107,19 @@ struct PasscodeEntryView: View {
                     .disabled(isLockedOut)
                 }
             }
+            // iPhone-sized keypad on every device: on iPad the three columns spread across
+            // the full width and the keys drifted far apart.
+            .frame(maxWidth: 320)
             .frame(maxWidth: .infinity)
             .foregroundColor(.primary)
             .opacity(isLockedOut ? 0.4 : 1)
             .allowsHitTesting(!isLockedOut)
             .padding(.bottom, 30)
         }
+        // iPad: header and keypad stay together as one iPhone-sized block, centred. iPhone keeps
+        // its full-height layout with the keypad at the bottom.
+        .frame(maxWidth: horizontalSizeClass == .regular ? 420 : .infinity,
+               maxHeight: horizontalSizeClass == .regular ? 760 : .infinity)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .padding(.horizontal)
         .background(Color.appBackground.ignoresSafeArea())

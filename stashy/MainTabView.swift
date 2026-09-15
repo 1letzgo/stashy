@@ -29,6 +29,15 @@ struct MainTabView: View {
         case authExpired
     }
 
+    /// `-stashyDebugShowLock YES` (DEBUG): shows the passcode screen for layout checks.
+    private static var debugShowsLockScreen: Bool {
+        #if DEBUG
+        UserDefaults.standard.bool(forKey: "stashyDebugShowLock")
+        #else
+        false
+        #endif
+    }
+
     var body: some View {
         ZStack {
             Color.appBackground(for: appearanceManager.currentTheme)
@@ -113,7 +122,7 @@ struct MainTabView: View {
                 ensureSelectedTabIsVisible()
             }
 
-            if securityManager.isAppLocked {
+            if securityManager.isAppLocked || Self.debugShowsLockScreen {
                 PasscodeEntryView()
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(100)
