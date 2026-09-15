@@ -842,9 +842,8 @@ struct RateMeToolsView: View {
                 themeChips
             }
             // Same size and spacing as the pill rows in Charts and Match.
-            // The theme scroller carries 6 pt of vertical room for the selection glow.
-            .padding(.top, max(0, DesignTokens.Tools.menuTopPadding - 6))
-            .padding(.bottom, max(0, DesignTokens.Tools.menuBottomPadding - 6))
+            .padding(.top, DesignTokens.Tools.menuTopPadding)
+            .padding(.bottom, DesignTokens.Tools.menuBottomPadding)
 
             content
         }
@@ -1003,7 +1002,6 @@ struct RateMeToolsView: View {
                     }
                 }
                 .padding(.trailing, DesignTokens.Tools.contentPadding)
-                .padding(.vertical, 6)
             }
             // A picked performer / studio / tag sits at the far end; bring its chip into view.
             .onChange(of: model.theme) { _, theme in
@@ -1027,11 +1025,11 @@ struct RateMeToolsView: View {
         }
     }
 
-    /// Fill and selection glow of the Charts / Match pills.
+    /// Fill of the Charts / Match pills. No glow: those clip their shadow away, and here the
+    /// horizontal scroller cut it into a visible rectangle around the selected pill.
     private func pillBackground(selected: Bool) -> some View {
         Capsule(style: .continuous)
             .fill(selected ? appearance.tintColor : Color.secondaryAppBackground)
-            .shadow(color: selected ? appearance.tintColor.opacity(0.35) : .clear, radius: 6, x: 0, y: 3)
     }
 
     private func themeChip(title: String, icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
