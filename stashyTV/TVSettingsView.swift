@@ -18,7 +18,6 @@ private enum TVSettingsEntry: Hashable {
     case defaultSort, defaultFilters, visibleTabs
     case subtitles
     case dolbyVision
-    case sidebar
     case maintenance
     case about
 
@@ -33,7 +32,6 @@ private enum TVSettingsEntry: Hashable {
         case .visibleTabs: return "Visible Tabs"
         case .subtitles: return "Subtitles"
         case .dolbyVision: return "Dolby Vision"
-        case .sidebar: return "Sidebar Navigation"
         case .maintenance: return "Maintenance"
         case .about: return "About"
         }
@@ -50,7 +48,6 @@ private enum TVSettingsEntry: Hashable {
         case .visibleTabs: return "rectangle.3.group.fill"
         case .subtitles: return "captions.bubble.fill"
         case .dolbyVision: return "sparkles.tv"
-        case .sidebar: return "sidebar.leading"
         case .maintenance: return "internaldrive"
         case .about: return "info.circle"
         }
@@ -76,8 +73,6 @@ private enum TVSettingsEntry: Hashable {
             return "Turn subtitles on automatically, choose the language a scene should start with, and set how the cues look."
         case .dolbyVision:
             return "Turn off if a Dolby Vision scene shows green or purple colors. It then plays as HDR10, which your TV still shows in HDR."
-        case .sidebar:
-            return "The left sidebar is the standard for Apple TV. Turn it off to go back to the classic tab bar along the top."
         case .maintenance:
             return "Clear the cached artwork for the active server. Images are re-downloaded as they are shown again."
         case .about:
@@ -88,7 +83,6 @@ private enum TVSettingsEntry: Hashable {
 
 struct TVSettingsView: View {
     @ObservedObject private var appearanceManager = AppearanceManager.shared
-    @AppStorage("tvUseSidebar") private var useSidebar = true
     @ObservedObject private var tabManager = TabManager.shared
     @FocusState private var focusedEntry: TVSettingsEntry?
     /// Wird an die gepushten Unterseiten weitergereicht, damit `tvExitDismissable()`
@@ -145,24 +139,13 @@ struct TVSettingsView: View {
 
             Section {
                 link(.subtitles)
-                // Toggle-Zustand zeichnet tvOS selbst an, wie bei der Sidebar.
+                // Kein eigener Wert-Text: tvOS zeichnet den Toggle-Zustand rechts selbst an.
                 Toggle(isOn: $tabManager.playerDolbyVisionEnabled) {
                     row(.dolbyVision)
                 }
                 .focused($focusedEntry, equals: .dolbyVision)
             } header: {
                 Text("Playback")
-            }
-
-            Section {
-                // Kein eigener Wert-Text: tvOS zeichnet den Toggle-Zustand
-                // rechts selbst an, sonst steht dort zweimal „On".
-                Toggle(isOn: $useSidebar) {
-                    row(.sidebar)
-                }
-                .focused($focusedEntry, equals: .sidebar)
-            } header: {
-                Text("Navigation")
             }
 
             Section {
@@ -201,7 +184,7 @@ struct TVSettingsView: View {
         case .maintenance: TVMaintenanceSettingsView()
         case .about: TVAboutSettingsView()
         // Kein Link, sondern ein Toggle in der Liste.
-        case .sidebar, .dolbyVision: EmptyView()
+        case .dolbyVision: EmptyView()
         }
     }
 

@@ -52,11 +52,6 @@ struct TVMainTabView: View {
         #endif
     }
 
-    /// Rückfalltür auf die alte obere Leiste. Das Sidebar-Verhalten lässt sich
-    /// ohne Gerät nicht verifizieren — bleibt sie unbrauchbar, kommt der Nutzer
-    /// hierüber zurück, ohne dass neu gebaut werden muss.
-    @AppStorage("tvUseSidebar") private var useSidebar = true
-
     /// Home ist ein eigener Eintrag über der Library-Sektion.
     private let homeTab = TVContentTab(
         id: .home, appTab: .catalogue, title: "Home", systemImage: "house.fill"
@@ -148,7 +143,7 @@ struct TVMainTabView: View {
                 TVTabStack(tab: .settings) { TVSettingsView() }
             }
         }
-        .modifier(TVTabPresentationStyle(sidebar: useSidebar))
+        .tabViewStyle(.sidebarAdaptable)
         .environmentObject(navigationStore)
         .onChange(of: tabManager.tabs) { _, _ in
             // Blendet der Nutzer den gerade aktiven Bereich aus, zeigt der
@@ -181,23 +176,6 @@ struct TVMainTabView: View {
         case .home, .search, .settings:
             // Diese drei werden oben direkt deklariert.
             EmptyView()
-        }
-    }
-}
-
-/// Sidebar oder klassische obere Leiste. `.tabBarOnly` ist Apples dokumentierte
-/// Rückfalltür; im Fallback stimmt die Deklarationsreihenfolge für eine obere
-/// Leiste nicht mehr ganz (Search wird wieder nach rechts gepinnt), das ist
-/// kosmetisch schief, aber funktionsfähig.
-private struct TVTabPresentationStyle: ViewModifier {
-    let sidebar: Bool
-
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if sidebar {
-            content.tabViewStyle(.sidebarAdaptable)
-        } else {
-            content.tabViewStyle(.tabBarOnly)
         }
     }
 }
