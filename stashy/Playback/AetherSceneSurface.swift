@@ -298,11 +298,17 @@ struct AetherSceneSurface: View {
     /// Width of the pillarbox on each side in fullscreen (aspect-fit), 0 when the picture
     /// spans the surface, is cropped to fill, or inline.
     private var videoHorizontalInset: CGFloat {
+        // Landscape only: in portrait the bars are above and below the picture, and a source
+        // whose reported size is off (rotation metadata, odd pixel aspect) squeezed the controls
+        // into a sliver. Capped so the controls always keep a usable width.
         guard isFullscreen, !fillsScreen, let source = engine.sourceSize,
               source.width > 0, source.height > 0,
-              surfaceSize.width > 0, surfaceSize.height > 0 else { return 0 }
+              surfaceSize.width > surfaceSize.height, surfaceSize.height > 0 else { return 0 }
         let videoWidth = min(surfaceSize.width, surfaceSize.height * source.width / source.height)
-        return max(0, (surfaceSize.width - videoWidth) / 2)
+        let inset = max(0, (surfaceSize.width - videoWidth) / 2)
+        let minimumControlsWidth: CGFloat = 520
+        let maxInset = max(0, (surfaceSize.width - minimumControlsWidth) / 2)
+        return min(inset, maxInset)
     }
 
     private var chromeButtonSize: CGFloat { isCompact ? 34 : 42 }
@@ -337,12 +343,15 @@ struct AetherSceneSurface: View {
 
             // Top row: dismiss / expand plus the output-route capsule on the left, the volume
             // capsule on the right.
+            // The row must never be wider than the surface: with close, rotate, PiP, AirPlay
+            // and options next to a fixed 210 pt capsule it overflowed on a 375–402 pt wide
+            // iPhone, and the overlay grew past the screen, so every control on it was cut off
+            // at both edges. The volume capsule gives way first: narrower, then mute only.
             VStack {
-                HStack(alignment: .top, spacing: 10) {
-                    topLeadingControls
-                    Spacer(minLength: 12)
-                    optionsMenu
-                    volumeControls
+                ViewThatFits(in: .horizontal) {
+                    topRow(volumeWidth: 210)
+                    topRow(volumeWidth: 130)
+                    topRow(volumeWidth: nil)
                 }
                 .padding(.horizontal, 16)
                 .padding(.top, 12)
@@ -442,18 +451,29 @@ struct AetherSceneSurface: View {
         }
     }
 
+    private func topRow(volumeWidth: CGFloat?) -> some View {
+        HStack(alignment: .top, spacing: 10) {
+            topLeadingControls
+            Spacer(minLength: 12)
+            optionsMenu
+            volumeControls(width: volumeWidth)
+        }
+    }
+
     // MARK: Volume
 
+    /// `width == nil` drops the slider and keeps the mute button — the fallback when the row
+    /// has no room for a capsule.
     @ViewBuilder
-    private var volumeControls: some View {
-        if showsVolumeSlider {
+    private func volumeControls(width: CGFloat?) -> some View {
+        if showsVolumeSlider, let width {
             HStack(spacing: 12) {
                 volumeSlider
                 muteButton
             }
             .padding(.leading, 16)
             .padding(.trailing, 10)
-            .frame(width: 210, height: chromeButtonSize)
+            .frame(width: width, height: chromeButtonSize)
             .stashyGlass(shape: Capsule())
         } else {
             muteButton
