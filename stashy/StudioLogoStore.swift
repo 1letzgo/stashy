@@ -87,11 +87,15 @@ actor StudioLogoStore {
         }
 
         // 2. Server
-        guard let config = ServerConfigManager.shared.loadConfig(),
-              let url = URL(string: "\(config.baseURL)/studio/\(studioId)/image") else {
-            return nil
+        // Config and request are main-actor state on tvOS (default isolation); build both there.
+        let built: URLRequest? = await MainActor.run {
+            guard let config = ServerConfigManager.shared.loadConfig(),
+                  let url = URL(string: "\(config.baseURL)/studio/\(studioId)/image") else {
+                return nil
+            }
+            return stashRequest(to: url, config: config, timeout: 20)
         }
-        let request = stashRequest(to: url, config: config, timeout: 20)
+        guard let request = built else { return nil }
         guard let (data, response) = try? await StashNetworking.session.data(for: request),
               let http = response as? HTTPURLResponse, http.statusCode == 200 else {
             return nil
@@ -121,7 +125,7 @@ actor StudioLogoStore {
         }.value
 
         if let rendered, let diskKey = diskKey(key), let png = rendered.pngData() {
-            ImageCache.shared.setData(png, forKey: diskKey)
+            await MainActor.run { ImageCache.shared.setData(png, forKey: diskKey) }
         }
         return rendered
     }
@@ -136,7 +140,7 @@ nonisolated enum StudioLogoRasterizer {
         guard image.size.height > 0, image.size.width > 0 else { return nil }
         guard let trimmed = trimmedToVisiblePixels(image) else { return nil }
         let size = fit(trimmed.size, height: height, maxWidth: maxWidth)
-        let format = UIGraphicsImageRendererFormat.default()
+        let format = UIGraphicsImageRendererFormat.preferred()
         format.scale = scale
         format.opaque = false
         return UIGraphicsImageRenderer(size: size, format: format).image { _ in

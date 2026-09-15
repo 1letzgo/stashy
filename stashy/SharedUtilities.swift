@@ -618,24 +618,33 @@ func makeAuthenticatedAsset(for url: URL) -> AVURLAsset {
     return AVURLAsset(url: authenticatedURL, options: ["AVURLAssetHTTPHeaderFieldsKey": headers])
 }
 
+/// `setCategory` / `setActive` block while the session is busy, which the runtime flags as a
+/// hang risk on the main thread. Both helpers run on this serial queue instead; serial keeps
+/// a playback-then-ambient sequence in the order it was asked for.
+private let audioSessionQueue = DispatchQueue(label: "de.letzgo.stashy.audio-session", qos: .userInitiated)
+
 func applyPlaybackAudioSession() {
-    let session = AVAudioSession.sharedInstance()
-    guard session.category != .playback else { return }
-    do {
-        try session.setCategory(.playback, mode: .moviePlayback, options: [])
-        try session.setActive(true)
-    } catch {
-        print("🎬 VIDEO PLAYER: Error setting up AVAudioSession: \(error)")
+    audioSessionQueue.async {
+        let session = AVAudioSession.sharedInstance()
+        guard session.category != .playback else { return }
+        do {
+            try session.setCategory(.playback, mode: .moviePlayback, options: [])
+            try session.setActive(true)
+        } catch {
+            AppLog.error("🎬 VIDEO PLAYER: Error setting up AVAudioSession: \(error)")
+        }
     }
 }
 
 /// Mixes with other audio (Music, podcasts). Used for muted previews and Feeds → Pics.
 func applyAmbientMixingAudioSession() {
-    do {
-        try AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: .mixWithOthers)
-        try AVAudioSession.sharedInstance().setActive(true)
-    } catch {
-        print("🎬 PREVIEW PLAYER: Error setting up AVAudioSession: \(error)")
+    audioSessionQueue.async {
+        do {
+            try AVAudioSession.sharedInstance().setCategory(.ambient, mode: .default, options: .mixWithOthers)
+            try AVAudioSession.sharedInstance().setActive(true)
+        } catch {
+            AppLog.error("🎬 PREVIEW PLAYER: Error setting up AVAudioSession: \(error)")
+        }
     }
 }
 

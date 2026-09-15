@@ -48,7 +48,7 @@ enum ConnectionType: String, Codable, CaseIterable {
 
 /// A user-defined HTTP header sent with every request to the Stash server — for setups behind
 /// SSO or a reverse proxy that expects its own token (e.g. `X-Auth-Token`, `CF-Access-Client-Id`).
-struct ServerHTTPHeader: Codable, Equatable, Hashable, Identifiable, Sendable {
+nonisolated struct ServerHTTPHeader: Codable, Equatable, Hashable, Identifiable, Sendable {
     var id: UUID = UUID()
     var name: String
     var value: String
@@ -187,7 +187,7 @@ struct ServerConfig: Codable, Identifiable, Equatable {
     }
     
     /// API key from Keychain (preferred) or stored value (migration fallback)
-    var secureApiKey: String? {
+    nonisolated var secureApiKey: String? {
         #if !os(tvOS)
         // First try Keychain
         if let keychainKey = KeychainManager.shared.loadAPIKey(forServerID: id) {
