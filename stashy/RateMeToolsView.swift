@@ -1360,43 +1360,49 @@ private struct RateMeThemePickerSheet: View {
     }
 
     var body: some View {
-        NavigationStack {
-            List {
-                if store.isLoading(storeKind) && options.isEmpty {
-                    HStack { Spacer(); ProgressView(); Spacer() }
-                        .listRowBackground(Color.clear)
-                }
-                ForEach(options) { option in
-                    Button {
-                        HapticManager.selection()
-                        onPick(option)
-                    } label: {
-                        Text(option.name)
-                            .foregroundStyle(.primary)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+        // Same build as the scene detail popups (Edit Performers / Tags / Studio): modal sheet
+        // chrome with Back, a "Search …" section holding the text field and the list below it.
+        NavigationView {
+            Form {
+                Section(header: Text("Search \(kind.title)s")) {
+                    TextField("Search...", text: $query)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                    if store.isLoading(storeKind) && options.isEmpty {
+                        HStack { Spacer(); ProgressView("Loading..."); Spacer() }.padding()
+                    } else {
+                        ForEach(options.prefix(50)) { option in
+                            HStack {
+                                Text(option.name)
+                                Spacer()
+                            }
                             .contentShape(Rectangle())
+                            .onTapGesture {
+                                HapticManager.selection()
+                                onPick(option)
+                            }
+                        }
+                        if options.count > 50 {
+                            Text("Type more to refine...").font(.caption).foregroundColor(.secondary)
+                        }
+                        if store.isSearching(storeKind) {
+                            HStack { Spacer(); ProgressView(); Spacer() }
+                        } else if !query.isEmpty && options.isEmpty {
+                            Text("No \(kind.title.lowercased())s match '\(query)'")
+                                .foregroundColor(.secondary)
+                        }
                     }
-                    .buttonStyle(.plain)
                 }
-                if store.isSearching(storeKind) {
-                    HStack { Spacer(); ProgressView(); Spacer() }
-                        .listRowBackground(Color.clear)
-                }
+                .listRowBackground(Color.secondaryAppBackground)
             }
-            .searchable(text: $query, prompt: "Search \(kind.title.lowercased())s")
+            .applyAppBackground()
+            .scrollContentBackground(.hidden)
+            .stashyModalSheetChrome(kind.title, onBack: { dismiss() })
             .onChange(of: query) { _, newValue in
                 store.search(storeKind, query: newValue)
             }
-            .navigationTitle(kind.title)
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") { dismiss() }
-                }
-            }
             .onAppear { store.load(storeKind) }
         }
-        .presentationDetents([.medium, .large])
     }
 }
 
