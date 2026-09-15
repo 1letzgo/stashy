@@ -164,8 +164,77 @@ private final class RateMeViewModel: ObservableObject {
         }
     }
 
+    /// What a round draws from. Random is the old behaviour; the rest narrow it so a round has a
+    /// point ("all unrated scenes of this performer").
+    enum Theme: Equatable, Identifiable {
+        case random
+        case newest
+        case mostPlayed
+        case performer(FilterEntityOption)
+        case studio(FilterEntityOption)
+        case tag(FilterEntityOption)
+
+        var id: String {
+            switch self {
+            case .random: return "random"
+            case .newest: return "newest"
+            case .mostPlayed: return "mostPlayed"
+            case .performer(let o): return "performer-\(o.id)"
+            case .studio(let o): return "studio-\(o.id)"
+            case .tag(let o): return "tag-\(o.id)"
+            }
+        }
+
+        var label: String {
+            switch self {
+            case .random: return "Random"
+            case .newest: return "Newest"
+            case .mostPlayed: return "Most played"
+            case .performer(let o), .studio(let o), .tag(let o): return o.name
+            }
+        }
+
+        var icon: String {
+            switch self {
+            case .random: return "shuffle"
+            case .newest: return "sparkles"
+            case .mostPlayed: return "play.circle"
+            case .performer: return "person.fill"
+            case .studio: return "building.2.fill"
+            case .tag: return "tag.fill"
+            }
+        }
+    }
+
+    /// One rated item of the running round, kept for the summary.
+    struct RatedEntry: Identifiable {
+        let item: Item
+        let rating100: Int
+        var id: String { item.id }
+        var stars: Int { min(5, max(1, Int((Double(rating100) / 20).rounded()))) }
+    }
+
+    struct Session {
+        var rated: [RatedEntry] = []
+        var skipped = 0
+        var oAdded = 0
+
+        /// Highest rating of the round; the first one wins a tie.
+        var topPick: RatedEntry? {
+            rated.max { lhs, rhs in lhs.rating100 < rhs.rating100 }
+        }
+
+        func count(stars: Int) -> Int { rated.filter { $0.stars == stars }.count }
+    }
+
+    static let sessionLengthOptions = [10, 20, 50]
+
     private static let modeDefaultsKey = "stashy.rateMe.mode"
     private static let imageMediaKindDefaultsKey = "stashy.rateMe.imageMediaKind"
+    private static let sessionLengthDefaultsKey = "stashy.rateMe.sessionLength"
+    private static let dayDefaultsKey = "stashy.rateMe.lastDay"
+    private static let todayCountDefaultsKey = "stashy.rateMe.todayCount"
+    private static let streakDefaultsKey = "stashy.rateMe.streak"
     private static let ratingHoldNanoseconds: UInt64 = 750_000_000
 
     @Published var mode: Mode = .scenes {
@@ -184,6 +253,18 @@ private final class RateMeViewModel: ObservableObject {
     @Published var errorMessage: String?
     @Published var remainingHint: Int?
 
+    @Published var theme: Theme = .random
+    @Published var sessionLength: Int = 10 {
+        didSet { UserDefaults.standard.set(sessionLength, forKey: Self.sessionLengthDefaultsKey) }
+    }
+    @Published private(set) var session = Session()
+    /// Round finished (or the theme ran dry mid-round): the summary replaces the card.
+    @Published var showsSummary = false
+    /// Everything in the current theme, rated or not — the denominator of the progress readout.
+    @Published private(set) var scopeTotal: Int?
+    @Published private(set) var ratedToday = 0
+    @Published private(set) var streakDays = 0
+
     private let client = GraphQLClient.shared
     private var skipIDs: Set<String> = []
 
@@ -196,6 +277,85 @@ private final class RateMeViewModel: ObservableObject {
            let restored = ImageListMediaKind(rawValue: raw) {
             imageMediaKind = restored
         }
+        let storedLength = UserDefaults.standard.integer(forKey: Self.sessionLengthDefaultsKey)
+        sessionLength = Self.sessionLengthOptions.contains(storedLength) ? storedLength : 10
+        refreshDailyStats()
+    }
+
+    /// Themes that make sense for the current mode — images have no play count.
+    var availableFixedThemes: [Theme] {
+        mode == .scenes ? [.random, .newest, .mostPlayed] : [.random, .newest]
+    }
+
+    /// Fresh round on the current theme: counters reset, progress denominator refetched.
+    func startNewSession() async {
+        session = Session()
+        showsSummary = false
+        if mode == .images, theme == .mostPlayed { theme = .random }
+        async let total: Void = refreshScopeTotal()
+        await loadNext(resetSkip: true)
+        await total
+        #if DEBUG
+        // `-stashyDebugRateMeSummary YES`: a filled round on the loaded item, nothing written to
+        // the server — for checking the summary layout without rating ten real scenes.
+        if UserDefaults.standard.bool(forKey: "stashyDebugRateMeSummary"), let current = item {
+            session.rated = [100, 80, 80, 40, 60].map { RatedEntry(item: current, rating100: $0) }
+            session.skipped = 3
+            session.oAdded = 1
+            showsSummary = true
+        }
+        #endif
+    }
+
+    func selectTheme(_ newTheme: Theme) async {
+        guard newTheme != theme else { return }
+        theme = newTheme
+        await startNewSession()
+    }
+
+    /// Share of the theme that carries a rating, 0…1.
+    var ratedShare: Double? {
+        guard let total = scopeTotal, total > 0, let remaining = remainingHint else { return nil }
+        return min(1, max(0, Double(total - remaining) / Double(total)))
+    }
+
+    // MARK: Daily stats
+
+    private static func dayString(_ date: Date) -> String {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.dateFormat = "yyyy-MM-dd"
+        return f.string(from: date)
+    }
+
+    private func refreshDailyStats() {
+        let defaults = UserDefaults.standard
+        let today = Self.dayString(Date())
+        let yesterday = Self.dayString(Date().addingTimeInterval(-86_400))
+        let last = defaults.string(forKey: Self.dayDefaultsKey)
+        ratedToday = last == today ? defaults.integer(forKey: Self.todayCountDefaultsKey) : 0
+        // A streak survives today until the first rating; it is gone once a whole day is missed.
+        streakDays = (last == today || last == yesterday) ? defaults.integer(forKey: Self.streakDefaultsKey) : 0
+    }
+
+    private func recordDailyRating() {
+        let defaults = UserDefaults.standard
+        let today = Self.dayString(Date())
+        let yesterday = Self.dayString(Date().addingTimeInterval(-86_400))
+        let last = defaults.string(forKey: Self.dayDefaultsKey)
+        var count = defaults.integer(forKey: Self.todayCountDefaultsKey)
+        var streak = defaults.integer(forKey: Self.streakDefaultsKey)
+        if last == today {
+            count += 1
+        } else {
+            count = 1
+            streak = last == yesterday ? streak + 1 : 1
+        }
+        defaults.set(today, forKey: Self.dayDefaultsKey)
+        defaults.set(count, forKey: Self.todayCountDefaultsKey)
+        defaults.set(streak, forKey: Self.streakDefaultsKey)
+        ratedToday = count
+        streakDays = streak
     }
 
     func loadNext(resetSkip: Bool = false) async {
@@ -213,7 +373,8 @@ private final class RateMeViewModel: ObservableObject {
                 item = try await fetchUnratedImage()
             }
             if item == nil {
-                errorMessage = "No unrated \(mode.label.lowercased()) left."
+                errorMessage = "No unrated \(mode.label.lowercased()) left in \(theme.label)."
+                if !session.rated.isEmpty { showsSummary = true }
             }
         } catch {
             item = nil
@@ -224,11 +385,14 @@ private final class RateMeViewModel: ObservableObject {
     func skip() async {
         if let id = item?.id {
             skipIDs.insert(id)
+            session.skipped += 1
         }
         await loadNext()
     }
 
-    func submitRating(_ rating100: Int?) async {
+    /// `holdsSelection`: the star row keeps the picked stars on screen for a moment; a swipe has
+    /// already thrown the card away, so it advances immediately.
+    func submitRating(_ rating100: Int?, holdsSelection: Bool = true) async {
         guard let current = item else { return }
         isSubmitting = true
         draftRating100 = rating100
@@ -275,9 +439,21 @@ private final class RateMeViewModel: ObservableObject {
                     userInfo: userInfo
                 )
             }
+            if let rating100 {
+                session.rated.append(RatedEntry(item: current, rating100: rating100))
+                recordDailyRating()
+                if let remaining = remainingHint { remainingHint = max(0, remaining - 1) }
+            }
             // Keep the selected stars visible briefly before advancing.
-            try? await Task.sleep(nanoseconds: Self.ratingHoldNanoseconds)
+            if holdsSelection {
+                try? await Task.sleep(nanoseconds: Self.ratingHoldNanoseconds)
+            }
             skipIDs.remove(current.id)
+            if session.rated.count >= sessionLength {
+                HapticManager.success()
+                showsSummary = true
+                return
+            }
             await loadNext()
         } catch {
             errorMessage = error.localizedDescription
@@ -297,6 +473,7 @@ private final class RateMeViewModel: ObservableObject {
             let newCount = try await mutateIncrementO(id: current.id, mode: current.mode)
             current.oCounter = newCount ?? (previous + 1)
             item = current
+            session.oAdded += 1
             HapticManager.success()
             switch current.mode {
             case .scenes:
@@ -347,7 +524,9 @@ private final class RateMeViewModel: ObservableObject {
 
     /// `IntCriterionInput.value` is required by GraphQL even for IS_NULL (Stash ignores it in SQL).
     private var unratedFilter: [String: Any] {
-        ["rating100": ["modifier": "IS_NULL", "value": 0]]
+        var filter = themeCriteria
+        filter["rating100"] = ["modifier": "IS_NULL", "value": 0]
+        return filter
     }
 
     private var unratedImageFilter: [String: Any] {
@@ -358,25 +537,74 @@ private final class RateMeViewModel: ObservableObject {
         return filter
     }
 
-    /// Stash expects `random_<seed>` (not bare `random`).
+    /// The theme's narrowing, merged into the unrated / media-kind criteria.
+    private var themeCriteria: [String: Any] {
+        switch theme {
+        case .random, .newest, .mostPlayed:
+            return [:]
+        case .performer(let o):
+            return ["performers": ["value": [o.id], "modifier": "INCLUDES"]]
+        case .studio(let o):
+            return ["studios": ["value": [o.id], "modifier": "INCLUDES", "depth": 0]]
+        case .tag(let o):
+            return ["tags": ["value": [o.id], "modifier": "INCLUDES", "depth": 0]]
+        }
+    }
+
+    /// Stash expects `random_<seed>` (not bare `random`). A page of 20, not 1: with a fixed sort
+    /// (Newest, Most played) the first row is the same every time, so skipped items have to be
+    /// stepped over inside the page.
     private var pageFilter: [String: Any] {
-        [
-            "per_page": 1,
-            "sort": "random_\(Int.random(in: 0...99_999_999))"
-        ]
+        let sort: (String, String)
+        switch theme {
+        case .newest: sort = ("created_at", "DESC")
+        case .mostPlayed: sort = ("play_count", "DESC")
+        default: sort = ("random_\(Int.random(in: 0...99_999_999))", "ASC")
+        }
+        return ["per_page": 20, "sort": sort.0, "direction": sort.1]
+    }
+
+    private func refreshScopeTotal() async {
+        var criteria = themeCriteria
+        do {
+            switch mode {
+            case .scenes:
+                let query = GraphQLQueries.loadQuery(named: "findScenesCompact")
+                let res: RateMeSceneFindResponse = try await client.execute(
+                    query: query,
+                    variables: ["filter": ["per_page": 1], "scene_filter": criteria]
+                )
+                scopeTotal = res.data?.findScenes.count
+            case .images:
+                if let path = imageMediaKind.pathCriterion { criteria["path"] = path }
+                let query = GraphQLQueries.queryWithFragments("findImages")
+                let res: RateMeImageFindResponse = try await client.execute(
+                    query: query,
+                    variables: ["filter": ["per_page": 1], "image_filter": criteria]
+                )
+                scopeTotal = res.data?.findImages.count
+            }
+        } catch {
+            scopeTotal = nil
+        }
     }
 
     private func fetchUnratedScene() async throws -> Item? {
         let query = GraphQLQueries.loadQuery(named: "findScenesCompact")
-        for _ in 0..<8 {
+        for _ in 0..<4 {
             let variables: [String: Any] = [
                 "filter": pageFilter,
                 "scene_filter": unratedFilter
             ]
             let res: RateMeSceneFindResponse = try await client.execute(query: query, variables: variables)
             remainingHint = res.data?.findScenes.count
-            guard let scene = res.data?.findScenes.scenes.first else { return nil }
-            if skipIDs.contains(scene.id) { continue }
+            let page = res.data?.findScenes.scenes ?? []
+            guard !page.isEmpty else { return nil }
+            guard let scene = page.first(where: { !skipIDs.contains($0.id) }) else {
+                // Everything on this page was skipped. A fixed sort would return it again.
+                if theme == .newest || theme == .mostPlayed { skipIDs.removeAll() }
+                continue
+            }
             let preview = signedMediaURL(scene.paths?.preview)
             let performers = (scene.performers ?? [])
                 .compactMap { $0.name?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty }
@@ -400,15 +628,19 @@ private final class RateMeViewModel: ObservableObject {
 
     private func fetchUnratedImage() async throws -> Item? {
         let query = GraphQLQueries.queryWithFragments("findImages")
-        for _ in 0..<8 {
+        for _ in 0..<4 {
             let variables: [String: Any] = [
                 "filter": pageFilter,
                 "image_filter": unratedImageFilter
             ]
             let res: RateMeImageFindResponse = try await client.execute(query: query, variables: variables)
             remainingHint = res.data?.findImages.count
-            guard let image = res.data?.findImages.images.first else { return nil }
-            if skipIDs.contains(image.id) { continue }
+            let page = res.data?.findImages.images ?? []
+            guard !page.isEmpty else { return nil }
+            guard let image = page.first(where: { !skipIDs.contains($0.id) }) else {
+                if theme == .newest { skipIDs.removeAll() }
+                continue
+            }
 
             let isVideo = Self.isVideoImage(image)
             let thumb = signedMediaURL(image.paths?.thumbnail)
@@ -705,6 +937,85 @@ struct RateMeToolsView: View {
     /// Avoids reloading when returning from `NavigationLink` (Watch Scene): `.task` restarts after disappear/reappear.
     @State private var didRunInitialRateMeLoad = false
     @State private var showDeleteConfirmation = false
+    /// Swipe card state: the drag offset, and the intent last announced with a haptic tick.
+    @State private var dragOffset: CGSize = .zero
+    @State private var announcedIntent: SwipeIntent?
+    @State private var oBurst = false
+    @State private var themePicker: ThemePickerKind?
+    /// The swipe legend under the card stays until the gestures have been used a few times.
+    @AppStorage("stashy.rateMe.swipesDone") private var swipesDone = 0
+
+    enum ThemePickerKind: String, Identifiable {
+        case performer, studio, tag
+        var id: String { rawValue }
+        var title: String {
+            switch self {
+            case .performer: return "Performer"
+            case .studio: return "Studio"
+            case .tag: return "Tag"
+            }
+        }
+        var icon: String {
+            switch self {
+            case .performer: return "person.fill"
+            case .studio: return "building.2.fill"
+            case .tag: return "tag.fill"
+            }
+        }
+    }
+
+    /// Up 5 ★, right 4 ★, left 2 ★, down skip. 1 and 3 stars stay on the star row.
+    enum SwipeIntent: Equatable {
+        case five, four, two, skip
+
+        static let commitDistance: CGFloat = 110
+
+        init?(translation t: CGSize, minimum: CGFloat) {
+            guard max(abs(t.width), abs(t.height)) >= minimum else { return nil }
+            if abs(t.width) > abs(t.height) {
+                self = t.width > 0 ? .four : .two
+            } else {
+                self = t.height < 0 ? .five : .skip
+            }
+        }
+
+        var rating100: Int? {
+            switch self {
+            case .five: return 100
+            case .four: return 80
+            case .two: return 40
+            case .skip: return nil
+            }
+        }
+
+        var title: String {
+            switch self {
+            case .five: return "★★★★★"
+            case .four: return "★★★★"
+            case .two: return "★★"
+            case .skip: return "Skip"
+            }
+        }
+
+        var color: Color {
+            switch self {
+            case .five: return .yellow
+            case .four: return .green
+            case .two: return .orange
+            case .skip: return .gray
+            }
+        }
+
+        /// Where the card flies when the swipe commits.
+        var flyOut: CGSize {
+            switch self {
+            case .five: return CGSize(width: 0, height: -900)
+            case .four: return CGSize(width: 700, height: 0)
+            case .two: return CGSize(width: -700, height: 0)
+            case .skip: return CGSize(width: 0, height: 900)
+            }
+        }
+    }
 
     private var isRegular: Bool { horizontalSizeClass == .regular }
 
@@ -730,6 +1041,9 @@ struct RateMeToolsView: View {
                 }
             }
 
+            themeChips
+                .padding(.bottom, 8)
+
             content
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -737,14 +1051,30 @@ struct RateMeToolsView: View {
         .onAppear {
             guard !didRunInitialRateMeLoad else { return }
             didRunInitialRateMeLoad = true
-            Task { await model.loadNext(resetSkip: true) }
+            Task { await model.startNewSession() }
         }
         .onChange(of: model.mode) { _, _ in
-            Task { await model.loadNext(resetSkip: true) }
+            Task { await model.startNewSession() }
         }
         .onChange(of: model.imageMediaKind) { _, _ in
             guard model.mode == .images else { return }
-            Task { await model.loadNext(resetSkip: true) }
+            Task { await model.startNewSession() }
+        }
+        // A failed save must not leave the card thrown off screen.
+        .onChange(of: model.errorMessage) { _, message in
+            if message != nil { withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { dragOffset = .zero } }
+        }
+        .sheet(item: $themePicker) { kind in
+            RateMeThemePickerSheet(kind: kind, mode: model.mode) { option in
+                themePicker = nil
+                let theme: RateMeViewModel.Theme
+                switch kind {
+                case .performer: theme = .performer(option)
+                case .studio: theme = .studio(option)
+                case .tag: theme = .tag(option)
+                }
+                Task { await model.selectTheme(theme) }
+            }
         }
         .alert(deleteConfirmationTitle, isPresented: $showDeleteConfirmation) {
             Button("Cancel", role: .cancel) { }
@@ -772,14 +1102,24 @@ struct RateMeToolsView: View {
                 imageMediaKindChrome
             }
 
-            if model.isLoading && model.item == nil {
+            if model.showsSummary {
+                ScrollView {
+                    summaryView
+                        .frame(maxWidth: isRegular ? 720 : .infinity)
+                        .frame(maxWidth: .infinity)
+                }
+            } else if model.isLoading && model.item == nil {
                 StandardLoadingView(message: "Loading…")
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
             } else if let item = model.item {
-                mediaCard(item)
+                sessionBar
+
+                swipeCard(item)
                     .layoutPriority(1)
                     .frame(maxWidth: isRegular ? 720 : .infinity)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+                if swipesDone < 5 { swipeLegend }
 
                 detailsAndActions(item)
             } else {
@@ -801,12 +1141,6 @@ struct RateMeToolsView: View {
         detailsCard(item)
         ratingRow(item)
 
-        if let remaining = model.remainingHint {
-            Text("\(remaining) unrated \(model.mode.label.lowercased())")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .frame(maxWidth: .infinity, alignment: .center)
-        }
 
         if item.mode == .scenes {
             watchSceneButton(for: item)
@@ -824,6 +1158,355 @@ struct RateMeToolsView: View {
         }
         .buttonStyle(.bordered)
         .disabled(model.isSubmitting || model.isLoading)
+    }
+
+    // MARK: Themes
+
+    private var themeChips: some View {
+        ScrollViewReader { proxy in
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
+                    ForEach(model.availableFixedThemes) { theme in
+                        themeChip(title: theme.label, icon: theme.icon, selected: model.theme == theme) {
+                            Task { await model.selectTheme(theme) }
+                        }
+                        .id(theme.id)
+                    }
+                    ForEach([ThemePickerKind.performer, .studio, .tag]) { kind in
+                        let picked = pickedTheme(for: kind)
+                        themeChip(title: picked?.label ?? "\(kind.title)…", icon: kind.icon, selected: picked != nil) {
+                            themePicker = kind
+                        }
+                        .id(kind.rawValue)
+                    }
+                }
+                .padding(.horizontal, DesignTokens.Tools.contentPadding)
+            }
+            // A picked performer / studio / tag sits at the far end; bring its chip into view.
+            .onChange(of: model.theme) { _, theme in
+                let target: String
+                switch theme {
+                case .performer: target = ThemePickerKind.performer.rawValue
+                case .studio: target = ThemePickerKind.studio.rawValue
+                case .tag: target = ThemePickerKind.tag.rawValue
+                default: target = theme.id
+                }
+                withAnimation { proxy.scrollTo(target, anchor: .center) }
+            }
+        }
+        .disabled(model.isSubmitting)
+    }
+
+    private func pickedTheme(for kind: ThemePickerKind) -> RateMeViewModel.Theme? {
+        switch (kind, model.theme) {
+        case (.performer, .performer), (.studio, .studio), (.tag, .tag): return model.theme
+        default: return nil
+        }
+    }
+
+    private func themeChip(title: String, icon: String, selected: Bool, action: @escaping () -> Void) -> some View {
+        Button {
+            HapticManager.selection()
+            action()
+        } label: {
+            Label(title, systemImage: icon)
+                .font(.caption.weight(.semibold))
+                .lineLimit(1)
+                .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.85))
+                .padding(.horizontal, 12)
+                .frame(height: 30)
+                .background(Capsule(style: .continuous).fill(selected ? appearance.tintColor : Color.secondaryAppBackground))
+                .contentShape(Capsule(style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+
+    // MARK: Session
+
+    private var sessionBar: some View {
+        HStack(spacing: 10) {
+            Text("\(model.session.rated.count)/\(model.sessionLength)")
+                .font(.caption.weight(.bold).monospacedDigit())
+            ProgressView(value: Double(model.session.rated.count), total: Double(model.sessionLength))
+                .tint(appearance.tintColor)
+            if model.streakDays > 1 {
+                Label("\(model.streakDays)", systemImage: "flame.fill")
+                    .font(.caption.weight(.bold).monospacedDigit())
+                    .foregroundStyle(.orange)
+                    .accessibilityLabel("\(model.streakDays) day streak")
+            }
+            Menu {
+                Picker("Round", selection: $model.sessionLength) {
+                    ForEach(RateMeViewModel.sessionLengthOptions, id: \.self) { n in
+                        Text("\(n) per round").tag(n)
+                    }
+                }
+            } label: {
+                Image(systemName: "slider.horizontal.3")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 28, height: 24)
+            }
+            .accessibilityLabel("Round length")
+        }
+        .frame(maxWidth: isRegular ? 720 : .infinity)
+    }
+
+    private var summaryView: some View {
+        let session = model.session
+        let maxBucket = max(1, (1...5).map { session.count(stars: $0) }.max() ?? 1)
+        return VStack(spacing: 14) {
+            VStack(spacing: 4) {
+                Image(systemName: "checkmark.seal.fill")
+                    .font(.system(size: 44))
+                    .foregroundStyle(appearance.tintColor)
+                Text(model.item == nil ? "\(model.theme.label) done" : "Round complete")
+                    .font(.title2.weight(.bold))
+                Text(model.theme.label)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.top, 8)
+
+            HStack(spacing: 10) {
+                summaryTile(value: "\(session.rated.count)", label: "Rated", icon: "star.fill")
+                summaryTile(value: "\(session.skipped)", label: "Skipped", icon: "forward.fill")
+                summaryTile(value: "\(session.oAdded)", label: "O", icon: appearance.oCounterIconFilled)
+            }
+
+            VStack(spacing: 6) {
+                ForEach((1...5).reversed(), id: \.self) { stars in
+                    let count = session.count(stars: stars)
+                    HStack(spacing: 8) {
+                        Text(String(repeating: "★", count: stars))
+                            .font(.caption)
+                            .foregroundStyle(.yellow)
+                            .frame(width: 70, alignment: .leading)
+                        GeometryReader { geo in
+                            Capsule()
+                                .fill(appearance.tintColor.opacity(count == 0 ? 0.15 : 0.85))
+                                .frame(width: max(6, geo.size.width * CGFloat(count) / CGFloat(maxBucket)))
+                        }
+                        .frame(height: 10)
+                        Text("\(count)")
+                            .font(.caption.monospacedDigit())
+                            .foregroundStyle(.secondary)
+                            .frame(width: 24, alignment: .trailing)
+                    }
+                }
+            }
+            .padding(12)
+            .background(Color.secondaryAppBackground)
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+
+            if let top = session.topPick {
+                HStack(spacing: 12) {
+                    CustomAsyncImage(url: top.item.thumbnailURL) { loader in
+                        if let image = loader.image {
+                            image.resizable().scaledToFill()
+                        } else {
+                            Color.black.opacity(0.1)
+                        }
+                    }
+                    .frame(width: 96, height: 60)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Top pick")
+                            .font(.caption2.weight(.semibold))
+                            .foregroundStyle(.secondary)
+                        Text(top.item.title)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(2)
+                        Text(String(repeating: "★", count: top.stars))
+                            .font(.caption)
+                            .foregroundStyle(.yellow)
+                    }
+                    Spacer(minLength: 0)
+                }
+                .padding(12)
+                .background(Color.secondaryAppBackground)
+                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            }
+
+            VStack(alignment: .leading, spacing: 8) {
+                if let share = model.ratedShare {
+                    HStack {
+                        Text("\(Int((share * 100).rounded())) % of \(progressScopeLabel) rated")
+                            .font(.subheadline.weight(.semibold))
+                        Spacer()
+                    }
+                    ProgressView(value: share)
+                        .tint(appearance.tintColor)
+                }
+                HStack(spacing: 16) {
+                    Label("\(model.ratedToday) today", systemImage: "calendar")
+                    if model.streakDays > 0 {
+                        Label("\(model.streakDays) day streak", systemImage: "flame.fill")
+                            .foregroundStyle(.orange)
+                    }
+                    Spacer()
+                }
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+            }
+            .padding(12)
+            .background(Color.secondaryAppBackground)
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+
+            if model.item != nil || model.errorMessage == nil {
+                Button {
+                    HapticManager.light()
+                    Task { await model.startNewSession() }
+                } label: {
+                    Label("Next round", systemImage: "arrow.clockwise")
+                        .font(.headline)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(appearance.tintColor)
+            }
+            Text("Or pick another theme above.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .padding(.bottom, 12)
+    }
+
+    /// "all scenes" for the unscoped themes (the whole library is the denominator), the name for
+    /// a performer / studio / tag.
+    private var progressScopeLabel: String {
+        switch model.theme {
+        case .random, .newest, .mostPlayed: return "all \(model.mode.label.lowercased())"
+        case .performer(let o), .studio(let o), .tag(let o): return o.name
+        }
+    }
+
+    private func summaryTile(value: String, label: String, icon: String) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: icon)
+                .font(.subheadline)
+                .foregroundStyle(appearance.tintColor)
+            Text(value)
+                .font(.title2.weight(.bold).monospacedDigit())
+            Text(label)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+        .background(Color.secondaryAppBackground)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+    }
+
+    // MARK: Swipe
+
+    private var swipeLegend: some View {
+        HStack(spacing: 12) {
+            legendItem("arrow.up", "5★")
+            legendItem("arrow.right", "4★")
+            legendItem("arrow.left", "2★")
+            legendItem("arrow.down", "Skip")
+            legendItem("hand.tap", "2× O")
+        }
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(.secondary)
+        .frame(maxWidth: .infinity)
+    }
+
+    private func legendItem(_ icon: String, _ text: String) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+            Text(text)
+        }
+    }
+
+    private func swipeCard(_ item: RateMeViewModel.Item) -> some View {
+        let live = SwipeIntent(translation: dragOffset, minimum: 36)
+        let committed = SwipeIntent(translation: dragOffset, minimum: SwipeIntent.commitDistance)
+        return mediaCard(item)
+            .overlay {
+                if let live {
+                    Text(live.title)
+                        .font(.system(size: live == .skip ? 30 : 34, weight: .heavy))
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 18)
+                        .padding(.vertical, 10)
+                        .background(Capsule().fill(live.color.opacity(committed == nil ? 0.55 : 0.9)))
+                        .scaleEffect(committed == nil ? 0.9 : 1.05)
+                        .allowsHitTesting(false)
+                }
+            }
+            .overlay {
+                if oBurst {
+                    Image(systemName: appearance.oCounterIconFilled)
+                        .font(.system(size: 80, weight: .bold))
+                        .foregroundStyle(appearance.tintColor)
+                        .shadow(radius: 8)
+                        .transition(.scale.combined(with: .opacity))
+                        .allowsHitTesting(false)
+                }
+            }
+            .offset(dragOffset)
+            .rotationEffect(.degrees(Double(dragOffset.width / 22)))
+            .gesture(
+                DragGesture(minimumDistance: 12)
+                    .onChanged { value in
+                        guard !model.isSubmitting, !model.isLoading else { return }
+                        dragOffset = value.translation
+                        let intent = SwipeIntent(translation: value.translation, minimum: SwipeIntent.commitDistance)
+                        if intent != announcedIntent {
+                            if intent != nil { HapticManager.selection() }
+                            announcedIntent = intent
+                        }
+                    }
+                    .onEnded { value in
+                        announcedIntent = nil
+                        // A quick flick counts even if the finger stopped short of the line.
+                        let reach = CGSize(
+                            width: value.translation.width + (value.predictedEndTranslation.width - value.translation.width) * 0.35,
+                            height: value.translation.height + (value.predictedEndTranslation.height - value.translation.height) * 0.35
+                        )
+                        guard !model.isSubmitting, !model.isLoading,
+                              let intent = SwipeIntent(translation: reach, minimum: SwipeIntent.commitDistance) else {
+                            withAnimation(.spring(response: 0.35, dampingFraction: 0.75)) { dragOffset = .zero }
+                            return
+                        }
+                        commitSwipe(intent)
+                    }
+            )
+            .simultaneousGesture(
+                TapGesture(count: 2).onEnded {
+                    guard !model.isSubmitting, !model.isIncrementingO else { return }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { oBurst = true }
+                    Task {
+                        await model.incrementOCounter()
+                        try? await Task.sleep(nanoseconds: 450_000_000)
+                        withAnimation(.easeOut(duration: 0.25)) { oBurst = false }
+                    }
+                }
+            )
+            .onChange(of: item.id) { _, _ in
+                // New card: back in the middle, without animating in from where the last one flew.
+                var transaction = Transaction()
+                transaction.disablesAnimations = true
+                withTransaction(transaction) { dragOffset = .zero }
+            }
+    }
+
+    private func commitSwipe(_ intent: SwipeIntent) {
+        swipesDone += 1
+        if intent == .five { HapticManager.success() } else { HapticManager.medium() }
+        withAnimation(.easeIn(duration: 0.2)) { dragOffset = intent.flyOut }
+        Task {
+            try? await Task.sleep(nanoseconds: 200_000_000)
+            if let rating = intent.rating100 {
+                await model.submitRating(rating, holdsSelection: false)
+            } else {
+                await model.skip()
+            }
+        }
     }
 
     private func mediaCard(_ item: RateMeViewModel.Item) -> some View {
@@ -1039,6 +1722,77 @@ struct RateMeToolsView: View {
         .disabled(model.isSubmitting)
         .accessibilityLabel("\(title)\(selected ? ", selected" : "")")
         .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+// MARK: - Theme picker
+
+/// Performer / studio / tag for a RateMe theme, from the shared filter picker store (most used
+/// first, name search for the long tail).
+private struct RateMeThemePickerSheet: View {
+    let kind: RateMeToolsView.ThemePickerKind
+    let mode: RateMeViewModel.Mode
+    let onPick: (FilterEntityOption) -> Void
+
+    @ObservedObject private var store = FilterPickerOptionsStore.shared
+    @Environment(\.dismiss) private var dismiss
+    @State private var query = ""
+
+    private var storeKind: FilterPickerOptionsStore.Kind {
+        switch (kind, mode) {
+        case (.performer, _): return .performers
+        case (.studio, .scenes): return .studios
+        case (.studio, .images): return .imageStudios
+        case (.tag, .scenes): return .tags
+        case (.tag, .images): return .imageTags
+        }
+    }
+
+    private var options: [FilterEntityOption] {
+        let all = store.availableOptions(storeKind)
+        let term = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !term.isEmpty else { return all }
+        return all.filter { $0.name.localizedCaseInsensitiveContains(term) }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                if store.isLoading(storeKind) && options.isEmpty {
+                    HStack { Spacer(); ProgressView(); Spacer() }
+                        .listRowBackground(Color.clear)
+                }
+                ForEach(options) { option in
+                    Button {
+                        HapticManager.selection()
+                        onPick(option)
+                    } label: {
+                        Text(option.name)
+                            .foregroundStyle(.primary)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+                if store.isSearching(storeKind) {
+                    HStack { Spacer(); ProgressView(); Spacer() }
+                        .listRowBackground(Color.clear)
+                }
+            }
+            .searchable(text: $query, prompt: "Search \(kind.title.lowercased())s")
+            .onChange(of: query) { _, newValue in
+                store.search(storeKind, query: newValue)
+            }
+            .navigationTitle(kind.title)
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+            .onAppear { store.load(storeKind) }
+        }
+        .presentationDetents([.medium, .large])
     }
 }
 
