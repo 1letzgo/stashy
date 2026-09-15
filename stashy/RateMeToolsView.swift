@@ -94,24 +94,6 @@ private struct RateMeUpdated: Codable {
     let rating100: Int?
 }
 
-private struct RateMeIncrementOResponse: Codable {
-    let data: RateMeIncrementOData?
-}
-
-private struct RateMeIncrementOData: Codable {
-    let sceneIncrementO: Int?
-    let imageIncrementO: Int?
-}
-
-private struct RateMeDestroyResponse: Codable {
-    let data: RateMeDestroyData?
-}
-
-private struct RateMeDestroyData: Codable {
-    let sceneDestroy: Bool?
-    let imageDestroy: Bool?
-}
-
 // MARK: - ViewModel
 
 @MainActor
@@ -217,7 +199,6 @@ private final class RateMeViewModel: ObservableObject {
     struct Session {
         var rated: [RatedEntry] = []
         var skipped = 0
-        var oAdded = 0
 
         /// Highest rating of the round; the first one wins a tie.
         var topPick: RatedEntry? {
@@ -248,8 +229,6 @@ private final class RateMeViewModel: ObservableObject {
     @Published var draftRating100: Int?
     @Published var isLoading = false
     @Published var isSubmitting = false
-    @Published var isIncrementingO = false
-    @Published var isDeleting = false
     @Published var errorMessage: String?
     @Published var remainingHint: Int?
 
@@ -301,7 +280,6 @@ private final class RateMeViewModel: ObservableObject {
         if UserDefaults.standard.bool(forKey: "stashyDebugRateMeSummary"), let current = item {
             session.rated = [100, 80, 80, 40, 60].map { RatedEntry(item: current, rating100: $0) }
             session.skipped = 3
-            session.oAdded = 1
             showsSummary = true
         }
         #endif
@@ -458,65 +436,6 @@ private final class RateMeViewModel: ObservableObject {
         } catch {
             errorMessage = error.localizedDescription
             draftRating100 = nil
-        }
-    }
-
-    func incrementOCounter() async {
-        guard var current = item, !isIncrementingO else { return }
-        isIncrementingO = true
-        let previous = current.oCounter
-        current.oCounter = previous + 1
-        item = current
-        defer { isIncrementingO = false }
-
-        do {
-            let newCount = try await mutateIncrementO(id: current.id, mode: current.mode)
-            current.oCounter = newCount ?? (previous + 1)
-            item = current
-            session.oAdded += 1
-            HapticManager.success()
-            switch current.mode {
-            case .scenes:
-                NotificationCenter.default.post(
-                    name: NSNotification.Name("SceneOCounterUpdated"),
-                    object: nil,
-                    userInfo: ["sceneId": current.id, "oCounter": current.oCounter]
-                )
-            case .images:
-                NotificationCenter.default.post(
-                    name: NSNotification.Name("ImageOCounterUpdated"),
-                    object: nil,
-                    userInfo: ["imageId": current.id, "oCounter": current.oCounter]
-                )
-            }
-        } catch {
-            current.oCounter = previous
-            item = current
-            errorMessage = error.localizedDescription
-        }
-    }
-
-    func deleteCurrent() async {
-        guard let current = item, !isDeleting else { return }
-        isDeleting = true
-        defer { isDeleting = false }
-
-        do {
-            let ok = try await mutateDestroy(id: current.id, mode: current.mode)
-            guard ok else {
-                errorMessage = current.mode == .scenes ? "Failed to delete scene." : "Failed to delete image."
-                return
-            }
-            HapticManager.success()
-            ToastManager.shared.show(
-                current.mode == .scenes ? "Scene deleted" : "Image deleted",
-                icon: "trash",
-                style: .success
-            )
-            skipIDs.remove(current.id)
-            await loadNext()
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 
@@ -765,62 +684,6 @@ private final class RateMeViewModel: ObservableObject {
         default: return false
         }
     }
-
-    private func mutateIncrementO(id: String, mode: Mode) async throws -> Int? {
-        let mutation: String
-        switch mode {
-        case .scenes:
-            mutation = """
-            mutation RateMeSceneIncrementO($id: ID!) {
-              sceneIncrementO(id: $id)
-            }
-            """
-        case .images:
-            mutation = """
-            mutation RateMeImageIncrementO($id: ID!) {
-              imageIncrementO(id: $id)
-            }
-            """
-        }
-        let res: RateMeIncrementOResponse = try await client.execute(
-            query: mutation,
-            variables: ["id": id]
-        )
-        switch mode {
-        case .scenes: return res.data?.sceneIncrementO
-        case .images: return res.data?.imageIncrementO
-        }
-    }
-
-    private func mutateDestroy(id: String, mode: Mode) async throws -> Bool {
-        let mutation: String
-        switch mode {
-        case .scenes:
-            mutation = """
-            mutation RateMeSceneDestroy($input: SceneDestroyInput!) {
-              sceneDestroy(input: $input)
-            }
-            """
-        case .images:
-            mutation = """
-            mutation RateMeImageDestroy($input: ImageDestroyInput!) {
-              imageDestroy(input: $input)
-            }
-            """
-        }
-        let variables: [String: Any] = [
-            "input": [
-                "id": id,
-                "delete_file": true,
-                "delete_generated": true
-            ]
-        ]
-        let res: RateMeDestroyResponse = try await client.execute(query: mutation, variables: variables)
-        switch mode {
-        case .scenes: return res.data?.sceneDestroy == true
-        case .images: return res.data?.imageDestroy == true
-        }
-    }
 }
 
 private extension String {
@@ -936,11 +799,9 @@ struct RateMeToolsView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     /// Avoids reloading when returning from `NavigationLink` (Watch Scene): `.task` restarts after disappear/reappear.
     @State private var didRunInitialRateMeLoad = false
-    @State private var showDeleteConfirmation = false
     /// Swipe card state: the drag offset, and the intent last announced with a haptic tick.
     @State private var dragOffset: CGSize = .zero
     @State private var announcedIntent: SwipeIntent?
-    @State private var oBurst = false
     @State private var themePicker: ThemePickerKind?
     /// The swipe legend under the card stays until the gestures have been used a few times.
     @AppStorage("stashy.rateMe.swipesDone") private var swipesDone = 0
@@ -964,7 +825,7 @@ struct RateMeToolsView: View {
         }
     }
 
-    /// Up 5 ★, right 4 ★, left 2 ★, down skip. 1 and 3 stars stay on the star row.
+    /// Right 5 ★ (the "like"), up 4 ★, left 2 ★, down skip — the only way to rate here.
     enum SwipeIntent: Equatable {
         case five, four, two, skip
 
@@ -973,9 +834,9 @@ struct RateMeToolsView: View {
         init?(translation t: CGSize, minimum: CGFloat) {
             guard max(abs(t.width), abs(t.height)) >= minimum else { return nil }
             if abs(t.width) > abs(t.height) {
-                self = t.width > 0 ? .four : .two
+                self = t.width > 0 ? .five : .two
             } else {
-                self = t.height < 0 ? .five : .skip
+                self = t.height < 0 ? .four : .skip
             }
         }
 
@@ -1009,8 +870,8 @@ struct RateMeToolsView: View {
         /// Where the card flies when the swipe commits.
         var flyOut: CGSize {
             switch self {
-            case .five: return CGSize(width: 0, height: -900)
-            case .four: return CGSize(width: 700, height: 0)
+            case .five: return CGSize(width: 700, height: 0)
+            case .four: return CGSize(width: 0, height: -900)
             case .two: return CGSize(width: -700, height: 0)
             case .skip: return CGSize(width: 0, height: 900)
             }
@@ -1029,17 +890,18 @@ struct RateMeToolsView: View {
                     .padding(.horizontal, DesignTokens.Tools.contentPadding)
             }
 
-            ToolsPillMenuRow(
-                items: RateMeViewModel.Mode.allCases.map {
-                    ToolsPillMenuRow.Item(id: $0.rawValue, title: $0.label)
-                },
-                selectionID: model.mode.rawValue,
-                accessibilityLabel: "RateMe section"
-            ) { id in
-                if let mode = RateMeViewModel.Mode(rawValue: id) {
-                    model.mode = mode
+            // Pills as wide as their text, not stretched to equal widths.
+            HStack(spacing: 8) {
+                ForEach(RateMeViewModel.Mode.allCases) { mode in
+                    themeChip(title: mode.label, icon: mode.emptyIcon, selected: model.mode == mode) {
+                        model.mode = mode
+                    }
                 }
+                Spacer(minLength: 0)
             }
+            .padding(.horizontal, DesignTokens.Tools.contentPadding)
+            .padding(.vertical, 8)
+            .disabled(model.isSubmitting)
 
             themeChips
                 .padding(.bottom, 8)
@@ -1076,23 +938,6 @@ struct RateMeToolsView: View {
                 Task { await model.selectTheme(theme) }
             }
         }
-        .alert(deleteConfirmationTitle, isPresented: $showDeleteConfirmation) {
-            Button("Cancel", role: .cancel) { }
-            Button("Delete", role: .destructive) {
-                Task { await model.deleteCurrent() }
-            }
-        } message: {
-            Text(deleteConfirmationMessage)
-        }
-    }
-
-    private var deleteConfirmationTitle: String {
-        model.mode == .scenes ? "Really delete scene and files?" : "Really delete image and files?"
-    }
-
-    private var deleteConfirmationMessage: String {
-        let name = model.item?.title ?? (model.mode == .scenes ? "this scene" : "this image")
-        return "‘\(name)’ and all associated files will be permanently deleted. This action cannot be undone."
     }
 
     @ViewBuilder
@@ -1139,7 +984,6 @@ struct RateMeToolsView: View {
     @ViewBuilder
     private func detailsAndActions(_ item: RateMeViewModel.Item) -> some View {
         detailsCard(item)
-        ratingRow(item)
 
 
         if item.mode == .scenes {
@@ -1212,6 +1056,7 @@ struct RateMeToolsView: View {
             Label(title, systemImage: icon)
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.85))
                 .padding(.horizontal, 12)
                 .frame(height: 30)
@@ -1272,7 +1117,6 @@ struct RateMeToolsView: View {
             HStack(spacing: 10) {
                 summaryTile(value: "\(session.rated.count)", label: "Rated", icon: "star.fill")
                 summaryTile(value: "\(session.skipped)", label: "Skipped", icon: "forward.fill")
-                summaryTile(value: "\(session.oAdded)", label: "O", icon: appearance.oCounterIconFilled)
             }
 
             VStack(spacing: 6) {
@@ -1404,11 +1248,10 @@ struct RateMeToolsView: View {
 
     private var swipeLegend: some View {
         HStack(spacing: 12) {
-            legendItem("arrow.up", "5★")
-            legendItem("arrow.right", "4★")
+            legendItem("arrow.right", "5★")
+            legendItem("arrow.up", "4★")
             legendItem("arrow.left", "2★")
             legendItem("arrow.down", "Skip")
-            legendItem("hand.tap", "2× O")
         }
         .font(.caption2.weight(.semibold))
         .foregroundStyle(.secondary)
@@ -1435,16 +1278,6 @@ struct RateMeToolsView: View {
                         .padding(.vertical, 10)
                         .background(Capsule().fill(live.color.opacity(committed == nil ? 0.55 : 0.9)))
                         .scaleEffect(committed == nil ? 0.9 : 1.05)
-                        .allowsHitTesting(false)
-                }
-            }
-            .overlay {
-                if oBurst {
-                    Image(systemName: appearance.oCounterIconFilled)
-                        .font(.system(size: 80, weight: .bold))
-                        .foregroundStyle(appearance.tintColor)
-                        .shadow(radius: 8)
-                        .transition(.scale.combined(with: .opacity))
                         .allowsHitTesting(false)
                 }
             }
@@ -1475,17 +1308,6 @@ struct RateMeToolsView: View {
                         }
                         commitSwipe(intent)
                     }
-            )
-            .simultaneousGesture(
-                TapGesture(count: 2).onEnded {
-                    guard !model.isSubmitting, !model.isIncrementingO else { return }
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.6)) { oBurst = true }
-                    Task {
-                        await model.incrementOCounter()
-                        try? await Task.sleep(nanoseconds: 450_000_000)
-                        withAnimation(.easeOut(duration: 0.25)) { oBurst = false }
-                    }
-                }
             )
             .onChange(of: item.id) { _, _ in
                 // New card: back in the middle, without animating in from where the last one flew.
@@ -1612,76 +1434,12 @@ struct RateMeToolsView: View {
         .opacity(model.isSubmitting ? 0.85 : 1)
     }
 
-    private func ratingRow(_ item: RateMeViewModel.Item) -> some View {
-        HStack(alignment: .center, spacing: 10) {
-            StarRatingView(
-                rating100: model.draftRating100,
-                isInteractive: !model.isSubmitting && !model.isDeleting,
-                size: 24,
-                spacing: 4
-            ) { newRating in
-                Task { await model.submitRating(newRating) }
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-
-            Button {
-                Task { await model.incrementOCounter() }
-            } label: {
-                HStack(spacing: 6) {
-                    Image(systemName: item.oCounter > 0
-                          ? appearance.oCounterIconFilled
-                          : appearance.oCounterIcon)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(item.oCounter > 0 ? appearance.tintColor : .secondary)
-                    Text("\(item.oCounter)")
-                        .font(.body.weight(.bold).monospacedDigit())
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                }
-                .padding(.horizontal, 10)
-                .frame(height: 44)
-                .background(Color.appBackground)
-                .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
-                .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .disabled(model.isSubmitting || model.isIncrementingO || model.isDeleting)
-            .accessibilityLabel("O-Counter \(item.oCounter), tap to increment")
-
-            Button {
-                HapticManager.light()
-                showDeleteConfirmation = true
-            } label: {
-                Image(systemName: "trash.fill")
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.red)
-                    .frame(width: 44, height: 44)
-                    .background(Color.appBackground)
-                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
-                    .contentShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
-            }
-            .buttonStyle(.plain)
-            .disabled(model.isSubmitting || model.isDeleting || model.isLoading)
-            .accessibilityLabel("Delete")
-            .accessibilityHint("Deletes this item and its files after confirmation")
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-        .overlay(
-            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
-                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
-        )
-        .cardShadow()
-        .opacity(model.isSubmitting ? 0.85 : 1)
-    }
-
     private var imageMediaKindChrome: some View {
-        HStack(spacing: StashyExpandingDock.itemSpacing) {
+        HStack(spacing: 8) {
             ForEach(ImageListMediaKind.allCases) { kind in
                 imageMediaKindChip(kind)
             }
+            Spacer(minLength: 0)
         }
     }
 
@@ -1702,8 +1460,8 @@ struct RateMeToolsView: View {
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(selected ? Color.white : Color.primary.opacity(0.85))
                 .lineLimit(1)
-                .minimumScaleFactor(0.65)
-                .frame(maxWidth: .infinity)
+                .fixedSize(horizontal: true, vertical: false)
+                .padding(.horizontal, 12)
                 .frame(height: 28)
                 .background(
                     Capsule(style: .continuous)
