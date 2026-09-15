@@ -552,7 +552,10 @@ struct TVSceneDetailView: View {
                                                 .font(.largeTitle)
                                                 .foregroundColor(.secondary))
                                     }
-                                
+
+                                    // Muted marker clip after 2 s of focus.
+                                    TVFocusPreview(url: marker.previewURL, width: 260, height: 146)
+
                                     // Timestamp
                                     Text(formattedDuration(marker.seconds))
                                         .font(.caption2)
