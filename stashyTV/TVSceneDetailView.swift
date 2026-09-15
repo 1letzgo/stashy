@@ -201,34 +201,38 @@ struct TVSceneDetailView: View {
 
     @ViewBuilder
     private func heroBackground(scene: Scene) -> some View {
-        GeometryReader { geo in
-            ZStack(alignment: .topTrailing) {
+        // No GeometryReader: inside the tab container its proposed size can exclude the
+        // sidebar / safe-area region on some tvOS versions, which left the artwork offset
+        // with bare background showing along the left and bottom edges. A clear, edge-to-edge
+        // base with the artwork as an overlay always fills whatever the screen is.
+        Color.appBackground
+            .overlay {
                 if let thumbnailURL = scene.thumbnailURL {
                     CustomAsyncImage(url: thumbnailURL) { loader in
                         if let image = loader.image {
                             image
                                 .resizable()
                                 .scaledToFill()
-                                .frame(width: geo.size.width, height: geo.size.height)
-                                .clipped()
                         } else {
                             Color.appBackground
                         }
                     }
-                } else {
-                     Color.appBackground
                 }
-
+            }
+            .clipped()
+            .overlay {
                 // Subtle overall darkening
                 Color.black.opacity(0.1)
-
+            }
+            .overlay {
                 // Complex Gradient Overlay to fade into the black background and side
                 LinearGradient(
                     colors: [Color.appBackground.opacity(0.9), Color.appBackground.opacity(0.5), .clear, .clear],
                     startPoint: .leading,
                     endPoint: .trailing
                 )
-                
+            }
+            .overlay {
                 // Bottom linear gradient to ground the content
                 LinearGradient(
                     colors: [Color.appBackground.opacity(0.9), Color.appBackground.opacity(0.4), .clear],
@@ -236,9 +240,7 @@ struct TVSceneDetailView: View {
                     endPoint: .center
                 )
             }
-            .frame(width: geo.size.width, height: geo.size.height)
-        }
-        .ignoresSafeArea()
+            .ignoresSafeArea()
     }
 
     @ViewBuilder
