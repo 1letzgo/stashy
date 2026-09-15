@@ -50,7 +50,8 @@ struct TVMarkerRailView: View {
                 .foregroundStyle(.white.opacity(0.6))
 
             ScrollView(.horizontal, showsIndicators: false) {
-                HStack(alignment: .top, spacing: 30) {
+                // Lazy for the same reason as the channel's Up Next rail: it opens over playback.
+                LazyHStack(alignment: .top, spacing: 30) {
                     ForEach(sorted) { marker in
                         card(for: marker, isActive: marker.id == activeMarkerID)
                     }

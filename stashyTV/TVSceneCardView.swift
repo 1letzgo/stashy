@@ -11,6 +11,9 @@ struct TVSceneCardView: View {
     let scene: Scene
     var width: CGFloat = 410
     var height: CGFloat = 230
+    /// Off where a player is already running (Up Next panel): a second engine next to the
+    /// playing one only costs memory there.
+    var showsFocusPreview: Bool = true
     @Environment(\.isFocused) var isFocused
 
     var body: some View {
@@ -23,7 +26,9 @@ struct TVSceneCardView: View {
                 .clipShape(RoundedRectangle(cornerRadius: 10))
 
             // Muted preview after 2 s of focus, like the iOS cards.
-            TVFocusPreview(url: scene.previewURL, width: width, height: height, cornerRadius: 10)
+            if showsFocusPreview {
+                TVFocusPreview(url: scene.previewURL, width: width, height: height, cornerRadius: 10)
+            }
 
             // Gradient
             LinearGradient(

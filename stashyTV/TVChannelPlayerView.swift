@@ -449,13 +449,15 @@ private struct TVChannelUpNextView: View {
                     .onAppear { session.loadMoreScenesForBrowsing() }
             } else {
                 ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(alignment: .top, spacing: 30) {
+                    // Lazy: the panel opens over running playback, and an eager HStack decoded
+                    // the artwork of every loaded scene (20, 40, 60 …) the moment it appeared.
+                    LazyHStack(alignment: .top, spacing: 30) {
                         ForEach(entries) { entry in
                             VStack(alignment: .leading, spacing: 10) {
                                 Button {
                                     session.play(sceneAt: entry.index)
                                 } label: {
-                                    TVSceneCardView(scene: entry.scene, width: 340, height: 191)
+                                    TVSceneCardView(scene: entry.scene, width: 340, height: 191, showsFocusPreview: false)
                                 }
                                 .buttonStyle(.card)
 
