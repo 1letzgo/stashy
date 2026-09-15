@@ -825,9 +825,9 @@ struct RateMeToolsView: View {
         }
     }
 
-    /// Right 5 ★ (the "like"), up 4 ★, left 2 ★, down skip — the only way to rate here.
+    /// Right 5 ★ (the "like"), up 4 ★, left 2 ★, down 1 ★. Skip is the button below the card.
     enum SwipeIntent: Equatable {
-        case five, four, two, skip
+        case five, four, two, one
 
         static let commitDistance: CGFloat = 110
 
@@ -836,16 +836,16 @@ struct RateMeToolsView: View {
             if abs(t.width) > abs(t.height) {
                 self = t.width > 0 ? .five : .two
             } else {
-                self = t.height < 0 ? .four : .skip
+                self = t.height < 0 ? .four : .one
             }
         }
 
-        var rating100: Int? {
+        var rating100: Int {
             switch self {
             case .five: return 100
             case .four: return 80
             case .two: return 40
-            case .skip: return nil
+            case .one: return 20
             }
         }
 
@@ -854,7 +854,7 @@ struct RateMeToolsView: View {
             case .five: return "★★★★★"
             case .four: return "★★★★"
             case .two: return "★★"
-            case .skip: return "Skip"
+            case .one: return "★"
             }
         }
 
@@ -863,7 +863,7 @@ struct RateMeToolsView: View {
             case .five: return .yellow
             case .four: return .green
             case .two: return .orange
-            case .skip: return .gray
+            case .one: return .red
             }
         }
 
@@ -873,7 +873,7 @@ struct RateMeToolsView: View {
             case .five: return CGSize(width: 700, height: 0)
             case .four: return CGSize(width: 0, height: -900)
             case .two: return CGSize(width: -700, height: 0)
-            case .skip: return CGSize(width: 0, height: 900)
+            case .one: return CGSize(width: 0, height: 900)
             }
         }
     }
@@ -1251,7 +1251,7 @@ struct RateMeToolsView: View {
             legendItem("arrow.right", "5★")
             legendItem("arrow.up", "4★")
             legendItem("arrow.left", "2★")
-            legendItem("arrow.down", "Skip")
+            legendItem("arrow.down", "1★")
         }
         .font(.caption2.weight(.semibold))
         .foregroundStyle(.secondary)
@@ -1272,7 +1272,7 @@ struct RateMeToolsView: View {
             .overlay {
                 if let live {
                     Text(live.title)
-                        .font(.system(size: live == .skip ? 30 : 34, weight: .heavy))
+                        .font(.system(size: 34, weight: .heavy))
                         .foregroundStyle(.white)
                         .padding(.horizontal, 18)
                         .padding(.vertical, 10)
@@ -1323,11 +1323,7 @@ struct RateMeToolsView: View {
         withAnimation(.easeIn(duration: 0.2)) { dragOffset = intent.flyOut }
         Task {
             try? await Task.sleep(nanoseconds: 200_000_000)
-            if let rating = intent.rating100 {
-                await model.submitRating(rating, holdsSelection: false)
-            } else {
-                await model.skip()
-            }
+            await model.submitRating(intent.rating100, holdsSelection: false)
         }
     }
 
