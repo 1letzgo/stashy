@@ -134,6 +134,11 @@ struct TVTabStack<Content: View>: View {
         // Einmal pro Stack: liefert `tvContentWidth` an Root-View und alle
         // gepushten Ziele. Deckt damit sämtliche Grids ab.
         .measuringTVContentWidth()
+        // Edge-to-edge ground under every tab page. Where the system hands the stack
+        // less than the full screen (sidebar column, larger safe-area insets), the page
+        // background alone would stop at that box and bare screen showed along the left
+        // and bottom edges.
+        .background(Color.appBackground.ignoresSafeArea())
     }
 }
 
