@@ -1577,6 +1577,11 @@ private struct SceneDetailLifecycleModifier: ViewModifier {
                 let muted = ScenePlayerMute.initialValue()
                 if muted != isMuted { isMuted = muted }
             }
+            // Feeds taking over the screen stops this player; otherwise its audio kept running
+            // underneath the feed until the user swiped.
+            .onReceive(NotificationCenter.default.publisher(for: .stashyPauseBackgroundPlayers)) { _ in
+                aetherEngine?.pause()
+            }
             .onReceive(Timer.publish(every: 10, on: .main, in: .common).autoconnect()) { _ in onPeriodicSync() }
             .onChange(of: StashSyncManager.shared.isActive) { _, active in if active { onInitialSync() } }
             .overlay(aetherOverlay)

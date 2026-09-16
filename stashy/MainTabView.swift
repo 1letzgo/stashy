@@ -109,6 +109,11 @@ struct MainTabView: View {
                 if newTab != .reels {
                     coordinator.suppressNextFeedsIconRemount = false
                 }
+                if newTab == .reels, oldTab != .reels {
+                    // A scene / gallery / download player on the tab we came from keeps running
+                    // otherwise, and its audio played under the feed until the first swipe.
+                    NotificationCenter.default.post(name: .stashyPauseBackgroundPlayers, object: nil)
+                }
                 guard oldTab == .reels, newTab != .reels else { return }
                 // Suspend before audio teardown so deferred Reel `play()` races cannot restart audio.
                 ReelsPlayerRegistry.suspendPlayback()

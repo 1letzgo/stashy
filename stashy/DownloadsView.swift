@@ -1368,6 +1368,10 @@ struct DownloadedGalleryItemView: View {
             guard isActiveItem else { return }
             if playing { engine?.play() } else { engine?.pause() }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .stashyPauseBackgroundPlayers)) { _ in
+            engine?.pause()
+            isPlaying = false
+        }
         .onChange(of: scrubberState.seekTarget) { _, target in
             guard isActiveItem, let target, let engine else { return }
             Task { @MainActor in

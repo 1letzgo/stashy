@@ -774,6 +774,11 @@ func videoFrameDataURL(from image: UIImage) -> String? {
 extension Notification.Name {
     /// Posted on the main thread whenever the hardware volume buttons change the output volume.
     static let stashyHardwareVolumeChanged = Notification.Name("stashyHardwareVolumeChanged")
+
+    /// Posted when Feeds takes over the screen. Every other player (scene detail, gallery
+    /// fullscreen, a downloaded file) pauses on it — without this the player left running on
+    /// another tab kept its audio going underneath the feed.
+    static let stashyPauseBackgroundPlayers = Notification.Name("stashyPauseBackgroundPlayers")
 }
 
 /// Watches `AVAudioSession.outputVolume` (the only signal the hardware volume buttons leave

@@ -1109,6 +1109,11 @@ struct GalleryItemView: View {
                 cancelAnimationAdvanceTimer()
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .stashyPauseBackgroundPlayers)) { _ in
+            engine?.pause()
+            isPlaying = false
+            cancelAnimationAdvanceTimer()
+        }
         .onChange(of: continuousPlay) { _, enabled in
             // Looping is the engine's job unless continuous play takes over at the end.
             engine?.loopsAtEnd = !enabled
