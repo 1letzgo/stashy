@@ -21,6 +21,7 @@ struct PerformerDetailView: View {
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var fullPerformer: Performer?
     @State private var performerLiveFilterSheetPresented = false
+    @State private var showingSceneDownloadOptions = false
     @State private var performerSceneFilterActive = false
     @State private var isFavorite: Bool = false
     @State private var isUpdatingFavorite: Bool = false
@@ -534,6 +535,11 @@ struct PerformerDetailView: View {
         .stashyDetailChrome(performerDetailChromeConfig) {
             performerDetailNavBar
         }
+        .sceneBulkDownloadDialog(
+            isPresented: $showingSceneDownloadOptions,
+            scope: .performer(id: displayPerformer.id),
+            scopeName: displayPerformer.name,
+        )
         .sheet(isPresented: $showingEditPerformerSheet) {
             EditPerformerSheet(performer: displayPerformer, viewModel: viewModel, onDeleted: { dismiss() }) { updated in
                 applyEditedPerformer(updated)
@@ -555,6 +561,9 @@ struct PerformerDetailView: View {
             ) {
                 HapticManager.light()
                 performerLiveFilterSheetPresented = true
+            }
+            slots.contextual = SceneBulkDownloadChrome.slot {
+                showingSceneDownloadOptions = true
             }
         case .galleries:
             slots.filterSort = CatalogChromeSlot(

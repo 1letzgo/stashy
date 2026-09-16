@@ -718,6 +718,7 @@ struct TagDetailView: View {
     @StateObject private var linkedImages: DetailLinkedImagesFilterModel
     @ObservedObject private var downloadManager = DownloadManager.shared
     @State private var showingTagDownloadOptions = false
+    @State private var showingSceneDownloadOptions = false
     /// Images 1/row autoplay: parent ScrollView drag/decelerate.
     @State private var imagesFeedScrolling = false
 
@@ -1188,6 +1189,11 @@ struct TagDetailView: View {
                 selectedTag.updatedAt = updatedAt
             }
         }
+        .sceneBulkDownloadDialog(
+            isPresented: $showingSceneDownloadOptions,
+            scope: .tag(id: selectedTag.id),
+            scopeName: selectedTag.name,
+        )
         .stashyDetailChrome(tagDetailChromeConfig) {
             tagDetailNavBar
         }
@@ -1241,6 +1247,9 @@ struct TagDetailView: View {
             ) {
                 HapticManager.light()
                 tagLiveFilterSheetPresented = true
+            }
+            slots.contextual = SceneBulkDownloadChrome.slot {
+                showingSceneDownloadOptions = true
             }
         case .galleries:
             slots.filterSort = CatalogChromeSlot(

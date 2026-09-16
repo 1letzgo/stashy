@@ -10857,8 +10857,103 @@ class DownloadManager: NSObject, ObservableObject {
     /// Folder name for a gallery download. Prefixed so it can never collide with a scene id.
     static func galleryFolderName(for id: String) -> String { "gallery-" + id }
 
-    /// Default cap for a "newest images only" gallery download.
-    static let galleryNewestBatchSize = 50
+    /// Cap for a "newest only" download — images of a gallery / tag, scenes of a performer,
+    /// studio, tag or group. Settings › Downloads.
+    static var galleryNewestBatchSize: Int { TabManager.shared.downloadBatchSize }
+
+    // MARK: - Bulk scene downloads (performer / studio / tag / group)
+
+    /// Which library object a bulk scene download belongs to.
+    enum SceneDownloadScope {
+        case performer(id: String)
+        case studio(id: String)
+        case tag(id: String)
+        case group(id: String)
+
+        /// `scene_filter` fragment selecting that object's scenes.
+        var sceneFilter: [String: Any] {
+            switch self {
+            case .performer(let id):
+                return ["performers": ["value": [id], "modifier": "INCLUDES"]]
+            case .studio(let id):
+                return ["studios": ["value": [id], "modifier": "INCLUDES", "depth": 0]]
+            case .tag(let id):
+                return ["tags": ["value": [id], "modifier": "INCLUDES", "depth": 0]]
+            case .group(let id):
+                return ["groups": ["value": [id], "modifier": "INCLUDES"]]
+            }
+        }
+    }
+
+    /// Queues every scene of a performer / studio / tag / group for download, newest first.
+    /// `limit` nil takes all of them. Scenes already downloaded (or downloading) are skipped,
+    /// so running it again after new scenes appeared only fetches the additions.
+    func downloadScenes(for scope: SceneDownloadScope, limit: Int?, scopeName: String) {
+        guard requireDownloadEntitlement() else { return }
+        fetchScenesForDownload(scope: scope, limit: limit) { [weak self] scenes in
+            guard let self else { return }
+            Task { @MainActor in
+                let pending = scenes.filter { !self.isDownloaded(id: $0.id) && self.activeDownloads[$0.id] == nil }
+                guard !pending.isEmpty else {
+                    self.notifyDownload(
+                        scenes.isEmpty ? "No scenes for \(scopeName)" : "All scenes already downloaded",
+                        icon: "checkmark.circle.fill",
+                        isError: false
+                    )
+                    return
+                }
+                self.notifyDownload(
+                    "Downloading \(pending.count) scene(s) from \(scopeName)",
+                    icon: "arrow.down.circle.fill",
+                    isError: false
+                )
+                for scene in pending {
+                    self.downloadScene(scene)
+                }
+            }
+        }
+    }
+
+    /// Newest-first scene page walk for a bulk download. Mirrors `fetchTagImagesForDownload`.
+    private func fetchScenesForDownload(
+        scope: SceneDownloadScope,
+        limit: Int?,
+        completion: @escaping ([Scene]) -> Void
+    ) {
+        Task {
+            let query = GraphQLQueries.queryWithFragments("findScenes")
+            var collected: [Scene] = []
+            var total = 0
+            var page = 1
+            let perPage = min(limit ?? 100, 100)
+            while true {
+                let variables: [String: Any] = [
+                    "filter": ["page": page, "per_page": perPage, "sort": "date", "direction": "DESC"],
+                    "scene_filter": scope.sceneFilter
+                ]
+                do {
+                    let response: AltScenesResponse = try await GraphQLClient.shared.execute(
+                        query: query,
+                        variables: variables
+                    )
+                    let scenes = response.data?.findScenes?.scenes ?? []
+                    total = response.data?.findScenes?.count ?? total
+                    collected.append(contentsOf: scenes)
+                    if let limit, collected.count >= limit {
+                        collected = Array(collected.prefix(limit))
+                        break
+                    }
+                    if scenes.count < perPage || collected.count >= total { break }
+                    page += 1
+                    if page > 50 { break }
+                } catch {
+                    AppLog.error("📥 Scene fetch for bulk download failed: \(error)")
+                    break
+                }
+            }
+            completion(collected)
+        }
+    }
 
     /// Entries the user cancelled. The sequential image loop checks this between files — cancelling
     /// the URLSession tasks alone would not stop it from starting the next one.

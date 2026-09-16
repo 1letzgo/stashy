@@ -19,6 +19,7 @@ struct StudioDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var studioLiveFilterSheetPresented = false
+    @State private var showingSceneDownloadOptions = false
     @State private var studioSceneFilterActive = false
     @StateObject private var linkedPerformers: DetailLinkedPerformersFilterModel
     @StateObject private var linkedTags: DetailLinkedTagsFilterModel
@@ -504,6 +505,11 @@ struct StudioDetailView: View {
             }
         }
         .sceneLiveUpdates(using: viewModel)
+        .sceneBulkDownloadDialog(
+            isPresented: $showingSceneDownloadOptions,
+            scope: .studio(id: studio.id),
+            scopeName: studio.name,
+        )
         .stashyDetailChrome(studioDetailChromeConfig) {
             studioDetailNavBar
         }
@@ -528,6 +534,9 @@ struct StudioDetailView: View {
             ) {
                 HapticManager.light()
                 studioLiveFilterSheetPresented = true
+            }
+            slots.contextual = SceneBulkDownloadChrome.slot {
+                showingSceneDownloadOptions = true
             }
         case .galleries:
             slots.filterSort = CatalogChromeSlot(

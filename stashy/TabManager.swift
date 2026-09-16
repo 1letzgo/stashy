@@ -463,6 +463,13 @@ class TabManager: ObservableObject {
     }
     static let holdSpeedOptions: [Double] = [1.5, 2, 2.5, 3, 4]
 
+    /// Settings › Downloads › "Newest batch size": how many items a "newest" download grabs —
+    /// images of a gallery or tag, and scenes of a performer / studio / tag / group.
+    @Published var downloadBatchSize: Int = 50 {
+        didSet { UserDefaults.standard.set(downloadBatchSize, forKey: downloadBatchSizeKey) }
+    }
+    static let downloadBatchSizeOptions: [Int] = [10, 25, 50, 100, 200]
+
     static func holdSpeedLabel(_ rate: Double) -> String {
         rate == rate.rounded() ? "\(Int(rate))×" : String(format: "%.1f×", rate)
     }
@@ -574,6 +581,7 @@ class TabManager: ObservableObject {
     private let isPiPEnabledKey = "isPiPEnabled"
     private let playerSkipSecondsKey = "playerSkipSeconds"
     private let playerDolbyVisionEnabledKey = "player_dolby_vision_enabled"
+    private let downloadBatchSizeKey = "download_batch_size"
     private let holdSpeedPlayerKey = "hold_speed_player"
     private let holdSpeedFeedsKey = "hold_speed_feeds"
     private let playCountPlayerSecondsKey = "play_count_player_seconds"
@@ -628,6 +636,8 @@ class TabManager: ObservableObject {
         let storedSkip = UserDefaults.standard.object(forKey: playerSkipSecondsKey) as? Double ?? 10
         self.playerSkipSeconds = Self.playerSkipOptions.contains(storedSkip) ? storedSkip : 10
         self.playerDolbyVisionEnabled = UserDefaults.standard.object(forKey: playerDolbyVisionEnabledKey) as? Bool ?? true
+        let storedBatch = UserDefaults.standard.object(forKey: downloadBatchSizeKey) as? Int ?? 50
+        self.downloadBatchSize = Self.downloadBatchSizeOptions.contains(storedBatch) ? storedBatch : 50
         let storedHoldPlayer = UserDefaults.standard.object(forKey: holdSpeedPlayerKey) as? Double ?? 2
         self.holdSpeedPlayer = Self.holdSpeedOptions.contains(storedHoldPlayer) ? storedHoldPlayer : 2
         let storedHoldFeeds = UserDefaults.standard.object(forKey: holdSpeedFeedsKey) as? Double ?? 2

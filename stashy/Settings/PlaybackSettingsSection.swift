@@ -77,12 +77,30 @@ struct PlaybackSettingsSection: View {
             }
 
             #if !os(tvOS)
+            downloadsSection
             subtitlesSection
             #endif
         }
     }
 
     #if !os(tvOS)
+    /// How much a "newest" download grabs — gallery / tag images and the scenes of a
+    /// performer, studio, tag or group.
+    private var downloadsSection: some View {
+        Section {
+            stashyScrollingSectionHeader("Downloads")
+
+            Picker(selection: $tabManager.downloadBatchSize) {
+                ForEach(TabManager.downloadBatchSizeOptions, id: \.self) { size in
+                    Text("\(size)").tag(size)
+                }
+            } label: {
+                Label("Newest batch size", systemImage: "arrow.down.doc")
+            }
+            .stashyGroupedBlockRow(index: 0, count: 1)
+        }
+    }
+
     /// Subtitle defaults and look. Shared by every player overlay (scene detail, downloads, tvOS).
     private var subtitlesSection: some View {
         Section {

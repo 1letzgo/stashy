@@ -101,6 +101,7 @@
 		AE7E0000000000000000B0C2 /* PlayerMenuButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B0C1 /* PlayerMenuButton.swift */; };
 		AE7E0000000000000000B0C3 /* PlayerMenuButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B0C1 /* PlayerMenuButton.swift */; };
 		AITAG00012F70A00000000001 /* AITagSuggestionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00022F70A00000000002 /* AITagSuggestionManager.swift */; };
+		SCENEDL01000000000000001 /* SceneBulkDownloadControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = SCENEDL02000000000000002 /* SceneBulkDownloadControl.swift */; };
 		SWIPE0001000000000000001 /* SwipeActionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = SWIPE0002000000000000002 /* SwipeActionCard.swift */; };
 		AITAG00032F70A00000000003 /* AITagSuggestionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00042F70A00000000004 /* AITagSuggestionBar.swift */; };
 		AITAG00052F70A00000000005 /* AITagsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00062F70A00000000006 /* AITagsSettingsView.swift */; };
@@ -271,6 +272,7 @@
 		AE7E0000000000000000B0B1 /* AetherTimeBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherTimeBar.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B0C1 /* PlayerMenuButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerMenuButton.swift; sourceTree = "<group>"; };
 		AITAG00022F70A00000000002 /* AITagSuggestionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagSuggestionManager.swift; sourceTree = "<group>"; };
+		SCENEDL02000000000000002 /* SceneBulkDownloadControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneBulkDownloadControl.swift; sourceTree = "<group>"; };
 		SWIPE0002000000000000002 /* SwipeActionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeActionCard.swift; sourceTree = "<group>"; };
 		AITAG00042F70A00000000004 /* AITagSuggestionBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagSuggestionBar.swift; sourceTree = "<group>"; };
 		AITAG00062F70A00000000006 /* AITagsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagsSettingsView.swift; sourceTree = "<group>"; };
@@ -582,6 +584,7 @@
 			children = (
 				AITAG00042F70A00000000004 /* AITagSuggestionBar.swift */,
 				SWIPE0002000000000000002 /* SwipeActionCard.swift */,
+				SCENEDL02000000000000002 /* SceneBulkDownloadControl.swift */,
 				AITAG000A2F70A0000000000A /* AddTagsSheet.swift */,
 				DFSEC0042F2A000100000004 /* PasscodeEntryView.swift */,
 			);
@@ -863,6 +866,7 @@
 				5115C0050000000000000005 /* SceneSimilarScenesCard.swift in Sources */,
 				AITAG00032F70A00000000003 /* AITagSuggestionBar.swift in Sources */,
 				SWIPE0001000000000000001 /* SwipeActionCard.swift in Sources */,
+				SCENEDL01000000000000001 /* SceneBulkDownloadControl.swift in Sources */,
 				AITAG00092F70A00000000009 /* AddTagsSheet.swift in Sources */,
 				AITAG00052F70A00000000005 /* AITagsSettingsView.swift in Sources */,
 				DFSEC0052F2A000100000005 /* SecuritySettingsView.swift in Sources */,

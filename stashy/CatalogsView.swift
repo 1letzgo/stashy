@@ -753,6 +753,7 @@ struct GroupDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.horizontalSizeClass) private var horizontalSizeClass
     @State private var groupLiveFilterSheetPresented = false
+    @State private var showingSceneDownloadOptions = false
     @State private var groupSceneFilterActive = false
     @State private var isHeaderExpanded = false
     @State private var showingEditGroupSheet = false
@@ -1151,6 +1152,9 @@ struct GroupDetailView: View {
                 HapticManager.light()
                 groupLiveFilterSheetPresented = true
             }
+            slots.contextual = SceneBulkDownloadChrome.slot {
+                showingSceneDownloadOptions = true
+            }
         case .galleries:
             slots.filterSort = CatalogChromeSlot(
                 systemImage: "slider.horizontal.3",
@@ -1217,6 +1221,11 @@ struct GroupDetailView: View {
         }
         .applyAppBackground()
         .sceneLiveUpdates(using: viewModel)
+        .sceneBulkDownloadDialog(
+            isPresented: $showingSceneDownloadOptions,
+            scope: .group(id: selectedGroup.id),
+            scopeName: selectedGroup.name,
+        )
         .stashyDetailChrome(groupDetailChromeConfig) {
             groupDetailNavBar
         }
