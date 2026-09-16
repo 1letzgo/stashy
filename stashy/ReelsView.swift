@@ -5350,7 +5350,9 @@ extension ReelItemView {
                     .padding(.horizontal, 22)
                     .padding(.vertical, 14)
                     .stashyGlass(shape: Capsule())
-                    .padding(.top, 130)
+                    // Below the filter chip row: at 130 the badge sat on top of an active
+                    // performer / tag chip.
+                    .padding(.top, 200)
                 Spacer()
             }
             .transition(.opacity)
