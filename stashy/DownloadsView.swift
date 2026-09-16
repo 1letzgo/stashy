@@ -715,14 +715,6 @@ extension DownloadsView {
                     downloadManager.syncGallery(id: entry.id, limit: nil)
                 }
             })
-            actions.append(StashySwipeAction(title: "Newest \(DownloadManager.galleryNewestBatchSize)",
-                                             systemImage: "arrow.down.to.line", tint: .indigo) {
-                if entry.resolvedKind == .tag {
-                    downloadManager.syncTagImages(entryId: entry.id, limit: DownloadManager.galleryNewestBatchSize)
-                } else {
-                    downloadManager.syncGallery(id: entry.id, limit: DownloadManager.galleryNewestBatchSize)
-                }
-            })
         }
         actions.append(StashySwipeAction(title: "Delete", systemImage: "trash", tint: .red, isDestructive: true) {
             downloadManager.deleteGalleryDownload(id: entry.id)

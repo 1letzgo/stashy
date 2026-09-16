@@ -20,89 +20,137 @@ struct StashySwipeAction: Identifiable {
 }
 
 /// `.swipeActions` only exists inside a `List`. Downloads and the other Tools screens lay their
-/// cards out in `LazyVGrid`s, so the gesture is rebuilt here: drag left to reveal the buttons,
-/// keep dragging past the card's half width to fire the destructive one directly.
+/// cards out in `LazyVGrid`s, so the gesture is rebuilt here with the system's feel: the buttons
+/// grow out of the trailing edge with the finger, the destructive one takes over the whole row on
+/// a full swipe, and everything settles with a spring.
 struct StashySwipeActionsModifier: ViewModifier {
     let actions: [StashySwipeAction]
 
     @State private var offset: CGFloat = 0
     @State private var isOpen = false
     @State private var width: CGFloat = 0
+    @State private var isFullSwipe = false
+    @State private var isDeleting = false
 
-    private var buttonWidth: CGFloat { 72 }
+    /// Resting width per button, as in Mail.
+    private let buttonWidth: CGFloat = 76
     private var openWidth: CGFloat { buttonWidth * CGFloat(actions.count) }
-    /// Past this the drag completes on its own — the same feel as Mail's full swipe.
-    private var fullSwipeThreshold: CGFloat { max(openWidth + 60, width * 0.5) }
+    private var reveal: CGFloat { max(0, -offset) }
+    private var fullSwipeThreshold: CGFloat { max(openWidth + 80, width * 0.55) }
+    private var destructive: StashySwipeAction? { actions.last(where: { $0.isDestructive }) }
+    private var cornerRadius: CGFloat { DesignTokens.CornerRadius.card }
+    private var springOpen: Animation { .spring(response: 0.34, dampingFraction: 0.82) }
+    private var springClose: Animation { .spring(response: 0.3, dampingFraction: 0.9) }
 
     func body(content: Content) -> some View {
         ZStack(alignment: .trailing) {
-            buttons
+            // Sits still behind the card; only its width follows the finger.
+            actionRail
             content
-                .background(
-                    GeometryReader { geo in
-                        Color.clear.onAppear { width = geo.size.width }
-                    }
-                )
                 .offset(x: offset)
                 .highPriorityGesture(dragGesture)
-                // A tap anywhere closes an open row instead of opening the card.
-                .simultaneousGesture(TapGesture().onEnded {
-                    if isOpen { close() }
-                }, including: isOpen ? .all : .subviews)
+                // While a row is open, a tap closes it instead of opening the card.
+                .simultaneousGesture(TapGesture().onEnded { close() }, including: isOpen ? .all : .subviews)
         }
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .background(
+            GeometryReader { geo in
+                Color.clear
+                    .onAppear { width = geo.size.width }
+                    .onChange(of: geo.size.width) { _, new in width = new }
+            }
+        )
+        .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
     }
 
-    private var buttons: some View {
+    /// Buttons sized from the current drag, so they slide out of the edge with the finger.
+    private var actionRail: some View {
         HStack(spacing: 0) {
-            ForEach(actions) { action in
+            ForEach(Array(actions.enumerated()), id: \.element.id) { index, action in
+                let share = railWidth(for: index)
                 Button {
                     close()
                     action.handler()
                 } label: {
-                    VStack(spacing: 4) {
-                        Image(systemName: action.systemImage)
-                            .font(.title3)
-                        Text(action.title)
-                            .font(.caption2.weight(.semibold))
-                    }
-                    .foregroundColor(.white)
-                    .frame(width: buttonWidth)
-                    .frame(maxHeight: .infinity)
-                    .background(action.tint)
+                    label(for: action, width: share)
                 }
                 .buttonStyle(.plain)
+                .frame(width: share)
+                .frame(maxHeight: .infinity)
+                .background(action.tint)
+                .clipped()
             }
         }
-        .opacity(offset < -1 ? 1 : 0)
+        .frame(width: reveal, alignment: .trailing)
+        .opacity(reveal > 0.5 ? 1 : 0)
+    }
+
+    /// On a full swipe the destructive action swallows the other buttons' width.
+    private func railWidth(for index: Int) -> CGFloat {
+        guard reveal > 0 else { return 0 }
+        let isLast = index == actions.count - 1
+        if isFullSwipe, let destructive, actions[index].id == destructive.id {
+            return reveal
+        }
+        if isFullSwipe { return 0 }
+        let even = reveal / CGFloat(actions.count)
+        // Rounding leftovers go to the last button so no hairline gap shows.
+        return isLast ? reveal - even * CGFloat(actions.count - 1) : even
+    }
+
+    @ViewBuilder
+    private func label(for action: StashySwipeAction, width: CGFloat) -> some View {
+        VStack(spacing: 4) {
+            Image(systemName: action.systemImage)
+                .font(.system(size: 18, weight: .semibold))
+            // The caption only appears once the button is wide enough to hold it.
+            Text(action.title)
+                .font(.caption2.weight(.semibold))
+                .lineLimit(1)
+                .opacity(width >= 62 ? 1 : 0)
+                .frame(height: width >= 62 ? nil : 0)
+        }
+        .foregroundColor(.white)
+        .frame(maxWidth: .infinity)
+        .padding(.horizontal, 4)
     }
 
     private var dragGesture: some Gesture {
-        DragGesture(minimumDistance: 12)
+        DragGesture(minimumDistance: 14)
             .onChanged { value in
                 // Vertical scrolling stays with the surrounding ScrollView.
                 guard abs(value.translation.width) > abs(value.translation.height) else { return }
+                guard !isDeleting else { return }
                 let base = isOpen ? -openWidth : 0
                 let proposed = base + value.translation.width
-                // Rubber band once past the buttons; no swiping the card to the right.
-                offset = min(0, proposed < -openWidth ? -openWidth + (proposed + openWidth) / 3 : proposed)
+                // Rubber band past the buttons, and no swiping the card to the right.
+                let resisted = proposed < -openWidth ? -openWidth + (proposed + openWidth) * 0.55 : proposed
+                offset = min(0, resisted)
+
+                let reachedFullSwipe = destructive != nil && -offset > fullSwipeThreshold
+                if reachedFullSwipe != isFullSwipe {
+                    withAnimation(springOpen) { isFullSwipe = reachedFullSwipe }
+                    HapticManager.light()
+                }
             }
             .onEnded { value in
-                guard abs(value.translation.width) > abs(value.translation.height) else {
-                    withAnimation(.snappy) { offset = isOpen ? -openWidth : 0 }
+                guard abs(value.translation.width) > abs(value.translation.height), !isDeleting else {
+                    withAnimation(springClose) { offset = isOpen ? -openWidth : 0 }
                     return
                 }
-                let base = isOpen ? -openWidth : 0
-                let total = base + value.translation.width
-                if let destructive = actions.last(where: { $0.isDestructive }), total < -fullSwipeThreshold {
+                if isFullSwipe, let destructive {
+                    isDeleting = true
                     HapticManager.medium()
-                    withAnimation(.snappy) { offset = -(width + openWidth) }
-                    destructive.handler()
+                    withAnimation(.easeIn(duration: 0.22)) { offset = -(width + openWidth) }
+                    // Let the row run off screen before the model drops it.
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) { destructive.handler() }
                     return
                 }
-                if total < -buttonWidth / 2 {
+                // Flicking left opens even when the finger did not travel the full width.
+                let flicked = value.predictedEndTranslation.width < -buttonWidth
+                if -offset > buttonWidth * 0.5 || flicked {
+                    if !isOpen { HapticManager.light() }
                     isOpen = true
-                    withAnimation(.snappy) { offset = -openWidth }
+                    withAnimation(springOpen) { offset = -openWidth }
                 } else {
                     close()
                 }
@@ -110,8 +158,10 @@ struct StashySwipeActionsModifier: ViewModifier {
     }
 
     private func close() {
+        guard isOpen || offset != 0 else { return }
         isOpen = false
-        withAnimation(.snappy) { offset = 0 }
+        isFullSwipe = false
+        withAnimation(springClose) { offset = 0 }
     }
 }
 
