@@ -119,6 +119,11 @@ struct AetherSceneSurface: View {
         // Keyboard insets (a sheet's text field over this surface) must not resize the surface.
         .ignoresSafeArea(.keyboard)
         .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
+            // Rotation reports a new size every animation frame, and each assignment
+            // re-evaluates this whole surface even when nothing moved by a visible amount.
+            // The device watchdog killed the app mid-rotation over exactly that churn.
+            guard abs(size.width - surfaceSize.width) > 0.5
+                    || abs(size.height - surfaceSize.height) > 0.5 else { return }
             surfaceHeight = size.height
             surfaceSize = size
         }
