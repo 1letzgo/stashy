@@ -1101,7 +1101,9 @@ struct DownloadedGalleryCard: View {
     private var isSyncing: Bool { downloadManager.activeDownloads[entry.id] != nil }
 
     var body: some View {
-        HStack(spacing: DesignTokens.Spacing.sm) {
+        // Cover flush with the card's leading edge, straight on the right — the scene cards
+        // are built the same way.
+        HStack(spacing: 0) {
             cover
             VStack(alignment: .leading, spacing: 4) {
                 Text(entry.displayTitle)
@@ -1113,6 +1115,8 @@ struct DownloadedGalleryCard: View {
                     .foregroundColor(.secondary)
                     .lineLimit(1)
             }
+            .padding(.horizontal, DesignTokens.Spacing.sm)
+            .padding(.vertical, DesignTokens.Spacing.sm)
             Spacer(minLength: 0)
             if isSyncing {
                 Button {
@@ -1123,11 +1127,12 @@ struct DownloadedGalleryCard: View {
                         .foregroundColor(.red)
                 }
                 .buttonStyle(.plain)
+                .padding(.trailing, DesignTokens.Spacing.sm)
                 .accessibilityLabel("Cancel download")
             }
             // No "more" button: the row's actions live behind a swipe to the left.
         }
-        .padding(DesignTokens.Spacing.sm)
+        .frame(height: 72)
         .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
     }
@@ -1155,7 +1160,6 @@ struct DownloadedGalleryCard: View {
 
     @ViewBuilder
     private var cover: some View {
-        let size: CGFloat = 56
         Group {
             if let url = downloadManager.localCoverURL(for: entry),
                let data = try? Data(contentsOf: url),
@@ -1178,8 +1182,8 @@ struct DownloadedGalleryCard: View {
                     }
             }
         }
-        .frame(width: size, height: size)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small))
+        .frame(width: 96, height: 72)
+        .clipped()
     }
 }
 
