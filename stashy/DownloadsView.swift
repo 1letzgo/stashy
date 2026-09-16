@@ -1483,7 +1483,6 @@ struct DownloadedGalleryFullScreenView: View {
                     if showUI, StashyChromePlacement.prefersBottom {
                         navBar.transition(.opacity)
                     }
-                    playbackControls
                     infoOverlay
                     scrubberBar
                 }
@@ -1542,37 +1541,6 @@ struct DownloadedGalleryFullScreenView: View {
         return letters.isEmpty ? "?" : letters.joined().uppercased()
     }
 
-    /// Mute and play/pause, in their own row above the caption — same arrangement as Feeds.
-    @ViewBuilder
-    private var playbackControls: some View {
-        let isVideo = currentImage?.isVideo ?? false
-        HStack(spacing: 8) {
-            Spacer(minLength: 0)
-            ChromeCircleButton(
-                systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
-                enabled: isVideo,
-                accessibilityLabel: isMuted ? "Ton an" : "Stumm"
-            ) {
-                if isVideo {
-                    isMuted.toggle()
-                    ScenePlayerMute.persist(isMuted)
-                }
-            }
-            ChromeCircleButton(
-                systemImage: isPlaying ? "pause.fill" : "play.fill",
-                enabled: isVideo,
-                accessibilityLabel: isPlaying ? "Pause" : "Play"
-            ) {
-                if isVideo { isPlaying.toggle() }
-            }
-        }
-        .padding(.horizontal, StashyExpandingDock.edgePadding)
-        .padding(.bottom, 8)
-        .colorScheme(.dark)
-        .opacity(showUI ? 1 : 0)
-        .animation(.easeInOut(duration: 0.2), value: showUI)
-    }
-
     /// Only videos have something to scrub; stills keep the height so the chrome does not jump.
     @ViewBuilder
     private var scrubberBar: some View {
@@ -1581,77 +1549,108 @@ struct DownloadedGalleryFullScreenView: View {
             .allowsHitTesting(currentImage?.isVideo ?? false)
     }
 
-    /// Performer · title line plus tag chips — same layout and typography as the online viewer's
-    /// `feedsStyleInfoOverlay`, fed from the metadata stored at download time.
+    /// Performer · title line, the trailing control stack and the tag row — the same three
+    /// pieces the online viewer's `feedsStyleInfoOverlay` shows, fed from the metadata stored
+    /// at download time.
     @ViewBuilder
     private var infoOverlay: some View {
         if let image = currentImage {
             let performers = image.performerNames ?? []
             let tags = image.tagNames ?? []
             let title = image.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let isVideo = image.isVideo
 
-            if !performers.isEmpty || !title.isEmpty || !tags.isEmpty {
-                HStack(alignment: .center, spacing: 10) {
-                    if let performer = performers.first {
-                        // No cached profile picture offline — initials stand in for the round
-                        // thumbnail the online viewer shows.
-                        Circle()
-                            .fill(appearance.tintColor.opacity(0.2))
-                            .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
-                            .overlay {
-                                Text(Self.initials(for: performer))
-                                    .font(.system(size: 14, weight: .bold))
-                                    .foregroundColor(.white.opacity(0.9))
-                            }
-                            .overlay(Circle().stroke(appearance.tintColor, lineWidth: 2))
-                    }
-
-                    VStack(alignment: .leading, spacing: 4) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(alignment: .bottom, spacing: 8) {
+                    HStack(alignment: .center, spacing: 10) {
                         if let performer = performers.first {
-                            Text(performer)
-                                .font(.system(size: 15, weight: .bold))
-                                .foregroundColor(.white)
-                            if !title.isEmpty {
-                                Text("-")
-                                    .font(.system(size: 15, weight: .medium))
-                                    .foregroundColor(.white.opacity(0.6))
-                            }
+                            // No cached profile picture offline — initials stand in for the
+                            // round thumbnail the online viewer shows.
+                            Circle()
+                                .fill(appearance.tintColor.opacity(0.2))
+                                .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
+                                .overlay {
+                                    Text(Self.initials(for: performer))
+                                        .font(.system(size: 14, weight: .bold))
+                                        .foregroundColor(.white.opacity(0.9))
+                                }
+                                .overlay(Circle().stroke(appearance.tintColor, lineWidth: 2))
                         }
-                        if !title.isEmpty {
-                            Text(title)
-                                .font(.system(size: 15, weight: .medium))
-                                .foregroundColor(.white.opacity(0.85))
-                                .lineLimit(1)
-                        }
-                        Spacer(minLength: 0)
-                    }
 
-                    if !tags.isEmpty {
-                        ScrollView(.horizontal, showsIndicators: false) {
-                            HStack(spacing: 6) {
-                                ForEach(tags, id: \.self) { tag in
-                                    Text("#\(tag)")
-                                        .font(.system(size: 11, weight: .semibold))
-                                        .foregroundColor(.white.opacity(0.8))
-                                        .padding(.horizontal, 8)
-                                        .padding(.vertical, 3)
-                                        .background(Color.black.opacity(0.3))
-                                        .clipShape(Capsule())
-                                        .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                        VStack(alignment: .leading, spacing: 4) {
+                            HStack(alignment: .firstTextBaseline, spacing: 6) {
+                                if let performer = performers.first {
+                                    Text(performer)
+                                        .font(.system(size: 15, weight: .bold))
+                                        .foregroundColor(.white)
+                                    if !title.isEmpty {
+                                        Text("-")
+                                            .font(.system(size: 15, weight: .medium))
+                                            .foregroundColor(.white.opacity(0.6))
+                                    }
+                                }
+                                if !title.isEmpty {
+                                    Text(title)
+                                        .font(.system(size: 15, weight: .medium))
+                                        .foregroundColor(.white.opacity(0.85))
+                                        .lineLimit(1)
                                 }
                             }
+                            .frame(maxWidth: .infinity, alignment: .leading)
                         }
-                        .frame(height: 20)
                     }
+                    Spacer(minLength: 8)
+
+                    // Mute · Play stacked on the trailing edge. Rating and the O-counter are
+                    // server state, so the offline viewer has no use for them.
+                    VStack(alignment: .trailing, spacing: 8) {
+                        ChromePillIconButton(
+                            systemImage: isMuted ? "speaker.slash.fill" : "speaker.wave.2.fill",
+                            enabled: isVideo,
+                            accessibilityLabel: isMuted ? "Ton an" : "Stumm"
+                        ) {
+                            if isVideo {
+                                isMuted.toggle()
+                                ScenePlayerMute.persist(isMuted)
+                            }
+                        }
+
+                        ChromePillIconButton(
+                            systemImage: isPlaying ? "pause.fill" : "play.fill",
+                            enabled: isVideo,
+                            accessibilityLabel: isPlaying ? "Pause" : "Play"
+                        ) {
+                            if isVideo { isPlaying.toggle() }
+                        }
                     }
                 }
                 .padding(.horizontal, StashyExpandingDock.edgePadding)
-                .padding(.bottom, 2)
-                .colorScheme(.dark)
-                .opacity(showUI ? 1 : 0)
-                .animation(.easeInOut(duration: 0.2), value: showUI)
+
+                // Hashtags on their own full-width row under the title / controls row.
+                if !tags.isEmpty {
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(tags, id: \.self) { tag in
+                                Text("#\(tag)")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(.white.opacity(0.8))
+                                    .padding(.horizontal, 8)
+                                    .padding(.vertical, 3)
+                                    .background(Color.black.opacity(0.3))
+                                    .clipShape(Capsule())
+                                    .overlay(Capsule().stroke(Color.white.opacity(0.15), lineWidth: 0.5))
+                            }
+                        }
+                        .padding(.horizontal, StashyExpandingDock.edgePadding)
+                    }
+                    .frame(height: 24)
+                    .padding(.top, 6)
+                }
             }
+            .padding(.bottom, 2)
+            .colorScheme(.dark)
+            .opacity(showUI ? 1 : 0)
+            .animation(.easeInOut(duration: 0.2), value: showUI)
         }
     }
 
