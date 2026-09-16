@@ -80,11 +80,16 @@ struct DownloadsView: View {
                                                 Text("\(Int(download.progress * 100))%")
                                                     .font(.caption2)
                                                     .foregroundColor(.secondary)
+                                            } else if download.progress <= 0 && download.downloadedSize == 0 {
+                                                // Waiting for one of the two transfer slots.
+                                                Text("Queued")
+                                                    .font(.caption2)
+                                                    .foregroundColor(.secondary)
                                             } else {
                                                 ProgressView()
                                                     .progressViewStyle(.linear)
                                                     .tint(appearanceManager.tintColor)
-                                            
+
                                                 Text("\(ByteCountFormatter.string(fromByteCount: download.downloadedSize, countStyle: .file)) downloaded")
                                                     .font(.caption2)
                                                     .foregroundColor(.secondary)
@@ -113,7 +118,7 @@ struct DownloadsView: View {
                                         }
                                         .buttonStyle(.plain)
                                         .stashySwipeActions([
-                                            StashySwipeAction(title: "Delete", systemImage: "trash", tint: .red, isDestructive: true) {
+                                            StashySwipeAction(title: "Delete", systemImage: "trash", tint: AppearanceManager.shared.tintColor, isDestructive: true) {
                                                 sceneToDelete = downloaded
                                             }
                                         ])
@@ -256,7 +261,6 @@ struct DownloadsView: View {
                     .accessibilityLabel("New sync job")
                 }
             }
-            .scrollClipDisabled()
         }
         .padding(.horizontal, DesignTokens.Tools.contentPadding)
         .padding(.top, DesignTokens.Tools.menuTopPadding)
@@ -294,23 +298,22 @@ private struct DownloadSyncJobSheet: View {
 
                 Section {
                     ForEach(usableFilters) { filter in
-                        Button {
-                            selectedFilterId = filter.id
-                        } label: {
-                            HStack(spacing: DesignTokens.Spacing.sm) {
+                        // Plain row with a tap gesture: a `Button` inside a themed list row
+                        // did not reliably register the tap.
+                        HStack(spacing: DesignTokens.Spacing.sm) {
                                 Image(systemName: filter.mode == .scenes ? "film" : "photo")
                                     .foregroundStyle(.secondary)
                                 Text(filter.name)
                                     .font(.body.weight(.medium))
                                     .foregroundColor(.primary)
                                 Spacer()
-                                if selectedFilterId == filter.id {
-                                    Image(systemName: "checkmark")
-                                        .foregroundColor(appearance.tintColor)
-                                }
+                            if selectedFilterId == filter.id {
+                                Image(systemName: "checkmark")
+                                    .foregroundColor(appearance.tintColor)
                             }
                         }
-                        .buttonStyle(.plain)
+                        .contentShape(Rectangle())
+                        .onTapGesture { selectedFilterId = filter.id }
                         .listRowBackground(Color.secondaryAppBackground(for: appearance.currentTheme))
                         .listRowSeparatorTint(Color.primary.opacity(0.15))
                     }
@@ -953,7 +956,7 @@ extension DownloadsView {
     private func swipeActions(for entry: DownloadedGallery) -> [StashySwipeAction] {
         var actions: [StashySwipeAction] = []
         if !entry.isSingleImage {
-            actions.append(StashySwipeAction(title: "Sync", systemImage: "arrow.triangle.2.circlepath", tint: .blue) {
+            actions.append(StashySwipeAction(title: "Sync", systemImage: "arrow.triangle.2.circlepath", tint: .gray) {
                 if entry.resolvedKind == .tag {
                     downloadManager.syncTagImages(entryId: entry.id, limit: nil)
                 } else {
@@ -961,7 +964,7 @@ extension DownloadsView {
                 }
             })
         }
-        actions.append(StashySwipeAction(title: "Delete", systemImage: "trash", tint: .red, isDestructive: true) {
+        actions.append(StashySwipeAction(title: "Delete", systemImage: "trash", tint: AppearanceManager.shared.tintColor, isDestructive: true) {
             galleryToDelete = entry
         })
         return actions

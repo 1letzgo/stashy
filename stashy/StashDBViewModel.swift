@@ -10719,9 +10719,17 @@ class DownloadManager: NSObject, ObservableObject {
         return downloads.contains(where: { $0.id == id })
     }
     
+    /// At most this many scene files transfer at once; the rest wait in `sceneQueue`.
+    static let maxParallelSceneDownloads = 2
+    /// Scenes waiting for a slot, in the order they were queued.
+    private var sceneQueue: [Scene] = []
+    /// Scene ids currently transferring (an entry in `activeDownloads` also exists for each).
+    private var runningSceneIds: Set<String> = []
+
     func downloadScene(_ scene: Scene) {
         let sceneId = scene.id
         guard !isDownloaded(id: sceneId), activeDownloads[sceneId] == nil else { return }
+        guard !sceneQueue.contains(where: { $0.id == sceneId }) else { return }
         #if !os(tvOS)
         guard StashyPlusManager.isUnlockedNow else {
             ToastManager.shared.show(
@@ -10734,7 +10742,33 @@ class DownloadManager: NSObject, ObservableObject {
         #endif
 
         // The original file is what gets downloaded, so there is no stream list to fetch.
-        startDownload(scene)
+        // Queued rather than started: a handful of parallel video transfers starve each other
+        // and the progress bars crawl. Waiting scenes show up as "Queued".
+        sceneQueue.append(scene)
+        activeDownloads[sceneId] = ActiveDownload(
+            id: sceneId,
+            title: scene.title ?? "Unknown Scene",
+            progress: 0,
+            totalSize: 0,
+            downloadedSize: 0
+        )
+        startNextQueuedScenesIfPossible()
+    }
+
+    /// Fills the free slots from the queue.
+    private func startNextQueuedScenesIfPossible() {
+        while runningSceneIds.count < Self.maxParallelSceneDownloads, !sceneQueue.isEmpty {
+            let next = sceneQueue.removeFirst()
+            runningSceneIds.insert(next.id)
+            startDownload(next)
+        }
+    }
+
+    /// A slot came free — either the file finished or it failed.
+    private func finishSceneDownload(id: String) {
+        runningSceneIds.remove(id)
+        sceneQueue.removeAll { $0.id == id }
+        startNextQueuedScenesIfPossible()
     }
 
     private func startDownload(_ scene: Scene) {
@@ -10810,6 +10844,7 @@ class DownloadManager: NSObject, ObservableObject {
                 try? FileManager.default.removeItem(at: sceneFolder)
                 self.activeDownloads.removeValue(forKey: sceneId)
             }
+            self.finishSceneDownload(id: sceneId)
         }
     }
     
@@ -10841,8 +10876,19 @@ class DownloadManager: NSObject, ObservableObject {
     func cancelDownload(id: String) {
         guard activeDownloads[id] != nil else { return }
 
+        // Still waiting for a slot: drop it from the queue, nothing is transferring yet.
+        if sceneQueue.contains(where: { $0.id == id }), !runningSceneIds.contains(id) {
+            sceneQueue.removeAll { $0.id == id }
+            activeDownloads.removeValue(forKey: id)
+            return
+        }
+
         let taskIds = Set(taskMap.taskIds(matching: id))
-        guard !taskIds.isEmpty else { return }
+        guard !taskIds.isEmpty else {
+            activeDownloads.removeValue(forKey: id)
+            finishSceneDownload(id: id)
+            return
+        }
 
         session.getAllTasks { tasks in
             for task in tasks where taskIds.contains(task.taskIdentifier) {

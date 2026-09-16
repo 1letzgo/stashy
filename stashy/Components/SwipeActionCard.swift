@@ -79,13 +79,13 @@ struct StashySwipeActionsModifier: ViewModifier {
                 .buttonStyle(.plain)
                 .frame(width: share)
                 .frame(maxHeight: .infinity)
-                .background(action.tint)
                 .clipped()
             }
         }
         // Widened by the corner radius and tucked under the card: without it the card's rounded
         // trailing corner left a notch of page background between the row and the first button.
         .frame(width: reveal > 0 ? reveal + cornerRadius : 0, alignment: .trailing)
+        .background(Color.appBackground)
         .opacity(reveal > 0.5 ? 1 : 0)
     }
 
@@ -105,19 +105,24 @@ struct StashySwipeActionsModifier: ViewModifier {
         return isLast ? total - (even + cornerRadius) - even * CGFloat(max(0, actions.count - 2)) : even
     }
 
+    /// Tinted capsule with the caption underneath — the same shape the system draws for
+    /// `.swipeActions` in Tools › Filters.
     @ViewBuilder
     private func label(for action: StashySwipeAction, width: CGFloat) -> some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 6) {
             Image(systemName: action.systemImage)
                 .font(.system(size: 18, weight: .semibold))
+                .foregroundColor(.white)
+                .frame(width: min(max(width - 16, 28), 62), height: 44)
+                .background(action.tint, in: Capsule())
             // The caption only appears once the button is wide enough to hold it.
             Text(action.title)
-                .font(.caption2.weight(.semibold))
+                .font(.caption2)
+                .foregroundStyle(.secondary)
                 .lineLimit(1)
                 .opacity(width >= 62 ? 1 : 0)
                 .frame(height: width >= 62 ? nil : 0)
         }
-        .foregroundColor(.white)
         .frame(maxWidth: .infinity)
         .padding(.horizontal, 4)
     }
