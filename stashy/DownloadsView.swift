@@ -19,6 +19,9 @@ struct DownloadsView: View {
     @State private var showingJobSheet = false
     @State private var showingRunAllConfirmation = false
     @State private var jobToDelete: DownloadSyncJob?
+    /// Delete asks first, as in Tools › Filters.
+    @State private var sceneToDelete: DownloadedScene?
+    @State private var galleryToDelete: DownloadedGallery?
 
     private var columns: [GridItem] {
         DesignTokens.Grid.adaptiveColumns(
@@ -111,7 +114,7 @@ struct DownloadsView: View {
                                         .buttonStyle(.plain)
                                         .stashySwipeActions([
                                             StashySwipeAction(title: "Delete", systemImage: "trash", tint: .red, isDestructive: true) {
-                                                downloadManager.deleteDownload(id: downloaded.id)
+                                                sceneToDelete = downloaded
                                             }
                                         ])
                                     }
@@ -153,6 +156,24 @@ struct DownloadsView: View {
             Button("Cancel", role: .cancel) {}
         } message: {
             Text("Each job downloads its configured number of newest items. Items already downloaded are skipped.")
+        }
+        .alert("Delete download?", isPresented: Binding(get: { sceneToDelete != nil }, set: { if !$0 { sceneToDelete = nil } })) {
+            Button("Delete", role: .destructive) {
+                if let scene = sceneToDelete { downloadManager.deleteDownload(id: scene.id) }
+                sceneToDelete = nil
+            }
+            Button("Cancel", role: .cancel) { sceneToDelete = nil }
+        } message: {
+            Text(sceneToDelete.map { "Remove “\($0.title ?? "this scene")” from this device?" } ?? "")
+        }
+        .alert("Delete download?", isPresented: Binding(get: { galleryToDelete != nil }, set: { if !$0 { galleryToDelete = nil } })) {
+            Button("Delete", role: .destructive) {
+                if let entry = galleryToDelete { downloadManager.deleteGalleryDownload(id: entry.id) }
+                galleryToDelete = nil
+            }
+            Button("Cancel", role: .cancel) { galleryToDelete = nil }
+        } message: {
+            Text(galleryToDelete.map { "Remove “\($0.displayTitle)” from this device?" } ?? "")
         }
         .alert("Delete job?", isPresented: Binding(get: { jobToDelete != nil }, set: { if !$0 { jobToDelete = nil } })) {
             Button("Delete", role: .destructive) {
@@ -249,6 +270,7 @@ private struct DownloadSyncJobSheet: View {
     let onSave: (DownloadSyncJob) -> Void
 
     @Environment(\.dismiss) private var dismiss
+    @ObservedObject private var appearance = AppearanceManager.shared
     @State private var selectedFilterId: String?
     @State private var amount: Int = 5
     @State private var search = ""
@@ -262,36 +284,57 @@ private struct DownloadSyncJobSheet: View {
 
     var body: some View {
         NavigationView {
-            Form {
-                Section("Search …") {
+            List {
+                Section {
                     TextField("Filter name", text: $search)
+                        .listRowBackground(Color.secondaryAppBackground(for: appearance.currentTheme))
+                } header: {
+                    sectionHeader("Search …")
                 }
-                Section("Filter") {
+
+                Section {
                     ForEach(usableFilters) { filter in
                         Button {
                             selectedFilterId = filter.id
                         } label: {
-                            HStack {
+                            HStack(spacing: DesignTokens.Spacing.sm) {
                                 Image(systemName: filter.mode == .scenes ? "film" : "photo")
                                     .foregroundStyle(.secondary)
                                 Text(filter.name)
+                                    .font(.body.weight(.medium))
+                                    .foregroundColor(.primary)
                                 Spacer()
                                 if selectedFilterId == filter.id {
                                     Image(systemName: "checkmark")
+                                        .foregroundColor(appearance.tintColor)
                                 }
                             }
                         }
                         .buttonStyle(.plain)
+                        .listRowBackground(Color.secondaryAppBackground(for: appearance.currentTheme))
+                        .listRowSeparatorTint(Color.primary.opacity(0.15))
                     }
                     if usableFilters.isEmpty {
                         Text("No scene or image filters on this server")
                             .foregroundStyle(.secondary)
+                            .listRowBackground(Color.secondaryAppBackground(for: appearance.currentTheme))
                     }
+                } header: {
+                    sectionHeader("Filter")
                 }
-                Section("Amount per run") {
+
+                Section {
                     Stepper("Newest \(amount)", value: $amount, in: 1...500, step: amount < 20 ? 1 : 10)
+                        .listRowBackground(Color.secondaryAppBackground(for: appearance.currentTheme))
+                } header: {
+                    sectionHeader("Amount per run")
                 }
             }
+            .listStyle(.insetGrouped)
+            .listSectionSpacing(DesignTokens.Spacing.md)
+            .contentMargins(.horizontal, DesignTokens.Tools.contentPadding, for: .scrollContent)
+            .scrollContentBackground(.hidden)
+            .background(Color.appBackground(for: appearance.currentTheme))
             // Room for the pinned save button below the form.
             .contentMargins(.bottom, 80, for: .scrollContent)
             .stashyModalSheetChrome("New sync job", onBack: { dismiss() })
@@ -317,8 +360,18 @@ private struct DownloadSyncJobSheet: View {
                 .disabled(selectedFilterId == nil)
                 .padding(.horizontal, DesignTokens.Tools.contentPadding)
                 .padding(.bottom, 12)
+                .background(Color.appBackground(for: appearance.currentTheme))
             }
         }
+    }
+
+    /// Small caps header, as in Tools › Filters.
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+            .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
     }
 }
 
@@ -909,7 +962,7 @@ extension DownloadsView {
             })
         }
         actions.append(StashySwipeAction(title: "Delete", systemImage: "trash", tint: .red, isDestructive: true) {
-            downloadManager.deleteGalleryDownload(id: entry.id)
+            galleryToDelete = entry
         })
         return actions
     }
