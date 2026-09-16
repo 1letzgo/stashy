@@ -5298,7 +5298,8 @@ extension ReelItemView {
 
         if isPressed {
             HapticManager.selection()
-            aether.rate = 2.0
+            // Settings › Playback › "Hold to speed up — Feeds".
+            aether.rate = Float(TabManager.shared.holdSpeedFeeds)
             withAnimation {
                 isFastForwarding = true
             }

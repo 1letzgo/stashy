@@ -857,7 +857,8 @@ struct AetherSceneSurface: View {
             guard engine.isPlaying else { return }
             HapticManager.selection()
             rateBeforeFastForward = engine.rate
-            engine.rate = 2
+            // Settings › Playback › "Hold to speed up — Player".
+            engine.rate = Float(TabManager.shared.holdSpeedPlayer)
         } else {
             engine.rate = rateBeforeFastForward
         }
@@ -865,8 +866,8 @@ struct AetherSceneSurface: View {
         withAnimation(.easeInOut(duration: 0.15)) { isFastForwarding = active }
     }
 
-    /// Press-and-hold rewind: playback pauses and the position steps back 0.5 s every 0.25 s
-    /// (2× backwards); on release the previous play state comes back.
+    /// Press-and-hold rewind: playback pauses and the position steps back every 0.25 s
+    /// at the configured hold speed; on release the previous play state comes back.
     private func setRewinding(_ active: Bool) {
         guard active != isRewinding else { return }
         if active {
@@ -875,9 +876,11 @@ struct AetherSceneSurface: View {
             wasPlayingBeforeRewind = engine.isPlaying
             engine.pause()
             rewindPosition = engine.currentTime
+            // Same rate as the forward hold: a 0.25 s tick times the configured speed.
+            let step = 0.25 * TabManager.shared.holdSpeedPlayer
             let timer = Timer(timeInterval: 0.25, repeats: true) { _ in
                 Task { @MainActor in
-                    let target = max(0, rewindPosition - 0.5)
+                    let target = max(0, rewindPosition - step)
                     rewindPosition = target
                     onSeek(target)
                     if target <= 0 { setRewinding(false) }

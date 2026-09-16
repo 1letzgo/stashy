@@ -453,6 +453,20 @@ class TabManager: ObservableObject {
     }
     static let playCountThresholdOptions: [Double] = [0, 1, 5, 10, 30, 60, 120]
 
+    /// Settings › Playback › "Hold to speed up". Rate while a finger rests on the picture —
+    /// separate for the full player and for Feeds.
+    @Published var holdSpeedPlayer: Double = 2 {
+        didSet { UserDefaults.standard.set(holdSpeedPlayer, forKey: holdSpeedPlayerKey) }
+    }
+    @Published var holdSpeedFeeds: Double = 2 {
+        didSet { UserDefaults.standard.set(holdSpeedFeeds, forKey: holdSpeedFeedsKey) }
+    }
+    static let holdSpeedOptions: [Double] = [1.5, 2, 2.5, 3, 4]
+
+    static func holdSpeedLabel(_ rate: Double) -> String {
+        rate == rate.rounded() ? "\(Int(rate))×" : String(format: "%.1f×", rate)
+    }
+
     static func playCountThresholdLabel(_ seconds: Double) -> String {
         switch seconds {
         case 0: return "Immediately"
@@ -560,6 +574,8 @@ class TabManager: ObservableObject {
     private let isPiPEnabledKey = "isPiPEnabled"
     private let playerSkipSecondsKey = "playerSkipSeconds"
     private let playerDolbyVisionEnabledKey = "player_dolby_vision_enabled"
+    private let holdSpeedPlayerKey = "hold_speed_player"
+    private let holdSpeedFeedsKey = "hold_speed_feeds"
     private let playCountPlayerSecondsKey = "play_count_player_seconds"
     private let playCountFeedsSecondsKey = "play_count_feeds_seconds"
     private let subtitlesAutoEnabledKey = "subtitle_auto_enabled"
@@ -612,6 +628,10 @@ class TabManager: ObservableObject {
         let storedSkip = UserDefaults.standard.object(forKey: playerSkipSecondsKey) as? Double ?? 10
         self.playerSkipSeconds = Self.playerSkipOptions.contains(storedSkip) ? storedSkip : 10
         self.playerDolbyVisionEnabled = UserDefaults.standard.object(forKey: playerDolbyVisionEnabledKey) as? Bool ?? true
+        let storedHoldPlayer = UserDefaults.standard.object(forKey: holdSpeedPlayerKey) as? Double ?? 2
+        self.holdSpeedPlayer = Self.holdSpeedOptions.contains(storedHoldPlayer) ? storedHoldPlayer : 2
+        let storedHoldFeeds = UserDefaults.standard.object(forKey: holdSpeedFeedsKey) as? Double ?? 2
+        self.holdSpeedFeeds = Self.holdSpeedOptions.contains(storedHoldFeeds) ? storedHoldFeeds : 2
         let storedPlayerThreshold = UserDefaults.standard.object(forKey: playCountPlayerSecondsKey) as? Double ?? 1
         self.playCountPlayerSeconds = Self.playCountThresholdOptions.contains(storedPlayerThreshold) ? storedPlayerThreshold : 1
         let storedFeedsThreshold = UserDefaults.standard.object(forKey: playCountFeedsSecondsKey) as? Double ?? 30

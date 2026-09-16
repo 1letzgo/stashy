@@ -20,7 +20,7 @@ struct PlaybackSettingsSection: View {
                     Label("Picture-in-Picture", systemImage: "pip")
                 }
                 .tint(appearanceManager.tintColor)
-                .stashyGroupedBlockRow(index: 0, count: 5)
+                .stashyGroupedBlockRow(index: 0, count: 7)
 
                 Picker(selection: $tabManager.playerSkipSeconds) {
                     ForEach(TabManager.playerSkipOptions, id: \.self) { seconds in
@@ -29,13 +29,13 @@ struct PlaybackSettingsSection: View {
                 } label: {
                     Label("Double-tap skip", systemImage: "goforward")
                 }
-                .stashyGroupedBlockRow(index: 1, count: 5)
+                .stashyGroupedBlockRow(index: 1, count: 7)
 
                 Toggle(isOn: $tabManager.playerDolbyVisionEnabled) {
                     Label("Dolby Vision", systemImage: "sparkles.tv")
                 }
                 .tint(appearanceManager.tintColor)
-                .stashyGroupedBlockRow(index: 2, count: 5)
+                .stashyGroupedBlockRow(index: 2, count: 7)
 
                 Picker(selection: $tabManager.playCountPlayerSeconds) {
                     ForEach(TabManager.playCountThresholdOptions, id: \.self) { seconds in
@@ -44,7 +44,7 @@ struct PlaybackSettingsSection: View {
                 } label: {
                     Label("Count as played — Player", systemImage: "play.circle")
                 }
-                .stashyGroupedBlockRow(index: 3, count: 5)
+                .stashyGroupedBlockRow(index: 3, count: 7)
 
                 Picker(selection: $tabManager.playCountFeedsSeconds) {
                     ForEach(TabManager.playCountThresholdOptions, id: \.self) { seconds in
@@ -53,7 +53,25 @@ struct PlaybackSettingsSection: View {
                 } label: {
                     Label("Count as played — Feeds", systemImage: "rectangle.stack.badge.play")
                 }
-                .stashyGroupedBlockRow(index: 4, count: 5)
+                .stashyGroupedBlockRow(index: 4, count: 7)
+
+                Picker(selection: $tabManager.holdSpeedPlayer) {
+                    ForEach(TabManager.holdSpeedOptions, id: \.self) { rate in
+                        Text(TabManager.holdSpeedLabel(rate)).tag(rate)
+                    }
+                } label: {
+                    Label("Hold to speed up — Player", systemImage: "forward.fill")
+                }
+                .stashyGroupedBlockRow(index: 5, count: 7)
+
+                Picker(selection: $tabManager.holdSpeedFeeds) {
+                    ForEach(TabManager.holdSpeedOptions, id: \.self) { rate in
+                        Text(TabManager.holdSpeedLabel(rate)).tag(rate)
+                    }
+                } label: {
+                    Label("Hold to speed up — Feeds", systemImage: "forward.frame.fill")
+                }
+                .stashyGroupedBlockRow(index: 6, count: 7)
 
                 #endif
             }
