@@ -163,7 +163,6 @@ final class TVChannelSession: ObservableObject {
     private var totalCount = 0
     private var currentPage = 0
     private var isLoadingMore = false
-    private var playedSceneIDs = Set<String>()
     private var skipFailures = 0
     private var cancellables = Set<AnyCancellable>()
     private let pageSize = 20
@@ -272,9 +271,7 @@ final class TVChannelSession: ObservableObject {
             return
         }
         skipFailures = 0
-        if playedSceneIDs.insert(scene.id).inserted {
-            catalog.addScenePlay(sceneId: scene.id)
-        }
+        // Credited by `TVAetherPlaybackModel` once the scene passes the play threshold.
         let subtitle = scene.studio?.name
         // One engine across the whole channel: `playNext` reuses the session
         // (`prepareForItemReplacement`) instead of rebuilding the route per scene.

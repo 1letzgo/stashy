@@ -442,6 +442,25 @@ class TabManager: ObservableObject {
     }
     static let playerSkipOptions: [Double] = [5, 10, 15, 30]
 
+    /// Settings › Playback › "Count as played after". Seconds of playback before a scene gets a
+    /// play count and its progress is written back. 0 counts as soon as playback starts.
+    /// Kept separate for the full player and for Feeds, where users skip through quickly.
+    @Published var playCountPlayerSeconds: Double = 1 {
+        didSet { UserDefaults.standard.set(playCountPlayerSeconds, forKey: playCountPlayerSecondsKey) }
+    }
+    @Published var playCountFeedsSeconds: Double = 30 {
+        didSet { UserDefaults.standard.set(playCountFeedsSeconds, forKey: playCountFeedsSecondsKey) }
+    }
+    static let playCountThresholdOptions: [Double] = [0, 1, 5, 10, 30, 60, 120]
+
+    static func playCountThresholdLabel(_ seconds: Double) -> String {
+        switch seconds {
+        case 0: return "Immediately"
+        case ..<60: return "\(Int(seconds)) s"
+        default: return "\(Int(seconds / 60)) min"
+        }
+    }
+
     /// Settings › Playback › Dolby Vision. Off plays the HDR10 / HLG base layer of a Dolby Vision
     /// file instead (AetherEngine `LoadOptions.dolbyVisionHandling = .baseLayerOnly`, 6.81) — for
     /// remuxes whose Dolby Vision is broken (green / purple picture) while the base layer is fine.
@@ -541,6 +560,8 @@ class TabManager: ObservableObject {
     private let isPiPEnabledKey = "isPiPEnabled"
     private let playerSkipSecondsKey = "playerSkipSeconds"
     private let playerDolbyVisionEnabledKey = "player_dolby_vision_enabled"
+    private let playCountPlayerSecondsKey = "play_count_player_seconds"
+    private let playCountFeedsSecondsKey = "play_count_feeds_seconds"
     private let subtitlesAutoEnabledKey = "subtitle_auto_enabled"
     private let subtitlePreferredLanguageKey = "subtitle_preferred_language"
     private let subtitleFontSizeKey = "subtitle_font_size"
@@ -591,6 +612,10 @@ class TabManager: ObservableObject {
         let storedSkip = UserDefaults.standard.object(forKey: playerSkipSecondsKey) as? Double ?? 10
         self.playerSkipSeconds = Self.playerSkipOptions.contains(storedSkip) ? storedSkip : 10
         self.playerDolbyVisionEnabled = UserDefaults.standard.object(forKey: playerDolbyVisionEnabledKey) as? Bool ?? true
+        let storedPlayerThreshold = UserDefaults.standard.object(forKey: playCountPlayerSecondsKey) as? Double ?? 1
+        self.playCountPlayerSeconds = Self.playCountThresholdOptions.contains(storedPlayerThreshold) ? storedPlayerThreshold : 1
+        let storedFeedsThreshold = UserDefaults.standard.object(forKey: playCountFeedsSecondsKey) as? Double ?? 30
+        self.playCountFeedsSeconds = Self.playCountThresholdOptions.contains(storedFeedsThreshold) ? storedFeedsThreshold : 30
         loadSubtitleSettings()
         self.reelsShowsDeleteButton = UserDefaults.standard.bool(forKey: reelsShowsDeleteButtonKey)
         self.sceneCardsShowStudioLogo = UserDefaults.standard.object(forKey: sceneCardsShowStudioLogoKey) as? Bool ?? true

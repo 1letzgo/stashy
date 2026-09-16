@@ -16,7 +16,6 @@ struct TVSceneDetailView: View {
     @StateObject private var playerModel = TVAetherPlaybackModel()
     @State private var sceneDetail: Scene?
     @State private var isLoadingDetail = true
-    @State private var hasAddedPlay = false
     @State private var showingRatingPicker = false
     @FocusState private var focusedHeroAction: HeroAction?
 
@@ -482,26 +481,8 @@ struct TVSceneDetailView: View {
         let startTime = timestamp ?? scene.resumeTime ?? 0
         AppLog.debug("🎬 TV: Starting playback for scene \(scene.id) at \(startTime)s")
 
-        if !hasAddedPlay {
-            viewModel.addScenePlay(sceneId: scene.id) { newCount in
-                if let count = newCount {
-                    DispatchQueue.main.async {
-                        if var updatedScene = sceneDetail {
-                            updatedScene = updatedScene.withPlayCount(count)
-                            self.sceneDetail = updatedScene
-                        }
-                    }
-                }
-            }
-            hasAddedPlay = true
-            // Damit Listen und Dashboard das mitbekommen — iOS postet das an
-            // derselben Stelle (`SceneDetailView.registerScenePlay`).
-            NotificationCenter.default.post(
-                name: NSNotification.Name("ScenePlayAdded"),
-                object: nil,
-                userInfo: ["sceneId": scene.id]
-            )
-        }
+        // The play count is credited by `TVAetherPlaybackModel` once playback passes the
+        // threshold from Settings › Playback; the list refresh follows the notification.
         
         guard let streamURL = scene.aetherVideoURL else { return }
         playerModel.setup(url: streamURL,

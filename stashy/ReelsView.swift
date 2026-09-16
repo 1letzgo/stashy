@@ -4892,7 +4892,10 @@ struct ReelItemView: View {
     @State private var reelsWatchedSeconds: Double = 0
     @State private var heldReelsPlayDuration: Double = 0
 
-    private static let reelsMinWatchSecondsBeforePlayCredit: Double = 30
+    /// Settings › Playback › "Count as played — Feeds".
+    private var reelsMinWatchSecondsBeforePlayCredit: Double {
+        max(0, TabManager.shared.playCountFeedsSeconds)
+    }
 
     /// Scenes + markers contribute watch time to the parent scene; previews/clips do not.
     private var tracksPlaybackActivity: Bool {
@@ -5616,7 +5619,7 @@ extension ReelItemView {
         guard isPlaying, isPlaybackActive, !isRotating else { return }
         guard !ReelsPlayerRegistry.isPlaybackSuspended else { return }
         reelsWatchedSeconds += delta
-        guard !didCreditReelsWatch, reelsWatchedSeconds >= Self.reelsMinWatchSecondsBeforePlayCredit else { return }
+        guard !didCreditReelsWatch, reelsWatchedSeconds >= reelsMinWatchSecondsBeforePlayCredit else { return }
         didCreditReelsWatch = true
         incrementPlayCount()
         playbackActivityTracker.flush()

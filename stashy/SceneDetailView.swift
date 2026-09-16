@@ -858,7 +858,7 @@ struct SceneDetailView: View {
             playbackActivityTracker.setPosition(currentTime: currentTime, duration: duration)
             ensurePlaybackActivityConfigured()
             playbackActivityTracker.start()
-            if !hasAddedPlay, currentTime > 1 {
+            if !hasAddedPlay, currentTime >= playCountThreshold {
                 registerScenePlay()
             }
         }
@@ -931,7 +931,7 @@ struct SceneDetailView: View {
                         playbackActivityTracker.start()
                     }
                 }
-                if !hasAddedPlay, seconds > 1 {
+                if !hasAddedPlay, seconds >= playCountThreshold {
                     registerScenePlay()
                 }
             }
@@ -990,9 +990,17 @@ struct SceneDetailView: View {
         ensurePlaybackActivityConfigured()
         playbackActivityTracker.start()
 
-        if !hasAddedPlay {
+        // Above 0 the play is credited from the playhead callbacks once the threshold is passed.
+        if !hasAddedPlay, playCountThreshold <= 0 {
             registerScenePlay()
         }
+    }
+
+    /// Settings › Playback › "Count as played — Player": seconds of playback before the scene
+    /// gets its play count. The threshold is measured on the playhead, so a resumed scene needs
+    /// that many seconds of new playback too.
+    private var playCountThreshold: Double {
+        max(0, TabManager.shared.playCountPlayerSeconds)
     }
 
     /// Stash's server captions as selectable external subtitle tracks on the engine. Registering

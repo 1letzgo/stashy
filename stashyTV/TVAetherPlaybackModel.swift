@@ -33,6 +33,10 @@ final class TVAetherPlaybackModel: ObservableObject {
 
     private var cancellables = Set<AnyCancellable>()
     private var progressTimer: AnyCancellable?
+    /// Settings › Playback › "Count as played": the play is credited once the playhead has
+    /// passed the threshold, not when playback starts.
+    private var playCreditTimer: AnyCancellable?
+    private var creditedSceneIds: Set<String> = []
     private var sceneId: String?
     private var viewModel: StashDBViewModel?
     /// `saveProgress()` already ran in `suspend()` — skip the duplicate in `clear()`.
@@ -101,6 +105,7 @@ final class TVAetherPlaybackModel: ObservableObject {
         applyNowPlaying(title: title, subtitle: subtitle, artworkURL: artworkURL)
         isShowingPlayer = true
         startProgressTimer()
+        startPlayCreditTimer()
 
         engine.fallbackSources = fallbackSources
         engine.fallbackDeclaredDuration = fallbackDeclaredDuration
@@ -140,6 +145,7 @@ final class TVAetherPlaybackModel: ObservableObject {
 
         applyNowPlaying(title: title, subtitle: subtitle, artworkURL: artworkURL)
         startProgressTimer()
+        startPlayCreditTimer()
 
         engine.fallbackSources = fallbackSources
         engine.fallbackDeclaredDuration = fallbackDeclaredDuration
@@ -197,6 +203,33 @@ final class TVAetherPlaybackModel: ObservableObject {
             .sink { [weak self] _ in self?.saveProgress() }
     }
 
+    private func startPlayCreditTimer() {
+        playCreditTimer = nil
+        creditPlayIfDue()
+        guard TabManager.shared.playCountPlayerSeconds > 0 else { return }
+        playCreditTimer = Timer.publish(every: 1, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in self?.creditPlayIfDue() }
+    }
+
+    /// Credits the scene once its playhead passed the configured threshold. Seeking ahead counts
+    /// as well — the same as the phone player, which also reads the playhead.
+    private func creditPlayIfDue() {
+        guard let sceneId, let viewModel, !creditedSceneIds.contains(sceneId) else { return }
+        let threshold = max(0, TabManager.shared.playCountPlayerSeconds)
+        if threshold > 0 {
+            guard let engine, engine.currentTime >= threshold else { return }
+        }
+        creditedSceneIds.insert(sceneId)
+        playCreditTimer = nil
+        viewModel.addScenePlay(sceneId: sceneId)
+        NotificationCenter.default.post(
+            name: NSNotification.Name("ScenePlayAdded"),
+            object: nil,
+            userInfo: ["sceneId": sceneId]
+        )
+    }
+
     func saveProgress() {
         guard let engine,
               let sceneId,
@@ -228,6 +261,7 @@ final class TVAetherPlaybackModel: ObservableObject {
         isSuspended = true
         saveProgress()
         progressTimer = nil
+        playCreditTimer = nil
         engine?.pause()
     }
 
@@ -235,6 +269,8 @@ final class TVAetherPlaybackModel: ObservableObject {
         if !isSuspended { saveProgress() }
         isSuspended = false
         progressTimer = nil
+        playCreditTimer = nil
+        creditedSceneIds.removeAll()
         nowPlayingGeneration &+= 1
         nowPlayingInfo = [:]
         let stopping = engine

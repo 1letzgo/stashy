@@ -18,6 +18,7 @@ private enum TVSettingsEntry: Hashable {
     case defaultSort, defaultFilters, visibleTabs
     case subtitles
     case dolbyVision
+    case playCount
     case maintenance
     case about
 
@@ -32,6 +33,7 @@ private enum TVSettingsEntry: Hashable {
         case .visibleTabs: return "Visible Tabs"
         case .subtitles: return "Subtitles"
         case .dolbyVision: return "Dolby Vision"
+        case .playCount: return "Count As Played"
         case .maintenance: return "Maintenance"
         case .about: return "About"
         }
@@ -48,6 +50,7 @@ private enum TVSettingsEntry: Hashable {
         case .visibleTabs: return "rectangle.3.group.fill"
         case .subtitles: return "captions.bubble.fill"
         case .dolbyVision: return "sparkles.tv"
+        case .playCount: return "play.circle"
         case .maintenance: return "internaldrive"
         case .about: return "info.circle"
         }
@@ -71,6 +74,8 @@ private enum TVSettingsEntry: Hashable {
             return "Hide sections you do not use. They disappear from the sidebar."
         case .subtitles:
             return "Turn subtitles on automatically, choose the language a scene should start with, and set how the cues look."
+        case .playCount:
+            return "How long a scene has to play before it counts as played and its position is saved."
         case .dolbyVision:
             return "Turn off if a Dolby Vision scene shows green or purple colors. It then plays as HDR10, which your TV still shows in HDR."
         case .maintenance:
@@ -144,6 +149,7 @@ struct TVSettingsView: View {
                     row(.dolbyVision)
                 }
                 .focused($focusedEntry, equals: .dolbyVision)
+                link(.playCount, value: TabManager.playCountThresholdLabel(tabManager.playCountPlayerSeconds))
             } header: {
                 Text("Playback")
             }
@@ -163,9 +169,9 @@ struct TVSettingsView: View {
     /// zwar auch, taucht im gebundenen Pfad aber nie auf — dann ließ sich die
     /// Unterseite von außen nicht mehr schließen, und beim Wechsel in einen anderen
     /// Sidebar-Eintrag blieb sie stehen.
-    private func link(_ entry: TVSettingsEntry) -> some View {
+    private func link(_ entry: TVSettingsEntry, value: String? = nil) -> some View {
         NavigationLink(value: entry) {
-            row(entry)
+            row(entry, value: value)
         }
         .focused($focusedEntry, equals: entry)
     }
@@ -184,8 +190,29 @@ struct TVSettingsView: View {
         case .maintenance: TVMaintenanceSettingsView()
         case .about: TVAboutSettingsView()
         // Kein Link, sondern ein Toggle in der Liste.
+        case .playCount: playCountPage
         case .dolbyVision: EmptyView()
         }
+    }
+
+    private var playCountPage: some View {
+        List {
+            ForEach(TabManager.playCountThresholdOptions, id: \.self) { seconds in
+                Button {
+                    tabManager.playCountPlayerSeconds = seconds
+                } label: {
+                    HStack {
+                        Text(TabManager.playCountThresholdLabel(seconds))
+                        if tabManager.playCountPlayerSeconds == seconds {
+                            Spacer()
+                            Image(systemName: "checkmark")
+                        }
+                    }
+                }
+            }
+        }
+        .tvSettingsPage("Count As Played",
+                        description: "How long a scene has to play before it counts as played and its position is saved.")
     }
 
     /// Nur Text, Wert rechtsbündig — die tvOS-Form. Icons und Untertitel in
