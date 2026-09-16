@@ -355,6 +355,9 @@ struct ReelsViewBody: View {
     /// `ReelsViewBody` nicht neu rendern. Observiert wird nur in ``IsolatedScrubberBar``.
     @State private var scrubberState = ScrubberState()
     @State private var isInitialized = false
+    /// Set once a remount is announced: this instance is about to be replaced and must not
+    /// resume or restart playback in the meantime.
+    @State private var isBeingReplaced = false
     /// Reentrancy guard: SwiftUI can fire `onAppear` multiple times during tab
     /// remounts before `isInitialized` flips — each pass would re-bootstrap and
     /// reset arrays/players mid-mount (black first cell).
@@ -2497,6 +2500,8 @@ struct ReelsViewBody: View {
             }
             .onChange(of: coordinator.selectedTab) { oldTab, newTab in
                 if newTab == .reels {
+                    // A remount is already on its way — the fresh instance owns playback.
+                    guard !isBeingReplaced else { return }
                     // Prefer pending performer/tag navigation over plain resume.
                     if applyPendingReelsNavigationFromCoordinator() {
                         return
@@ -2529,7 +2534,7 @@ struct ReelsViewBody: View {
             .onChange(of: coordinator.reelsNavigationToken) { _, _ in
                 // Ignore token updates while Feeds is not visible — otherwise an
                 // off-tab / soon-remounted instance clears `reelsPerformer` too early.
-                guard coordinator.selectedTab == .reels else { return }
+                guard coordinator.selectedTab == .reels, !isBeingReplaced else { return }
                 applyPendingReelsNavigationFromCoordinator()
             }
             .sceneLiveUpdates(using: viewModel)
@@ -2550,6 +2555,11 @@ struct ReelsViewBody: View {
                 }
             }
             .onReceive(NotificationCenter.default.publisher(for: .reelsWillRemount)) { _ in
+                // This instance is on its way out; nothing it does from here may start audio.
+                // Opening a channel switches to the Feeds tab in the same pass, and the tab
+                // change made this dying instance resume its old item — heard under the new
+                // feed until the first swipe tore it down.
+                isBeingReplaced = true
                 // Tab-bar icon: restart feed from the top (mode/filter stay; position does not).
                 markRestartFeedFromTop()
                 persistSessionReelsMode()
@@ -3227,7 +3237,7 @@ struct ReelsViewBody: View {
 
     /// Resume scroll item + mid-clip time and continue autoplay after returning to Feeds.
     private func reelsResumePlaybackAfterReturn() {
-        guard coordinator.selectedTab == .reels else { return }
+        guard coordinator.selectedTab == .reels, !isBeingReplaced else { return }
 
         ReelsPlayerRegistry.resumePlayback()
 
