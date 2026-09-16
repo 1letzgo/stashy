@@ -409,6 +409,21 @@ struct DownloadedSceneCard: View {
                     .clipShape(Circle())
                     .padding(4)
 
+                // Watched progress, as on the online scene cards.
+                if let resume = downloaded.resumeTime, resume > 0,
+                   let duration = downloaded.duration, duration > 0 {
+                    GeometryReader { geo in
+                        ZStack(alignment: .leading) {
+                            Rectangle().fill(Color.white.opacity(0.25))
+                            Rectangle()
+                                .fill(appearanceManager.tintColor)
+                                .frame(width: geo.size.width * min(1, resume / duration))
+                        }
+                    }
+                    .frame(width: 130, height: 3)
+                    .frame(width: 130, height: 100, alignment: .bottom)
+                }
+
                 // Duration Badge (Bottom Right)
                 if let duration = downloaded.duration, duration > 0 {
                     Text(formatDuration(duration))
@@ -504,6 +519,9 @@ struct DownloadDetailView: View {
     @StateObject private var downloadManager = DownloadManager.shared
     @State private var engine: AetherSceneEngine?
     @State private var isPlaybackStarted = false
+    /// Latest playhead, written back to the download metadata every few seconds.
+    @State private var localPlayhead: Double = 0
+    @State private var lastResumeWrite: Date = .distantPast
     @State private var isFullScreen = false
     @State private var isHeaderExpanded = false
     @State private var isMuted = ScenePlayerMute.initialValue()
@@ -595,25 +613,74 @@ struct DownloadDetailView: View {
                                 Color.black
                             }
                             
-                            // Large Play Button Overlay
-                            ZStack {
-                                Circle()
-                                    .fill(Color.black.opacity(DesignTokens.Opacity.medium))
-                                    .frame(width: 70, height: 70)
-                                    .blur(radius: 1)
-                                
-                                Image(systemName: "play.fill")
-                                    .font(.system(size: 30, weight: .bold))
-                                    .foregroundColor(.white)
-                                    .offset(x: 2)
+                            // Resume / play, the same pair the online scene page shows.
+                            if let resume = storedResumeTime, resume > 0 {
+                                VStack(spacing: 16) {
+                                    Button {
+                                        startPlayback(resume: true)
+                                    } label: {
+                                        HStack(spacing: 8) {
+                                            Image(systemName: "clock.arrow.circlepath")
+                                            Text("Resume from \(formatDuration(resume))")
+                                                .fontWeight(.bold)
+                                        }
+                                        .padding(.horizontal, 20)
+                                        .padding(.vertical, 12)
+                                        .background(appearanceManager.tintColor)
+                                        .foregroundColor(.white)
+                                        .clipShape(Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+
+                                    Button {
+                                        startPlayback(resume: false)
+                                    } label: {
+                                        Text("Start from beginning")
+                                            .font(.caption)
+                                            .fontWeight(.medium)
+                                            .foregroundColor(.white)
+                                            .padding(.horizontal, 12)
+                                            .padding(.vertical, 6)
+                                            .background(appearanceManager.tintColor)
+                                            .clipShape(Capsule())
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            } else {
+                                ZStack {
+                                    Circle()
+                                        .fill(Color.black.opacity(DesignTokens.Opacity.medium))
+                                        .frame(width: 70, height: 70)
+                                        .blur(radius: 1)
+
+                                    Image(systemName: "play.fill")
+                                        .font(.system(size: 30, weight: .bold))
+                                        .foregroundColor(.white)
+                                        .offset(x: 2)
+                                }
                             }
                         }
                         .aspectRatio(16/9, contentMode: .fit)
                         .frame(maxWidth: .infinity)
                         .background(Color.black)
+                        .overlay(alignment: .bottom) {
+                            if let resume = storedResumeTime, resume > 0,
+                               let duration = downloaded.duration, duration > 0 {
+                                GeometryReader { geo in
+                                    ZStack(alignment: .leading) {
+                                        Rectangle().fill(Color.white.opacity(0.25))
+                                        Rectangle()
+                                            .fill(appearanceManager.tintColor)
+                                            .frame(width: geo.size.width * min(1, resume / duration))
+                                    }
+                                }
+                                .frame(height: 4)
+                            }
+                        }
                         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
                         .contentShape(Rectangle())
                         .onTapGesture {
+                            guard storedResumeTime == nil else { return }
                             startPlayback()
                         }
                     }
@@ -802,9 +869,16 @@ struct DownloadDetailView: View {
         }
     }
 
+    /// Position stored for this file, kept live so it shows right after playback ends.
+    private var storedResumeTime: Double? {
+        downloadManager.downloads.first(where: { $0.id == downloaded.id })?.resumeTime
+    }
+
     /// Local file URL — the engine skips auth headers for `file://`.
-    private func startPlayback() {
+    private func startPlayback(resume: Bool = true) {
         let videoURL = downloadManager.getLocalVideoURL(for: downloaded)
+        let storedResume = downloadManager.downloads.first(where: { $0.id == downloaded.id })?.resumeTime
+        let startAt: Double? = resume ? storedResume : nil
 
         if engine == nil {
             guard let created = try? AetherSceneEngine() else {
@@ -819,8 +893,17 @@ struct DownloadDetailView: View {
             created.isMuted = isMuted
             created.audioSessionPolicy = .playback
             engine = created
+            created.onTime = { time, duration in
+                guard time >= 0 else { return }
+                localPlayhead = time
+                // Same cadence as the online tracker: every 10 s, plus once on teardown.
+                if Date().timeIntervalSince(lastResumeWrite) >= 10 {
+                    lastResumeWrite = Date()
+                    downloadManager.updateLocalResumeTime(id: downloaded.id, seconds: time, duration: duration)
+                }
+            }
             Task { @MainActor in
-                await created.load(url: videoURL, startAt: nil, autoplay: true)
+                await created.load(url: videoURL, startAt: (startAt ?? 0) > 1 ? startAt : nil, autoplay: true)
             }
         }
 
@@ -840,6 +923,13 @@ struct DownloadDetailView: View {
     /// `@State` release is not deterministic — the engine has to be stopped by hand.
     private func teardownPlayer() {
         guard !isFullScreen, let engine else { return }
+        if localPlayhead > 0 {
+            downloadManager.updateLocalResumeTime(
+                id: downloaded.id,
+                seconds: localPlayhead,
+                duration: engine.duration > 0 ? engine.duration : downloaded.duration
+            )
+        }
         engine.onTime = nil
         engine.stop()
         self.engine = nil

@@ -10506,7 +10506,10 @@ struct DownloadedScene: Codable, Identifiable {
     let localVideoPath: String
     let localThumbnailPath: String
     let duration: Double?
-    
+    /// Where offline playback stopped, in seconds. Optional so metadata written before this
+    /// existed still decodes. Cleared once the file was watched to the end.
+    var resumeTime: Double?
+
     var id_uuid: String { id }
 }
 
@@ -10862,6 +10865,20 @@ class DownloadManager: NSObject, ObservableObject {
         task.resume()
     }
     
+    /// Remembers where offline playback stopped, the local counterpart of Stash's `resume_time`.
+    /// Past 98 % the position is dropped so the file starts over next time.
+    func updateLocalResumeTime(id: String, seconds: Double, duration: Double?) {
+        guard let index = downloads.firstIndex(where: { $0.id == id }) else { return }
+        var resume: Double? = seconds > 1 ? seconds : nil
+        if let duration = duration ?? downloads[index].duration, duration > 0,
+           (100.0 / duration) * seconds >= 98 {
+            resume = nil
+        }
+        guard downloads[index].resumeTime != resume else { return }
+        downloads[index].resumeTime = resume
+        saveMetadata()
+    }
+
     func deleteDownload(id: String) {
         if let index = downloads.firstIndex(where: { $0.id == id }) {
             downloads.remove(at: index)
