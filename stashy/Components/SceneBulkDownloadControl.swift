@@ -19,7 +19,8 @@ extension View {
         downloadManager: DownloadManager = .shared
     ) -> some View {
         let batch = DownloadManager.sceneNewestBatchSize
-        return confirmationDialog("Download scenes", isPresented: isPresented, titleVisibility: .visible) {
+        // Alert, not a confirmation dialog — the gallery and tag image downloads ask this way.
+        return alert("Download scenes", isPresented: isPresented) {
             Button("Newest \(batch) scenes") {
                 downloadManager.downloadScenes(for: scope, limit: batch, scopeName: scopeName)
             }
