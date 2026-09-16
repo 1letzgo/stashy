@@ -72,6 +72,9 @@ struct StashySwipeActionsModifier: ViewModifier {
                     action.handler()
                 } label: {
                     label(for: action, width: share)
+                        // The first button's extra strip hides under the card; keep its icon
+                        // centred in the part the user actually sees.
+                        .padding(.leading, index == 0 && !isFullSwipe ? cornerRadius : 0)
                 }
                 .buttonStyle(.plain)
                 .frame(width: share)
@@ -80,21 +83,26 @@ struct StashySwipeActionsModifier: ViewModifier {
                 .clipped()
             }
         }
-        .frame(width: reveal, alignment: .trailing)
+        // Widened by the corner radius and tucked under the card: without it the card's rounded
+        // trailing corner left a notch of page background between the row and the first button.
+        .frame(width: reveal > 0 ? reveal + cornerRadius : 0, alignment: .trailing)
         .opacity(reveal > 0.5 ? 1 : 0)
     }
 
     /// On a full swipe the destructive action swallows the other buttons' width.
     private func railWidth(for index: Int) -> CGFloat {
         guard reveal > 0 else { return 0 }
+        let total = reveal + cornerRadius
         let isLast = index == actions.count - 1
         if isFullSwipe, let destructive, actions[index].id == destructive.id {
-            return reveal
+            return total
         }
         if isFullSwipe { return 0 }
         let even = reveal / CGFloat(actions.count)
-        // Rounding leftovers go to the last button so no hairline gap shows.
-        return isLast ? reveal - even * CGFloat(actions.count - 1) : even
+        // The leftmost button carries the tuck-under strip; rounding leftovers go to the last
+        // one so no hairline gap shows between the buttons.
+        if index == 0 { return even + cornerRadius }
+        return isLast ? total - (even + cornerRadius) - even * CGFloat(max(0, actions.count - 2)) : even
     }
 
     @ViewBuilder
