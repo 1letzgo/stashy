@@ -18,7 +18,7 @@ extension View {
         scopeName: String,
         downloadManager: DownloadManager = .shared
     ) -> some View {
-        let batch = DownloadManager.galleryNewestBatchSize
+        let batch = DownloadManager.sceneNewestBatchSize
         return confirmationDialog("Download scenes", isPresented: isPresented, titleVisibility: .visible) {
             Button("Newest \(batch) scenes") {
                 downloadManager.downloadScenes(for: scope, limit: batch, scopeName: scopeName)

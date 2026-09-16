@@ -10861,6 +10861,10 @@ class DownloadManager: NSObject, ObservableObject {
     /// studio, tag or group. Settings › Downloads.
     static var galleryNewestBatchSize: Int { TabManager.shared.downloadBatchSize }
 
+    /// Cap for "newest scenes only" of a performer / studio / tag / group. Separate from the
+    /// image batch: one scene is a whole video file.
+    static var sceneNewestBatchSize: Int { TabManager.shared.sceneDownloadBatchSize }
+
     // MARK: - Bulk scene downloads (performer / studio / tag / group)
 
     /// Which library object a bulk scene download belongs to.

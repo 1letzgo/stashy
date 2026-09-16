@@ -95,9 +95,18 @@ struct PlaybackSettingsSection: View {
                     Text("\(size)").tag(size)
                 }
             } label: {
-                Label("Newest batch size", systemImage: "arrow.down.doc")
+                Label("Newest batch — Images", systemImage: "photo.stack")
             }
-            .stashyGroupedBlockRow(index: 0, count: 1)
+            .stashyGroupedBlockRow(index: 0, count: 2)
+
+            Picker(selection: $tabManager.sceneDownloadBatchSize) {
+                ForEach(TabManager.downloadBatchSizeOptions, id: \.self) { size in
+                    Text("\(size)").tag(size)
+                }
+            } label: {
+                Label("Newest batch — Scenes", systemImage: "film")
+            }
+            .stashyGroupedBlockRow(index: 1, count: 2)
         }
     }
 
