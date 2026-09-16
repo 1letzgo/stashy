@@ -100,6 +100,11 @@ struct DownloadsView: View {
                                             DownloadedSceneCard(downloaded: downloaded)
                                         }
                                         .buttonStyle(.plain)
+                                        .stashySwipeActions([
+                                            StashySwipeAction(title: "Delete", systemImage: "trash", tint: .red, isDestructive: true) {
+                                                downloadManager.deleteDownload(id: downloaded.id)
+                                            }
+                                        ])
                                     }
                                 }
                                 .measuresGridWidth($gridWidth)
@@ -692,10 +697,37 @@ extension DownloadsView {
                         DownloadedGalleryCard(entry: entry)
                     }
                     .buttonStyle(.plain)
+                    .stashySwipeActions(swipeActions(for: entry))
                 }
             }
             .padding(.horizontal, DesignTokens.Tools.contentPadding)
         }
+    }
+
+    /// Sync and delete for a downloaded gallery / tag — behind a swipe to the left on the row.
+    private func swipeActions(for entry: DownloadedGallery) -> [StashySwipeAction] {
+        var actions: [StashySwipeAction] = []
+        if !entry.isSingleImage {
+            actions.append(StashySwipeAction(title: "Sync", systemImage: "arrow.triangle.2.circlepath", tint: .blue) {
+                if entry.resolvedKind == .tag {
+                    downloadManager.syncTagImages(entryId: entry.id, limit: nil)
+                } else {
+                    downloadManager.syncGallery(id: entry.id, limit: nil)
+                }
+            })
+            actions.append(StashySwipeAction(title: "Newest \(DownloadManager.galleryNewestBatchSize)",
+                                             systemImage: "arrow.down.to.line", tint: .indigo) {
+                if entry.resolvedKind == .tag {
+                    downloadManager.syncTagImages(entryId: entry.id, limit: DownloadManager.galleryNewestBatchSize)
+                } else {
+                    downloadManager.syncGallery(id: entry.id, limit: DownloadManager.galleryNewestBatchSize)
+                }
+            })
+        }
+        actions.append(StashySwipeAction(title: "Delete", systemImage: "trash", tint: .red, isDestructive: true) {
+            downloadManager.deleteGalleryDownload(id: entry.id)
+        })
+        return actions
     }
 
     /// Small caps footnote, flush with the content edge — same header look as the other Tools.
@@ -741,32 +773,8 @@ struct DownloadedGalleryCard: View {
                 }
                 .buttonStyle(.plain)
                 .accessibilityLabel("Cancel download")
-            } else {
-                Menu {
-                    if !entry.isSingleImage {
-                        Button {
-                            sync(limit: nil)
-                        } label: {
-                            Label("Sync newest", systemImage: "arrow.triangle.2.circlepath")
-                        }
-                        Button {
-                            sync(limit: DownloadManager.galleryNewestBatchSize)
-                        } label: {
-                            Label("Sync newest \(DownloadManager.galleryNewestBatchSize)", systemImage: "arrow.down.to.line")
-                        }
-                        Divider()
-                    }
-                    Button(role: .destructive) {
-                        downloadManager.deleteGalleryDownload(id: entry.id)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.title3)
-                        .foregroundColor(.secondary)
-                }
             }
+            // No "more" button: the row's actions live behind a swipe to the left.
         }
         .padding(DesignTokens.Spacing.sm)
         .background(Color.secondaryAppBackground)
