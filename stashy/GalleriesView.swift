@@ -1554,7 +1554,9 @@ struct FullScreenImageView: View {
                 VStack(spacing: 2) {
                     Image(systemName: oCounter > 0 ? AppearanceManager.shared.oCounterIconFilled : AppearanceManager.shared.oCounterIcon)
                         .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                        .foregroundColor(oCounter > 0 ? appearanceManager.tintColor : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
+                        // Same fill as Feeds: white when counted, dimmed white when not — the
+                        // tint colour here made the identical pill look like a different control.
+                        .foregroundColor(.white.opacity(oCounter > 0 ? 1.0 : StashyExpandingDock.inactiveIconOpacity))
                     Text("\(oCounter)")
                         .font(.caption2.weight(.semibold))
                         .foregroundColor(.white.opacity(StashyExpandingDock.inactiveIconOpacity))
