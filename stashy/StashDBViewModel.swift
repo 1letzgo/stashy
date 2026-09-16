@@ -10580,6 +10580,11 @@ struct ActiveDownload {
     var progress: Double
     var totalSize: Int64
     var downloadedSize: Int64
+    /// Bytes per second, sampled between progress callbacks. 0 until the first sample.
+    var speed: Double = 0
+    /// Image downloads count files rather than bytes: "7 of 50 images".
+    var completedUnits: Int = 0
+    var totalUnits: Int = 0
 }
 
 final class DownloadTaskMap: Sendable {
@@ -10771,8 +10776,27 @@ class DownloadManager: NSObject, ObservableObject {
         }
     }
 
+    /// Last speed sample per download: when it was taken and how many bytes had arrived.
+    private var speedSamples: [String: (date: Date, bytes: Int64)] = [:]
+
+    /// Bytes per second since the previous callback. Samples at most once a second so the
+    /// number does not jitter with every few kilobytes.
+    private func sampleSpeed(id: String, written: Int64) -> Double {
+        let now = Date()
+        guard let previous = speedSamples[id] else {
+            speedSamples[id] = (now, written)
+            return 0
+        }
+        let elapsed = now.timeIntervalSince(previous.date)
+        guard elapsed >= 1 else { return activeDownloads[id]?.speed ?? 0 }
+        speedSamples[id] = (now, written)
+        let delta = Double(written - previous.bytes)
+        return delta > 0 ? delta / elapsed : 0
+    }
+
     /// A slot came free — either the file finished or it failed.
     private func finishSceneDownload(id: String) {
+        speedSamples.removeValue(forKey: id)
         runningSceneIds.remove(id)
         queuedSceneIds.remove(id)
         sceneQueue.removeAll { $0.id == id }
@@ -10817,6 +10841,7 @@ class DownloadManager: NSObject, ObservableObject {
                 Task { @MainActor in
                     if var activeDownload = self.activeDownloads[sceneId] {
                         activeDownload.progress = 0.1 + (progress * 0.9)
+                        activeDownload.speed = self.sampleSpeed(id: sceneId, written: written)
                         activeDownload.downloadedSize = written
                         activeDownload.totalSize = total
                         self.activeDownloads[sceneId] = activeDownload
@@ -11581,7 +11606,12 @@ class DownloadManager: NSObject, ObservableObject {
             let destination = folder.appendingPathComponent(fileName)
             let relativePath = Self.galleryFolderName(for: entryId) + "/" + fileName
 
-            downloadFile(id: entryId + "_img_" + image.id, from: remote, to: destination) { _, _, _ in
+            downloadFile(id: entryId + "_img_" + image.id, from: remote, to: destination) { _, written, _ in
+                Task { @MainActor in
+                    guard var active = self.activeDownloads[entryId] else { return }
+                    active.speed = self.sampleSpeed(id: entryId, written: active.downloadedSize + written)
+                    self.activeDownloads[entryId] = active
+                }
             } completion: { success in
                 // Thumbnail generation is async (AVAssetImageGenerator); the chain continues
                 // once it is written so `stored` keeps its order.
@@ -11608,6 +11638,9 @@ class DownloadManager: NSObject, ObservableObject {
                     }
                     if var active = self.activeDownloads[entryId] {
                         active.progress = max(0.02, Double(index + 1) / Double(max(total, 1)))
+                        active.completedUnits = index + 1
+                        active.totalUnits = total
+                        active.downloadedSize += (try? FileManager.default.attributesOfItem(atPath: destination.path)[.size] as? Int64 ?? 0) ?? 0
                         self.activeDownloads[entryId] = active
                     }
                     next(index + 1)

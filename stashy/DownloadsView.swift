@@ -163,11 +163,10 @@ struct DownloadsView: View {
             Text(download.title)
                 .font(.subheadline.weight(.medium))
                 .lineLimit(1)
-            ProgressView(value: download.totalSize > 0 ? download.progress : 0)
+            // Images count files, scene files count bytes — both report a fraction.
+            ProgressView(value: min(max(download.progress, 0), 1))
                 .tint(appearanceManager.tintColor)
-            Text(download.totalSize > 0
-                 ? "\(Int(download.progress * 100))%"
-                 : "\(ByteCountFormatter.string(fromByteCount: download.downloadedSize, countStyle: .file)) downloaded")
+            Text(progressCaption(for: download))
                 .font(.caption2)
                 .foregroundColor(.secondary)
         }
@@ -175,6 +174,22 @@ struct DownloadsView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color.secondaryAppBackground)
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+    }
+
+    /// "42% · 12,3 MB of 280 MB · 4,1 MB/s", or "7 of 50 images" for an image download.
+    private func progressCaption(for download: ActiveDownload) -> String {
+        var parts: [String] = ["\(Int(min(max(download.progress, 0), 1) * 100))%"]
+        if download.totalUnits > 0 {
+            parts.append("\(download.completedUnits) of \(download.totalUnits) images")
+        } else if download.totalSize > 0 {
+            parts.append("\(ByteCountFormatter.string(fromByteCount: download.downloadedSize, countStyle: .file)) of \(ByteCountFormatter.string(fromByteCount: download.totalSize, countStyle: .file))")
+        } else if download.downloadedSize > 0 {
+            parts.append(ByteCountFormatter.string(fromByteCount: download.downloadedSize, countStyle: .file))
+        }
+        if download.speed > 0 {
+            parts.append("\(ByteCountFormatter.string(fromByteCount: Int64(download.speed), countStyle: .file))/s")
+        }
+        return parts.joined(separator: " · ")
     }
 
     /// Waiting for one of the two transfer slots.
