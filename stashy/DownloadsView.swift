@@ -11,8 +11,14 @@ import SwiftUI
 struct DownloadsView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @StateObject private var downloadManager = DownloadManager.shared
-    
+    @ObservedObject private var jobStore = DownloadSyncJobStore.shared
+    /// Own view model: the sync jobs need the server's saved filters.
+    @StateObject private var viewModel = StashDBViewModel()
+
     @State private var gridWidth: CGFloat = 0
+    @State private var showingJobSheet = false
+    @State private var showingRunAllConfirmation = false
+    @State private var jobToDelete: DownloadSyncJob?
 
     private var columns: [GridItem] {
         DesignTokens.Grid.adaptiveColumns(
@@ -26,6 +32,9 @@ struct DownloadsView: View {
     var body: some View {
         ZStack {
             Color.appBackground.ignoresSafeArea()
+
+            VStack(spacing: 0) {
+            syncJobRow
 
             if downloadManager.downloads.isEmpty && downloadManager.galleryDownloads.isEmpty && downloadManager.activeDownloads.isEmpty {
                 VStack(spacing: 20) {
@@ -125,6 +134,189 @@ struct DownloadsView: View {
                     .padding(.top, DesignTokens.Tools.menuTopPadding)
                     .padding(.bottom, DesignTokens.Tools.menuBottomPadding)
                 }
+            }
+            }
+        }
+        .onAppear {
+            jobStore.load()
+            if viewModel.savedFilters.isEmpty { viewModel.fetchSavedFilters() }
+        }
+        .sheet(isPresented: $showingJobSheet) {
+            DownloadSyncJobSheet(savedFilters: viewModel.savedFilters) { job in
+                jobStore.add(job)
+            }
+        }
+        .alert("Run all jobs?", isPresented: $showingRunAllConfirmation) {
+            Button("Run all") {
+                DownloadSyncJobRunner.runAll(jobStore.jobs, filters: viewModel.savedFilters, viewModel: viewModel)
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("Each job downloads its configured number of newest items. Items already downloaded are skipped.")
+        }
+        .alert("Delete job?", isPresented: Binding(get: { jobToDelete != nil }, set: { if !$0 { jobToDelete = nil } })) {
+            Button("Delete", role: .destructive) {
+                if let job = jobToDelete { jobStore.remove(job) }
+                jobToDelete = nil
+            }
+            Button("Cancel", role: .cancel) { jobToDelete = nil }
+        } message: {
+            Text(jobToDelete.map { "\($0.filterName) stays on the server; only the job goes away." } ?? "")
+        }
+    }
+
+    // MARK: - Sync jobs
+
+    /// Run-all button plus one pill per job, like the merge templates.
+    @ViewBuilder
+    private var syncJobRow: some View {
+        HStack(spacing: DesignTokens.Spacing.xs) {
+            Button {
+                showingRunAllConfirmation = true
+            } label: {
+                Image(systemName: "play.square.stack.fill")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundColor(jobStore.jobs.isEmpty ? .secondary : appearanceManager.tintColor)
+                    .frame(width: 40, height: 44)
+                    .background(Color.secondaryAppBackground)
+                    .clipShape(Capsule())
+            }
+            .buttonStyle(.plain)
+            .disabled(jobStore.jobs.isEmpty)
+            .accessibilityLabel("Run all sync jobs")
+
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: DesignTokens.Spacing.xs) {
+                    ForEach(jobStore.jobs) { job in
+                        Button {
+                            HapticManager.light()
+                            DownloadSyncJobRunner.run(job, filters: viewModel.savedFilters, viewModel: viewModel)
+                        } label: {
+                            VStack(alignment: .leading, spacing: 1) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: job.kind.icon)
+                                        .font(.caption2)
+                                    Text(job.filterName)
+                                        .font(.footnote.weight(.medium))
+                                        .lineLimit(1)
+                                }
+                                Text("newest \(job.amount) \(job.kind.label)")
+                                    .font(.caption2)
+                                    .lineLimit(1)
+                                    .opacity(0.75)
+                            }
+                            .foregroundColor(.primary)
+                            .padding(.horizontal, DesignTokens.Spacing.sm)
+                            .frame(height: 44)
+                            .background(Color.secondaryAppBackground)
+                            .clipShape(Capsule())
+                        }
+                        .buttonStyle(.plain)
+                        // Long press deletes, as on the merge template pills.
+                        .simultaneousGesture(
+                            LongPressGesture(minimumDuration: 0.5).onEnded { _ in
+                                HapticManager.light()
+                                jobToDelete = job
+                            }
+                        )
+                    }
+
+                    Button {
+                        showingJobSheet = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundColor(appearanceManager.tintColor)
+                            .frame(width: 40, height: 44)
+                            .background(Color.secondaryAppBackground)
+                            .clipShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("New sync job")
+                }
+            }
+            .scrollClipDisabled()
+        }
+        .padding(.horizontal, DesignTokens.Tools.contentPadding)
+        .padding(.top, DesignTokens.Tools.menuTopPadding)
+        .padding(.bottom, DesignTokens.Spacing.sm)
+    }
+}
+
+/// Picks a saved filter and the number of newest items one run should fetch.
+private struct DownloadSyncJobSheet: View {
+    let savedFilters: [String: StashDBViewModel.SavedFilter]
+    let onSave: (DownloadSyncJob) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var selectedFilterId: String?
+    @State private var amount: Int = 5
+    @State private var search = ""
+
+    private var usableFilters: [StashDBViewModel.SavedFilter] {
+        savedFilters.values
+            .filter { $0.mode == .scenes || $0.mode == .images }
+            .filter { search.isEmpty || $0.name.localizedCaseInsensitiveContains(search) }
+            .sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    var body: some View {
+        NavigationView {
+            Form {
+                Section("Search …") {
+                    TextField("Filter name", text: $search)
+                }
+                Section("Filter") {
+                    ForEach(usableFilters) { filter in
+                        Button {
+                            selectedFilterId = filter.id
+                        } label: {
+                            HStack {
+                                Image(systemName: filter.mode == .scenes ? "film" : "photo")
+                                    .foregroundStyle(.secondary)
+                                Text(filter.name)
+                                Spacer()
+                                if selectedFilterId == filter.id {
+                                    Image(systemName: "checkmark")
+                                }
+                            }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    if usableFilters.isEmpty {
+                        Text("No scene or image filters on this server")
+                            .foregroundStyle(.secondary)
+                    }
+                }
+                Section("Amount per run") {
+                    Stepper("Newest \(amount)", value: $amount, in: 1...500, step: amount < 20 ? 1 : 10)
+                }
+            }
+            // Room for the pinned save button below the form.
+            .contentMargins(.bottom, 80, for: .scrollContent)
+            .stashyModalSheetChrome("New sync job", onBack: { dismiss() })
+            .safeAreaInset(edge: .bottom) {
+                Button {
+                    guard let id = selectedFilterId, let filter = savedFilters[id] else { return }
+                    onSave(DownloadSyncJob(
+                        filterId: id,
+                        filterName: filter.name,
+                        kind: filter.mode == .images ? .images : .scenes,
+                        amount: amount
+                    ))
+                    dismiss()
+                } label: {
+                    Text("Save job")
+                        .font(.subheadline.weight(.semibold))
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 14)
+                        .background(Color.secondaryAppBackground)
+                        .clipShape(Capsule())
+                }
+                .buttonStyle(.plain)
+                .disabled(selectedFilterId == nil)
+                .padding(.horizontal, DesignTokens.Tools.contentPadding)
+                .padding(.bottom, 12)
             }
         }
     }

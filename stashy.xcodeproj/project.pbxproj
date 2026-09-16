@@ -7,6 +7,8 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		SYNCJOB01000000000000001 /* DownloadSyncJobs.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYNCJOB02000000000000002 /* DownloadSyncJobs.swift */; };
+		SYNCJOB03000000000000003 /* DownloadSyncJobs.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYNCJOB02000000000000002 /* DownloadSyncJobs.swift */; };
 		02B19A59AAFE4A16B45A861F /* DownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB172F16743C007C2090 /* DownloadsView.swift */; };
 		08FB7793FE84155DC02AAC07 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7794FE84155DC02AAC07 /* App.swift */; };
 		08FB7797FE84155DC02AAC07 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7798FE84155DC02AAC07 /* MainTabView.swift */; };
@@ -290,6 +292,7 @@
 		D32D9793F36147319D8FF8BF /* FilterCriterionTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterCriterionTypes.swift; sourceTree = "<group>"; };
 		DF06EF252F18EC1100299105 /* SceneCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCardView.swift; sourceTree = "<group>"; };
 		DF22BB142F167223007C2090 /* CatalogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogsView.swift; sourceTree = "<group>"; };
+		SYNCJOB02000000000000002 /* DownloadSyncJobs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadSyncJobs.swift; sourceTree = "<group>"; };
 		DF22BB172F16743C007C2090 /* DownloadsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadsView.swift; sourceTree = "<group>"; };
 		DF22BB182F16743C007C2090 /* GalleriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleriesView.swift; sourceTree = "<group>"; };
 		DF22BB192F16743C007C2090 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -408,6 +411,7 @@
 				DF22BB142F167223007C2090 /* CatalogsView.swift */,
 				DFUI000022F3AUDIT002 /* DesignTokens.swift */,
 				DF22BB172F16743C007C2090 /* DownloadsView.swift */,
+				SYNCJOB02000000000000002 /* DownloadSyncJobs.swift */,
 				DF22BB182F16743C007C2090 /* GalleriesView.swift */,
 				DFUI000042F3AUDIT004 /* HapticManager.swift */,
 				DF675E6C2F2A6386004CA019 /* Repositories */,
@@ -821,6 +825,7 @@
 				C7F3A10600000000000000E6 /* StudioLogoStore.swift in Sources */,
 				DF90B75E2F1A5ECF003ED852 /* StarRatingView.swift in Sources */,
 				DF22BB1F2F16743C007C2090 /* DownloadsView.swift in Sources */,
+				SYNCJOB03000000000000003 /* DownloadSyncJobs.swift in Sources */,
 				DF4A022C2F1E8B6900E5EAFB /* ImagesView.swift in Sources */,
 				A1IMGDS012345678901234AB /* StashImageDateSort.swift in Sources */,
 				DF22BB202F16743C007C2090 /* GalleriesView.swift in Sources */,
@@ -894,6 +899,7 @@
 				C7F3A10700000000000000E7 /* StudioLogoStore.swift in Sources */,
 				5B0100661A854DEDA5E55778 /* CatalogsView.swift in Sources */,
 				02B19A59AAFE4A16B45A861F /* DownloadsView.swift in Sources */,
+				SYNCJOB01000000000000001 /* DownloadSyncJobs.swift in Sources */,
 				5BC6653D5C9D4675881F40BA /* GalleriesView.swift in Sources */,
 				2F2314B3093A480F864AFEEC /* HomeView.swift in Sources */,
 				FC10AB0212345678901234AB /* FloatingCatalogBar.swift in Sources */,

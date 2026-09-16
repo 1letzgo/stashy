@@ -4044,7 +4044,7 @@ class StashDBViewModel: ObservableObject {
         )
     }
     
-    private func sanitizeFilter(_ dict: [String: Any], isMarker: Bool = false) -> [String: Any] {
+    func sanitizeFilter(_ dict: [String: Any], isMarker: Bool = false) -> [String: Any] {
         return FilterMapper.sanitize(dict, isMarker: isMarker)
     }
 
@@ -10873,6 +10873,8 @@ class DownloadManager: NSObject, ObservableObject {
         case studio(id: String)
         case tag(id: String)
         case group(id: String)
+        /// A saved scene filter, already sanitised into a `scene_filter` fragment.
+        case savedFilter(sceneFilter: [String: Any])
 
         /// `scene_filter` fragment selecting that object's scenes.
         var sceneFilter: [String: Any] {
@@ -10885,6 +10887,8 @@ class DownloadManager: NSObject, ObservableObject {
                 return ["tags": ["value": [id], "modifier": "INCLUDES", "depth": 0]]
             case .group(let id):
                 return ["groups": ["value": [id], "modifier": "INCLUDES"]]
+            case .savedFilter(let sceneFilter):
+                return sceneFilter
             }
         }
     }
@@ -11226,6 +11230,107 @@ class DownloadManager: NSObject, ObservableObject {
                     self.notifyDownload("Added \(stored.count) new image(s)", icon: "checkmark.circle.fill")
                 }
             }
+        }
+    }
+
+    /// Downloads (or tops up) the newest images matching a saved image filter. The entry id is
+    /// derived from the filter, so running the same job again only adds what is new.
+    func downloadFilterImages(filterId: String, filterName: String, imageFilter: [String: Any], limit: Int?) {
+        guard requireDownloadEntitlement() else { return }
+        let entryId = "filter-" + filterId
+        guard activeDownloads[entryId] == nil else { return }
+        let existing = downloadedGallery(id: entryId)
+        let knownIds = Set(existing?.images.map(\.id) ?? [])
+
+        activeDownloads[entryId] = ActiveDownload(id: entryId, title: filterName, progress: 0.02, totalSize: 0, downloadedSize: 0)
+
+        fetchImagesForDownload(imageFilter: imageFilter, limit: limit) { [weak self] images, total in
+            guard let self else { return }
+            let fresh = images.filter { !knownIds.contains($0.id) }
+            guard !fresh.isEmpty else {
+                Task { @MainActor in
+                    self.activeDownloads.removeValue(forKey: entryId)
+                    self.notifyDownload(images.isEmpty ? "No images for this filter" : "Already up to date", icon: "checkmark.circle")
+                }
+                return
+            }
+            let folder = self.downloadsFolder.appendingPathComponent(Self.galleryFolderName(for: entryId), isDirectory: true)
+            try? FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+
+            self.downloadImages(fresh, into: folder, entryId: entryId, existing: existing?.images ?? []) { stored in
+                Task { @MainActor in
+                    self.activeDownloads.removeValue(forKey: entryId)
+                    guard !stored.isEmpty else {
+                        if existing == nil { try? FileManager.default.removeItem(at: folder) }
+                        self.notifyDownload("Download failed", icon: "exclamationmark.triangle.fill", isError: true)
+                        return
+                    }
+                    if let index = self.galleryDownloads.firstIndex(where: { $0.id == entryId }) {
+                        self.galleryDownloads[index].images = stored + self.galleryDownloads[index].images
+                        self.galleryDownloads[index].downloadDate = Date()
+                        self.galleryDownloads[index].serverImageCount = total
+                    } else {
+                        self.galleryDownloads.insert(
+                            DownloadedGallery(
+                                id: entryId,
+                                title: filterName,
+                                studioName: nil,
+                                performerNames: [],
+                                downloadDate: Date(),
+                                localCoverPath: stored.first?.localPath,
+                                images: stored,
+                                isSingleImage: false,
+                                sourceKind: DownloadedGallery.Kind.tag.rawValue,
+                                serverImageCount: total
+                            ),
+                            at: 0
+                        )
+                    }
+                    self.saveGalleryMetadata()
+                    self.notifyDownload("Added \(stored.count) image(s) from \(filterName)", icon: "checkmark.circle.fill")
+                }
+            }
+        }
+    }
+
+    /// Newest-first images for any `image_filter`, paged like the tag variant.
+    private func fetchImagesForDownload(
+        imageFilter: [String: Any],
+        limit: Int?,
+        completion: @escaping ([StashImage], Int) -> Void
+    ) {
+        Task {
+            let query = GraphQLQueries.queryWithFragments("findImages")
+            var collected: [StashImage] = []
+            var total = 0
+            var page = 1
+            let perPage = min(limit ?? 200, 200)
+            while true {
+                var variables: [String: Any] = [
+                    "filter": ["page": page, "per_page": perPage, "sort": "date", "direction": "DESC"]
+                ]
+                if !imageFilter.isEmpty { variables["image_filter"] = imageFilter }
+                do {
+                    let response: GalleryImagesResponse = try await GraphQLClient.shared.execute(
+                        query: query,
+                        variables: variables
+                    )
+                    let images = response.data?.findImages.images ?? []
+                    total = response.data?.findImages.count ?? total
+                    collected.append(contentsOf: images)
+                    if let limit, collected.count >= limit {
+                        collected = Array(collected.prefix(limit))
+                        break
+                    }
+                    if images.count < perPage || collected.count >= total { break }
+                    page += 1
+                    if page > 50 { break }
+                } catch {
+                    AppLog.error("📥 Filter image fetch failed: \(error)")
+                    break
+                }
+            }
+            completion(collected, total)
         }
     }
 
