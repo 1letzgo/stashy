@@ -1541,12 +1541,13 @@ struct DownloadedGalleryFullScreenView: View {
         return letters.isEmpty ? "?" : letters.joined().uppercased()
     }
 
-    /// Only videos have something to scrub; stills keep the height so the chrome does not jump.
+    /// Only videos have something to scrub. A still shows no bar at all — an invisible one
+    /// still took up its height under the caption.
     @ViewBuilder
     private var scrubberBar: some View {
-        IsolatedScrubberBar(state: scrubberState, isUIVisible: showUI)
-            .opacity((currentImage?.isVideo ?? false) ? 1 : 0)
-            .allowsHitTesting(currentImage?.isVideo ?? false)
+        if currentImage?.isVideo == true {
+            IsolatedScrubberBar(state: scrubberState, isUIVisible: showUI)
+        }
     }
 
     /// Performer · title line, the trailing control stack and the tag row — the same three
