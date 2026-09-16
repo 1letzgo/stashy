@@ -19,9 +19,6 @@ struct DownloadsView: View {
     @State private var showingJobSheet = false
     @State private var showingRunAllConfirmation = false
     @State private var jobToDelete: DownloadSyncJob?
-    /// Delete asks first, as in Tools › Filters.
-    @State private var sceneToDelete: DownloadedScene?
-    @State private var galleryToDelete: DownloadedGallery?
 
     private var columns: [GridItem] {
         DesignTokens.Grid.adaptiveColumns(
@@ -60,52 +57,38 @@ struct DownloadsView: View {
             } else {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        // Active Downloads Section
-                        if !downloadManager.activeDownloads.isEmpty {
+                        // Running transfers first, then what waits for a slot — both full width.
+                        let active = downloadManager.activeDownloads.values
+                            .filter { !downloadManager.queuedSceneIds.contains($0.id) }
+                            .sorted { $0.title < $1.title }
+                        let queued = downloadManager.activeDownloads.values
+                            .filter { downloadManager.queuedSceneIds.contains($0.id) }
+                            .sorted { $0.title < $1.title }
+
+                        if !active.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
                                 downloadsSectionHeading("Active Downloads")
-
-                                LazyVGrid(columns: columns, spacing: 12) {
-                                    ForEach(Array(downloadManager.activeDownloads.values).sorted { $0.title < $1.title }, id: \.id) { download in
-                                        VStack(alignment: .leading, spacing: 6) {
-                                            Text(download.title)
-                                                .font(.subheadline)
-                                                .fontWeight(.medium)
-                                                .lineLimit(1)
-                                        
-                                            if download.totalSize > 0 {
-                                                ProgressView(value: download.progress)
-                                                    .tint(appearanceManager.tintColor)
-                                            
-                                                Text("\(Int(download.progress * 100))%")
-                                                    .font(.caption2)
-                                                    .foregroundColor(.secondary)
-                                            } else if download.progress <= 0 && download.downloadedSize == 0 {
-                                                // Waiting for one of the two transfer slots.
-                                                Text("Queued")
-                                                    .font(.caption2)
-                                                    .foregroundColor(.secondary)
-                                            } else {
-                                                ProgressView()
-                                                    .progressViewStyle(.linear)
-                                                    .tint(appearanceManager.tintColor)
-
-                                                Text("\(ByteCountFormatter.string(fromByteCount: download.downloadedSize, countStyle: .file)) downloaded")
-                                                    .font(.caption2)
-                                                    .foregroundColor(.secondary)
-                                            }
-                                        }
-                                        .padding()
-                                        .background(Color.secondaryAppBackground)
-                                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-                                        .subtleShadow()
+                                VStack(spacing: 12) {
+                                    ForEach(active, id: \.id) { download in
+                                        activeDownloadRow(download)
                                     }
                                 }
-                                .measuresGridWidth($gridWidth)
                                 .padding(.horizontal, DesignTokens.Tools.contentPadding)
                             }
                         }
-                        
+
+                        if !queued.isEmpty {
+                            VStack(alignment: .leading, spacing: 12) {
+                                downloadsSectionHeading("Queued")
+                                VStack(spacing: 12) {
+                                    ForEach(queued, id: \.id) { download in
+                                        queuedDownloadRow(download)
+                                    }
+                                }
+                                .padding(.horizontal, DesignTokens.Tools.contentPadding)
+                            }
+                        }
+
                         // Completed Downloads Section
                         if !downloadManager.downloads.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
@@ -119,7 +102,7 @@ struct DownloadsView: View {
                                         .buttonStyle(.plain)
                                         .stashySwipeActions([
                                             StashySwipeAction(title: "Delete", systemImage: "trash", tint: AppearanceManager.shared.tintColor, isDestructive: true) {
-                                                sceneToDelete = downloaded
+                                                downloadManager.deleteDownload(id: downloaded.id)
                                             }
                                         ])
                                     }
@@ -162,24 +145,6 @@ struct DownloadsView: View {
         } message: {
             Text("Each job downloads its configured number of newest items. Items already downloaded are skipped.")
         }
-        .alert("Delete download?", isPresented: Binding(get: { sceneToDelete != nil }, set: { if !$0 { sceneToDelete = nil } })) {
-            Button("Delete", role: .destructive) {
-                if let scene = sceneToDelete { downloadManager.deleteDownload(id: scene.id) }
-                sceneToDelete = nil
-            }
-            Button("Cancel", role: .cancel) { sceneToDelete = nil }
-        } message: {
-            Text(sceneToDelete.map { "Remove “\($0.title ?? "this scene")” from this device?" } ?? "")
-        }
-        .alert("Delete download?", isPresented: Binding(get: { galleryToDelete != nil }, set: { if !$0 { galleryToDelete = nil } })) {
-            Button("Delete", role: .destructive) {
-                if let entry = galleryToDelete { downloadManager.deleteGalleryDownload(id: entry.id) }
-                galleryToDelete = nil
-            }
-            Button("Cancel", role: .cancel) { galleryToDelete = nil }
-        } message: {
-            Text(galleryToDelete.map { "Remove “\($0.displayTitle)” from this device?" } ?? "")
-        }
         .alert("Delete job?", isPresented: Binding(get: { jobToDelete != nil }, set: { if !$0 { jobToDelete = nil } })) {
             Button("Delete", role: .destructive) {
                 if let job = jobToDelete { jobStore.remove(job) }
@@ -189,6 +154,47 @@ struct DownloadsView: View {
         } message: {
             Text(jobToDelete.map { "\($0.filterName) stays on the server; only the job goes away." } ?? "")
         }
+    }
+
+    /// A transfer in flight: title, progress bar, percentage.
+    @ViewBuilder
+    private func activeDownloadRow(_ download: ActiveDownload) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(download.title)
+                .font(.subheadline.weight(.medium))
+                .lineLimit(1)
+            ProgressView(value: download.totalSize > 0 ? download.progress : 0)
+                .tint(appearanceManager.tintColor)
+            Text(download.totalSize > 0
+                 ? "\(Int(download.progress * 100))%"
+                 : "\(ByteCountFormatter.string(fromByteCount: download.downloadedSize, countStyle: .file)) downloaded")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondaryAppBackground)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+    }
+
+    /// Waiting for one of the two transfer slots.
+    @ViewBuilder
+    private func queuedDownloadRow(_ download: ActiveDownload) -> some View {
+        HStack(spacing: DesignTokens.Spacing.sm) {
+            Image(systemName: "clock")
+                .foregroundStyle(.secondary)
+            Text(download.title)
+                .font(.subheadline.weight(.medium))
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            Text("Queued")
+                .font(.caption2)
+                .foregroundColor(.secondary)
+        }
+        .padding()
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Color.secondaryAppBackground)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
     }
 
     // MARK: - Sync jobs
@@ -1055,7 +1061,7 @@ extension DownloadsView {
             })
         }
         actions.append(StashySwipeAction(title: "Delete", systemImage: "trash", tint: AppearanceManager.shared.tintColor, isDestructive: true) {
-            galleryToDelete = entry
+            downloadManager.deleteGalleryDownload(id: entry.id)
         })
         return actions
     }

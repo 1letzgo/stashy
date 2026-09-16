@@ -10728,6 +10728,8 @@ class DownloadManager: NSObject, ObservableObject {
     private var sceneQueue: [Scene] = []
     /// Scene ids currently transferring (an entry in `activeDownloads` also exists for each).
     private var runningSceneIds: Set<String> = []
+    /// Scene ids waiting for a slot — the UI lists them under their own heading.
+    @Published private(set) var queuedSceneIds: Set<String> = []
 
     func downloadScene(_ scene: Scene) {
         let sceneId = scene.id
@@ -10748,6 +10750,7 @@ class DownloadManager: NSObject, ObservableObject {
         // Queued rather than started: a handful of parallel video transfers starve each other
         // and the progress bars crawl. Waiting scenes show up as "Queued".
         sceneQueue.append(scene)
+        queuedSceneIds.insert(sceneId)
         activeDownloads[sceneId] = ActiveDownload(
             id: sceneId,
             title: scene.title ?? "Unknown Scene",
@@ -10762,6 +10765,7 @@ class DownloadManager: NSObject, ObservableObject {
     private func startNextQueuedScenesIfPossible() {
         while runningSceneIds.count < Self.maxParallelSceneDownloads, !sceneQueue.isEmpty {
             let next = sceneQueue.removeFirst()
+            queuedSceneIds.remove(next.id)
             runningSceneIds.insert(next.id)
             startDownload(next)
         }
@@ -10770,6 +10774,7 @@ class DownloadManager: NSObject, ObservableObject {
     /// A slot came free — either the file finished or it failed.
     private func finishSceneDownload(id: String) {
         runningSceneIds.remove(id)
+        queuedSceneIds.remove(id)
         sceneQueue.removeAll { $0.id == id }
         startNextQueuedScenesIfPossible()
     }
@@ -10896,6 +10901,7 @@ class DownloadManager: NSObject, ObservableObject {
         // Still waiting for a slot: drop it from the queue, nothing is transferring yet.
         if sceneQueue.contains(where: { $0.id == id }), !runningSceneIds.contains(id) {
             sceneQueue.removeAll { $0.id == id }
+            queuedSceneIds.remove(id)
             activeDownloads.removeValue(forKey: id)
             return
         }
