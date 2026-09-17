@@ -214,9 +214,11 @@ struct DownloadsView: View {
 
     // MARK: - Sync jobs
 
-    /// Run-all button plus one pill per job, like the merge templates.
+    /// Heading, run-all button and one pill per job — the same shape the merge templates use.
     @ViewBuilder
     private var syncJobRow: some View {
+        VStack(alignment: .leading, spacing: 12) {
+        downloadsSectionHeading("Sync Jobs")
         HStack(spacing: DesignTokens.Spacing.xs) {
             Button {
                 showingRunAllConfirmation = true
@@ -284,8 +286,9 @@ struct DownloadsView: View {
             }
         }
         .padding(.horizontal, DesignTokens.Tools.contentPadding)
+        }
         .padding(.top, DesignTokens.Tools.menuTopPadding)
-        .padding(.bottom, DesignTokens.Spacing.sm)
+        .padding(.bottom, DesignTokens.Spacing.md)
     }
 }
 
