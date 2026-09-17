@@ -1109,10 +1109,10 @@ struct GalleryItemView: View {
                 cancelAnimationAdvanceTimer()
             }
         }
+        // Only the engine: the play intent stays, so the page autoplays again when it returns.
+        // Flipping `isPlaying` here left autoplay off after a trip to Feeds.
         .onReceive(NotificationCenter.default.publisher(for: .stashyPauseBackgroundPlayers)) { _ in
             engine?.pause()
-            isPlaying = false
-            cancelAnimationAdvanceTimer()
         }
         .onChange(of: continuousPlay) { _, enabled in
             // Looping is the engine's job unless continuous play takes over at the end.

@@ -4892,6 +4892,9 @@ struct ReelItemView: View {
     @Binding var isRotating: Bool
     @State private var showStashSyncSheet = false
     @State private var isFastForwarding = false
+    /// Steps the playhead forward while held when the Feeds hold speed exceeds the engine's
+    /// native cap (2× for video).
+    @State private var fastForwardBoostTimer: Timer?
     var onInteraction: () -> Void
     @StateObject private var videoSurfaceReadiness = ReelItemVideoSurfaceReadiness()
     /// Live decoded size (accounts for clip rotation / preferredTransform).
@@ -5303,17 +5306,41 @@ extension ReelItemView {
         return true
     }
 
+    private func startFastForwardBoost(on aether: AetherSceneEngine, extraRate: Double) {
+        fastForwardBoostTimer?.invalidate()
+        fastForwardBoostTimer = nil
+        guard extraRate > 0.01 else { return }
+        let step = 0.25 * extraRate
+        let timer = Timer(timeInterval: 0.25, repeats: true) { [weak aether] _ in
+            Task { @MainActor in
+                guard let aether else { return }
+                let duration = aether.duration
+                var target = aether.currentTime + step
+                if duration > 0 { target = min(target, max(0, duration - 0.5)) }
+                await aether.seek(to: target)
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        fastForwardBoostTimer = timer
+    }
+
     private func handleLongPress(_ isPressed: Bool) {
         guard !item.isAnimated, let aether = aetherEngine else { return }
 
         if isPressed {
             HapticManager.selection()
-            // Settings › Playback › "Hold to speed up — Feeds".
-            aether.rate = Float(TabManager.shared.holdSpeedFeeds)
+            // Settings › Playback › "Hold to speed up — Feeds". The engine plays video at
+            // most 2×; anything above is made up by stepping the playhead forward.
+            let target = Float(TabManager.shared.holdSpeedFeeds)
+            let native = min(target, aether.maxNativeRate)
+            aether.rate = native
+            startFastForwardBoost(on: aether, extraRate: Double(target - native))
             withAnimation {
                 isFastForwarding = true
             }
         } else {
+            fastForwardBoostTimer?.invalidate()
+            fastForwardBoostTimer = nil
             aether.rate = 1.0
             withAnimation {
                 isFastForwarding = false
@@ -5344,8 +5371,13 @@ extension ReelItemView {
     private var fastForwardOverlay: some View {
         if isFastForwarding {
             VStack {
-                Image(systemName: "chevron.right.2")
-                    .font(.system(size: 32, weight: .black))
+                HStack(spacing: 6) {
+                    Image(systemName: "chevron.right.2")
+                        .font(.system(size: 32, weight: .black))
+                    // The configured Feeds hold speed, so 3× reads as 3× while it runs.
+                    Text(TabManager.holdSpeedLabel(TabManager.shared.holdSpeedFeeds))
+                        .font(.system(size: 20, weight: .bold).monospacedDigit())
+                }
                     .foregroundColor(.white)
                     .padding(.horizontal, 22)
                     .padding(.vertical, 14)

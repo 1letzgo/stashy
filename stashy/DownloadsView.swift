@@ -1792,9 +1792,9 @@ struct DownloadedGalleryItemView: View {
             guard isActiveItem else { return }
             if playing { engine?.play() } else { engine?.pause() }
         }
+        // Only the engine: the play intent stays, so the page autoplays again when it returns.
         .onReceive(NotificationCenter.default.publisher(for: .stashyPauseBackgroundPlayers)) { _ in
             engine?.pause()
-            isPlaying = false
         }
         .onChange(of: scrubberState.seekTarget) { _, target in
             guard isActiveItem, let target, let engine else { return }

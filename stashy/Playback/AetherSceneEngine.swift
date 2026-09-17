@@ -169,6 +169,10 @@ final class AetherSceneEngine: ObservableObject {
 
     private var _rate: Float = 1.0
     /// Playback speed. Never forwarded as 0 (that would be a pause on the engine).
+    /// Fastest rate the current route plays natively — 2× for video (AetherEngine caps it),
+    /// 3× only for audio-only sessions.
+    var maxNativeRate: Float { engine.maxSupportedRate }
+
     var rate: Float {
         get { _rate }
         set {

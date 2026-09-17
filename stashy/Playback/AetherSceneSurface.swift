@@ -59,6 +59,9 @@ struct AetherSceneSurface: View {
     @State private var surfaceSize: CGSize = .zero
     /// Hold anywhere on the picture: 2× while pressed (same as Feeds), previous rate after.
     @State private var isFastForwarding = false
+    /// Above the engine's native cap (2× for video) the hold speed is made up by stepping the
+    /// playhead forward on a timer while the engine plays at its cap.
+    @State private var fastForwardBoostTimer: Timer?
     @State private var rateBeforeFastForward: Float = 1
     @State private var fastForwardArmTask: DispatchWorkItem?
     /// Hold left of the play button: 2× backwards. The engine has no negative rate, so this is
@@ -858,12 +861,40 @@ struct AetherSceneSurface: View {
             HapticManager.selection()
             rateBeforeFastForward = engine.rate
             // Settings › Playback › "Hold to speed up — Player".
-            engine.rate = Float(TabManager.shared.holdSpeedPlayer)
+            let target = Float(TabManager.shared.holdSpeedPlayer)
+            let native = min(target, engine.maxNativeRate)
+            engine.rate = native
+            startFastForwardBoost(extraRate: Double(target - native))
         } else {
+            stopFastForwardBoost()
             engine.rate = rateBeforeFastForward
         }
-        playbackRate = engine.rate
+        // The badge shows the effective hold speed (e.g. 3×), not the engine's native 2× cap.
+        playbackRate = active ? Float(TabManager.shared.holdSpeedPlayer) : engine.rate
         withAnimation(.easeInOut(duration: 0.15)) { isFastForwarding = active }
+    }
+
+    /// Adds `extraRate` seconds of content per second on top of the native rate, in 0.25 s steps.
+    private func startFastForwardBoost(extraRate: Double) {
+        stopFastForwardBoost()
+        guard extraRate > 0.01 else { return }
+        let step = 0.25 * extraRate
+        let timer = Timer(timeInterval: 0.25, repeats: true) { _ in
+            Task { @MainActor in
+                guard isFastForwarding else { return }
+                let duration = engine.duration
+                var target = engine.currentTime + step
+                if duration > 0 { target = min(target, max(0, duration - 0.5)) }
+                onSeek(target)
+            }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        fastForwardBoostTimer = timer
+    }
+
+    private func stopFastForwardBoost() {
+        fastForwardBoostTimer?.invalidate()
+        fastForwardBoostTimer = nil
     }
 
     /// Press-and-hold rewind: playback pauses and the position steps back every 0.25 s
@@ -900,8 +931,13 @@ struct AetherSceneSurface: View {
     private var fastForwardOverlay: some View {
         if isFastForwarding || isRewinding {
             VStack {
-                Image(systemName: isRewinding ? "chevron.left.2" : "chevron.right.2")
-                    .font(.system(size: isCompact ? 22 : 32, weight: .black))
+                HStack(spacing: 6) {
+                    Image(systemName: isRewinding ? "chevron.left.2" : "chevron.right.2")
+                        .font(.system(size: isCompact ? 22 : 32, weight: .black))
+                    // The configured hold speed, so 3× reads as 3× while it runs.
+                    Text(Self.speedLabel(Float(TabManager.shared.holdSpeedPlayer)))
+                        .font(.system(size: isCompact ? 15 : 20, weight: .bold).monospacedDigit())
+                }
                     .foregroundColor(.white)
                     .padding(.horizontal, isCompact ? 16 : 22)
                     .padding(.vertical, isCompact ? 10 : 14)
