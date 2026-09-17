@@ -121,6 +121,15 @@ struct AetherSceneSurface: View {
         .contentShape(Rectangle())
         // Keyboard insets (a sheet's text field over this surface) must not resize the surface.
         .ignoresSafeArea(.keyboard)
+        // Paused from outside (app background, another tab): bring the controls up so the
+        // play button shows instead of a bare still frame. Playing again lets them fade.
+        .onChange(of: engine.isPlaying) { _, playing in
+            if playing {
+                if areControlsVisible { scheduleControlsHide() }
+            } else if !isRewinding, !isScrubbing {
+                withAnimation(.easeInOut(duration: 0.15)) { areControlsVisible = true }
+            }
+        }
         .onGeometryChange(for: CGSize.self) { $0.size } action: { size in
             // Rotation reports a new size every animation frame, and each assignment
             // re-evaluates this whole surface even when nothing moved by a visible amount.
@@ -1130,7 +1139,9 @@ struct AetherSceneSurface: View {
         // fresh token also cancels whatever hide was already in flight.
         guard !isOptionsMenuOpen else { return }
         DispatchQueue.main.asyncAfter(deadline: .now() + 5) {
-            guard controlsHideToken == token, !isScrubbing, !isOptionsMenuOpen else { return }
+            // A paused player keeps its controls up, so the play button is always visible —
+            // the same as Feeds' centre play button.
+            guard controlsHideToken == token, !isScrubbing, !isOptionsMenuOpen, engine.isPlaying else { return }
             withAnimation(.easeInOut(duration: 0.2)) {
                 areControlsVisible = false
             }
