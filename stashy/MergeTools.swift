@@ -416,18 +416,17 @@ struct MergeToolsView<Item: MergeableItem>: View {
     /// sichtbar bleiben, worauf gemerged wird und wonach gefiltert ist.
     private var pinnedHeader: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
-            // Search first, as in Tools › Filters — the field is the top element of every tool.
-            MergeSearchField(text: $searchText)
-                .padding(.bottom, DesignTokens.Spacing.xs)
-
-            sectionHeading("Merge into")
-
+            // The destination picker is the first field and carries its own label — no
+            // heading above it.
             Button {
                 showingDestinationPicker = true
             } label: {
                 HStack(spacing: DesignTokens.Spacing.sm) {
                     if let destination {
                         VStack(alignment: .leading, spacing: 2) {
+                            Text("Merge into")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
                             Text(destination.name)
                                 .foregroundColor(.primary)
                             Text(destination.mergeUsageSummary)
@@ -435,7 +434,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                                 .foregroundColor(.secondary)
                         }
                     } else {
-                        Text("Choose a \(config.noun)")
+                        Text("Merge into…")
                             .foregroundColor(.secondary)
                     }
 
@@ -457,6 +456,10 @@ struct MergeToolsView<Item: MergeableItem>: View {
             if !presets.presets.isEmpty {
                 presetRow
             }
+
+            // The search sits with the list it filters, right above it.
+            MergeSearchField(text: $searchText)
+                .padding(.top, DesignTokens.Spacing.xs)
         }
         .padding(.horizontal, DesignTokens.Tools.contentPadding)
         .padding(.top, DesignTokens.Tools.menuTopPadding)
@@ -538,15 +541,6 @@ struct MergeToolsView<Item: MergeableItem>: View {
                     )
                 }
             }
-    }
-
-    /// Gleicher Small-Caps-Header wie in den anderen Tools (`stashyScrollingSectionHeader`),
-    /// bündig mit der Kartenkante — kein zusätzlicher Einzug.
-    private func sectionHeading(_ title: String) -> some View {
-        Text(title)
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .textCase(.uppercase)
     }
 
     // MARK: List
