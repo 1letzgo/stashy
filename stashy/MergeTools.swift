@@ -457,11 +457,14 @@ struct MergeToolsView<Item: MergeableItem>: View {
                 presetRow
                     .padding(.top, DesignTokens.Spacing.xs)
             }
+
+            // Category heading over the list, Settings style, 8 pt above the card.
+            StashySectionHeading(title: nounTitle)
+                .padding(.top, DesignTokens.Spacing.md)
         }
         .padding(.horizontal, DesignTokens.Tools.contentPadding)
         .padding(.top, DesignTokens.Tools.menuTopPadding)
-        // Same air below the header as between Settings' groups.
-        .padding(.bottom, DesignTokens.Spacing.md)
+        .padding(.bottom, DesignTokens.Spacing.xs)
         .background(Color.appBackground(for: appearance.currentTheme))
     }
 
