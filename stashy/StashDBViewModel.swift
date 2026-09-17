@@ -11674,6 +11674,40 @@ class DownloadManager: NSObject, ObservableObject {
 }
 
 extension DownloadManager: URLSessionDownloadDelegate {
+    /// Same certificate rule as browsing and playback (`StashTrustDelegate`): a self-signed
+    /// certificate is accepted for local / private servers, everything else validates normally.
+    /// Without it an HTTPS download from e.g. 192.168.x.x failed although the scene played.
+    nonisolated func urlSession(
+        _ session: URLSession,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        Self.handleServerTrust(challenge, completionHandler: completionHandler)
+    }
+
+    /// Background sessions can deliver the challenge per task instead of per session.
+    nonisolated func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didReceive challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        Self.handleServerTrust(challenge, completionHandler: completionHandler)
+    }
+
+    nonisolated private static func handleServerTrust(
+        _ challenge: URLAuthenticationChallenge,
+        completionHandler: @escaping (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+    ) {
+        guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+              let trust = challenge.protectionSpace.serverTrust,
+              StashTrustDelegate.acceptsSelfSigned(host: challenge.protectionSpace.host) else {
+            completionHandler(.performDefaultHandling, nil)
+            return
+        }
+        completionHandler(.useCredential, URLCredential(trust: trust))
+    }
+
     nonisolated func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) {
         guard let (id, destination) = taskMap.get(downloadTask.taskIdentifier) else { return }
         
