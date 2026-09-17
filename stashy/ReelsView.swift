@@ -2512,7 +2512,8 @@ struct ReelsViewBody: View {
                     if !isInitialized {
                         handleOnAppear()
                     } else {
-                        reelsResumePlaybackAfterReturn()
+                        // Same as coming back from the background: paused at the saved spot.
+                        reelsResumePlaybackAfterReturn(autoplay: false)
                     }
                 } else if oldTab == .reels {
                     reelsStopPlaybackAndAccessories()
@@ -3243,8 +3244,8 @@ struct ReelsViewBody: View {
     }
 
     /// Resume scroll item + mid-clip time and continue autoplay after returning to Feeds.
-    /// `autoplay` false: back from the app background — re-arm everything but leave the item
-    /// paused, so nothing starts on its own. A tab switch back into Feeds keeps autoplaying.
+    /// `autoplay` false: back from the app background or from another tab — re-arm everything
+    /// but leave the item paused, so nothing starts on its own.
     private func reelsResumePlaybackAfterReturn(autoplay: Bool = true) {
         guard coordinator.selectedTab == .reels, !isBeingReplaced else { return }
 
@@ -3569,9 +3570,10 @@ struct ReelsViewBody: View {
         let restoredCriterionOverlay = hasActiveCriterionOverlay
 
         // After the first full setup, re-onAppear must NOT re-run session restore /
-        // autoSelectFirstItem (that reset scroll). Just resume autoplay + seek.
+        // autoSelectFirstItem (that reset scroll). Back from another tab or page the item
+        // comes back paused at its spot, the same as after the app background.
         if isInitialized {
-            reelsResumePlaybackAfterReturn()
+            reelsResumePlaybackAfterReturn(autoplay: false)
             return
         }
 
