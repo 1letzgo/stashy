@@ -455,15 +455,13 @@ struct MergeToolsView<Item: MergeableItem>: View {
 
             if !presets.presets.isEmpty {
                 presetRow
+                    .padding(.top, DesignTokens.Spacing.xs)
             }
-
-            // The search sits with the list it filters, right above it.
-            MergeSearchField(text: $searchText)
-                .padding(.top, DesignTokens.Spacing.xs)
         }
         .padding(.horizontal, DesignTokens.Tools.contentPadding)
         .padding(.top, DesignTokens.Tools.menuTopPadding)
-        .padding(.bottom, DesignTokens.Spacing.sm)
+        // Same air below the header as between Settings' groups.
+        .padding(.bottom, DesignTokens.Spacing.md)
         .background(Color.appBackground(for: appearance.currentTheme))
     }
 
@@ -550,6 +548,28 @@ struct MergeToolsView<Item: MergeableItem>: View {
     private var listCard: some View {
         ScrollView {
             LazyVStack(spacing: 0) {
+                // The search is the card's first row, above the rows it filters.
+                HStack(spacing: DesignTokens.Spacing.xs) {
+                    Image(systemName: "magnifyingglass")
+                        .foregroundColor(.secondary)
+                    TextField("Search \(config.nounPlural)", text: $searchText)
+                        .textInputAutocapitalization(.never)
+                        .disableAutocorrection(true)
+                    if !searchText.isEmpty {
+                        Button {
+                            searchText = ""
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.secondary)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Clear search")
+                    }
+                }
+                .padding(.horizontal, DesignTokens.Spacing.md)
+                .padding(.vertical, DesignTokens.Spacing.sm)
+                Divider()
+                    .overlay(Color.primary.opacity(0.15))
                 if isLoading && allItems.isEmpty {
                     HStack { Spacer(); ProgressView("Loading..."); Spacer() }
                         .padding(.vertical, DesignTokens.Spacing.lg)

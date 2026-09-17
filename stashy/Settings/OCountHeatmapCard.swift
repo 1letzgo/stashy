@@ -220,11 +220,7 @@ struct OCountHeatmapCard: View {
 
     private func dayItemsSection(title: String, items: [OCountHeatmapItem]) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-                .textCase(.uppercase)
-                .padding(.horizontal, 4)
+            StashySectionHeading(title: title)
 
             LazyVGrid(columns: DesignTokens.Tools.rankedColumns(for: horizontalSizeClass), spacing: 8) {
                 ForEach(items) { item in

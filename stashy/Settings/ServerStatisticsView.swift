@@ -183,25 +183,24 @@ struct ServerStatisticsView: View {
         }
     }
 
+    /// Category heading above the card, as in Settings — not a title inside it.
     private func statsCard<Content: View>(title: String, @ViewBuilder content: () -> Content) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            Text(title)
-                .font(.title3)
-                .fontWeight(.semibold)
-                .padding(.horizontal, 12)
-                .padding(.top, 8)
+            StashySectionHeading(title: title)
 
-            content()
-                .padding(.bottom, 4)
+            VStack(alignment: .leading, spacing: 8) {
+                content()
+            }
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Color.secondaryAppBackground(for: appearance.currentTheme))
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .overlay(
+                RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
+                    .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
+            )
+            .cardShadow()
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.secondaryAppBackground(for: appearance.currentTheme))
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-        .overlay(
-            RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card)
-                .stroke(Color.primary.opacity(0.1), lineWidth: 0.5)
-        )
-        .cardShadow()
     }
 
     // MARK: - Data

@@ -916,6 +916,20 @@ extension View {
 
 
 #if !os(tvOS)
+/// Small caps category heading — the look of Settings' `stashyScrollingSectionHeader`, for
+/// screens that are not a `List`. Sits above a card, flush with its leading edge, 8 pt above it.
+struct StashySectionHeading: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.footnote)
+            .foregroundStyle(.secondary)
+            .textCase(.uppercase)
+            .frame(maxWidth: .infinity, alignment: .leading)
+    }
+}
+
 /// The one search field every Tools screen uses — built after Tools › Filters: magnifier,
 /// field, clear button, on the secondary background with the card radius.
 struct ToolsSearchField: View {

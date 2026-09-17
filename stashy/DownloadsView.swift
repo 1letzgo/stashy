@@ -70,7 +70,7 @@ struct DownloadsView: View {
                             .sorted { $0.title < $1.title }
 
                         if !active.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 8) {
                                 downloadsSectionHeading("Active Downloads")
                                 VStack(spacing: 12) {
                                     ForEach(active, id: \.id) { download in
@@ -82,7 +82,7 @@ struct DownloadsView: View {
                         }
 
                         if !queued.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 8) {
                                 downloadsSectionHeading("Queued")
                                 VStack(spacing: 12) {
                                     ForEach(queued, id: \.id) { download in
@@ -95,7 +95,7 @@ struct DownloadsView: View {
 
                         // Completed Downloads Section
                         if !filteredSceneDownloads.isEmpty {
-                            VStack(alignment: .leading, spacing: 12) {
+                            VStack(alignment: .leading, spacing: 8) {
                                 downloadsSectionHeading("Scenes")
                                 
                                 LazyVGrid(columns: columns, spacing: 12) {
@@ -1093,7 +1093,7 @@ struct OfflineWrappedHStack<Data: RandomAccessCollection, Content: View>: View w
 extension DownloadsView {
     @ViewBuilder
     func downloadSection(_ title: String, entries: [DownloadedGallery]) -> some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 8) {
             downloadsSectionHeading(title)
 
             LazyVGrid(columns: columns, spacing: 12) {
@@ -1130,10 +1130,7 @@ extension DownloadsView {
     /// Small caps footnote, flush with the content edge — same header look as the other Tools.
     @ViewBuilder
     func downloadsSectionHeading(_ title: String) -> some View {
-        Text(title)
-            .font(.footnote)
-            .foregroundStyle(.secondary)
-            .textCase(.uppercase)
+        StashySectionHeading(title: title)
             .padding(.horizontal, DesignTokens.Tools.contentPadding)
     }
 }
