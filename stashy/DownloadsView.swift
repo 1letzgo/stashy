@@ -247,7 +247,7 @@ struct DownloadsView: View {
                                         .font(.footnote.weight(.medium))
                                         .lineLimit(1)
                                 }
-                                Text("newest \(job.amount) \(job.kind.label)")
+                                Text(job.amountLabel)
                                     .font(.caption2)
                                     .lineLimit(1)
                                     .opacity(0.75)
@@ -298,6 +298,7 @@ private struct DownloadSyncJobSheet: View {
     @ObservedObject private var appearance = AppearanceManager.shared
     @State private var selectedFilterId: String?
     @State private var amount: Int = 5
+    @State private var downloadsEverything = false
     @State private var search = ""
 
     private var usableFilters: [StashDBViewModel.SavedFilter] {
@@ -348,8 +349,16 @@ private struct DownloadSyncJobSheet: View {
                 }
 
                 Section {
-                    Stepper("Newest \(amount)", value: $amount, in: 1...500, step: amount < 20 ? 1 : 10)
-                        .listRowBackground(Color.secondaryAppBackground(for: appearance.currentTheme))
+                    Toggle(isOn: $downloadsEverything) {
+                        Text("All matching items")
+                    }
+                    .tint(appearance.tintColor)
+                    .listRowBackground(Color.secondaryAppBackground(for: appearance.currentTheme))
+
+                    if !downloadsEverything {
+                        Stepper("Newest \(amount)", value: $amount, in: 1...500, step: amount < 20 ? 1 : 10)
+                            .listRowBackground(Color.secondaryAppBackground(for: appearance.currentTheme))
+                    }
                 } header: {
                     sectionHeader("Amount per run")
                 }
@@ -369,7 +378,7 @@ private struct DownloadSyncJobSheet: View {
                         filterId: id,
                         filterName: filter.name,
                         kind: filter.mode == .images ? .images : .scenes,
-                        amount: amount
+                        amount: downloadsEverything ? 0 : amount
                     ))
                     dismiss()
                 } label: {

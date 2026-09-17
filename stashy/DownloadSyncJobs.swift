@@ -24,8 +24,16 @@ struct DownloadSyncJob: Codable, Identifiable, Equatable {
     var filterId: String
     var filterName: String
     var kind: Kind
-    /// How many of the newest matching items one run fetches.
+    /// How many of the newest matching items one run fetches. 0 means everything the filter
+    /// matches.
     var amount: Int
+
+    var downloadsEverything: Bool { amount <= 0 }
+
+    /// Subtitle of the job pill.
+    var amountLabel: String {
+        downloadsEverything ? "all \(kind.label)" : "newest \(amount) \(kind.label)"
+    }
 
     init(id: String = UUID().uuidString, filterId: String, filterName: String, kind: Kind, amount: Int) {
         self.id = id
@@ -99,11 +107,12 @@ enum DownloadSyncJobRunner {
             return
         }
         let criteria = viewModel.sanitizeFilter(filter.filterDict ?? [:])
+        let limit: Int? = job.downloadsEverything ? nil : job.amount
         switch job.kind {
         case .scenes:
             DownloadManager.shared.downloadScenes(
                 for: .savedFilter(sceneFilter: criteria),
-                limit: job.amount,
+                limit: limit,
                 scopeName: job.filterName
             )
         case .images:
@@ -111,7 +120,7 @@ enum DownloadSyncJobRunner {
                 filterId: job.filterId,
                 filterName: job.filterName,
                 imageFilter: criteria,
-                limit: job.amount
+                limit: limit
             )
         }
     }
