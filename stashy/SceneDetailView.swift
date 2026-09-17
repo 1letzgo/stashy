@@ -54,6 +54,9 @@ struct SceneDetailView: View {
     @State private var tagsTotalHeight: CGFloat = 0
     @State private var isMuted = ScenePlayerMute.initialValue()
     @State private var hasAddedPlay = false
+    /// Set when the page is left while the video plays (another tab, a pushed page). The engine
+    /// is torn down then, so coming back starts it again at the position it had.
+    @State private var resumeOnReturn: (wasPlaying: Bool, position: Double)?
     /// The transcode-fallback toast is shown once per screen, not once per rung.
     @State private var didAnnounceTranscodeFallback = false
     @State private var showingAddMarkerSheet = false
@@ -772,6 +775,21 @@ struct SceneDetailView: View {
             configureSubtitles()
         }
         
+        // Back from another tab or a pushed page: the video played when it was left, so it plays
+        // on from the same spot instead of waiting on the cover.
+        if let pending = resumeOnReturn {
+            resumeOnReturn = nil
+            if pending.position > 1 {
+                activeScene = activeScene.withResumeTime(pending.position)
+            }
+            if pending.wasPlaying {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    if !isPlaybackStarted { startPlayback(resume: true) }
+                }
+            }
+            return
+        }
+
         // Removed automatic setupScene to enforce manual activation unless explicitly requested via autoPlay
         if autoPlay {
             DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
@@ -817,6 +835,9 @@ struct SceneDetailView: View {
 
         activeScene.postListMetadataUpdated()
 
+        if let aether = aetherEngine, isPlaybackStarted {
+            resumeOnReturn = (aether.isPlaying, aether.currentTime)
+        }
         aetherEngine?.pause()
         StashSyncManager.shared.stop()
         if handyManager.isSyncing || handyManager.isStashSyncMode { handyManager.pause() }
@@ -831,6 +852,8 @@ struct SceneDetailView: View {
         // `@State` release is not deterministic, so the engine is torn down explicitly.
         aetherEngine?.stop()
         aetherEngine = nil
+        // The player surface has no engine behind it any more; show the cover until return.
+        isPlaybackStarted = false
     }
 
     private func persistPlaybackActivity(stopTracking: Bool) {
