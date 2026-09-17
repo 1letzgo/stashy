@@ -53,10 +53,10 @@ enum GraphQLNetworkError: LocalizedError {
 
 // MARK: - SSL Trust Delegate
 
-/// Accepts self-signed certificates for local/private Stash servers and the
-/// explicitly whitelisted domains. Everything else falls back to standard TLS validation.
+/// Accepts self-signed certificates for local / private Stash servers only. Every public host
+/// — domain or IP — falls back to standard TLS validation, so nothing on the internet can
+/// present a forged certificate.
 final class StashTrustDelegate: NSObject, URLSessionDelegate {
-    static let whitelistedHosts: Set<String> = ["gole.tz"]
 
     func urlSession(
         _ session: URLSession,
@@ -76,22 +76,39 @@ final class StashTrustDelegate: NSObject, URLSessionDelegate {
         }
     }
 
+    /// True for hosts that can only be reached from the local network: loopback, mDNS (`.local`),
+    /// the private IPv4 ranges, the CGNAT range Tailscale uses, and private / link-local IPv6.
     static func acceptsSelfSigned(host: String) -> Bool {
-        let normalizedHost = host.lowercased()
-        if whitelistedHosts.contains(normalizedHost) { return true }
-        if normalizedHost == "localhost" || normalizedHost == "::1" || normalizedHost.hasSuffix(".local") { return true }
-        if normalizedHost.hasPrefix("127.") { return true }
-        if normalizedHost.hasPrefix("10.") { return true }
-        if normalizedHost.hasPrefix("192.168.") { return true }
-        if isPrivate172Range(normalizedHost) { return true }
-        return false
+        var normalizedHost = host.lowercased()
+        // URL hosts may carry IPv6 brackets and a zone id ("[fe80::1%en0]").
+        normalizedHost = normalizedHost.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
+        if let zone = normalizedHost.firstIndex(of: "%") {
+            normalizedHost = String(normalizedHost[..<zone])
+        }
+
+        if normalizedHost == "localhost" || normalizedHost.hasSuffix(".local") { return true }
+        if normalizedHost.contains(":") { return isLocalIPv6(normalizedHost) }
+
+        let octets = normalizedHost.split(separator: ".").compactMap { Int($0) }
+        guard octets.count == 4, octets.allSatisfy({ (0...255).contains($0) }) else { return false }
+        switch (octets[0], octets[1]) {
+        case (127, _), (10, _): return true
+        case (192, 168): return true
+        case (172, 16...31): return true
+        // 100.64.0.0/10 — carrier-grade NAT, the range Tailscale hands out.
+        case (100, 64...127): return true
+        default: return false
+        }
     }
 
-    private static func isPrivate172Range(_ host: String) -> Bool {
-        guard host.hasPrefix("172.") else { return false }
-        let octets = host.split(separator: ".").compactMap { Int($0) }
-        guard octets.count >= 2 else { return false }
-        return octets[1] >= 16 && octets[1] <= 31
+    /// `::1`, unique local `fc00::/7` (fc…, fd…) and link-local `fe80::/10` (fe8…–feb…).
+    private static func isLocalIPv6(_ host: String) -> Bool {
+        if host == "::1" { return true }
+        let firstGroup = host.split(separator: ":", omittingEmptySubsequences: false).first.map(String.init) ?? ""
+        guard !firstGroup.isEmpty, let value = UInt16(firstGroup, radix: 16) else { return false }
+        if value & 0xFE00 == 0xFC00 { return true }
+        if value & 0xFFC0 == 0xFE80 { return true }
+        return false
     }
 }
 

@@ -60,7 +60,7 @@ No test target is wired into the Xcode project. `stashyTests/` holds Swift Testi
 
 1. **Network**: `GraphQLClient`
    - Actor-based for thread safety
-   - Shared `StashTrustDelegate` (GraphQLClient.swift) accepts self-signed certs for localhost/private IPs + `gole.tz`; used by GraphQLClient, ImageCacheManager, and `StashNetworking.session`
+   - Shared `StashTrustDelegate` (GraphQLClient.swift) accepts self-signed certs only for local hosts (localhost, `.local`, private IPv4, Tailscale 100.64/10, private/link-local IPv6); used by GraphQLClient, ImageCacheManager, `StashNetworking.session` and the download session
    - `withDatabaseRetry` auto-retries "database is locked" (execute, executeRaw, performMutation)
    - Typed envelope validation: errors with null data are fatal, partial errors tolerated
    - Requests outside GraphQLClient use `stashRequest(to:config:)` + `StashNetworking.session`
@@ -126,7 +126,7 @@ The `stashy` target uses classic Xcode groups — update `project.pbxproj` in 4 
 - Tint: `kTintColorRed`, `kTintColorGreen`, `kTintColorBlue`, `kTintColorAlpha`
 
 ## SSL and Local Servers
-`GraphQLClient` and `ImageCacheManager` share a URLSession delegate that accepts self-signed certs for localhost/private IP ranges and whitelists `gole.tz` (test server) — required for local Stash servers.
+`StashTrustDelegate.acceptsSelfSigned` decides which hosts may present a self-signed certificate: localhost, `.local`, private IPv4 ranges, Tailscale's 100.64.0.0/10 and private / link-local IPv6. No public domain is whitelisted; every other host gets standard TLS validation.
 
 ## Migration and Backward Compatibility
 `ServerConfig` decodes the legacy format (connectionType, ipAddress, domain, useHTTPS) and migrates to the unified one (serverAddress, port, serverProtocol). API keys auto-migrate from UserDefaults to Keychain on iOS.

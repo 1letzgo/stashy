@@ -33,9 +33,20 @@ struct StashTrustDelegateTests {
         #expect(!StashTrustDelegate.acceptsSelfSigned(host: "193.168.1.1"))
     }
 
-    @Test func acceptsExplicitlyWhitelistedHosts() {
-        #expect(StashTrustDelegate.acceptsSelfSigned(host: "gole.tz"))
-        #expect(StashTrustDelegate.acceptsSelfSigned(host: "GOLE.TZ"))
+    @Test func noHardcodedPublicDomain() {
+        #expect(!StashTrustDelegate.acceptsSelfSigned(host: "gole.tz"))
+        #expect(!StashTrustDelegate.acceptsSelfSigned(host: "stashytest.gole.tz"))
+    }
+
+    @Test func acceptsTailscaleAndLocalIPv6() {
+        #expect(StashTrustDelegate.acceptsSelfSigned(host: "100.64.0.1"))
+        #expect(StashTrustDelegate.acceptsSelfSigned(host: "100.127.255.254"))
+        #expect(!StashTrustDelegate.acceptsSelfSigned(host: "100.63.0.1"))
+        #expect(!StashTrustDelegate.acceptsSelfSigned(host: "100.128.0.1"))
+        #expect(StashTrustDelegate.acceptsSelfSigned(host: "::1"))
+        #expect(StashTrustDelegate.acceptsSelfSigned(host: "fd12:3456::1"))
+        #expect(StashTrustDelegate.acceptsSelfSigned(host: "[fe80::1%en0]"))
+        #expect(!StashTrustDelegate.acceptsSelfSigned(host: "2001:db8::1"))
     }
 }
 
