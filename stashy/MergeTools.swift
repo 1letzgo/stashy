@@ -444,8 +444,11 @@ struct MergeToolsView<Item: MergeableItem>: View {
                         .font(.caption.weight(.semibold))
                         .foregroundColor(.secondary)
                 }
-                .padding(.horizontal, DesignTokens.Spacing.md)
-                .padding(.vertical, DesignTokens.Spacing.sm)
+                // Same insets as ToolsSearchField, and a text line as tall as its TextField
+                // (22 pt), so the empty field matches the search field of Tools › Filters.
+                .frame(minHeight: 22)
+                .padding(.horizontal, DesignTokens.Spacing.sm)
+                .padding(.vertical, DesignTokens.Spacing.xs + 2)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(Color.secondaryAppBackground)
                 .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
