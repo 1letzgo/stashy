@@ -164,9 +164,13 @@ struct DownloadsView: View {
     @ViewBuilder
     private func activeDownloadRow(_ download: ActiveDownload) -> some View {
         VStack(alignment: .leading, spacing: 6) {
-            Text(download.title)
-                .font(.subheadline.weight(.medium))
-                .lineLimit(1)
+            HStack(spacing: DesignTokens.Spacing.sm) {
+                Text(download.title)
+                    .font(.subheadline.weight(.medium))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+                cancelButton(for: download)
+            }
             // Images count files, scene files count bytes — both report a fraction.
             ProgressView(value: min(max(download.progress, 0), 1))
                 .tint(appearanceManager.tintColor)
@@ -196,6 +200,19 @@ struct DownloadsView: View {
         return parts.joined(separator: " · ")
     }
 
+    private func cancelButton(for download: ActiveDownload) -> some View {
+        Button {
+            HapticManager.light()
+            downloadManager.cancelActiveDownload(id: download.id)
+        } label: {
+            Image(systemName: "xmark.circle.fill")
+                .font(.title3)
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Cancel download")
+    }
+
     /// Waiting for one of the two transfer slots.
     @ViewBuilder
     private func queuedDownloadRow(_ download: ActiveDownload) -> some View {
@@ -209,6 +226,7 @@ struct DownloadsView: View {
             Text("Queued")
                 .font(.caption2)
                 .foregroundColor(.secondary)
+            cancelButton(for: download)
         }
         .padding()
         .frame(maxWidth: .infinity, alignment: .leading)

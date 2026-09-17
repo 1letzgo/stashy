@@ -10920,6 +10920,16 @@ class DownloadManager: NSObject, ObservableObject {
     }
 
     /// Cancels an in-flight download (video + thumbnail tasks) and cleans up partial data.
+    /// Cancel for whatever the Active / Queued rows show: a scene transfer (running or still
+    /// waiting) or a gallery / tag / filter image batch.
+    func cancelActiveDownload(id: String) {
+        if runningSceneIds.contains(id) || sceneQueue.contains(where: { $0.id == id }) {
+            cancelDownload(id: id)
+        } else {
+            cancelGalleryDownload(id: id)
+        }
+    }
+
     func cancelDownload(id: String) {
         guard activeDownloads[id] != nil else { return }
 
