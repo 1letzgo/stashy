@@ -369,7 +369,7 @@ private struct DownloadSyncJobSheet: View {
             .scrollContentBackground(.hidden)
             .background(Color.appBackground(for: appearance.currentTheme))
             // Room for the pinned save button below the form.
-            .contentMargins(.bottom, 80, for: .scrollContent)
+            .contentMargins(.bottom, 12, for: .scrollContent)
             .stashyModalSheetChrome("New sync job", onBack: { dismiss() })
             .safeAreaInset(edge: .bottom) {
                 Button {
@@ -392,6 +392,8 @@ private struct DownloadSyncJobSheet: View {
                 .buttonStyle(.plain)
                 .disabled(selectedFilterId == nil)
                 .padding(.horizontal, DesignTokens.Tools.contentPadding)
+                // Just enough air above so the button does not touch the last row.
+                .padding(.top, 6)
                 .padding(.bottom, 12)
                 .background(Color.appBackground(for: appearance.currentTheme))
             }
