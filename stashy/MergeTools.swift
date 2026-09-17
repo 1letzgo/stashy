@@ -416,6 +416,10 @@ struct MergeToolsView<Item: MergeableItem>: View {
     /// sichtbar bleiben, worauf gemerged wird und wonach gefiltert ist.
     private var pinnedHeader: some View {
         VStack(alignment: .leading, spacing: DesignTokens.Spacing.xs) {
+            // Search first, as in Tools › Filters — the field is the top element of every tool.
+            MergeSearchField(text: $searchText)
+                .padding(.bottom, DesignTokens.Spacing.xs)
+
             sectionHeading("Merge into")
 
             Button {
@@ -438,7 +442,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
                     Spacer()
 
                     Image(systemName: "chevron.right")
-                        .font(.footnote.weight(.semibold))
+                        .font(.caption.weight(.semibold))
                         .foregroundColor(.secondary)
                 }
                 .padding(.horizontal, DesignTokens.Spacing.md)
@@ -453,11 +457,6 @@ struct MergeToolsView<Item: MergeableItem>: View {
             if !presets.presets.isEmpty {
                 presetRow
             }
-
-            sectionHeading("Search \(nounTitle)")
-                .padding(.top, DesignTokens.Spacing.xs)
-
-            MergeSearchField(text: $searchText)
         }
         .padding(.horizontal, DesignTokens.Tools.contentPadding)
         .padding(.top, DesignTokens.Tools.menuTopPadding)
@@ -544,9 +543,10 @@ struct MergeToolsView<Item: MergeableItem>: View {
     /// Gleicher Small-Caps-Header wie in den anderen Tools (`stashyScrollingSectionHeader`),
     /// bündig mit der Kartenkante — kein zusätzlicher Einzug.
     private func sectionHeading(_ title: String) -> some View {
-        Text(title.uppercased())
+        Text(title)
             .font(.footnote)
             .foregroundStyle(.secondary)
+            .textCase(.uppercase)
     }
 
     // MARK: List
@@ -601,6 +601,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
             }
             .background(Color.secondaryAppBackground)
             .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
+            .cardShadow()
             .padding(.horizontal, DesignTokens.Tools.contentPadding)
             .padding(.bottom, DesignTokens.Spacing.sm)
         }
@@ -1013,32 +1014,13 @@ private struct MergeDestinationSheet<Item: MergeableItem>: View {
 
 // MARK: - Search field
 
-/// Eine Suchleiste für beide Listen — Tool-Seite und Ziel-Auswahl.
+/// Eine Suchleiste für beide Listen — Tool-Seite und Ziel-Auswahl. Dasselbe Feld wie in
+/// Tools › Filters.
 private struct MergeSearchField: View {
     @Binding var text: String
 
     var body: some View {
-        HStack(spacing: DesignTokens.Spacing.xs) {
-            Image(systemName: "magnifyingglass")
-                .foregroundColor(.secondary)
-            TextField("Search...", text: $text)
-                .textInputAutocapitalization(.never)
-                .disableAutocorrection(true)
-            if !text.isEmpty {
-                Button {
-                    text = ""
-                } label: {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundColor(.secondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Clear search")
-            }
-        }
-        .padding(.horizontal, DesignTokens.Spacing.md)
-        .padding(.vertical, DesignTokens.Spacing.sm)
-        .background(Color.secondaryAppBackground)
-        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card, style: .continuous))
+        ToolsSearchField(prompt: "Search…", text: $text)
     }
 }
 

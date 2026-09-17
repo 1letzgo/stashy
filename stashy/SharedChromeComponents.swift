@@ -913,3 +913,51 @@ extension View {
 }
 
 #endif
+
+
+#if !os(tvOS)
+/// The one search field every Tools screen uses — built after Tools › Filters: magnifier,
+/// field, clear button, on the secondary background with the card radius.
+struct ToolsSearchField: View {
+    let prompt: String
+    @Binding var text: String
+
+    var body: some View {
+        HStack(spacing: DesignTokens.Spacing.xs) {
+            Image(systemName: "magnifyingglass")
+                .foregroundColor(.secondary)
+            TextField(prompt, text: $text)
+                .textInputAutocapitalization(.never)
+                .disableAutocorrection(true)
+            if !text.isEmpty {
+                Button {
+                    text = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundColor(.secondary)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Clear search")
+            }
+        }
+        .padding(.horizontal, DesignTokens.Spacing.sm)
+        .padding(.vertical, DesignTokens.Spacing.xs + 2)
+        .background(Color.secondaryAppBackground)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+    }
+}
+
+/// Round tinted "+" next to a Tools search field, as in Tools › Filters.
+struct ToolsAddButtonLabel: View {
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        Image(systemName: "plus")
+            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+            .foregroundColor(.white)
+            .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
+            .background(appearance.tintColor)
+            .clipShape(Circle())
+    }
+}
+#endif

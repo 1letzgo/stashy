@@ -280,36 +280,11 @@ private struct FiltersToolsSearchChromeModifier<MenuItems: View>: ViewModifier {
         content
             .safeAreaInset(edge: .top, spacing: 0) {
                 HStack(spacing: DesignTokens.Spacing.sm) {
-                    HStack(spacing: DesignTokens.Spacing.xs) {
-                        Image(systemName: "magnifyingglass")
-                            .foregroundColor(.secondary)
-                        TextField("Search filters", text: $searchText)
-                            .textInputAutocapitalization(.never)
-                            .disableAutocorrection(true)
-                        if !searchText.isEmpty {
-                            Button {
-                                searchText = ""
-                            } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundColor(.secondary)
-                            }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("Clear search")
-                        }
-                    }
-                    .padding(.horizontal, DesignTokens.Spacing.sm)
-                    .padding(.vertical, DesignTokens.Spacing.xs + 2)
-                    .background(Color.secondaryAppBackground(for: appearance.currentTheme))
-                    .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+                    ToolsSearchField(prompt: "Search filters", text: $searchText)
                     Menu {
                         addMenuItems()
                     } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
-                            .foregroundColor(.white)
-                            .frame(width: StashyExpandingDock.circleSize, height: StashyExpandingDock.circleSize)
-                            .background(appearance.tintColor)
-                            .clipShape(Circle())
+                        ToolsAddButtonLabel()
                     }
                     .accessibilityLabel("New filter")
                 }

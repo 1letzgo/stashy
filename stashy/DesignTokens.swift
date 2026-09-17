@@ -54,7 +54,9 @@ enum DesignTokens {
     enum Tools {
         static let contentPadding: CGFloat = Spacing.md
         static let regularContentPadding: CGFloat = Spacing.xl
-        static let menuTopPadding: CGFloat = Spacing.sm
+        /// Space above a tool's first row. Together with `Chrome.contentTopGap` (8) it puts the
+        /// first element 16 pt under the chrome — the gap Scene Detail leaves above its first card.
+        static let menuTopPadding: CGFloat = Spacing.xs
         static let menuBottomPadding: CGFloat = Spacing.sm
         static let regularMaxContentWidth: CGFloat = 1100
         static let rankedGridSpacing: CGFloat = 12

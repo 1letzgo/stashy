@@ -16,6 +16,7 @@ struct DownloadsView: View {
     @StateObject private var viewModel = StashDBViewModel()
 
     @State private var gridWidth: CGFloat = 0
+    @State private var searchText = ""
     @State private var showingJobSheet = false
     @State private var showingRunAllConfirmation = false
     @State private var jobToDelete: DownloadSyncJob?
@@ -34,7 +35,10 @@ struct DownloadsView: View {
             Color.appBackground.ignoresSafeArea()
 
             VStack(spacing: 0) {
-            syncJobRow
+            searchChrome
+            if !jobStore.jobs.isEmpty {
+                syncJobRow
+            }
 
             if downloadManager.downloads.isEmpty && downloadManager.galleryDownloads.isEmpty && downloadManager.activeDownloads.isEmpty {
                 VStack(spacing: 20) {
@@ -90,12 +94,12 @@ struct DownloadsView: View {
                         }
 
                         // Completed Downloads Section
-                        if !downloadManager.downloads.isEmpty {
+                        if !filteredSceneDownloads.isEmpty {
                             VStack(alignment: .leading, spacing: 12) {
                                 downloadsSectionHeading("Scenes")
                                 
                                 LazyVGrid(columns: columns, spacing: 12) {
-                                    ForEach(downloadManager.downloads) { downloaded in
+                                    ForEach(filteredSceneDownloads) { downloaded in
                                         NavigationLink(destination: DownloadDetailView(downloaded: downloaded)) {
                                             DownloadedSceneCard(downloaded: downloaded)
                                         }
@@ -112,8 +116,8 @@ struct DownloadsView: View {
                             }
                         }
 
-                        let galleryEntries = downloadManager.galleryDownloads.filter { $0.resolvedKind != .tag }
-                        let tagEntries = downloadManager.galleryDownloads.filter { $0.resolvedKind == .tag }
+                        let galleryEntries = filteredGalleryDownloads.filter { $0.resolvedKind != .tag }
+                        let tagEntries = filteredGalleryDownloads.filter { $0.resolvedKind == .tag }
 
                         if !galleryEntries.isEmpty {
                             downloadSection("Galleries & Images", entries: galleryEntries)
@@ -212,6 +216,45 @@ struct DownloadsView: View {
         .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
     }
 
+    // MARK: - Search chrome
+
+    private var trimmedSearch: String {
+        searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private var filteredSceneDownloads: [DownloadedScene] {
+        guard !trimmedSearch.isEmpty else { return downloadManager.downloads }
+        return downloadManager.downloads.filter {
+            ($0.title ?? "").localizedCaseInsensitiveContains(trimmedSearch)
+                || ($0.studioName ?? "").localizedCaseInsensitiveContains(trimmedSearch)
+                || $0.performerNames.contains { $0.localizedCaseInsensitiveContains(trimmedSearch) }
+        }
+    }
+
+    private var filteredGalleryDownloads: [DownloadedGallery] {
+        guard !trimmedSearch.isEmpty else { return downloadManager.galleryDownloads }
+        return downloadManager.galleryDownloads.filter {
+            $0.displayTitle.localizedCaseInsensitiveContains(trimmedSearch)
+        }
+    }
+
+    /// Search field plus the round "+" for a new sync job — the chrome Tools › Filters has.
+    private var searchChrome: some View {
+        HStack(spacing: DesignTokens.Spacing.sm) {
+            ToolsSearchField(prompt: "Search downloads", text: $searchText)
+            Button {
+                showingJobSheet = true
+            } label: {
+                ToolsAddButtonLabel()
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("New sync job")
+        }
+        .padding(.horizontal, DesignTokens.Tools.contentPadding)
+        .padding(.top, DesignTokens.Tools.menuTopPadding)
+        .padding(.bottom, DesignTokens.Spacing.xs + 2)
+    }
+
     // MARK: - Sync jobs
 
     /// Heading, run-all button and one pill per job — the same shape the merge templates use.
@@ -270,24 +313,12 @@ struct DownloadsView: View {
                         )
                     }
 
-                    Button {
-                        showingJobSheet = true
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundColor(appearanceManager.tintColor)
-                            .frame(width: 40, height: 44)
-                            .background(Color.secondaryAppBackground)
-                            .clipShape(Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("New sync job")
                 }
             }
         }
         .padding(.horizontal, DesignTokens.Tools.contentPadding)
         }
-        .padding(.top, DesignTokens.Tools.menuTopPadding)
+        .padding(.top, DesignTokens.Spacing.sm)
         .padding(.bottom, DesignTokens.Spacing.md)
     }
 }
@@ -315,8 +346,9 @@ private struct DownloadSyncJobSheet: View {
         NavigationView {
             List {
                 Section {
-                    TextField("Filter name", text: $search)
-                        .listRowBackground(Color.secondaryAppBackground(for: appearance.currentTheme))
+                    ToolsSearchField(prompt: "Search filters", text: $search)
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
                 } header: {
                     sectionHeader("Search …")
                 }
