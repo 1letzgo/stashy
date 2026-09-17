@@ -358,6 +358,9 @@ struct ReelsViewBody: View {
     /// Set once a remount is announced: this instance is about to be replaced and must not
     /// resume or restart playback in the meantime.
     @State private var isBeingReplaced = false
+    /// The app really went to the background (not just Control Center or a notification pulled
+    /// over it) — only then does Feeds come back paused.
+    @State private var didEnterBackground = false
     /// Reentrancy guard: SwiftUI can fire `onAppear` multiple times during tab
     /// remounts before `isInitialized` flips — each pass would re-bootstrap and
     /// reset arrays/players mid-mount (black first cell).
@@ -2515,6 +2518,9 @@ struct ReelsViewBody: View {
                     reelsStopPlaybackAndAccessories()
                 }
             }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+                didEnterBackground = true
+            }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.willResignActiveNotification)) { _ in
                 // iOS pauses playback on backgrounding but never tells SwiftUI, so
                 // `currentItemIsPlaying` would stay `true` over a paused player. Pausing here
@@ -2523,13 +2529,14 @@ struct ReelsViewBody: View {
                 reelsPausePlaybackForLocalTeardown()
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
-                // Same path the tab switch uses — re-arms the audio session, restores the
-                // checkpoint and re-asserts play intent. Without it Feeds came back paused
-                // while the button still read "playing", so the first tap only flipped the
-                // flag and a second one was needed to actually resume.
+                // Same path the tab switch uses — re-arms the audio session and restores the
+                // checkpoint — but back from the background the item stays paused. The button
+                // then reads "paused" as well, so one tap resumes.
+                let cameFromBackground = didEnterBackground
+                didEnterBackground = false
                 guard coordinator.selectedTab == .reels else { return }
                 guard isInitialized else { return }
-                reelsResumePlaybackAfterReturn()
+                reelsResumePlaybackAfterReturn(autoplay: !cameFromBackground)
             }
             .onChange(of: coordinator.reelsNavigationToken) { _, _ in
                 // Ignore token updates while Feeds is not visible — otherwise an
@@ -3236,7 +3243,9 @@ struct ReelsViewBody: View {
     }
 
     /// Resume scroll item + mid-clip time and continue autoplay after returning to Feeds.
-    private func reelsResumePlaybackAfterReturn() {
+    /// `autoplay` false: back from the app background — re-arm everything but leave the item
+    /// paused, so nothing starts on its own. A tab switch back into Feeds keeps autoplaying.
+    private func reelsResumePlaybackAfterReturn(autoplay: Bool = true) {
         guard coordinator.selectedTab == .reels, !isBeingReplaced else { return }
 
         ReelsPlayerRegistry.resumePlayback()
@@ -3259,6 +3268,17 @@ struct ReelsViewBody: View {
             restorePositionIfAvailable(for: reelsMode, forceIfPrefixMismatch: false)
             beginPagedRestoreIfNeeded()
             autoSelectFirstItem()
+        }
+
+        guard autoplay else {
+            // Paused at the saved spot: the play button shows, one tap resumes.
+            currentItemIsPlaying = false
+            DispatchQueue.main.async {
+                guard self.coordinator.selectedTab == .reels else { return }
+                self.isUserScrollingReels = false
+                self.applySavedPlaybackCheckpointIfMatching()
+            }
+            return
         }
 
         // Play first so the layer can decode a frame; seek follows on the next tick.

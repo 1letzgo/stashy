@@ -285,6 +285,10 @@ final class AetherSceneEngine: ObservableObject {
 
     private func bind() {
         #if os(iOS)
+        NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.pauseForBackgroundUnlessPictureInPicture() }
+            .store(in: &cancellables)
         NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)
             .receive(on: RunLoop.main)
             .sink { [weak self] _ in self?.resumeFromBackgroundIfNeeded() }
@@ -777,6 +781,16 @@ final class AetherSceneEngine: ObservableObject {
 
     /// iOS convention: an app that comes back from the background shows the paused frame and
     /// waits for the user. Rebuild the torn-down pipeline now so the picture is there, then pause.
+    /// Going to the background without a live Picture-in-Picture window pauses. The engine would
+    /// otherwise keep playing audio in the background (background playback follows the PiP
+    /// setting), and the video would still be running when the app came back.
+    private func pauseForBackgroundUnlessPictureInPicture() {
+        guard !engine.pictureInPictureActive else { return }
+        engine.pause()
+    }
+
+    /// Back from the background: a torn-down session is rebuilt but stays paused — the user
+    /// resumes it. Nothing ever starts playing on its own here.
     private func resumeFromBackgroundIfNeeded() {
         guard isSessionTornDown else { return }
         Task { [weak self] in
