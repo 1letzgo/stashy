@@ -112,6 +112,9 @@ final class ScenePlayerExtrasController: ObservableObject {
 
     private func updateScene(_ newValue: Scene) {
         sceneBinding?.wrappedValue = newValue
+        // The menu is data rebuilt on the host's next render; nudge it so a changed scene
+        // language shows up the next time the menu opens, in fullscreen as well.
+        objectWillChange.send()
     }
 
     // MARK: Menu
@@ -257,10 +260,18 @@ final class ScenePlayerExtrasController: ObservableObject {
 
         children.append(.separator(id: "extras.section.sceneLanguage", title: "Scene Language"))
         if isSceneLanguageSet {
-            children.append(.submenu(
-                id: "extras.language.collapsed",
+            // Set: the active language as a single checked row, and the full list only behind
+            // a separate "Change language" dropdown.
+            children.append(.action(
+                id: "extras.language.current",
                 title: selectedLanguageLabel,
                 systemImage: "globe",
+                isChecked: true
+            ) {})
+            children.append(.submenu(
+                id: "extras.language.change",
+                title: "Change language",
+                systemImage: "arrow.left.arrow.right",
                 items: languageRows
             ))
         } else if languageOptions.isEmpty {
