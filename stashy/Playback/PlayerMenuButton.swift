@@ -147,17 +147,43 @@ enum PlayerMenuBuilder {
         UIMenu(title: "", identifier: rootIdentifier, children: children(from: items))
     }
 
-    /// The open menu level rebuilt from fresh items: the root, or the submenu with the same id.
+    /// The open menu level updated from fresh items: the root, or the submenu with the same id.
     /// Used while the menu is on screen, so state changes show without closing it.
-    static func refreshed(_ visible: UIMenu, from items: [PlayerMenuItem]) -> UIMenu {
+    ///
+    /// UIKit hands every displayed level to the update block, root first. A level whose own rows
+    /// did not change is returned as it is — rebuilding the root would swap out the submenu the
+    /// user is looking at, and on device the old one then stays on screen. A changed level keeps
+    /// its identity and only gets new children.
+    static func refreshed(_ visible: UIMenu, from items: [PlayerMenuItem], previous: [PlayerMenuItem]) -> UIMenu {
+        let level: (new: [PlayerMenuItem], old: [PlayerMenuItem])?
         if visible.identifier == rootIdentifier {
-            return visible.replacingChildren(children(from: items))
+            level = (items, previous)
+        } else if case .submenu(let nested)? = submenuItem(id: visible.identifier.rawValue, in: items)?.kind {
+            let old: [PlayerMenuItem]
+            if case .submenu(let oldNested)? = submenuItem(id: visible.identifier.rawValue, in: previous)?.kind {
+                old = oldNested
+            } else {
+                old = []
+            }
+            level = (nested, old)
+        } else {
+            level = nil
         }
-        if let item = submenuItem(id: visible.identifier.rawValue, in: items),
-           let rebuilt = element(for: item) as? UIMenu {
-            return rebuilt
+        guard let level, levelSignature(level.new) != levelSignature(level.old) else { return visible }
+        return visible.replacingChildren(children(from: level.new))
+    }
+
+    /// What one menu level shows itself: its rows, and for submenus only their title line — a
+    /// change deeper down belongs to that submenu's own level.
+    private static func levelSignature(_ items: [PlayerMenuItem]) -> String {
+        items.map { item in
+            if case .submenu = item.kind {
+                return [item.id, item.title, item.systemImage ?? "", item.isDisabled ? "1" : "0", "s"]
+                    .joined(separator: "|")
+            }
+            return item.signature
         }
-        return visible
+        .joined(separator: ";")
     }
 
     private static func submenuItem(id: String, in items: [PlayerMenuItem]) -> PlayerMenuItem? {
@@ -224,6 +250,7 @@ struct PlayerMenuButton: UIViewRepresentable {
         button.addTarget(context.coordinator, action: #selector(Coordinator.touchDown), for: .touchDown)
         button.addTarget(context.coordinator, action: #selector(Coordinator.touchDown), for: .menuActionTriggered)
         context.coordinator.appliedSignature = items.menuSignature
+        context.coordinator.shownItems = items
         button.menu = PlayerMenuBuilder.menu(from: items)
         return button
     }
@@ -240,15 +267,18 @@ struct PlayerMenuButton: UIViewRepresentable {
         // präsentiertes Menü, sobald man es unter ihm austauscht. Die sichtbare Ebene wird
         // stattdessen live aktualisiert; das volle Menü folgt beim Schließen.
         guard !context.coordinator.isMenuVisible else {
+            let previous = context.coordinator.shownItems
             context.coordinator.pendingItems = items
+            context.coordinator.shownItems = items
             context.coordinator.appliedSignature = signature
             let items = items
             button.contextMenuInteraction?.updateVisibleMenu { visible in
-                PlayerMenuBuilder.refreshed(visible, from: items)
+                PlayerMenuBuilder.refreshed(visible, from: items, previous: previous)
             }
             return
         }
         context.coordinator.appliedSignature = signature
+        context.coordinator.shownItems = items
         button.menu = PlayerMenuBuilder.menu(from: items)
     }
 
@@ -258,6 +288,8 @@ struct PlayerMenuButton: UIViewRepresentable {
         var isMenuVisible = false
         var pendingItems: [PlayerMenuItem]?
         var appliedSignature = ""
+        /// The rows the open menu currently shows — the baseline for in-place updates.
+        var shownItems: [PlayerMenuItem] = []
 
         init(_ parent: PlayerMenuButton) {
             self.parent = parent
@@ -278,6 +310,7 @@ struct PlayerMenuButton: UIViewRepresentable {
             if let pendingItems {
                 self.pendingItems = nil
                 appliedSignature = pendingItems.menuSignature
+                shownItems = pendingItems
                 button.menu = PlayerMenuBuilder.menu(from: pendingItems)
             }
         }
