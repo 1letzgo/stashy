@@ -148,6 +148,13 @@ final class SceneLiveTranscriptionController: ObservableObject {
     private var isFlushingPendingSentence = false
     /// In-progress sentence from volatile ASR — shown at first-word time before finalization.
     private var draftCue: SubtitleCue?
+    /// Start / end / playhead of the line currently on screen. The forward probe below adapts
+    /// its lead, and a shrinking lead used to fall back from the newer line to the older one
+    /// that was still in range — old and new text then alternated. Selection only moves forward
+    /// while the playhead does.
+    private var shownCueStart: Double = -.greatestFiniteMagnitude
+    private var shownCueEnd: Double = -.greatestFiniteMagnitude
+    private var shownCueTime: Double = -.greatestFiniteMagnitude
     /// Extra seconds to bring captions forward when ASR consistently finishes late.
     private var adaptiveDisplayLead: Double = 0.8
 
@@ -532,11 +539,35 @@ final class SceneLiveTranscriptionController: ObservableObject {
         // shown exactly on their own timestamps. Only the realtime tap needs a forward bias, and
         // there it just means "show the late cue as soon as it exists".
         let probe = usesLookaheadFeed ? time : time + Self.displayLookaheadSeconds + adaptiveDisplayLead
-        if let draft = draftCue, probe >= draft.start && time < draft.end {
-            return draft.text
+
+        // A seek backwards (or a restart) starts selection afresh.
+        if time + 0.5 < shownCueTime {
+            shownCueStart = -.greatestFiniteMagnitude
+            shownCueEnd = -.greatestFiniteMagnitude
         }
-        if let cue = subtitleCues.last(where: { probe >= $0.start && time < $0.end }) {
-            return cue.displayText
+        shownCueTime = time
+
+        // Candidates in range; never one that starts before the line already shown while that
+        // line is still valid — that is the flip back to the older text.
+        let floor = time < shownCueEnd ? shownCueStart : -.greatestFiniteMagnitude
+        var bestStart = -Double.greatestFiniteMagnitude
+        var bestEnd = 0.0
+        var bestText: String?
+        if let draft = draftCue, probe >= draft.start, time < draft.end, draft.start >= floor {
+            bestStart = draft.start; bestEnd = draft.end; bestText = draft.text
+        }
+        for cue in subtitleCues where probe >= cue.start && time < cue.end && cue.start >= floor {
+            // The latest-starting line wins; a final cue replaces the draft of the same speech
+            // (which starts at practically the same moment).
+            let replacesDraft = draftCue.map { $0.start == bestStart } == true && cue.start >= bestStart - 0.05
+            if cue.start > bestStart || replacesDraft {
+                bestStart = cue.start; bestEnd = cue.end; bestText = cue.displayText
+            }
+        }
+        if let bestText {
+            shownCueStart = bestStart
+            shownCueEnd = bestEnd
+            return bestText
         }
         return ""
     }
@@ -1456,6 +1487,9 @@ final class SceneLiveTranscriptionController: ObservableObject {
         pendingSentenceWords = []
         isFlushingPendingSentence = false
         draftCue = nil
+        shownCueStart = -.greatestFiniteMagnitude
+        shownCueEnd = -.greatestFiniteMagnitude
+        shownCueTime = -.greatestFiniteMagnitude
         lineAccumulator.reset()
     }
 
