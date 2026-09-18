@@ -49,9 +49,11 @@ enum SceneLiveTranscriptionError: LocalizedError {
 
 /// Live transcription for Scene Detail.
 ///
-/// Audio reaches the recognizer through one of two tiers, in order of caption lag:
+/// Audio reaches the recognizer through one of three tiers, in order of caption lag:
 /// 1. `AVAssetReader` straight on a byte-range readable original (no server cost, zero lag),
-/// 2. the playback engine's realtime PCM tap, where the 1-2s recognition lag cannot be compensated.
+/// 2. a dedicated low-res Stash transcode pulled ahead of the playhead (works for MKV/AV1/HLS).
+///    Audio only, for the captions — playback itself still runs on the original file,
+/// 3. the playback engine's realtime PCM tap, where the 1-2s recognition lag cannot be compensated.
 @MainActor
 final class SceneLiveTranscriptionController: ObservableObject {
     static let preRollSeconds: Double = 2
@@ -127,6 +129,8 @@ final class SceneLiveTranscriptionController: ObservableObject {
     private var candidateURLs: [URL] = []
     private var generation: UInt = 0
     private var usesLookaheadFeed = false
+    /// Set when the dedicated transcode feed dies, so the restart lands on the engine tap.
+    private var transcodePrefetchFailed = false
     private var captionHoldUntil = Date.distantPast
     private static let captionHoldSeconds: TimeInterval = 2.2
     private static let maxCaptionCharacters = 160
@@ -296,6 +300,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
         isPreparing = false
         isTeleprompterReady = false
         usesLookaheadFeed = false
+        transcodePrefetchFailed = false
         cachedFeedSource = nil
         cachedLocaleResolution = nil
         seekRestartTask?.cancel()
@@ -547,27 +552,24 @@ final class SceneLiveTranscriptionController: ObservableObject {
         }
         shownCueTime = time
 
-        // Candidates in range; never one that starts before the line already shown while that
-        // line is still valid — that is the flip back to the older text.
+        // Final lines only move forward: while a final line is valid, no final line that started
+        // before it is picked again — that was the flip back to the older text. Drafts never set
+        // that floor, so the final version of a draft (whose start can shift a little once the
+        // recognizer settles) always replaces it.
         let floor = time < shownCueEnd ? shownCueStart : -.greatestFiniteMagnitude
-        var bestStart = -Double.greatestFiniteMagnitude
-        var bestEnd = 0.0
-        var bestText: String?
-        if let draft = draftCue, probe >= draft.start, time < draft.end, draft.start >= floor {
-            bestStart = draft.start; bestEnd = draft.end; bestText = draft.text
-        }
+        var bestCue: SubtitleCue?
         for cue in subtitleCues where probe >= cue.start && time < cue.end && cue.start >= floor {
-            // The latest-starting line wins; a final cue replaces the draft of the same speech
-            // (which starts at practically the same moment).
-            let replacesDraft = draftCue.map { $0.start == bestStart } == true && cue.start >= bestStart - 0.05
-            if cue.start > bestStart || replacesDraft {
-                bestStart = cue.start; bestEnd = cue.end; bestText = cue.displayText
-            }
+            if cue.start > (bestCue?.start ?? -.greatestFiniteMagnitude) { bestCue = cue }
         }
-        if let bestText {
-            shownCueStart = bestStart
-            shownCueEnd = bestEnd
-            return bestText
+        // A draft is newer speech than every final line, so it wins while it is in range.
+        let newestFinalStart = bestCue?.start ?? -.greatestFiniteMagnitude
+        if let draft = draftCue, probe >= draft.start, draft.end > time, draft.start > newestFinalStart {
+            return draft.text
+        }
+        if let bestCue {
+            shownCueStart = bestCue.start
+            shownCueEnd = bestCue.end
+            return bestCue.displayText
         }
         return ""
     }
@@ -716,6 +718,7 @@ final class SceneLiveTranscriptionController: ObservableObject {
         isPreparing = false
         isTeleprompterReady = false
         usesLookaheadFeed = false
+        transcodePrefetchFailed = false
         cachedFeedSource = nil
         cachedLocaleResolution = nil
         lastObservedPlayhead = nil
@@ -912,6 +915,16 @@ final class SceneLiveTranscriptionController: ObservableObject {
                     generation: generation
                 )
             }
+        case .transcodePrefetch(let sceneID):
+            feedTask = Task { [weak self] in
+                await self?.transcodePrefetchFeedLoop(
+                    sceneID: sceneID,
+                    localStart: localStart,
+                    targetFormat: format,
+                    input: continuation,
+                    generation: generation
+                )
+            }
         case .engineTap:
             #if canImport(AetherEngine)
             feedTask = Task { [weak self] in
@@ -931,20 +944,28 @@ final class SceneLiveTranscriptionController: ObservableObject {
 
     private enum FeedSource {
         case assetReader(URL)
+        /// Audio-only Stash transcode fetched ahead of the playhead, for originals `AVAssetReader`
+        /// cannot open (MKV, AV1, …).
+        case transcodePrefetch(sceneID: String)
         /// Realtime PCM from the playback engine's shared audio tap.
         case engineTap
 
         var isLookahead: Bool {
             switch self {
             case .engineTap: return false
-            case .assetReader: return true
+            case .assetReader, .transcodePrefetch: return true
             }
         }
     }
 
     private func resolveFeedSource(startSeconds: Double) async -> FeedSource {
         // Probing candidates costs seconds; a seek must not pay that price again.
-        if let cachedFeedSource { return cachedFeedSource }
+        if let cachedFeedSource {
+            let staleTranscode: Bool
+            if case .transcodePrefetch = cachedFeedSource { staleTranscode = transcodePrefetchFailed }
+            else { staleTranscode = false }
+            if !staleTranscode { return cachedFeedSource }
+        }
         let source = await pickFeedSource(startSeconds: startSeconds)
         cachedFeedSource = source
         return source
@@ -954,7 +975,14 @@ final class SceneLiveTranscriptionController: ObservableObject {
         if let url = await firstReadableCandidate(from: candidateURLs, startSeconds: startSeconds) {
             return .assetReader(url)
         }
-        // Playback always uses the original file; the engine's tap is the only realtime tier.
+        // Captions only: a transcoded audio feed ahead of the playhead keeps the lines on their
+        // own timestamps. Without it the realtime tap shows rewriting drafts, so lines jump.
+        if #available(iOS 26.0, *),
+           !transcodePrefetchFailed,
+           let sceneID,
+           SceneTranscodeAudioPrefetcher.isAvailable() {
+            return .transcodePrefetch(sceneID: sceneID)
+        }
         return .engineTap
     }
 
@@ -1239,6 +1267,58 @@ final class SceneLiveTranscriptionController: ObservableObject {
         feedTimeline.append(FeedTimelineSegment(analyzerStart: fedAnalyzerSeconds, globalStart: globalStart))
         if feedTimeline.count > 60 {
             feedTimeline.removeFirst(feedTimeline.count - 60)
+        }
+    }
+
+    // MARK: - Dedicated transcode feed (low lag on originals AVAssetReader cannot read)
+
+    @available(iOS 26.0, *)
+    private func transcodePrefetchFeedLoop(
+        sceneID: String,
+        localStart: Double,
+        targetFormat: AVAudioFormat,
+        input: AsyncStream<AnalyzerInput>.Continuation,
+        generation: UInt
+    ) async {
+        let prefetcher = SceneTranscodeAudioPrefetcher(sceneID: sceneID, mediaDuration: sceneDuration)
+        let delegate = SceneTranscodeAudioPrefetcher.Delegate(
+            anchor: { [weak self] globalStart in
+                await self?.appendFeedTimeline(globalStart: globalStart)
+            },
+            progress: { [weak self] frontier, analyzerDelta in
+                await self?.updateFedSeconds(local: frontier, analyzerDelta: analyzerDelta)
+            },
+            step: { [weak self] frontier in
+                guard let self else { return .restart }
+                switch await self.nextFeedStep(fedLocalSeconds: frontier, generation: generation) {
+                case .feed: return .feed
+                case .wait(let nanoseconds): return .wait(nanoseconds)
+                case .restart: return .restart
+                }
+            }
+        )
+
+        do {
+            _ = try await prefetcher.run(
+                from: localStart,
+                targetFormat: targetFormat,
+                input: input,
+                delegate: delegate
+            )
+            input.finish()
+        } catch is CancellationError {
+            input.finish()
+        } catch {
+            input.finish()
+            guard sessionIsCurrent(generation), !Self.isBenignStopError(error) else { return }
+            AppLog.debug("💬 Transcode prefetch failed, falling back to tap: \(error.localizedDescription)")
+            transcodePrefetchFailed = true
+            usesLookaheadFeed = false
+            onLookaheadModeChanged?(false)
+            enableTask?.cancel()
+            enableTask = Task { [weak self] in
+                await self?.runEnableSession()
+            }
         }
     }
 
