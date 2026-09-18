@@ -631,7 +631,11 @@ struct SceneDetailView: View {
                         capturedMarkerTime = aetherEngine?.currentTime ?? 0
                         showingFullscreenAddMarkerSheet = true
                     },
-                    extraMenuItems: { extrasController.menuItems() }
+                    extraMenuItems: { extrasController.menuItems() },
+                                subtitleMenuExtras: { extrasController.subtitleMenuRows() },
+                                isHostSubtitleActive: { extrasController.isAISubtitleActive },
+                                onHostSubtitleOff: { extrasController.turnOffAISubtitles() },
+                                hostSubtitleLabel: { extrasController.aiSubtitleStateLabel }
                 )
                 // Only the black backdrop bleeds under the notch and home indicator; the
                 // surface (and with it the transport) stays inside the safe area so every

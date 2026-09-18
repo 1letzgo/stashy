@@ -60,7 +60,11 @@ struct SceneVideoPlayerCard: View {
                                 onToggleFullscreen: { isFullscreen = true },
                                 markers: activeScene.timeBarMarkers,
                                 onAddMarker: onAddMarker,
-                                extraMenuItems: { extrasController.menuItems() }
+                                extraMenuItems: { extrasController.menuItems() },
+                                subtitleMenuExtras: { extrasController.subtitleMenuRows() },
+                                isHostSubtitleActive: { extrasController.isAISubtitleActive },
+                                onHostSubtitleOff: { extrasController.turnOffAISubtitles() },
+                                hostSubtitleLabel: { extrasController.aiSubtitleStateLabel }
                             )
                         }
                     }

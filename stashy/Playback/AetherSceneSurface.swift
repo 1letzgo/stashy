@@ -33,8 +33,17 @@ struct AetherSceneSurface: View {
     private var markerSeconds: [Double] { markers.map(\.seconds) }
     /// Opens the host's add-marker flow at the current time. nil hides the button.
     var onAddMarker: (() -> Void)? = nil
-    /// Host-provided rows for the "…" menu (Set Image, AI Subtitles, AI Motion, …).
+    /// Host-provided rows for the "…" menu (scene tools such as AI Motion or cover capture).
     var extraMenuItems: () -> [PlayerMenuItem] = { [] }
+    /// Host rows placed inside the Subtitles menu, under the video's own tracks (AI subtitles,
+    /// spoken language). Empty when the host has none.
+    var subtitleMenuExtras: () -> [PlayerMenuItem] = { [] }
+    /// Whether host-driven subtitles (AI) are on, so "Off" is not checked while they run.
+    var isHostSubtitleActive: () -> Bool = { false }
+    /// Called for "Off" and for picking a track, so the host can end its own subtitles.
+    var onHostSubtitleOff: () -> Void = {}
+    /// Label for the Subtitles row while host subtitles are on, e.g. "AI · English".
+    var hostSubtitleLabel: () -> String? = { nil }
 
     @ObservedObject private var tabManager = TabManager.shared
     @StateObject private var pip = AetherPictureInPictureCoordinator()
@@ -730,47 +739,60 @@ struct AetherSceneSurface: View {
             ))
         }
 
-        if !engine.subtitleTracks.isEmpty {
+        // One Subtitles menu for everything: Off, the video's own tracks, then the host's AI rows.
+        let hostRows = subtitleMenuExtras()
+        if !engine.subtitleTracks.isEmpty || !hostRows.isEmpty {
+            let hostActive = isHostSubtitleActive()
             var subtitleItems: [PlayerMenuItem] = [
                 .action(
                     id: "player.subtitle.off",
                     title: "Off",
-                    isChecked: engine.activeSubtitleTrackIndex == nil
+                    isChecked: engine.activeSubtitleTrackIndex == nil && !hostActive
                 ) {
                     engine.clearSubtitle()
+                    onHostSubtitleOff()
                     revealControls()
                 }
             ]
-            subtitleItems.append(contentsOf: engine.subtitleTracks.map { track in
-                .action(
-                    id: "player.subtitle.\(track.id)",
-                    title: AetherTrackLabel.subtitle(track),
-                    isChecked: engine.activeSubtitleTrackIndex == track.id
-                ) {
-                    engine.selectSubtitleTrack(index: track.id)
-                    revealControls()
+            if !engine.subtitleTracks.isEmpty {
+                subtitleItems.append(.separator(id: "player.subtitle.tracks", title: "From the video"))
+                subtitleItems.append(contentsOf: engine.subtitleTracks.map { track in
+                    .action(
+                        id: "player.subtitle.\(track.id)",
+                        title: AetherTrackLabel.subtitle(track),
+                        isChecked: engine.activeSubtitleTrackIndex == track.id
+                    ) {
+                        onHostSubtitleOff()
+                        engine.selectSubtitleTrack(index: track.id)
+                        revealControls()
+                    }
+                })
+            }
+            subtitleItems.append(contentsOf: hostRows)
+
+            let current: String = {
+                if let index = engine.activeSubtitleTrackIndex,
+                   let track = engine.subtitleTracks.first(where: { $0.id == index }) {
+                    return AetherTrackLabel.subtitle(track)
                 }
-            })
+                return hostSubtitleLabel() ?? "Off"
+            }()
             items.append(.submenu(
                 id: "player.subtitles",
-                title: "Subtitles",
+                title: "Subtitles: \(current)",
                 systemImage: "captions.bubble",
                 items: subtitleItems
             ))
         }
 
         if showsAirPlayButton {
-            items.append(.separator(id: "player.airplay.break"))
             items.append(.action(id: "player.airplay", title: "AirPlay", systemImage: "airplayvideo") {
                 airPlayTrigger.present()
             })
         }
 
-        let extras = extraMenuItems()
-        if !extras.isEmpty {
-            items.append(.separator(id: "player.extras.break"))
-            items.append(contentsOf: extras)
-        }
+        // Host rows bring their own section heading.
+        items.append(contentsOf: extraMenuItems())
         return items
     }
 

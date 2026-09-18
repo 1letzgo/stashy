@@ -122,9 +122,9 @@ final class ScenePlayerExtrasController: ObservableObject {
     /// Die Zeilen, die der Player in sein "…"-Menü einhängt — als Daten, nicht als View:
     /// das Menü wird von UIKit präsentiert (siehe `PlayerMenuButton`).
     func menuItems() -> [PlayerMenuItem] {
-        var items: [PlayerMenuItem] = []
-
-        items.append(aiSubtitlesItem())
+        // Subtitles (incl. AI) live in the player's Subtitles menu — see `subtitleMenuRows()`.
+        // Here only the scene tools, as one group.
+        var items: [PlayerMenuItem] = [.separator(id: "extras.section.scene", title: "Scene")]
 
         #if canImport(AetherEngine)
         // AI Motion braucht ein echtes Player-Item zum Abtasten (`.loopback` /
@@ -132,11 +132,11 @@ final class ScenePlayerExtrasController: ObservableObject {
         let sync = StashSyncManager.shared
         if let engine, engine.analysisPlayerItem != nil, sync.isStashSyncEnabled {
             let isSyncing = sync.isSyncing
-            items.append(.separator(id: "extras.break.aiMotion"))
             items.append(.action(
                 id: "extras.aiMotion",
-                title: isSyncing ? "AI Motion: On" : "AI Motion: Off",
-                systemImage: isSyncing ? "bolt.horizontal.fill" : "bolt.horizontal"
+                title: "AI Motion",
+                systemImage: isSyncing ? "bolt.horizontal.fill" : "bolt.horizontal",
+                isChecked: isSyncing
             ) {
                 HapticManager.selection()
                 StashSyncManager.shared.setSyncing(!isSyncing)
@@ -144,97 +144,102 @@ final class ScenePlayerExtrasController: ObservableObject {
         }
         #endif
 
-        // "Set as …" at the bottom, each with its own separator.
-        items.append(.separator(id: "extras.break.sceneCover"))
         items.append(.action(
             id: "extras.sceneCover",
-            title: "Generate scene cover",
+            title: "Use frame as scene cover",
             systemImage: "photo",
             isDisabled: isBusyCapturing
         ) { [weak self] in
             self?.requestSceneCoverReplacement()
         })
-
-        items.append(.separator(id: "extras.break.tagImage"))
         items.append(.action(
             id: "extras.tagImage",
-            title: "Generate tag cover",
-            systemImage: "tag.fill",
+            title: "Use frame as tag image",
+            systemImage: "tag",
             isDisabled: isBusyCapturing
         ) { [weak self] in
             self?.captureTagImageFrameAndPresentSheet()
         })
 
         if let resolution = sourceResolutionLabel {
-            items.append(.separator(id: "extras.break.resolution"))
+            items.append(.separator(id: "extras.section.info"))
             items.append(.info(id: "extras.resolution", title: resolution, systemImage: "video.fill"))
         }
 
         return items
     }
 
+    /// True while AI captions are on — the player's Subtitles menu checks "Off" otherwise.
+    var isAISubtitleActive: Bool {
+        (transcriptionController?.mode ?? .off) != .off
+            || (transcriptionController?.isTeleprompterModeActive ?? false)
+            || (subtitleController?.isLiveCaptionsActive ?? false)
+    }
+
+    /// Short state for the Subtitles menu title, e.g. "AI · English".
+    var aiSubtitleStateLabel: String? {
+        guard isAISubtitleActive else { return nil }
+        switch transcriptionController?.mode ?? .off {
+        case .off: return nil
+        case .english, .sceneLanguage: return "AI · English"
+        case .userLanguage: return "AI · \(SubtitleTargetLanguage.displayName(for: SubtitleTargetLanguage.load()))"
+        }
+    }
+
+    /// "Off" in the player's Subtitles menu: ends AI captions too, and remembers the choice.
+    func turnOffAISubtitles() {
+        guard isAISubtitleActive else { return }
+        setTeleprompterMode(.off)
+        selectNoCaption()
+    }
+
     // MARK: AI Subtitles submenu
 
-    /// 1:1-Abbild der früheren SwiftUI-Zeilen: AI Captions, Scene Language, Captions Off.
-    private func aiSubtitlesItem() -> PlayerMenuItem {
+    /// Rows appended inside the player's Subtitles menu: the AI caption languages and the
+    /// scene's spoken language. "Off" is the player's own row at the top of that menu.
+    func subtitleMenuRows() -> [PlayerMenuItem] {
         let transcription = transcriptionController
         let translator = captionTranslator
-        let subtitles = subtitleController
         let userLanguage = SubtitleTargetLanguage.load()
         let languageOptions = speechSupportedLanguageOptions
         let selectedLanguage = SpeechTranscriberAvailability.matchingPickerId(
             stored: scene?.spokenLanguageCode,
             optionIds: languageOptions.map(\.id)
         )
-        let isActive = transcription?.isTeleprompterModeActive ?? false
         let mode = transcription?.mode ?? .off
-        let isSceneLanguageSet = selectedLanguage != nil
+        let aiOn = isAISubtitleActive
 
-        // --- AI Captions rows
-        var captionRows: [PlayerMenuItem] = [
-            .action(
-                id: "extras.captions.off",
-                title: SceneTeleprompterMode.off.title,
-                isChecked: mode == .off
-            ) { [weak self] in self?.setTeleprompterMode(.off) },
-            .action(
-                id: "extras.captions.english",
-                title: SceneTeleprompterMode.english.title,
-                isChecked: mode.captionTargetCode == "en"
-            ) { [weak self] in self?.setTeleprompterMode(.english) }
-        ]
+        var rows: [PlayerMenuItem] = [.separator(id: "extras.section.ai", title: "AI Subtitles")]
+        rows.append(.action(
+            id: "extras.captions.english",
+            title: SceneTeleprompterMode.english.title,
+            isChecked: aiOn && mode.captionTargetCode == "en"
+        ) { [weak self] in self?.setTeleprompterMode(.english) })
         if SubtitleTargetLanguage.languageCode(from: userLanguage)?.lowercased() != "en" {
-            captionRows.append(.action(
+            rows.append(.action(
                 id: "extras.captions.userLanguage",
                 title: SubtitleTargetLanguage.displayName(for: userLanguage),
-                isChecked: mode == .userLanguage
+                isChecked: aiOn && mode == .userLanguage
             ) { [weak self] in self?.setTeleprompterMode(.userLanguage) })
         }
         if transcription?.needsSpeechModelDownload == true {
             let name = transcription?.downloadingModelLanguage ?? "speech"
-            captionRows.append(.action(
+            rows.append(.action(
                 id: "extras.captions.downloadSpeechModel",
                 title: "Download \(name) speech model",
                 systemImage: "arrow.down.circle"
             ) { transcription?.approveSpeechModelDownload() })
         }
         if translator?.needsLanguageDownload == true {
-            captionRows.append(.action(
+            rows.append(.action(
                 id: "extras.captions.downloadPack",
                 title: "Download \(userLanguage.uppercased()) language pack",
                 systemImage: "arrow.down.circle"
             ) { translator?.approveDownload() })
         }
 
-        let selectedCaptionModeLabel: String = {
-            switch mode {
-            case .off: return SceneTeleprompterMode.off.title
-            case .english, .sceneLanguage: return SceneTeleprompterMode.english.title
-            case .userLanguage: return SubtitleTargetLanguage.displayName(for: userLanguage)
-            }
-        }()
-
-        // --- Scene Language rows
+        // Spoken language: one row. Set → its name, changeable behind the chevron; not set →
+        // "Set spoken language" with the list behind it. Never the whole list inline.
         let languageRows: [PlayerMenuItem] = languageOptions.map { option in
             .action(
                 id: "extras.language.\(option.id)",
@@ -242,61 +247,26 @@ final class ScenePlayerExtrasController: ObservableObject {
                 isChecked: selectedLanguage == option.id
             ) { [weak self] in self?.applySceneLanguage(option.id) }
         }
-        let selectedLanguageLabel = languageOptions.first(where: { $0.id == selectedLanguage })?.label
-            ?? selectedLanguage?.uppercased()
-            ?? "Language"
-
-        var children: [PlayerMenuItem] = [.separator(id: "extras.section.aiCaptions", title: "AI Captions")]
-        if isSceneLanguageSet {
-            children.append(.submenu(
-                id: "extras.captions.collapsed",
-                title: selectedCaptionModeLabel,
-                systemImage: "captions.bubble",
-                items: captionRows
-            ))
-        } else {
-            children.append(contentsOf: captionRows)
-        }
-
-        children.append(.separator(id: "extras.section.sceneLanguage", title: "Scene Language"))
-        if isSceneLanguageSet {
-            // Set: the active language as a single checked row, and the full list only behind
-            // a separate "Change language" dropdown.
-            children.append(.action(
-                id: "extras.language.current",
-                title: selectedLanguageLabel,
+        if let selectedLanguage {
+            let label = languageOptions.first(where: { $0.id == selectedLanguage })?.label
+                ?? selectedLanguage.uppercased()
+            rows.append(.submenu(
+                id: "extras.language",
+                title: "Spoken: \(label)",
                 systemImage: "globe",
-                isChecked: true
-            ) {})
-            children.append(.submenu(
-                id: "extras.language.change",
-                title: "Change language",
-                systemImage: "arrow.left.arrow.right",
                 items: languageRows
             ))
         } else if languageOptions.isEmpty {
-            children.append(.info(id: "extras.language.loading", title: "Loading languages…"))
+            rows.append(.info(id: "extras.language.loading", title: "Loading languages…", systemImage: "globe"))
         } else {
-            children.append(contentsOf: languageRows)
+            rows.append(.submenu(
+                id: "extras.language",
+                title: "Set spoken language",
+                systemImage: "globe",
+                items: languageRows
+            ))
         }
-
-        let showsCaptionsOffRow = (scene?.hasCaptions ?? false) || (subtitles?.isLiveCaptionsActive ?? false)
-        if showsCaptionsOffRow {
-            let hasSelection = (subtitles?.selectedCaption != nil) || (subtitles?.isLiveCaptionsActive ?? false)
-            children.append(.separator(id: "extras.section.captions", title: "Captions"))
-            children.append(.action(
-                id: "extras.captions.none",
-                title: "Off",
-                isChecked: !hasSelection
-            ) { [weak self] in self?.selectNoCaption() })
-        }
-
-        return .submenu(
-            id: "extras.aiSubtitles",
-            title: isActive ? "AI Subtitles: On" : "AI Subtitles",
-            systemImage: isActive ? "captions.bubble.fill" : "captions.bubble",
-            items: children
-        )
+        return rows
     }
 
     /// Dateihöhe → kurzer Qualitäts-Text (`4K`, `1080p`, …).
@@ -479,6 +449,10 @@ final class ScenePlayerExtrasController: ObservableObject {
             stopLiveCaptionsIfNeeded()
             return
         }
+        #if canImport(AetherEngine)
+        // One subtitle at a time: an embedded / sidecar track would win over the AI line.
+        engine?.clearSubtitle()
+        #endif
         guard StashyPlusManager.shared.isUnlocked else {
             if userInitiated {
                 ToastManager.shared.show("AI captions are part of stashy+ — unlock in Settings", icon: "sparkles", style: .error)
