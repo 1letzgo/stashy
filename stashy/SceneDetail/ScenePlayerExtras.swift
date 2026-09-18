@@ -254,15 +254,23 @@ final class ScenePlayerExtrasController: ObservableObject {
                 isChecked: selectedLanguage == option.id
             ) { [weak self] in self?.applySceneLanguage(option.id) }
         }
-        if let selectedLanguage {
-            let label = languageOptions.first(where: { $0.id == selectedLanguage })?.label
-                ?? selectedLanguage.uppercased()
-            rows.append(.submenu(
-                id: "extras.language",
-                title: "Spoken: \(label)",
-                systemImage: "globe",
-                items: languageRows
-            ))
+        // A stored language always shows by name, even before the device's speech languages have
+        // loaded or when the stored tag matches none of them (`en` vs `en-US`, a free-form tag).
+        let storedLanguage = scene?.spokenLanguageCode?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if selectedLanguage != nil || storedLanguage?.isEmpty == false {
+            let label = selectedLanguage.flatMap { id in languageOptions.first(where: { $0.id == id })?.label }
+                ?? storedLanguage.flatMap { Locale.current.localizedString(forIdentifier: $0) }
+                ?? (selectedLanguage ?? storedLanguage ?? "").uppercased()
+            if languageRows.isEmpty {
+                rows.append(.info(id: "extras.language", title: "Spoken: \(label)", systemImage: "globe"))
+            } else {
+                rows.append(.submenu(
+                    id: "extras.language",
+                    title: "Spoken: \(label)",
+                    systemImage: "globe",
+                    items: languageRows
+                ))
+            }
         } else if languageOptions.isEmpty {
             rows.append(.info(id: "extras.language.loading", title: "Loading languages…", systemImage: "globe"))
         } else {
