@@ -406,6 +406,16 @@ final class ScenePlayerExtrasController: ObservableObject {
     func applySceneLanguage(_ code: String) {
         guard let viewModel, let previous = scene else { return }
         updateScene(previous.withSpokenLanguage(code))
+        // Running AI captions keep transcribing in the language they were started with; restart
+        // them so the speech model (and the translation source) switch to the new language.
+        if let transcriptionController,
+           transcriptionController.isTeleprompterModeActive || transcriptionController.mode != .off {
+            let mode = transcriptionController.mode
+            stopLiveCaptionsIfNeeded()
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) { [weak self] in
+                self?.setTeleprompterMode(mode, userInitiated: false)
+            }
+        }
         viewModel.updateSceneLanguage(sceneId: previous.id, languageCode: code) { [weak self] success in
             DispatchQueue.main.async {
                 if success {
