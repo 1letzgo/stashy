@@ -62,6 +62,11 @@ struct AetherSceneSurface: View {
     /// Above the engine's native cap (2× for video) the hold speed is made up by stepping the
     /// playhead forward on a timer while the engine plays at its cap.
     @State private var fastForwardBoostTimer: Timer?
+    /// The line on screen. Follows `displayedSubtitleText`, but an empty moment between two
+    /// cues (or two live-caption updates) is bridged instead of blanking the line — that gap
+    /// made the subtitle flash off and fade back in.
+    @State private var shownSubtitleText: String?
+    @State private var subtitleClearToken = UUID()
     @State private var rateBeforeFastForward: Float = 1
     @State private var fastForwardArmTask: DispatchWorkItem?
     /// Hold left of the play button: 2× backwards. The engine has no negative rate, so this is
@@ -251,7 +256,7 @@ struct AetherSceneSurface: View {
             if let bitmap = engine.currentSubtitleImage {
                 subtitleImage(bitmap)
             }
-            if let text = displayedSubtitleText {
+            if let text = shownSubtitleText {
                 VStack {
                     Spacer()
                     StashySubtitleText(text: text,
@@ -259,11 +264,27 @@ struct AetherSceneSurface: View {
                                        style: tabManager.subtitleStyle)
                         .padding(.horizontal, 16)
                         .padding(.bottom, 14)
-                        .transition(.opacity)
                 }
+                // Text swaps snap; no fade that would blink on every cue change.
+                .transaction { $0.animation = nil }
             }
         }
         .allowsHitTesting(false)
+        .onAppear { shownSubtitleText = displayedSubtitleText }
+        .onChange(of: displayedSubtitleText) { _, newText in
+            if let newText {
+                subtitleClearToken = UUID()
+                shownSubtitleText = newText
+            } else {
+                // Only clear once the gap outlasts a cue boundary.
+                let token = UUID()
+                subtitleClearToken = token
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.35) {
+                    guard subtitleClearToken == token else { return }
+                    shownSubtitleText = nil
+                }
+            }
+        }
     }
 
     /// Bitmap cues carry a [0, 1] rect against their own composition canvas, so they are mapped
