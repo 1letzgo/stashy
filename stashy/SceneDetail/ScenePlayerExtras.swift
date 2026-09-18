@@ -427,13 +427,16 @@ final class ScenePlayerExtrasController: ObservableObject {
         speechSupportedLanguageOptions = options
     }
 
-    func applySceneLanguage(_ code: String) {
+    /// `detected` marks a language read from the file rather than picked by the user: the caller
+    /// is about to start captions with it, so nothing is restarted, and the toast says where the
+    /// language came from.
+    func applySceneLanguage(_ code: String, detected: Bool = false) {
         guard let viewModel, let previous = scene else { return }
         pickedSpokenLanguage = code
         updateScene(previous.withSpokenLanguage(code))
         // Running AI captions keep transcribing in the language they were started with; restart
         // them so the speech model (and the translation source) switch to the new language.
-        if let transcriptionController,
+        if !detected, let transcriptionController,
            transcriptionController.isTeleprompterModeActive || transcriptionController.mode != .off {
             let mode = transcriptionController.mode
             stopLiveCaptionsIfNeeded()
@@ -444,7 +447,12 @@ final class ScenePlayerExtrasController: ObservableObject {
         viewModel.updateSceneLanguage(sceneId: previous.id, languageCode: code) { [weak self] success in
             DispatchQueue.main.async {
                 if success {
-                    ToastManager.shared.show("Language set to \(code.uppercased())", icon: "globe", style: .success)
+                    if detected {
+                        let name = Locale.current.localizedString(forIdentifier: code) ?? code.uppercased()
+                        ToastManager.shared.show("Spoken language from the file: \(name)", icon: "globe", style: .success)
+                    } else {
+                        ToastManager.shared.show("Language set to \(code.uppercased())", icon: "globe", style: .success)
+                    }
                 } else {
                     self?.pickedSpokenLanguage = nil
                     self?.updateScene(previous)
@@ -452,6 +460,48 @@ final class ScenePlayerExtrasController: ObservableObject {
                 }
             }
         }
+    }
+
+    // MARK: Spoken language from the file
+
+    /// ISO 639-2/B codes that differ from the terminology codes `Locale` understands.
+    private static let bibliographicLanguageCodes: [String: String] = [
+        "ger": "de", "fre": "fr", "dut": "nl", "chi": "zh", "cze": "cs", "gre": "el",
+        "per": "fa", "rum": "ro", "slo": "sk", "alb": "sq", "arm": "hy", "baq": "eu",
+        "bur": "my", "geo": "ka", "ice": "is", "mac": "mk", "mao": "mi", "may": "ms",
+        "tib": "bo", "wel": "cy",
+    ]
+    /// Tags that name no actual language: undetermined, multiple, no linguistic content, …
+    private static let nonLanguageTags: Set<String> = ["und", "mul", "zxx", "mis", "qaa", "unknown", "none"]
+
+    /// The spoken language the playing audio track declares (MKV / MP4 metadata), as a scene
+    /// language tag. Falls back to a language name in the track title ("English", "Deutsch").
+    /// `nil` when the file says nothing usable.
+    func audioTrackLanguageTag() -> String? {
+        #if canImport(AetherEngine)
+        guard let engine, !engine.audioTracks.isEmpty else { return nil }
+        let tracks = engine.audioTracks
+        let track = engine.activeAudioTrackIndex.flatMap { index in tracks.first(where: { $0.id == index }) }
+            ?? tracks.first(where: \.isDefault)
+            ?? tracks.first
+        guard let track else { return nil }
+
+        if let raw = track.language?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased(),
+           !raw.isEmpty, !Self.nonLanguageTags.contains(raw) {
+            let base = raw.replacingOccurrences(of: "_", with: "-").split(separator: "-").first.map(String.init) ?? raw
+            let alpha2 = Self.bibliographicLanguageCodes[base]
+                ?? Locale.LanguageCode(base).identifier(.alpha2)
+                ?? base
+            if let tag = SubtitleTargetLanguage.normalizedSceneLanguageTag(from: alpha2) {
+                return tag
+            }
+        }
+        if let alias = SubtitleTargetLanguage.aliasCode(forName: track.name),
+           let tag = SubtitleTargetLanguage.normalizedSceneLanguageTag(from: alias) {
+            return tag
+        }
+        #endif
+        return nil
     }
 
     // MARK: Captions / AI Subs
@@ -522,7 +572,14 @@ final class ScenePlayerExtrasController: ObservableObject {
             return
         }
         guard let activeScene = scene else { return }
-        guard let sceneLanguage = activeScene.spokenLanguageCode else {
+        // No language on the scene yet: take the one the file declares on its audio track and
+        // save it, so the next start (and every other device) has it too.
+        var resolvedLanguage = activeScene.spokenLanguageCode
+        if resolvedLanguage == nil, let fromFile = audioTrackLanguageTag() {
+            applySceneLanguage(fromFile, detected: true)
+            resolvedLanguage = fromFile
+        }
+        guard let sceneLanguage = resolvedLanguage else {
             if userInitiated {
                 ToastManager.shared.show("Set scene language first", icon: "globe", style: .error)
             }
