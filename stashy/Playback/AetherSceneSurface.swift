@@ -41,6 +41,8 @@ struct AetherSceneSurface: View {
     /// Called when the user picks one of the video's tracks, so the host can end its own
     /// captions — only one subtitle line at a time.
     var onHostSubtitleOff: () -> Void = {}
+    /// The "…" menu closed — the host resets transient menu state (an expanded picker).
+    var onOptionsMenuClosed: () -> Void = {}
 
     @ObservedObject private var tabManager = TabManager.shared
     @StateObject private var pip = AetherPictureInPictureCoordinator()
@@ -807,6 +809,7 @@ struct AetherSceneSurface: View {
                 },
                 onDidDismiss: {
                     isOptionsMenuOpen = false
+                    onOptionsMenuClosed()
                     revealControls()
                 }
             )

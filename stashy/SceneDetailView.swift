@@ -633,7 +633,8 @@ struct SceneDetailView: View {
                     },
                     extraMenuItems: { extrasController.menuItems() },
                                 subtitleMenuExtras: { extrasController.aiSubtitleMenuItems() },
-                                onHostSubtitleOff: { extrasController.turnOffAISubtitles() }
+                                onHostSubtitleOff: { extrasController.turnOffAISubtitles() },
+                                onOptionsMenuClosed: { extrasController.optionsMenuClosed() }
                 )
                 // Only the black backdrop bleeds under the notch and home indicator; the
                 // surface (and with it the transport) stays inside the safe area so every

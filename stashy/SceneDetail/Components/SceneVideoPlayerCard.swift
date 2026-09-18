@@ -62,7 +62,8 @@ struct SceneVideoPlayerCard: View {
                                 onAddMarker: onAddMarker,
                                 extraMenuItems: { extrasController.menuItems() },
                                 subtitleMenuExtras: { extrasController.aiSubtitleMenuItems() },
-                                onHostSubtitleOff: { extrasController.turnOffAISubtitles() }
+                                onHostSubtitleOff: { extrasController.turnOffAISubtitles() },
+                                onOptionsMenuClosed: { extrasController.optionsMenuClosed() }
                             )
                         }
                     }

@@ -39,6 +39,9 @@ struct PlayerMenuItem: Identifiable {
     var systemImage: String?
     var isChecked: Bool = false
     var isDisabled: Bool = false
+    /// The menu stays open after this action; it updates in place instead (e.g. expanding or
+    /// collapsing a picker inside a submenu).
+    var keepsMenuOpen: Bool = false
     var kind: Kind
 }
 
@@ -49,10 +52,12 @@ extension PlayerMenuItem {
         systemImage: String? = nil,
         isChecked: Bool = false,
         isDisabled: Bool = false,
+        keepsMenuOpen: Bool = false,
         handler: @escaping () -> Void
     ) -> PlayerMenuItem {
         PlayerMenuItem(id: id, title: title, systemImage: systemImage,
-                       isChecked: isChecked, isDisabled: isDisabled, kind: .action(handler))
+                       isChecked: isChecked, isDisabled: isDisabled,
+                       keepsMenuOpen: keepsMenuOpen, kind: .action(handler))
     }
 
     static func submenu(
@@ -85,7 +90,8 @@ extension PlayerMenuItem {
     /// Alles, was das gerenderte `UIMenu` beeinflusst — ohne die Closures. Der Player
     /// rebuildet seinen Body im Sekundentakt (Spielzeit), das Menü darf davon nichts merken.
     var signature: String {
-        var parts = [id, title, systemImage ?? "", isChecked ? "1" : "0", isDisabled ? "1" : "0"]
+        var parts = [id, title, systemImage ?? "", isChecked ? "1" : "0", isDisabled ? "1" : "0",
+                     keepsMenuOpen ? "k" : ""]
         switch kind {
         case .action: parts.append("a")
         case .info: parts.append("i")
@@ -135,8 +141,32 @@ enum PlayerMenuBuilder {
         }
     }
 
+    static let rootIdentifier = UIMenu.Identifier("stashy.player.menu.root")
+
     static func menu(from items: [PlayerMenuItem]) -> UIMenu {
-        UIMenu(title: "", children: children(from: items))
+        UIMenu(title: "", identifier: rootIdentifier, children: children(from: items))
+    }
+
+    /// The open menu level rebuilt from fresh items: the root, or the submenu with the same id.
+    /// Used while the menu is on screen, so state changes show without closing it.
+    static func refreshed(_ visible: UIMenu, from items: [PlayerMenuItem]) -> UIMenu {
+        if visible.identifier == rootIdentifier {
+            return visible.replacingChildren(children(from: items))
+        }
+        if let item = submenuItem(id: visible.identifier.rawValue, in: items),
+           let rebuilt = element(for: item) as? UIMenu {
+            return rebuilt
+        }
+        return visible
+    }
+
+    private static func submenuItem(id: String, in items: [PlayerMenuItem]) -> PlayerMenuItem? {
+        for item in items {
+            guard case .submenu(let nested) = item.kind else { continue }
+            if item.id == id { return item }
+            if let found = submenuItem(id: id, in: nested) { return found }
+        }
+        return nil
     }
 
     private static func element(for item: PlayerMenuItem) -> UIMenuElement {
@@ -145,12 +175,14 @@ enum PlayerMenuBuilder {
         case .submenu(let nested):
             return UIMenu(title: item.title,
                           image: image,
+                          identifier: UIMenu.Identifier(item.id),
                           options: [],
                           children: children(from: nested))
         case .action(let handler):
             let action = UIAction(title: item.title, image: image) { _ in handler() }
             action.state = item.isChecked ? .on : .off
             if item.isDisabled { action.attributes.insert(.disabled) }
+            if item.keepsMenuOpen { action.attributes.insert(.keepsMenuPresented) }
             return action
         case .info:
             let action = UIAction(title: item.title, image: image, attributes: .disabled) { _ in }
@@ -205,9 +237,15 @@ struct PlayerMenuButton: UIViewRepresentable {
         let signature = items.menuSignature
         guard signature != context.coordinator.appliedSignature else { return }
         // Solange das Menü offen ist, wird `menu` nicht ersetzt: UIKit schließt ein
-        // präsentiertes Menü, sobald man es unter ihm austauscht.
+        // präsentiertes Menü, sobald man es unter ihm austauscht. Die sichtbare Ebene wird
+        // stattdessen live aktualisiert; das volle Menü folgt beim Schließen.
         guard !context.coordinator.isMenuVisible else {
             context.coordinator.pendingItems = items
+            context.coordinator.appliedSignature = signature
+            let items = items
+            button.contextMenuInteraction?.updateVisibleMenu { visible in
+                PlayerMenuBuilder.refreshed(visible, from: items)
+            }
             return
         }
         context.coordinator.appliedSignature = signature

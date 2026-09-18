@@ -36,6 +36,19 @@ final class ScenePlayerExtrasController: ObservableObject {
     @Published var capturedTagImageDataURL: String?
     @Published var showSpeechModelDownloadOffer = false
     @Published var speechSupportedLanguageOptions: [(id: String, label: String)] = []
+    /// The spoken-language list is expanded inside the AI Subtitles menu. Picking a language
+    /// folds it back to one row while the menu stays open.
+    @Published var isPickingSpokenLanguage = false
+    /// The language just picked, shown at once while the menu is still open — the scene
+    /// binding only catches up on the host's next full update. Cleared again on failure.
+    @Published private var pickedSpokenLanguage: String?
+
+    /// The "…" menu closed: fold the language list, and let the scene binding (caught up by
+    /// now) be the only source for the spoken language again.
+    func optionsMenuClosed() {
+        isPickingSpokenLanguage = false
+        pickedSpokenLanguage = nil
+    }
     /// Welche Fläche gerade oben ist — entscheidet, wer Sheets präsentiert.
     @Published var isFullscreenActive = false
 
@@ -202,8 +215,10 @@ final class ScenePlayerExtrasController: ObservableObject {
         let translator = captionTranslator
         let userLanguage = SubtitleTargetLanguage.load()
         let languageOptions = speechSupportedLanguageOptions
+        let storedLanguage = (pickedSpokenLanguage ?? scene?.spokenLanguageCode)?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
         let selectedLanguage = SpeechTranscriberAvailability.matchingPickerId(
-            stored: scene?.spokenLanguageCode,
+            stored: storedLanguage,
             optionIds: languageOptions.map(\.id)
         )
         let mode = transcription.mode
@@ -245,41 +260,40 @@ final class ScenePlayerExtrasController: ObservableObject {
         }
 
         rows.append(.separator(id: "extras.section.spoken", title: "Spoken in this scene"))
-        // Spoken language: one row. Set → its name, changeable behind the chevron; not set →
-        // "Set spoken language" with the list behind it. Never the whole list inline.
-        let languageRows: [PlayerMenuItem] = languageOptions.map { option in
-            .action(
-                id: "extras.language.\(option.id)",
-                title: option.label,
-                isChecked: selectedLanguage == option.id
-            ) { [weak self] in self?.applySceneLanguage(option.id) }
-        }
-        // A stored language always shows by name, even before the device's speech languages have
-        // loaded or when the stored tag matches none of them (`en` vs `en-US`, a free-form tag).
-        let storedLanguage = scene?.spokenLanguageCode?.trimmingCharacters(in: .whitespacesAndNewlines)
-        if selectedLanguage != nil || storedLanguage?.isEmpty == false {
-            let label = selectedLanguage.flatMap { id in languageOptions.first(where: { $0.id == id })?.label }
-                ?? storedLanguage.flatMap { Locale.current.localizedString(forIdentifier: $0) }
-                ?? (selectedLanguage ?? storedLanguage ?? "").uppercased()
-            if languageRows.isEmpty {
-                rows.append(.info(id: "extras.language", title: "Spoken: \(label)", systemImage: "globe"))
-            } else {
-                rows.append(.submenu(
-                    id: "extras.language",
-                    title: "Spoken: \(label)",
-                    systemImage: "globe",
-                    items: languageRows
-                ))
-            }
-        } else if languageOptions.isEmpty {
-            rows.append(.info(id: "extras.language.loading", title: "Loading languages…", systemImage: "globe"))
-        } else {
-            rows.append(.submenu(
+        // Spoken language: one row with the current language (or "Set spoken language"). Tapping
+        // it unfolds the list right here, picking folds it again — the menu stays open, so the
+        // new language shows immediately.
+        let hasLanguage = selectedLanguage != nil || storedLanguage?.isEmpty == false
+        let languageLabel = selectedLanguage.flatMap { id in languageOptions.first(where: { $0.id == id })?.label }
+            ?? storedLanguage.flatMap { Locale.current.localizedString(forIdentifier: $0) }
+            ?? (selectedLanguage ?? storedLanguage ?? "").uppercased()
+        if languageOptions.isEmpty {
+            rows.append(.info(
                 id: "extras.language",
-                title: "Set spoken language",
-                systemImage: "globe",
-                items: languageRows
+                title: hasLanguage ? "Spoken: \(languageLabel)" : "Loading languages…",
+                systemImage: "globe"
             ))
+        } else {
+            rows.append(.action(
+                id: "extras.language",
+                title: hasLanguage ? "Spoken: \(languageLabel)" : "Set spoken language",
+                systemImage: isPickingSpokenLanguage ? "chevron.up" : "globe",
+                keepsMenuOpen: true
+            ) { [weak self] in self?.isPickingSpokenLanguage.toggle() })
+            if isPickingSpokenLanguage {
+                rows.append(.separator(id: "extras.section.languages"))
+                rows.append(contentsOf: languageOptions.map { option in
+                    .action(
+                        id: "extras.language.\(option.id)",
+                        title: option.label,
+                        isChecked: selectedLanguage == option.id,
+                        keepsMenuOpen: true
+                    ) { [weak self] in
+                        self?.isPickingSpokenLanguage = false
+                        self?.applySceneLanguage(option.id)
+                    }
+                })
+            }
         }
 
         let current: String = {
@@ -415,6 +429,7 @@ final class ScenePlayerExtrasController: ObservableObject {
 
     func applySceneLanguage(_ code: String) {
         guard let viewModel, let previous = scene else { return }
+        pickedSpokenLanguage = code
         updateScene(previous.withSpokenLanguage(code))
         // Running AI captions keep transcribing in the language they were started with; restart
         // them so the speech model (and the translation source) switch to the new language.
@@ -431,6 +446,7 @@ final class ScenePlayerExtrasController: ObservableObject {
                 if success {
                     ToastManager.shared.show("Language set to \(code.uppercased())", icon: "globe", style: .success)
                 } else {
+                    self?.pickedSpokenLanguage = nil
                     self?.updateScene(previous)
                     ToastManager.shared.show("Failed to save language", icon: "exclamationmark.triangle", style: .error)
                 }
