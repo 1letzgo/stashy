@@ -35,15 +35,12 @@ struct AetherSceneSurface: View {
     var onAddMarker: (() -> Void)? = nil
     /// Host-provided rows for the "…" menu (scene tools such as AI Motion or cover capture).
     var extraMenuItems: () -> [PlayerMenuItem] = { [] }
-    /// Host rows placed inside the Subtitles menu, under the video's own tracks (AI subtitles,
-    /// spoken language). Empty when the host has none.
+    /// Host menus placed right under the video's Subtitles menu (AI subtitles). Kept separate
+    /// on purpose: the video's own tracks and generated captions are different things.
     var subtitleMenuExtras: () -> [PlayerMenuItem] = { [] }
-    /// Whether host-driven subtitles (AI) are on, so "Off" is not checked while they run.
-    var isHostSubtitleActive: () -> Bool = { false }
-    /// Called for "Off" and for picking a track, so the host can end its own subtitles.
+    /// Called when the user picks one of the video's tracks, so the host can end its own
+    /// captions — only one subtitle line at a time.
     var onHostSubtitleOff: () -> Void = {}
-    /// Label for the Subtitles row while host subtitles are on, e.g. "AI · English".
-    var hostSubtitleLabel: () -> String? = { nil }
 
     @ObservedObject private var tabManager = TabManager.shared
     @StateObject private var pip = AetherPictureInPictureCoordinator()
@@ -739,44 +736,32 @@ struct AetherSceneSurface: View {
             ))
         }
 
-        // One Subtitles menu for everything: Off, the video's own tracks, then the host's AI rows.
-        let hostRows = subtitleMenuExtras()
-        if !engine.subtitleTracks.isEmpty || !hostRows.isEmpty {
-            let hostActive = isHostSubtitleActive()
+        // The video's own subtitle tracks. Only shown when the file has any.
+        if !engine.subtitleTracks.isEmpty {
             var subtitleItems: [PlayerMenuItem] = [
                 .action(
                     id: "player.subtitle.off",
                     title: "Off",
-                    isChecked: engine.activeSubtitleTrackIndex == nil && !hostActive
+                    isChecked: engine.activeSubtitleTrackIndex == nil
                 ) {
                     engine.clearSubtitle()
-                    onHostSubtitleOff()
                     revealControls()
                 }
             ]
-            if !engine.subtitleTracks.isEmpty {
-                subtitleItems.append(.separator(id: "player.subtitle.tracks", title: "From the video"))
-                subtitleItems.append(contentsOf: engine.subtitleTracks.map { track in
-                    .action(
-                        id: "player.subtitle.\(track.id)",
-                        title: AetherTrackLabel.subtitle(track),
-                        isChecked: engine.activeSubtitleTrackIndex == track.id
-                    ) {
-                        onHostSubtitleOff()
-                        engine.selectSubtitleTrack(index: track.id)
-                        revealControls()
-                    }
-                })
-            }
-            subtitleItems.append(contentsOf: hostRows)
-
-            let current: String = {
-                if let index = engine.activeSubtitleTrackIndex,
-                   let track = engine.subtitleTracks.first(where: { $0.id == index }) {
-                    return AetherTrackLabel.subtitle(track)
+            subtitleItems.append(contentsOf: engine.subtitleTracks.map { track in
+                .action(
+                    id: "player.subtitle.\(track.id)",
+                    title: AetherTrackLabel.subtitle(track),
+                    isChecked: engine.activeSubtitleTrackIndex == track.id
+                ) {
+                    onHostSubtitleOff()
+                    engine.selectSubtitleTrack(index: track.id)
+                    revealControls()
                 }
-                return hostSubtitleLabel() ?? "Off"
-            }()
+            })
+            let current = engine.activeSubtitleTrackIndex
+                .flatMap { index in engine.subtitleTracks.first(where: { $0.id == index }) }
+                .map(AetherTrackLabel.subtitle) ?? "Off"
             items.append(.submenu(
                 id: "player.subtitles",
                 title: "Subtitles: \(current)",
@@ -784,6 +769,9 @@ struct AetherSceneSurface: View {
                 items: subtitleItems
             ))
         }
+
+        // AI subtitles are the host's own menu, next to (not inside) the video's tracks.
+        items.append(contentsOf: subtitleMenuExtras())
 
         if showsAirPlayButton {
             items.append(.action(id: "player.airplay", title: "AirPlay", systemImage: "airplayvideo") {

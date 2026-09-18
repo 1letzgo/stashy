@@ -122,7 +122,7 @@ final class ScenePlayerExtrasController: ObservableObject {
     /// Die Zeilen, die der Player in sein "…"-Menü einhängt — als Daten, nicht als View:
     /// das Menü wird von UIKit präsentiert (siehe `PlayerMenuButton`).
     func menuItems() -> [PlayerMenuItem] {
-        // Subtitles (incl. AI) live in the player's Subtitles menu — see `subtitleMenuRows()`.
+        // AI subtitles are their own submenu next to the video's Subtitles — see `aiSubtitleMenuItems()`.
         // Here only the scene tools, as one group.
         var items: [PlayerMenuItem] = [.separator(id: "extras.section.scene", title: "Scene")]
 
@@ -169,24 +169,14 @@ final class ScenePlayerExtrasController: ObservableObject {
         return items
     }
 
-    /// True while AI captions are on — the player's Subtitles menu checks "Off" otherwise.
+    /// True while AI captions are on.
     var isAISubtitleActive: Bool {
         (transcriptionController?.mode ?? .off) != .off
             || (transcriptionController?.isTeleprompterModeActive ?? false)
             || (subtitleController?.isLiveCaptionsActive ?? false)
     }
 
-    /// Short state for the Subtitles menu title, e.g. "AI · English".
-    var aiSubtitleStateLabel: String? {
-        guard isAISubtitleActive else { return nil }
-        switch transcriptionController?.mode ?? .off {
-        case .off: return nil
-        case .english, .sceneLanguage: return "AI · English"
-        case .userLanguage: return "AI · \(SubtitleTargetLanguage.displayName(for: SubtitleTargetLanguage.load()))"
-        }
-    }
-
-    /// "Off" in the player's Subtitles menu: ends AI captions too, and remembers the choice.
+    /// Picking one of the video's own subtitle tracks ends AI captions — one line at a time.
     func turnOffAISubtitles() {
         guard isAISubtitleActive else { return }
         setTeleprompterMode(.off)
@@ -195,10 +185,20 @@ final class ScenePlayerExtrasController: ObservableObject {
 
     // MARK: AI Subtitles submenu
 
-    /// Rows appended inside the player's Subtitles menu: the AI caption languages and the
-    /// scene's spoken language. "Off" is the player's own row at the top of that menu.
-    func subtitleMenuRows() -> [PlayerMenuItem] {
-        let transcription = transcriptionController
+    /// The "AI Subtitles" submenu, placed by the player right under its own Subtitles menu.
+    /// Empty on devices without on-device speech recognition; a single locked row without
+    /// stashy+, so the feature is discoverable but not a dead end of disabled rows.
+    func aiSubtitleMenuItems() -> [PlayerMenuItem] {
+        guard let transcription = transcriptionController, transcription.isReadAlongAvailable else { return [] }
+        guard StashyPlusManager.shared.isUnlocked else {
+            return [.action(
+                id: "extras.aiSubtitles.locked",
+                title: "AI Subtitles · stashy+",
+                systemImage: "lock"
+            ) {
+                ToastManager.shared.show("AI subtitles are part of stashy+ — unlock in Settings", icon: "sparkles", style: .error)
+            }]
+        }
         let translator = captionTranslator
         let userLanguage = SubtitleTargetLanguage.load()
         let languageOptions = speechSupportedLanguageOptions
@@ -206,10 +206,16 @@ final class ScenePlayerExtrasController: ObservableObject {
             stored: scene?.spokenLanguageCode,
             optionIds: languageOptions.map(\.id)
         )
-        let mode = transcription?.mode ?? .off
+        let mode = transcription.mode
         let aiOn = isAISubtitleActive
 
-        var rows: [PlayerMenuItem] = [.separator(id: "extras.section.ai", title: "AI Subtitles")]
+        var rows: [PlayerMenuItem] = [
+            .action(
+                id: "extras.captions.off",
+                title: "Off",
+                isChecked: !aiOn
+            ) { [weak self] in self?.setTeleprompterMode(.off) }
+        ]
         rows.append(.action(
             id: "extras.captions.english",
             title: SceneTeleprompterMode.english.title,
@@ -222,13 +228,13 @@ final class ScenePlayerExtrasController: ObservableObject {
                 isChecked: aiOn && mode == .userLanguage
             ) { [weak self] in self?.setTeleprompterMode(.userLanguage) })
         }
-        if transcription?.needsSpeechModelDownload == true {
-            let name = transcription?.downloadingModelLanguage ?? "speech"
+        if transcription.needsSpeechModelDownload {
+            let name = transcription.downloadingModelLanguage ?? "speech"
             rows.append(.action(
                 id: "extras.captions.downloadSpeechModel",
                 title: "Download \(name) speech model",
                 systemImage: "arrow.down.circle"
-            ) { transcription?.approveSpeechModelDownload() })
+            ) { transcription.approveSpeechModelDownload() })
         }
         if translator?.needsLanguageDownload == true {
             rows.append(.action(
@@ -238,6 +244,7 @@ final class ScenePlayerExtrasController: ObservableObject {
             ) { translator?.approveDownload() })
         }
 
+        rows.append(.separator(id: "extras.section.spoken", title: "Spoken in this scene"))
         // Spoken language: one row. Set → its name, changeable behind the chevron; not set →
         // "Set spoken language" with the list behind it. Never the whole list inline.
         let languageRows: [PlayerMenuItem] = languageOptions.map { option in
@@ -266,7 +273,21 @@ final class ScenePlayerExtrasController: ObservableObject {
                 items: languageRows
             ))
         }
-        return rows
+
+        let current: String = {
+            guard aiOn else { return "Off" }
+            switch mode {
+            case .off: return "On"
+            case .english, .sceneLanguage: return SceneTeleprompterMode.english.title
+            case .userLanguage: return SubtitleTargetLanguage.displayName(for: userLanguage)
+            }
+        }()
+        return [.submenu(
+            id: "extras.aiSubtitles",
+            title: "AI Subtitles: \(current)",
+            systemImage: aiOn ? "sparkles.rectangle.stack.fill" : "sparkles.rectangle.stack",
+            items: rows
+        )]
     }
 
     /// Dateihöhe → kurzer Qualitäts-Text (`4K`, `1080p`, …).

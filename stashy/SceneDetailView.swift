@@ -632,10 +632,8 @@ struct SceneDetailView: View {
                         showingFullscreenAddMarkerSheet = true
                     },
                     extraMenuItems: { extrasController.menuItems() },
-                                subtitleMenuExtras: { extrasController.subtitleMenuRows() },
-                                isHostSubtitleActive: { extrasController.isAISubtitleActive },
-                                onHostSubtitleOff: { extrasController.turnOffAISubtitles() },
-                                hostSubtitleLabel: { extrasController.aiSubtitleStateLabel }
+                                subtitleMenuExtras: { extrasController.aiSubtitleMenuItems() },
+                                onHostSubtitleOff: { extrasController.turnOffAISubtitles() }
                 )
                 // Only the black backdrop bleeds under the notch and home indicator; the
                 // surface (and with it the transport) stays inside the safe area so every

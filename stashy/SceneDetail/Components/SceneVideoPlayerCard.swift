@@ -61,10 +61,8 @@ struct SceneVideoPlayerCard: View {
                                 markers: activeScene.timeBarMarkers,
                                 onAddMarker: onAddMarker,
                                 extraMenuItems: { extrasController.menuItems() },
-                                subtitleMenuExtras: { extrasController.subtitleMenuRows() },
-                                isHostSubtitleActive: { extrasController.isAISubtitleActive },
-                                onHostSubtitleOff: { extrasController.turnOffAISubtitles() },
-                                hostSubtitleLabel: { extrasController.aiSubtitleStateLabel }
+                                subtitleMenuExtras: { extrasController.aiSubtitleMenuItems() },
+                                onHostSubtitleOff: { extrasController.turnOffAISubtitles() }
                             )
                         }
                     }
