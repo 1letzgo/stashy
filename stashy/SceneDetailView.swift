@@ -1258,13 +1258,19 @@ struct AddMarkerSheet: View {
     @Environment(\.dismiss) var dismiss
     @ObservedObject var appearanceManager = AppearanceManager.shared
     
-    @State private var title: String = ""
     @State private var primaryTagId: String = ""
     @State private var tags: [Tag] = []
     @State private var searchText: String = ""
     @State private var isCreating = false
     @State private var isLoadingTags = false
     @State private var endTimeString: String = ""
+    /// Quick pick for the end time, in seconds after the start. nil once the field is typed in.
+    @State private var quickDuration: Int?
+
+    /// The marker is named after its primary tag — there is no separate name field.
+    private var title: String {
+        tags.first(where: { $0.id == primaryTagId })?.name ?? ""
+    }
     
     var filteredTags: [Tag] {
         let base: [Tag]
@@ -1286,14 +1292,13 @@ struct AddMarkerSheet: View {
     }
     
     private var canAddMarker: Bool {
-        !title.isEmpty && !primaryTagId.isEmpty && !isCreating
+        !primaryTagId.isEmpty && !title.isEmpty && !isCreating
     }
 
     var body: some View {
         NavigationStack {
             Form {
                 Section(header: Text("Marker Details")) {
-                    TextField("Name", text: $title)
                     HStack {
                         Text("Start Time:")
                         Spacer()
@@ -1311,6 +1316,38 @@ struct AddMarkerSheet: View {
                             .multilineTextAlignment(.trailing)
                             .keyboardType(.numbersAndPunctuation)
                             .submitLabel(.done)
+                            .onChange(of: endTimeString) { _, newValue in
+                                // Typing replaces a quick pick; the pick itself writes the
+                                // same string, so only a different value clears it.
+                                if let quickDuration, newValue != quickEndString(quickDuration) {
+                                    self.quickDuration = nil
+                                }
+                            }
+                    }
+
+                    // Quick picks: end the marker 30 / 60 / 90 s after its start.
+                    HStack(spacing: 8) {
+                        ForEach([30, 60, 90], id: \.self) { duration in
+                            let isSelected = quickDuration == duration
+                            Button {
+                                if isSelected {
+                                    quickDuration = nil
+                                    endTimeString = ""
+                                } else {
+                                    quickDuration = duration
+                                    endTimeString = quickEndString(duration)
+                                }
+                            } label: {
+                                Text("+\(duration)s")
+                                    .font(.subheadline.weight(.semibold))
+                                    .foregroundColor(isSelected ? .white : .primary)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 8)
+                                    .background(isSelected ? appearanceManager.tintColor : Color.appBackground)
+                                    .clipShape(Capsule())
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                 }
                 .listRowBackground(Color.secondaryAppBackground)
@@ -1347,10 +1384,9 @@ struct AddMarkerSheet: View {
                             }
                             .contentShape(Rectangle())
                             .onTapGesture {
+                                // The tag is the marker's name, so a second tap simply
+                                // renames it by picking another tag.
                                 primaryTagId = tag.id
-                                if title.isEmpty {
-                                    title = tag.name
-                                }
                             }
                         }
 
@@ -1495,6 +1531,11 @@ struct AddMarkerSheet: View {
         }
     }
     
+    /// End time for a quick pick, written in the same form the field accepts.
+    private func quickEndString(_ duration: Int) -> String {
+        formatTime(seconds + Double(duration))
+    }
+
     private func parseTime(_ timeString: String) -> Double? {
         if timeString.isEmpty { return nil }
         
