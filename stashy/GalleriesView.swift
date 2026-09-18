@@ -1230,6 +1230,7 @@ struct GalleryItemView: View {
             existing.prepareForItemReplacement()
             Task { @MainActor in
                 await existing.load(url: streamURL, startAt: nil, autoplay: autoplay)
+                playIfStillActive(existing, itemId: itemId)
             }
             return
         }
@@ -1251,7 +1252,19 @@ struct GalleryItemView: View {
 
         Task { @MainActor in
             await created.load(url: streamURL, startAt: nil, autoplay: autoplay)
+            playIfStillActive(created, itemId: itemId)
         }
+    }
+
+    /// `autoplay` is fixed when the load starts. A page preloaded while its neighbour was on
+    /// screen loads paused, and a `play()` sent while that load was still running is dropped —
+    /// so the page became active but sat still until the user swiped away and back. Once the
+    /// load is done, the live state decides.
+    private func playIfStillActive(_ engine: AetherSceneEngine, itemId: String) {
+        guard self.engine === engine,
+              itemId == (currentVisibleId ?? fallbackActiveId),
+              isPlaying else { return }
+        engine.play()
     }
 
     /// Time into the scrubber, end-of-item into the continuous-play handler. Both check the
