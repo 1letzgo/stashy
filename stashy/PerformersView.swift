@@ -780,9 +780,13 @@ struct PerformerCardView: View {
                                 if loader.isLoading {
                                     ProgressView()
                                 } else if let image = loader.image {
+                                    // Anchored at the top: portraits keep the face instead of
+                                    // being cut through the middle.
                                     image
                                         .resizable()
                                         .scaledToFill()
+                                        .frame(width: geometry.size.width, height: geometry.size.height, alignment: .top)
+                                        .clipped()
                                 } else {
                                     Image(systemName: "person.fill")
                                         .font(.largeTitle)
