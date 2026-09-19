@@ -1639,6 +1639,7 @@ struct ReelsViewBody: View {
             reelsPicsFilters.selectedFilter = nil
             reelsPicsFilters.catalogPresetRowSelection = ""
             reelsPicsViewModel.currentImageFilter = nil
+            reelsPicsApplyHandedCriteria(onTopOf: nil)
             persistSessionCriteria()
             reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
         }
@@ -1682,6 +1683,7 @@ struct ReelsViewBody: View {
                 reelsPicsFilters.catalogPresetRowSelection = ""
                 reelsPicsViewModel.currentImageFilter = nil
             }
+            reelsPicsApplyHandedCriteria(onTopOf: reelsPicsFilters.selectedFilter)
             persistSessionCriteria()
             reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
         }
@@ -1724,6 +1726,7 @@ struct ReelsViewBody: View {
             if selectedTags.isEmpty && selectedPerformer == nil {
                 reelsPicsRestoreDefaultFilterAfterDeepLinkIfNeeded()
             }
+            reelsPicsApplyHandedCriteria(onTopOf: reelsPicsFilters.selectedFilter)
             persistSessionCriteria()
             reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
         }
@@ -1867,6 +1870,27 @@ struct ReelsViewBody: View {
     }
 
     /// After clearing a Feeds deep-link, allow Settings default filter again.
+    /// Pics fetches its criteria only from the image model's criteria document — the old
+    /// `liveFilterTagIds` / `liveFilterStudioIds` chips no longer reach the query, so a tag or
+    /// studio handed to Pics was silently dropped. The document is rebuilt from `base` (the
+    /// filter Pics starts from) with the handed tags / studio on top; with nothing handed it is
+    /// cleared so the fetch falls back to the plain base filter. The performer still travels via
+    /// `imagePerformerIdFilter`.
+    private func reelsPicsApplyHandedCriteria(onTopOf base: StashDBViewModel.SavedFilter?) {
+        let document = reelsPicsFilters.criteriaDocument
+        guard !selectedTags.isEmpty || selectedStudio != nil else {
+            document.clear()
+            return
+        }
+        document.load(base?.criteriaObjectFilter() ?? [:])
+        if !selectedTags.isEmpty {
+            document.setCriterion(key: "tags", value: ["modifier": "INCLUDES", "value": selectedTags.map(\.id), "depth": 0])
+        }
+        if let studio = selectedStudio {
+            document.setCriterion(key: "studios", value: ["modifier": "INCLUDES", "value": [studio.id], "depth": 0])
+        }
+    }
+
     private func reelsPicsRestoreDefaultFilterAfterDeepLinkIfNeeded() {
         guard reelsPicsFilters.suppressSettingsDefaultFilter else { return }
         reelsPicsFilters.suppressSettingsDefaultFilter = false
@@ -3484,6 +3508,7 @@ struct ReelsViewBody: View {
         reelsPicsViewModel.imagePerformerIdFilter = performer?.id
         reelsPicsFilters.liveFilterTagIds = tags.map(\.id)
         reelsPicsFilters.liveFilterStudioIds = studio.map { [$0.id] } ?? []
+        reelsPicsApplyHandedCriteria(onTopOf: reelsPicsFilters.selectedFilter)
         saveSessionState(for: .pics)
 
         reelsPicsFilters.refetchImages(viewModel: reelsPicsViewModel, initial: true)
@@ -3511,6 +3536,9 @@ struct ReelsViewBody: View {
         reelsPicsViewModel.imagePerformerIdFilter = selectedPerformer?.id
         reelsPicsFilters.liveFilterTagIds = selectedTags.map(\.id)
         reelsPicsFilters.liveFilterStudioIds = selectedStudio.map { [$0.id] } ?? []
+        if !selectedTags.isEmpty || selectedStudio != nil {
+            reelsPicsApplyHandedCriteria(onTopOf: reelsPicsFilters.selectedFilter)
+        }
         saveSessionState(for: .pics)
     }
 
