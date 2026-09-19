@@ -779,25 +779,32 @@ final class AetherSceneEngine: ObservableObject {
         }
     }
 
-    /// iOS convention: an app that comes back from the background shows the paused frame and
-    /// waits for the user. Rebuild the torn-down pipeline now so the picture is there, then pause.
+    /// Playing when the app went to the background — it plays on when the app comes back.
+    private var resumesAfterBackground = false
+
     /// Going to the background without a live Picture-in-Picture window pauses. The engine would
     /// otherwise keep playing audio in the background (background playback follows the PiP
-    /// setting), and the video would still be running when the app came back.
+    /// setting). Whether it was playing is remembered for the return.
     private func pauseForBackgroundUnlessPictureInPicture() {
         guard !engine.pictureInPictureActive else { return }
+        resumesAfterBackground = isPlaying
         engine.pause()
     }
 
-    /// Back from the background: a torn-down session is rebuilt but stays paused — the user
-    /// resumes it. Nothing ever starts playing on its own here.
+    /// Back from the background: a video that was playing plays on at its spot. A session the
+    /// engine tore down meanwhile is rebuilt first; a paused one stays paused.
     private func resumeFromBackgroundIfNeeded() {
-        guard isSessionTornDown else { return }
-        Task { [weak self] in
-            guard let self else { return }
-            await self.rebuildTornDownSession()
-            self.engine.pause()
+        let shouldPlay = resumesAfterBackground
+        resumesAfterBackground = false
+        if isSessionTornDown {
+            Task { [weak self] in
+                guard let self else { return }
+                await self.rebuildTornDownSession()
+                if shouldPlay { self.engine.play() } else { self.engine.pause() }
+            }
+            return
         }
+        if shouldPlay { engine.play() }
     }
 
     func pause() {

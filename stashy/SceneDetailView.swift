@@ -54,9 +54,8 @@ struct SceneDetailView: View {
     @State private var tagsTotalHeight: CGFloat = 0
     @State private var isMuted = ScenePlayerMute.initialValue()
     @State private var hasAddedPlay = false
-    /// Set when the page is left with a running player (another tab, a pushed page). The engine is
-    /// torn down then; coming back shows the cover paused at that position ("Resume from …"),
-    /// the same state a return from the background leaves.
+    /// Set when the page is left while the video plays (another tab, a pushed page). The engine
+    /// is torn down then, so coming back starts it again at the position it had.
     @State private var resumeOnReturn: (wasPlaying: Bool, position: Double)?
     /// The transcode-fallback toast is shown once per screen, not once per rung.
     @State private var didAnnounceTranscodeFallback = false
@@ -779,12 +778,17 @@ struct SceneDetailView: View {
             configureSubtitles()
         }
         
-        // Back from another tab or a pushed page: paused at the spot it was left, one tap on
-        // "Resume from …" plays on — never starting by itself.
+        // Back from another tab or a pushed page: the video played when it was left, so it plays
+        // on from the same spot instead of waiting on the cover.
         if let pending = resumeOnReturn {
             resumeOnReturn = nil
             if pending.position > 1 {
                 activeScene = activeScene.withResumeTime(pending.position)
+            }
+            if pending.wasPlaying {
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.3) {
+                    if !isPlaybackStarted { startPlayback(resume: true) }
+                }
             }
             return
         }
