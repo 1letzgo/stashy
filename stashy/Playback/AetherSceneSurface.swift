@@ -139,7 +139,7 @@ struct AetherSceneSurface: View {
         .onChange(of: engine.isPlaying) { _, playing in
             if playing {
                 if areControlsVisible { scheduleControlsHide() }
-            } else if !isRewinding, !isScrubbing {
+            } else if !isRewinding, !isScrubbing, !isFastForwarding {
                 withAnimation(.easeInOut(duration: 0.15)) { areControlsVisible = true }
             }
         }
@@ -1006,6 +1006,13 @@ struct AetherSceneSurface: View {
         revealControls()
     }
 
+    /// What the transport shows. Above the engine's native rate the hold steps the playhead with
+    /// seeks, and each seek pauses the engine for a moment — the glyph flipped play/pause four
+    /// times a second. A running hold always counts as playing.
+    private var showsAsPlaying: Bool {
+        isFastForwarding || engine.isPlaying
+    }
+
     @ViewBuilder
     private var playPauseGlyph: some View {
         Button {
@@ -1013,12 +1020,12 @@ struct AetherSceneSurface: View {
             engine.togglePlayPause()
             revealControls()
         } label: {
-            glassCircle(systemName: engine.isPlaying ? "pause.fill" : "play.fill",
+            glassCircle(systemName: showsAsPlaying ? "pause.fill" : "play.fill",
                         diameter: playButtonSize,
                         glyphSize: isCompact ? 26 : 38)
         }
         .buttonStyle(.plain)
-        .accessibilityLabel(engine.isPlaying ? "Pause" : "Play")
+        .accessibilityLabel(showsAsPlaying ? "Pause" : "Play")
     }
 
     @ViewBuilder
