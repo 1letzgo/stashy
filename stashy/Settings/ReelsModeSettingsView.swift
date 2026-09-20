@@ -94,9 +94,9 @@ struct ReelsModeSettingsView: View {
                                 .padding(.top, 4)
 
                                 if groupIntoSets {
-                                    // How much of the filename timestamp counts — a whole day,
+                                    // How much of the created timestamp counts — a whole day,
                                     // the hour, or down to the minute.
-                                    reelsSettingRow(title: "Filename time") {
+                                    reelsSettingRow(title: "Created time") {
                                         let current = StashImageSessionPrecision(rawValue: groupSessionPrecisionRaw) ?? .hour
                                         Menu {
                                             ForEach(StashImageSessionPrecision.allCases, id: \.self) { option in

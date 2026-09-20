@@ -21,7 +21,7 @@ enum StashImageSetGroupingPolicy: String, CaseIterable {
     }
 }
 
-/// How exact the timestamp in a filename has to match for two images to land in one set.
+/// How exact the `created` timestamp has to match for two images to land in one set.
 enum StashImageSessionPrecision: String, CaseIterable {
     case day
     case hour
@@ -94,8 +94,11 @@ enum StashImageFilenameKeys {
         return candidates
     }
 
-    /// The filename timestamp, cut down to the configured precision. The cache always holds the
-    /// full timestamp, so changing the precision setting needs no cache reset.
+    /// The image's `created` timestamp as `YYYY-MM-DD_HH-MM-SS`, cut to the configured
+    /// precision. One import run writes its images within the same second-to-minute window, so
+    /// this groups a set far more reliably than a filename ever did. Files whose `created` is
+    /// missing fall back to a timestamp in the filename. The cache always holds the full
+    /// timestamp, so changing the precision setting needs no cache reset.
     static func sessionKey(
         for image: StashImage,
         cache: inout [String: String],
@@ -103,6 +106,11 @@ enum StashImageFilenameKeys {
     ) -> String {
         if let cached = cache[image.id] {
             return String(cached.prefix(precision.keyLength))
+        }
+
+        if let key = createdTimestampKey(for: image) {
+            cache[image.id] = key
+            return String(key.prefix(precision.keyLength))
         }
 
         for raw in filenameCandidates(for: image) {
@@ -115,6 +123,19 @@ enum StashImageFilenameKeys {
 
         cache[image.id] = ""
         return ""
+    }
+
+    /// `2026-06-24T07:42:44Z` / `2026-06-24 07:42:44 +0000` → `2026-06-24_07-42-44`, so it cuts
+    /// with the same `keyLength` offsets as a filename timestamp.
+    static func createdTimestampKey(for image: StashImage) -> String? {
+        guard let raw = image.createdAt?.trimmingCharacters(in: .whitespacesAndNewlines),
+              raw.count >= 19 else { return nil }
+        let day = String(raw.prefix(10))
+        guard day.count == 10, day.dropFirst(4).first == "-" else { return nil }
+        let timeStart = raw.index(raw.startIndex, offsetBy: 11)
+        let time = String(raw[timeStart...].prefix(8)).replacingOccurrences(of: ":", with: "-")
+        guard time.count == 8 else { return nil }
+        return "\(day)_\(time)"
     }
 
     /// Calendar day for meta grouping (`date`, else `created_at` prefix).
