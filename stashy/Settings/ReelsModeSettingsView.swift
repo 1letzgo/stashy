@@ -96,7 +96,7 @@ struct ReelsModeSettingsView: View {
                                 if groupIntoSets {
                                     // How much of the created timestamp counts — a whole day,
                                     // the hour, or down to the minute.
-                                    reelsSettingRow(title: "Created time") {
+                                    reelsSettingRow(title: "Created within") {
                                         let current = StashImageSessionPrecision(rawValue: groupSessionPrecisionRaw) ?? .hour
                                         Menu {
                                             ForEach(StashImageSessionPrecision.allCases, id: \.self) { option in
@@ -110,7 +110,7 @@ struct ReelsModeSettingsView: View {
                                     }
                                     .padding(.top, 4)
 
-                                    reelsSettingRow(title: "Grouping") {
+                                    reelsSettingRow(title: "No created time") {
                                         let current = StashImageSetGroupingPolicy(rawValue: groupFallbackRaw) ?? .sessionThenMeta
                                         Menu {
                                             ForEach(StashImageSetGroupingPolicy.allCases, id: \.self) { policy in

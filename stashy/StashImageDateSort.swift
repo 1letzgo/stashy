@@ -15,8 +15,8 @@ enum StashImageSetGroupingPolicy: String, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .sessionOnly: return "Session only"
-        case .sessionThenMeta: return "Session + metadata"
+        case .sessionOnly: return "Leave as single images"
+        case .sessionThenMeta: return "Same day, performers, gallery"
         }
     }
 }
@@ -29,9 +29,9 @@ enum StashImageSessionPrecision: String, CaseIterable {
 
     var displayName: String {
         switch self {
-        case .day: return "Day"
-        case .hour: return "Day + hour"
-        case .minute: return "Day + hour + minute"
+        case .day: return "Same day"
+        case .hour: return "Same hour"
+        case .minute: return "Same minute"
         }
     }
 
