@@ -115,6 +115,7 @@ private struct ImagesViewBody: View {
     /// Same grouping prefs as Feeds → Pics.
     @AppStorage("stashline_group_sets") private var groupIntoSets = true
     @AppStorage("stashline_group_fallback") private var groupFallbackRaw = StashImageSetGroupingPolicy.sessionThenMeta.rawValue
+    @AppStorage("stashline_group_session_precision") private var groupSessionPrecisionRaw = StashImageSessionPrecision.hour.rawValue
 
     private func recomputeAutoplayTarget() {
         guard feedAutoplayGateOpen else {
@@ -951,6 +952,7 @@ private struct ImagesViewBody: View {
             from: displayedImages,
             sort: imageListFilters.selectedSortOption,
             policy: groupingPolicy,
+            precision: StashImageSessionPrecision(rawValue: groupSessionPrecisionRaw) ?? .hour,
             groupEnabled: true,
             sessionCache: &sessionKeyCache
         )

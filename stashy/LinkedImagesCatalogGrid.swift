@@ -26,6 +26,7 @@ struct LinkedImagesCatalogGrid: View {
     @ObservedObject private var tabManager = TabManager.shared
     @AppStorage("stashline_group_sets") private var groupIntoSets = true
     @AppStorage("stashline_group_fallback") private var groupFallbackRaw = StashImageSetGroupingPolicy.sessionThenMeta.rawValue
+    @AppStorage("stashline_group_session_precision") private var groupSessionPrecisionRaw = StashImageSessionPrecision.hour.rawValue
     @AppStorage("images_feed_video_autoplay") private var imagesFeedVideoAutoplay = true
     @State private var sessionKeyCache: [String: String] = [:]
     /// Only updated while idle — avoids SwiftUI invalidation on every scroll frame.
@@ -62,6 +63,7 @@ struct LinkedImagesCatalogGrid: View {
                 from: images,
                 sort: sortOption,
                 policy: groupingPolicy,
+                precision: StashImageSessionPrecision(rawValue: groupSessionPrecisionRaw) ?? .hour,
                 groupEnabled: true,
                 sessionCache: &sessionKeyCache
             )

@@ -21,6 +21,30 @@ enum StashImageSetGroupingPolicy: String, CaseIterable {
     }
 }
 
+/// How exact the timestamp in a filename has to match for two images to land in one set.
+enum StashImageSessionPrecision: String, CaseIterable {
+    case day
+    case hour
+    case minute
+
+    var displayName: String {
+        switch self {
+        case .day: return "Day"
+        case .hour: return "Day + hour"
+        case .minute: return "Day + hour + minute"
+        }
+    }
+
+    /// Characters of the normalized `YYYY-MM-DD_HH-MM-SS` key that still count.
+    var keyLength: Int {
+        switch self {
+        case .day: return 10      // 2026-01-12
+        case .hour: return 13     // 2026-01-12_12
+        case .minute: return 16   // 2026-01-12_12-39
+        }
+    }
+}
+
 enum StashImageFilenameKeys {
     static func filenameStem(from path: String) -> String {
         let raw = path.components(separatedBy: "?").first ?? path
@@ -37,11 +61,10 @@ enum StashImageFilenameKeys {
            let match = filename.range(of: #"(?<=_-_).+(?=_\d+$)"#, options: .regularExpression) {
             return String(filename[match])
         }
-        // Importer: "wolke11-2026-06-24_07-42-44_0" -> "2026-06-24_07". Bewusst nur Tag + Stunde:
-        // ein Importlauf liefert Dateien mit leicht abweichenden Sekunden/Minuten, die trotzdem
-        // ein Set sind.
+        // Importer: "wolke11-2026-06-24_07-42-44_0" -> "2026-06-24_07-42-44". Wie genau davon
+        // zählt, entscheidet `StashImageSessionPrecision` beim Kürzen.
         if let match = filename.range(
-            of: #"(\d{4}-\d{2}-\d{2}_\d{2})(?=-\d{2}-\d{2}_\d+$)"#,
+            of: #"\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}(?=_\d+$)"#,
             options: .regularExpression
         ) {
             return String(filename[match])
@@ -71,14 +94,22 @@ enum StashImageFilenameKeys {
         return candidates
     }
 
-    static func sessionKey(for image: StashImage, cache: inout [String: String]) -> String {
-        if let cached = cache[image.id] { return cached }
+    /// The filename timestamp, cut down to the configured precision. The cache always holds the
+    /// full timestamp, so changing the precision setting needs no cache reset.
+    static func sessionKey(
+        for image: StashImage,
+        cache: inout [String: String],
+        precision: StashImageSessionPrecision = .hour
+    ) -> String {
+        if let cached = cache[image.id] {
+            return String(cached.prefix(precision.keyLength))
+        }
 
         for raw in filenameCandidates(for: image) {
             let filename = filenameStem(from: raw)
             if let key = parseSessionFromFilename(filename) {
                 cache[image.id] = key
-                return key
+                return String(key.prefix(precision.keyLength))
             }
         }
 
@@ -128,9 +159,10 @@ enum StashImageFilenameKeys {
     static func groupKey(
         for image: StashImage,
         policy: StashImageSetGroupingPolicy = .sessionThenMeta,
+        precision: StashImageSessionPrecision = .hour,
         sessionCache: inout [String: String]
     ) -> String {
-        let session = sessionKey(for: image, cache: &sessionCache)
+        let session = sessionKey(for: image, cache: &sessionCache, precision: precision)
         if !session.isEmpty {
             return "session|\(session)"
         }
@@ -155,6 +187,7 @@ enum StashImageFilenameKeys {
         from images: [StashImage],
         sort: StashDBViewModel.ImageSortOption,
         policy: StashImageSetGroupingPolicy = .sessionThenMeta,
+        precision: StashImageSessionPrecision = .hour,
         groupEnabled: Bool = true,
         sessionCache: inout [String: String]
     ) -> [(id: String, images: [StashImage])] {
@@ -166,7 +199,7 @@ enum StashImageFilenameKeys {
         var metaCandidates: [StashImage] = []
 
         for image in images {
-            let session = sessionKey(for: image, cache: &sessionCache)
+            let session = sessionKey(for: image, cache: &sessionCache, precision: precision)
             if !session.isEmpty {
                 let key = "session|\(session)"
                 if sessionGroups[key] == nil {
@@ -198,7 +231,8 @@ enum StashImageFilenameKeys {
             sessionGroups: sessionGroups,
             metaById: metaById,
             sessionCache: &sessionCache,
-            policy: policy
+            policy: policy,
+            precision: precision
         )
     }
 
@@ -264,7 +298,8 @@ enum StashImageFilenameKeys {
         sessionGroups: [String: [StashImage]],
         metaById: [String: [StashImage]],
         sessionCache: inout [String: String],
-        policy: StashImageSetGroupingPolicy
+        policy: StashImageSetGroupingPolicy,
+        precision: StashImageSessionPrecision
     ) -> [(id: String, images: [StashImage])] {
         var imageToMetaId: [String: String] = [:]
         for (id, imgs) in metaById {
@@ -275,7 +310,7 @@ enum StashImageFilenameKeys {
         var result: [(id: String, images: [StashImage])] = []
 
         for image in ordered {
-            let session = sessionKey(for: image, cache: &sessionCache)
+            let session = sessionKey(for: image, cache: &sessionCache, precision: precision)
             if !session.isEmpty {
                 let key = "session|\(session)"
                 guard !seen.contains(key) else { continue }
