@@ -673,7 +673,7 @@ private struct TVTabVisibilitySettingsView: View {
     var body: some View {
         List {
             Section {
-                tabVisibilityRow(.reels, label: "Feeds", icon: "play.rectangle.on.rectangle")
+                // No Feeds row: tvOS has no Feeds section, so the toggle controlled nothing.
                 tabVisibilityRow(.scenes, label: "Scenes", icon: "film.fill")
                 tabVisibilityRow(.performers, label: "Performers", icon: "person.3.fill")
                 tabVisibilityRow(.studios, label: "Studios", icon: "building.2.fill")
