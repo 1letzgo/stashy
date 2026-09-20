@@ -57,6 +57,9 @@ struct SceneDetailView: View {
     /// Set when the page is left while the video plays (another tab, a pushed page). The engine
     /// is torn down then, so coming back starts it again at the position it had.
     @State private var resumeOnReturn: (wasPlaying: Bool, position: Double)?
+    /// Stash's scrubber sprite sheet for this scene — the scrub preview's first source. Held
+    /// here so the sheet is fetched once and both the inline player and fullscreen share it.
+    @State private var scrubSprites: SceneScrubSprites?
     /// The transcode-fallback toast is shown once per screen, not once per rung.
     @State private var didAnnounceTranscodeFallback = false
     @State private var showingAddMarkerSheet = false
@@ -554,7 +557,11 @@ struct SceneDetailView: View {
             .fullScreenCover(isPresented: $isFullscreen) {
                 fullscreenPlayer
             }
-            .onAppear { configureExtrasController() }
+            .onAppear {
+                configureExtrasController()
+                refreshScrubSprites()
+            }
+            .onChange(of: activeScene.id) { _, _ in refreshScrubSprites() }
             .onChange(of: aetherEngine.map(ObjectIdentifier.init)) { _, _ in
                 configureExtrasController()
             }
@@ -631,9 +638,10 @@ struct SceneDetailView: View {
                         showingFullscreenAddMarkerSheet = true
                     },
                     extraMenuItems: { extrasController.menuItems() },
-                                subtitleMenuExtras: { extrasController.aiSubtitleMenuItems() },
-                                onHostSubtitleOff: { extrasController.turnOffAISubtitles() },
-                                onOptionsMenuClosed: { extrasController.optionsMenuClosed() }
+                    subtitleMenuExtras: { extrasController.aiSubtitleMenuItems() },
+                    onHostSubtitleOff: { extrasController.turnOffAISubtitles() },
+                    onOptionsMenuClosed: { extrasController.optionsMenuClosed() },
+                    scrubSprites: scrubSprites
                 )
                 // Only the black backdrop bleeds under the notch and home indicator; the
                 // surface (and with it the transport) stays inside the safe area so every
@@ -664,6 +672,12 @@ struct SceneDetailView: View {
         // No `onKeyPress` here: the key handlers on the cover sat in the keyboard event chain
         // of the add-marker sheet and froze the app in landscape as soon as the keyboard
         // came up. (The ±15 s arrow-key skip for hardware keyboards went with it.)
+    }
+
+    /// Rebuilt whenever the scene changes; nil when the server has no sprites for it, and the
+    /// preview then falls back to decoding frames.
+    private func refreshScrubSprites() {
+        scrubSprites = SceneScrubSprites(vttPath: activeScene.paths?.vtt, spritePath: activeScene.paths?.sprite)
     }
 
     private func configureExtrasController() {

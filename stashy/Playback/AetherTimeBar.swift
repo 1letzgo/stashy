@@ -22,6 +22,9 @@ struct AetherTimeBar: View {
     var isScrubbing: Bool
     /// Scrub-Still. `nil` zeigt den dunklen Platzhalter, damit die Vorschau nicht springt.
     var previewImage: UIImage?
+    /// Shown until the first preview frame exists — the scene cover reads better than the
+    /// black box the decode used to leave behind for its first second.
+    var previewPlaceholderURL: URL?
     /// Marker-Positionen (Sekunden) als Punkte auf dem Track. Leer blendet sie aus.
     var markerSeconds: [Double] = []
     /// Marker positions with titles: the dots take the accent colour and the scrub preview
@@ -140,6 +143,15 @@ struct AetherTimeBar: View {
                     Image(uiImage: previewImage)
                         .resizable()
                         .scaledToFill()
+                } else if let previewPlaceholderURL {
+                    CustomAsyncImage(url: previewPlaceholderURL) { @MainActor loader in
+                        if let image = loader.image {
+                            image
+                                .resizable()
+                                .scaledToFill()
+                                .opacity(0.55)
+                        }
+                    }
                 }
             }
             .frame(width: previewWidth, height: previewHeight)

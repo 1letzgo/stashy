@@ -43,6 +43,9 @@ struct AetherSceneSurface: View {
     var onHostSubtitleOff: () -> Void = {}
     /// The "…" menu closed — the host resets transient menu state (an expanded picker).
     var onOptionsMenuClosed: () -> Void = {}
+    /// Stash's scrubber sprite sheet for this scene. Read instantly and available from the
+    /// first second; frame extraction only runs when a scene has none.
+    var scrubSprites: SceneScrubSprites? = nil
 
     @ObservedObject private var tabManager = TabManager.shared
     @StateObject private var pip = AetherPictureInPictureCoordinator()
@@ -1067,9 +1070,12 @@ struct AetherSceneSurface: View {
             duration: max(engine.duration, 0),
             isScrubbing: isScrubbing,
             previewImage: scrubPreviewImage,
+            previewPlaceholderURL: posterURL,
             markers: markers,
             isCompact: isCompact,
             onScrubChanged: { seconds in
+                // Fetches sheet + index once per scene, on the first scrub rather than on load.
+                scrubSprites?.prepare()
                 isScrubbing = true
                 scrubSeconds = seconds
                 requestScrubPreview(at: seconds)
@@ -1091,6 +1097,11 @@ struct AetherSceneSurface: View {
     private func requestScrubPreview(at seconds: Double) {
         if scrubPreviewTask != nil {
             scrubPreviewPendingSeconds = seconds
+            return
+        }
+        // The sprite sheet answers without a decode, so it needs no task and no queue.
+        if let sprites = scrubSprites, let tile = sprites.thumbnail(at: seconds) {
+            scrubPreviewImage = tile
             return
         }
         scrubPreviewPendingSeconds = nil

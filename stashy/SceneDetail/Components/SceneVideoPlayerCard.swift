@@ -24,6 +24,8 @@ struct SceneVideoPlayerCard: View {
     @ObservedObject var transcriptionController: SceneLiveTranscriptionController
     /// Sonderfunktionen im "…"-Menü des Players; geteilt mit dem Fullscreen-Cover.
     @ObservedObject var extrasController: ScenePlayerExtrasController
+    /// The scene's scrubber sprite sheet, built once by the host.
+    var scrubSprites: SceneScrubSprites?
 
     @StateObject private var previewPlayer = AetherPreviewPlayer()
 
@@ -63,7 +65,8 @@ struct SceneVideoPlayerCard: View {
                                 extraMenuItems: { extrasController.menuItems() },
                                 subtitleMenuExtras: { extrasController.aiSubtitleMenuItems() },
                                 onHostSubtitleOff: { extrasController.turnOffAISubtitles() },
-                                onOptionsMenuClosed: { extrasController.optionsMenuClosed() }
+                                onOptionsMenuClosed: { extrasController.optionsMenuClosed() },
+                                scrubSprites: scrubSprites
                             )
                         }
                     }
