@@ -442,6 +442,16 @@ class TabManager: ObservableObject {
     }
     static let playerSkipOptions: [Double] = [5, 10, 15, 30]
 
+    /// Settings › Playback › "Autozoom". Landscape fullscreen fills the screen by itself when
+    /// filling costs little of the picture — a 16:9 video on a 19.5:9 phone, not a 21:9 film.
+    @Published var playerAutoZoom: Bool = false {
+        didSet {
+            UserDefaults.standard.set(playerAutoZoom, forKey: playerAutoZoomKey)
+        }
+    }
+    /// Share of the picture the fill may cut off before Autozoom leaves it letterboxed.
+    static let autoZoomMaximumCrop: Double = 0.15
+
     /// Settings › Playback › "Skip buttons". Off leaves the skip on the double tap alone.
     @Published var showsPlayerSkipButtons: Bool = true {
         didSet {
@@ -592,6 +602,7 @@ class TabManager: ObservableObject {
     private let isPiPEnabledKey = "isPiPEnabled"
     private let playerSkipSecondsKey = "playerSkipSeconds"
     private let showsPlayerSkipButtonsKey = "showsPlayerSkipButtons"
+    private let playerAutoZoomKey = "playerAutoZoom"
     private let playerDolbyVisionEnabledKey = "player_dolby_vision_enabled"
     private let downloadBatchSizeKey = "download_batch_size"
     private let sceneDownloadBatchSizeKey = "scene_download_batch_size"
@@ -649,6 +660,7 @@ class TabManager: ObservableObject {
         let storedSkip = UserDefaults.standard.object(forKey: playerSkipSecondsKey) as? Double ?? 10
         self.playerSkipSeconds = Self.playerSkipOptions.contains(storedSkip) ? storedSkip : 10
         self.showsPlayerSkipButtons = UserDefaults.standard.object(forKey: showsPlayerSkipButtonsKey) as? Bool ?? true
+        self.playerAutoZoom = UserDefaults.standard.object(forKey: playerAutoZoomKey) as? Bool ?? false
         self.playerDolbyVisionEnabled = UserDefaults.standard.object(forKey: playerDolbyVisionEnabledKey) as? Bool ?? true
         let storedBatch = UserDefaults.standard.object(forKey: downloadBatchSizeKey) as? Int ?? 50
         self.downloadBatchSize = Self.downloadBatchSizeOptions.contains(storedBatch) ? storedBatch : 50

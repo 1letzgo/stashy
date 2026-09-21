@@ -154,6 +154,7 @@ struct AetherSceneSurface: View {
                     || abs(size.height - surfaceSize.height) > 0.5 else { return }
             surfaceHeight = size.height
             surfaceSize = size
+            applyAutoZoomIfNeeded()
         }
         .onReceive(NotificationCenter.default.publisher(for: .stashyHardwareVolumeChanged)) { _ in
             volumeLevel = AVAudioSession.sharedInstance().outputVolume
@@ -193,6 +194,15 @@ struct AetherSceneSurface: View {
             // letterboxed, and the fill mode is opted into per fullscreen session.
             fillsScreen = false
             engine.setVideoGravity(.resizeAspect)
+            applyAutoZoomIfNeeded()
+        }
+        // `sourceSize` is not published; the first frame is, and it is the point the size is
+        // settled — Autozoom needs both that and the surface geometry.
+        .onChange(of: engine.hasFirstFrame) { _, ready in
+            if ready { applyAutoZoomIfNeeded() }
+        }
+        .onChange(of: isFullscreen) { _, _ in
+            applyAutoZoomIfNeeded()
         }
         .onChange(of: fillsScreen) { _, fills in
             engine.setVideoGravity(fills ? .resizeAspectFill : .resizeAspect)
@@ -353,6 +363,30 @@ struct AetherSceneSurface: View {
     private var isCompact: Bool { isFullscreen || (surfaceHeight > 0 && surfaceHeight < 260) }
     private var skipButtonSize: CGFloat { isCompact ? 44 : 66 }
     private var playButtonSize: CGFloat { isCompact ? 64 : 96 }
+    /// Filling only makes sense where the picture is wider than tall on screen; in portrait it
+    /// would cut away most of a 16:9 frame.
+    private var isLandscape: Bool { surfaceSize.width > surfaceSize.height }
+    /// Fullscreen in landscape: everything about zoom lives here — the button, the pinch and
+    /// Autozoom.
+    private var allowsFillControls: Bool { isFullscreen && isLandscape }
+
+    /// Share of the picture a fill would cut off, 0 when the video matches the screen.
+    private var fillCropFraction: Double? {
+        guard let source = engine.sourceSize, source.width > 0, source.height > 0,
+              surfaceSize.width > 0, surfaceSize.height > 0 else { return nil }
+        let video = Double(source.width / source.height)
+        let screen = Double(surfaceSize.width / surfaceSize.height)
+        guard video > 0, screen > 0 else { return nil }
+        return 1 - min(video / screen, screen / video)
+    }
+
+    /// Settings › Playback › "Autozoom": fills by itself while the loss stays small, so a 16:9
+    /// scene uses the whole phone and a 21:9 film keeps its bars.
+    private func applyAutoZoomIfNeeded() {
+        guard tabManager.playerAutoZoom, allowsFillControls, !fillsScreen,
+              let crop = fillCropFraction, crop <= TabManager.autoZoomMaximumCrop else { return }
+        fillsScreen = true
+    }
     private var centerSpacing: CGFloat { isCompact ? 24 : 70 }
     /// Width of the pillarbox on each side in fullscreen (aspect-fit), 0 when the picture
     /// spans the surface, is cropped to fill, or inline.
@@ -386,7 +420,7 @@ struct AetherSceneSurface: View {
             }
             // Fullscreen: pinch open fills the screen, pinch closed fits the picture — the
             // same two states the fill button switches, on the gesture every photo app uses.
-            .modifier(AetherFillPinchGesture(isEnabled: isFullscreen, fillsScreen: $fillsScreen) {
+            .modifier(AetherFillPinchGesture(isEnabled: allowsFillControls, fillsScreen: $fillsScreen) {
                 revealControls()
             })
 
@@ -712,7 +746,7 @@ struct AetherSceneSurface: View {
     /// Fullscreen only: the fill toggle. (Options live next to the volume capsule.)
     @ViewBuilder
     private var bottomTrailingControls: some View {
-        if isFullscreen { fillButton }
+        if allowsFillControls { fillButton }
     }
 
     /// Non-interactive marker: this session is not playing the original file.
