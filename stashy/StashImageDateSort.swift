@@ -7,20 +7,6 @@
 
 import Foundation
 
-enum StashImageSetGroupingPolicy: String, CaseIterable {
-    /// Only merge when a filename session timestamp is present.
-    case sessionOnly
-    /// Session first; otherwise same created day + performers + galleries.
-    case sessionThenMeta
-
-    var displayName: String {
-        switch self {
-        case .sessionOnly: return "Leave as single images"
-        case .sessionThenMeta: return "Same day, performers, gallery"
-        }
-    }
-}
-
 /// How exact the `created` timestamp has to match for two images to land in one set.
 enum StashImageSessionPrecision: String, CaseIterable {
     case day
@@ -181,12 +167,11 @@ enum StashImageFilenameKeys {
     /// by their metadata: same galleries, and performer sets that are equal or one a subset of
     /// the other. The timestamp narrows the rule, it does not replace it — two unrelated
     /// galleries imported in the same minute stay two posts. Images without a timestamp fall
-    /// back to same day + galleries + performers under `.sessionThenMeta`, and stay single
-    /// under `.sessionOnly`. Post order and frame order follow API appearance order.
+    /// back to the same day plus those same metadata rules. Post order and frame order follow
+    /// API appearance order.
     static func buildPosts(
         from images: [StashImage],
         sort: StashDBViewModel.ImageSortOption,
-        policy: StashImageSetGroupingPolicy = .sessionThenMeta,
         precision: StashImageSessionPrecision = .hour,
         groupEnabled: Bool = true,
         sessionCache: inout [String: String]
@@ -224,8 +209,9 @@ enum StashImageFilenameKeys {
                 guard galleries[i] == galleries[j],
                       performersCompatible(performerSets[i], performerSets[j]) else { continue }
                 let sharesSession = !sessions[i].isEmpty && sessions[i] == sessions[j]
-                let sharesDay = policy == .sessionThenMeta
-                    && sessions[i].isEmpty && sessions[j].isEmpty
+                // No timestamp on either side: the metadata alone has to carry the set, and it
+                // needs a day to hold on to.
+                let sharesDay = sessions[i].isEmpty && sessions[j].isEmpty
                     && !days[i].isEmpty && days[i] == days[j]
                     && (!performerSets[i].isEmpty || !galleries[i].isEmpty)
                 guard sharesSession || sharesDay else { continue }

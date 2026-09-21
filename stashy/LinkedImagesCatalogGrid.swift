@@ -25,7 +25,6 @@ struct LinkedImagesCatalogGrid: View {
 
     @ObservedObject private var tabManager = TabManager.shared
     @AppStorage("stashline_group_sets") private var groupIntoSets = true
-    @AppStorage("stashline_group_fallback") private var groupFallbackRaw = StashImageSetGroupingPolicy.sessionThenMeta.rawValue
     @AppStorage("stashline_group_session_precision") private var groupSessionPrecisionRaw = StashImageSessionPrecision.hour.rawValue
     @AppStorage("images_feed_video_autoplay") private var imagesFeedVideoAutoplay = true
     @State private var sessionKeyCache: [String: String] = [:]
@@ -53,16 +52,11 @@ struct LinkedImagesCatalogGrid: View {
         feedAutoplayGateOpen
     }
 
-    private var groupingPolicy: StashImageSetGroupingPolicy {
-        StashImageSetGroupingPolicy(rawValue: groupFallbackRaw) ?? .sessionThenMeta
-    }
-
     private var oneColumnPosts: [(id: String, images: [StashImage])] {
         if groupIntoSets {
             return StashImageFilenameKeys.buildPosts(
                 from: images,
                 sort: sortOption,
-                policy: groupingPolicy,
                 precision: StashImageSessionPrecision(rawValue: groupSessionPrecisionRaw) ?? .hour,
                 groupEnabled: true,
                 sessionCache: &sessionKeyCache
@@ -206,9 +200,6 @@ struct LinkedImagesCatalogGrid: View {
             sessionKeyCache.removeAll(keepingCapacity: true)
         }
         .onChange(of: groupIntoSets) { _, _ in
-            sessionKeyCache.removeAll(keepingCapacity: true)
-        }
-        .onChange(of: groupFallbackRaw) { _, _ in
             sessionKeyCache.removeAll(keepingCapacity: true)
         }
     }

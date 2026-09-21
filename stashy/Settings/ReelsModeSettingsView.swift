@@ -13,7 +13,6 @@ struct ReelsModeSettingsView: View {
     @ObservedObject var appearanceManager = AppearanceManager.shared
     /// Feeds → Pics / Images 1-Spalten-Feed: Bilder einer Session bzw. gleicher Metadaten als Set.
     @AppStorage("stashline_group_sets") private var groupIntoSets = true
-    @AppStorage("stashline_group_fallback") private var groupFallbackRaw = StashImageSetGroupingPolicy.sessionThenMeta.rawValue
     @AppStorage("stashline_group_session_precision") private var groupSessionPrecisionRaw = StashImageSessionPrecision.hour.rawValue
     @StateObject private var viewModel = StashDBViewModel()
 
@@ -102,20 +101,6 @@ struct ReelsModeSettingsView: View {
                                             ForEach(StashImageSessionPrecision.allCases, id: \.self) { option in
                                                 Button(action: { groupSessionPrecisionRaw = option.rawValue }) {
                                                     HStack { Text(option.displayName); if option == current { Image(systemName: "checkmark") } }
-                                                }
-                                            }
-                                        } label: {
-                                            pickerLabelText(current.displayName)
-                                        }
-                                    }
-                                    .padding(.top, 4)
-
-                                    reelsSettingRow(title: "No created time") {
-                                        let current = StashImageSetGroupingPolicy(rawValue: groupFallbackRaw) ?? .sessionThenMeta
-                                        Menu {
-                                            ForEach(StashImageSetGroupingPolicy.allCases, id: \.self) { policy in
-                                                Button(action: { groupFallbackRaw = policy.rawValue }) {
-                                                    HStack { Text(policy.displayName); if policy == current { Image(systemName: "checkmark") } }
                                                 }
                                             }
                                         } label: {
