@@ -327,7 +327,9 @@ struct SceneDetailView: View {
         GeometryReader { proxy in
         VStack(spacing: 12) {
             // Pinned only while the player runs: then it keeps its place at the top and the
-            // page scrolls underneath. On the cover it scrolls along, as before.
+            // page scrolls underneath. On the cover it scrolls along, as before. The swap
+            // between the two places is not animated — SwiftUI slid the cover down and out
+            // of the page on the way.
             if isPlayerPinned {
                 playerCardView
                     .padding(.horizontal, 16)
@@ -556,6 +558,7 @@ struct SceneDetailView: View {
             .frame(width: proxy.size.width)
             }
         }
+        .animation(nil, value: isPlayerPinned)
         }
     }
 
