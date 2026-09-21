@@ -392,9 +392,11 @@ struct AetherSceneSurface: View {
             // on the double-tap regions left and right of the centre.
             // The jumps wait for the first frame: while the scene loads, `markerSeconds`
             // and the playhead settle in steps, which made the buttons blink in and out.
-            HStack(spacing: centerSpacing) {
+            HStack(spacing: showsMarkerJumps ? centerSpacing * 0.6 : centerSpacing) {
                 if showsMarkerJumps { markerJumpButton(forward: false, large: true) }
+                skipButton(forward: false)
                 playPauseGlyph
+                skipButton(forward: true)
                 if showsMarkerJumps { markerJumpButton(forward: true, large: true) }
             }
             .transaction { $0.animation = nil }
@@ -617,6 +619,32 @@ struct AetherSceneSurface: View {
         .buttonStyle(.plain)
         .disabled(target == nil)
         .accessibilityLabel(forward ? "Next marker" : "Previous marker")
+    }
+
+    /// ±`playerSkipSeconds` as a button, with the configured seconds inside the arrow — the
+    /// double-tap regions left and right still do the same, but are invisible to anyone who
+    /// does not know about them.
+    @ViewBuilder
+    private func skipButton(forward: Bool) -> some View {
+        let seconds = tabManager.playerSkipSeconds
+        Button {
+            // `skip(by:)` carries the haptic and the controls reveal.
+            skip(by: forward ? seconds : -seconds)
+        } label: {
+            ZStack {
+                Image(systemName: forward ? "arrow.trianglehead.clockwise" : "arrow.trianglehead.counterclockwise")
+                    .font(.system(size: isCompact ? 24 : 32, weight: .semibold))
+                Text("\(Int(seconds.rounded()))")
+                    .font(.system(size: isCompact ? 9 : 12, weight: .bold).monospacedDigit())
+                    .offset(y: isCompact ? 1 : 1.5)
+            }
+            .foregroundStyle(.white)
+            .frame(width: skipButtonSize, height: skipButtonSize)
+            .stashyGlass(shape: Circle())
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(forward ? "Forward \(Int(seconds.rounded())) seconds" : "Back \(Int(seconds.rounded())) seconds")
     }
 
     @ViewBuilder
