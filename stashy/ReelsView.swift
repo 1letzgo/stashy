@@ -4080,9 +4080,32 @@ struct ReelsViewBody: View {
                     currentVisibleSceneId = currentReelItems.first?.id
                     playTrigger += 1
                 }
+                refillFeedAfterDrops()
             }
         }
     }
+
+    /// Dropped rows leave the feed short: the last rows of a page carry the paging trigger, and
+    /// where a whole page had no files the feed ended up empty and reported "nothing found"
+    /// while the server still had pages. Whenever too few rows are left, the next page is asked
+    /// for directly.
+    private func refillFeedAfterDrops() {
+        guard reelsMode == .markers || reelsMode == .previews else { return }
+        guard currentReelItems.count < Self.minimumRowsBeforeRefill else { return }
+        switch reelsMode {
+        case .markers:
+            guard viewModel.hasMoreMarkers, !viewModel.isLoadingMarkers else { return }
+            viewModel.loadMoreMarkers()
+        case .previews:
+            guard viewModel.hasMorePreviews, !viewModel.isLoadingMorePreviews else { return }
+            viewModel.loadMorePreviews()
+        default:
+            break
+        }
+    }
+
+    /// Rows that have to remain for the feed to page on its own again.
+    private static let minimumRowsBeforeRefill = 5
 
     /// True only for a definite "this file does not exist".
     private static func generatedFileIsMissing(at url: URL) async -> Bool {
@@ -4116,6 +4139,7 @@ struct ReelsViewBody: View {
             currentVisibleSceneId = successorId ?? currentReelItems.first?.id
             playTrigger += 1
         }
+        refillFeedAfterDrops()
     }
 
     private func advanceToNextItem(from item: ReelItemData) {
