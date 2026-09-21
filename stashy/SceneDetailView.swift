@@ -296,28 +296,38 @@ struct SceneDetailView: View {
         // The reader sits *outside* the ScrollView, so it reports the space available to the
         // view rather than the width its own content ended up needing.
         GeometryReader { proxy in
-        ScrollView {
+        VStack(spacing: 12) {
+            // The player is pinned: it keeps its place at the top while the page scrolls
+            // underneath, so the video stays visible while reading performers, tags, markers.
+            VStack(spacing: 0) {
+                SceneVideoPlayerCard(
+                    activeScene: $activeScene,
+                    aetherEngine: aetherEngine,
+                    isPlaybackStarted: $isPlaybackStarted,
+                    isFullscreen: $isFullscreen,
+                    isPreviewing: $isPreviewing,
+                    isMuted: $isMuted,
+                    onAddMarker: {
+                        capturedMarkerTime = aetherEngine?.currentTime ?? 0
+                        showingAddMarkerSheet = true
+                    },
+                    subtitleController: subtitleController,
+                    transcriptionController: transcriptionController,
+                    extrasController: extrasController,
+                    onSeek: { seconds in seekTo(seconds) },
+                    onStartPlayback: { resume in startPlayback(resume: resume) }
+                )
+            }
+            .background(Color.secondaryAppBackground)
+            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+            .cardShadow()
+            .padding(.horizontal, 16)
+            .padding(.top, 16)
+
+            ScrollView {
             VStack(spacing: 12) {
                 VStack(spacing: 0) {
-                    SceneVideoPlayerCard(
-                        activeScene: $activeScene,
-                        aetherEngine: aetherEngine,
-                        isPlaybackStarted: $isPlaybackStarted,
-                        isFullscreen: $isFullscreen,
-                        isPreviewing: $isPreviewing,
-                        isMuted: $isMuted,
-                        onAddMarker: {
-                            capturedMarkerTime = aetherEngine?.currentTime ?? 0
-                            showingAddMarkerSheet = true
-                        },
-                        subtitleController: subtitleController,
-                        transcriptionController: transcriptionController,
-                        extrasController: extrasController,
-                        onSeek: { seconds in seekTo(seconds) },
-                        onStartPlayback: { resume in startPlayback(resume: resume) }
-                    )
-
-                    SceneDetailMetadataCard(
+                                        SceneDetailMetadataCard(
                         activeScene: $activeScene,
                         aetherEngine: aetherEngine,
                         isHeaderExpanded: $isHeaderExpanded,
@@ -521,13 +531,14 @@ struct SceneDetailView: View {
                 }
             }
             .padding(.horizontal, 16)
-            .padding(.vertical, 16)
+            .padding(.bottom, 16)
             // Pins the content to the viewport width. Without this a single unbreakable
             // string (long file-name title, URL in the details) grows the scroll content
             // sideways, and the horizontal drag then pans the cards instead of triggering
             // the interactive back gesture. `containerRelativeFrame` looked right but
             // reported half the width in landscape, where the size class turns regular.
             .frame(width: proxy.size.width)
+            }
         }
         }
     }
