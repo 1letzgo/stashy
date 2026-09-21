@@ -264,6 +264,19 @@ private struct StashyExpandingDockChip: View {
     let onSelect: () -> Void
 
     @ObservedObject private var appearance = AppearanceManager.shared
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+
+    /// The capsule's width is animated by the strip's spring, and the label rides inside it
+    /// behind a clip. Fading it on the same curve meant it was still readable while the width
+    /// was still moving: the text appeared to smear out of the pill. It now leaves quickly and
+    /// comes back only once the capsule has almost finished opening.
+    private var labelAnimation: Animation? {
+        guard !reduceMotion else { return nil }
+        return isSelected
+            // The width spring runs ~0.32 s; the label waits it out and then fades in.
+            ? .easeOut(duration: 0.10).delay(0.26)
+            : .linear(duration: 0.01)
+    }
 
     private var activeBackground: Color { appearance.tintColor }
     private var activeForeground: Color { .white }
@@ -288,6 +301,7 @@ private struct StashyExpandingDockChip: View {
                     .lineLimit(1)
                     .fixedSize(horizontal: true, vertical: false)
                     .opacity(isSelected ? 1 : 0)
+                    .animation(labelAnimation, value: isSelected)
                     .frame(width: isSelected ? nil : 0, alignment: .leading)
                     .clipped()
             }
