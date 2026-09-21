@@ -1023,16 +1023,12 @@ struct ReelsViewBody: View {
                 if let flat { reelsApplyAuxIdsFromLiveFragment(flat) }
             }
         }
-        let applied: StashDBViewModel.SavedFilter? = {
-            guard let meta = f.stashyScenePresetMetadata else { return f }
-            guard let bid = meta.baseSavedFilterId else { return nil }
-            return viewModel.savedFilters[bid]
-        }()
-        // A stashy-saved filter without a base keeps its criteria in itself, not in the chip
-        // fragment: reading only the fragment left the feed with no criteria at all.
-        let criteriaSource = applied ?? f
-        reelsLoadPresetCriteria(f.stashyScenePresetMetadata?.liveFragment ?? [:], base: criteriaSource)
-        reelsApplySceneLiveFromSheet(appliedFilter: applied, filterWasPicked: true)
+        // The picked filter stays the selection, wrapper or not. Resolving it down to its base
+        // (nil for a stashy filter without one) made the sheet's row fall back to "None" on the
+        // next sync, and that immediately refetched the feed unfiltered. Its criteria are
+        // mirrored into the editor on top, so the sheet shows what is filtering.
+        reelsLoadPresetCriteria(f.stashyScenePresetMetadata?.liveFragment ?? [:], base: f)
+        reelsApplySceneLiveFromSheet(appliedFilter: f, filterWasPicked: true)
     }
 
     private func reelsSaveSceneLivePresetOverwrite() {
