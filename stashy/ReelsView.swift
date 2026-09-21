@@ -4085,11 +4085,21 @@ struct ReelsViewBody: View {
             }
             guard !missing.isEmpty else { return }
             let currentId = currentVisibleSceneId
+            // The successor has to be read before the rows leave the list: the next surviving
+            // row after the current one, not the feed's first row (that threw the user back
+            // to the top).
+            let successorId: String? = currentId.flatMap { id in
+                let all = currentReelItems
+                guard let index = all.firstIndex(where: { $0.id == id }) else { return nil }
+                return all[(index + 1)...].first { !missing.contains($0.id) }?.id
+            }
             unplayableItemIds.formUnion(missing)
             AppLog.debug("🎬 Reels: \(missing.count) item(s) without a generated file removed")
             // The row under the finger is gone: move to whatever took its place.
             if let currentId, missing.contains(currentId) {
-                currentVisibleSceneId = currentReelItems.first?.id
+                currentVisibleSceneId = successorId ?? currentReelItems.first?.id
+                // Auto-advance is a play intent, even when a scroll phase paused the feed.
+                currentItemIsPlaying = true
                 playTrigger += 1
             }
             refillFeedAfterDrops()
@@ -4158,6 +4168,9 @@ struct ReelsViewBody: View {
         AppLog.debug("🎬 Reels: dropping \(item.id) — the server has no file for it")
         if currentVisibleSceneId == item.id {
             currentVisibleSceneId = successorId ?? currentReelItems.first?.id
+            // Auto-advance is a play intent: a scroll phase may have cleared it, and the
+            // successor's watchdog only kicks a row that wants to play.
+            currentItemIsPlaying = true
             playTrigger += 1
         }
         refillFeedAfterDrops()
@@ -4444,6 +4457,9 @@ struct ReelsViewBody: View {
             guard let mode = ReelsMode(rawValue: id), mode != reelsMode else { return }
             reelsMode = mode
         }
+        // The same air toward the content that `StashyTopNavNameDropdownRow` gives the strip in
+        // Home, Tools and Settings. Without it the Feeds chrome sat 4 pt shorter than the rest.
+        .padding(StashyChromePlacement.prefersBottom ? .top : .bottom, 4)
     }
 
     @ViewBuilder
@@ -5208,9 +5224,11 @@ extension ReelItemView {
             }
             .onDisappear {
                 // LazyVStack can call `onDisappear` briefly while the row is still the centered reel; tearing down
-                // the active engine there causes a second flash when paging settles.
-                disarmPlaybackWatchdog()
+                // the active engine there causes a second flash when paging settles. The watchdog stays
+                // armed for the same reason: dropping a dead neighbour reshuffles the stack, and a
+                // disarmed active row with a dead file never reported it — the feed sat on a black row.
                 guard !isActive else { return }
+                disarmPlaybackWatchdog()
                 shutdownScrubPreview()
                 cleanupPlayer()
                 cancelAnimationAdvanceTimer()
@@ -5297,6 +5315,8 @@ extension ReelItemView {
                         self.aetherPlayIfAllowed()
                     }
                 }
+                // A row that became active mid-scroll skipped the arming in `onChange(of: isActive)`.
+                armPlaybackWatchdog()
             }
             .onChange(of: tabManager.reelsContinuousPlay) { _, enabled in
                 aetherSetLoops(continuousPlay: enabled)
@@ -5785,32 +5805,35 @@ extension ReelItemView {
                 return
             }
 
-            // From here on the row has an engine — the remaining checks are about *playback*,
-            // so they must respect a pause the user tapped in the last 2.5s.
-            guard self.isPlaying else { return }
-
-            guard !self.isPlaybackMoving else {
-                // Playing but no decoded frame surfaced yet — force the readiness fallback.
-                if !self.videoSurfaceReadiness.showsDecodedVideo {
-                    AppLog.error("🎬 Reel watchdog: playing without decoded surface — forcing visibility")
-                    self.videoSurfaceReadiness.markFrameReady()
+            // From here on the row has an engine. The kick and the rebuild are about *playback*,
+            // so they respect a pause the user tapped in the last 2.5s; the "no media at all"
+            // backstop below does not — a paused row still has a duration, a dead one never.
+            if self.isPlaying {
+                guard !self.isPlaybackMoving else {
+                    // Playing but no decoded frame surfaced yet — force the readiness fallback.
+                    if !self.videoSurfaceReadiness.showsDecodedVideo {
+                        AppLog.error("🎬 Reel watchdog: playing without decoded surface — forcing visibility")
+                        self.videoSurfaceReadiness.markFrameReady()
+                    }
+                    return
                 }
-                return
-            }
-            self.aetherPlayIfAllowed()
-
-            if await cancellableSleep(nanoseconds: 1_200_000_000) { return }
-            guard self.isActive, self.isPlaying else { return }
-            if !self.isPlaybackMoving {
-                AppLog.error("🎬 Reel watchdog: playback stalled after kick — rebuilding")
-                self.cleanupPlayer()
-                self.setupPlayer()
                 self.aetherPlayIfAllowed()
+
+                if await cancellableSleep(nanoseconds: 1_200_000_000) { return }
+                guard self.isActive else { return }
+                if self.isPlaying, !self.isPlaybackMoving {
+                    AppLog.error("🎬 Reel watchdog: playback stalled after kick — rebuilding")
+                    self.cleanupPlayer()
+                    self.setupPlayer()
+                    self.aetherPlayIfAllowed()
+                }
+                if await cancellableSleep(nanoseconds: 1_500_000_000) { return }
+            } else {
+                if await cancellableSleep(nanoseconds: 2_700_000_000) { return }
             }
 
             // Backstop for a file that answers but plays nothing (a 0-byte generation, say):
             // the 404 case is already gone within a second through the availability probe.
-            if await cancellableSleep(nanoseconds: 1_500_000_000) { return }
             guard self.isActive else { return }
             if !self.isPlaybackMoving, !self.hasUsableMedia {
                 AppLog.error("🎬 Reel watchdog: no playable media for this row — skipping it")
