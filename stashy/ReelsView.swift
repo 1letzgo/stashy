@@ -4040,10 +4040,17 @@ struct ReelsViewBody: View {
     private func handleUnplayableItem(_ item: ReelItemData) {
         guard reelsMode == .markers || reelsMode == .previews else { return }
         guard !unplayableItemIds.contains(item.id) else { return }
+        // The successor has to be read before the item leaves the list — afterwards it cannot
+        // be found in it any more, and the feed would stay on the dead row.
+        let items = currentReelItems
+        let successorId: String? = items.firstIndex(where: { $0.id == item.id })
+            .map { $0 + 1 }
+            .flatMap { $0 < items.count ? items[$0].id : nil }
         unplayableItemIds.insert(item.id)
         AppLog.debug("🎬 Reels: dropping \(item.id) — the server has no file for it")
         if currentVisibleSceneId == item.id {
-            advanceToNextItem(from: item)
+            currentVisibleSceneId = successorId ?? currentReelItems.first?.id
+            playTrigger += 1
         }
     }
 
@@ -5665,7 +5672,27 @@ extension ReelItemView {
                 self.setupPlayer()
                 self.aetherPlayIfAllowed()
             }
+
+            // Last word on a marker / preview the server never generated: such a load reports
+            // no error at all, it just arrives with no duration and no frame, and the row then
+            // sat there forever. Give the rebuild a moment, then hand the item back.
+            if await cancellableSleep(nanoseconds: 2_500_000_000) { return }
+            guard self.isActive else { return }
+            if !self.isPlaybackMoving, !self.hasUsableMedia {
+                AppLog.error("🎬 Reel watchdog: no playable media for this row — skipping it")
+                self.engineErrorMessage = "No playable source"
+                self.onPlaybackUnavailable()
+            }
         }
+    }
+
+    /// True once the engine knows the item's length or has shown a frame of it. A file the
+    /// server never generated satisfies neither.
+    private var hasUsableMedia: Bool {
+        guard let engine = aetherEngine else { return false }
+        if engine.hasFirstFrame { return true }
+        let duration = engine.duration
+        return duration.isFinite && duration > 0.05
     }
 
     private func disarmPlaybackWatchdog() {
