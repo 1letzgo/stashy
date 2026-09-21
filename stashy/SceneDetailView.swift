@@ -544,6 +544,9 @@ struct SceneDetailView: View {
                 }
             }
             .padding(.horizontal, 16)
+            // Pinned, the card above already carries the gap under the chrome; unpinned the
+            // player is the first element and needs it here.
+            .padding(.top, isPlayerPinned ? 0 : 16)
             .padding(.bottom, 16)
             // Pins the content to the viewport width. Without this a single unbreakable
             // string (long file-name title, URL in the details) grows the scroll content
