@@ -527,9 +527,16 @@ struct AetherSceneSurface: View {
     }
 
     /// The route picker only does anything on a route that owns an AVPlayer; the software route
-    /// decodes into its own layer and cannot be mirrored. With neither control the capsule goes.
-    private var showsAirPlayButton: Bool {
+    /// decodes into its own layer and cannot be mirrored.
+    private var airPlayIsReady: Bool {
         engine.pipPlayerLayer != nil
+    }
+
+    /// Which route a session gets is only known once it has a picture, so waiting for that let
+    /// the button pop into the row seconds after the others. It is therefore in place from the
+    /// start, greyed out, and only disappears where the settled route cannot mirror at all.
+    private var showsAirPlayButton: Bool {
+        airPlayIsReady || !engine.hasFirstFrame
     }
 
     @ViewBuilder
@@ -548,15 +555,6 @@ struct AetherSceneSurface: View {
             .opacity(0.01)
             .allowsHitTesting(false)
             .accessibilityHidden(true)
-        // AirPlay is an entry in the options menu; the system picker still needs a live
-        // AVRoutePickerView to present from, so one sits here invisibly.
-        if showsAirPlayButton {
-            AetherRoutePickerView(trigger: airPlayTrigger)
-                .frame(width: 1, height: 1)
-                .opacity(0.01)
-                .allowsHitTesting(false)
-                .accessibilityHidden(true)
-        }
     }
 
     private func topRow(volumeWidth: CGFloat?) -> some View {
@@ -564,6 +562,9 @@ struct AetherSceneSurface: View {
             topLeadingControls
             Spacer(minLength: 12)
             optionsMenu
+            // AirPlay sits left of the volume/mute capsule, not in the options menu:
+            // one tap to the route sheet is what people reach for.
+            if showsAirPlayButton { airPlayButton }
             volumeControls(width: volumeWidth)
         }
     }
@@ -853,12 +854,6 @@ struct AetherSceneSurface: View {
         // AI subtitles are the host's own menu, next to (not inside) the video's tracks.
         items.append(contentsOf: subtitleMenuExtras())
 
-        if showsAirPlayButton {
-            items.append(.action(id: "player.airplay", title: "AirPlay", systemImage: "airplayvideo") {
-                airPlayTrigger.present()
-            })
-        }
-
         // Host rows bring their own section heading.
         items.append(contentsOf: extraMenuItems())
         return items
@@ -903,6 +898,20 @@ struct AetherSceneSurface: View {
             ? String(format: "%.0f", rounded)
             : String(format: "%g", rounded)
         return "\(text)×"
+    }
+
+    /// The real `AVRoutePickerView` on a glass circle. The tap goes straight to the system
+    /// control: presenting the sheet by poking the picker's button from a menu action
+    /// (the previous approach) only worked some of the time.
+    private var airPlayButton: some View {
+        AetherRoutePickerView(trigger: airPlayTrigger)
+            .frame(width: chromeButtonSize - 8, height: chromeButtonSize - 8)
+            .frame(width: chromeButtonSize, height: chromeButtonSize)
+            .stashyGlass(shape: Circle())
+            .opacity(airPlayIsReady ? 1 : 0.45)
+            .allowsHitTesting(airPlayIsReady)
+            .accessibilityLabel("AirPlay")
+            .accessibilityHidden(!airPlayIsReady)
     }
 
     @ViewBuilder
