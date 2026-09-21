@@ -27,7 +27,7 @@ struct PlaybackSettingsSection: View {
                         Text("\(Int(seconds)) s").tag(seconds)
                     }
                 } label: {
-                    Label("Double-tap skip", systemImage: "goforward")
+                    Label("Skip interval", systemImage: "goforward")
                 }
                 .stashyGroupedBlockRow(index: 1, count: 9)
 

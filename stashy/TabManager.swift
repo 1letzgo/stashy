@@ -434,7 +434,8 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(reelsContinuousPlay, forKey: reelsContinuousPlayKey)
         }
     }
-    /// Seconds a double tap on the player's outer thirds skips (Settings › Playback).
+    /// Seconds one skip covers — the skip buttons and a double tap on the player's outer
+    /// thirds (Settings › Playback › "Skip interval").
     @Published var playerSkipSeconds: Double = 10 {
         didSet {
             UserDefaults.standard.set(playerSkipSeconds, forKey: playerSkipSecondsKey)
