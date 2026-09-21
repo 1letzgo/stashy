@@ -384,6 +384,11 @@ struct AetherSceneSurface: View {
                 tapRegion(doubleTapSkip: nil, holdRewinds: false)
                 tapRegion(doubleTapSkip: tabManager.playerSkipSeconds, holdRewinds: false)
             }
+            // Fullscreen: pinch open fills the screen, pinch closed fits the picture — the
+            // same two states the fill button switches, on the gesture every photo app uses.
+            .modifier(AetherFillPinchGesture(isEnabled: isFullscreen, fillsScreen: $fillsScreen) {
+                revealControls()
+            })
 
             // Opacity instead of structural insertion: a conditional `if` plus a transition
             // proved unreliable over the UIKit-hosted player view (the re-inserted controls
@@ -394,9 +399,9 @@ struct AetherSceneSurface: View {
             // and the playhead settle in steps, which made the buttons blink in and out.
             HStack(spacing: showsMarkerJumps ? centerSpacing * 0.6 : centerSpacing) {
                 if showsMarkerJumps { markerJumpButton(forward: false, large: true) }
-                skipButton(forward: false)
+                if tabManager.showsPlayerSkipButtons { skipButton(forward: false) }
                 playPauseGlyph
-                skipButton(forward: true)
+                if tabManager.showsPlayerSkipButtons { skipButton(forward: true) }
                 if showsMarkerJumps { markerJumpButton(forward: true, large: true) }
             }
             .transaction { $0.animation = nil }
@@ -1424,6 +1429,32 @@ private final class AetherPictureInPictureCoordinator: NSObject, ObservableObjec
         DispatchQueue.main.async {
             self.isActive = active
             self.onActiveChange?(active)
+        }
+    }
+}
+
+/// Pinch on the picture switches between fit and fill while fullscreen. Deliberately only the
+/// two states the fill button has: a free zoom would have to carry panning, and the engine
+/// renders the layer's gravity rather than a transform of it.
+private struct AetherFillPinchGesture: ViewModifier {
+    let isEnabled: Bool
+    @Binding var fillsScreen: Bool
+    let onChange: () -> Void
+
+    func body(content: Content) -> some View {
+        if isEnabled {
+            content.simultaneousGesture(
+                MagnifyGesture(minimumScaleDelta: 0.1)
+                    .onEnded { value in
+                        let fills = value.magnification > 1
+                        guard fills != fillsScreen else { return }
+                        HapticManager.light()
+                        fillsScreen = fills
+                        onChange()
+                    }
+            )
+        } else {
+            content
         }
     }
 }

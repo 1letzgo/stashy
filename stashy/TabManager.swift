@@ -442,6 +442,13 @@ class TabManager: ObservableObject {
     }
     static let playerSkipOptions: [Double] = [5, 10, 15, 30]
 
+    /// Settings › Playback › "Skip buttons". Off leaves the skip on the double tap alone.
+    @Published var showsPlayerSkipButtons: Bool = true {
+        didSet {
+            UserDefaults.standard.set(showsPlayerSkipButtons, forKey: showsPlayerSkipButtonsKey)
+        }
+    }
+
     /// Settings › Playback › "Count as played after". Seconds of playback before a scene gets a
     /// play count and its progress is written back. 0 counts as soon as playback starts.
     /// Kept separate for the full player and for Feeds, where users skip through quickly.
@@ -584,6 +591,7 @@ class TabManager: ObservableObject {
     private let reelsContinuousPlayKey = "ReelsContinuousPlay"
     private let isPiPEnabledKey = "isPiPEnabled"
     private let playerSkipSecondsKey = "playerSkipSeconds"
+    private let showsPlayerSkipButtonsKey = "showsPlayerSkipButtons"
     private let playerDolbyVisionEnabledKey = "player_dolby_vision_enabled"
     private let downloadBatchSizeKey = "download_batch_size"
     private let sceneDownloadBatchSizeKey = "scene_download_batch_size"
@@ -640,6 +648,7 @@ class TabManager: ObservableObject {
         self.isPiPEnabled = UserDefaults.standard.object(forKey: isPiPEnabledKey) as? Bool ?? true
         let storedSkip = UserDefaults.standard.object(forKey: playerSkipSecondsKey) as? Double ?? 10
         self.playerSkipSeconds = Self.playerSkipOptions.contains(storedSkip) ? storedSkip : 10
+        self.showsPlayerSkipButtons = UserDefaults.standard.object(forKey: showsPlayerSkipButtonsKey) as? Bool ?? true
         self.playerDolbyVisionEnabled = UserDefaults.standard.object(forKey: playerDolbyVisionEnabledKey) as? Bool ?? true
         let storedBatch = UserDefaults.standard.object(forKey: downloadBatchSizeKey) as? Int ?? 50
         self.downloadBatchSize = Self.downloadBatchSizeOptions.contains(storedBatch) ? storedBatch : 50
