@@ -84,7 +84,14 @@ struct TVImagesView: View {
             }
         )
         .fullScreenCover(item: $presentedImage) { link in
-            TVImageDetailView(imageId: link.id, imageTitle: link.title, galleryId: link.galleryId)
+            TVImageDetailView(
+                imageId: link.id,
+                imageTitle: link.title,
+                galleryId: link.galleryId,
+                initialImages: displayImages,
+                onLoadMore: { viewModel.loadMoreImages() },
+                hasMore: viewModel.hasMoreImages
+            )
         }
         .onChange(of: sortBy) { _, newValue in
             focusResetToken += 1

@@ -227,7 +227,14 @@ struct TVGalleryDetailView: View {
         }
         .background(Color.appBackground)
         .fullScreenCover(item: $presentedImage) { link in
-            TVImageDetailView(imageId: link.id, imageTitle: link.title, galleryId: link.galleryId)
+            TVImageDetailView(
+                imageId: link.id,
+                imageTitle: link.title,
+                galleryId: link.galleryId,
+                initialImages: displayImages,
+                onLoadMore: { viewModel.fetchGalleryImages(galleryId: galleryId, isInitialLoad: false) },
+                hasMore: viewModel.hasMoreGalleryImages
+            )
         }
         .onAppear {
             loadGalleryData()

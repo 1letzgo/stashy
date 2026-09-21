@@ -12,6 +12,13 @@ struct TVImageDetailView: View {
     let imageTitle: String
     /// When set, Left/Right browse this gallery; otherwise the image library.
     var galleryId: String? = nil
+    /// The list the grid is showing, handed over so the viewer opens the image that was picked.
+    /// Its own fetch only knows page one of a default sort, so anything the user had scrolled to
+    /// was missing from it and the viewer fell back to the first image.
+    var initialImages: [StashImage] = []
+    /// Asks the grid's view model for the next page — the viewer no longer pages on its own.
+    var onLoadMore: (() -> Void)? = nil
+    var hasMore: Bool = false
 
     @StateObject private var viewModel = StashDBViewModel()
     @Environment(\.dismiss) private var dismiss
@@ -78,8 +85,13 @@ struct TVImageDetailView: View {
         .onAppear {
             loadImages()
         }
+        // More pages the grid loaded while the viewer is open.
+        .onChange(of: initialImages) { _, images in
+            guard !images.isEmpty else { return }
+            applyImages(images)
+        }
         .onChange(of: viewModel.allImages) { _, allImages in
-            guard galleryId == nil else { return }
+            guard galleryId == nil, initialImages.isEmpty else { return }
             applyImages(allImages)
         }
         .onChange(of: viewModel.galleryImages) { _, galleryImages in
@@ -138,6 +150,13 @@ struct TVImageDetailView: View {
         isLoading = true
         loadFailed = false
 
+        // The grid's own list: it holds every page the user scrolled through, in the sort and
+        // filter they are looking at.
+        if !initialImages.isEmpty {
+            applyImages(initialImages)
+            return
+        }
+
         if let galleryId {
             if !viewModel.galleryImages.isEmpty {
                 applyImages(viewModel.galleryImages)
@@ -190,12 +209,19 @@ struct TVImageDetailView: View {
 
     private func maybeLoadMoreIfNeeded() {
         guard let galleryId else {
-            if currentIndex >= images.count - 3, viewModel.hasMoreImages {
+            guard currentIndex >= images.count - 3 else { return }
+            // Paging belongs to whoever owns the list; the viewer only says when it needs more.
+            if let onLoadMore {
+                if hasMore { onLoadMore() }
+            } else if viewModel.hasMoreImages {
                 viewModel.loadMoreImages()
             }
             return
         }
-        if currentIndex >= images.count - 3, viewModel.hasMoreGalleryImages {
+        guard currentIndex >= images.count - 3 else { return }
+        if let onLoadMore {
+            if hasMore { onLoadMore() }
+        } else if viewModel.hasMoreGalleryImages {
             viewModel.fetchGalleryImages(galleryId: galleryId, isInitialLoad: false)
         }
     }
