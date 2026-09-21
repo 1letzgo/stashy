@@ -880,14 +880,22 @@ struct ReelsViewBody: View {
         applySettings(markerSortBy: new, markerFilter: selectedMarkerFilter, performer: selectedPerformer, tags: selectedTags, studio: selectedStudio, sceneLiveRefresh: true)
     }
 
-    private func reelsApplySceneLiveFromSheet() {
+    /// Applies what the sheet holds. `appliedFilter` is the filter just picked: the `@State`
+    /// assignment made a moment earlier is not readable yet inside the same SwiftUI update, so
+    /// reading `selectedFilter` here handed the fetch the *previous* filter — the feed stayed
+    /// unfiltered and only came right on the next refetch. The picked value is therefore passed
+    /// in rather than read back.
+    private func reelsApplySceneLiveFromSheet(appliedFilter: StashDBViewModel.SavedFilter? = nil, filterWasPicked: Bool = false) {
         switch reelsMode {
         case .scenes:
-            applySettings(sortBy: selectedSortOption, sceneFilter: selectedFilter, performer: selectedPerformer, tags: selectedTags, studio: selectedStudio, sceneLiveRefresh: true)
+            let filter = filterWasPicked ? appliedFilter : selectedFilter
+            applySettings(sortBy: selectedSortOption, sceneFilter: filter, performer: selectedPerformer, tags: selectedTags, studio: selectedStudio, clearSceneFilter: filter == nil, sceneLiveRefresh: true)
         case .markers:
-            applySettings(markerSortBy: selectedMarkerSortOption, markerFilter: selectedMarkerFilter, performer: selectedPerformer, tags: selectedTags, studio: selectedStudio, sceneLiveRefresh: true)
+            let filter = filterWasPicked ? appliedFilter : selectedMarkerFilter
+            applySettings(markerSortBy: selectedMarkerSortOption, markerFilter: filter, performer: selectedPerformer, tags: selectedTags, studio: selectedStudio, clearMarkerFilter: filter == nil, sceneLiveRefresh: true)
         case .previews:
-            applySettings(previewSortBy: selectedSortOption, previewFilter: selectedPreviewFilter, performer: selectedPerformer, tags: selectedTags, studio: selectedStudio, sceneLiveRefresh: true)
+            let filter = filterWasPicked ? appliedFilter : selectedPreviewFilter
+            applySettings(previewSortBy: selectedSortOption, previewFilter: filter, performer: selectedPerformer, tags: selectedTags, studio: selectedStudio, clearPreviewFilter: filter == nil, sceneLiveRefresh: true)
         default:
             break
         }
@@ -925,7 +933,7 @@ struct ReelsViewBody: View {
             // "None" must also empty the editor — otherwise the criteria of the filter just
             // deselected keep filtering the feed from the document.
             reelsLoadPresetCriteria([:], base: nil)
-            reelsApplySceneLiveFromSheet()
+            reelsApplySceneLiveFromSheet(appliedFilter: nil, filterWasPicked: true)
             return
         }
         if let sid = SceneLivePresetTag.parseServerId(newId), let f = viewModel.savedFilters[sid] {
@@ -962,8 +970,9 @@ struct ReelsViewBody: View {
             reelsApplyAuxIdsFromLiveFragment(preset.liveFragment)
         }
         // Preset-Kriterien in das Dokument des aktiven Modus — das ist die einzige Filterfläche.
-        reelsLoadPresetCriteria(preset.liveFragment, base: reelsLiveChipTargetFilter)
-        reelsApplySceneLiveFromSheet()
+        let applied = preset.baseSavedFilterId.flatMap { viewModel.savedFilters[$0] }
+        reelsLoadPresetCriteria(preset.liveFragment, base: applied)
+        reelsApplySceneLiveFromSheet(appliedFilter: applied, filterWasPicked: true)
     }
 
     /// Spiegelt den gewählten Filter in das Kriterien-Dokument des aktiven Modus: erst die
@@ -1014,8 +1023,16 @@ struct ReelsViewBody: View {
                 if let flat { reelsApplyAuxIdsFromLiveFragment(flat) }
             }
         }
-        reelsLoadPresetCriteria(f.stashyScenePresetMetadata?.liveFragment ?? [:], base: reelsLiveChipTargetFilter)
-        reelsApplySceneLiveFromSheet()
+        let applied: StashDBViewModel.SavedFilter? = {
+            guard let meta = f.stashyScenePresetMetadata else { return f }
+            guard let bid = meta.baseSavedFilterId else { return nil }
+            return viewModel.savedFilters[bid]
+        }()
+        // A stashy-saved filter without a base keeps its criteria in itself, not in the chip
+        // fragment: reading only the fragment left the feed with no criteria at all.
+        let criteriaSource = applied ?? f
+        reelsLoadPresetCriteria(f.stashyScenePresetMetadata?.liveFragment ?? [:], base: criteriaSource)
+        reelsApplySceneLiveFromSheet(appliedFilter: applied, filterWasPicked: true)
     }
 
     private func reelsSaveSceneLivePresetOverwrite() {
