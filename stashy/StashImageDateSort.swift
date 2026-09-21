@@ -175,35 +175,14 @@ enum StashImageFilenameKeys {
         }
     }
 
-    /// Preliminary key for set identity. Meta uses day+gallery+exact performers;
-    /// final posts may further merge compatible multi-performer subsets.
-    static func groupKey(
-        for image: StashImage,
-        policy: StashImageSetGroupingPolicy = .sessionThenMeta,
-        precision: StashImageSessionPrecision = .hour,
-        sessionCache: inout [String: String]
-    ) -> String {
-        let session = sessionKey(for: image, cache: &sessionCache, precision: precision)
-        if !session.isEmpty {
-            return "session|\(session)"
-        }
-
-        guard policy == .sessionThenMeta else {
-            return "single|\(image.id)"
-        }
-
-        let day = createdDayKey(for: image)
-        let performers = performerKey(image)
-        let galleries = galleryKey(image)
-        guard !day.isEmpty, !performers.isEmpty || !galleries.isEmpty else {
-            return "single|\(image.id)"
-        }
-        return "meta|\(day)|\(performers)|\(galleries)"
-    }
-
-    /// Builds feed posts with stable ids. Session keys merge exactly; meta merges same
-    /// day+galleries when performer sets are equal or subsets (multi-performer safe).
-    /// Post order and frame order inside sets follow API appearance order.
+    /// Builds feed posts with stable ids.
+    ///
+    /// Two images share a post when they were added in the same window **and** belong together
+    /// by their metadata: same galleries, and performer sets that are equal or one a subset of
+    /// the other. The timestamp narrows the rule, it does not replace it — two unrelated
+    /// galleries imported in the same minute stay two posts. Images without a timestamp fall
+    /// back to same day + galleries + performers under `.sessionThenMeta`, and stay single
+    /// under `.sessionOnly`. Post order and frame order follow API appearance order.
     static func buildPosts(
         from images: [StashImage],
         sort: StashDBViewModel.ImageSortOption,
@@ -216,55 +195,14 @@ enum StashImageFilenameKeys {
             return images.map { (id: "single|\($0.id)", images: [$0]) }
         }
 
-        var sessionGroups: [String: [StashImage]] = [:]
-        var metaCandidates: [StashImage] = []
-
+        var sessions: [String] = []
+        sessions.reserveCapacity(images.count)
         for image in images {
-            let session = sessionKey(for: image, cache: &sessionCache, precision: precision)
-            if !session.isEmpty {
-                let key = "session|\(session)"
-                if sessionGroups[key] == nil {
-                    sessionGroups[key] = []
-                }
-                sessionGroups[key]?.append(image)
-                continue
-            }
-
-            if policy == .sessionThenMeta {
-                let day = createdDayKey(for: image)
-                let performers = performerKey(image)
-                let galleries = galleryKey(image)
-                if !day.isEmpty, !performers.isEmpty || !galleries.isEmpty {
-                    metaCandidates.append(image)
-                    continue
-                }
-            }
+            sessions.append(sessionKey(for: image, cache: &sessionCache, precision: precision))
         }
-
-        let metaClusters = clusterMetaImages(metaCandidates)
-        var metaById: [String: [StashImage]] = [:]
-        for cluster in metaClusters {
-            metaById[cluster.id] = cluster.images
-        }
-
-        return orderedPostsPreservingAppearance(
-            ordered: images,
-            sessionGroups: sessionGroups,
-            metaById: metaById,
-            sessionCache: &sessionCache,
-            policy: policy,
-            precision: precision
-        )
-    }
-
-    private struct MetaCluster {
-        let id: String
-        let images: [StashImage]
-    }
-
-    /// Same created day + same galleries; performers equal or subset (supports multi-performer frames).
-    private static func clusterMetaImages(_ images: [StashImage]) -> [MetaCluster] {
-        guard !images.isEmpty else { return [] }
+        let days = images.map { createdDayKey(for: $0) }
+        let galleries = images.map { galleryKey($0) }
+        let performerSets = images.map { performerIDSet($0) }
 
         var parent = Array(0..<images.count)
         func find(_ i: Int) -> Int {
@@ -280,81 +218,43 @@ enum StashImageFilenameKeys {
             if ra != rb { parent[rb] = ra }
         }
 
-        let days = images.map { createdDayKey(for: $0) }
-        let galleries = images.map { galleryKey($0) }
-        let performerSets = images.map { performerIDSet($0) }
-
         for i in 0..<images.count {
             for j in (i + 1)..<images.count {
-                guard days[i] == days[j], galleries[i] == galleries[j] else { continue }
-                guard performersCompatible(performerSets[i], performerSets[j]) else { continue }
+                // Metadata first: it holds for every pair, whatever the timestamps say.
+                guard galleries[i] == galleries[j],
+                      performersCompatible(performerSets[i], performerSets[j]) else { continue }
+                let sharesSession = !sessions[i].isEmpty && sessions[i] == sessions[j]
+                let sharesDay = policy == .sessionThenMeta
+                    && sessions[i].isEmpty && sessions[j].isEmpty
+                    && !days[i].isEmpty && days[i] == days[j]
+                    && (!performerSets[i].isEmpty || !galleries[i].isEmpty)
+                guard sharesSession || sharesDay else { continue }
                 union(i, j)
             }
         }
 
-        var clusters: [Int: [Int]] = [:]
-        var rootOrder: [Int] = []
+        var members: [Int: [Int]] = [:]
+        var order: [Int] = []
         for i in 0..<images.count {
-            let r = find(i)
-            if clusters[r] == nil {
-                rootOrder.append(r)
-                clusters[r] = []
+            let root = find(i)
+            if members[root] == nil {
+                order.append(root)
+                members[root] = []
             }
-            clusters[r]?.append(i)
+            members[root]?.append(i)
         }
 
-        return rootOrder.compactMap { root in
-            guard let idxs = clusters[root], !idxs.isEmpty else { return nil }
-            // Stable id from first-seen image in this cluster (not the merged performer union).
-            let seed = idxs[0]
-            let seedImage = images[seed]
-            let id = "meta|\(days[seed])|\(performerKey(seedImage))|\(galleries[seed])"
-            let members = idxs.map { images[$0] }
-            return MetaCluster(id: id, images: members)
+        return order.compactMap { root in
+            guard let indices = members[root], let seed = indices.first else { return nil }
+            let image = images[seed]
+            // Stable id from the first image of the set, so a post keeps its identity while
+            // later pages add frames to it.
+            let key = sessions[seed].isEmpty ? "day|\(days[seed])" : "session|\(sessions[seed])"
+            let id = indices.count == 1
+                ? "single|\(image.id)"
+                : "set|\(key)|\(performerKey(image))|\(galleries[seed])"
+            return (id: id, images: indices.map { images[$0] })
         }
     }
 
-    private static func orderedPostsPreservingAppearance(
-        ordered: [StashImage],
-        sessionGroups: [String: [StashImage]],
-        metaById: [String: [StashImage]],
-        sessionCache: inout [String: String],
-        policy: StashImageSetGroupingPolicy,
-        precision: StashImageSessionPrecision
-    ) -> [(id: String, images: [StashImage])] {
-        var imageToMetaId: [String: String] = [:]
-        for (id, imgs) in metaById {
-            for img in imgs { imageToMetaId[img.id] = id }
-        }
-
-        var seen: Set<String> = []
-        var result: [(id: String, images: [StashImage])] = []
-
-        for image in ordered {
-            let session = sessionKey(for: image, cache: &sessionCache, precision: precision)
-            if !session.isEmpty {
-                let key = "session|\(session)"
-                guard !seen.contains(key) else { continue }
-                seen.insert(key)
-                let imgs = sessionGroups[key] ?? [image]
-                result.append((id: key, images: imgs))
-                continue
-            }
-
-            if let metaId = imageToMetaId[image.id] {
-                guard !seen.contains(metaId) else { continue }
-                seen.insert(metaId)
-                let imgs = metaById[metaId] ?? [image]
-                result.append((id: metaId, images: imgs))
-                continue
-            }
-
-            let key = "single|\(image.id)"
-            guard !seen.contains(key) else { continue }
-            seen.insert(key)
-            result.append((id: key, images: [image]))
-        }
-
-        return result
-    }
 }
