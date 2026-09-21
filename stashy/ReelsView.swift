@@ -358,6 +358,8 @@ struct ReelsViewBody: View {
     /// Set once a remount is announced: this instance is about to be replaced and must not
     /// resume or restart playback in the meantime.
     @State private var isBeingReplaced = false
+    /// Items whose file the server never generated — found out by playback failing on them.
+    @State private var unplayableItemIds: Set<String> = []
     /// Reentrancy guard: SwiftUI can fire `onAppear` multiple times during tab
     /// remounts before `isInitialized` flips — each pass would re-bootstrap and
     /// reset arrays/players mid-mount (black first cell).
@@ -1639,9 +1641,14 @@ struct ReelsViewBody: View {
     private var currentReelItems: [ReelItemData] {
         switch reelsMode {
         case .scenes: return viewModel.scenes.map { ReelItemData.scene($0) }
-        case .markers: return viewModel.sceneMarkers.filter { $0.stream != nil && !$0.stream!.isEmpty }.map { ReelItemData.marker($0) }
+        case .markers: return viewModel.sceneMarkers
+            .filter { $0.stream != nil && !$0.stream!.isEmpty }
+            .map { ReelItemData.marker($0) }
+            .filter { !unplayableItemIds.contains($0.id) }
         case .clips: return viewModel.clips.map { ReelItemData.clip($0) }
-        case .previews: return viewModel.previews.map { ReelItemData.preview($0) }
+        case .previews: return viewModel.previews
+            .map { ReelItemData.preview($0) }
+            .filter { !unplayableItemIds.contains($0.id) }
         case .pics: return []
         }
     }
@@ -2141,6 +2148,9 @@ struct ReelsViewBody: View {
                 viewModel.rememberReelsFeedSignature(signature)
             }
         }
+
+        // A fresh fetch may well bring items whose files exist now.
+        unplayableItemIds.removeAll()
 
         switch currentMode {
         case .scenes:
@@ -4024,6 +4034,19 @@ struct ReelsViewBody: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// Markers and previews are files the server generates on demand; where that never
+    /// happened the URL still exists and only playback finds out. Such an item is dropped from
+    /// the feed and the next one takes over, instead of leaving a dead row in the rotation.
+    private func handleUnplayableItem(_ item: ReelItemData) {
+        guard reelsMode == .markers || reelsMode == .previews else { return }
+        guard !unplayableItemIds.contains(item.id) else { return }
+        unplayableItemIds.insert(item.id)
+        AppLog.debug("🎬 Reels: dropping \(item.id) — the server has no file for it")
+        if currentVisibleSceneId == item.id {
+            advanceToNextItem(from: item)
+        }
+    }
+
     private func advanceToNextItem(from item: ReelItemData) {
         let items = currentReelItems
         guard let currentIndex = items.firstIndex(where: { $0.id == item.id }) else { return }
@@ -4067,6 +4090,9 @@ struct ReelsViewBody: View {
             },
             onVideoEnded: {
                 self.advanceToNextItem(from: item)
+            },
+            onPlaybackUnavailable: {
+                self.handleUnplayableItem(item)
             },
             viewModel: viewModel,
             playTrigger: playTrigger,
@@ -4933,6 +4959,8 @@ struct ReelItemView: View {
     var onOCounterChanged: (Int) -> Void
     var onPlayCountChanged: (Int) -> Void
     var onVideoEnded: () -> Void = {}
+    /// The row gave up on this item: its file is not on the server. The feed drops it.
+    var onPlaybackUnavailable: () -> Void = {}
     @ObservedObject var viewModel: StashDBViewModel
     var playTrigger: Int
     @Environment(\.verticalSizeClass) var verticalSizeClass
@@ -5605,6 +5633,7 @@ extension ReelItemView {
                 guard !self.didRebuildAfterEngineError else {
                     AppLog.error("🎬 Reel watchdog: playback engine failed again (\(message))")
                     self.engineErrorMessage = message
+                    self.onPlaybackUnavailable()
                     return
                 }
                 AppLog.error("🎬 Reel watchdog: playback engine failed (\(message)) — rebuilding once")
@@ -5666,6 +5695,7 @@ extension ReelItemView {
         guard let url = item.videoURL else {
             AppLog.error("🎬 Reel: no playable source for this row")
             engineErrorMessage = "No playable source"
+            onPlaybackUnavailable()
             return
         }
 
