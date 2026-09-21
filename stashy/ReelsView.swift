@@ -562,6 +562,15 @@ struct ReelsViewBody: View {
     }
 
     /// Saved filter used to decide whether live scene chips may merge into the GraphQL query.
+    /// Markers mode saves `SCENE_MARKERS` filters; the sheet is otherwise the same one the
+    /// scene and preview modes use.
+    private var reelsSheetFilterMode: StashDBViewModel.FilterMode {
+        reelsMode == .markers ? .sceneMarkers : .scenes
+    }
+    private var reelsSheetMarkerSort: StashDBViewModel.SceneMarkerSortOption? {
+        reelsMode == .markers ? selectedMarkerSortOption : nil
+    }
+
     private var reelsLiveChipTargetFilter: StashDBViewModel.SavedFilter? {
         switch reelsMode {
         case .scenes: return selectedFilter
@@ -1018,6 +1027,8 @@ struct ReelsViewBody: View {
                 existingId: sid,
                 name: currentName,
                 sort: selectedSortOption,
+                mode: reelsSheetFilterMode,
+                markerSort: reelsSheetMarkerSort,
                 baseFilter: reelsLiveChipTargetFilter,
                 liveFragment: liveDict
             ) { _ in }
@@ -1046,6 +1057,8 @@ struct ReelsViewBody: View {
             existingId: nil,
             name: trimmed,
             sort: selectedSortOption,
+            mode: reelsSheetFilterMode,
+            markerSort: reelsSheetMarkerSort,
             baseFilter: reelsLiveChipTargetFilter,
             liveFragment: reelsActivePresetLiveFragment()
         ) { result in
@@ -1065,6 +1078,8 @@ struct ReelsViewBody: View {
                 existingId: sid,
                 name: trimmed,
                 sort: selectedSortOption,
+                mode: reelsSheetFilterMode,
+                markerSort: reelsSheetMarkerSort,
                 baseFilter: reelsLiveChipTargetFilter,
                 liveFragment: reelsActivePresetLiveFragment()
             ) { result in
@@ -2731,7 +2746,9 @@ struct ReelsViewBody: View {
                 Button("Speichern") { reelsSaveSceneLivePresetAs(name: reelsScenePresetNameInput) }
                 Button("Abbrechen", role: .cancel) {}
             } message: {
-                Text("Neuen Szenen-Filter auf dem Stash-Server anlegen.")
+                Text(reelsMode == .markers
+                     ? "Neuen Marker-Filter auf dem Stash-Server anlegen."
+                     : "Neuen Szenen-Filter auf dem Stash-Server anlegen.")
             }
             .alert("Umbenennen", isPresented: $showReelsSceneRenameAlert) {
                 TextField("Name", text: $reelsScenePresetNameInput)

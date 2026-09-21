@@ -618,12 +618,79 @@ class StashDBViewModel: ObservableObject {
     }
     
     // Home Row Caching - prevents reload on view recreation
-    @Published var homeRowScenes: [HomeRowType: [Scene]] = [:]
-    @Published var homeRowPerformers: [HomeRowType: [Performer]] = [:]
-    @Published var homeRowStudios: [HomeRowType: [Studio]] = [:]
-    @Published var homeRowGalleries: [HomeRowType: [Gallery]] = [:]
-    @Published var homeRowLoadingState: [HomeRowType: Bool] = [:]
+    //
+    // The dictionaries stay the single source of truth (live updates, deletions and
+    // the server reset all write here). Every write is mirrored into the per-row
+    // `HomeRowStore`, which is what the dashboard rows observe. Rows therefore only
+    // redraw when their own items change, not on every publish of this view model.
+    @Published var homeRowScenes: [HomeRowType: [Scene]] = [:] {
+        didSet { syncHomeRowStores(oldValue, homeRowScenes) { $0.scenes = $1 ?? [] } }
+    }
+    @Published var homeRowPerformers: [HomeRowType: [Performer]] = [:] {
+        didSet { syncHomeRowStores(oldValue, homeRowPerformers) { $0.performers = $1 ?? [] } }
+    }
+    @Published var homeRowStudios: [HomeRowType: [Studio]] = [:] {
+        didSet { syncHomeRowStores(oldValue, homeRowStudios) { $0.studios = $1 ?? [] } }
+    }
+    @Published var homeRowGalleries: [HomeRowType: [Gallery]] = [:] {
+        didSet { syncHomeRowStores(oldValue, homeRowGalleries) { $0.galleries = $1 ?? [] } }
+    }
+    @Published var homeRowLoadingState: [HomeRowType: Bool] = [:] {
+        didSet { syncHomeRowStores(oldValue, homeRowLoadingState) { $0.isLoading = $1 ?? true } }
+    }
     private var isFetchingHomeRows: Set<HomeRowType> = []
+    private var homeRowStores: [HomeRowType: HomeRowStore] = [:]
+
+    /// The observable state of one dashboard row. Created on first use and kept for
+    /// the lifetime of the view model, so a row keeps its store across remounts.
+    func homeRowStore(for type: HomeRowType) -> HomeRowStore {
+        if let store = homeRowStores[type] { return store }
+        let store = HomeRowStore()
+        store.scenes = homeRowScenes[type] ?? []
+        store.performers = homeRowPerformers[type] ?? []
+        store.studios = homeRowStudios[type] ?? []
+        store.galleries = homeRowGalleries[type] ?? []
+        store.isLoading = homeRowLoadingState[type] ?? true
+        homeRowStores[type] = store
+        return store
+    }
+
+    /// Pushes changed entries of a home-row dictionary into the matching stores.
+    /// Only keys whose value actually changed publish, and only stores that exist.
+    private func syncHomeRowStores<Value: Equatable>(
+        _ old: [HomeRowType: Value],
+        _ new: [HomeRowType: Value],
+        apply: (HomeRowStore, Value?) -> Void
+    ) {
+        for key in Set(old.keys).union(new.keys) where old[key] != new[key] {
+            guard let store = homeRowStores[key] else { continue }
+            apply(store, new[key])
+        }
+    }
+
+    /// How long a loaded row counts as fresh for `loadHomeRowIfNeeded`.
+    static let homeRowFreshness: TimeInterval = 60
+
+    /// Loads a row unless it was loaded recently. Replaces the old “refresh every row on
+    /// every appear”, which refetched the whole dashboard after each detail page.
+    /// Honors the default dashboard filter: while saved filters are still loading and
+    /// the filter is not known yet, the row waits (the caller re-runs on filter changes).
+    func loadHomeRowIfNeeded(config: HomeRowConfig, maxAge: TimeInterval = StashDBViewModel.homeRowFreshness) {
+        if let filterId = TabManager.shared.getDefaultFilterId(for: .dashboard),
+           savedFilters[filterId] == nil, isLoadingSavedFilters {
+            return
+        }
+        let store = homeRowStore(for: config.type)
+        if !store.isEmpty, let loadedAt = store.lastLoadedAt,
+           Date().timeIntervalSince(loadedAt) < maxAge {
+            return
+        }
+        refreshHomeRow(config: config, limit: 10)
+    }
+
+    private func markHomeRowLoaded(_ type: HomeRowType) {
+        homeRowStore(for: type).lastLoadedAt = Date()
+    }
 
     // Connection Status
     @Published var isServerConnected: Bool = false
@@ -2215,17 +2282,18 @@ class StashDBViewModel: ObservableObject {
     func mergedSceneObjectFilterForSave(
         base: SavedFilter?,
         live: [String: Any],
-        previousLive: [String: Any] = [:]
+        previousLive: [String: Any] = [:],
+        isMarker: Bool = false
     ) -> [String: Any] {
         var merged: [String: Any] = [:]
         if let base {
             if let dict = base.filterDict, !dict.isEmpty {
-                merged = sanitizeFilter(dict)
+                merged = sanitizeFilter(dict, isMarker: isMarker)
             } else if let obj = base.object_filter, let objDict = obj.value as? [String: Any], !objDict.isEmpty {
-                merged = sanitizeFilter(objDict)
+                merged = sanitizeFilter(objDict, isMarker: isMarker)
             }
         }
-        let liveSan = sanitizeFilter(live)
+        let liveSan = sanitizeFilter(live, isMarker: isMarker)
         for (k, v) in liveSan {
             merged[k] = v
         }
@@ -2290,10 +2358,15 @@ class StashDBViewModel: ObservableObject {
 
     /// Creates or updates a **scene** saved filter on the Stash server (`saveFilter`).
     /// Stores stashy metadata in `ui_options` so the live-filter sheet can restore base filter, chips, and sort.
+    /// `mode` decides which list the filter shows up in. Feeds saves from the same sheet in
+    /// Scenes, Previews and Markers mode, and a marker filter written as `SCENES` never appeared
+    /// in the marker list again. `markerSort` carries the marker sheet's own sort.
     func saveSceneSavedFilter(
         existingId: String?,
         name: String,
         sort: SceneSortOption,
+        mode: FilterMode = .scenes,
+        markerSort: SceneMarkerSortOption? = nil,
         baseFilter: SavedFilter?,
         liveFragment: [String: Any],
         completion: @escaping (Result<SavedFilter, Error>) -> Void
@@ -2304,26 +2377,28 @@ class StashDBViewModel: ObservableObject {
             return
         }
         let previousLive = existingId.flatMap { savedFilters[$0]?.stashyLiveFragment } ?? [:]
+        let isMarker = mode == .sceneMarkers
         let merged = mergedSceneObjectFilterForSave(
             base: baseFilter,
             live: liveFragment,
-            previousLive: previousLive
+            previousLive: previousLive,
+            isMarker: isMarker
         )
         var stashy: [String: Any] = [
             "liveFragment": liveFragment,
-            "sortRaw": sort.rawValue
+            "sortRaw": (isMarker ? markerSort?.rawValue : nil) ?? sort.rawValue
         ]
         if let bid = baseFilter?.id {
             stashy["baseSavedFilterId"] = bid
         }
         let uiOptions: [String: Any] = ["stashy": stashy]
-        let sortField = sort.sortField == "random" ? "random" : sort.sortField
+        let sortField = (isMarker ? markerSort?.sortField : nil) ?? sort.sortField
         let findFilter: [String: Any] = [
             "sort": sortField,
-            "direction": sort.direction
+            "direction": (isMarker ? markerSort?.direction : nil) ?? sort.direction
         ]
         var input: [String: Any] = [
-            "mode": FilterMode.scenes.rawValue,
+            "mode": mode.rawValue,
             "name": trimmedName,
             "find_filter": findFilter,
             // Web UI storage shape, same as the other save paths.
@@ -3753,6 +3828,7 @@ class StashDBViewModel: ObservableObject {
                 let scenes = response?.data?.findScenes?.scenes ?? []
                 // Cache the result
                 self?.homeRowScenes[rowType] = scenes
+                self?.markHomeRowLoaded(rowType)
                 completion(scenes)
             }
         }
@@ -3836,6 +3912,7 @@ class StashDBViewModel: ObservableObject {
                 let performers = response?.data?.findPerformers.performers ?? []
                 // Cache the result
                 self?.homeRowPerformers[rowType] = performers
+                self?.markHomeRowLoaded(rowType)
                 completion(performers)
             }
         }
@@ -3913,6 +3990,7 @@ class StashDBViewModel: ObservableObject {
                 let studios = response?.data?.findStudios.studios ?? []
                 // Cache the result
                 self?.homeRowStudios[rowType] = studios
+                self?.markHomeRowLoaded(rowType)
                 completion(studios)
             }
         }
@@ -3992,6 +4070,7 @@ class StashDBViewModel: ObservableObject {
                 let galleries = response?.data?.findGalleries.galleries ?? []
                 // Cache the result
                 self?.homeRowGalleries[rowType] = galleries
+                self?.markHomeRowLoaded(rowType)
                 completion(galleries)
             }
         }
@@ -13161,3 +13240,26 @@ struct FunscriptAction: Codable {
     let pos: Int // Position 0-100
 }
 #endif
+
+
+// MARK: - Dashboard row store
+
+/// Observable state of one dashboard row. Rows observe this instead of the whole
+/// `StashDBViewModel`: with a dozen or more rows, every publish of the big view model
+/// redrew every row (N rows × 3 publishes per load ⇒ O(N²) row bodies while the
+/// dashboard was still loading), which showed up as stutter while scrolling.
+@MainActor
+final class HomeRowStore: ObservableObject {
+    @Published var scenes: [Scene] = []
+    @Published var performers: [Performer] = []
+    @Published var studios: [Studio] = []
+    @Published var galleries: [Gallery] = []
+    /// `true` until the first load finishes, like the old `homeRowLoadingState[type] ?? true`.
+    @Published var isLoading = true
+    /// Set when a fetch completes; live patches do not touch it.
+    var lastLoadedAt: Date?
+
+    var isEmpty: Bool {
+        scenes.isEmpty && performers.isEmpty && studios.isEmpty && galleries.isEmpty
+    }
+}
