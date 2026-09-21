@@ -292,8 +292,12 @@ struct SceneDetailView: View {
     }
 
     // Extracted main content to use modular components
-    /// True once playback has started — the cover state scrolls with the page.
-    private var isPlayerPinned: Bool { isPlaybackStarted && aetherEngine != nil }
+    /// Pinned while a started player sits in portrait. Landscape keeps it in the scroll
+    /// content: there the picture already takes most of the height, and a pinned card would
+    /// leave a sliver for everything else.
+    private var isPlayerPinned: Bool {
+        isPlaybackStarted && aetherEngine != nil && verticalSizeClass != .compact
+    }
 
     /// One instance, used pinned above the scroll area or inside it.
     private var playerCardView: some View {
