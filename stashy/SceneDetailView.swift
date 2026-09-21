@@ -292,14 +292,12 @@ struct SceneDetailView: View {
     }
 
     // Extracted main content to use modular components
-    private var mainContentView: some View {
-        // The reader sits *outside* the ScrollView, so it reports the space available to the
-        // view rather than the width its own content ended up needing.
-        GeometryReader { proxy in
-        VStack(spacing: 12) {
-            // The player is pinned: it keeps its place at the top while the page scrolls
-            // underneath, so the video stays visible while reading performers, tags, markers.
-            VStack(spacing: 0) {
+    /// True once playback has started — the cover state scrolls with the page.
+    private var isPlayerPinned: Bool { isPlaybackStarted && aetherEngine != nil }
+
+    /// One instance, used pinned above the scroll area or inside it.
+    private var playerCardView: some View {
+        VStack(spacing: 0) {
                 SceneVideoPlayerCard(
                     activeScene: $activeScene,
                     aetherEngine: aetherEngine,
@@ -317,17 +315,32 @@ struct SceneDetailView: View {
                     onSeek: { seconds in seekTo(seconds) },
                     onStartPlayback: { resume in startPlayback(resume: resume) }
                 )
+        }
+        .background(Color.secondaryAppBackground)
+        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
+        .cardShadow()
+    }
+
+    private var mainContentView: some View {
+        // The reader sits *outside* the ScrollView, so it reports the space available to the
+        // view rather than the width its own content ended up needing.
+        GeometryReader { proxy in
+        VStack(spacing: 12) {
+            // Pinned only while the player runs: then it keeps its place at the top and the
+            // page scrolls underneath. On the cover it scrolls along, as before.
+            if isPlayerPinned {
+                playerCardView
+                    .padding(.horizontal, 16)
+                    .padding(.top, 16)
             }
-            .background(Color.secondaryAppBackground)
-            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-            .cardShadow()
-            .padding(.horizontal, 16)
-            .padding(.top, 16)
 
             ScrollView {
             VStack(spacing: 12) {
+                if !isPlayerPinned {
+                    playerCardView
+                }
                 VStack(spacing: 0) {
-                                        SceneDetailMetadataCard(
+                    SceneDetailMetadataCard(
                         activeScene: $activeScene,
                         aetherEngine: aetherEngine,
                         isHeaderExpanded: $isHeaderExpanded,

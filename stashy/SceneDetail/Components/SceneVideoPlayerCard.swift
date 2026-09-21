@@ -297,7 +297,8 @@ struct SceneVideoPlayerCard: View {
                 .padding(.horizontal, 12)
             }
             .padding(.top, markerStripTopPadding)
-            .padding(.bottom, 2)
+            // The titles sat right on the card's edge; they need room to breathe under them.
+            .padding(.bottom, 12)
         }
     }
 
