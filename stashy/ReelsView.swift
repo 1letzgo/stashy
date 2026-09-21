@@ -360,6 +360,8 @@ struct ReelsViewBody: View {
     @State private var isBeingReplaced = false
     /// Items whose file the server never generated — found out by playback failing on them.
     @State private var unplayableItemIds: Set<String> = []
+    /// Items whose file has already been asked about, so the feed asks once per item.
+    @State private var mediaProbedItemIds: Set<String> = []
     /// Reentrancy guard: SwiftUI can fire `onAppear` multiple times during tab
     /// remounts before `isInitialized` flips — each pass would re-bootstrap and
     /// reset arrays/players mid-mount (black first cell).
@@ -2151,6 +2153,7 @@ struct ReelsViewBody: View {
 
         // A fresh fetch may well bring items whose files exist now.
         unplayableItemIds.removeAll()
+        mediaProbedItemIds.removeAll()
 
         switch currentMode {
         case .scenes:
@@ -2481,13 +2484,12 @@ struct ReelsViewBody: View {
     private var isListEmpty: Bool {
         switch reelsMode {
         case .scenes: return viewModel.scenes.isEmpty
-        case .markers:
-            // Markers without streams are filtered out of the feed — an all-streamless
-            // marker list must count as empty, otherwise the UI renders zero rows
-            // without spinner/error (blank screen).
-            return viewModel.sceneMarkers.allSatisfy { $0.stream == nil || $0.stream!.isEmpty }
+        case .markers, .previews:
+            // Rows the feed drops — no stream, or no file behind it on the server — must count
+            // as empty here too, otherwise the screen stays black with no spinner and no
+            // message.
+            return currentReelItems.isEmpty
         case .clips: return viewModel.clips.isEmpty
-        case .previews: return viewModel.previews.isEmpty
         case .pics: return false
         }
     }
@@ -2633,6 +2635,13 @@ struct ReelsViewBody: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
                 handleDefaultFilterChanged(notification)
+            }
+            // Each page that arrives is checked for files the server never generated.
+            .onChange(of: viewModel.sceneMarkers.count) { _, _ in
+                probeGeneratedMedia(for: currentReelItems)
+            }
+            .onChange(of: viewModel.previews.count) { _, _ in
+                probeGeneratedMedia(for: currentReelItems)
             }
             .onChange(of: viewModel.savedFilters) { _, newValue in
                 handleSavedFiltersChanged(newValue)
@@ -4034,6 +4043,61 @@ struct ReelsViewBody: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
+    /// Asks the server whether the generated file behind each marker / preview is actually
+    /// there, and drops the ones that are not before they ever reach the rotation.
+    ///
+    /// Stash answers `findSceneMarkers` / `findScenes` with a stream URL for every item, whether
+    /// the file was generated or not, and its filters cannot ask for "has a file". Only the
+    /// request itself tells: a one-byte range is answered with 206 where the file exists and 404
+    /// where it does not, which costs a single byte per item. HEAD is not allowed on those
+    /// routes (405), hence the range. Anything other than 404 leaves the item in place — a
+    /// timeout or an auth error must not empty the feed.
+    private func probeGeneratedMedia(for items: [ReelItemData]) {
+        guard reelsMode == .markers || reelsMode == .previews else { return }
+        let pending = items.filter { !mediaProbedItemIds.contains($0.id) && $0.videoURL != nil }
+        guard !pending.isEmpty else { return }
+        for item in pending { mediaProbedItemIds.insert(item.id) }
+
+        Task { @MainActor in
+            // A handful at a time: a page is 20-40 rows and the server is often a home NAS.
+            for chunk in stride(from: 0, to: pending.count, by: 4).map({ Array(pending[$0..<min($0 + 4, pending.count)]) }) {
+                let missing = await withTaskGroup(of: String?.self) { group -> [String] in
+                    for item in chunk {
+                        guard let url = item.videoURL else { continue }
+                        let id = item.id
+                        group.addTask { await Self.generatedFileIsMissing(at: url) ? id : nil }
+                    }
+                    var ids: [String] = []
+                    for await id in group { if let id { ids.append(id) } }
+                    return ids
+                }
+                guard !missing.isEmpty else { continue }
+                let currentId = currentVisibleSceneId
+                unplayableItemIds.formUnion(missing)
+                AppLog.debug("🎬 Reels: \(missing.count) item(s) without a generated file removed")
+                // The row under the finger is gone: move to whatever took its place.
+                if let currentId, missing.contains(currentId) {
+                    currentVisibleSceneId = currentReelItems.first?.id
+                    playTrigger += 1
+                }
+            }
+        }
+    }
+
+    /// True only for a definite "this file does not exist".
+    private static func generatedFileIsMissing(at url: URL) async -> Bool {
+        var request = authenticatedStashRequest(for: url)
+        request.timeoutInterval = 12
+        request.setValue("bytes=0-0", forHTTPHeaderField: "Range")
+        do {
+            let (_, response) = try await StashNetworking.session.data(for: request)
+            guard let http = response as? HTTPURLResponse else { return false }
+            return http.statusCode == 404 || http.statusCode == 410
+        } catch {
+            return false
+        }
+    }
+
     /// Markers and previews are files the server generates on demand; where that never
     /// happened the URL still exists and only playback finds out. Such an item is dropped from
     /// the feed and the next one takes over, instead of leaving a dead row in the rotation.
@@ -4980,6 +5044,8 @@ struct ReelItemView: View {
     @State private var engineErrorMessage: String?
     @State private var showTagsOverlay = false
     @State private var playbackWatchdogTask: Task<Void, Never>?
+    /// Asks the server whether this row's file exists at all once playback produced nothing.
+    @State private var mediaProbeTask: Task<Void, Never>?
     @Binding var isMenuOpen: Bool
     @Binding var isZoomed: Bool
     @Binding var isRotating: Bool
@@ -5610,8 +5676,32 @@ extension ReelItemView {
     /// if the active row should be playing but the engine is missing or not actually
     /// playing, rebuild it. Covers lost play triggers, audio-session hiccups and
     /// load races that deterministic review could not pin down.
+    /// Markers and previews are generated files; a missing one loads without an error and just
+    /// never produces anything. Waiting for the watchdog's rebuild cost six seconds on a dead
+    /// row, so after one second without media the server is asked whether the file is there at
+    /// all — a 404 skips the row at once, anything else keeps waiting (slow link, big file).
+    private func armMediaAvailabilityProbe() {
+        guard !item.isAnimated else { return }
+        mediaProbeTask?.cancel()
+        mediaProbeTask = Task { @MainActor in
+            if await cancellableSleep(nanoseconds: 1_000_000_000) { return }
+            guard self.isActive, !self.hasUsableMedia, let url = self.item.videoURL else { return }
+            var request = authenticatedStashRequest(for: url)
+            request.httpMethod = "HEAD"
+            request.timeoutInterval = 5
+            guard let (_, response) = try? await StashNetworking.session.data(for: request),
+                  let http = response as? HTTPURLResponse else { return }
+            guard (400...499).contains(http.statusCode) else { return }
+            guard self.isActive, !self.hasUsableMedia else { return }
+            AppLog.error("🎬 Reel: \(http.statusCode) for this row's media — skipping it")
+            self.engineErrorMessage = "No playable source"
+            self.onPlaybackUnavailable()
+        }
+    }
+
     private func armPlaybackWatchdog() {
         guard !item.isAnimated else { return }
+        armMediaAvailabilityProbe()
         playbackWatchdogTask?.cancel()
         playbackWatchdogTask = Task {
             if await cancellableSleep(nanoseconds: 2_500_000_000) { return }
@@ -5673,10 +5763,9 @@ extension ReelItemView {
                 self.aetherPlayIfAllowed()
             }
 
-            // Last word on a marker / preview the server never generated: such a load reports
-            // no error at all, it just arrives with no duration and no frame, and the row then
-            // sat there forever. Give the rebuild a moment, then hand the item back.
-            if await cancellableSleep(nanoseconds: 2_500_000_000) { return }
+            // Backstop for a file that answers but plays nothing (a 0-byte generation, say):
+            // the 404 case is already gone within a second through the availability probe.
+            if await cancellableSleep(nanoseconds: 1_500_000_000) { return }
             guard self.isActive else { return }
             if !self.isPlaybackMoving, !self.hasUsableMedia {
                 AppLog.error("🎬 Reel watchdog: no playable media for this row — skipping it")
@@ -5698,6 +5787,8 @@ extension ReelItemView {
     private func disarmPlaybackWatchdog() {
         playbackWatchdogTask?.cancel()
         playbackWatchdogTask = nil
+        mediaProbeTask?.cancel()
+        mediaProbeTask = nil
     }
 
     /// Builds (or refreshes) this row's playback engine. One engine per row, created lazily.
