@@ -2636,12 +2636,16 @@ struct ReelsViewBody: View {
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
                 handleDefaultFilterChanged(notification)
             }
-            // Each page that arrives is checked for files the server never generated.
+            // Rows ahead of the playhead are checked for files the server never generated —
+            // on every new page and every time the feed moves on.
             .onChange(of: viewModel.sceneMarkers.count) { _, _ in
-                probeGeneratedMedia(for: currentReelItems)
+                probeUpcomingMedia()
             }
             .onChange(of: viewModel.previews.count) { _, _ in
-                probeGeneratedMedia(for: currentReelItems)
+                probeUpcomingMedia()
+            }
+            .onChange(of: currentVisibleSceneId) { _, _ in
+                probeUpcomingMedia()
             }
             .onChange(of: viewModel.savedFilters) { _, newValue in
                 handleSavedFiltersChanged(newValue)
@@ -4043,8 +4047,8 @@ struct ReelsViewBody: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    /// Asks the server whether the generated file behind each marker / preview is actually
-    /// there, and drops the ones that are not before they ever reach the rotation.
+    /// Asks the server whether the generated file behind a marker / preview is actually there,
+    /// and drops the ones that are not before the feed reaches them.
     ///
     /// Stash answers `findSceneMarkers` / `findScenes` with a stream URL for every item, whether
     /// the file was generated or not, and its filters cannot ask for "has a file". Only the
@@ -4052,38 +4056,50 @@ struct ReelsViewBody: View {
     /// where it does not, which costs a single byte per item. HEAD is not allowed on those
     /// routes (405), hence the range. Anything other than 404 leaves the item in place — a
     /// timeout or an auth error must not empty the feed.
-    private func probeGeneratedMedia(for items: [ReelItemData]) {
+    ///
+    /// Only the few rows ahead of the current one are asked about. Checking whole pages meant a
+    /// library whose markers were never generated lost twenty rows in one go: the list collapsed
+    /// under the finger and the feed stalled while it refilled. A rolling window removes them
+    /// one or two at a time, ahead of where the user is.
+    private func probeUpcomingMedia() {
         guard reelsMode == .markers || reelsMode == .previews else { return }
-        let pending = items.filter { !mediaProbedItemIds.contains($0.id) && $0.videoURL != nil }
+        let items = currentReelItems
+        guard !items.isEmpty else { return }
+        let start = currentVisibleSceneId
+            .flatMap { id in items.firstIndex(where: { $0.id == id }) } ?? 0
+        let window = items[start..<min(start + Self.mediaProbeLookahead, items.count)]
+        let pending = window.filter { !mediaProbedItemIds.contains($0.id) && $0.videoURL != nil }
         guard !pending.isEmpty else { return }
         for item in pending { mediaProbedItemIds.insert(item.id) }
 
         Task { @MainActor in
-            // A handful at a time: a page is 20-40 rows and the server is often a home NAS.
-            for chunk in stride(from: 0, to: pending.count, by: 4).map({ Array(pending[$0..<min($0 + 4, pending.count)]) }) {
-                let missing = await withTaskGroup(of: String?.self) { group -> [String] in
-                    for item in chunk {
-                        guard let url = item.videoURL else { continue }
-                        let id = item.id
-                        group.addTask { await Self.generatedFileIsMissing(at: url) ? id : nil }
-                    }
-                    var ids: [String] = []
-                    for await id in group { if let id { ids.append(id) } }
-                    return ids
+            let missing = await withTaskGroup(of: String?.self) { group -> [String] in
+                for item in pending {
+                    guard let url = item.videoURL else { continue }
+                    let id = item.id
+                    group.addTask { await Self.generatedFileIsMissing(at: url) ? id : nil }
                 }
-                guard !missing.isEmpty else { continue }
-                let currentId = currentVisibleSceneId
-                unplayableItemIds.formUnion(missing)
-                AppLog.debug("🎬 Reels: \(missing.count) item(s) without a generated file removed")
-                // The row under the finger is gone: move to whatever took its place.
-                if let currentId, missing.contains(currentId) {
-                    currentVisibleSceneId = currentReelItems.first?.id
-                    playTrigger += 1
-                }
-                refillFeedAfterDrops()
+                var ids: [String] = []
+                for await id in group { if let id { ids.append(id) } }
+                return ids
             }
+            guard !missing.isEmpty else { return }
+            let currentId = currentVisibleSceneId
+            unplayableItemIds.formUnion(missing)
+            AppLog.debug("🎬 Reels: \(missing.count) item(s) without a generated file removed")
+            // The row under the finger is gone: move to whatever took its place.
+            if let currentId, missing.contains(currentId) {
+                currentVisibleSceneId = currentReelItems.first?.id
+                playTrigger += 1
+            }
+            refillFeedAfterDrops()
+            // The window moved up by whatever was dropped: look at what slid into it.
+            probeUpcomingMedia()
         }
     }
+
+    /// Rows ahead of the current one that are checked for a file.
+    private static let mediaProbeLookahead = 4
 
     /// Dropped rows leave the feed short: the last rows of a page carry the paging trigger, and
     /// where a whole page had no files the feed ended up empty and reported "nothing found"
@@ -4091,7 +4107,12 @@ struct ReelsViewBody: View {
     /// for directly.
     private func refillFeedAfterDrops() {
         guard reelsMode == .markers || reelsMode == .previews else { return }
-        guard currentReelItems.count < Self.minimumRowsBeforeRefill else { return }
+        let items = currentReelItems
+        let index = currentVisibleSceneId
+            .flatMap { id in items.firstIndex(where: { $0.id == id }) } ?? 0
+        // What counts is how much is left *ahead*: with dead rows the list can look long while
+        // the playhead already sits on its last live row.
+        guard items.count - index < Self.minimumRowsBeforeRefill else { return }
         switch reelsMode {
         case .markers:
             guard viewModel.hasMoreMarkers, !viewModel.isLoadingMarkers else { return }
