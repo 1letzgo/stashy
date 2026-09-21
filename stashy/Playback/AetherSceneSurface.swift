@@ -154,7 +154,7 @@ struct AetherSceneSurface: View {
                     || abs(size.height - surfaceSize.height) > 0.5 else { return }
             surfaceHeight = size.height
             surfaceSize = size
-            applyAutoZoomIfNeeded()
+            applyFillForGeometry()
         }
         .onReceive(NotificationCenter.default.publisher(for: .stashyHardwareVolumeChanged)) { _ in
             volumeLevel = AVAudioSession.sharedInstance().outputVolume
@@ -202,7 +202,7 @@ struct AetherSceneSurface: View {
             if ready { applyAutoZoomIfNeeded() }
         }
         .onChange(of: isFullscreen) { _, _ in
-            applyAutoZoomIfNeeded()
+            applyFillForGeometry()
         }
         .onChange(of: fillsScreen) { _, fills in
             engine.setVideoGravity(fills ? .resizeAspectFill : .resizeAspect)
@@ -382,6 +382,14 @@ struct AetherSceneSurface: View {
 
     /// Settings › Playback › "Autozoom": fills by itself while the loss stays small, so a 16:9
     /// scene uses the whole phone and a 21:9 film keeps its bars.
+    /// Geometry changed: portrait (or inline) drops a fill that landscape had, then Autozoom
+    /// decides again. Without the drop a rotation carried the crop into portrait, where it cuts
+    /// away most of the frame.
+    private func applyFillForGeometry() {
+        if !allowsFillControls, fillsScreen { fillsScreen = false }
+        applyAutoZoomIfNeeded()
+    }
+
     private func applyAutoZoomIfNeeded() {
         guard tabManager.playerAutoZoom, allowsFillControls, !fillsScreen,
               let crop = fillCropFraction, crop <= TabManager.autoZoomMaximumCrop else { return }
