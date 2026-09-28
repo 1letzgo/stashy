@@ -974,4 +974,54 @@ struct ToolsAddButtonLabel: View {
             .clipShape(Circle())
     }
 }
+// MARK: - O-Counter long-press menu
+
+extension View {
+    /// Long-press menu on an O-Counter pill: remove the last O, or reset all of them (confirmed).
+    /// A plain tap keeps incrementing — this only adds the way back.
+    func oCounterRemovalMenu(count: Int, onRemoveOne: @escaping () -> Void, onReset: @escaping () -> Void) -> some View {
+        modifier(OCounterRemovalMenu(count: count, onRemoveOne: onRemoveOne, onReset: onReset))
+    }
+}
+
+private struct OCounterRemovalMenu: ViewModifier {
+    let count: Int
+    let onRemoveOne: () -> Void
+    let onReset: () -> Void
+
+    @State private var confirmingReset = false
+
+    func body(content: Content) -> some View {
+        content
+            .contextMenu {
+                if count > 0 {
+                    Button {
+                        HapticManager.light()
+                        onRemoveOne()
+                    } label: {
+                        Label("Remove one O", systemImage: "minus.circle")
+                    }
+                    if count > 1 {
+                        Button(role: .destructive) {
+                            confirmingReset = true
+                        } label: {
+                            Label("Reset O-Counter (\(count))", systemImage: "arrow.counterclockwise")
+                        }
+                    }
+                } else {
+                    Text("No O recorded")
+                }
+            }
+            // Centered warning alert, not an action sheet: this deletes history on the server.
+            .alert("Reset O-Counter?", isPresented: $confirmingReset) {
+                Button("Remove all \(count)", role: .destructive) {
+                    HapticManager.light()
+                    onReset()
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("All \(count) recorded O entries and their dates are permanently deleted on the server. This cannot be undone.")
+            }
+    }
+}
 #endif

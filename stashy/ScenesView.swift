@@ -854,17 +854,19 @@ private struct ScenesViewContent: View {
     }
 
 
-    @ObservedObject private var tabManager = TabManager.shared
-
     @State private var cardGridWidth: CGFloat = 0
     /// A caller handed in its own filter (Director, and anything else scoping the catalogue list
     /// without a detail scope). Such a list must never take the Settings default, and must not
     /// wait for it either — waiting is what left it empty.
     @State private var hasInjectedFilter = false
+    /// The Settings default filter is applied once per view lifetime. `selectedFilter == nil`
+    /// alone also means "user reset to Any", and every `savedFilters` refresh re-applied it.
+    @State private var didApplyDefaultFilter = false
 
 
+    /// Die Szenenliste ist fest einspaltig — kein Umschalter, keine Einstellung.
     private var columns: [GridItem] {
-        tabManager.catalogCardColumns(for: CatalogCardColumnScope.scenes).gridItems(width: cardGridWidth)
+        CatalogCardColumns.one.gridItems(width: cardGridWidth)
     }
 
     // Safe sort change function
@@ -922,12 +924,13 @@ private struct ScenesViewContent: View {
     /// gilt und noch keiner aktiv ist. Gibt zurück, ob etwas gesetzt wurde.
     @discardableResult
     private func applySettingsDefaultFilterIfNeeded() -> Bool {
-        guard scope == .catalog, !hasInjectedFilter, selectedFilter == nil else { return false }
+        guard scope == .catalog, !hasInjectedFilter, !didApplyDefaultFilter, selectedFilter == nil else { return false }
         guard !coordinator.noDefaultFilter else { return false }
         guard let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes),
               let filter = viewModel.savedFilters[defaultId] else { return false }
 
         selectedFilter = filter
+        didApplyDefaultFilter = true
         // Keep the sheet's preset row in sync so the default shows as selected.
         liveSheetPresetSelection = SceneLivePresetTag.serverRow(filter.id)
         syncLiveChipsToMatchSelectedFilter()
@@ -1025,7 +1028,6 @@ private struct ScenesViewContent: View {
 
     /// Single source for nav bar + slot chrome. The legacy/native branch lives in `stashyCatalogChrome`.
     private var catalogChromeConfig: CatalogChromeConfig {
-        let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.scenes)
         return CatalogChromeConfig(
             title: "Scenes",
             ownsNavigationBar: !hideTitle,
@@ -1035,16 +1037,6 @@ private struct ScenesViewContent: View {
                 errorMessage: viewModel.errorMessage
             ),
             isPresented: showsFloatingFilterButton,
-            columns: CatalogChromeSlot(
-                systemImage: cardColumns.toggleIcon,
-                accessibilityLabel: cardColumns.accessibilityLabel,
-                accessibilityHint: "Switches between one and two cards per row",
-                action: {
-                    withAnimation(DesignTokens.Animation.quick) {
-                        tabManager.toggleCatalogCardColumns(for: CatalogCardColumnScope.scenes)
-                    }
-                }
-            ),
             filterSort: CatalogChromeSlot(
                 systemImage: "slider.horizontal.3",
                 isActive: liveFilterFABHasSomethingSet,
@@ -1234,6 +1226,7 @@ private struct ScenesViewContent: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
             selectedFilter = nil
+            didApplyDefaultFilter = false
             liveSheetPresetSelection = ""
             refreshLivePresets()
             performSearch()
@@ -1247,6 +1240,7 @@ private struct ScenesViewContent: View {
                 if let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes),
                    let newFilter = viewModel.savedFilters[defaultId] {
                     selectedFilter = newFilter
+                    didApplyDefaultFilter = true
                     // Keep the sheet's preset row in sync so the default shows as selected.
                     liveSheetPresetSelection = SceneLivePresetTag.serverRow(newFilter.id)
                     syncLiveChipsToMatchSelectedFilter()
@@ -1285,10 +1279,11 @@ private struct ScenesViewContent: View {
             if selectedFilter == nil {
                 // `scope == .catalog` mirrors `ImagesView`'s `guard gallery == nil`: the Settings
                 // default filter belongs to the catalog list, not to a scoped one.
-                if scope == .catalog, !hasInjectedFilter,
+                if scope == .catalog, !hasInjectedFilter, !didApplyDefaultFilter,
                    let defaultId = TabManager.shared.getDefaultFilterId(for: .scenes),
                    let filter = newValue[defaultId] {
                     selectedFilter = filter
+                    didApplyDefaultFilter = true
                     // Keep the sheet's preset row in sync so the default shows as selected.
                     liveSheetPresetSelection = SceneLivePresetTag.serverRow(filter.id)
                     syncLiveChipsToMatchSelectedFilter()
@@ -1373,7 +1368,6 @@ private struct ScenesViewContent: View {
 
     private var scenesGrid: some View {
             ScrollView {
-                let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.scenes)
                 VStack(spacing: 12) {
                     if let scrollHeader {
                         scrollHeader
@@ -1383,7 +1377,7 @@ private struct ScenesViewContent: View {
                             NavigationLink(destination: LazyView { SceneDetailView(scene: scene) }) {
                                 SceneCardView(
                                     scene: scene,
-                                    aspectRatio: cardColumns.cardAspectRatio
+                                    aspectRatio: CatalogCardColumns.one.cardAspectRatio
                                 )
                                     .contentShape(Rectangle())
                             }
@@ -1406,8 +1400,6 @@ private struct ScenesViewContent: View {
                         }
                     }
                     .measuresGridWidth($cardGridWidth)
-                    // Force cell rebuild — LazyVGrid otherwise keeps stale square/16:9 sizes.
-                    .id(cardColumns)
                     .padding(.horizontal, 16)
                     .padding(.top, scrollHeader == nil ? 16 : 0)
                 }

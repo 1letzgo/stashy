@@ -71,6 +71,9 @@ private struct ImagesViewBody: View {
     @State private var lastOpenedImageId: String?
     @State private var searchText: String
     @State private var sessionKeyCache: [String: String] = [:]
+    /// Settings default filter applies once per view lifetime (force = DefaultFilterChanged
+    /// excepted); otherwise every appear re-applied it after the user reset to Any.
+    @State private var didApplyDefaultFilter = false
     @State private var showingEditGallerySheet = false
     @State private var isHeaderExpanded = false
     /// After the user hits the 1/2-column toggle, stop locking `forceOneColumnFeed`.
@@ -220,7 +223,7 @@ private struct ImagesViewBody: View {
         guard gallery == nil else { return false }
         // Feeds performer/tag handoff: stay on Filter = None until the user picks a filter.
         if imageListFilters.suppressSettingsDefaultFilter { return false }
-        if !force, imageListFilters.selectedFilter != nil { return false }
+        if !force, didApplyDefaultFilter || imageListFilters.selectedFilter != nil { return false }
 
         if let defaultId = TabManager.shared.getDefaultFilterId(for: .images),
            let filter = viewModel.savedFilters[defaultId] {
@@ -230,6 +233,7 @@ private struct ImagesViewBody: View {
             imageListFilters.selectedFilter = filter
             imageListFilters.catalogPresetRowSelection = ListLivePresetTag.serverRow(filter.id)
             imageListFilters.syncLiveChipsFromSelectedFilter(viewModel: viewModel)
+            didApplyDefaultFilter = true
             return force || !already
         }
 
@@ -516,6 +520,7 @@ private struct ImagesViewBody: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
             sessionKeyCache.removeAll(keepingCapacity: true)
+            didApplyDefaultFilter = false
             imageListFilters.catalogPresetRowSelection = ""
             imageListFilters.selectedFilter = nil
             imageListFilters.clearLiveChipsOnly()
@@ -1122,20 +1127,32 @@ private struct ImagesViewBody: View {
         // Simple batch delete (could be optimized with a dedicated batch API if available)
         // For now, we'll just iterate. This is not atomic but functional.
         let group = DispatchGroup()
-        
+        // Collected on main: the completions report success, which used to be ignored — the
+        // toast claimed every image was deleted and the failed ones silently reappeared.
+        var failedIds = Set<String>()
+
         for id in idsToDelete {
             group.enter()
-            viewModel.deleteImage(imageId: id) { _ in
-                group.leave()
+            viewModel.deleteImage(imageId: id) { success in
+                DispatchQueue.main.async {
+                    if !success { failedIds.insert(id) }
+                    group.leave()
+                }
             }
         }
-        
+
         group.notify(queue: .main) {
-            let count = idsToDelete.count
+            let count = idsToDelete.count - failedIds.count
             isDeleting = false
-            selectedImageIds.removeAll()
-            withAnimation(DesignTokens.Animation.quick) { isSelectionMode = false }
-            ToastManager.shared.show("\(count) image\(count == 1 ? "" : "s") deleted", icon: "trash", style: .success)
+            if failedIds.isEmpty {
+                selectedImageIds.removeAll()
+                withAnimation(DesignTokens.Animation.quick) { isSelectionMode = false }
+                ToastManager.shared.show("\(count) image\(count == 1 ? "" : "s") deleted", icon: "trash", style: .success)
+            } else {
+                // Keep the failed ones selected so the user can retry.
+                selectedImageIds = failedIds
+                ToastManager.shared.show("\(count) of \(idsToDelete.count) deleted — \(failedIds.count) failed", icon: "exclamationmark.triangle.fill", style: .error)
+            }
 
             imageListFilters.refetchImages(viewModel: viewModel, initial: true)
         }
@@ -1482,8 +1499,28 @@ extension ImageGroupCatalogCell {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("O-Counter")
+            .oCounterRemovalMenu(
+                count: oCounter,
+                onRemoveOne: { changeOCounter(of: image, .decrement) },
+                onReset: { changeOCounter(of: image, .reset) }
+            )
         }
         .fixedSize()
+    }
+
+    /// Long-press menu: remove the last O or reset them all, optimistic with rollback.
+    private func changeOCounter(of image: StashImage, _ mutation: StashDBViewModel.OCounterMutation) {
+        guard let viewModel else { return }
+        let original = image.o_counter ?? 0
+        onImageUpdated?(image.withOCounter(mutation == .reset ? 0 : max(0, original - 1)))
+        viewModel.mutateImageOCounter(imageId: image.id, mutation) { returnedCount in
+            if let count = returnedCount {
+                onImageUpdated?(image.withOCounter(count))
+            } else {
+                onImageUpdated?(image.withOCounter(original))
+                ToastManager.shared.show("Failed to update O-Counter", icon: "exclamationmark.triangle", style: .error)
+            }
+        }
     }
 
     private func incrementOCounter(of image: StashImage) {

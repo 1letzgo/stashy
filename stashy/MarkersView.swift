@@ -56,7 +56,8 @@ private struct MarkersViewContent: View {
         let chips = markerLiveChips.effectiveLiveFilter(for: selectedFilter)
         // The selected filter's criteria live in `criteriaDocument`, so the fetch sends those —
         // unless the editor is still empty (default filter on appear), then send the filter itself.
-        let live = criteriaDocument.layered(over: chips)
+        // Chips are scene-level criteria (`scene_filter`); the editor's entries are marker fields.
+        let live = criteriaDocument.layered(over: chips.isEmpty ? [:] : ["scene_filter": chips])
         let base = criteriaDocument.isEmpty ? selectedFilter : nil
         viewModel.fetchSceneMarkers(sortBy: selectedSortOption, searchQuery: searchText, filter: base, liveFilter: live)
     }

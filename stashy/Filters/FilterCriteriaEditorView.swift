@@ -103,6 +103,8 @@ struct FilterCriteriaEditorView: View {
         )) { identity in
             nestedEditorSheet(key: identity.key)
         }
+        // Sheet closed within the debounce window: apply now instead of dropping the edit.
+        .onDisappear { applyScheduler.flush() }
     }
 
     /// This level's own conditions. Also the drop target for the level — the group cards carry
@@ -520,14 +522,29 @@ final class FilterCriteriaApplyScheduler: ObservableObject {
     static let delay: Duration = .milliseconds(450)
 
     private var pending: Task<Void, Never>?
+    private var pendingWork: (() -> Void)?
 
     func schedule(_ work: @escaping () -> Void) {
         pending?.cancel()
+        pendingWork = work
         pending = Task { @MainActor in
             try? await Task.sleep(for: Self.delay)
             guard !Task.isCancelled else { return }
+            self.pendingWork = nil
             work()
         }
+    }
+
+    /// Runs a still-waiting apply right now. Called when the editor goes away: closing the
+    /// sheet with Done inside the debounce window used to cancel the apply, so the new
+    /// criteria never reached the list (Feeds kept its old timeline; the tag pill, which applies
+    /// directly, worked).
+    func flush() {
+        guard let work = pendingWork else { return }
+        pending?.cancel()
+        pending = nil
+        pendingWork = nil
+        work()
     }
 
     deinit { pending?.cancel() }

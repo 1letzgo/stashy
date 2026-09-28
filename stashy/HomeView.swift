@@ -48,26 +48,43 @@ private struct HomeViewContent: View {
                     viewModel.initializeServerConnection()
                 } else {
                     viewModel.fetchStatistics()
-                    for row in tabManager.homeRows where row.isEnabled && row.type != .statistics {
-                        viewModel.refreshHomeRow(config: row, limit: 10)
-                    }
+                    // Only rows whose cache is older than the freshness window refetch.
+                    // Coming back from a detail page used to reload every row.
+                    loadRowsIfNeeded()
                 }
             }
+            // The server reset clears every row cache, so `loadHomeRowIfNeeded` refetches.
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
                 viewModel.initializeServerConnection()
             }
+            // Once for the whole dashboard. Each row used to subscribe on its own, so a
+            // single resume-time update ran through every row's handler.
             .sceneLiveUpdates(using: viewModel)
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { notification in
                 if let tabId = notification.userInfo?["tab"] as? String, tabId == AppTab.dashboard.rawValue {
+                    viewModel.homeRowScenes.removeAll()
                     viewModel.initializeServerConnection()
                 }
             }
+            // Rows that waited for the default dashboard filter load once filters are in.
+            .onChange(of: viewModel.savedFilters) { _, _ in loadRowsIfNeeded() }
+            .onChange(of: viewModel.isLoadingSavedFilters) { old, new in
+                if old && !new { loadRowsIfNeeded() }
+            }
+    }
+
+    private func loadRowsIfNeeded() {
+        for row in tabManager.homeRows where row.isEnabled && row.type != .statistics && row.type != .channels {
+            viewModel.loadHomeRowIfNeeded(config: row)
+        }
     }
 
     @ViewBuilder
     private var dashboardContent: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            // Lazy: rows below the fold are built (and their cards, preview players and
+            // image loaders allocated) only when they scroll into view.
+            LazyVStack(spacing: 24) {
                 let activeRows = tabManager.homeRows.filter { $0.isEnabled }
                 let firstRowId = activeRows.first?.id
                 let firstSceneRowId = activeRows.first(where: { $0.type != .statistics && $0.type != .channels })?.id
@@ -93,6 +110,9 @@ private struct HomeViewContent: View {
         .scrollContentBackground(.hidden)
         .refreshable {
             viewModel.homeRowScenes.removeAll()
+            viewModel.homeRowPerformers.removeAll()
+            viewModel.homeRowStudios.removeAll()
+            viewModel.homeRowGalleries.removeAll()
             viewModel.initializeServerConnection()
         }
     }

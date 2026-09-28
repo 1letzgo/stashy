@@ -360,6 +360,14 @@ struct ReelsViewBody: View {
     @State private var isBeingReplaced = false
     /// Items whose file the server never generated — found out by playback failing on them.
     @State private var unplayableItemIds: Set<String> = []
+    /// Set when the feed moved on from a dead row by itself. Dropping rows and paging reshuffle
+    /// the stack, which runs a programmatic scroll phase; that phase clears the play intent and
+    /// only restores what it found *before* — during a skip cascade that is already `false`, so
+    /// the surviving row stayed paused. The flag makes the settle resume playback regardless.
+    @State private var reelsAutoAdvanceArmed = false
+    /// Which saved filter each criteria document was last mirrored from (scenes and previews
+    /// share one document). A sync loads the document only when the selection moved on.
+    @State private var reelsCriteriaDocumentSourceIds: [ReelsMode: String] = [:]
     /// Items whose file has already been asked about, so the feed asks once per item.
     @State private var mediaProbedItemIds: Set<String> = []
     /// Reentrancy guard: SwiftUI can fire `onAppear` multiple times during tab
@@ -767,6 +775,41 @@ struct ReelsViewBody: View {
             break
         case .pics: break
         }
+        reelsLoadCriteriaDocumentIfEmpty(for: mode, savedFilters: savedFilters)
+    }
+
+    /// Default and session filters set `selectedFilter` directly, not through the sheet's
+    /// selection path, so the mode's criteria document stayed empty: the sheet showed none of
+    /// the filter's tags or studios until the filter was picked by hand. Clips never had the
+    /// problem because its controller loads the document on every selection. Only an empty
+    /// document is filled, so criteria the user edited in this session survive a re-sync.
+    private func reelsLoadCriteriaDocumentIfEmpty(for mode: ReelsMode, savedFilters: [String: StashDBViewModel.SavedFilter]) {
+        let document: FilterCriteriaDocument
+        let filter: StashDBViewModel.SavedFilter?
+        switch mode {
+        case .scenes: document = reelsCriteriaDocument; filter = selectedFilter
+        case .previews: document = reelsCriteriaDocument; filter = selectedPreviewFilter
+        case .markers: document = reelsMarkerCriteriaDocument; filter = selectedMarkerFilter
+        case .clips, .pics: return
+        }
+        guard let filter else {
+            reelsCriteriaDocumentSourceIds[mode] = nil
+            return
+        }
+        // Reload when the selection changed, or when the document is empty although a filter
+        // is selected (a reset or a deep link cleared it after the last mirror).
+        guard reelsCriteriaDocumentSourceIds[mode] != filter.id || document.isEmpty else { return }
+        // Same rule as the manual pick (`reelsApplyServerSceneSavedFilterForReels`): a filter
+        // saved by stashy carries `ui_options.stashy` even when it is a plain server filter
+        // (`liveFragment: {}`, no base). Its own criteria are the base then — resolving
+        // only `baseSavedFilterId` mirrored nothing for exactly those filters.
+        let meta = filter.stashyScenePresetMetadata
+        let base = meta?.baseSavedFilterId.flatMap { savedFilters[$0] } ?? filter
+        var criteria = base.criteriaObjectFilter()
+        for (key, value) in meta?.liveFragment ?? [:] { criteria[key] = value }
+        document.load(criteria)
+        reelsCriteriaDocumentSourceIds[mode] = filter.id
+        AppLog.debug("🎛 Feeds sheet: mirrored filter \(filter.id) (\(filter.name)) mode=\(filter.mode.rawValue) into \(mode) document → raw keys \(document.objectFilter.keys.sorted()) sanitized \(document.sanitizedObjectFilter.keys.sorted()) | filterDict=\(String(describing: filter.filterDict).prefix(300)) | object_filter=\(String(describing: filter.object_filter?.value).prefix(300))")
     }
 
     /// What a preset stores for the active mode: the criteria document of that mode.
@@ -992,6 +1035,7 @@ struct ReelsViewBody: View {
         } else {
             reelsCriteriaDocument.load(merged)
         }
+        AppLog.debug("🎛 Feeds manual: base \(base?.id ?? "nil") mode=\(base?.mode.rawValue ?? "-") merged keys \(merged.keys.sorted()) docMode=\((reelsMode == .markers ? reelsMarkerCriteriaDocument : reelsCriteriaDocument).mode.rawValue) doc raw keys \((reelsMode == .markers ? reelsMarkerCriteriaDocument : reelsCriteriaDocument).objectFilter.keys.sorted()) | filterDict=\(String(describing: base?.filterDict).prefix(300)) | object_filter=\(String(describing: base?.object_filter?.value).prefix(300))")
     }
 
     private func reelsApplyServerSceneSavedFilterForReels(_ f: StashDBViewModel.SavedFilter) {
@@ -1356,6 +1400,9 @@ struct ReelsViewBody: View {
         Binding<String?>(
             get: { currentVisibleSceneId },
             set: { newValue in
+                if newValue != currentVisibleSceneId {
+                    AppLog.debug("🎬 RS: scrollPosition → \(newValue ?? "nil") (was \(currentVisibleSceneId ?? "nil"), scrolling=\(isUserScrollingReels))")
+                }
                 currentVisibleSceneId = newValue
             }
         )
@@ -1630,6 +1677,20 @@ struct ReelsViewBody: View {
             }
         }
 
+        /// The scene the title opens. A marker's scene carries the marker's time as its
+        /// resume point and starts right there, the same way `MarkersView` opens it.
+        var titleLinkScene: Scene? {
+            switch self {
+            case .marker(let m): return m.scene?.toScene().withResumeTime(m.seconds)
+            default: return underlyingScene
+            }
+        }
+
+        var titleLinkAutoPlays: Bool {
+            if case .marker = self { return true }
+            return false
+        }
+
         /// Rows a scrub still can be decoded for: real video with a stream.
         /// Clips are images and animations have no timeline.
         var supportsScrubPreview: Bool {
@@ -1784,9 +1845,11 @@ struct ReelsViewBody: View {
         reelsCriteriaDocument.layered(over: base ?? [:])
     }
 
-    /// Marker counterpart of ``reelsSceneLive(_:)``.
+    /// Marker counterpart of ``reelsSceneLive(_:)``. The chips are scene-level criteria and go
+    /// under `scene_filter`; the marker criteria editor's entries stay top-level (marker fields).
     private func reelsMarkerLive(_ base: [String: Any]?) -> [String: Any]? {
-        reelsMarkerCriteriaDocument.layered(over: base ?? [:])
+        let chips = base ?? [:]
+        return reelsMarkerCriteriaDocument.layered(over: chips.isEmpty ? [:] : ["scene_filter": chips])
     }
 
     /// Criteria identity for the given mode — used to skip a page-1 refetch when the VM list is still valid.
@@ -2001,6 +2064,13 @@ struct ReelsViewBody: View {
         let timelineMutated = sortMutated || sceneSavedFilterMutated || markerSavedFilterMutated || clipSavedFilterMutated || previewSavedFilterMutated || sceneLiveRefresh || clipImageLiveRefresh
         if timelineMutated {
             viewModel.clearReelsCriterionFrozenSnapshots()
+            // A new sort / filter / criteria set is a new timeline: start at its first item.
+            // Otherwise the session position (still present in the new results) was restored
+            // and the feed looked as if the new criteria had not been applied at all.
+            clearSavedPosition(for: currentMode)
+            pendingRestoreId = nil
+            currentVisibleSceneId = nil
+            shouldScrollToTopAfterCriterionChange = true
         }
 
         let hadCriterionOverlay = selectedPerformer != nil || !selectedTags.isEmpty || selectedStudio != nil
@@ -2208,18 +2278,12 @@ struct ReelsViewBody: View {
                 return
             }
 
-            var newId: String?
-            switch reelsMode {
-            case .scenes:
-                if let firstId = viewModel.scenes.first?.id { newId = "scene-\(firstId)" }
-            case .markers:
-                if let firstId = viewModel.sceneMarkers.first?.id { newId = "marker-\(firstId)" }
-            case .clips:
-                if let firstId = viewModel.clips.first?.id { newId = "clip-\(firstId)" }
-            case .previews:
-                if let firstId = viewModel.previews.first?.id { newId = "preview-\(firstId)" }
-            case .pics: break
-            }
+            // The *rendered* list, not the view model's raw one: markers and previews drop
+            // rows without a file, and after a whole page was dropped the raw list's first
+            // entry is exactly such a row. Selecting it picked a row that no longer exists
+            // in the stack — nothing played, nothing could report, the feed sat black while
+            // the refill paged through the library.
+            let newId = currentReelItems.first?.id
             if let id = newId {
                 // Show first item while paging walks toward pendingRestoreId in
                 // the background. Don't clear pendingRestoreId here — the snap
@@ -2310,7 +2374,9 @@ struct ReelsViewBody: View {
         }
     }
 
-    private func handleOCounterChange(item: ReelItemData, newCount: Int) {
+    /// `mutation` defaults to the tap (increment); the long-press menu passes `.decrement` / `.reset`
+    /// with the matching optimistic `newCount`.
+    private func handleOCounterChange(item: ReelItemData, newCount: Int, mutation: StashDBViewModel.OCounterMutation = .increment) {
         // Preview items live in viewModel.previews, not viewModel.scenes
         if case .preview(let scene) = item {
             let sceneId = scene.id
@@ -2318,7 +2384,7 @@ struct ReelsViewBody: View {
             if let index = viewModel.previews.firstIndex(where: { $0.id == sceneId }) {
                 viewModel.previews[index] = viewModel.previews[index].withOCounter(newCount)
             }
-            viewModel.incrementOCounter(sceneId: sceneId) { returnedCount in
+            viewModel.mutateSceneOCounter(sceneId: sceneId, mutation) { returnedCount in
                 DispatchQueue.main.async {
                     if let count = returnedCount {
                         if let idx = viewModel.previews.firstIndex(where: { $0.id == sceneId }) {
@@ -2357,7 +2423,7 @@ struct ReelsViewBody: View {
             }
 
             // One mutation for scene + all related markers
-            viewModel.incrementOCounter(sceneId: sceneId) { returnedCount in
+            viewModel.mutateSceneOCounter(sceneId: sceneId, mutation) { returnedCount in
                 DispatchQueue.main.async {
                     if let count = returnedCount {
                         if let idx = viewModel.scenes.firstIndex(where: { $0.id == sceneId }) {
@@ -2391,7 +2457,7 @@ struct ReelsViewBody: View {
             if let index = viewModel.clips.firstIndex(where: { $0.id == imageId }) {
                 viewModel.clips[index] = viewModel.clips[index].withOCounter(newCount)
             }
-            viewModel.incrementImageOCounter(imageId: imageId) { returnedCount in
+            viewModel.mutateImageOCounter(imageId: imageId, mutation) { returnedCount in
                 DispatchQueue.main.async {
                     if let count = returnedCount {
                         if let idx = viewModel.clips.firstIndex(where: { $0.id == imageId }) {
@@ -2711,13 +2777,18 @@ struct ReelsViewBody: View {
         .presentationBackgroundInteraction(.disabled)
         .onAppear {
             reelsSceneFilterSheetHydrating = true
+            AppLog.debug("🎛 Feeds sheet open: mode \(reelsMode) filter \(reelsLiveChipTargetFilter?.id ?? "nil") doc keys \((reelsMode == .markers ? reelsMarkerCriteriaDocument : reelsCriteriaDocument).sanitizedObjectFilter.keys.sorted()) chips tags \(reelsMode == .markers ? reelsMarkerLiveChips.tagIds : reelsSceneLiveChips.tagIds)")
             SceneLivePresetTag.migrateLegacySelection(&reelsSceneLiveSheetPresetSelection)
             SceneLivePresetTag.migrateLegacySelection(&reelsMarkerLiveSheetPresetSelection)
             SceneLivePresetTag.migrateLegacySelection(&reelsPreviewLiveSheetPresetSelection)
             reelsRefreshSceneLivePresets()
             reelsSyncFilterSheetPresetRow()
+            // Whatever set the selection, the document must mirror it when the sheet opens.
+            // Only the document: re-syncing the chips here would drop chips added in session.
+            reelsLoadCriteriaDocumentIfEmpty(for: reelsMode, savedFilters: viewModel.savedFilters)
             viewModel.fetchSavedFilters { _ in
                 reelsSyncFilterSheetPresetRow()
+                reelsLoadCriteriaDocumentIfEmpty(for: reelsMode, savedFilters: viewModel.savedFilters)
             }
             Task { @MainActor in
                 reelsSceneFilterSheetHydrating = false
@@ -2956,6 +3027,7 @@ struct ReelsViewBody: View {
     }
 
     private func handleCurrentVisibleSceneIdChanged() {
+        AppLog.debug("🎬 RS: current → \(currentVisibleSceneId ?? "nil") scrolling=\(isUserScrollingReels) playing=\(currentItemIsPlaying)")
         isMenuOpen = false
         // New page: drop zoom lock so Feeds paging is not stuck disabled.
         isMediaZoomed = false
@@ -3680,6 +3752,10 @@ struct ReelsViewBody: View {
         case .pics:
             bootstrapReelsPicsFiltersIfNeeded()
         }
+        // The restored filter has to reach the sheet's criteria document too — this path set
+        // the selection without any sheet sync, so the sheet showed the filter's name with
+        // every condition on "Any".
+        reelsLoadCriteriaDocumentIfEmpty(for: reelsMode, savedFilters: viewModel.savedFilters)
 
         // Tab-bar icon → start of feed. Normal appear → restore last scroll position.
         if restartFromTop {
@@ -4100,6 +4176,7 @@ struct ReelsViewBody: View {
                 currentVisibleSceneId = successorId ?? currentReelItems.first?.id
                 // Auto-advance is a play intent, even when a scroll phase paused the feed.
                 currentItemIsPlaying = true
+                reelsAutoAdvanceArmed = true
                 playTrigger += 1
             }
             refillFeedAfterDrops()
@@ -4139,7 +4216,7 @@ struct ReelsViewBody: View {
     private static let minimumRowsBeforeRefill = 5
 
     /// True only for a definite "this file does not exist".
-    private static func generatedFileIsMissing(at url: URL) async -> Bool {
+    static func generatedFileIsMissing(at url: URL) async -> Bool {
         var request = authenticatedStashRequest(for: url)
         request.timeoutInterval = 12
         request.setValue("bytes=0-0", forHTTPHeaderField: "Range")
@@ -4171,6 +4248,7 @@ struct ReelsViewBody: View {
             // Auto-advance is a play intent: a scroll phase may have cleared it, and the
             // successor's watchdog only kicks a row that wants to play.
             currentItemIsPlaying = true
+            reelsAutoAdvanceArmed = true
             playTrigger += 1
         }
         refillFeedAfterDrops()
@@ -4249,6 +4327,31 @@ struct ReelsViewBody: View {
         }
     }
 
+    /// Initial (page-1) load of the feed that is on screen.
+    private var isActiveFeedLoadingInitial: Bool {
+        switch reelsMode {
+        case .scenes: return viewModel.isLoadingScenes
+        case .markers: return viewModel.isLoadingMarkers
+        case .clips: return viewModel.isLoadingClips
+        case .previews: return viewModel.isLoadingPreviews
+        case .pics: return false
+        }
+    }
+
+    /// After a criteria change: select and show the new timeline's first item, once.
+    private func scrollToTopIfRequested(items: [ReelItemData], proxy: ScrollViewProxy) {
+        guard shouldScrollToTopAfterCriterionChange, !isActiveFeedLoadingInitial,
+              let first = items.first?.id else { return }
+        shouldScrollToTopAfterCriterionChange = false
+        pendingRestoreId = nil
+        currentVisibleSceneId = first
+        DispatchQueue.main.async {
+            withAnimation(nil) {
+                proxy.scrollTo(first, anchor: .top)
+            }
+        }
+    }
+
     @ViewBuilder
     private func reelsListView() -> some View {
         let items = currentReelItems
@@ -4272,6 +4375,7 @@ struct ReelsViewBody: View {
             .onScrollPhaseChange { oldPhase, newPhase in
                 let wasDriftSuppressed = reelsScrollDelaysPagingIdentityDrift(oldPhase)
                 let driftSuppressed = reelsScrollDelaysPagingIdentityDrift(newPhase)
+                AppLog.debug("🎬 RS: scroll phase \(oldPhase) → \(newPhase) playing=\(currentItemIsPlaying) current=\(currentVisibleSceneId ?? "nil")")
                 if !wasDriftSuppressed && driftSuppressed {
                     reelsWasPlayingBeforeScrollGesture = currentItemIsPlaying
                 }
@@ -4283,9 +4387,10 @@ struct ReelsViewBody: View {
                 } else {
                     // Restore play intent before clearing the scroll flag so `ReelItemView` never sees
                     // `!isUserScrolling && !isPlaying` for a frame (play button / thumbnail flash).
-                    if reelsWasPlayingBeforeScrollGesture {
+                    if reelsWasPlayingBeforeScrollGesture || reelsAutoAdvanceArmed {
                         currentItemIsPlaying = true
                     }
+                    reelsAutoAdvanceArmed = false
                     isUserScrollingReels = false
                     if pendingFeedActivation {
                         requestFeedActivation()
@@ -4295,17 +4400,13 @@ struct ReelsViewBody: View {
             .onChange(of: items.count) { _, _ in
                 continuePagedRestoreIfNeeded()
                 snapToPendingRestoreIfLoaded(using: proxy)
-
-                if shouldScrollToTopAfterCriterionChange, let first = items.first?.id {
-                    shouldScrollToTopAfterCriterionChange = false
-                    pendingRestoreId = nil
-                    currentVisibleSceneId = first
-                    DispatchQueue.main.async {
-                        withAnimation(nil) {
-                            proxy.scrollTo(first, anchor: .top)
-                        }
-                    }
-                }
+                scrollToTopIfRequested(items: items, proxy: proxy)
+            }
+            // A full first page has the same count as the old one, so `items.count` alone never
+            // fired after a criteria change — the jump to the new first item waits for the load.
+            .onChange(of: isActiveFeedLoadingInitial) { _, loading in
+                guard !loading else { return }
+                scrollToTopIfRequested(items: items, proxy: proxy)
             }
             .onAppear {
                 reelsListMounted = true
@@ -4541,8 +4642,8 @@ struct ReelsViewBody: View {
     @ViewBuilder
     private func reelsTitleText(item: ReelItemData) -> some View {
         if let title = item.title, !title.isEmpty {
-            if let scene = item.underlyingScene {
-                NavigationLink(destination: LazyView { SceneDetailView(scene: scene) }) {
+            if let scene = item.titleLinkScene {
+                NavigationLink(destination: LazyView { SceneDetailView(scene: scene, autoPlay: item.titleLinkAutoPlays) }) {
                     Text(title)
                         .font(.system(size: 15, weight: .medium))
                         .foregroundColor(.white.opacity(0.85))
@@ -4584,6 +4685,19 @@ struct ReelsViewBody: View {
             .buttonStyle(.plain)
             .disabled(currentItem == nil)
             .accessibilityLabel("O-Counter")
+            .oCounterRemovalMenu(
+                count: oCounter,
+                onRemoveOne: {
+                    if let item = currentItem {
+                        handleOCounterChange(item: item, newCount: max(0, oCounter - 1), mutation: .decrement)
+                    }
+                },
+                onReset: {
+                    if let item = currentItem {
+                        handleOCounterChange(item: item, newCount: 0, mutation: .reset)
+                    }
+                }
+            )
 
             Group {
                 if let item = currentItem {
@@ -4704,12 +4818,15 @@ struct ReelsViewBody: View {
                             }
                         }
 
+                        // Animated clips (GIF/WebP) have no player, but with continuous play on
+                        // the button pauses the auto-advance, like it does for stills in Pics.
+                        let pausesAdvance = item.isAnimated && TabManager.shared.reelsContinuousPlay
                         ChromePillIconButton(
                             systemImage: currentItemIsPlaying ? "pause.fill" : "play.fill",
-                            enabled: isVideo,
+                            enabled: isVideo || pausesAdvance,
                             accessibilityLabel: currentItemIsPlaying ? "Pause" : "Play"
                         ) {
-                            if isVideo { currentItemIsPlaying.toggle() }
+                            if isVideo || pausesAdvance { currentItemIsPlaying.toggle() }
                         }
                     }
                 }
@@ -5236,6 +5353,7 @@ extension ReelItemView {
             .onReceive(NotificationCenter.default.publisher(for: .reelsPauseAllPlayers)) { _ in
                 // Robust pause: when paging/scrolling starts, pause immediately even if
                 // `currentVisibleSceneId` (and thus `isActive`) hasn't updated yet.
+                if isActive { AppLog.debug("🎬 RS: pauseAll hits active row \(item.id)") }
                 aetherPause()
                 syncPlaybackActivityPosition()
                 playbackActivityTracker.stop()
@@ -5249,6 +5367,7 @@ extension ReelItemView {
                 aetherSetMuted(newValue)
             }
             .onChange(of: isActive) { _, newValue in
+                AppLog.debug("🎬 RS: row \(item.id) active=\(newValue) scrolling=\(isUserScrolling) playing=\(isPlaying) engine=\(aetherEngine != nil)")
                 if newValue {
                     guard !isUserScrolling else { return }
                     if aetherEngine == nil {
@@ -5363,6 +5482,11 @@ extension ReelItemView {
             }
             .onChange(of: isPlaying) { _, playing in
                 guard isPlaybackActive else { return }
+                if item.isAnimated {
+                    // Pause on an animated clip holds the feed on it; play resumes the advance.
+                    if playing { startAnimationAdvanceTimer() } else { cancelAnimationAdvanceTimer() }
+                    return
+                }
                 if playing {
                     if !isRotating {
                         aetherPlayIfAllowed()
@@ -5552,6 +5676,9 @@ extension ReelItemView {
         guard !item.isAnimated, let aether = aetherEngine else { return }
 
         if isPressed {
+            // Like `AetherSceneSurface.setFastForwarding`: on a paused row the boost timer
+            // still stepped the playhead, so a hold visibly scrubbed a row shown as paused.
+            guard aether.isPlaying else { return }
             HapticManager.selection()
             // Settings › Playback › "Hold to speed up — Feeds". The engine plays video at
             // most 2×; anything above is made up by stepping the playhead forward.
@@ -5695,8 +5822,8 @@ extension ReelItemView {
     private func titleLabel(for item: ReelsViewBody.ReelItemData) -> some View {
         if let title = item.title, !title.isEmpty {
             Group {
-                if let scene = item.underlyingScene {
-                    NavigationLink(destination: LazyView { SceneDetailView(scene: scene) }) {
+                if let scene = item.titleLinkScene {
+                    NavigationLink(destination: LazyView { SceneDetailView(scene: scene, autoPlay: item.titleLinkAutoPlays) }) {
                         titleText(title, item: item)
                     }
                     .buttonStyle(.plain)
@@ -5751,14 +5878,12 @@ extension ReelItemView {
         mediaProbeTask = Task { @MainActor in
             if await cancellableSleep(nanoseconds: 1_000_000_000) { return }
             guard self.isActive, !self.hasUsableMedia, let url = self.item.videoURL else { return }
-            var request = authenticatedStashRequest(for: url)
-            request.httpMethod = "HEAD"
-            request.timeoutInterval = 5
-            guard let (_, response) = try? await StashNetworking.session.data(for: request),
-                  let http = response as? HTTPURLResponse else { return }
-            guard (400...499).contains(http.statusCode) else { return }
+            // Same probe as the feed's lookahead: a one-byte range GET, and only a definite
+            // 404/410 means "no file". A HEAD got a 405 from Stash's marker stream route and
+            // every 4xx counted, so rows that were loading fine were thrown out after a second.
+            guard await ReelsViewBody.generatedFileIsMissing(at: url) else { return }
             guard self.isActive, !self.hasUsableMedia else { return }
-            AppLog.error("🎬 Reel: \(http.statusCode) for this row's media — skipping it")
+            AppLog.error("🎬 Reel: the server has no file for this row's media — skipping it")
             self.engineErrorMessage = "No playable source"
             self.onPlaybackUnavailable()
         }
@@ -5777,6 +5902,7 @@ extension ReelItemView {
             // that has to be repaired whether or not the user wants playback running.
             guard self.isActive,
                   !ReelsPlayerRegistry.isPlaybackSuspended else { return }
+            AppLog.debug("🎬 RS: watchdog \(self.item.id) engine=\(self.aetherEngine != nil) playing=\(self.isPlaying) moving=\(self.isPlaybackMoving) media=\(self.hasUsableMedia) error=\(self.aetherErrorMessage ?? "-")")
 
             if self.aetherEngine == nil {
                 AppLog.error("🎬 Reel watchdog: active row has no engine — recovering (scrolling=\(self.isUserScrolling) playing=\(self.isPlaying))")

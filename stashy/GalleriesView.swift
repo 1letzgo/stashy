@@ -14,6 +14,9 @@ private struct GalleriesViewContent: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @State private var selectedSortOption: StashDBViewModel.GallerySortOption = StashDBViewModel.GallerySortOption(rawValue: TabManager.shared.getSortOption(for: .galleries) ?? "") ?? .dateDesc
     @State private var selectedFilter: StashDBViewModel.SavedFilter? = nil
+    /// Settings default filter applies once per view lifetime (force = DefaultFilterChanged
+    /// excepted); otherwise every appear re-applied it after the user reset to Any.
+    @State private var didApplyDefaultFilter = false
     @State private var searchText = ""
     @State private var isSearchVisible = false
     @State private var scrollPosition: String? = nil
@@ -552,6 +555,7 @@ private struct GalleriesViewContent: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
                 selectedFilter = nil
+                didApplyDefaultFilter = false
                 catalogPresetRowSelection = ""
                 clearGalleryLiveChipsOnly()
                 refreshGalleryLocalPresets()
@@ -596,7 +600,7 @@ private struct GalleriesViewContent: View {
     /// Applies Settings → Default Filters for Galleries. Returns `true` if selection changed.
     @discardableResult
     private func applyGalleriesDefaultFilterFromSettingsIfNeeded(force: Bool) -> Bool {
-        if !force, selectedFilter != nil { return false }
+        if !force, didApplyDefaultFilter || selectedFilter != nil { return false }
 
         if let defaultId = TabManager.shared.getDefaultFilterId(for: .galleries),
            let filter = viewModel.savedFilters[defaultId] {
@@ -606,6 +610,7 @@ private struct GalleriesViewContent: View {
             selectedFilter = filter
             catalogPresetRowSelection = ListLivePresetTag.serverRow(filter.id)
             syncGalleryLiveChipsFromSelectedFilter()
+            didApplyDefaultFilter = true
             return force || !already
         }
 
@@ -1583,6 +1588,11 @@ struct FullScreenImageView: View {
             }
             .buttonStyle(.plain)
             .accessibilityLabel("O-Counter")
+            .oCounterRemovalMenu(
+                count: oCounter,
+                onRemoveOne: { changeCurrentOCounter(.decrement) },
+                onReset: { changeCurrentOCounter(.reset) }
+            )
 
             Menu {
                 Button {
@@ -1907,6 +1917,24 @@ struct FullScreenImageView: View {
                     }
                     ToastManager.shared.show("Failed to save rating", icon: "exclamationmark.triangle", style: .error)
                 }
+            }
+        }
+    }
+
+    /// Long-press menu: remove the last O or reset them all, optimistic with rollback.
+    private func changeCurrentOCounter(_ mutation: StashDBViewModel.OCounterMutation) {
+        let targetId = currentVisibleId ?? selectedImageId
+        guard let index = images.firstIndex(where: { $0.id == targetId }) else { return }
+        let imageId = images[index].id
+        let originalCount = images[index].o_counter ?? 0
+        images[index] = images[index].withOCounter(mutation == .reset ? 0 : max(0, originalCount - 1))
+        viewModel.mutateImageOCounter(imageId: imageId, mutation) { returnedCount in
+            guard let idx = images.firstIndex(where: { $0.id == imageId }) else { return }
+            if let count = returnedCount {
+                images[idx] = images[idx].withOCounter(count)
+            } else {
+                images[idx] = images[idx].withOCounter(originalCount)
+                ToastManager.shared.show("Failed to update O-Counter", icon: "exclamationmark.triangle", style: .error)
             }
         }
     }

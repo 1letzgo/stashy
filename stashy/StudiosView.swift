@@ -27,6 +27,9 @@ private struct StudiosViewContent: View {
     @State private var searchText = StudiosDebug.initialSearch
     @State private var isSearchVisible = false
     @State private var selectedFilter: StashDBViewModel.SavedFilter? = nil
+    /// Settings default filter applies once per view lifetime; `selectedFilter == nil` alone
+    /// also means "user reset to Any", and every `savedFilters` refresh re-applied it.
+    @State private var didApplyDefaultFilter = false
     @State private var lastOpenedStudioId: String?
     var hideTitle: Bool = false
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -366,11 +369,13 @@ private struct StudiosViewContent: View {
     /// gilt und noch keiner aktiv ist. Gibt zurück, ob etwas gesetzt wurde.
     @discardableResult
     private func applySettingsDefaultFilterIfNeeded() -> Bool {
-        guard !hideTitle, selectedFilter == nil else { return false }
+        guard !hideTitle, !didApplyDefaultFilter, selectedFilter == nil else { return false }
         guard let defaultId = TabManager.shared.getDefaultFilterId(for: .studios),
               let filter = viewModel.savedFilters[defaultId] else { return false }
 
         selectedFilter = filter
+
+        didApplyDefaultFilter = true
         // Keep the sheet's preset row in sync so the default shows as selected.
         catalogPresetRowSelection = ListLivePresetTag.serverRow(filter.id)
         return true
@@ -410,6 +415,7 @@ private struct StudiosViewContent: View {
                     if let defaultId = TabManager.shared.getDefaultFilterId(for: .studios),
                        let newFilter = viewModel.savedFilters[defaultId] {
                         selectedFilter = newFilter
+                        didApplyDefaultFilter = true
                     } else {
                         selectedFilter = nil
                     }
@@ -424,6 +430,7 @@ private struct StudiosViewContent: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
                 selectedFilter = nil
+                didApplyDefaultFilter = false
                 catalogPresetRowSelection = ""
                 refreshStudioLocalPresets()
                 performSearch()
@@ -605,9 +612,10 @@ private struct StudiosViewContent: View {
 
     private func onSavedFiltersChange(_ newValue: [String: StashDBViewModel.SavedFilter]) {
         if selectedFilter == nil {
-            if let defaultId = TabManager.shared.getDefaultFilterId(for: .studios),
+            if !didApplyDefaultFilter, let defaultId = TabManager.shared.getDefaultFilterId(for: .studios),
                let filter = newValue[defaultId] {
                 selectedFilter = filter
+                didApplyDefaultFilter = true
                 // Immer nachladen: `CatalogsView` hält ein ViewModel über alle Sub-Tabs
                 // warm, die Liste ist beim Öffnen also selten leer. Unter der alten
                 // Bedingung stand der Filter nur in der Variable und wirkte nie.
@@ -657,6 +665,20 @@ private struct StudiosViewContent: View {
                         .simultaneousGesture(TapGesture().onEnded {
                             lastOpenedStudioId = studio.id
                         })
+                    }
+
+                    // Same sentinel as TagsView — without it the list stopped at the first
+                    // page (500 studios) with no way to reach the rest.
+                    if viewModel.isLoadingMoreStudios {
+                        ProgressView()
+                            .frame(maxWidth: .infinity)
+                            .padding()
+                    } else if viewModel.hasMoreStudios && !viewModel.studios.isEmpty {
+                        Color.clear
+                            .frame(height: 1)
+                            .onAppear {
+                                viewModel.loadMoreStudios()
+                            }
                     }
                 }
                 .measuresGridWidth($gridWidth)

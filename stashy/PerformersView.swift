@@ -18,6 +18,9 @@ private struct PerformersViewContent: View {
     @State private var isChangingSort = false
     @State private var searchText = ""
     @State private var selectedFilter: StashDBViewModel.SavedFilter? = nil
+    /// Settings default filter applies once per view lifetime; `selectedFilter == nil` alone
+    /// also means "user reset to Any", and every `savedFilters` refresh re-applied it.
+    @State private var didApplyDefaultFilter = false
     @State private var navigationPath = [Performer]()
     @State private var isSearchVisible = false
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -413,11 +416,13 @@ private struct PerformersViewContent: View {
     /// gilt und noch keiner aktiv ist. Gibt zurück, ob etwas gesetzt wurde.
     @discardableResult
     private func applySettingsDefaultFilterIfNeeded() -> Bool {
-        guard selectedFilter == nil else { return false }
+        guard !didApplyDefaultFilter, selectedFilter == nil else { return false }
         guard let defaultId = TabManager.shared.getDefaultFilterId(for: .performers),
               let filter = viewModel.savedFilters[defaultId] else { return false }
 
         selectedFilter = filter
+
+        didApplyDefaultFilter = true
         // Keep the sheet's preset row in sync so the default shows as selected.
         catalogPresetRowSelection = ListLivePresetTag.serverRow(filter.id)
         return true
@@ -454,6 +459,7 @@ private struct PerformersViewContent: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
                 selectedFilter = nil
+                didApplyDefaultFilter = false
                 catalogPresetRowSelection = ""
                 refreshPerformerLocalPresets()
                 performSearch()
@@ -463,6 +469,7 @@ private struct PerformersViewContent: View {
                     if let defaultId = TabManager.shared.getDefaultFilterId(for: .performers),
                        let newFilter = viewModel.savedFilters[defaultId] {
                         selectedFilter = newFilter
+                        didApplyDefaultFilter = true
                     } else {
                         selectedFilter = nil
                     }
@@ -477,9 +484,10 @@ private struct PerformersViewContent: View {
             }
             .onChange(of: viewModel.savedFilters) { oldValue, newValue in
                 if selectedFilter == nil {
-                    if let defaultId = TabManager.shared.getDefaultFilterId(for: .performers),
+                    if !didApplyDefaultFilter, let defaultId = TabManager.shared.getDefaultFilterId(for: .performers),
                        let filter = newValue[defaultId] {
                         selectedFilter = filter
+                        didApplyDefaultFilter = true
                         // Immer nachladen: `CatalogsView` hält ein ViewModel über alle Sub-Tabs
                         // warm, die Liste ist beim Öffnen also selten leer. Unter der alten
                         // Bedingung stand der Filter nur in der Variable und wirkte nie.

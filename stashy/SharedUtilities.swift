@@ -1992,7 +1992,13 @@ public struct FilterMapper {
         }
         
         // Multi-select/ID mapping (`[String]` does not cast to `[Any]` in Swift).
-        let multiSelectFields: Set<String> = ["performers", "studios", "tags", "galleries", "scenes", "groups", "movies"]
+        // Every multi-id field the editor knows (FilterFieldCatalog `.multi` / `.hierarchicalMulti`).
+        // `performer_tags` / `scene_tags` were missing: a saved filter's `{id, label}` items then
+        // reached the server as maps ("cannot use map as ID") once the criteria document sent them.
+        let multiSelectFields: Set<String> = [
+            "performers", "studios", "tags", "galleries", "scenes", "groups", "movies",
+            "performer_tags", "scene_tags", "parents", "children", "containing_groups", "sub_groups"
+        ]
         if multiSelectFields.contains(key) {
             if subDict["value"] != nil {
                 subDict["value"] = idStrings(from: subDict["value"])
@@ -2002,7 +2008,10 @@ public struct FilterMapper {
             }
             // HierarchicalMultiCriterionInput requires optional `depth`; MultiCriterionInput (performers etc.) rejects it.
             // Empty value is "Any" and is dropped later — don't persist `depth` on a blank criterion.
-            let hierarchicalFields: Set<String> = ["tags", "studios", "groups", "movies"]
+            let hierarchicalFields: Set<String> = [
+                "tags", "studios", "groups", "movies",
+                "performer_tags", "scene_tags", "parents", "children", "containing_groups", "sub_groups"
+            ]
             if hierarchicalFields.contains(key) {
                 if subDict["depth"] == nil, !idStrings(from: subDict["value"]).isEmpty {
                     subDict["depth"] = 0

@@ -1,6 +1,7 @@
 import Foundation
 import LocalAuthentication
 import Combine
+import SwiftUI
 
 class SecurityManager: ObservableObject {
     static let shared = SecurityManager()
@@ -81,6 +82,11 @@ class SecurityManager: ObservableObject {
         let salt = UUID().uuidString
         let hash = KeychainManager.sha256Hex(passcode + ":" + salt)
         if KeychainManager.shared.saveAppPasscodeHash(salt: salt, hash: hash) {
+            // First PIN on this install and the user never touched the toggle: a PIN that
+            // does not lock on background protects nothing. Existing choices stay as they are.
+            if !isPasscodeSet, UserDefaults.standard.object(forKey: kAutoLockOnBackground) == nil {
+                autoLockOnBackground = true
+            }
             isPasscodeSet = true
             resetFailedAttempts()
         }
@@ -194,5 +200,29 @@ class SecurityManager: ObservableObject {
         let context = LAContext()
         _ = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
         return context.biometryType
+    }
+}
+
+// MARK: - Lock hand-off
+
+extension View {
+    /// Closes a full-screen presentation as soon as the app locks. The passcode screen is a
+    /// ZStack overlay in `MainTabView`, and a `fullScreenCover` sits above that — the video
+    /// stayed visible after returning from the background until the player was closed.
+    func dismissOnAppLock(_ dismiss: @escaping () -> Void) -> some View {
+        modifier(DismissOnAppLock(dismiss: dismiss))
+    }
+}
+
+/// `onChange` rather than `onReceive($isAppLocked)`: the `@Published` publisher replays the
+/// current value on subscribe, which looped dismiss → update → dismiss while locked (seen on tvOS).
+private struct DismissOnAppLock: ViewModifier {
+    @ObservedObject private var security = SecurityManager.shared
+    let dismiss: () -> Void
+
+    func body(content: Content) -> some View {
+        content.onChange(of: security.isAppLocked) { _, locked in
+            if locked { dismiss() }
+        }
     }
 }

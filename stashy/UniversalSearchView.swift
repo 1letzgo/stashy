@@ -16,6 +16,9 @@ struct UniversalSearchView: View {
     
     @State private var searchText = ""
     @State private var isSearching = false
+    /// The running search. Every keystroke used to start 8 parallel queries with no
+    /// cancellation, and a slow earlier answer could land after — and replace — a newer one.
+    @State private var searchTask: Task<Void, Never>?
     
     // Search results
     @State private var performers: [Performer] = []
@@ -49,7 +52,8 @@ struct UniversalSearchView: View {
         NavigationStack {
             Group {
                 if configManager.activeConfig == nil {
-                    ConnectionErrorView { }
+                    // No server configured: the only way forward is Settings.
+                    ConnectionErrorView { coordinator.selectedTab = .settings }
                 } else if searchText.isEmpty {
                     emptySearchView
                 } else {
@@ -709,9 +713,13 @@ struct UniversalSearchView: View {
         }
         
         isSearching = true
-        
+        searchTask?.cancel()
+
         // Run all searches in parallel using async let
-        Task { @MainActor in
+        searchTask = Task { @MainActor in
+            // Debounce: typing cancels this before any request goes out.
+            try? await Task.sleep(for: .milliseconds(300))
+            guard !Task.isCancelled else { return }
             async let performersTask = viewModel.searchPerformersAsync(query: query, limit: performersLimit)
             async let studiosTask = viewModel.searchStudiosAsync(query: query, limit: studiosLimit)
             async let tagsTask = viewModel.searchTagsAsync(query: query, limit: tagsLimit)
@@ -733,6 +741,10 @@ struct UniversalSearchView: View {
                 markersTask
             )
             
+            // Drop answers for a query the user already typed past.
+            guard !Task.isCancelled,
+                  query == searchText.trimmingCharacters(in: .whitespacesAndNewlines) else { return }
+
             // Update state on main actor
             performers = performersResult
             studios = studiosResult
@@ -747,6 +759,9 @@ struct UniversalSearchView: View {
     }
     
     private func clearResults() {
+        searchTask?.cancel()
+        searchTask = nil
+        isSearching = false
         performers = []
         studios = []
         tags = []

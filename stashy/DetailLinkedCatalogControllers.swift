@@ -153,10 +153,9 @@ final class DetailLinkedPerformersFilterModel: ObservableObject {
     /// editable; fetches then pass `filter: nil` and send the document instead.
     private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
         if let meta = filter.stashyCatalogPresetMetadata {
-            var merged: [String: Any] = [:]
-            if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
-                merged = base.criteriaObjectFilter()
-            }
+            // A filter saved from stashy carries `ui_options.stashy` even as a plain server
+            // filter (empty fragment, no base); its own criteria are the base then.
+            var merged: [String: Any] = (meta.baseSavedFilterId.flatMap { viewModel.savedFilters[$0] } ?? filter).criteriaObjectFilter()
             for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
                 merged[key] = value
             }
@@ -485,10 +484,9 @@ final class DetailLinkedTagsFilterModel: ObservableObject {
     /// editable; fetches then pass `filter: nil` and send the document instead.
     private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
         if let meta = filter.stashyCatalogPresetMetadata {
-            var merged: [String: Any] = [:]
-            if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
-                merged = base.criteriaObjectFilter()
-            }
+            // A filter saved from stashy carries `ui_options.stashy` even as a plain server
+            // filter (empty fragment, no base); its own criteria are the base then.
+            var merged: [String: Any] = (meta.baseSavedFilterId.flatMap { viewModel.savedFilters[$0] } ?? filter).criteriaObjectFilter()
             for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
                 merged[key] = value
             }
@@ -820,10 +818,9 @@ final class DetailLinkedStudiosFilterModel: ObservableObject {
     /// editable; fetches then pass `filter: nil` and send the document instead.
     private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
         if let meta = filter.stashyCatalogPresetMetadata {
-            var merged: [String: Any] = [:]
-            if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
-                merged = base.criteriaObjectFilter()
-            }
+            // A filter saved from stashy carries `ui_options.stashy` even as a plain server
+            // filter (empty fragment, no base); its own criteria are the base then.
+            var merged: [String: Any] = (meta.baseSavedFilterId.flatMap { viewModel.savedFilters[$0] } ?? filter).criteriaObjectFilter()
             for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
                 merged[key] = value
             }
@@ -1168,10 +1165,9 @@ final class DetailLinkedGalleriesFilterModel: ObservableObject {
     /// editable; fetches then pass `filter: nil` and send the document instead.
     private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
         if let meta = filter.stashyCatalogPresetMetadata {
-            var merged: [String: Any] = [:]
-            if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
-                merged = base.criteriaObjectFilter()
-            }
+            // A filter saved from stashy carries `ui_options.stashy` even as a plain server
+            // filter (empty fragment, no base); its own criteria are the base then.
+            var merged: [String: Any] = (meta.baseSavedFilterId.flatMap { viewModel.savedFilters[$0] } ?? filter).criteriaObjectFilter()
             for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
                 merged[key] = value
             }
@@ -1538,8 +1534,25 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
         }
     }
 
+    /// Which saved filter the criteria document was last mirrored from.
+    private var criteriaDocumentSourceId: String?
+
+    /// Feeds sets `selectedFilter` directly for its default, session and channel filters —
+    /// none of that goes through `handleSavedFilterSelection`, which is where the document
+    /// used to be filled. Mirror it whenever the selection moved on, so the sheet shows the
+    /// filter's criteria and not a row of "Any". Only the document; chips stay as they are.
+    func mirrorSelectedFilterIntoDocumentIfNeeded(viewModel: StashDBViewModel) {
+        guard let f = selectedFilter else {
+            criteriaDocumentSourceId = nil
+            return
+        }
+        guard criteriaDocumentSourceId != f.id || criteriaDocument.isEmpty else { return }
+        loadCriteriaDocument(from: f, viewModel: viewModel)
+    }
+
     func applyResolvedCatalogPresetPickerRowIfNeeded(viewModel: StashDBViewModel) {
         rehydrateSelectedFilter(from: viewModel)
+        mirrorSelectedFilterIntoDocumentIfNeeded(viewModel: viewModel)
         let next = resolvedCatalogPresetPickerRowId(viewModel: viewModel)
         if catalogPresetRowSelection != next {
             catalogPresetRowSelection = next
@@ -1556,6 +1569,7 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
         }
         refreshLocalPresets()
         rehydrateSelectedFilter(from: viewModel)
+        mirrorSelectedFilterIntoDocumentIfNeeded(viewModel: viewModel)
         let next = resolvedCatalogPresetPickerRowId(viewModel: viewModel)
         if catalogPresetRowSelection != next {
             ignoreNextPresetSelectionChange = true
@@ -1754,10 +1768,9 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
     /// editable; fetches then pass `filter: nil` and send the document instead.
     private func loadCriteriaDocument(from filter: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {
         if let meta = filter.stashyCatalogPresetMetadata {
-            var merged: [String: Any] = [:]
-            if let bid = meta.baseSavedFilterId, let base = viewModel.savedFilters[bid] {
-                merged = base.criteriaObjectFilter()
-            }
+            // A filter saved from stashy carries `ui_options.stashy` even as a plain server
+            // filter (empty fragment, no base); its own criteria are the base then.
+            var merged: [String: Any] = (meta.baseSavedFilterId.flatMap { viewModel.savedFilters[$0] } ?? filter).criteriaObjectFilter()
             for (key, value) in FilterMapper.sanitize(meta.liveFragment, isMarker: false) {
                 merged[key] = value
             }
@@ -1765,6 +1778,7 @@ final class DetailLinkedImagesFilterModel: ObservableObject {
         } else {
             criteriaDocument.load(filter.criteriaObjectFilter())
         }
+        criteriaDocumentSourceId = filter.id
     }
 
     func applyServerSavedFilter(_ f: StashDBViewModel.SavedFilter, viewModel: StashDBViewModel) {

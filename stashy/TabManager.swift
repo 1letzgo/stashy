@@ -5,7 +5,7 @@
 import SwiftUI
 import Combine
 
-/// Catalog grid density for Scenes / Galleries / Images (1 or 2 cards per row).
+/// Catalog grid density for Galleries / Images (1 or 2 cards per row).
 enum CatalogCardColumns: Int, CaseIterable, Codable, Hashable {
     case one = 1
     case two = 2
@@ -67,7 +67,6 @@ enum CatalogCardColumns: Int, CaseIterable, Codable, Hashable {
 
 /// Independent persistence scopes for the 1/2-per-row toggle.
 enum CatalogCardColumnScope: String, CaseIterable, Codable {
-    case scenes
     case galleries
     case images
     /// Image grid inside an opened gallery (`ImagesView(gallery:)`).
@@ -75,7 +74,6 @@ enum CatalogCardColumnScope: String, CaseIterable, Codable {
 
     static func from(appTab: AppTab) -> CatalogCardColumnScope? {
         switch appTab {
-        case .scenes: return .scenes
         case .galleries: return .galleries
         case .images: return .images
         default: return nil
@@ -583,7 +581,7 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(useColoredStatistics, forKey: useColoredStatisticsKey)
         }
     }
-    /// Per-scope catalog card density (Scenes / Galleries / Images / opened gallery). Published for SwiftUI refresh.
+    /// Per-scope catalog card density (Galleries / Images / opened gallery). Published for SwiftUI refresh.
     @Published private(set) var catalogCardColumnsByScope: [CatalogCardColumnScope: CatalogCardColumns] = [:]
 
     // Session-only sort options (not persisted)
@@ -711,7 +709,6 @@ class TabManager: ObservableObject {
 
     private func defaultCatalogCardColumns(for scope: CatalogCardColumnScope) -> CatalogCardColumns {
         switch scope {
-        case .scenes: return .one
         case .galleries, .images, .openedGallery: return .two
         }
     }

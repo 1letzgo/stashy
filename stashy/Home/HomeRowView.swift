@@ -116,19 +116,30 @@ private struct HomeDashboardHeroBackdrop: View, Equatable {
 
 struct HomeRowView: View {
     let config: HomeRowConfig
-    @ObservedObject var viewModel: StashDBViewModel
+    /// Deliberately **not** `@ObservedObject`: the row must not redraw on every publish
+    /// of the big view model. It only observes its own `HomeRowStore`.
+    let viewModel: StashDBViewModel
+    @ObservedObject var store: HomeRowStore
     @ObservedObject var tabManager = TabManager.shared
     var isLarge: Bool = false
     var isFirst: Bool = false
     @State private var scrollID: String?
     @EnvironmentObject var coordinator: NavigationCoordinator
 
+    init(config: HomeRowConfig, viewModel: StashDBViewModel, isLarge: Bool = false, isFirst: Bool = false) {
+        self.config = config
+        self.viewModel = viewModel
+        self.store = viewModel.homeRowStore(for: config.type)
+        self.isLarge = isLarge
+        self.isFirst = isFirst
+    }
+
     // MARK: - Derived content
 
-    private var scenes: [Scene]       { viewModel.homeRowScenes[config.type] ?? [] }
-    private var performers: [Performer] { viewModel.homeRowPerformers[config.type] ?? [] }
-    private var studios: [Studio]     { viewModel.homeRowStudios[config.type] ?? [] }
-    private var galleries: [Gallery]  { viewModel.homeRowGalleries[config.type] ?? [] }
+    private var scenes: [Scene]       { store.scenes }
+    private var performers: [Performer] { store.performers }
+    private var studios: [Studio]     { store.studios }
+    private var galleries: [Gallery]  { store.galleries }
 
     private var items: [String] {
         switch config.type {
@@ -140,7 +151,7 @@ struct HomeRowView: View {
     }
 
     private var isEmpty: Bool { items.isEmpty }
-    private var isLoading: Bool { isEmpty && (viewModel.homeRowLoadingState[config.type] ?? true) }
+    private var isLoading: Bool { isEmpty && store.isLoading }
 
     // MARK: - Body
 
@@ -170,26 +181,10 @@ struct HomeRowView: View {
                     .equatable()
             }
         }
-        .onAppear { checkAndLoad() }
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("DefaultFilterChanged"))) { n in
-            if let tabId = n.userInfo?["tab"] as? String, tabId == AppTab.dashboard.rawValue {
-                viewModel.homeRowScenes[config.type] = nil
-                checkAndLoad()
-            }
-        }
-        // Keep in-place row caches in sync with SceneDetailView changes.
-        .sceneLiveUpdates(using: viewModel)
-        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
-            viewModel.homeRowScenes[config.type] = nil
-            viewModel.homeRowPerformers[config.type] = nil
-            viewModel.homeRowStudios[config.type] = nil
-            viewModel.homeRowGalleries[config.type] = nil
-            checkAndLoad()
-        }
-        .onChange(of: viewModel.savedFilters) { _, _ in checkAndLoad() }
-        .onChange(of: viewModel.isLoadingSavedFilters) { old, new in
-            if old && !new { checkAndLoad() }
-        }
+        // Inside the dashboard's `LazyVStack` this fires when the row scrolls into view,
+        // so rows below the fold load on demand. Filter / server / live-update listeners
+        // live once in `HomeView`, not once per row.
+        .onAppear { viewModel.loadHomeRowIfNeeded(config: config) }
     }
 
     // MARK: - Header
@@ -343,17 +338,7 @@ struct HomeRowView: View {
             .id(id)
     }
 
-    // MARK: - Load logic
-
-    private func checkAndLoad() {
-        if let filterId = TabManager.shared.getDefaultFilterId(for: .dashboard) {
-            if viewModel.savedFilters[filterId] != nil || !viewModel.isLoadingSavedFilters {
-                viewModel.refreshHomeRow(config: config, limit: 10)
-            }
-        } else {
-            viewModel.refreshHomeRow(config: config, limit: 10)
-        }
-    }
+    // MARK: - Sort mapping
 
     private func sortOption() -> StashDBViewModel.SceneSortOption? {
         switch config.type {

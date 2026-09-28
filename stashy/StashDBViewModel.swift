@@ -881,8 +881,17 @@ class StashDBViewModel: ObservableObject {
         parts.map { $0 ?? "-" }.joined(separator: "|")
     }
 
+    /// Identity of a live filter for the feed signature and the initial-fetch single-flight.
+    /// Must include the values: keys alone made "no tag" (an empty `tags` criterion) and
+    /// "tag X" — or tag A and tag B — the same key, so Feeds treated the new timeline as
+    /// already loaded and never refetched it.
     private func liveFilterKey(_ liveFilter: [String: Any]?) -> String {
         guard let liveFilter else { return "none" }
+        if JSONSerialization.isValidJSONObject(liveFilter),
+           let data = try? JSONSerialization.data(withJSONObject: liveFilter, options: [.sortedKeys]),
+           let json = String(data: data, encoding: .utf8) {
+            return json
+        }
         return liveFilter.keys.sorted().joined(separator: ",") + "#\(liveFilter.count)"
     }
 
@@ -1825,6 +1834,11 @@ class StashDBViewModel: ObservableObject {
         imagesFetchGeneration += 1
         clipsFetchGeneration += 1
         scenesFetchGeneration += 1
+        // The bumped generation drops the in-flight answer before it can clear these,
+        // so the next fetch with the same key would be skipped as "already in flight"
+        // and the list would stay on its spinner after a server switch.
+        scenesInitialInflightKey = nil
+        isLoadingScenes = false
         previewsFetchGeneration += 1
         markersFetchGeneration += 1
         reelsFeedSignatures.removeAll()
@@ -3439,12 +3453,24 @@ class StashDBViewModel: ObservableObject {
             }
         }
         if !currentMarkerLiveFilter.isEmpty {
+            // Live filter layout: scene-level chips arrive under `scene_filter`, everything else
+            // is a marker-level criterion from the criteria editor (SceneMarkerFilterType: `tags`
+            // = the marker's tags, `scene_tags`, `performers`, `duration`, …). All of it used to be
+            // nested into `scene_filter`, so "Tags: Titjob" filtered for scenes carrying the tag
+            // and returned nearly every marker.
+            var live = currentMarkerLiveFilter
             var sceneNested = (markerFilter["scene_filter"] as? [String: Any]) ?? [:]
-            let liveSan = sanitizeFilter(currentMarkerLiveFilter, isMarker: false)
-            for (k, v) in liveSan {
-                sceneNested[k] = v
+            if let chips = live.removeValue(forKey: "scene_filter") as? [String: Any] {
+                for (k, v) in sanitizeFilter(chips, isMarker: false) {
+                    sceneNested[k] = v
+                }
             }
-            markerFilter["scene_filter"] = sanitizeFilter(sceneNested, isMarker: false)
+            for (k, v) in sanitizeFilter(live, isMarker: false) {
+                markerFilter[k] = v
+            }
+            if !sceneNested.isEmpty {
+                markerFilter["scene_filter"] = sanitizeFilter(sceneNested, isMarker: false)
+            }
         }
         if !markerFilter.isEmpty {
             markerFilter = normalizeSceneMarkerFilterForQuery(markerFilter)
@@ -6623,6 +6649,78 @@ class StashDBViewModel: ObservableObject {
         }
     }
     
+    /// What a tap / the long-press menu on an O-Counter pill asks for.
+    enum OCounterMutation {
+        case increment
+        /// Removes the most recent O entry.
+        case decrement
+        /// Removes every O entry.
+        case reset
+    }
+
+    /// Single entry point for all O-Counter changes on a scene. `.increment` keeps the existing path.
+    func mutateSceneOCounter(sceneId: String, _ mutation: OCounterMutation, completion: ((Int?) -> Void)? = nil) {
+        let field: String
+        switch mutation {
+        case .increment:
+            incrementOCounter(sceneId: sceneId, completion: completion)
+            return
+        case .decrement: field = "sceneDecrementO"
+        case .reset: field = "sceneResetO"
+        }
+        performOCounterMutation(field: field, id: sceneId) { count in
+            if let count {
+                self.patchSceneOCounterInLists(sceneId: sceneId, oCounter: count)
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("SceneOCounterUpdated"),
+                    object: nil,
+                    userInfo: ["sceneId": sceneId, "oCounter": count]
+                )
+            }
+            completion?(count)
+        }
+    }
+
+    /// Image counterpart of `mutateSceneOCounter`.
+    func mutateImageOCounter(imageId: String, _ mutation: OCounterMutation, completion: ((Int?) -> Void)? = nil) {
+        let field: String
+        switch mutation {
+        case .increment:
+            incrementImageOCounter(imageId: imageId, completion: completion)
+            return
+        case .decrement: field = "imageDecrementO"
+        case .reset: field = "imageResetO"
+        }
+        performOCounterMutation(field: field, id: imageId) { count in
+            if let count {
+                self.patchImageOCounterInLists(imageId: imageId, oCounter: count)
+                NotificationCenter.default.post(
+                    name: NSNotification.Name("ImageOCounterUpdated"),
+                    object: nil,
+                    userInfo: ["imageId": imageId, "oCounter": count]
+                )
+            }
+            completion?(count)
+        }
+    }
+
+    /// `sceneDecrementO` / `sceneResetO` / `imageDecrementO` / `imageResetO` all take an `id`
+    /// and return the new count. Completion runs on main.
+    private func performOCounterMutation(field: String, id: String, completion: @escaping (Int?) -> Void) {
+        let mutation = """
+        {
+          "query": "mutation OCounterChange($id: ID!) { \(field)(id: $id) }",
+          "variables": { "id": "\(id)" }
+        }
+        """
+        AppLog.debug("🎬 O: \(field) for \(id)")
+        performGraphQLMutationSilent(query: mutation) { result in
+            let count = (result?["data"]?.value as? [String: Any])?[field] as? Int
+            if count == nil { AppLog.error("❌ O: \(field) failed for \(id)") }
+            DispatchQueue.main.async { completion(count) }
+        }
+    }
+
     /// Syncs playback activity to Stash. `playDuration` is **added** to the scene's total watch time.
     /// Pass `resumeTime: nil` to update only play duration (e.g. marker streams).
     func updateSceneResumeTime(
@@ -7190,6 +7288,29 @@ class StashDBViewModel: ObservableObject {
             sceneIDs: [sceneId]
         ) { success, _, jobId in
             completion(success, jobId)
+        }
+    }
+
+    /// Generates the video preview (`markers`) and animated image preview (`markerImagePreviews`)
+    /// for a scene's markers — what Feeds and the marker cards play. Without this a new marker
+    /// had no preview until someone ran Generate on the server.
+    ///
+    /// No `overwrite`: Stash skips markers that already have their files, so only the new one
+    /// is rendered. Scoped by `sceneIDs` for the same directory reason as the screenshots.
+    func generateMarkerPreviews(sceneId: String, completion: ((Bool) -> Void)? = nil) {
+        guard !sceneId.isEmpty else {
+            completion?(false)
+            return
+        }
+        triggerGenerateReturningJobId(
+            markers: true,
+            markerImagePreviews: true,
+            sceneIDs: [sceneId]
+        ) { success, _, _ in
+            if !success {
+                AppLog.error("⚠️ Marker preview generate failed to start for scene \(sceneId)")
+            }
+            completion?(success)
         }
     }
 

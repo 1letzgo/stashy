@@ -588,6 +588,7 @@ struct SceneDetailView: View {
                 onDelete: deleteSceneWithFiles
             ))
             .modifier(lifecycleModifier)
+            .dismissOnAppLock { isFullscreen = false }
             .fullScreenCover(isPresented: $isFullscreen) {
                 fullscreenPlayer
             }
@@ -1527,6 +1528,11 @@ struct AddMarkerSheet: View {
                     // came second.
                     self.dismiss()
                     self.onComplete()
+
+                    // Video + animated preview for the new marker (Feeds, marker cards).
+                    // Separate job: it must not use the screenshot job's `overwrite`,
+                    // which would re-render every marker of the scene.
+                    self.viewModel.generateMarkerPreviews(sceneId: self.sceneId)
 
                     // Persist on the server: Stash has no marker image upload field
                     // (unlike scene `cover_image`), so generate the still at start time.

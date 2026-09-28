@@ -15,6 +15,9 @@ private struct TagsViewContent: View {
     @EnvironmentObject var coordinator: NavigationCoordinator
     @State private var selectedSortOption: StashDBViewModel.TagSortOption = StashDBViewModel.TagSortOption(rawValue: TabManager.shared.getSortOption(for: .tags) ?? "") ?? .sceneCountDesc
     @State private var selectedFilter: StashDBViewModel.SavedFilter? = nil
+    /// Settings default filter applies once per view lifetime; `selectedFilter == nil` alone
+    /// also means "user reset to Any", and every `savedFilters` refresh re-applied it.
+    @State private var didApplyDefaultFilter = false
     @State private var lastOpenedTagId: String?
     @State private var isChangingSort = false
     @State private var searchText = ""
@@ -373,6 +376,7 @@ private struct TagsViewContent: View {
                     if let defaultId = TabManager.shared.getDefaultFilterId(for: .tags),
                        let newFilter = viewModel.savedFilters[defaultId] {
                         selectedFilter = newFilter
+                        didApplyDefaultFilter = true
                     } else {
                         selectedFilter = nil
                     }
@@ -387,6 +391,7 @@ private struct TagsViewContent: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
                 selectedFilter = nil
+                didApplyDefaultFilter = false
                 catalogPresetRowSelection = ""
                 refreshTagLocalPresets()
                 performSearch()
@@ -509,11 +514,13 @@ private struct TagsViewContent: View {
     /// (minus the fetch) so the preset row and chips stay in sync. Returns whether it applied one.
     @discardableResult
     private func applySettingsDefaultFilterIfNeeded() -> Bool {
-        guard selectedFilter == nil else { return false }
+        guard !didApplyDefaultFilter, selectedFilter == nil else { return false }
         guard let defaultId = TabManager.shared.getDefaultFilterId(for: .tags),
               let filter = viewModel.savedFilters[defaultId] else { return false }
 
         selectedFilter = filter
+
+        didApplyDefaultFilter = true
         catalogPresetRowSelection = ListLivePresetTag.serverRow(filter.id)
         if CatalogLiveChipFilterSupport.tagSavedFilterSupportsLiveEditor(filter), let raw = filter.filterDict {
             mapTagLiveFragmentToChips(raw)

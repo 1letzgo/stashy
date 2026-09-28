@@ -14,6 +14,10 @@ struct SceneVideoPlayerCard: View {
     @Binding var isPlaybackStarted: Bool
     @Binding var isFullscreen: Bool
     @Binding var isPreviewing: Bool
+    /// `pressing` fires on touch-down, not after `minimumDuration`. Starting the preview there
+    /// removed the play buttons under the finger, so a plain tap on Play only flashed the
+    /// preview and needed a second tap. The preview now waits until the press really holds.
+    @State private var pendingPreviewStart: DispatchWorkItem?
     /// Owned by SceneDetailView; the engine surface draws its own mute button.
     @Binding var isMuted: Bool
     /// Add-marker flow (the detail view owns the sheet); nil hides the button.
@@ -185,9 +189,20 @@ struct SceneVideoPlayerCard: View {
             )
         )
         .onLongPressGesture(minimumDuration: 0.15, pressing: { pressing in
-            if pressing { startPreview() } else { stopPreview() }
+            pendingPreviewStart?.cancel()
+            pendingPreviewStart = nil
+            if pressing {
+                let work = DispatchWorkItem { startPreview() }
+                pendingPreviewStart = work
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.15, execute: work)
+            } else if isPreviewing {
+                stopPreview()
+            }
         }, perform: {})
-        .onDisappear { previewPlayer.stop(release: true) }
+        .onDisappear {
+            pendingPreviewStart?.cancel()
+            previewPlayer.stop(release: true)
+        }
     }
 
     @ViewBuilder
@@ -503,6 +518,24 @@ struct SceneDetailMetadataCard: View {
             infoPill(icon: AppearanceManager.shared.oCounterIconFilled, text: "\(activeScene.oCounter ?? 0)")
         }
         .buttonStyle(.plain)
+        .oCounterRemovalMenu(
+            count: activeScene.oCounter ?? 0,
+            onRemoveOne: { removeOCounter(.decrement) },
+            onReset: { removeOCounter(.reset) }
+        )
+    }
+
+    private func removeOCounter(_ mutation: StashDBViewModel.OCounterMutation) {
+        let original = activeScene.oCounter ?? 0
+        activeScene = activeScene.withOCounter(mutation == .reset ? 0 : max(0, original - 1))
+        viewModel.mutateSceneOCounter(sceneId: activeScene.id, mutation) { newCount in
+            if let count = newCount {
+                activeScene = activeScene.withOCounter(count)
+            } else {
+                activeScene = activeScene.withOCounter(original)
+                ToastManager.shared.show("Counter update failed", icon: "exclamationmark.triangle", style: .error)
+            }
+        }
     }
 
     @ViewBuilder

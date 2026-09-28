@@ -604,6 +604,7 @@ struct DownloadDetailView: View {
     @StateObject private var downloadManager = DownloadManager.shared
     @State private var engine: AetherSceneEngine?
     @State private var isPlaybackStarted = false
+    @State private var confirmingDelete = false
     /// Latest playhead, written back to the download metadata every few seconds.
     @State private var localPlayhead: Double = 0
     @State private var lastResumeWrite: Date = .distantPast
@@ -900,8 +901,8 @@ struct DownloadDetailView: View {
                 
                 // Delete Button
                 Button(role: .destructive) {
-                    downloadManager.deleteDownload(id: downloaded.id)
-                    dismiss()
+                    // Big full-width button, irreversible, and it deletes a whole video: confirm first.
+                    confirmingDelete = true
                 } label: {
                     HStack {
                         Image(systemName: "trash")
@@ -918,11 +919,21 @@ struct DownloadDetailView: View {
             .padding(16)
         }
         .applyAppBackground()
+        .confirmationDialog("Delete this download?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+            Button("Delete Download", role: .destructive) {
+                downloadManager.deleteDownload(id: downloaded.id)
+                dismiss()
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("The video file is removed from this device.")
+        }
         .hideSystemNavigationBarForCustomChrome()
         .enableSwipeBackWhenNavBarHidden()
         .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
             downloadDetailNavBar
         }
+        .dismissOnAppLock { isFullScreen = false }
         .fullScreenCover(isPresented: $isFullScreen) {
             fullscreenPlayer
         }
