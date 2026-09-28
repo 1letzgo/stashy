@@ -123,6 +123,18 @@ a.btn.primary {
   background: var(--card);
 }
 
+.shots figure {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.shots figcaption {
+  color: var(--muted);
+  font-size: 13px;
+}
+
 .store-copy {
   text-align: left;
   color: var(--muted);
