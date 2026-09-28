@@ -385,6 +385,11 @@ private struct TVServersSettingsView: View {
                                 .font(.title3)
                         }
                     }
+                    // Ohne das liess sich der aktive Server (bei nur einem Server: der
+                    // einzige) nie bearbeiten, z. B. um den API-Key zu ändern.
+                    .contextMenu {
+                        Button("Edit") { serverForm = .edit(config) }
+                    }
                 } else {
                     HStack {
                         Image(systemName: "exclamationmark.triangle")
@@ -421,6 +426,7 @@ private struct TVServersSettingsView: View {
                 }
             }
         }
+        .dismissOnAppLock { serverForm = nil }
         .sheet(item: $serverForm) { target in
             switch target {
             case .new:
@@ -439,7 +445,7 @@ private struct TVServersSettingsView: View {
                 }
             }
         }
-        .tvSettingsPage("Servers", description: "Add Stash servers and switch between them. Hold Select on a saved server to edit or remove it.")
+        .tvSettingsPage("Servers", description: "Add Stash servers and switch between them. Hold Select on a server to edit it or remove a saved one.")
     }
 }
 
@@ -455,6 +461,7 @@ private struct TVSavedServerRow: View {
     let onActivate: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
+    @State private var confirmingDelete = false
 
     var body: some View {
         Button(action: onActivate) {
@@ -469,7 +476,11 @@ private struct TVSavedServerRow: View {
         }
         .contextMenu {
             Button("Edit", action: onEdit)
+            Button("Delete", role: .destructive) { confirmingDelete = true }
+        }
+        .confirmationDialog("Delete \"\(server.name)\"?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive, action: onDelete)
+            Button("Cancel", role: .cancel) {}
         }
     }
 }
@@ -567,6 +578,7 @@ private struct TVSecuritySettingsView: View {
                 }
             }
         }
+        .dismissOnAppLock { showingSetPasscode = false }
         .fullScreenCover(isPresented: $showingSetPasscode) {
             TVPasscodeSetupView(isPresented: $showingSetPasscode)
                 .presentationBackground(Color.black)
@@ -769,6 +781,7 @@ private struct TVSubtitleSettingsView: View {
                 Text("Appearance")
             }
         }
+        .dismissOnAppLock { showingLanguagePicker = false }
         .fullScreenCover(isPresented: $showingLanguagePicker) {
             TVSubtitleLanguagePickerView(selection: $tabManager.subtitlePreferredLanguage)
         }

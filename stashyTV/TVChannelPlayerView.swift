@@ -423,6 +423,7 @@ struct TVChannelPlayerView: View {
 /// jumps straight to that scene instead of skipping through everything in between.
 private struct TVChannelUpNextView: View {
     @ObservedObject var session: TVChannelSession
+    @Environment(\.tvPlayerClosePanel) private var closePanel
 
     private struct Entry: Identifiable {
         let index: Int
@@ -453,6 +454,9 @@ private struct TVChannelUpNextView: View {
                             VStack(alignment: .leading, spacing: 10) {
                                 Button {
                                     session.play(sceneAt: entry.index)
+                                    // Wie die Marker-Rail: Panel zu, sonst baut sich die Liste
+                                    // unter dem Fokus neu auf und er springt.
+                                    closePanel()
                                 } label: {
                                     TVSceneCardView(scene: entry.scene, width: 340, height: 191, showsFocusPreview: false)
                                 }

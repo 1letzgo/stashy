@@ -13,6 +13,9 @@ struct TVGalleriesView: View {
     @ObservedObject private var tabManager = TabManager.shared
     @State private var sortBy: StashDBViewModel.GallerySortOption
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
+    // Default-Filter nur einmal pro View-Lebensdauer anwenden — sonst kommt er
+    // nach jedem Pop/Tab-Wechsel zurück, obwohl "No Filter" gewählt war.
+    @State private var didApplyDefaultFilter = false
     @State private var focusResetToken = 0
     @FocusState private var focusedGalleryID: String?
 
@@ -84,6 +87,7 @@ struct TVGalleriesView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
             selectedFilter = nil
+            didApplyDefaultFilter = false
             viewModel.fetchGalleries(sortBy: sortBy, isInitialLoad: true, filter: nil)
         }
         .onReceive(NotificationCenter.default.publisher(for: .stashServerInitializationFinished)) { _ in
@@ -102,6 +106,8 @@ struct TVGalleriesView: View {
     }
 
     private func applyDefaultFilterIfNeeded() {
+        guard !didApplyDefaultFilter else { return }
+        didApplyDefaultFilter = true
         guard selectedFilter == nil,
               let filterId = tabManager.getDefaultFilterId(for: .galleries),
               let filter = viewModel.savedFilters[filterId] else { return }
@@ -226,6 +232,7 @@ struct TVGalleryDetailView: View {
             .padding(.bottom, 80)
         }
         .background(Color.appBackground)
+        .dismissOnAppLock { presentedImage = nil }
         .fullScreenCover(item: $presentedImage) { link in
             TVImageDetailView(
                 imageId: link.id,

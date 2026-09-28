@@ -40,25 +40,36 @@ struct TVApp: App {
 
     var body: some SwiftUI.Scene {
         WindowGroup {
-            Group {
-                if configManager.activeConfig?.hasValidConfig == true {
-                    TVMainTabView()
-                } else {
-                    TVServerSetupView()
+            // Sperre als Overlay statt `fullScreenCover`: tvOS schließt ein Cover bei
+            // Menu trotz `interactiveDismissDisabled` (im Simulator reproduziert) — die
+            // App war danach ohne PIN bedienbar. Die App darunter ist `disabled`, kann
+            // also keinen Fokus nehmen; offene Covers schließen sich über
+            // `dismissOnAppLock`, weil sie sonst über dem Overlay lägen.
+            ZStack {
+                Group {
+                    if configManager.activeConfig?.hasValidConfig == true {
+                        TVMainTabView()
+                    } else {
+                        TVServerSetupView()
+                    }
+                }
+                .disabled(securityManager.isAppLocked)
+
+                if securityManager.isAppLocked {
+                    TVPasscodeEntryView()
+                        .zIndex(1)
                 }
             }
-            .fullScreenCover(isPresented: $securityManager.isAppLocked) {
-                TVPasscodeEntryView()
-                    .presentationBackground(Color.black)
-            }
+            // Hintergrund ist auf tvOS fest dunkel (`appBackground`) — ohne das würden
+            // `.primary`/`.secondary`-Texte beim hellen Apple-TV-Design unlesbar.
+            .preferredColorScheme(.dark)
             .onChange(of: scenePhase) { _, newPhase in
                 defer { lastScenePhase = newPhase }
 
-                // Always lock when leaving active, and also lock again when re-entering active
-                // (covers cold start + returning from background).
-                if newPhase != .active {
-                    securityManager.lock()
-                } else if lastScenePhase != .active {
+                // Nur bei echtem Background sperren. `.inactive` kommt auch für
+                // Kontrollzentrum/Mitteilungen – dort nicht nach der PIN fragen.
+                // Kaltstart deckt `TVSecurityManager.init` ab.
+                if newPhase == .background {
                     securityManager.lock()
                 }
             }
@@ -77,9 +88,10 @@ final class TVSecurityManager: ObservableObject {
     @Published var isPinLockEnabled: Bool {
         didSet {
             UserDefaults.standard.set(isPinLockEnabled, forKey: kEnabled)
-            if isPinLockEnabled {
-                lock()
-            } else {
+            // Einschalten sperrt NICHT sofort (sonst schlägt der Lock-Screen über
+            // Settings bzw. dem noch offenen PIN-Setup auf) – die Sperre greift beim
+            // nächsten Background/Launch.
+            if !isPinLockEnabled {
                 isAppLocked = false
             }
         }
@@ -655,6 +667,30 @@ struct TVServerSetupView: View {
                     self.isFetchingKey = false
                 }
             }
+        }
+    }
+}
+
+// MARK: - Lock hand-off
+
+extension View {
+    /// Schließt eine Präsentation (Player, Bildbetrachter, Sheet), sobald die App
+    /// sperrt — sonst läge sie über dem Sperr-Overlay an der Wurzel.
+    func dismissOnAppLock(_ dismiss: @escaping () -> Void) -> some View {
+        modifier(TVDismissOnAppLock(dismiss: dismiss))
+    }
+}
+
+/// `onChange` statt `onReceive($isAppLocked)`: der `@Published`-Publisher liefert beim
+/// Abonnieren sofort den aktuellen Wert, und `onReceive` abonniert bei jedem Body-Update
+/// neu — gesperrt ergab das eine Endlosschleife aus dismiss → Update → dismiss.
+private struct TVDismissOnAppLock: ViewModifier {
+    @ObservedObject private var security = TVSecurityManager.shared
+    let dismiss: () -> Void
+
+    func body(content: Content) -> some View {
+        content.onChange(of: security.isAppLocked) { _, locked in
+            if locked { dismiss() }
         }
     }
 }

@@ -119,6 +119,7 @@ struct TVSceneDetailView: View {
             startPlayback(for: scene)
         }
         .defaultFocus($focusedHeroAction, .play)
+        .dismissOnAppLock { playerModel.isShowingPlayer = false }
         .fullScreenCover(isPresented: $playerModel.isShowingPlayer, onDismiss: {
             playerModel.clear()
             loadData()
@@ -188,11 +189,24 @@ struct TVSceneDetailView: View {
             return
         }
 
-        isLoadingDetail = true
+        // Stilles Refresh (z. B. nach dem Player): Inhalt stehen lassen, sonst
+        // ersetzt der Spinner die Seite und der Fokus springt zurück auf Play.
+        let isInitialLoad = sceneDetail == nil
+        if isInitialLoad { isLoadingDetail = true }
 
         viewModel.fetchSceneDetails(sceneId: sceneId) { scene in
-            self.sceneDetail = scene
+            if scene != nil || isInitialLoad { self.sceneDetail = scene }
             self.isLoadingDetail = false
+            guard isInitialLoad else { return }
+            // `defaultFocus` only covers the first layout, and that layout is the
+            // loading spinner. Once the hero buttons exist, put focus on Play unless
+            // the user already moved it — otherwise the page can appear with nothing
+            // focused when something else claimed focus during the load.
+            if scene != nil, self.focusedHeroAction == nil {
+                DispatchQueue.main.async {
+                    if self.focusedHeroAction == nil { self.focusedHeroAction = .play }
+                }
+            }
         }
     }
 

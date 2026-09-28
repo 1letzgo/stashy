@@ -15,6 +15,9 @@ struct TVStudioDetailView: View {
     @StateObject private var viewModel = StashDBViewModel()
     @State private var studio: Studio?
     @State private var isLoadingStudio = true
+    // Nur beim ersten Erscheinen laden — ein Pop zurück darf die nachgeladenen
+    // Seiten (und damit Scroll-Position/Fokus) nicht auf Seite 1 zurücksetzen.
+    @State private var didLoad = false
 
     var body: some View {
         TVGenericDetailView(
@@ -71,6 +74,8 @@ struct TVStudioDetailView: View {
             additionalContent: { EmptyView() }
         )
         .onAppear {
+            guard !didLoad else { return }
+            didLoad = true
             loadStudioData()
         }
     }

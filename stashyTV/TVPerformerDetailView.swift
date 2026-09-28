@@ -14,6 +14,9 @@ struct TVPerformerDetailView: View {
     @StateObject private var viewModel = StashDBViewModel()
     @State private var performer: Performer?
     @State private var isLoadingPerformer = true
+    // Nur beim ersten Erscheinen laden — ein Pop zurück darf die nachgeladenen
+    // Seiten (und damit Scroll-Position/Fokus) nicht auf Seite 1 zurücksetzen.
+    @State private var didLoad = false
 
     var body: some View {
         TVGenericDetailView(
@@ -69,6 +72,8 @@ struct TVPerformerDetailView: View {
             additionalContent: { EmptyView() }
         )
         .onAppear {
+            guard !didLoad else { return }
+            didLoad = true
             loadPerformerData()
         }
     }

@@ -163,6 +163,12 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     @State private var scrubThumbGeneration = 0
     @State private var lastMove = Date.distantPast
     @State private var moveStreak = 0
+    /// When a held direction just switched the scene. The release of that same press
+    /// still arrives as a move command and must not open the panel or reveal anything.
+    @State private var lastHoldAt = Date.distantPast
+    /// Which Up/Down click is down right now (fed by `TVRemoteHoldRecognizer`). Clicks are
+    /// handled on release by the recognizer; swipes still arrive only as move commands.
+    @State private var remotePresses = TVRemotePressTracker()
 
     private static var autoHideDelay: Double { 4 }
 
@@ -201,6 +207,23 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                 panelOverlay
                     .transition(.move(edge: .bottom).combined(with: .opacity))
             }
+
+            // Channel shortcut: hold Down for the next scene, hold Up for the previous one.
+            // Remotes without dedicated skip buttons otherwise have to open the panel.
+            if canGoPrevious || canGoNext {
+                TVRemoteHoldRecognizer(
+                    tracker: remotePresses,
+                    onHoldUp: canGoPrevious ? { holdSwitch(onPrevious) } : nil,
+                    onHoldDown: canGoNext ? { holdSwitch(onNext) } : nil,
+                    // Up/Down clicks act on release here, not on press-down in `handleMove`:
+                    // opening the panel on press-down cancelled the press and no hold completed.
+                    onTapUp: { handleVerticalTap(.up) },
+                    onTapDown: { handleVerticalTap(.down) }
+                )
+                .frame(width: 0, height: 0)
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
         }
         .onAppear {
             isPlayerFocused = true
@@ -235,6 +258,9 @@ private struct TVAetherPlayerContent<Panel: View>: View {
         // Menu einmal an der Wurzel: gilt für den Input-Layer wie für die Panel-Buttons
         // (alle sind Nachfahren). Bei offenem Panel schließt `handleExit` nur das Panel.
         .onExitCommand { handleExit() }
+        // Ebenfalls an der Wurzel: sonst ist Play/Pause bei offenem Panel tot (der
+        // Input-Layer ist dann nicht im Baum).
+        .onPlayPauseCommand { handlePlayPause() }
     }
 
     /// Das einzige Fokus-Ziel bei geschlossenem Panel: `AetherPlayerSurface` kann
@@ -246,7 +272,6 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             .focusable(true)
             .focused($isPlayerFocused)
             .onTapGesture { handleSelect() }
-            .onPlayPauseCommand { handlePlayPause() }
             .onMoveCommand { handleMove($0) }
             .ignoresSafeArea()
     }
@@ -421,12 +446,12 @@ private struct TVAetherPlayerContent<Panel: View>: View {
                     if canGoPrevious || canGoNext {
                         HStack(spacing: 20) {
                             if canGoPrevious {
-                                Label("Prev", systemImage: "backward.end.fill")
+                                Label("Hold ▲ Prev", systemImage: "backward.end.fill")
                             }
                             if canGoNext {
-                                Label("Next", systemImage: "forward.end.fill")
+                                Label("Hold ▼ Next", systemImage: "forward.end.fill")
                             }
-                            Label("Menu", systemImage: "chevron.down")
+                            Label("▼ Options", systemImage: "chevron.down")
                         }
                         .font(.system(size: 20))
                         .foregroundStyle(.white.opacity(0.5))
@@ -632,11 +657,43 @@ private struct TVAetherPlayerContent<Panel: View>: View {
         reveal()
     }
 
+    /// A held Up/Down switched the scene. With the panel open (focus engine moved on
+    /// press-down) close it again, then hand over to the channel.
+    private func holdSwitch(_ action: (() -> Void)?) {
+        guard let action else { return }
+        lastHoldAt = Date()
+        cancelScrub()
+        if isPanelOpen { closePanel() }
+        action()
+    }
+
     private func handleMove(_ direction: MoveCommandDirection) {
         // With the panel up, every move belongs to the focus engine. The ones that reach us
         // are the moves no button could take (an edge of a row, the rail's last card), and
         // treating those as seeks or as "close" made the panel feel broken.
         guard !isPanelOpen else { return }
+        // The release of a held Up/Down is not a tap.
+        guard Date().timeIntervalSince(lastHoldAt) > 1 else { return }
+        switch direction {
+        case .down, .up:
+            // A click the hold recognizer is tracking: it reports tap or hold on its own.
+            // Only swipes (no press) are handled here.
+            if (canGoPrevious || canGoNext), remotePresses.isPressing(direction) { return }
+            handleVerticalTap(direction)
+        case .left:
+            step(by: -stepSeconds())
+        case .right:
+            step(by: stepSeconds())
+        @unknown default:
+            break
+        }
+    }
+
+    /// Down opens the panel, Up reveals the transport. From a swipe (`handleMove`) or from a
+    /// click released before the hold threshold (`TVRemoteHoldRecognizer`).
+    private func handleVerticalTap(_ direction: MoveCommandDirection) {
+        guard !isPanelOpen else { return }
+        guard Date().timeIntervalSince(lastHoldAt) > 1 else { return }
         switch direction {
         case .down:
             cancelScrub()
@@ -645,11 +702,7 @@ private struct TVAetherPlayerContent<Panel: View>: View {
             cancelAutoHide()
         case .up:
             reveal()
-        case .left:
-            step(by: -stepSeconds())
-        case .right:
-            step(by: stepSeconds())
-        @unknown default:
+        default:
             break
         }
     }
@@ -759,7 +812,9 @@ private struct TVAetherPlayerContent<Panel: View>: View {
     private func scheduleAutoHide() {
         hideWork?.cancel()
         let work = DispatchWorkItem {
-            guard !isScrubbing, !isPanelOpen else { return }
+            // Pausiert bleibt die Zeitleiste stehen (wie im Apple-Player); Play ruft
+            // `reveal()` und plant das Ausblenden neu.
+            guard !isScrubbing, !isPanelOpen, engine.isPlaying else { return }
             showTransport = false
         }
         hideWork = work

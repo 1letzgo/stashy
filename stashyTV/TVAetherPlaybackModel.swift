@@ -44,6 +44,15 @@ final class TVAetherPlaybackModel: ObservableObject {
     /// Guards a stale artwork download from overwriting a newer item's Now-Playing info.
     private var nowPlayingGeneration = 0
     private var nowPlayingInfo: [String: Any] = [:]
+    /// Set while an item hand-over (channel Next / Up Next) is in flight. The engine keeps the
+    /// outgoing item's `currentTime` until the new one ticks, so neither the play credit nor the
+    /// resume save may read the playhead before the new item has shown its first frame.
+    private var isAwaitingNewItem = false
+
+    private var playheadBelongsToCurrentItem: Bool {
+        guard let engine else { return false }
+        return !isAwaitingNewItem && engine.hasFirstFrame
+    }
 
     init() {
         // Combine instead of raw observer tokens: the subscriptions die with the model,
@@ -150,9 +159,12 @@ final class TVAetherPlaybackModel: ObservableObject {
         engine.fallbackSources = fallbackSources
         engine.fallbackDeclaredDuration = fallbackDeclaredDuration
 
+        isAwaitingNewItem = true
         engine.prepareForItemReplacement()
         Task {
             await engine.load(url: url, startAt: nil, autoplay: true)
+            // `load` resets `hasFirstFrame` synchronously; from here the gate waits for the new frame.
+            self.isAwaitingNewItem = false
             if let scene { engine.registerCaptions(for: scene) }
         }
     }
@@ -218,7 +230,7 @@ final class TVAetherPlaybackModel: ObservableObject {
         guard let sceneId, let viewModel, !creditedSceneIds.contains(sceneId) else { return }
         let threshold = max(0, TabManager.shared.playCountPlayerSeconds)
         if threshold > 0 {
-            guard let engine, engine.currentTime >= threshold else { return }
+            guard let engine, playheadBelongsToCurrentItem, engine.currentTime >= threshold else { return }
         }
         creditedSceneIds.insert(sceneId)
         playCreditTimer = nil
@@ -235,6 +247,7 @@ final class TVAetherPlaybackModel: ObservableObject {
               let sceneId,
               let viewModel else { return }
 
+        guard playheadBelongsToCurrentItem else { return }
         let currentTime = engine.currentTime
         guard currentTime > 0 else { return }
 

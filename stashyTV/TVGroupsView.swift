@@ -13,6 +13,9 @@ struct TVGroupsView: View {
     @ObservedObject private var tabManager = TabManager.shared
     @State private var sortBy: StashDBViewModel.GroupSortOption
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
+    // Default-Filter nur einmal pro View-Lebensdauer anwenden — sonst kommt er
+    // nach jedem Pop/Tab-Wechsel zurück, obwohl "No Filter" gewählt war.
+    @State private var didApplyDefaultFilter = false
     @State private var focusResetToken = 0
     @FocusState private var focusedGroupID: String?
 
@@ -85,6 +88,7 @@ struct TVGroupsView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
             selectedFilter = nil
+            didApplyDefaultFilter = false
             viewModel.fetchGroups(sortBy: sortBy, isInitialLoad: true, filter: nil)
         }
         .onReceive(NotificationCenter.default.publisher(for: .stashServerInitializationFinished)) { _ in
@@ -103,6 +107,8 @@ struct TVGroupsView: View {
     }
 
     private func applyDefaultFilterIfNeeded() {
+        guard !didApplyDefaultFilter else { return }
+        didApplyDefaultFilter = true
         guard selectedFilter == nil,
               let filterId = tabManager.getDefaultFilterId(for: .groups),
               let filter = viewModel.savedFilters[filterId] else { return }
@@ -147,6 +153,8 @@ struct TVGroupDetailView: View {
     @StateObject private var viewModel = StashDBViewModel()
     @State private var groupDetail: StashGroup?
     @State private var isLoadingGroup: Bool = false
+    // Szenen nur beim ersten Erscheinen laden (Pop zurück behält Seiten/Fokus).
+    @State private var didLoadScenes = false
     @State private var coverSide: CoverSide = .front
 
     private enum CoverSide: String, CaseIterable {
@@ -218,7 +226,10 @@ struct TVGroupDetailView: View {
                     }
                 }
             }
-            viewModel.fetchGroupScenes(groupId: groupId, isInitialLoad: true)
+            if !didLoadScenes {
+                didLoadScenes = true
+                viewModel.fetchGroupScenes(groupId: groupId, isInitialLoad: true)
+            }
         }
     }
 

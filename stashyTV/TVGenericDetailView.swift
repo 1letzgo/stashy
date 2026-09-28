@@ -15,6 +15,10 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
     /// Start focus in the header. Without it tvOS put the first scene card in focus and
     /// scrolled the page down on open, cutting off the name and image.
     @FocusState private var headerFocus: Bool
+    /// The invisible header anchor for pages without a channel button. Its own state: with
+    /// the button and the container bound to one `@FocusState`, tvOS could neither claim
+    /// the header programmatically nor move focus back up from the scene grid.
+    @FocusState private var headerAnchorFocus: Bool
     /// Set once focus has left the header; from then on loading never pulls focus back.
     @State private var headerFocusReleased = false
     @Environment(\.tvContentWidth) private var contentWidth
@@ -88,6 +92,18 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                                 Label("Play as Channel", systemImage: "play.tv.fill")
                             }
                             .focused($headerFocus)
+                        } else {
+                            // Without the channel button the header has nothing focusable;
+                            // this invisible anchor keeps the opening focus (and scroll) at
+                            // the top. It is its own view on purpose: `.focusable(false)` on
+                            // the header container disabled focus for the whole subtree, so
+                            // Up from the scene grid could never land on the channel button.
+                            Color.clear
+                                .frame(width: 1, height: 1)
+                                .focusable()
+                                .focusEffectDisabled()
+                                .focused($headerAnchorFocus)
+                                .accessibilityHidden(true)
                         }
 
                         if isLoading {
@@ -113,11 +129,9 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, 60)
                 .padding(.top, 40)
-                // Without the channel button the header has nothing focusable; this
-                // invisible anchor keeps the opening focus (and scroll) at the top.
-                .focusable(!showsChannelButton)
-                .focusEffectDisabled()
-                .focused($headerFocus)
+                // One focus region: Up from any grid column lands on the channel button even
+                // where the button and the column do not overlap horizontally.
+                .focusSection()
 
                 // Additional Content (e.g. more metadata or specific views)
                 additionalContent()
@@ -218,10 +232,14 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
         .onChange(of: headerFocus) { wasFocused, isFocused in
             if wasFocused && !isFocused { headerFocusReleased = true }
         }
+        .onChange(of: headerAnchorFocus) { wasFocused, isFocused in
+            if wasFocused && !isFocused { headerFocusReleased = true }
+        }
         .onAppear { claimHeaderFocusIfUntouched() }
         .onChange(of: showsChannelButton) { _, _ in claimHeaderFocusIfUntouched() }
         .onChange(of: isLoading) { _, _ in claimHeaderFocusIfUntouched() }
         .onChange(of: scenes.isEmpty) { _, _ in claimHeaderFocusIfUntouched() }
+        .dismissOnAppLock { playingChannel = nil }
         .fullScreenCover(item: $playingChannel, onDismiss: {
             playingChannel = nil
         }) { channel in
@@ -231,7 +249,9 @@ struct TVGenericDetailView<Item: TVDetailItem, Info: View, Content: View>: View 
 
     private func claimHeaderFocusIfUntouched() {
         guard !headerFocusReleased else { return }
-        DispatchQueue.main.async { headerFocus = true }
+        DispatchQueue.main.async {
+            if showsChannelButton { headerFocus = true } else { headerAnchorFocus = true }
+        }
     }
 
     @ViewBuilder

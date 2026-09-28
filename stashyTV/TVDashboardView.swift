@@ -56,6 +56,7 @@ struct TVDashboardView: View {
             }
         }
         .background(Color.appBackground)
+        .dismissOnAppLock { playingChannel = nil }
         .fullScreenCover(item: $playingChannel, onDismiss: {
             playingChannel = nil
             // Fortschritte aus dem Kanal-Player nachholen, die während der

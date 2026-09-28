@@ -40,11 +40,13 @@ struct TVServerDetailView: View {
         }
         .background(Color.appBackground)
         .navigationTitle(config?.name ?? "Server")
+        // `force`: diese Seite hat eine frische VM — ein gedrosselter Check (andere
+        // VMs haben schon getestet) liesse Status und Spinner für immer hängen.
         .onAppear {
-            viewModel.testConnection()
+            viewModel.testConnection(force: true)
         }
         .onReceive(NotificationCenter.default.publisher(for: .stashServerInitializationFinished)) { _ in
-            viewModel.testConnection()
+            viewModel.testConnection(force: true)
         }
         .onChange(of: viewModel.isLoading) { _, isLoading in
             if !isLoading {
@@ -105,7 +107,9 @@ struct TVServerDetailView: View {
             Button {
                 guard !isTesting else { return }
                 isTesting = true
-                viewModel.testConnection()
+                viewModel.testConnection(force: true)
+                // Failsafe: bei ungültiger URL kehrt `isLoading` nie zurück.
+                DispatchQueue.main.asyncAfter(deadline: .now() + 20) { isTesting = false }
             } label: {
                 HStack(spacing: 10) {
                     if isTesting { ProgressView() } else { Image(systemName: "arrow.clockwise") }

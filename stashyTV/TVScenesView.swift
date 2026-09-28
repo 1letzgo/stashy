@@ -13,6 +13,9 @@ struct TVScenesView: View {
     @ObservedObject private var tabManager = TabManager.shared
     @State private var sortBy: StashDBViewModel.SceneSortOption
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
+    // Default-Filter nur einmal pro View-Lebensdauer anwenden — sonst kommt er
+    // nach jedem Pop/Tab-Wechsel zurück, obwohl "No Filter" gewählt war.
+    @State private var didApplyDefaultFilter = false
     @State private var focusResetToken = 0
     @FocusState private var focusedSceneID: String?
 
@@ -87,6 +90,7 @@ struct TVScenesView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
             selectedFilter = nil
+            didApplyDefaultFilter = false
             viewModel.fetchScenes(sortBy: sortBy, isInitialLoad: true, filter: nil)
         }
         .onReceive(NotificationCenter.default.publisher(for: .stashServerInitializationFinished)) { _ in
@@ -105,6 +109,8 @@ struct TVScenesView: View {
     }
 
     private func applyDefaultFilterIfNeeded() {
+        guard !didApplyDefaultFilter else { return }
+        didApplyDefaultFilter = true
         guard selectedFilter == nil,
               let filterId = tabManager.getDefaultFilterId(for: .scenes),
               let filter = viewModel.savedFilters[filterId] else { return }

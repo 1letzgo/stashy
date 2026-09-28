@@ -13,6 +13,9 @@ struct TVTagsView: View {
     @ObservedObject private var tabManager = TabManager.shared
     @State private var sortBy: StashDBViewModel.TagSortOption
     @State private var selectedFilter: StashDBViewModel.SavedFilter?
+    // Default-Filter nur einmal pro View-Lebensdauer anwenden — sonst kommt er
+    // nach jedem Pop/Tab-Wechsel zurück, obwohl "No Filter" gewählt war.
+    @State private var didApplyDefaultFilter = false
     @State private var focusResetToken = 0
     @FocusState private var focusedTagID: String?
 
@@ -90,6 +93,7 @@ struct TVTagsView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
             selectedFilter = nil
+            didApplyDefaultFilter = false
             viewModel.fetchTags(sortBy: sortBy, isInitialLoad: true, filter: nil)
         }
         .onReceive(NotificationCenter.default.publisher(for: .stashServerInitializationFinished)) { _ in
@@ -108,6 +112,8 @@ struct TVTagsView: View {
     }
 
     private func applyDefaultFilterIfNeeded() {
+        guard !didApplyDefaultFilter else { return }
+        didApplyDefaultFilter = true
         guard selectedFilter == nil,
               let filterId = tabManager.getDefaultFilterId(for: .tags),
               let filter = viewModel.savedFilters[filterId] else { return }
@@ -130,6 +136,8 @@ struct TVTagDetailView: View {
     @StateObject private var viewModel = StashDBViewModel()
     @State private var loadedTag: Tag?
     @State private var isLoadingTag: Bool = false
+    // Szenen nur beim ersten Erscheinen laden (Pop zurück behält Seiten/Fokus).
+    @State private var didLoadScenes = false
 
     var body: some View {
         Group {
@@ -174,7 +182,10 @@ struct TVTagDetailView: View {
                     }
                 }
             }
-            viewModel.fetchTagScenes(tagId: tagId, isInitialLoad: true)
+            if !didLoadScenes {
+                didLoadScenes = true
+                viewModel.fetchTagScenes(tagId: tagId, isInitialLoad: true)
+            }
         }
     }
 }

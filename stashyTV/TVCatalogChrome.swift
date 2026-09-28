@@ -141,7 +141,9 @@ struct TVCatalogGrid<Item: Identifiable, Card: View, Header: View>: View where I
     @ViewBuilder let card: (Item) -> Card
 
     @State private var pendingFocusReset = false
+    @State private var ownPathCount: Int?
     @Environment(\.tvContentWidth) private var contentWidth
+    @Environment(\.tvNavigationPath) private var navigationPath
 
     private var gridSpec: TVGridSpec {
         TVGridSpec(
@@ -178,10 +180,14 @@ struct TVCatalogGrid<Item: Identifiable, Card: View, Header: View>: View where I
                     subtitle: "Add a server in Settings."
                 ) { reload() }
             } else if items.isEmpty && (errorMessage?.isEmpty == false) {
+                // Sortierung/Filter auch im Fehler- und Leerzustand erreichbar lassen —
+                // sonst sitzt man bei einem leeren (Default-)Filter ohne Ausweg fest.
+                header()
                 TVConnectionErrorView(title: errorTitle, subtitle: errorMessage) { reload() }
             } else if isLoading && items.isEmpty {
                 loadingView
             } else if items.isEmpty {
+                header()
                 emptyView
             } else {
                 contentGrid
@@ -189,15 +195,36 @@ struct TVCatalogGrid<Item: Identifiable, Card: View, Header: View>: View where I
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.appBackground)
+        .onAppear {
+            // Pfadtiefe, auf der dieses Grid selbst liegt ("See All" wird gepusht,
+            // der Pfad ist dort nie leer).
+            if ownPathCount == nil {
+                ownPathCount = navigationPath?.wrappedValue.count ?? 0
+            }
+        }
         .onChange(of: focusResetToken) { _, _ in
             pendingFocusReset = true
+        }
+        .onChange(of: isLoading) { _, loading in
+            // Ladevorgang vorbei, aber das erste Element blieb gleich (oder Ergebnis
+            // leer): den Reset verwerfen, sonst klaut ihn ein späterer Refetch.
+            guard !loading, pendingFocusReset else { return }
+            DispatchQueue.main.async { pendingFocusReset = false }
         }
         .onChange(of: items.first?.id) { _, newID in
             // Fokus nur nach einem gewollten Sort-/Filterwechsel zurücksetzen.
             // Ein Hintergrund-Refetch darf den Nutzer nicht aus dem Grid reißen.
             guard pendingFocusReset, let newID else { return }
             pendingFocusReset = false
-            focusedID = newID
+            // Never while a detail page sits on top of the grid: the refetch that a
+            // default filter triggers can land after the user already opened a
+            // scene, and moving focus to a hidden card then steals it from the
+            // pushed page (seen on device: scene detail with nothing focused).
+            let depth = navigationPath?.wrappedValue.count ?? 0
+            guard depth <= (ownPathCount ?? 0) else { return }
+            // Einen Runloop später: kommt das Grid gerade erst aus dem Leer-Zustand,
+            // existieren die Karten in diesem Update noch nicht.
+            DispatchQueue.main.async { focusedID = newID }
         }
     }
 
@@ -261,10 +288,15 @@ struct TVCatalogGrid<Item: Identifiable, Card: View, Header: View>: View where I
                             .padding(.vertical, 40)
                     }
                 }
-                .padding(.horizontal, 60)
+                // No horizontal padding: 4×410 + 3×40 is exactly the 1760pt safe
+                // width. Padding pushed the grid past it, and on tvOS 27 a root
+                // wider than its stack offsets every pushed page (see TVGridSpec).
                 .padding(.bottom, 80)
             }
         }
+        // Grid ist exakt so breit wie der ScrollView — ohne das schneidet der
+        // Fokus-Lift die äußeren Spalten ab.
+        .scrollClipDisabled()
         .safeAreaInset(edge: .bottom) { Color.clear.frame(height: 60).focusable(false) }
     }
 }

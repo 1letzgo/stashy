@@ -95,7 +95,12 @@ struct TVGridSpec {
     let spacing: CGFloat
     let maxColumns: Int
     var minColumns: Int = 1
-    var horizontalPadding: CGFloat = 60
+    /// 0: the grids sit directly on the safe-area edge (80pt). The old 60pt made
+    /// the 4×410 scene grid 1880pt wide, more than the 1760pt inside the safe
+    /// area. tvOS centred that overflow, which happened to land the cards on the
+    /// safe edge anyway, but on tvOS 27 the widened root also shifted every page
+    /// pushed on top of it 60pt to the right with a bare strip on the left.
+    var horizontalPadding: CGFloat = 0
 
     func columnCount(for availableWidth: CGFloat) -> Int {
         // +spacing, weil bei n Spalten nur (n-1) Zwischenräume anfallen.

@@ -10,7 +10,7 @@ struct STVHeaderView<SortMenu: View, FilterMenu: View>: View {
             filterMenu()
             Spacer()
         }
-        .padding(.horizontal, 60)
+        // Horizontal position comes from the safe area, same as the grid below.
         .padding(.vertical, 30)
         // Ohne focusSection springt der Fokus zwischen Grid und Header rein
         // geometrisch — aus mittleren Spalten liegt nichts über dem Spacer.

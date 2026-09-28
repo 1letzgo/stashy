@@ -98,6 +98,16 @@ enum TVRootTab: String, Hashable, CaseIterable {
 @MainActor
 final class TVNavigationStore: ObservableObject {
     @Published private var paths: [TVRootTab: NavigationPath] = [:]
+    private var serverChange: AnyCancellable?
+
+    init() {
+        // Gepushte Detailseiten gehören zum alten Server (IDs!) — nach einem
+        // Serverwechsel alle Stacks auf die Wurzel zurücksetzen.
+        serverChange = NotificationCenter.default
+            .publisher(for: NSNotification.Name("ServerConfigChanged"))
+            .receive(on: RunLoop.main)
+            .sink { [weak self] _ in self?.paths = [:] }
+    }
 
     func binding(for tab: TVRootTab) -> Binding<NavigationPath> {
         Binding(

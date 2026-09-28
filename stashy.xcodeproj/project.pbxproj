@@ -7,8 +7,6 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
-		SYNCJOB01000000000000001 /* DownloadSyncJobs.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYNCJOB02000000000000002 /* DownloadSyncJobs.swift */; };
-		SYNCJOB03000000000000003 /* DownloadSyncJobs.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYNCJOB02000000000000002 /* DownloadSyncJobs.swift */; };
 		02B19A59AAFE4A16B45A861F /* DownloadsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB172F16743C007C2090 /* DownloadsView.swift */; };
 		08FB7793FE84155DC02AAC07 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7794FE84155DC02AAC07 /* App.swift */; };
 		08FB7797FE84155DC02AAC07 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7798FE84155DC02AAC07 /* MainTabView.swift */; };
@@ -83,6 +81,7 @@
 		A8FA63740E8A43609EDB1AAD /* AppearanceManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DF22BB312F1831C7007C2090 /* AppearanceManager.swift */; };
 		AA0000012E8A9C0000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0000022E8A9C0000000001 /* Assets.xcassets */; };
 		AAB8EA012D744BBCB254F7D6 /* MainTabView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7798FE84155DC02AAC07 /* MainTabView.swift */; };
+		AE5C00000000000000000901 /* SceneScrubSprites.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE5C00000000000000000902 /* SceneScrubSprites.swift */; };
 		AE7E00000000000000000003 /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = AE7E00000000000000000002 /* AetherEngine */; };
 		AE7E00000000000000000013 /* AetherEngine in Frameworks */ = {isa = PBXBuildFile; productRef = AE7E00000000000000000012 /* AetherEngine */; };
 		AE7E0000000000000000B012 /* AetherSceneEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B011 /* AetherSceneEngine.swift */; };
@@ -92,7 +91,6 @@
 		AE7E0000000000000000B032 /* AcknowledgementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B031 /* AcknowledgementsView.swift */; };
 		AE7E0000000000000000B033 /* AcknowledgementsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B031 /* AcknowledgementsView.swift */; };
 		AE7E0000000000000000B042 /* AetherSceneSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B041 /* AetherSceneSurface.swift */; };
-		AE5C00000000000000000901 /* SceneScrubSprites.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE5C00000000000000000902 /* SceneScrubSprites.swift */; };
 		AE7E0000000000000000B043 /* AetherSceneSurface.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B041 /* AetherSceneSurface.swift */; };
 		AE7E0000000000000000B052 /* LocalDownloadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B051 /* LocalDownloadStore.swift */; };
 		AE7E0000000000000000B053 /* LocalDownloadStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B051 /* LocalDownloadStore.swift */; };
@@ -105,8 +103,6 @@
 		AE7E0000000000000000B0C2 /* PlayerMenuButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B0C1 /* PlayerMenuButton.swift */; };
 		AE7E0000000000000000B0C3 /* PlayerMenuButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE7E0000000000000000B0C1 /* PlayerMenuButton.swift */; };
 		AITAG00012F70A00000000001 /* AITagSuggestionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00022F70A00000000002 /* AITagSuggestionManager.swift */; };
-		SCENEDL01000000000000001 /* SceneBulkDownloadControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = SCENEDL02000000000000002 /* SceneBulkDownloadControl.swift */; };
-		SWIPE0001000000000000001 /* SwipeActionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = SWIPE0002000000000000002 /* SwipeActionCard.swift */; };
 		AITAG00032F70A00000000003 /* AITagSuggestionBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00042F70A00000000004 /* AITagSuggestionBar.swift */; };
 		AITAG00052F70A00000000005 /* AITagsSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG00062F70A00000000006 /* AITagsSettingsView.swift */; };
 		AITAG00092F70A00000000009 /* AddTagsSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = AITAG000A2F70A0000000000A /* AddTagsSheet.swift */; };
@@ -202,10 +198,14 @@
 		FDFEA639517B4DF2B8490448 /* App.swift in Sources */ = {isa = PBXBuildFile; fileRef = 08FB7794FE84155DC02AAC07 /* App.swift */; };
 		LIMG000012345678901234AB /* LinkedImagesCatalogGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = LIMG000022345678901234AB /* LinkedImagesCatalogGrid.swift */; };
 		LIMG000032345678901234AB /* LinkedImagesCatalogGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = LIMG000022345678901234AB /* LinkedImagesCatalogGrid.swift */; };
+		SCENEDL01000000000000001 /* SceneBulkDownloadControl.swift in Sources */ = {isa = PBXBuildFile; fileRef = SCENEDL02000000000000002 /* SceneBulkDownloadControl.swift */; };
 		SCHR000012345678901234AB /* SharedChromeComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = SCHR000022345678901234AB /* SharedChromeComponents.swift */; };
 		SCHR000032345678901234AB /* SharedChromeComponents.swift in Sources */ = {isa = PBXBuildFile; fileRef = SCHR000022345678901234AB /* SharedChromeComponents.swift */; };
 		STNV000012345678901234AB /* StashyTopNavStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = STNV000022345678901234AB /* StashyTopNavStrip.swift */; };
 		STNV000032345678901234AB /* StashyTopNavStrip.swift in Sources */ = {isa = PBXBuildFile; fileRef = STNV000022345678901234AB /* StashyTopNavStrip.swift */; };
+		SWIPE0001000000000000001 /* SwipeActionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = SWIPE0002000000000000002 /* SwipeActionCard.swift */; };
+		SYNCJOB01000000000000001 /* DownloadSyncJobs.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYNCJOB02000000000000002 /* DownloadSyncJobs.swift */; };
+		SYNCJOB03000000000000003 /* DownloadSyncJobs.swift in Sources */ = {isa = PBXBuildFile; fileRef = SYNCJOB02000000000000002 /* DownloadSyncJobs.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -267,19 +267,17 @@
 		A1PLUS022F30B00000000002 /* StashyPlusManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyPlusManager.swift; sourceTree = "<group>"; };
 		A1PLUS032F30B00000000003 /* Configuration.storekit */ = {isa = PBXFileReference; lastKnownFileType = text; path = Configuration.storekit; sourceTree = "<group>"; };
 		AA0000022E8A9C0000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		AE5C00000000000000000902 /* SceneScrubSprites.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneScrubSprites.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B011 /* AetherSceneEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherSceneEngine.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B021 /* Scene+AetherPlayback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "Scene+AetherPlayback.swift"; sourceTree = "<group>"; };
 		AE7E0000000000000000B031 /* AcknowledgementsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AcknowledgementsView.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B041 /* AetherSceneSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherSceneSurface.swift; sourceTree = "<group>"; };
-		AE5C00000000000000000902 /* SceneScrubSprites.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneScrubSprites.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B051 /* LocalDownloadStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LocalDownloadStore.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B061 /* AetherVideoSurface.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherVideoSurface.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B071 /* AetherPreviewPlayer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherPreviewPlayer.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B0B1 /* AetherTimeBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AetherTimeBar.swift; sourceTree = "<group>"; };
 		AE7E0000000000000000B0C1 /* PlayerMenuButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerMenuButton.swift; sourceTree = "<group>"; };
 		AITAG00022F70A00000000002 /* AITagSuggestionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagSuggestionManager.swift; sourceTree = "<group>"; };
-		SCENEDL02000000000000002 /* SceneBulkDownloadControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneBulkDownloadControl.swift; sourceTree = "<group>"; };
-		SWIPE0002000000000000002 /* SwipeActionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeActionCard.swift; sourceTree = "<group>"; };
 		AITAG00042F70A00000000004 /* AITagSuggestionBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagSuggestionBar.swift; sourceTree = "<group>"; };
 		AITAG00062F70A00000000006 /* AITagsSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AITagsSettingsView.swift; sourceTree = "<group>"; };
 		AITAG000A2F70A0000000000A /* AddTagsSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddTagsSheet.swift; sourceTree = "<group>"; };
@@ -296,7 +294,6 @@
 		D32D9793F36147319D8FF8BF /* FilterCriterionTypes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterCriterionTypes.swift; sourceTree = "<group>"; };
 		DF06EF252F18EC1100299105 /* SceneCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneCardView.swift; sourceTree = "<group>"; };
 		DF22BB142F167223007C2090 /* CatalogsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CatalogsView.swift; sourceTree = "<group>"; };
-		SYNCJOB02000000000000002 /* DownloadSyncJobs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadSyncJobs.swift; sourceTree = "<group>"; };
 		DF22BB172F16743C007C2090 /* DownloadsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadsView.swift; sourceTree = "<group>"; };
 		DF22BB182F16743C007C2090 /* GalleriesView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GalleriesView.swift; sourceTree = "<group>"; };
 		DF22BB192F16743C007C2090 /* HomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HomeView.swift; sourceTree = "<group>"; };
@@ -360,8 +357,11 @@
 		FC10AB0112345678901234AB /* FloatingCatalogBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FloatingCatalogBar.swift; sourceTree = "<group>"; };
 		FEA1E8DCB9534BA393BDCA09 /* FilterFieldCatalog.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FilterFieldCatalog.swift; sourceTree = "<group>"; };
 		LIMG000022345678901234AB /* LinkedImagesCatalogGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = LinkedImagesCatalogGrid.swift; sourceTree = "<group>"; };
+		SCENEDL02000000000000002 /* SceneBulkDownloadControl.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneBulkDownloadControl.swift; sourceTree = "<group>"; };
 		SCHR000022345678901234AB /* SharedChromeComponents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SharedChromeComponents.swift; sourceTree = "<group>"; };
 		STNV000022345678901234AB /* StashyTopNavStrip.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StashyTopNavStrip.swift; sourceTree = "<group>"; };
+		SWIPE0002000000000000002 /* SwipeActionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SwipeActionCard.swift; sourceTree = "<group>"; };
+		SYNCJOB02000000000000002 /* DownloadSyncJobs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DownloadSyncJobs.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -1092,7 +1092,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 377;
+				CURRENT_PROJECT_VERSION = 385;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1103,7 +1103,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.2.1;
+				MARKETING_VERSION = 3.3;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1122,7 +1122,7 @@
 				ASSETCATALOG_COMPILER_INCLUDE_ALL_APPICON_ASSETS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 377;
+				CURRENT_PROJECT_VERSION = 385;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				INFOPLIST_FILE = stashy/Info.plist;
@@ -1133,7 +1133,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 3.2.1;
+				MARKETING_VERSION = 3.3;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1156,7 +1156,7 @@
 				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 330;
+				CURRENT_PROJECT_VERSION = 339;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -1169,7 +1169,7 @@
 					"@executable_path/Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 3.2.1;
+				MARKETING_VERSION = 3.3.5;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
@@ -1198,7 +1198,7 @@
 				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
-				CURRENT_PROJECT_VERSION = 330;
+				CURRENT_PROJECT_VERSION = 339;
 				DEVELOPMENT_TEAM = 699G2QY959;
 				ENABLE_PREVIEWS = YES;
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
@@ -1211,7 +1211,7 @@
 					"@executable_path/Frameworks",
 				);
 				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
-				MARKETING_VERSION = 3.2.1;
+				MARKETING_VERSION = 3.3.5;
 				PRODUCT_BUNDLE_IDENTIFIER = de.letzgo.stashy;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				PROVISIONING_PROFILE_SPECIFIER = "";
