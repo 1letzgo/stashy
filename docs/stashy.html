@@ -3,15 +3,15 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>abstand — Audiobookshelf for iOS · KommSchon</title>
-  <meta name="description" content="A native, open-source Audiobookshelf client for iOS. Books and podcasts in one app.">
+  <title>stashy — Stash for iOS · KommSchon</title>
+  <meta name="description" content="A native Stash client for iOS. Fast, private, connected to your server.">
   <meta name="theme-color" content="#545454">
-  <link rel="icon" href="icons/abstand.png">
-  <link rel="apple-touch-icon" href="icons/abstand.png">
+  <link rel="icon" href="icons/stashy.png">
+  <link rel="apple-touch-icon" href="icons/stashy.png">
   <link rel="stylesheet" href="style.css">
   <script>document.documentElement.classList.add('js');</script>
 </head>
-<body style="--a: var(--lila)">
+<body style="--a: var(--rot)">
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
   <symbol id="i-app" viewBox="0 0 24 24"><path fill-rule="evenodd" d="M7.5 1h9A2.5 2.5 0 0 1 19 3.5v17a2.5 2.5 0 0 1-2.5 2.5h-9A2.5 2.5 0 0 1 5 20.5v-17A2.5 2.5 0 0 1 7.5 1zM7 4v14h10V4zm3 16v1.2h4V20z"/></symbol>
   <symbol id="i-download" viewBox="0 0 24 24"><path d="M11 2h2v11.2l3.6-3.6 1.4 1.4-6 6-6-6 1.4-1.4 3.6 3.6z"/><path d="M3 17h2v3h14v-3h2v5H3z"/></symbol>
@@ -56,8 +56,8 @@
       <button class="menu-toggle" id="menu-toggle" aria-label="Menü öffnen" aria-expanded="false" aria-controls="nav"><span></span></button>
       <ul class="nav" id="nav">
         <li><a class="nav-home" href="index.html">Start</a></li>
-        <li><a href="stashy.html"><img src="icons/stashy.png" alt="" width="26" height="26">stashy</a></li>
-        <li><a href="abstand.html" aria-current="page"><img src="icons/abstand.png" alt="" width="26" height="26">abstand</a></li>
+        <li><a href="stashy.html" aria-current="page"><img src="icons/stashy.png" alt="" width="26" height="26">stashy</a></li>
+        <li><a href="abstand.html"><img src="icons/abstand.png" alt="" width="26" height="26">abstand</a></li>
         <li><a href="tasmoty.html"><img src="icons/tasmoty.png" alt="" width="26" height="26">tasmoty</a></li>
         <li><a href="loog.html"><img src="icons/loog.png" alt="" width="26" height="26">loog</a></li>
         <li><a href="stede.html"><img src="icons/stede.png" alt="" width="26" height="26">stede</a></li>
@@ -73,68 +73,107 @@
         <div>
           <div class="app-title">
             <div>
-              <span class="kicker">Audiobookshelf client · iOS</span>
-              <h1>abstand</h1>
+              <span class="kicker">Stash client · iOS</span>
+              <h1>stashy</h1>
             </div>
           </div>
-          <p class="app-claim">Audiobooks and podcasts, side by side</p>
-          <p class="lead">Native Audiobookshelf client for iPhone. Open source, no paywall, no “pro” tier.</p>
+          <p class="app-claim">Your Stash server, native on iPhone</p>
+          <p class="lead">A fast, polished client for your self-hosted Stash media server. Connects straight to your GraphQL endpoint – no third-party tracking, ever.</p>
           <div class="store-btns">
-            <a class="store-btn accent" href="https://testflight.apple.com/join/ebs5RRG9" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true"><use href="#i-app"/></svg><span><small>Beta via</small>TestFlight</span></a>
-            <a class="store-btn dark" href="https://github.com/1letzgo/abstand" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true"><use href="#i-code"/></svg><span><small>Source on</small>GitHub</span></a>
+            <a class="store-btn accent" href="https://apps.apple.com/us/app/stashy/id6754876029" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true"><use href="#i-app"/></svg><span><small>Download on the</small>App Store</span></a>
+            <a class="store-btn dark" href="https://discord.gg/DMxEFaVzUM" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true"><use href="#i-chat"/></svg><span><small>Join us on</small>Discord</span></a>
+            <a class="store-btn dark" href="https://github.com/1letzgo/stashy" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true"><use href="#i-code"/></svg><span><small>Source on</small>GitHub</span></a>
           </div>
-          <ul class="badges"><li>Free</li><li>Open source (MIT)</li><li>No tracking</li><li>CarPlay</li></ul>
+          <ul class="badges"><li>Free core</li><li>No ads</li><li>No tracking</li><li>Multi-server</li></ul>
         </div>
         <div class="hero-mark" aria-hidden="true">
           <span class="blob b1"></span>
           <span class="blob b2"></span>
-          <img src="icons/abstand.png" alt="" width="512" height="512">
+          <img src="icons/stashy.png" alt="" width="512" height="512">
         </div>
       </div>
     </section>
 
     <section class="app-intro">
       <div class="wrap">
-        <p class="intro-text reveal">abstand is a native iOS and iPadOS client for your self-hosted <a href="https://www.audiobookshelf.org/">Audiobookshelf</a> server. A hobby build, not a polished product – it runs against our own server and keeps improving whenever there is time.</p>
+        <p class="intro-text reveal">stashy is a native iOS and iPadOS client for your self-hosted Stash media server. It connects directly to your GraphQL endpoint and gives you a fast interface for browsing, playing and managing your library.</p>
       </div>
+      <div class="rail" tabindex="0" aria-label="stashy screenshots"><figure class="phone-shot"><img src="https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/f9/87/42/f9874279-3c17-32b6-90a9-243bfb431a59/1.png/600x0w.jpg" alt="stashy dashboard" loading="lazy"><figcaption>Dashboard</figcaption></figure><figure class="phone-shot"><img src="https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/64/e9/1f/64e91f79-591d-7e74-e0fe-d2bf74248c8e/2.png/600x0w.jpg" alt="stashy scene view" loading="lazy"><figcaption>Scenes</figcaption></figure><figure class="phone-shot"><img src="https://is1-ssl.mzstatic.com/image/thumb/PurpleSource221/v4/c7/d6/cd/c7d6cdbc-728e-46b8-19be-379f7d03bcc4/Dein_Abschnittstext-2.png/600x0w.jpg" alt="stashy performer view" loading="lazy"><figcaption>Performers</figcaption></figure></div>
     </section>
 
     <section>
       <div class="wrap">
         <div class="section-head reveal">
-          <span class="kicker">What it does</span>
-          <h2>One app for both libraries</h2>
+          <span class="kicker">Core features</span>
+          <h2>Everything in your library, one tap away</h2>
         </div>
       <div class="features">
-        <article class="feature reveal" style="--c: var(--lila)">
-          <svg class="f-ico" aria-hidden="true"><use href="#i-book"/></svg>
-          <h3>Two libraries at once</h3>
-          <p>One book library and one podcast library, no juggling separate clients.</p>
-        </article>
         <article class="feature reveal" style="--c: var(--rot)">
-          <svg class="f-ico" aria-hidden="true"><use href="#i-headphones"/></svg>
-          <h3>Playback</h3>
-          <p>Chapters, sleep timer, playback speed.</p>
+          <svg class="f-ico" aria-hidden="true"><use href="#i-server"/></svg>
+          <h3>Direct connection</h3>
+          <p>Connect to your Stash server via GraphQL (Stash v0.26+). Save and switch between multiple servers.</p>
+        </article>
+        <article class="feature reveal" style="--c: var(--lila)">
+          <svg class="f-ico" aria-hidden="true"><use href="#i-grid"/></svg>
+          <h3>Library browsing</h3>
+          <p>Scenes, Performers, Studios, Galleries, Tags, Groups and Markers – each with its own view.</p>
         </article>
         <article class="feature reveal" style="--c: var(--gelb)">
-          <svg class="f-ico" aria-hidden="true"><use href="#i-car"/></svg>
-          <h3>CarPlay</h3>
-          <p>Keep listening in the car, straight from the dashboard.</p>
+          <svg class="f-ico" aria-hidden="true"><use href="#i-search"/></svg>
+          <h3>Search &amp; filters</h3>
+          <p>Quick filter chips plus the full Stash criteria editor, saved filters and sorting across all content types.</p>
         </article>
         <article class="feature reveal" style="--c: var(--blau)">
-          <svg class="f-ico" aria-hidden="true"><use href="#i-download"/></svg>
-          <h3>Downloads</h3>
-          <p>Offline listening with progress sync back to the server.</p>
+          <svg class="f-ico" aria-hidden="true"><use href="#i-play"/></svg>
+          <h3>Video playback</h3>
+          <p>Built-in player that plays your original files – with subtitles, PiP, AirPlay and resume support.</p>
         </article>
         <article class="feature reveal" style="--c: var(--gruen)">
-          <svg class="f-ico" aria-hidden="true"><use href="#i-book"/></svg>
-          <h3>Ebooks</h3>
-          <p>EPUB and PDF reading via the Readium toolkit.</p>
+          <svg class="f-ico" aria-hidden="true"><use href="#i-feed"/></svg>
+          <h3>Feeds</h3>
+          <p>Scroll through scenes, markers, clips and images in a reels-style view.</p>
+        </article>
+        <article class="feature reveal" style="--c: var(--rot)">
+          <svg class="f-ico" aria-hidden="true"><use href="#i-sliders"/></svg>
+          <h3>Customizable home</h3>
+          <p>Configure dashboard rows, tabs and layout to match how you browse.</p>
         </article>
         <article class="feature reveal" style="--c: var(--lila)">
+          <svg class="f-ico" aria-hidden="true"><use href="#i-bolt"/></svg>
+          <h3>Device sync</h3>
+          <p>Support for Handy, Intiface and LoveSpouse during playback.</p>
+        </article>
+        <article class="feature reveal" style="--c: var(--gelb)">
+          <svg class="f-ico" aria-hidden="true"><use href="#i-shield"/></svg>
+          <h3>Privacy first</h3>
+          <p>Direct communication with your server only. No analytics, no third-party tracking.</p>
+        </article>
+      </div>
+      </div>
+    </section>
+
+    <section class="band-dark">
+      <div class="wrap">
+        <div class="section-head reveal">
+          <span class="kicker">stashy+</span>
+          <h2>Unlock the extras</h2>
+          <p>stashy+ unlocks premium features with an optional subscription or a one-time Lifetime purchase.</p>
+        </div>
+      <div class="features features-dark">
+        <article class="feature feature-wide reveal" style="--c: var(--gelb)">
+          <svg class="f-ico" aria-hidden="true"><use href="#i-star"/></svg>
+          <h3>Included with stashy+</h3>
+          <ul><li><strong>AI Subs:</strong> on-device live captions and translation in the scene player (beta)</li><li><strong>AI Motion:</strong> real-time video analysis to sync connected devices to on-screen motion (beta)</li><li><strong>Downloads:</strong> save scenes for offline viewing</li><li><strong>Tools:</strong> overview statistics, O-Count heatmap, Session Timeline, Charts, Performer Match and RateMe</li><li><strong>Custom app icons:</strong> personalize stashy on your Home Screen</li></ul>
+        </article>
+        <article class="feature reveal" style="--c: var(--gruen)">
+          <svg class="f-ico" aria-hidden="true"><use href="#i-info"/></svg>
+          <h3>Plans</h3>
+          <p>Monthly, Yearly or Lifetime. Core browsing and playback stay free. Users who purchased stashy before 3.0 receive stashy+ Lifetime via Restore Purchases.</p>
+        </article>
+        <article class="feature reveal" style="--c: var(--blau)">
           <svg class="f-ico" aria-hidden="true"><use href="#i-server"/></svg>
-          <h3>Server admin</h3>
-          <p>Podcast subscribe via RSS and other basic management.</p>
+          <h3>Requirements</h3>
+          <p>A self-hosted Stash server (v0.26+).</p><p>Terms of Use (EULA): <a href="https://www.apple.com/legal/internet-services/itunes/dev/stdeula/">apple.com/legal/…/stdeula</a></p>
         </article>
       </div>
       </div>
@@ -144,12 +183,12 @@
       <div class="cta reveal">
         <div class="stripe" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
         <div>
-          <h2>Status: beta</h2>
-          <p>Beta via TestFlight, or build it yourself from source. Requirements: an Audiobookshelf server you can reach.</p><p>If you run Audiobookshelf with separate book and podcast libraries, feedback is welcome – especially what is missing compared to the web app.</p>
+          <h2>Get stashy</h2>
+          <p>Free on the App Store. Questions, bugs or ideas: join the Discord or write to <a href="mailto:stashy@letzgo.me">stashy@letzgo.me</a>.</p>
         </div>
         <div class="store-btns store-btns-col">
-          <a class="store-btn light" href="https://testflight.apple.com/join/ebs5RRG9" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true"><use href="#i-app"/></svg><span><small>Beta via</small>TestFlight</span></a>
-          <a class="store-btn white" href="https://github.com/1letzgo/abstand" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true"><use href="#i-code"/></svg><span><small>Source on</small>GitHub</span></a>
+          <a class="store-btn light" href="https://apps.apple.com/us/app/stashy/id6754876029" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true"><use href="#i-app"/></svg><span><small>Download on the</small>App Store</span></a>
+          <a class="store-btn white" href="https://discord.gg/DMxEFaVzUM" target="_blank" rel="noopener noreferrer"><svg aria-hidden="true"><use href="#i-chat"/></svg><span><small>Join us on</small>Discord</span></a>
         </div>
       </div>
     </div>
