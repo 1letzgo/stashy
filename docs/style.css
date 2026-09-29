@@ -135,6 +135,10 @@ a.btn.primary {
   font-size: 13px;
 }
 
+.group-shots {
+  margin: 24px 0 8px;
+}
+
 .store-copy {
   text-align: left;
   color: var(--muted);
