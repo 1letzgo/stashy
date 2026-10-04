@@ -4,6 +4,14 @@ import androidx.activity.compose.BackHandler
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -247,32 +255,47 @@ private fun Sidebar(
                 else Brush.horizontalGradient(listOf(Color(0x66000000), Color.Transparent)),
             ),
     ) {
-        Column(
-            Modifier.width(width).fillMaxHeight().animateContentSize()
-                .onFocusChanged { onFocusChange(it.hasFocus) }
-                .focusGroup()
-                .padding(horizontal = pt(16), vertical = pt(40)),
-            verticalArrangement = Arrangement.spacedBy(pt(8)),
-        ) {
-            SidebarRow(TvRootTab.Search, TvIcons.search, selected, expanded, focusable, requesters)
-            SidebarRow(TvRootTab.Home, TvIcons.home, selected, expanded, focusable, requesters)
-            if (library.isNotEmpty()) {
-                if (expanded) Text("Library", Modifier.padding(start = pt(20), top = pt(24), bottom = pt(6)), style = TvType.caption.copy(fontWeight = FontWeight.SemiBold), color = TvColors.secondary)
-                else Spacer(Modifier.height(pt(24)))
-                library.forEach { SidebarRow(it.tab, it.icon, selected, expanded, focusable, requesters) }
+        // Scrolls on short screens; with room to spare Settings sits at the bottom (tvOS).
+        BoxWithConstraints(Modifier.width(width).fillMaxHeight().animateContentSize()) {
+            val viewport = maxHeight
+            Column(
+                Modifier.fillMaxWidth()
+                    .onFocusChanged { onFocusChange(it.hasFocus) }
+                    .focusGroup()
+                    .verticalScroll(rememberScrollState())
+                    .heightIn(min = viewport)
+                    .padding(horizontal = pt(16), vertical = pt(40)),
+                verticalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Column(verticalArrangement = Arrangement.spacedBy(pt(8))) {
+                    SidebarRow(TvRootTab.Search, TvIcons.search, selected, expanded, focusable, requesters)
+                    SidebarRow(TvRootTab.Home, TvIcons.home, selected, expanded, focusable, requesters)
+                    if (library.isNotEmpty()) {
+                        if (expanded) Text("Library", Modifier.padding(start = pt(20), top = pt(24), bottom = pt(6)), style = TvType.caption.copy(fontWeight = FontWeight.SemiBold), color = TvColors.secondary)
+                        else Spacer(Modifier.height(pt(24)))
+                        library.forEach { SidebarRow(it.tab, it.icon, selected, expanded, focusable, requesters) }
+                    }
+                }
+                Box(Modifier.padding(top = pt(24))) {
+                    SidebarRow(TvRootTab.Settings, TvIcons.gear, selected, expanded, focusable, requesters)
+                }
             }
-            Spacer(Modifier.weight(1f))
-            SidebarRow(TvRootTab.Settings, TvIcons.gear, selected, expanded, focusable, requesters)
         }
     }
 }
 
+@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun SidebarRow(tab: TvRootTab, icon: ImageVector, selected: TvRootTab, expanded: Boolean, focusable: Boolean, requesters: Map<TvRootTab, FocusRequester>) {
     val isSelected = tab == selected
+    val bringIntoView = remember { BringIntoViewRequester() }
+    val scope = rememberCoroutineScope()
     Surface(
         onClick = { TvNav.select(tab) },
-        modifier = Modifier.fillMaxWidth().focusProperties { canFocus = focusable }.focusRequester(requesters.getValue(tab)),
+        modifier = Modifier.fillMaxWidth().bringIntoViewRequester(bringIntoView)
+            // Keep the focused pill (plus its focus scale) fully on screen.
+            .onFocusChanged { if (it.isFocused) scope.launch { bringIntoView.bringIntoView() } }
+            .focusProperties { canFocus = focusable }.focusRequester(requesters.getValue(tab)),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(pt(40))),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = if (isSelected && expanded) Color.White.copy(alpha = 0.15f) else Color.Transparent,
