@@ -69,6 +69,19 @@ The debug build then starts connected (`ServerConfigManager.seedDebugServer`).
 | `ui/settings/`, `ui/setup/`, `ui/search/` | `Settings/`, `ToolsServerView`, `PasscodeEntryView`, setup wizard, `UniversalSearchView` |
 | `tv/` | `stashyTV` |
 
+## Android TV (`tv/`)
+
+Same APK, own entry: `tv/TvActivity` (Leanback launcher; `MainActivity` forwards to it when
+`UiModeManager` reports a television). Mirrors `stashyTV` file by file with Compose for TV
+(`androidx.tv:tv-material`): `TvMain` = `TVMainTabView` (sidebar Search · Home · Library · Settings,
+one back stack per entry in `TvNav`, Back on a tab root focuses the sidebar), `TvDashboard`,
+`TvCatalogs` (`TVCatalogGrid` + the seven catalogs, tvOS sort labels in `TvSortLabels`),
+`TvDetail` / `TvSceneDetail`, `TvImageViewer`, `TvSearch`, `TvSettings` (two-column pages,
+same keys as tvOS incl. `tv_pin_*`), `TvServerSetup`, `TvPlayer` (`TVAetherPlayerView` on the
+shared `StashPlayer`: D-pad seek with 10/30/60 s acceleration and sprite scrub, Down = options
+panel with audio/subtitles/markers, channels with Up Next and hold ▲/▼), `TvChannel` (stashy+).
+Sizes are tvOS points halved (`pt()`: 1920 pt ≙ 960 dp). Pure logic lives in `TvLogic.kt` (tested).
+
 ## Conventions
 
 - Catalog deep links (dashboard "›" headers, stats tiles, Search "Show All"): `Nav.openCatalog(tab, sort, search, noDefaultFilter)`;
