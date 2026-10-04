@@ -26,7 +26,7 @@ directory per checkout so git worktrees don't collide.
 Debug server for the emulator: put into `android/local.properties` (never committed)
 
 ```
-stashy.debug.server=http://192.168.x.y:9999
+stashy.debug.server=https://stashytest.gole.tz
 stashy.debug.apiKey=…
 ```
 
