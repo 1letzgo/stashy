@@ -21,8 +21,9 @@ import java.util.Locale
 /**
  * Self-update of the sideloaded APK (Android only — iOS updates through the App Store).
  * Only the APK itself lives on the server (`BuildConfig.UPDATE_URL`), so the check is:
- * 1. HEAD → `ETag` / `Last-Modified`; a file newer than this install and not seen before
- *    counts as "update available".
+ * 1. HEAD → `Content-Length` equal to the installed APK = same build (up to date). Otherwise
+ *    `ETag` / `Last-Modified`: a file newer than this install and not seen before counts as
+ *    "update available" (a manual check offers any different file).
  * 2. After the download the APK's own `versionCode` (git commit count) decides: only a
  *    higher one is offered for installation; otherwise the ETag is remembered as seen.
  * The `play` flavor has no `UPDATE_URL` and never checks (Play forbids self-updates).
@@ -80,6 +81,13 @@ object AppUpdate {
             }
             val (etag, lastModified, bytes) = head
             pendingEtag = etag
+            // The installed base.apk is the same file the server offers when nothing changed, so an
+            // equal size means "this build" — no download needed (avoids "available" → "latest").
+            if (bytes != null && bytes == installedApkSize(context)) {
+                etag?.let { Prefs.setString(SEEN_ETAG_KEY, it) }
+                state = if (manual) State.UpToDate else State.Idle
+                return
+            }
             val installedAt = installTime(context)
             val seen = etag != null && etag == Prefs.string(SEEN_ETAG_KEY)
             val newerFile = lastModified == null || lastModified > installedAt
@@ -173,6 +181,9 @@ object AppUpdate {
         val info = context.packageManager.getPackageInfo(context.packageName, 0)
         if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
     }.getOrDefault(BuildConfig.VERSION_CODE.toLong())
+
+    private fun installedApkSize(context: Context): Long? =
+        runCatching { File(context.applicationInfo.sourceDir).length() }.getOrNull()?.takeIf { it > 0 }
 
     private fun installTime(context: Context): Long = runCatching {
         context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_META_DATA).lastUpdateTime
