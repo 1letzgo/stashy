@@ -215,7 +215,11 @@ object DetailFeedsLink {
     var open: ((Target) -> Unit)? = null
 
     fun navigate(target: Target) {
-        open?.invoke(target) ?: Nav.select(MainTab.Feeds)
+        open?.invoke(target) ?: when (target) {
+            is Target.Performer -> de.letzgo.stashy.ui.feeds.FeedsNav.openFiltered(performer = de.letzgo.stashy.data.IdName(target.id, target.name))
+            is Target.Studio -> de.letzgo.stashy.ui.feeds.FeedsNav.openFiltered(studio = de.letzgo.stashy.data.IdName(target.id, target.name))
+            is Target.Tag -> de.letzgo.stashy.ui.feeds.FeedsNav.openFiltered(tags = listOf(de.letzgo.stashy.data.IdName(target.id, target.name)))
+        }
     }
 }
 

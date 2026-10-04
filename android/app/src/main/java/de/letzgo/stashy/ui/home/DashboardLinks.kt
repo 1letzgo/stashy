@@ -47,15 +47,11 @@ enum class HomeChannelDestination(val label: String) { Scenes("Scenes"), Clips("
  */
 data class FeedsChannelRequest(val filter: SavedFilter, val destination: HomeChannelDestination, val sort: String)
 
-/**
- * Hand-off to Feeds. TODO(feeds): replace with the Feeds feature's channel entry (or read and
- * clear [pending] when the Feeds tab appears).
- */
+/** Hand-off to Feeds (`FeedsNav.openChannel`). */
 object FeedsChannelLink {
     var pending by mutableStateOf<FeedsChannelRequest?>(null)
 
     fun open(request: FeedsChannelRequest) {
-        pending = request
-        Nav.select(MainTab.Feeds)
+        de.letzgo.stashy.ui.feeds.FeedsNav.openChannel(request.filter, request.destination.name.lowercase(), request.sort)
     }
 }
