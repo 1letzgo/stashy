@@ -44,11 +44,15 @@ import androidx.compose.ui.unit.dp
  * stroke iOS draws pre-26, scaled by the user's glass transparency setting.
  */
 fun Modifier.stashyGlass(shape: Shape = CircleShape, tint: Color? = null): Modifier {
-    val dim = 0.18f + (1f - Appearance.glassTransparency) * 0.6f
-    val fill = tint?.copy(alpha = 0.55f + 0.4f * dim) ?: Color(0xFF1C2433).copy(alpha = 0.62f + dim * 0.35f)
+    // Without a backdrop blur the content behind must be mostly covered, or text under the
+    // chrome stays readable through it. Transparency 1 (iOS "pure glass") → 80 % cover.
+    val cover = 0.8f + (1f - Appearance.glassTransparency) * 0.18f
+    // Tinted glass: the tint sits on top of the dark glass (translucent tints keep their alpha).
+    val tintFill = tint?.let { if (it.alpha < 1f) it else it.copy(alpha = 0.6f) }
     return this
         .clip(shape)
-        .background(fill, shape)
+        .background(Color(0xFF1C2433).copy(alpha = cover), shape)
+        .let { m -> if (tintFill != null) m.background(tintFill, shape) else m }
         .border(0.5.dp, Color.White.copy(alpha = 0.22f), shape)
 }
 
