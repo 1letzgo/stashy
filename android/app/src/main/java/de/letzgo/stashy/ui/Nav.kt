@@ -39,6 +39,15 @@ object Nav {
     var tab by mutableStateOf(MainTab.Home)
     var catalogTab by mutableStateOf(CatalogTab.Dashboard)
 
+    /**
+     * A tab root that hides the floating tab bar (iOS `.toolbar(.hidden, for: .tabBar)`, e.g.
+     * Feeds with its chrome toggled off). Only honoured while that root is showing.
+     */
+    var rootHidesTabBar by mutableStateOf(false)
+
+    /** Counts re-selections of the already active tab (iOS: Feeds restarts from the top). */
+    val reselects = androidx.compose.runtime.mutableStateMapOf<MainTab, Int>()
+
     private val stacks = MainTab.entries.associateWith { mutableStateListOf<Screen>() }
 
     fun stack(tab: MainTab = this.tab): SnapshotStateList<Screen> = stacks.getValue(tab)
@@ -58,7 +67,10 @@ object Nav {
 
     /** Tapping the active tab again pops to its root (iOS behaviour). */
     fun select(tab: MainTab) {
-        if (this.tab == tab) popToRoot(tab) else this.tab = tab
+        if (this.tab == tab) {
+            popToRoot(tab)
+            reselects[tab] = (reselects[tab] ?: 0) + 1
+        } else this.tab = tab
     }
 
     /** Opens a catalog sub-tab on Home (used by dashboard "›" headers, stats tiles …). */

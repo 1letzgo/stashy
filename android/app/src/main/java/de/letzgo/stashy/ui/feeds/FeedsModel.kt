@@ -1,0 +1,563 @@
+package de.letzgo.stashy.ui.feeds
+
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import de.letzgo.stashy.data.FeedCriteria
+import de.letzgo.stashy.data.FeedQueryKind
+import de.letzgo.stashy.data.FeedSort
+import de.letzgo.stashy.data.FeedsConfig
+import de.letzgo.stashy.data.FeedsQuery
+import de.letzgo.stashy.data.FeedsRepository
+import de.letzgo.stashy.data.IdName
+import de.letzgo.stashy.data.ImageSortOption
+import de.letzgo.stashy.data.Net
+import de.letzgo.stashy.data.ReelsModeType
+import de.letzgo.stashy.data.SavedFilter
+import de.letzgo.stashy.data.SceneMarkerSortOption
+import de.letzgo.stashy.data.SceneSortOption
+import de.letzgo.stashy.data.ServerConfigManager
+import de.letzgo.stashy.data.await
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.JsonObject
+import okhttp3.Request
+import kotlin.random.Random
+
+/** One mode's timeline (iOS: `viewModel.scenes` / `sceneMarkers` / `clips` / `previews` + paging flags). */
+class FeedList {
+    val items = mutableStateListOf<FeedItem>()
+    var isLoading by mutableStateOf(false)
+    var isLoadingMore by mutableStateOf(false)
+    var hasMore by mutableStateOf(true)
+    var error by mutableStateOf<String?>(null)
+    var loadedOnce by mutableStateOf(false)
+    /** Bumped on every page-1 fetch, so the pager jumps to the new first row. */
+    var generation by mutableStateOf(0)
+    var page = 0
+    /** Criteria identity of the loaded timeline (iOS `ReelsFeedSignature`, warm feeds). */
+    var signature: String? = null
+    var job: Job? = null
+}
+
+/**
+ * Session state of the Feeds tab (iOS: `ReelsViewBody` @State + `ReelsSessionRAM` + the Reels
+ * part of `StashDBViewModel`). RAM only: survives tab switches and pushes, not an app restart —
+ * like iOS. Per server: a server switch resets everything.
+ */
+object FeedsModel {
+    private val scope = MainScope()
+    private var serverId: String? = null
+
+    var mode by mutableStateOf(ReelsModeType.scenes)
+        private set
+    private val lists = ReelsModeType.entries.associateWith { FeedList() }
+    fun list(m: ReelsModeType = mode): FeedList = lists.getValue(m)
+
+    // Per-mode selections (iOS: selectedSortOption / selectedMarkerSortOption / clip & pics models).
+    val sorts = mutableStateMapOf<ReelsModeType, FeedSort>()
+    val filters = mutableStateMapOf<ReelsModeType, SavedFilter>()
+    /** Advanced criteria per mode (iOS `FilterCriteriaDocument`) — filled by the `ui/filter` editor hook. */
+    val advanced = mutableStateMapOf<ReelsModeType, JsonObject>()
+    /** iOS: selectedPerformer / selectedTags / selectedStudio (shared across modes). */
+    var criteria by mutableStateOf(FeedCriteria())
+        private set
+
+    /** iOS: `currentVisibleSceneId` per mode (session position). */
+    val currentIds = mutableStateMapOf<ReelsModeType, String>()
+    /** iOS: playback checkpoint `itemId|seconds`. */
+    var checkpoint: Pair<String, Double>? = null
+
+    /** iOS: `unplayableItemIds` / `mediaProbedItemIds`. */
+    val unplayable = mutableStateMapOf<String, Boolean>()
+    private val probed = HashSet<String>()
+
+    private val seeds = HashMap<ReelsModeType, Int>()
+    var savedFilters by mutableStateOf<List<SavedFilter>>(emptyList())
+        private set
+    private var savedFiltersLoaded = false
+    private var initialized = false
+
+    /** iOS: `currentItemIsPlaying` (play intent of the active row). */
+    var isPlaying by mutableStateOf(true)
+    /** iOS: `isMuted` — set from [FeedAudio] on first show. */
+    var isMuted by mutableStateOf<Boolean?>(null)
+
+    private fun seed(m: ReelsModeType): Int = seeds.getOrPut(m) { Random.nextInt(1, 1_000_000) }
+    private fun reseed(m: ReelsModeType) { seeds[m] = Random.nextInt(1, 1_000_000) }
+
+    fun sort(m: ReelsModeType = mode): FeedSort = sorts[m] ?: defaultSort(m)
+
+    /** iOS: `getReelsDefaultSort(for:) ?? .random` (Pics: `.dateDesc`). */
+    fun defaultSort(m: ReelsModeType): FeedSort {
+        val raw = FeedsConfig.defaultSort(m)
+        return when (m) {
+            ReelsModeType.scenes, ReelsModeType.previews -> SceneSortOption.from(raw) ?: SceneSortOption.random
+            ReelsModeType.markers -> SceneMarkerSortOption.from(raw) ?: SceneMarkerSortOption.random
+            ReelsModeType.clips -> ImageSortOption.from(raw) ?: ImageSortOption.random
+            ReelsModeType.pics -> ImageSortOption.from(raw) ?: ImageSortOption.dateDesc
+        }
+    }
+
+    /** All sort options of a mode, for the sheet. */
+    fun sortOptions(m: ReelsModeType): List<FeedSort> = when (m) {
+        ReelsModeType.scenes, ReelsModeType.previews -> SceneSortOption.entries
+        ReelsModeType.markers -> SceneMarkerSortOption.entries
+        ReelsModeType.clips, ReelsModeType.pics -> ImageSortOption.entries
+    }
+
+    /** Saved-filter mode string a Feeds mode accepts (iOS: scenes/previews → SCENES …). */
+    fun filterModeFor(m: ReelsModeType): String = when (m) {
+        ReelsModeType.scenes, ReelsModeType.previews -> "SCENES"
+        ReelsModeType.markers -> "SCENE_MARKERS"
+        ReelsModeType.clips, ReelsModeType.pics -> "IMAGES"
+    }
+
+    fun filtersFor(m: ReelsModeType): List<SavedFilter> =
+        savedFilters.filter { it.mode == filterModeFor(m) }.sortedBy { it.name.lowercase() }
+
+    private fun kind(m: ReelsModeType) = when (m) {
+        ReelsModeType.scenes -> FeedQueryKind.Scenes
+        ReelsModeType.markers -> FeedQueryKind.Markers
+        ReelsModeType.clips -> FeedQueryKind.Clips
+        ReelsModeType.previews -> FeedQueryKind.Previews
+        ReelsModeType.pics -> FeedQueryKind.Pics
+    }
+
+    /** Rows the pager shows (iOS `currentReelItems`: markers need a stream, dead rows dropped). */
+    fun visibleItems(m: ReelsModeType = mode): List<FeedItem> = list(m).items.filter { it.id !in unplayable }
+
+    private fun signature(m: ReelsModeType): String = listOf(
+        m.name, sort(m).raw, seed(m), filters[m]?.id, advanced[m]?.toString(),
+        criteria.performer?.id, criteria.tags.joinToString(",") { it.id }, criteria.studio?.id,
+    ).joinToString("|")
+
+    // MARK: - Lifecycle
+
+    /** iOS: `handleOnAppear` (first show) / `reelsResumePlaybackAfterReturn` (later shows). */
+    fun onAppear() {
+        val sid = ServerConfigManager.activeConfig?.id
+        if (sid != serverId) resetForServer(sid)
+        if (!savedFiltersLoaded) refreshSavedFilters()
+        if (initialized) {
+            isPlaying = true
+            return
+        }
+        initialized = true
+        val enabled = FeedsConfig.enabledModes
+        if (mode !in enabled) mode = enabled.firstOrNull() ?: ReelsModeType.scenes
+        ensureLoaded(mode)
+    }
+
+    private fun resetForServer(sid: String?) {
+        serverId = sid
+        initialized = false
+        savedFiltersLoaded = false
+        savedFilters = emptyList()
+        lists.values.forEach { it.job?.cancel(); it.items.clear(); it.loadedOnce = false; it.signature = null; it.page = 0; it.error = null }
+        sorts.clear(); filters.clear(); advanced.clear(); currentIds.clear(); unplayable.clear(); probed.clear(); seeds.clear()
+        criteria = FeedCriteria()
+        checkpoint = null
+        mode = FeedsConfig.enabledModes.firstOrNull() ?: ReelsModeType.scenes
+    }
+
+    private fun refreshSavedFilters(then: (() -> Unit)? = null) {
+        scope.launch {
+            runCatching { FeedsRepository.savedFilters() }.onSuccess {
+                savedFilters = it
+                savedFiltersLoaded = true
+            }
+            then?.invoke()
+            // iOS `handleSavedFiltersChanged`: a default filter can only be applied once the list is in.
+            applyDefaultFilterIfPending()
+        }
+    }
+
+    private val awaitingDefaultFilter = HashSet<ReelsModeType>()
+
+    /** Default filter of the mode (Settings), resolved against the loaded saved filters. */
+    private fun defaultFilter(m: ReelsModeType): SavedFilter? =
+        FeedsConfig.defaultFilterId(m)?.let { id -> savedFilters.firstOrNull { it.id == id } }
+
+    /**
+     * Cold start of a mode: Settings default sort + default filter, then fetch. When a default
+     * filter is configured but the saved filters are still loading, the fetch waits for them
+     * (iOS: "Wait for onChange(of: viewModel.savedFilters)").
+     */
+    fun ensureLoaded(m: ReelsModeType, applyDefaultFilter: Boolean = criteria.isEmpty) {
+        val l = list(m)
+        if (l.loadedOnce || l.isLoading) {
+            if (l.signature == signature(m)) return
+        }
+        if (m !in filters && applyDefaultFilter && FeedsConfig.defaultFilterId(m) != null) {
+            val def = defaultFilter(m)
+            if (def == null && !savedFiltersLoaded) {
+                awaitingDefaultFilter.add(m)
+                l.isLoading = true
+                return
+            }
+            def?.let { filters[m] = it }
+        }
+        refetch(m)
+    }
+
+    private fun applyDefaultFilterIfPending() {
+        val pending = awaitingDefaultFilter.toList()
+        awaitingDefaultFilter.clear()
+        pending.forEach { m ->
+            defaultFilter(m)?.let { filters[m] = it }
+            refetch(m)
+        }
+    }
+
+    // MARK: - Fetching
+
+    /** Page-1 fetch of a mode (iOS `applySettings` → `fetchScenes` & co). */
+    fun refetch(m: ReelsModeType = mode, reroll: Boolean = false, keepPosition: Boolean = false) {
+        if (reroll && sort(m).isRandom) reseed(m)
+        val l = list(m)
+        l.job?.cancel()
+        if (!keepPosition) currentIds.remove(m)
+        // A fresh fetch may well bring items whose files exist now.
+        if (m == mode) { unplayable.clear(); probed.clear() }
+        l.isLoading = true
+        l.isLoadingMore = false
+        l.error = null
+        l.hasMore = true
+        val sig = signature(m)
+        l.signature = sig
+        l.job = scope.launch {
+            try {
+                val items = fetchPage(m, 1)
+                l.items.clear()
+                l.items.addAll(items.first)
+                l.page = 1
+                l.hasMore = items.second
+                l.generation++
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                l.error = e.message ?: "Unknown error"
+                l.signature = null
+            } finally {
+                l.loadedOnce = true
+                l.isLoading = false
+            }
+        }
+    }
+
+    /** iOS `loadMoreScenes` & co. */
+    fun loadMore(m: ReelsModeType = mode) {
+        val l = list(m)
+        if (l.isLoading || l.isLoadingMore || !l.hasMore || !l.loadedOnce) return
+        l.isLoadingMore = true
+        val next = l.page + 1
+        l.job = scope.launch {
+            try {
+                val (items, more) = fetchPage(m, next)
+                val existing = l.items.map { it.id }.toHashSet()
+                val fresh = items.filter { it.id !in existing }
+                l.items.addAll(fresh)
+                l.page = next
+                // iOS `noteFeedProgress`: a page that adds nothing new ends paging.
+                l.hasMore = more && fresh.isNotEmpty()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (_: Exception) {
+                l.hasMore = false
+            } finally {
+                l.isLoadingMore = false
+            }
+        }
+    }
+
+    /** Returns the page's rows and whether more pages exist (iOS: `count == perPage`). */
+    private suspend fun fetchPage(m: ReelsModeType, page: Int): Pair<List<FeedItem>, Boolean> {
+        val per = FeedsQuery.PER_PAGE
+        val vars = FeedsQuery.variables(kind(m), page, per, sort(m), seed(m), filters[m], advanced[m], criteria)
+        return when (m) {
+            ReelsModeType.scenes -> FeedsRepository.scenes(vars).let { p -> p.items.map { FeedItem.SceneItem(it) } to (p.items.size == per) }
+            ReelsModeType.previews -> FeedsRepository.scenes(vars).let { p ->
+                // iOS: only scenes the server actually has a preview for.
+                p.items.filter { !it.paths?.preview.isNullOrEmpty() }.map { FeedItem.PreviewItem(it) } to (p.items.size == per)
+            }
+            ReelsModeType.markers -> FeedsRepository.markers(vars).let { p ->
+                p.items.filter { !it.stream.isNullOrEmpty() }.map { FeedItem.MarkerItem(it) } to (p.items.size == per)
+            }
+            ReelsModeType.clips, ReelsModeType.pics -> FeedsRepository.images(vars).let { p -> p.items.map { FeedItem.ClipItem(it) } to (p.items.size == per) }
+        }
+    }
+
+    // MARK: - Mode / sort / filter (iOS sheet + dock)
+
+    /** iOS: `handleModeChange` — session sort/filter of the new mode stay, warm feeds are reused. */
+    fun selectMode(m: ReelsModeType) {
+        if (m == mode) return
+        mode = m
+        isPlaying = true
+        unplayable.clear(); probed.clear()
+        ensureLoaded(m)
+    }
+
+    fun setSort(m: ReelsModeType, sort: FeedSort) {
+        val reroll = sort.isRandom && sort(m).isRandom
+        sorts[m] = sort
+        refetch(m, reroll = reroll)
+    }
+
+    fun setFilter(m: ReelsModeType, filter: SavedFilter?) {
+        if (filter == null) filters.remove(m) else filters[m] = filter
+        // iOS: "None" must also empty the editor.
+        if (filter == null) advanced.remove(m)
+        refetch(m)
+    }
+
+    /** Hook for the advanced criteria editor (`ui/filter`): replaces the mode's criteria and refetches. */
+    fun setAdvancedCriteria(m: ReelsModeType, criteria: JsonObject?) {
+        if (criteria == null || criteria.isEmpty()) advanced.remove(m) else advanced[m] = criteria
+        refetch(m)
+    }
+
+    /** iOS sheet "Reset": no filter, no criteria; sort stays. */
+    fun reset(m: ReelsModeType) {
+        filters.remove(m); advanced.remove(m)
+        refetch(m)
+    }
+
+    /** Tab icon reselect (iOS `reelsWillRemount` → `refetchCurrentReelsModeFromTop`). */
+    fun restartFromTop() {
+        checkpoint = null
+        isPlaying = true
+        refetch(mode, reroll = true)
+    }
+
+    // MARK: - Criterion overlay (performer / tags / studio)
+
+    private fun updateCriteria(new: FeedCriteria) {
+        criteria = new
+        refetch(mode)
+    }
+
+    /** iOS `applyPerformerFilter`. */
+    fun filterByPerformer(p: IdName) = updateCriteria(criteria.copy(performer = p))
+    /** iOS `onTagTap` — toggles the tag in the selection. */
+    fun toggleTag(t: IdName) {
+        val tags = if (criteria.tags.any { it.id == t.id }) criteria.tags.filter { it.id != t.id } else criteria.tags + t
+        updateCriteria(criteria.copy(tags = tags))
+    }
+    fun clearPerformer() = updateCriteria(criteria.copy(performer = null))
+    fun clearStudio() = updateCriteria(criteria.copy(studio = null))
+
+    // MARK: - Deep links (iOS `applyPendingReelsNavigationFromCoordinator`)
+
+    fun apply(link: FeedsDeepLink) {
+        val sid = ServerConfigManager.activeConfig?.id
+        if (sid != serverId) resetForServer(sid)
+        if (!savedFiltersLoaded) refreshSavedFilters()
+        initialized = true
+        checkpoint = null
+        isPlaying = true
+        // iOS `prepareFreshFeedForDeepLink`: every list and position is rebuilt.
+        lists.values.forEach { it.job?.cancel(); it.items.clear(); it.loadedOnce = false; it.signature = null }
+        currentIds.clear()
+        val target = ReelsModeType.fromModeRaw(link.mode)
+        when {
+            link.clipFilter != null -> {
+                mode = ReelsModeType.clips
+                criteria = FeedCriteria()
+                advanced.remove(ReelsModeType.clips)
+                filters[ReelsModeType.clips] = link.clipFilter
+                sorts[ReelsModeType.clips] = ImageSortOption.from(link.clipSort) ?: defaultSort(ReelsModeType.clips)
+                refetch(ReelsModeType.clips)
+            }
+            link.sceneFilter != null -> {
+                mode = ReelsModeType.scenes
+                criteria = FeedCriteria()
+                advanced.remove(ReelsModeType.scenes)
+                filters[ReelsModeType.scenes] = link.sceneFilter
+                sorts[ReelsModeType.scenes] = SceneSortOption.from(link.sceneSort) ?: defaultSort(ReelsModeType.scenes)
+                refetch(ReelsModeType.scenes)
+            }
+            link.performer != null || link.tags.isNotEmpty() || link.studio != null -> {
+                // iOS `reelsClearSessionFiltersForDeepLink`: only the handed criteria plus the
+                // mode's Settings default filter and default sort survive.
+                filters.clear(); advanced.clear(); sorts.clear()
+                mode = target ?: FeedsConfig.enabledModes.firstOrNull() ?: ReelsModeType.scenes
+                criteria = FeedCriteria(link.performer, link.tags, link.studio)
+                // iOS: every Feeds view starts from its Settings default filter; the handed
+                // criteria narrow it.
+                ensureLoaded(mode, applyDefaultFilter = true)
+            }
+            target != null -> {
+                mode = target
+                ensureLoaded(mode)
+            }
+        }
+    }
+
+    // MARK: - Dead rows (iOS `probeUpcomingMedia`, `handleUnplayableItem`)
+
+    /** Drops a row the server has no file for and returns the id that takes its place. */
+    fun dropUnplayable(id: String): String? {
+        if (mode != ReelsModeType.markers && mode != ReelsModeType.previews) return null
+        val ids = visibleItems().map { it.id }
+        val successor = PreloadWindow.successor(ids, id, unplayable.keys + id)
+        unplayable[id] = true
+        if (currentIds[mode] == id) successor?.let { currentIds[mode] = it } ?: currentIds.remove(mode)
+        refillAfterDrops()
+        return successor
+    }
+
+    private fun refillAfterDrops() {
+        val items = visibleItems()
+        val index = currentIds[mode]?.let { id -> items.indexOfFirst { it.id == id } } ?: 0
+        if (PreloadWindow.needsRefill(index, items.size)) loadMore()
+    }
+
+    /**
+     * Asks the server whether the generated files ahead exist (one-byte range GET; only a
+     * definite 404/410 counts as missing) and drops the dead ones before the user reaches them.
+     */
+    fun probeUpcomingMedia() {
+        val m = mode
+        if (m != ReelsModeType.markers && m != ReelsModeType.previews) return
+        val items = visibleItems(m)
+        val window = PreloadWindow.probeWindow(items.map { it.id }, currentIds[m], probed)
+        if (window.isEmpty()) return
+        probed.addAll(window)
+        val byId = items.associateBy { it.id }
+        scope.launch {
+            val missing = window.map { id ->
+                async { byId[id]?.videoURL?.let { url -> if (fileIsMissing(url)) id else null } }
+            }.awaitAll().filterNotNull()
+            if (missing.isEmpty() || m != mode) return@launch
+            missing.forEach { dropUnplayable(it) }
+            probeUpcomingMedia()
+        }
+    }
+
+    private suspend fun fileIsMissing(url: String): Boolean = withContext(Dispatchers.IO) {
+        withTimeoutOrNull(12_000) {
+            runCatching {
+                val req = Request.Builder().url(url).header("Range", "bytes=0-0").build()
+                Net.client.newCall(req).await().use { it.code == 404 || it.code == 410 }
+            }.getOrDefault(false)
+        } ?: false
+    }
+
+    // MARK: - Optimistic updates (iOS `handleRatingChange`, `handleOCounterChange`, …)
+
+    /** Replaces every row that shows [sceneId] (scenes, previews, markers of that scene). */
+    private fun patchScene(sceneId: String, transform: (de.letzgo.stashy.data.Scene) -> de.letzgo.stashy.data.Scene) {
+        lists.values.forEach { l ->
+            for (i in l.items.indices) {
+                val item = l.items[i]
+                val patched = when (item) {
+                    is FeedItem.SceneItem -> if (item.scene.id == sceneId) FeedItem.SceneItem(transform(item.scene)) else null
+                    is FeedItem.PreviewItem -> if (item.scene.id == sceneId) FeedItem.PreviewItem(transform(item.scene)) else null
+                    is FeedItem.MarkerItem -> item.marker.scene?.takeIf { it.id == sceneId }?.let { FeedItem.MarkerItem(item.marker.copy(scene = transform(it))) }
+                    is FeedItem.ClipItem -> null
+                }
+                if (patched != null) l.items[i] = patched
+            }
+        }
+    }
+
+    private fun patchImage(imageId: String, transform: (de.letzgo.stashy.data.StashImage) -> de.letzgo.stashy.data.StashImage) {
+        lists.values.forEach { l ->
+            for (i in l.items.indices) {
+                val item = l.items[i]
+                if (item is FeedItem.ClipItem && item.image.id == imageId) l.items[i] = FeedItem.ClipItem(transform(item.image))
+            }
+        }
+    }
+
+    /** Toast-like message for failed writes (shown by the screen). */
+    var message by mutableStateOf<String?>(null)
+
+    fun setRating(item: FeedItem, rating100: Int?) {
+        val sceneId = item.sceneID
+        if (sceneId != null) {
+            val original = item.rating100
+            patchScene(sceneId) { it.copy(rating100 = rating100) }
+            scope.launch {
+                if (!FeedsRepository.updateSceneRating(sceneId, rating100)) {
+                    patchScene(sceneId) { it.copy(rating100 = original) }
+                    message = "Failed to save rating"
+                }
+            }
+        } else if (item is FeedItem.ClipItem) {
+            val original = item.image.rating100
+            patchImage(item.image.id) { it.copy(rating100 = rating100) }
+            scope.launch {
+                if (!FeedsRepository.updateImageRating(item.image.id, rating100)) {
+                    patchImage(item.image.id) { it.copy(rating100 = original) }
+                    message = "Failed to save rating"
+                }
+            }
+        }
+    }
+
+    fun changeOCounter(item: FeedItem, mutation: FeedsRepository.OMutation) {
+        val current = item.oCounter ?: 0
+        val optimistic = when (mutation) {
+            FeedsRepository.OMutation.Increment -> current + 1
+            FeedsRepository.OMutation.Decrement -> (current - 1).coerceAtLeast(0)
+            FeedsRepository.OMutation.Reset -> 0
+        }
+        val sceneId = item.sceneID
+        if (sceneId != null) {
+            patchScene(sceneId) { it.copy(oCounter = optimistic) }
+            scope.launch {
+                val count = FeedsRepository.mutateOCounter(sceneId, isImage = false, mutation)
+                patchScene(sceneId) { it.copy(oCounter = count ?: current) }
+                if (count == null) message = "Counter update failed"
+            }
+        } else if (item is FeedItem.ClipItem) {
+            patchImage(item.image.id) { it.copy(oCounter = optimistic) }
+            scope.launch {
+                val count = FeedsRepository.mutateOCounter(item.image.id, isImage = true, mutation)
+                patchImage(item.image.id) { it.copy(oCounter = count ?: current) }
+                if (count == null) message = "Counter update failed"
+            }
+        }
+    }
+
+    /** iOS `handlePlayCountChange` — credited once per row after the Feeds threshold. */
+    fun creditPlay(item: FeedItem) {
+        when (item) {
+            is FeedItem.SceneItem -> scope.launch {
+                FeedsRepository.addScenePlay(item.scene.id)?.let { c -> patchScene(item.scene.id) { it.copy(playCount = c) } }
+            }
+            is FeedItem.MarkerItem -> scope.launch { FeedsRepository.addSceneMarkerPlay(item.marker.id) }
+            else -> {}
+        }
+    }
+
+    /** iOS `reelsDeleteItem`. Returns via [message]. */
+    fun delete(item: FeedItem, onDone: (Boolean) -> Unit) {
+        scope.launch {
+            val ok = when (item) {
+                is FeedItem.SceneItem -> FeedsRepository.deleteSceneWithFiles(item.scene)
+                is FeedItem.PreviewItem -> FeedsRepository.deleteSceneWithFiles(item.scene)
+                is FeedItem.ClipItem -> FeedsRepository.deleteImage(item.image.id)
+                is FeedItem.MarkerItem -> false
+            }
+            val label = if (item is FeedItem.ClipItem) "image" else "scene"
+            if (ok) {
+                lists.values.forEach { l -> l.items.removeAll { it.sceneID != null && it.sceneID == item.sceneID && item.sceneID != null || it.id == item.id } }
+                message = "${label.replaceFirstChar { it.uppercase() }} deleted"
+            } else message = "Failed to delete $label"
+            onDone(ok)
+        }
+    }
+}

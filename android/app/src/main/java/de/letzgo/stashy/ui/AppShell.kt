@@ -83,7 +83,7 @@ fun AppShell() {
                 }
             }
         }
-        val showBar = top?.hidesTabBar != true
+        val showBar = top?.hidesTabBar != true && !(top == null && Nav.rootHidesTabBar)
         AnimatedVisibility(showBar, Modifier.align(Alignment.BottomCenter), enter = fadeIn(), exit = fadeOut()) {
             FloatingTabBar()
         }
