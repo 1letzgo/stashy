@@ -58,6 +58,7 @@ fun AppShell() {
     val p = Theme.palette
     if (ServerConfigManager.activeConfig == null) {
         Box(Modifier.fillMaxSize().background(p.background)) { ServerSetupScreen(onDone = {}) }
+        AppUpdateDialog()
         return
     }
     val holder = rememberSaveableStateHolder()
@@ -83,11 +84,12 @@ fun AppShell() {
                 }
             }
         }
-        val showBar = top?.hidesTabBar != true
+        val showBar = top?.hidesTabBar != true && !(top == null && Nav.rootHidesTabBar)
         AnimatedVisibility(showBar, Modifier.align(Alignment.BottomCenter), enter = fadeIn(), exit = fadeOut()) {
             FloatingTabBar()
         }
     }
+    AppUpdateDialog()
 }
 
 @Composable

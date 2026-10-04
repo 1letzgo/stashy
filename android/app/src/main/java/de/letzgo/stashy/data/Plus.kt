@@ -52,11 +52,14 @@ object StashyPlusProduct {
 
 /** iOS: `StashyPlusSource` (raw values identical; no pre-3.0 paid-app grant on Play). */
 enum class StashyPlusSource(val raw: String) {
-    None("none"), Subscription("subscription"), Lifetime("lifetime"), LocalDevelopment("localDevelopment");
+    None("none"), Subscription("subscription"), Lifetime("lifetime"), LocalDevelopment("localDevelopment"),
+    /** Our own sideloaded builds (`BuildConfig.PLUS_INCLUDED`): stashy+ is part of the build. */
+    Included("included");
 
     val statusTitle: String get() = when (this) {
         None -> "Not unlocked"
         LocalDevelopment -> "stashy+ (Local Build)"
+        Included -> "stashy+ included"
         Subscription -> "stashy+ active"
         Lifetime -> "stashy+ Lifetime"
     }
@@ -64,6 +67,7 @@ enum class StashyPlusSource(val raw: String) {
     val statusDetail: String get() = when (this) {
         None -> "Subscribe or buy Lifetime to unlock premium features."
         LocalDevelopment -> "Unlocked automatically because this is a debug build. Not active in any distributed build."
+        Included -> "All stashy+ features are included in this version of the app."
         Subscription -> "Thanks for supporting stashy."
         Lifetime -> "Unlocked forever on this Google account."
     }
@@ -85,7 +89,9 @@ object StashyPlus : PurchasesUpdatedListener {
     /** Debug helper like iOS: keep the paywall locked even in debug builds. */
     const val DEBUG_FORCE_LOCKED_KEY = "stashy_plus_debug_force_locked"
 
-    private val localUnlockActive: Boolean get() = BuildConfig.DEBUG && !Prefs.bool(DEBUG_FORCE_LOCKED_KEY)
+    private val localUnlockActive: Boolean get() = (BuildConfig.DEBUG || BuildConfig.PLUS_INCLUDED) && !Prefs.bool(DEBUG_FORCE_LOCKED_KEY)
+    /** Source used while no store purchase exists but the build unlocks stashy+. */
+    private val buildSource: StashyPlusSource get() = if (BuildConfig.PLUS_INCLUDED) StashyPlusSource.Included else StashyPlusSource.LocalDevelopment
 
     var source by mutableStateOf(initialSource()); private set
     var isUnlocked by mutableStateOf(source != StashyPlusSource.None); private set
@@ -103,14 +109,14 @@ object StashyPlus : PurchasesUpdatedListener {
     val hasLifetime: Boolean get() = source == StashyPlusSource.Lifetime
     /** iOS: `shouldOfferPurchases` — subscribers can still buy Lifetime. */
     val shouldOfferPurchases: Boolean get() =
-        Prefs.bool(DEBUG_FORCE_LOCKED_KEY) || source == StashyPlusSource.LocalDevelopment || !isUnlocked || source == StashyPlusSource.Subscription
+        source != StashyPlusSource.Included && (Prefs.bool(DEBUG_FORCE_LOCKED_KEY) || source == StashyPlusSource.LocalDevelopment || !isUnlocked || source == StashyPlusSource.Subscription)
     val tipsCount: Int get() = Prefs.int(TIPS_COUNT_KEY)
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
     private var client: BillingClient? = null
 
     private fun initialSource(): StashyPlusSource {
-        if (BuildConfig.DEBUG && !Prefs.bool(DEBUG_FORCE_LOCKED_KEY)) return StashyPlusSource.LocalDevelopment
+        if (localUnlockActive) return buildSource
         if (Prefs.bool(DEBUG_FORCE_LOCKED_KEY)) return StashyPlusSource.None
         return StashyPlusSource.from(Prefs.string(SOURCE_KEY))
     }
@@ -195,7 +201,7 @@ object StashyPlus : PurchasesUpdatedListener {
         activeProductID = productID
         source = when {
             Prefs.bool(DEBUG_FORCE_LOCKED_KEY) -> StashyPlusSource.None
-            storeSource == StashyPlusSource.None && localUnlockActive -> StashyPlusSource.LocalDevelopment
+            storeSource == StashyPlusSource.None && localUnlockActive -> buildSource
             else -> storeSource
         }
         isUnlocked = source != StashyPlusSource.None

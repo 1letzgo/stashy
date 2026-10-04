@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Temp files the fullscreen image viewer hands to the share sheet (ImageViewerScreen). -->
+<paths>
+    <cache-path name="share" path="share/" />
+</paths>

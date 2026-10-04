@@ -305,6 +305,8 @@ data class SavedFilter(
     val id: String,
     val name: String = "",
     val mode: String? = null,
+    /** Legacy Stash UI filter JSON string (`sortby`, `c` criteria) — iOS `uiFilterJSON`. */
+    val filter: String? = null,
     @SerialName("find_filter") val findFilter: JsonObject? = null,
     @SerialName("object_filter") val objectFilter: JsonElement? = null,
     @SerialName("ui_options") val uiOptions: JsonElement? = null,

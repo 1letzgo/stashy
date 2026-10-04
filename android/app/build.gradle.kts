@@ -16,6 +16,10 @@ val localProps = Properties().apply {
 }
 fun localString(key: String) = "\"" + (localProps.getProperty(key) ?: "").replace("\"", "\\\"") + "\""
 
+fun gitCommitCount(): Int = runCatching {
+    providers.exec { commandLine("git", "rev-list", "--count", "HEAD") }.standardOutput.asText.get().trim().toInt()
+}.getOrDefault(1)
+
 android {
     namespace = "de.letzgo.stashy"
     compileSdk = 36
@@ -23,10 +27,26 @@ android {
         applicationId = "de.letzgo.stashy"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        // Monotonic without manual bumps: number of commits on the checked-out branch.
+        versionCode = gitCommitCount()
         versionName = "3.3.5"
         buildConfigField("String", "DEBUG_SERVER", "\"\"")
         buildConfigField("String", "DEBUG_API_KEY", "\"\"")
+    }
+    // Distribution: `sideload` = our own APK (stashy+ included, self-update from buntes.am),
+    // `play` = Google Play (Play Billing, no self-update — Play forbids both other ways).
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("sideload") {
+            dimension = "distribution"
+            buildConfigField("boolean", "PLUS_INCLUDED", "true")
+            buildConfigField("String", "UPDATE_URL", "\"https://buntes.am/app/stashy.apk\"")
+        }
+        create("play") {
+            dimension = "distribution"
+            buildConfigField("boolean", "PLUS_INCLUDED", "false")
+            buildConfigField("String", "UPDATE_URL", "\"\"")
+        }
     }
     sourceSets {
         // The .graphql documents are shared 1:1 with the iOS app (loaded at runtime like there).
@@ -49,6 +69,8 @@ android {
             buildConfigField("String", "DEBUG_API_KEY", localString("stashy.debug.apiKey"))
         }
         release {
+            // Sideloaded APKs: ship only ARM (phones, TVs); x86 emulators use debug builds.
+            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -61,6 +83,8 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true; buildConfig = true }
+    // Compress native libs (Vosk, ML Kit) inside the APK — smaller download for sideloading.
+    packaging { jniLibs { useLegacyPackaging = true } }
     testOptions { unitTests.isReturnDefaultValues = true }
 }
 
@@ -90,8 +114,13 @@ dependencies {
     implementation("androidx.media3:media3-session:$media3")
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.fragment:fragment-ktx:1.8.5")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("com.android.billingclient:billing-ktx:7.1.1")
     implementation("androidx.tv:tv-material:1.0.0")
+    // AI Subtitles (stashy+): Vosk on-device speech recognition (models downloaded on demand),
+    // ML Kit on-device translation (language packs downloaded on demand).
+    implementation("com.alphacephei:vosk-android:0.3.75")
+    implementation("com.google.mlkit:translate:17.0.3")
     testImplementation("junit:junit:4.13.2")
 }

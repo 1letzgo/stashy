@@ -152,6 +152,12 @@ private fun LazyListScope.stashyPlusItems() {
         }
     }
     item { PurchaseSection() }
+    // Tips (iOS: Settings › About); "Leave a Tip" in Settings opens this page. Sideload builds
+    // have no Play products, so the section only appears when Play returned tip products.
+    if (StashyPlus.tipProducts.isNotEmpty()) item {
+        SectionSpacer()
+        StashyTipsSection()
+    }
 }
 
 /** iOS: `stashyPlusPurchaseSection`. */

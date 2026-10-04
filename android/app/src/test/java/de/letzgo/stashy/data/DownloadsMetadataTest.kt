@@ -111,9 +111,9 @@ class DownloadsMetadataTest {
     fun appleReferenceDate() {
         assertEquals(0.0, AppleDate.fromEpochMillis(978_307_200_000L), 0.0)
         assertEquals(978_307_200_000L, AppleDate.toEpochMillis(0.0))
-        // 2024-01-01T00:00:00Z = 1704067200 s since 1970 = 725846400 s since 2001.
-        assertEquals(725_846_400.0, AppleDate.fromEpochMillis(1_704_067_200_000L), 0.0)
-        assertEquals(1_704_067_200_000L, AppleDate.toEpochMillis(725_846_400.0))
+        // 2024-01-01T00:00:00Z = 1704067200 s since 1970 = 725760000 s since 2001.
+        assertEquals(725_760_000.0, AppleDate.fromEpochMillis(1_704_067_200_000L), 0.0)
+        assertEquals(1_704_067_200_000L, AppleDate.toEpochMillis(725_760_000.0))
     }
 
     @Test

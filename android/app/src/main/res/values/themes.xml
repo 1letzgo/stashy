@@ -5,4 +5,8 @@
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
     </style>
+    <!-- Android TV: fixed dark tvOS ground (`appBackground` #161E2B). -->
+    <style name="Theme.Stashy.TV" parent="Theme.Stashy">
+        <item name="android:windowBackground">#161E2B</item>
+    </style>
 </resources>

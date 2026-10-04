@@ -5,6 +5,8 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.CallMerge
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.automirrored.outlined.VolumeOff
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -68,11 +70,9 @@ object SF {
     val arrowClockwise = Icons.Filled.Refresh
 
     // Tools tab + stashy+ paywall.
-    val squareGrid2x2 = Icons.Outlined.GridView
     val chartBarFill = Icons.Filled.BarChart
     val calendarDayTimelineLeft = Icons.Outlined.ViewTimeline
     val listNumber = Icons.Filled.FormatListNumbered
-    val line3HorizontalDecreaseCircle = Icons.Outlined.FilterAlt
     val arrowTriangleMerge = Icons.AutoMirrored.Filled.CallMerge
     val flameFill = Icons.Filled.LocalFireDepartment
     val lockFill = Icons.Filled.Lock
@@ -81,6 +81,34 @@ object SF {
     val creditcard = Icons.Outlined.CreditCard
     val calendarBadgeClock = Icons.Outlined.EventRepeat
     val boltHeartFill = Icons.Filled.VolunteerActivism
+    // Catalog / filter chrome (catalog port).
+    val sliderHorizontal3 = Icons.Filled.Tune
+    val line3HorizontalDecreaseCircle = Icons.Outlined.FilterAlt
+    val rectangleGrid1x2 = Icons.Outlined.ViewAgenda
+    val squareGrid2x2 = Icons.Outlined.GridView
+    val checkmarkCircle = Icons.Outlined.CheckCircle
+    val checkmark = Icons.Filled.Check
+    val circle = Icons.Outlined.Circle
+    val xmarkCircleFill = Icons.Filled.Cancel
+    val plusCircleFill = Icons.Filled.AddCircle
+    val chevronDown = Icons.Filled.KeyboardArrowDown
+    val chevronUp = Icons.Filled.KeyboardArrowUp
+    val chevronUpChevronDown = Icons.Filled.UnfoldMore
+    val number = Icons.Filled.Tag
+    val photoOnRectangle = Icons.Outlined.PhotoLibrary
+    val person3 = Icons.Outlined.Groups
+    val playCircleFill = Icons.Filled.PlayCircle
+    val rectangleStack = Icons.Outlined.ViewCarousel
+    val bookmark = Icons.Outlined.BookmarkBorder
+    val photoFill = Icons.Filled.Image
+    // Feeds (ReelsView)
+    val photoOnRectangleAngled = Icons.Filled.Collections
+    val playRectangleOnRectangleFill = Icons.Filled.VideoLibrary
+    val cameraFill = Icons.Filled.PhotoCamera
+    val chevronRight2 = Icons.Filled.FastForward
+    val speakerWave2Fill = Icons.AutoMirrored.Filled.VolumeUp
+    val speakerSlashFill = Icons.AutoMirrored.Filled.VolumeOff
+    val playRectangle = Icons.Outlined.SmartDisplay
 }
 
 /** O-counter icon presets (iOS `oCounterIconPresets`, SF names as keys). */

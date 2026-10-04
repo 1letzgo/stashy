@@ -1,0 +1,329 @@
+package de.letzgo.stashy.ui.scene
+
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentHeight
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.clipRect
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import coil3.compose.AsyncImage
+import de.letzgo.stashy.data.Performer
+import de.letzgo.stashy.data.SceneEditing
+import de.letzgo.stashy.data.SceneGalleryStub
+import de.letzgo.stashy.data.SceneGroupEntry
+import de.letzgo.stashy.data.StashImage
+import de.letzgo.stashy.data.Studio
+import de.letzgo.stashy.data.Tag
+import de.letzgo.stashy.data.Net
+import de.letzgo.stashy.ui.Appearance
+import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.ui.Tokens
+import de.letzgo.stashy.ui.player.PlaybackFormat
+import de.letzgo.stashy.ui.player.PlayerIcons
+import java.time.LocalDate
+import java.time.Period
+
+internal fun Modifier.plainClick(onClick: () -> Unit) = clickable(interactionSource = null, indication = null, onClick = onClick)
+
+/** iOS: `ScenePerformersCard.age(for:)` — age at the scene date. */
+internal fun ageAt(birthdate: String?, sceneDate: String?): Int? {
+    if (birthdate.isNullOrEmpty() || sceneDate.isNullOrEmpty()) return null
+    return runCatching { Period.between(LocalDate.parse(birthdate.take(10)), LocalDate.parse(sceneDate.take(10))).years }.getOrNull()
+}
+
+/** iOS: `ScenePerformersCard` — round portraits (age badge, name pill) + director, horizontal scroll. */
+@Composable
+fun ScenePerformersCard(sceneDate: String?, performers: List<Performer>, director: String?, onEdit: () -> Unit) {
+    val tint = Appearance.tint
+    val p = Theme.palette
+    SceneCardContainer(Modifier.fillMaxWidth()) {
+        SceneCardHeader("Performers", onEdit)
+        if (performers.isEmpty() && director == null) {
+            Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No performers assigned") }
+        } else {
+            LazyRow(Modifier.padding(top = 8.dp, bottom = 12.dp), contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                items(performers.sortedBy { it.name }, key = { it.id }) { performer ->
+                    Box(Modifier.padding(bottom = 8.dp).plainClick { DetailLinks.performer(performer) }, contentAlignment = Alignment.BottomCenter) {
+                        Box(Modifier.size(88.dp).clip(CircleShape).background(tint).padding(4.dp).clip(CircleShape)) {
+                            val url = performer.imageURL
+                            if (url != null) AsyncImage(url, performer.name, Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.2f)), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter)
+                            else Icon(PlayerIcons.person, null, tint = tint.copy(alpha = 0.4f), modifier = Modifier.fillMaxSize())
+                        }
+                        ageAt(performer.birthdate, sceneDate)?.let { age ->
+                            Box(
+                                Modifier.align(Alignment.TopEnd).size(22.dp).clip(CircleShape).background(tint).border(1.5.dp, p.secondaryBackground, CircleShape),
+                                contentAlignment = Alignment.Center,
+                            ) { Text("$age", style = pillTextStyle, color = Color.White) }
+                        }
+                        NamePill(performer.name, Modifier.offset(y = 8.dp))
+                    }
+                }
+                if (director != null) item("director") {
+                    Box(Modifier.padding(bottom = 8.dp).plainClick { DetailLinks.director(director) }, contentAlignment = Alignment.BottomCenter) {
+                        Box(Modifier.size(88.dp).clip(CircleShape).background(tint).padding(4.dp).clip(CircleShape).background(p.secondaryBackground), contentAlignment = Alignment.Center) {
+                            Icon(PlayerIcons.director, null, tint = p.pillAccent, modifier = Modifier.size(30.dp))
+                        }
+                        NamePill(director, Modifier.offset(y = 8.dp))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** iOS: `SceneStudioCard` — 110×105 tile in the tint colour with the logo (or name), name pill. */
+@Composable
+fun SceneStudioCard(studio: Studio?, onEdit: () -> Unit, modifier: Modifier = Modifier) {
+    val tint = Appearance.tint
+    SceneCardContainer(modifier.fillMaxWidth()) {
+        SceneCardHeader("Studio", onEdit)
+        if (studio == null) Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No studio assigned") }
+        else Box(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 20.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.plainClick { DetailLinks.studio(studio) }, contentAlignment = Alignment.BottomCenter) {
+                Box(Modifier.size(110.dp, 105.dp).clip(RoundedCornerShape(Tokens.Radius.card)).background(tint).padding(8.dp), contentAlignment = Alignment.Center) {
+                    if (studio.hasImage) AsyncImage(studio.imageURL, studio.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
+                    else Text(studio.name, style = IosTypography.headline, color = Color.White, maxLines = 3)
+                }
+                NamePill(studio.name, Modifier.offset(y = 8.dp))
+            }
+        }
+    }
+}
+
+/** iOS: `SceneGroupsCard` — 70×105 posters with name pills. */
+@Composable
+fun SceneGroupsCard(groups: List<SceneGroupEntry>, onEdit: () -> Unit, modifier: Modifier = Modifier) {
+    val tint = Appearance.tint
+    SceneCardContainer(modifier.fillMaxWidth()) {
+        SceneCardHeader("Groups", onEdit)
+        if (groups.isEmpty()) Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No groups assigned") }
+        else Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+            groups.sortedBy { it.group.name }.forEach { entry ->
+                Box(Modifier.padding(bottom = 8.dp).plainClick { DetailLinks.group(entry.group) }, contentAlignment = Alignment.BottomCenter) {
+                    Box(Modifier.size(70.dp, 105.dp).clip(RoundedCornerShape(Tokens.Radius.card)).background(tint), contentAlignment = Alignment.Center) {
+                        val url = Net.signed(entry.group.frontImagePath)
+                        if (url != null) AsyncImage(url, entry.group.name, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+                        else Icon(PlayerIcons.group, null, tint = tint.copy(alpha = 0.4f), modifier = Modifier.padding(16.dp).fillMaxSize())
+                    }
+                    NamePill(entry.group.name, Modifier.offset(y = 8.dp))
+                }
+            }
+        }
+    }
+}
+
+/** iOS: `SceneTagsCard` — tag chips, collapsed to 68 pt with a chevron when they overflow. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun SceneTagsCard(tags: List<Tag>?, expanded: Boolean, onToggleExpanded: () -> Unit, onEdit: () -> Unit, modifier: Modifier = Modifier) {
+    val p = Theme.palette
+    val density = LocalDensity.current
+    var totalHeight by remember { mutableIntStateOf(0) }
+    val collapsed = 68.dp
+    SceneCardContainer(modifier.fillMaxWidth()) {
+        SceneCardHeader("Tags", onEdit)
+        if (tags.isNullOrEmpty()) Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No tags assigned") }
+        else Column(Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 8.dp, bottom = 12.dp), horizontalAlignment = Alignment.End) {
+            Box(Modifier.fillMaxWidth().then(if (expanded) Modifier else Modifier.heightIn(max = collapsed)).clipToBounds()) {
+                FlowRow(
+                    Modifier.fillMaxWidth().wrapContentHeight(unbounded = true, align = Alignment.Top).onSizeChanged { totalHeight = it.height },
+                    horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    tags.forEach { tag ->
+                        Row(
+                            Modifier.clip(RoundedCornerShape(50)).background(p.pillAccent.copy(alpha = 0.1f)).plainClick { DetailLinks.tag(tag) }
+                                .padding(horizontal = 10.dp, vertical = 6.dp),
+                            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        ) {
+                            Icon(PlayerIcons.tag, null, tint = p.pillAccent, modifier = Modifier.size(10.dp))
+                            Text(tag.name, style = pillTextStyle, color = p.pillAccent)
+                        }
+                    }
+                }
+            }
+            if (with(density) { totalHeight.toDp() } > collapsed) ExpandChevron(expanded, Modifier.padding(top = 4.dp), onToggleExpanded)
+        }
+    }
+}
+
+/** iOS: `SceneGalleriesCard` — one strip per gallery: link tile with the image count, then its images. */
+@Composable
+fun SceneGalleriesCard(galleries: List<SceneGalleryStub>?, onEdit: () -> Unit) {
+    SceneCardContainer(Modifier.fillMaxWidth()) {
+        SceneCardHeader("Galleries", onEdit)
+        if (galleries.isNullOrEmpty()) Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No galleries assigned") }
+        else Column(Modifier.padding(top = 8.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            galleries.forEach { GalleryImageStrip(it) }
+        }
+    }
+}
+
+@Composable
+private fun GalleryImageStrip(gallery: SceneGalleryStub) {
+    val tint = Appearance.tint
+    val thumb = 88.dp
+    val shape = RoundedCornerShape(Tokens.Radius.card * 0.75f)
+    var images by remember(gallery.id) { mutableStateOf<List<StashImage>>(emptyList()) }
+    var loading by remember(gallery.id) { mutableStateOf(true) }
+    LaunchedEffect(gallery.id) {
+        images = runCatching { SceneEditing.galleryPreviewImages(gallery.id, 40) }.getOrDefault(emptyList())
+        loading = false
+    }
+    LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        item("link") {
+            Column(
+                Modifier.size(thumb).clip(shape).background(tint.copy(alpha = 0.1f)).border(1.dp, tint.copy(alpha = 0.35f), shape).plainClick { DetailLinks.gallery(gallery) },
+                horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
+            ) {
+                Icon(PlayerIcons.gallery, null, tint = tint, modifier = Modifier.size(22.dp))
+                Text(gallery.imageCount?.toString() ?: "—", style = IosTypography.caption.copy(fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace), color = tint)
+            }
+        }
+        items(images, key = { it.id }) { image ->
+            Box(Modifier.size(thumb).clip(shape).background(Color.Gray.copy(alpha = 0.2f)).plainClick { DetailLinks.image(images, image.id) }) {
+                AsyncImage(image.thumbnailURL, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+            }
+        }
+        if (loading && images.isEmpty()) item("loading") {
+            Box(Modifier.size(thumb), contentAlignment = Alignment.Center) { CircularProgressIndicator(Modifier.size(20.dp), strokeWidth = 2.dp, color = tint) }
+        }
+    }
+}
+
+/**
+ * iOS: `SceneHeatmapCard` ("Interactive") — Stash's funscript heatmap with a draggable playhead
+ * (seeks throttled to 150 ms while dragging, committed on release). Device sync buttons
+ * (TheHandy, Intiface, Love Spouse) are not ported.
+ */
+@Composable
+fun SceneHeatmapCard(heatmapURL: String?, duration: Double, currentTime: Double, onSeek: (Double) -> Unit, onSeekCommit: (Double) -> Unit, onScrubStateChange: (Boolean) -> Unit) {
+    val tint = Appearance.tint
+    val p = Theme.palette
+    val heatmapHeight = 80.dp
+    var dragging by remember { mutableStateOf(false) }
+    var draft by remember { mutableStateOf(0f) }
+    val progress = if (dragging) draft else if (duration > 0) (currentTime.coerceIn(0.0, duration) / duration).toFloat() else 0f
+    SceneCardContainer(Modifier.fillMaxWidth()) {
+        SceneCardHeader("Interactive", null, trailing = { Icon(PlayerIcons.waveform, null, tint = p.pillAccent, modifier = Modifier.size(18.dp)) })
+        Box(
+            Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 8.dp).height(heatmapHeight + 30.dp)
+                .pointerInput(duration) {
+                    var lastSent = 0L
+                    awaitEachGesture {
+                        val down = awaitFirstDown()
+                        val w = size.width.toFloat().coerceAtLeast(1f)
+                        fun frac(x: Float) = (x / w).coerceIn(0f, 1f)
+                        dragging = true; lastSent = 0L; onScrubStateChange(true)
+                        draft = frac(down.position.x)
+                        var x = down.position.x
+                        while (true) {
+                            val now = System.currentTimeMillis()
+                            if (now - lastSent >= 150) { lastSent = now; onSeek(duration * frac(x)) }
+                            val e = awaitPointerEvent()
+                            val c = e.changes.firstOrNull { it.id == down.id } ?: break
+                            if (!c.pressed) break
+                            x = c.position.x; draft = frac(x); c.consume()
+                        }
+                        draft = frac(x)
+                        dragging = false
+                        onSeekCommit(duration * frac(x))
+                        onScrubStateChange(false)
+                    }
+                },
+        ) {
+            Box(Modifier.fillMaxWidth().height(heatmapHeight).background(p.secondaryText.copy(alpha = 0.12f)))
+            // Grid lines + time labels at 0 / 25 / 50 / 75 / 100 %.
+            androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxWidth()) {
+                val w = maxWidth
+                listOf(0f, 0.25f, 0.5f, 0.75f, 1f).forEach { pos ->
+                    Box(Modifier.offset(x = w * pos).size(1.dp, heatmapHeight).background(Color.Gray.copy(alpha = 0.2f)))
+                    Text(
+                        PlaybackFormat.time(duration * pos),
+                        Modifier.offset(x = w * pos + when (pos) { 1f -> (-25).dp; 0f -> 0.dp; else -> (-10).dp }, y = heatmapHeight + 12.dp),
+                        style = IosTypography.caption2.copy(fontSize = 9.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace), color = p.text.copy(alpha = 0.8f),
+                    )
+                }
+                if (heatmapURL != null) {
+                    AsyncImage(heatmapURL, null, Modifier.fillMaxWidth().height(heatmapHeight).alpha(0.15f), contentScale = ContentScale.FillBounds)
+                    AsyncImage(
+                        heatmapURL, null,
+                        Modifier.fillMaxWidth().height(heatmapHeight).drawWithContent {
+                            clipRect(right = size.width * progress) { this@drawWithContent.drawContent() }
+                        },
+                        contentScale = ContentScale.FillBounds,
+                    )
+                } else Box(Modifier.fillMaxWidth().height(heatmapHeight).background(Color.Gray.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
+                    Text("No Heatmap", style = IosTypography.caption2, color = p.secondaryText)
+                }
+                // Playhead.
+                Box(Modifier.offset(x = w * progress - 1.dp, y = (-2).dp).size(2.dp, heatmapHeight + 4.dp).background(tint))
+                Box(Modifier.offset(x = w * progress - 5.dp, y = (-7).dp).size(10.dp).clip(CircleShape).background(tint))
+            }
+        }
+    }
+}
+
+
+/**
+ * iOS: `SceneSimilarScenesCard` (stashy+). The similarity finder is a later stashy+ port; the
+ * card hides itself like iOS does while the finder is inactive. Feed it [scenes] once it exists.
+ */
+@Composable
+fun SceneSimilarScenesCard(scenes: List<de.letzgo.stashy.data.Scene> = emptyList(), isLoading: Boolean = false) {
+    if (scenes.isEmpty() && !isLoading) return
+    SceneCardContainer(Modifier.fillMaxWidth()) {
+        SceneCardHeader("Similar Scenes", null, trailing = { if (isLoading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) })
+        LazyRow(Modifier.padding(top = 8.dp, bottom = 8.dp), contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            items(scenes, key = { it.id }) { s ->
+                de.letzgo.stashy.ui.components.SceneCard(
+                    s, Modifier.size(222.dp, 125.dp).plainClick { de.letzgo.stashy.ui.Nav.push(SceneDetailScreen(s.id, s)) },
+                )
+            }
+        }
+    }
+}

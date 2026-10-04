@@ -14,6 +14,7 @@ import de.letzgo.stashy.data.Prefs
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.StashyPlus
 import okio.Path.Companion.toOkioPath
+import kotlinx.coroutines.launch
 
 /** App entry (iOS: `App.swift`). Sets up prefs, the server config and the image cache. */
 class StashyApplication : Application(), SingletonImageLoader.Factory {
@@ -22,6 +23,17 @@ class StashyApplication : Application(), SingletonImageLoader.Factory {
         Prefs.init(this)
         ServerConfigManager.init()
         StashyPlus.start(this)
+        de.letzgo.stashy.data.SecurityManager.init()
+        de.letzgo.stashy.data.TabManager.ensureLoaded()
+        // Offline downloads: metadata + in-flight workers (iOS: `DownloadManager.shared`).
+        de.letzgo.stashy.data.Downloads.init(this)
+        // stashy+ data features (iOS: `AITagSuggestionManager.shared`, `AppIconManager.shared`).
+        de.letzgo.stashy.data.tools.AITagSuggestions.start()
+        kotlinx.coroutines.MainScope().launch {
+            androidx.compose.runtime.snapshotFlow { StashyPlus.isUnlocked }.collect { unlocked ->
+                if (!unlocked) de.letzgo.stashy.ui.tools.AppIcons.revertToDefaultIfNeeded(this@StashyApplication)
+            }
+        }
     }
 
     // Image cache like `ImageCacheManager` (iOS): memory + disk, authenticated via the shared OkHttp client.
