@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.pager.VerticalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -51,7 +52,12 @@ import de.letzgo.stashy.data.FeedsConfig
 import de.letzgo.stashy.data.IdName
 import de.letzgo.stashy.data.Performer
 import de.letzgo.stashy.data.ReelsModeType
-import de.letzgo.stashy.ui.EmptyState
+import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.data.ServerConfigManager
+import de.letzgo.stashy.ui.catalog.StandardLoading
+import de.letzgo.stashy.ui.catalog.StatusPlaceholder
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.MainTab
 import de.letzgo.stashy.ui.Nav
@@ -68,7 +74,16 @@ import kotlinx.coroutines.launch
  * Edge-to-edge vertical pager (one row per screen) with autoplay of the settled row and
  * preloading of its neighbours ([FeedPlayerPool]); the section chrome (mode dock + Filter &
  * Sort) floats on top, the info overlay and scrubber sit right above the floating tab bar.
- * Tapping the media hides all chrome including the tab bar, like iOS.
+ * Tapping the media hides all chrome including the tab bar, like iOS. Pics is the Images
+ * catalog's 1/row feed under the same chrome ([PicsFeed]); loading / empty / error states and
+ * Pics sit on the app background like iOS (`StashyThemeFill(.app)`), video rows on black.
+ *
+ * Known differences to iOS: the AI Motion pill (device control) is not ported (Play policy);
+ * the Feeds sheet has no Save / presets (see [FeedsFilterSortSheet]); tag editing ("+", remove
+ * tag, AI tag suggestions) is missing from the overlay; the performer avatar opens the
+ * performer's default detail section (iOS jumps to Images for Clips / Pics); the scrubber shows
+ * the row's poster instead of decoded scrub stills; the mode chip's label appears without
+ * iOS's delayed fade.
  */
 @Composable
 fun FeedsScreen() {
@@ -105,6 +120,7 @@ fun FeedsScreen() {
         if (reselects != initialReselects) {
             pool.teardown()
             model.restartFromTop()
+            if (model.mode == ReelsModeType.Pics) model.picsListState.scrollToItem(0)
         }
     }
 
@@ -142,14 +158,22 @@ fun FeedsScreen() {
     // Height the floating tab bar covers (AppShell: 64 pt bar + 2×8 pt margins above the nav bar).
     val tabBarOverlap = if (isUIVisible) navBottom + 80.dp else navBottom
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    // Height of the top chrome (bar + criterion chips): Pics content starts below it (iOS safeAreaInset).
+    val density = LocalDensity.current
+    val statusTop = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
+    var measuredChrome by remember { mutableStateOf<androidx.compose.ui.unit.Dp?>(null) }
+    val chromeHeight = measuredChrome ?: (statusTop + FeedsDock.activeHeight + 17.dp)
+
+    // Rows are black; the states and Pics sit on the app background (iOS `StashyThemeFill(.app)`).
+    Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
         val items = model.visibleItems(mode)
         when {
-            mode == ReelsModeType.Pics -> PicsFeed(model, topPadding = 64.dp, bottomPadding = tabBarOverlap)
-            items.isEmpty() && list.isLoading -> LoadingState()
-            items.isEmpty() && list.error != null -> RetryState(SF.server, "Server not reachable", "Retry Connection") { model.refetch(mode) }
-            items.isEmpty() && list.loadedOnce -> RetryState(emptyIcon(mode), emptyTitle(mode), "Reload") { model.refetch(mode) }
-            items.isEmpty() -> LoadingState()
+            mode == ReelsModeType.Pics -> PicsFeed(model, topPadding = chromeHeight, bottomPadding = tabBarOverlap)
+            ServerConfigManager.activeConfig == null -> StatusPlaceholder(SF.server, "Server not reachable", "Retry Connection", { model.refetch(mode) })
+            items.isEmpty() && list.isLoading -> StandardLoading("Loading feeds...")
+            items.isEmpty() && list.error != null -> StatusPlaceholder(SF.server, "Server not reachable", "Retry Connection", { model.refetch(mode) })
+            items.isEmpty() && list.loadedOnce -> StatusPlaceholder(emptyIcon(mode), emptyTitle(mode), "Reload", { model.refetch(mode) })
+            items.isEmpty() -> StandardLoading("Loading feeds...")
             else -> androidx.compose.runtime.key(mode) {
                 FeedPager(
                     model = model, mode = mode, items = items, pool = pool,
@@ -164,13 +188,16 @@ fun FeedsScreen() {
 
         // Top chrome: mode dock + Filter & Sort, criterion chips below (iOS `reelsNavBar`).
         val chromeAlpha by animateFloatAsState(if (isUIVisible) 1f else 0f, tween(200), label = "chrome")
-        Column(Modifier.fillMaxWidth().alpha(chromeAlpha).align(Alignment.TopCenter)) {
+        Column(
+            Modifier.fillMaxWidth().alpha(chromeAlpha).align(Alignment.TopCenter)
+                .onSizeChanged { with(density) { if (chromeAlpha > 0.99f) measuredChrome = it.height.toDp() } },
+        ) {
             if (chromeAlpha > 0.01f) {
                 FeedsTopBar(
                     modes = FeedsConfig.enabledModes,
                     selected = mode,
                     onSelect = { m -> pool.teardown(); isZoomed = false; model.selectMode(m) },
-                    onFilterSort = { showSheet = true },
+                    onFilterSort = { if (mode == ReelsModeType.Pics) model.pics.isSheetPresented = true else showSheet = true },
                 )
                 val c = model.criteria
                 if (!c.isEmpty) FeedsCriterionChips(
@@ -190,17 +217,16 @@ fun FeedsScreen() {
         }
     }
 
-    if (showSheet) {
+    if (showSheet && mode != ReelsModeType.Pics) {
         FeedsFilterSortSheet(
             mode = mode,
             filters = model.filtersFor(mode),
             selectedFilter = model.filters[mode],
             sort = model.sort(mode),
             sortOptions = model.sortOptions(mode),
-            criteria = model.advanced[mode],
             onFilter = { pool.teardown(); model.setFilter(mode, it) },
             onSort = { pool.teardown(); model.setSort(mode, it) },
-            onCriteria = { pool.teardown(); model.setAdvancedCriteria(mode, it) },
+            onCriteriaChanged = { pool.teardown(); model.applyCriteriaDocument(mode) },
             onReset = { pool.teardown(); model.reset(mode) },
             onDismiss = { showSheet = false },
         )
@@ -397,7 +423,7 @@ private fun FeedPager(
                 )
                 if (!activeItem.isAnimated) {
                     FeedsScrubber(
-                        time = time, duration = duration,
+                        time = time, duration = duration, placeholderURL = activeItem.posterURL,
                         onScrub = { s -> seeking = true; time = s; pool.player(activeId)?.playWhenReady = false; pool.seek(activeId, s) },
                         onScrubEnd = { s ->
                             time = s; pool.seek(activeId, s); seeking = false
@@ -408,26 +434,6 @@ private fun FeedPager(
                 Spacer(Modifier.height(tabBarOverlap))
             }
         }
-    }
-}
-
-@Composable
-private fun LoadingState() {
-    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)) {
-        CircularProgressIndicator(color = Color.White)
-        Text("Loading feeds...", color = Color.White.copy(alpha = 0.7f), style = IosTypography.subheadline)
-    }
-}
-
-/** iOS: `SharedEmptyStateView` / `ConnectionErrorView` with their buttons. */
-@Composable
-private fun RetryState(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, button: String, onRetry: () -> Unit) {
-    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
-        EmptyState(icon, title)
-        Text(
-            button, color = Color.White, style = IosTypography.headline,
-            modifier = Modifier.stashyGlass(RoundedCornerShape(50)).noIndicationClick(onRetry).padding(horizontal = 20.dp, vertical = 12.dp),
-        )
     }
 }
 

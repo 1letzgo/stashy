@@ -101,7 +101,7 @@ fun Modifier.chromePill(height: Dp = FeedsDock.activeHeight, width: Dp? = null):
 
 /**
  * iOS: `StashySectionChromeBar` + `reelsModeDock` + `reelsFilterSortPill` — the Feeds top bar.
- * Selected mode = tinted capsule with label, the others glass circles.
+ * Selected mode = tinted glass capsule with label (iOS `stashyChromeFill`), the others glass circles.
  */
 @Composable
 fun FeedsTopBar(
@@ -147,7 +147,7 @@ private fun ModeChip(mode: ReelsModeType, selected: Boolean, onClick: () -> Unit
             .height(FeedsDock.activeHeight)
             .widthIn(min = FeedsDock.circleSize)
             .animateContentSize(spring(dampingRatio = 0.72f, stiffness = Spring.StiffnessMediumLow))
-            .let { if (selected) it.clip(shape).background(Appearance.tint, shape) else it.stashyGlass(shape) }
+            .let { if (selected) it.stashyGlass(shape, Appearance.tint) else it.stashyGlass(shape) }
             .noIndicationClick(onClick)
             .padding(horizontal = if (selected) FeedsDock.activeHorizontalPadding else (FeedsDock.circleSize - FeedsDock.iconSize) / 2),
         verticalAlignment = Alignment.CenterVertically,
@@ -188,7 +188,7 @@ private fun CriterionChip(label: String, onClick: () -> Unit) {
         horizontalArrangement = Arrangement.spacedBy(FeedsDock.iconLabelSpacing),
     ) {
         val c = Color.White.copy(alpha = FeedsDock.inactiveIconOpacity)
-        Icon(SF.xmark, null, tint = c, modifier = Modifier.size(12.dp))
+        Icon(SF.xmark, null, tint = c, modifier = Modifier.size(11.dp))
         Text(label, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = c, maxLines = 1)
     }
 }
@@ -346,62 +346,26 @@ private fun PerformerThumbnail(p: FeedPerformer, onClick: () -> Unit) {
     }
 }
 
-/** iOS: `IsolatedScrubberBar` (`AetherTimeBar`): elapsed · track · remaining; drag to scrub. */
+/**
+ * iOS: `IsolatedScrubberBar` — the shared `AetherTimeBar` (44 pt glass capsule: elapsed · track ·
+ * remaining) with 16 pt sides and 8 pt above / below. [placeholderURL] stands in for the iOS
+ * scrub-preview still (Android decodes no frames here; the row's poster is shown instead).
+ */
 @Composable
-fun FeedsScrubber(time: Double, duration: Double, onScrub: (Double) -> Unit, onScrubEnd: (Double) -> Unit) {
+fun FeedsScrubber(time: Double, duration: Double, placeholderURL: String?, onScrub: (Double) -> Unit, onScrubEnd: (Double) -> Unit) {
     var scrubbing by remember { mutableStateOf(false) }
-    var scrubFraction by remember { mutableFloatStateOf(0f) }
-    val fraction = if (scrubbing) scrubFraction else if (duration > 0) (time / duration).toFloat().coerceIn(0f, 1f) else 0f
-    val shownTime = if (scrubbing) scrubFraction * duration else time
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        TimeLabel(formatTime(shownTime))
-        BoxWithConstraints(Modifier.weight(1f).height(24.dp)) {
-            val widthPx = constraints.maxWidth.toFloat().coerceAtLeast(1f)
-            Box(
-                Modifier.fillMaxWidth().height(24.dp)
-                    .pointerInputScrub(widthPx, duration, onStart = { f -> scrubbing = true; scrubFraction = f; onScrub(f * duration) },
-                        onMove = { f -> scrubFraction = f; onScrub(f * duration) },
-                        onEnd = { scrubbing = false; onScrubEnd(scrubFraction * duration) }),
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                val trackHeight = if (scrubbing) 8.dp else 4.dp
-                Box(Modifier.fillMaxWidth().height(trackHeight).clip(Capsule).background(Color.White.copy(alpha = 0.25f)))
-                Box(Modifier.fillMaxWidth(fraction).height(trackHeight).clip(Capsule).background(Color.White))
-            }
-        }
-        TimeLabel("-" + formatTime((duration - shownTime).coerceAtLeast(0.0)))
-    }
+    de.letzgo.stashy.ui.player.TimeBar(
+        currentTime = time,
+        duration = duration,
+        isScrubbing = scrubbing,
+        previewImage = null,
+        previewPlaceholderURL = placeholderURL,
+        markers = emptyList(),
+        modifier = Modifier.padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 8.dp),
+        onScrubChanged = { s -> scrubbing = true; onScrub(s) },
+        onScrubEnded = { s -> scrubbing = false; onScrubEnd(s) },
+    )
 }
-
-@Composable
-private fun TimeLabel(text: String) =
-    Text(text, color = Color.White.copy(alpha = 0.85f), style = IosTypography.caption.copy(fontFamily = FontFamily.Monospace, fontWeight = FontWeight.Medium))
-
-private fun Modifier.pointerInputScrub(
-    widthPx: Float, duration: Double,
-    onStart: (Float) -> Unit, onMove: (Float) -> Unit, onEnd: () -> Unit,
-): Modifier = this
-    .pointerInput("scrub-tap", duration) {
-        detectTapGestures(onPress = { o ->
-            if (duration <= 0) return@detectTapGestures
-            onStart((o.x / widthPx).coerceIn(0f, 1f))
-            tryAwaitRelease()
-            onEnd()
-        })
-    }
-    .pointerInput("scrub-drag", duration) {
-        var f = 0f
-        detectHorizontalDragGestures(
-            onDragStart = { o -> if (duration > 0) { f = (o.x / widthPx).coerceIn(0f, 1f); onStart(f) } },
-            onHorizontalDrag = { change, _ -> if (duration > 0) { change.consume(); f = (change.position.x / widthPx).coerceIn(0f, 1f); onMove(f) } },
-            onDragEnd = { if (duration > 0) onEnd() },
-            onDragCancel = { if (duration > 0) onEnd() },
-        )
-    }
 
 /** `m:ss` / `h:mm:ss`. */
 fun formatTime(seconds: Double): String {
