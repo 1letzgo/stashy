@@ -38,6 +38,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -226,12 +227,15 @@ fun FeedRow(
             }
         }
 
-        // iOS `playButtonOverlay` (`CenterPlayButton`).
+        // iOS `playButtonOverlay` (`CenterPlayButton`): a bare 60 pt `play.fill`, white 70 % with
+        // a soft shadow, no circle; the whole page is the tap target.
         if (item.isVideo && !isPlaying && isUIVisible && !isScrolling && isActive) {
-            Box(
-                Modifier.align(Alignment.Center).size(72.dp).stashyGlass(CircleShape).noIndicationClick(onPlay),
-                contentAlignment = Alignment.Center,
-            ) { Icon(SF.playFill, "Play", tint = Color.White, modifier = Modifier.size(34.dp)) }
+            Box(Modifier.fillMaxSize().noIndicationClick(onPlay), contentAlignment = Alignment.Center) {
+                Box(contentAlignment = Alignment.Center) {
+                    Icon(SF.playFill, null, tint = Color.Black.copy(alpha = 0.25f), modifier = Modifier.size(84.dp).blur(10.dp))
+                    Icon(SF.playFill, "Play", tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(84.dp))
+                }
+            }
         }
     }
 }

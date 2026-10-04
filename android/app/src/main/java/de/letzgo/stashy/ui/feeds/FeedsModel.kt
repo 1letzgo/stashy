@@ -29,8 +29,18 @@ import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import okhttp3.Request
+import androidx.compose.foundation.lazy.LazyListState
+import de.letzgo.stashy.data.FilterMode
+import de.letzgo.stashy.data.ListLivePresetTag
+import de.letzgo.stashy.data.SavedFiltersStore
+import de.letzgo.stashy.data.SortCatalog
+import de.letzgo.stashy.data.criteriaObjectFilter
+import de.letzgo.stashy.data.StashImage
+import de.letzgo.stashy.ui.catalog.CatalogController
+import de.letzgo.stashy.ui.catalog.ImageMediaKindHolder
 import kotlin.random.Random
 
 /** One mode's timeline (iOS: `viewModel.scenes` / `sceneMarkers` / `clips` / `previews` + paging flags). */
@@ -71,6 +81,86 @@ object FeedsModel {
     /** iOS: selectedPerformer / selectedTags / selectedStudio (shared across modes). */
     var criteria by mutableStateOf(FeedCriteria())
         private set
+
+    // MARK: - Pics (iOS: `reelsPicsFilters` + `reelsPicsViewModel` driving the embedded `ImagesView`)
+
+    /** iOS `DetailLinkedImagesFilterModel.liveFilterMediaKind` of the Pics sheet ("Type"). */
+    val picsKind = ImageMediaKindHolder()
+
+    /**
+     * Pics runs the Images catalog's own controller (sort, saved filter / local preset, criteria
+     * editor, paging) like iOS embeds `ImagesView` with `reelsPicsFilters`: session sort starts
+     * at the Pics default sort (Settings › Feeds, `dateDesc`) and is not written to the Images
+     * tab; the handed performer / tags / studio and the "Type" chip are layered on top.
+     */
+    var pics by mutableStateOf(makePics())
+        private set
+    /** Scroll position of the Pics list (iOS keeps `lastOpenedImageId`; RAM like the rest). */
+    var picsListState = LazyListState()
+        private set
+    private var picsBootstrapped = false
+
+    private fun makePics(): CatalogController<StashImage> = CatalogController(
+        FilterMode.Images, scope, tabId = null,
+        initialSort = SortCatalog.option(FilterMode.Images, defaultSort(ReelsModeType.Pics).raw),
+        extraLive = { picsLive() },
+        persistSort = {},
+    )
+
+    private fun picsLive(): JsonObject {
+        val out = LinkedHashMap<String, JsonElement>()
+        picsKind.kind.pathCriterion?.let { out["path"] = it }
+        FeedsQuery.applyCriteria(out, criteria, FeedQueryKind.Pics)
+        return JsonObject(out)
+    }
+
+    private fun resetPics() {
+        pics = makePics()
+        picsKind.kind = de.letzgo.stashy.ui.filter.ImageListMediaKind.All
+        picsListState = LazyListState()
+        picsBootstrapped = false
+    }
+
+    /**
+     * First show of Pics: the Images tab's Settings default filter (iOS
+     * `bootstrapReelsPicsFiltersIfNeeded`) unless criteria were handed in — then Filter = None
+     * (`suppressSettingsDefaultFilter`).
+     */
+    fun ensurePicsLoaded() {
+        if (picsBootstrapped) {
+            if (!pics.list.loadedOnce && !pics.list.isLoading) pics.refresh()
+            return
+        }
+        picsBootstrapped = true
+        val controller = pics
+        scope.launch {
+            SavedFiltersStore.load()
+            val defId = FeedsConfig.defaultFilterId(ReelsModeType.Pics)
+            val def = defId?.let { SavedFiltersStore.byId[it] }
+            if (def != null && criteria.isEmpty && controller.presetRow.isEmpty()) controller.selectPresetRow(ListLivePresetTag.serverRow(def.id))
+            else controller.refresh()
+        }
+    }
+
+    /**
+     * Handed criteria changed while on Pics (iOS `applyPerformerFilter` / `applyTagsChange` /
+     * `applyClear…` `.pics` branches): a handed criterion drops the filter and editor
+     * (`reelsPicsApplyHandedCriteria(onTopOf: nil)`); clearing the last one restores the Settings
+     * default filter (`reelsPicsRestoreDefaultFilterAfterDeepLinkIfNeeded`).
+     */
+    private fun picsCriteriaChanged() {
+        if (!criteria.isEmpty) {
+            if (pics.presetRow.isNotEmpty() || pics.selectedFilter != null || !pics.criteria.isEmpty) { pics.reset(); return }
+        } else if (pics.selectedFilter == null && pics.presetRow.isEmpty()) {
+            FeedsConfig.defaultFilterId(ReelsModeType.Pics)?.let { SavedFiltersStore.byId[it] }?.let {
+                pics.selectPresetRow(ListLivePresetTag.serverRow(it.id)); return
+            }
+        }
+        pics.refresh()
+    }
+
+    /** Optimistic edit of one Pics image (rating / O-counter from a post). */
+    fun patchPicsImage(image: StashImage) = pics.list.patch { if (it.id == image.id) image else it }
 
     /** iOS: `currentVisibleSceneId` per mode (session position). */
     val currentIds = mutableStateMapOf<ReelsModeType, String>()
@@ -164,9 +254,10 @@ object FeedsModel {
         savedFiltersLoaded = false
         savedFilters = emptyList()
         lists.values.forEach { it.job?.cancel(); it.items.clear(); it.loadedOnce = false; it.signature = null; it.page = 0; it.error = null }
-        sorts.clear(); filters.clear(); advanced.clear(); currentIds.clear(); unplayable.clear(); probed.clear(); seeds.clear()
+        sorts.clear(); filters.clear(); advanced.clear(); criteriaDocs.clear(); currentIds.clear(); unplayable.clear(); probed.clear(); seeds.clear()
         criteria = FeedCriteria()
         checkpoint = null
+        resetPics()
         mode = FeedsConfig.enabledModes.firstOrNull() ?: ReelsModeType.Scenes
     }
 
@@ -194,6 +285,7 @@ object FeedsModel {
      * (iOS: "Wait for onChange(of: viewModel.savedFilters)").
      */
     fun ensureLoaded(m: ReelsModeType, applyDefaultFilter: Boolean = criteria.isEmpty) {
+        if (m == ReelsModeType.Pics) { ensurePicsLoaded(); return }
         val l = list(m)
         if (l.loadedOnce || l.isLoading) {
             if (l.signature == signature(m)) return
@@ -223,6 +315,11 @@ object FeedsModel {
 
     /** Page-1 fetch of a mode (iOS `applySettings` → `fetchScenes` & co). */
     fun refetch(m: ReelsModeType = mode, reroll: Boolean = false, keepPosition: Boolean = false) {
+        if (m == ReelsModeType.Pics) {
+            if (reroll && pics.sort.isRandom) de.letzgo.stashy.data.RandomSeeds.refresh(FilterMode.Images)
+            pics.refresh()
+            return
+        }
         if (reroll && sort(m).isRandom) reseed(m)
         val l = list(m)
         l.job?.cancel()
@@ -257,6 +354,7 @@ object FeedsModel {
 
     /** iOS `loadMoreScenes` & co. */
     fun loadMore(m: ReelsModeType = mode) {
+        if (m == ReelsModeType.Pics) { pics.list.loadMore(); return }
         val l = list(m)
         if (l.isLoading || l.isLoadingMore || !l.hasMore || !l.loadedOnce) return
         l.isLoadingMore = true
@@ -283,7 +381,9 @@ object FeedsModel {
     /** Returns the page's rows and whether more pages exist (iOS: `count == perPage`). */
     private suspend fun fetchPage(m: ReelsModeType, page: Int): Pair<List<FeedItem>, Boolean> {
         val per = FeedsQuery.PER_PAGE
-        val vars = FeedsQuery.variables(kind(m), page, per, sort(m), seed(m), filters[m], advanced[m], criteria)
+        // iOS `fetchBaseFilter`: once the editor holds the filter's criteria, only they are sent.
+        val base = if (advanced[m] != null) null else filters[m]
+        val vars = FeedsQuery.variables(kind(m), page, per, sort(m), seed(m), base, advanced[m], criteria)
         return when (m) {
             ReelsModeType.Scenes -> FeedsRepository.scenes(vars).let { p -> p.items.map { FeedItem.SceneItem(it) } to (p.items.size == per) }
             ReelsModeType.Previews -> FeedsRepository.scenes(vars).let { p ->
@@ -316,8 +416,43 @@ object FeedsModel {
 
     fun setFilter(m: ReelsModeType, filter: SavedFilter?) {
         if (filter == null) filters.remove(m) else filters[m] = filter
-        // iOS: "None" must also empty the editor.
-        if (filter == null) advanced.remove(m)
+        // iOS: picking a filter reloads the editor from it; "None" empties it.
+        advanced.remove(m)
+        criteriaDocs.remove(m)
+        refetch(m)
+    }
+
+    /**
+     * iOS `reelsCriteriaDocument` / `reelsMarkerCriteriaDocument` (+ the clip model's document):
+     * the editor's copy of the selected filter's criteria (`reelsLoadCriteriaDocumentIfEmpty`).
+     * Once edited, [advanced] holds the whole document and the filter is no longer sent as base
+     * (iOS `fetchBaseFilter`), so removing one of its criteria in the editor takes effect.
+     */
+    private val criteriaDocs = HashMap<ReelsModeType, de.letzgo.stashy.data.CriteriaDocument>()
+
+    fun criteriaDocument(m: ReelsModeType): de.letzgo.stashy.data.CriteriaDocument = criteriaDocs.getOrPut(m) {
+        val fm = when (m) {
+            ReelsModeType.Markers -> FilterMode.SceneMarkers
+            ReelsModeType.Clips, ReelsModeType.Pics -> FilterMode.Images
+            else -> FilterMode.Scenes
+        }
+        de.letzgo.stashy.data.CriteriaDocument(fm, pinsDefaults = true).also { doc ->
+            val source = advanced[m] ?: filters[m]?.let { f ->
+                val merged = LinkedHashMap<String, JsonElement>(f.criteriaObjectFilter())
+                f.stashyMetadataLive()?.let { live -> merged.putAll(de.letzgo.stashy.data.FilterMapper.sanitize(live, m == ReelsModeType.Markers)) }
+                JsonObject(merged)
+            }
+            source?.let { doc.load(it) }
+        }
+    }
+
+    private fun SavedFilter.stashyMetadataLive(): JsonObject? = FeedsQuery.stashyLiveFragment(this)?.takeIf { it.isNotEmpty() }
+
+    /** Editor change → the document replaces the criteria and the filter base (refetch). */
+    fun applyCriteriaDocument(m: ReelsModeType) {
+        val doc = criteriaDocs[m] ?: return
+        val dict = doc.sanitizedObjectFilter
+        advanced[m] = dict
         refetch(m)
     }
 
@@ -329,7 +464,7 @@ object FeedsModel {
 
     /** iOS sheet "Reset": no filter, no criteria; sort stays. */
     fun reset(m: ReelsModeType) {
-        filters.remove(m); advanced.remove(m)
+        filters.remove(m); advanced.remove(m); criteriaDocs.remove(m)
         refetch(m)
     }
 
@@ -344,7 +479,7 @@ object FeedsModel {
 
     private fun updateCriteria(new: FeedCriteria) {
         criteria = new
-        refetch(mode)
+        if (mode == ReelsModeType.Pics) picsCriteriaChanged() else refetch(mode)
     }
 
     /** iOS `applyPerformerFilter`. */
@@ -369,12 +504,13 @@ object FeedsModel {
         // iOS `prepareFreshFeedForDeepLink`: every list and position is rebuilt.
         lists.values.forEach { it.job?.cancel(); it.items.clear(); it.loadedOnce = false; it.signature = null }
         currentIds.clear()
+        resetPics()
         val target = ReelsModeType.fromModeRaw(link.mode)
         when {
             link.clipFilter != null -> {
                 mode = ReelsModeType.Clips
                 criteria = FeedCriteria()
-                advanced.remove(ReelsModeType.Clips)
+                advanced.remove(ReelsModeType.Clips); criteriaDocs.remove(ReelsModeType.Clips)
                 filters[ReelsModeType.Clips] = link.clipFilter
                 sorts[ReelsModeType.Clips] = ImageSortOption.from(link.clipSort) ?: defaultSort(ReelsModeType.Clips)
                 refetch(ReelsModeType.Clips)
@@ -382,7 +518,7 @@ object FeedsModel {
             link.sceneFilter != null -> {
                 mode = ReelsModeType.Scenes
                 criteria = FeedCriteria()
-                advanced.remove(ReelsModeType.Scenes)
+                advanced.remove(ReelsModeType.Scenes); criteriaDocs.remove(ReelsModeType.Scenes)
                 filters[ReelsModeType.Scenes] = link.sceneFilter
                 sorts[ReelsModeType.Scenes] = SceneSortOption.from(link.sceneSort) ?: defaultSort(ReelsModeType.Scenes)
                 refetch(ReelsModeType.Scenes)
@@ -390,7 +526,7 @@ object FeedsModel {
             link.performer != null || link.tags.isNotEmpty() || link.studio != null -> {
                 // iOS `reelsClearSessionFiltersForDeepLink`: only the handed criteria plus the
                 // mode's Settings default filter and default sort survive.
-                filters.clear(); advanced.clear(); sorts.clear()
+                filters.clear(); advanced.clear(); criteriaDocs.clear(); sorts.clear()
                 mode = target ?: FeedsConfig.enabledModes.firstOrNull() ?: ReelsModeType.Scenes
                 criteria = FeedCriteria(link.performer, link.tags, link.studio)
                 // iOS: every Feeds view starts from its Settings default filter; the handed
