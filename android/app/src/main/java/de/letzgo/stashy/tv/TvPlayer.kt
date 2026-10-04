@@ -88,6 +88,13 @@ import java.util.Locale
  * the play credit after Settings › Count As Played, server captions and the channel hand-over.
  */
 class TvPlaybackModel {
+    companion object {
+        private val live = java.util.Collections.newSetFromMap(java.util.WeakHashMap<TvPlaybackModel, Boolean>())
+
+        /** Pauses every TV player (app left via Home / another app in front). */
+        fun pauseAll() = live.toList().forEach { it.player?.pause() }
+    }
+
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     var player by mutableStateOf<StashPlayer?>(null); private set
     val hasPlayer: Boolean get() = player != null
@@ -109,8 +116,10 @@ class TvPlaybackModel {
             }
         }
         p.onReachedEnd = { onPlaybackEnded?.invoke() }
-        p.enableMediaSession()
+        // No MediaSession/PlaybackService on TV: playback must not continue in the background
+        // (Home button) — TvActivity.onStop pauses via [pauseAll].
         player = p
+        live.add(this)
     }
 
     private fun effectiveDuration(p: StashPlayer) = if (p.duration > 0) p.duration else scene?.sceneDuration ?: 0.0

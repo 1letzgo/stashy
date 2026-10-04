@@ -150,7 +150,8 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
         override fun onIsPlayingChanged(playing: Boolean) {
             isPlaying = playing
             onPlayingChanged?.invoke(playing)
-            if (playing && role == Role.Main) PlaybackService.ensureStarted(appContext)
+            // Only players that opted into background audio (phone) start the service; TV never does.
+            if (playing && role == Role.Main && session != null) PlaybackService.ensureStarted(appContext)
         }
 
         override fun onPlaybackStateChanged(state: Int) {
