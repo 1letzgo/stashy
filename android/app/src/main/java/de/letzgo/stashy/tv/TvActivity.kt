@@ -7,6 +7,9 @@ import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.fragment.app.FragmentActivity
 import de.letzgo.stashy.data.StashyPlus
+import de.letzgo.stashy.data.AppUpdate
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 
 /**
  * Android TV entry (iOS: the `stashyTV` target, `TVApp`). Launched from the Leanback launcher;
@@ -24,6 +27,8 @@ class TvActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         StashyPlus.refresh()
+        // Sideload builds: look for a newer APK (same check as the phone app, data/AppUpdate.kt).
+        lifecycleScope.launch { AppUpdate.autoCheck(this@TvActivity) }
     }
 
     private var wasBackgrounded = false

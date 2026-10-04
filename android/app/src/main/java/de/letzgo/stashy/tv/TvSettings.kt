@@ -88,7 +88,7 @@ enum class TvSettingsEntry(val title: String, val summary: String) {
     DolbyVision("Dolby Vision", "Turn off if a Dolby Vision scene shows green or purple colors. It then plays as HDR10, which your TV still shows in HDR."),
     PlayCount("Count As Played", "How long a scene has to play before it counts as played and its position is saved."),
     Maintenance("Maintenance", "Clear the cached artwork for the active server. Images are re-downloaded as they are shown again."),
-    About("About", "Version and build number.");
+    About("About", "Version, build number and updates.");
 
     val icon: ImageVector get() = when (this) {
         Servers -> TvIcons.server
@@ -631,5 +631,10 @@ private fun AboutPage() {
         item { TvListRow("App", {}, Modifier.focusRequester(first), value = "stashy for Android TV") }
         item { TvListRow("Version", {}, value = BuildConfig.VERSION_NAME) }
         item { TvListRow("Build", {}, value = "${BuildConfig.VERSION_CODE}") }
+        if (de.letzgo.stashy.data.AppUpdate.isEnabled) item {
+            val context = LocalContext.current
+            val scope = androidx.compose.runtime.rememberCoroutineScope()
+            TvListRow("Check for Updates", { scope.launch { de.letzgo.stashy.data.AppUpdate.check(context, manual = true) } })
+        }
     }
 }

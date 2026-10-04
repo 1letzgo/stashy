@@ -132,6 +132,7 @@ fun TvApp() {
             else -> TvMainShell()
         }
     }
+    de.letzgo.stashy.ui.AppUpdateDialog()
 }
 
 /**
