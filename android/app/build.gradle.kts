@@ -90,6 +90,7 @@ dependencies {
     implementation("androidx.media3:media3-session:$media3")
     implementation("androidx.work:work-runtime-ktx:2.10.0")
     implementation("androidx.biometric:biometric:1.1.0")
+    implementation("androidx.fragment:fragment-ktx:1.8.5")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("com.android.billingclient:billing-ktx:7.1.1")
     implementation("androidx.tv:tv-material:1.0.0")

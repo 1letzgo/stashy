@@ -61,8 +61,23 @@ object Nav {
         if (this.tab == tab) popToRoot(tab) else this.tab = tab
     }
 
-    /** Opens a catalog sub-tab on Home (used by dashboard "›" headers, stats tiles …). */
-    fun openCatalog(tab: CatalogTab) {
+    /**
+     * What the catalog opened by [openCatalog] should apply (iOS `navigateToScenes(sort:search:)` …).
+     * [sort] is the iOS sort raw value (`createdAtDesc`, `sceneCountDesc` …). The catalog reads it
+     * when it becomes visible and clears it via [consumeCatalogRequest].
+     */
+    data class CatalogRequest(val tab: CatalogTab, val sort: String? = null, val search: String? = null, val noDefaultFilter: Boolean = false)
+
+    var catalogRequest by mutableStateOf<CatalogRequest?>(null)
+        private set
+
+    /** Returns and clears the pending request for [tab] (null if none). */
+    fun consumeCatalogRequest(tab: CatalogTab): CatalogRequest? =
+        catalogRequest?.takeIf { it.tab == tab }?.also { catalogRequest = null }
+
+    /** Opens a catalog sub-tab on Home (used by dashboard "›" headers, stats tiles, Search "Show All"). */
+    fun openCatalog(tab: CatalogTab, sort: String? = null, search: String? = null, noDefaultFilter: Boolean = false) {
+        catalogRequest = if (sort != null || search != null || noDefaultFilter) CatalogRequest(tab, sort, search, noDefaultFilter) else null
         this.tab = MainTab.Home
         popToRoot(MainTab.Home)
         catalogTab = tab

@@ -57,7 +57,10 @@ The debug build then starts connected (`ServerConfigManager.seedDebugServer`).
 | `ui/detail/` | Performer/Studio/Tag/Gallery/Group detail |
 | `ui/feeds/` | `ReelsView` |
 | `ui/tools/` | `ToolsView` + tools, stashy+ paywall |
-| `ui/settings/`, `ui/setup/`, `ui/search/` | `Settings/`, setup wizard, `UniversalSearchView` |
+| `data/TabConfigs.kt`, `data/TabManager.kt` | `TabManager` (tabs, `HomeRowsConfig`, channels, Feeds modes, default sorts/filters, playback/subtitle keys) |
+| `data/Security.kt` (`PasscodeVault`, `SecurityManager`) | `SecurityManager`, Keychain PIN (`app_passcode_v1`) |
+| `data/DashboardRepository.kt` | dashboard/search/server-task fetches of `StashDBViewModel`, `SavedFiltersCache` |
+| `ui/settings/`, `ui/setup/`, `ui/search/` | `Settings/`, `ToolsServerView`, `PasscodeEntryView`, setup wizard, `UniversalSearchView` |
 | `tv/` | `stashyTV` |
 
 ## Conventions
