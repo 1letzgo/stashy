@@ -50,8 +50,11 @@ The debug build then starts connected (`ServerConfigManager.seedDebugServer`).
 | `ui/Nav.kt` (`Nav`, `Screen`, `MainTab`, `CatalogTab`) | `TabManager`, `NavigationCoordinator` |
 | `ui/AppShell.kt` | `MainTabView` (floating glass tab bar + search circle) |
 | `ui/Paging.kt` (`PagedList`) | infinite-scroll pattern of the list views |
-| `ui/catalog/` | `CatalogsView`, `ScenesView`, `PerformersView` … |
-| `ui/components/` | `SceneCardView` and other shared cards |
+| `ui/catalog/` (`CatalogController`, `CatalogScaffold`, `CatalogFloatingBar`) | `CatalogsView`, `ScenesView`, `PerformersView` …, `CatalogChrome`, `FloatingCatalogBar` |
+| `ui/filter/` (`CatalogFilterSortSheet`, `FilterCriteriaEditor`, `FilterPickerOptionsStore`) | `ListCatalogFilterSortSheets`, `Filters/FilterCriteriaEditorView`, `FilterPickerOptionsStore` |
+| `data/FilterMapper.kt`, `FilterFields.kt`, `Filters.kt`, `Sorting.kt` | `FilterMapper`, `FilterFieldCatalog`, `FilterCriteriaDocument`, `*SortOption`, presets |
+| `data/CatalogPrefs.kt`, `CatalogRepositories.kt` | catalog part of `TabManager` (`AppTabsConfig`, card columns), list fetches, saved filters |
+| `ui/components/` (`SceneCard`, `EntityCards.kt`) | `SceneCardView`, `PerformerCardView`, `StudioCardView`, `TagCardView`, `GalleryCardView`, `GroupCardView`, `ImageThumbnailCard`, `MarkerCardView` |
 | `ui/home/` | `HomeView` (dashboard) |
 | `ui/scene/` | `SceneDetailView`, `SceneDetail/` |
 | `ui/detail/` | Performer/Studio/Tag/Gallery/Group detail |

@@ -308,4 +308,6 @@ data class SavedFilter(
     @SerialName("find_filter") val findFilter: JsonObject? = null,
     @SerialName("object_filter") val objectFilter: JsonElement? = null,
     @SerialName("ui_options") val uiOptions: JsonElement? = null,
+    /** Legacy Stash UI filter JSON string (iOS `filter`). */
+    val filter: String? = null,
 )

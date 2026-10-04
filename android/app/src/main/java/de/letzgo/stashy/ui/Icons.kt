@@ -65,6 +65,27 @@ object SF {
     val gobackward = Icons.Filled.Replay10
     val goforward = Icons.Filled.Forward10
     val arrowClockwise = Icons.Filled.Refresh
+
+    // Catalog / filter chrome (catalog port).
+    val sliderHorizontal3 = Icons.Filled.Tune
+    val line3HorizontalDecreaseCircle = Icons.Outlined.FilterAlt
+    val rectangleGrid1x2 = Icons.Outlined.ViewAgenda
+    val squareGrid2x2 = Icons.Outlined.GridView
+    val checkmarkCircle = Icons.Outlined.CheckCircle
+    val checkmark = Icons.Filled.Check
+    val circle = Icons.Outlined.Circle
+    val xmarkCircleFill = Icons.Filled.Cancel
+    val plusCircleFill = Icons.Filled.AddCircle
+    val chevronDown = Icons.Filled.KeyboardArrowDown
+    val chevronUp = Icons.Filled.KeyboardArrowUp
+    val chevronUpChevronDown = Icons.Filled.UnfoldMore
+    val number = Icons.Filled.Tag
+    val photoOnRectangle = Icons.Outlined.PhotoLibrary
+    val person3 = Icons.Outlined.Groups
+    val playCircleFill = Icons.Filled.PlayCircle
+    val rectangleStack = Icons.Outlined.ViewCarousel
+    val bookmark = Icons.Outlined.BookmarkBorder
+    val photoFill = Icons.Filled.Image
 }
 
 /** O-counter icon presets (iOS `oCounterIconPresets`, SF names as keys). */

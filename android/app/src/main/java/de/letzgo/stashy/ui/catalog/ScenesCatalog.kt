@@ -1,67 +1,65 @@
 package de.letzgo.stashy.ui.catalog
 
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.GridItemSpan
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.itemsIndexed
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
-import de.letzgo.stashy.data.FindFilter
-import de.letzgo.stashy.data.ScenesRepository
-import de.letzgo.stashy.ui.EmptyState
-import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.data.CatalogCardColumns
+import de.letzgo.stashy.data.CatalogPrefs
+import de.letzgo.stashy.data.FilterMode
+import de.letzgo.stashy.data.Scene
+import de.letzgo.stashy.data.SortCatalog
 import de.letzgo.stashy.ui.Nav
-import de.letzgo.stashy.ui.PagedList
 import de.letzgo.stashy.ui.SF
-import de.letzgo.stashy.ui.TabBarClearance
-import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.components.SceneCard
+import de.letzgo.stashy.ui.filter.CatalogFilterSortSheet
 import de.letzgo.stashy.ui.noRippleClickable
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.serialization.json.JsonObject
 
-/** iOS: `ScenesView` (catalog root). Filters/sort/layout options come with the catalog port. */
+/**
+ * iOS: `ScenesView` (catalog tab) — fixed one card per row (16:9), filter & sort as the only
+ * slot, Settings default sort/filter, saved filters and on-device presets in the sheet.
+ */
 @Composable
 fun ScenesCatalog() {
-    val scope = rememberCoroutineScope()
-    val list = remember { PagedList(scope) { page, per -> ScenesRepository.find(FindFilter(page, per, sort = "created_at")) } }
-    LaunchedEffect(Unit) { if (!list.loadedOnce) list.refresh() }
-    SceneGrid(list)
+    val controller = rememberCatalogController<Scene>(FilterMode.Scenes)
+    ScenesList(controller)
 }
 
+/**
+ * Scene grid + chrome + sheet for any scope (catalog or a detail screen — iOS `ScenesListScope`).
+ * Detail screens create their controller with [detailCatalogController].
+ */
 @Composable
-fun SceneGrid(list: PagedList<de.letzgo.stashy.data.Scene>, columns: Int = 1) {
-    val p = Theme.palette
-    when {
-        list.items.isEmpty() && list.isLoading -> Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(color = p.text) }
-        list.items.isEmpty() && list.error != null -> Box(Modifier.fillMaxSize(), Alignment.Center) { EmptyState(SF.exclamationTriangle, "Could not load", list.error) }
-        list.items.isEmpty() && list.loadedOnce -> Box(Modifier.fillMaxSize(), Alignment.Center) { EmptyState(SF.film, "No Scenes") }
-        else -> LazyVerticalGrid(
-            columns = GridCells.Fixed(columns),
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = catalogTopPadding(), bottom = TabBarClearance + 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-            modifier = Modifier.fillMaxSize(),
-        ) {
-            itemsIndexed(list.items, key = { _, s -> s.id }) { index, scene ->
-                LaunchedEffect(index) { list.onItemShown(index) }
-                SceneCard(scene, Modifier.noRippleClickable { Nav.push(SceneDetailScreen(scene.id, scene)) })
-            }
-            if (list.isLoading) item(span = { GridItemSpan(maxLineSpan) }) {
-                Box(Modifier.fillMaxWidth().padding(16.dp), Alignment.Center) { CircularProgressIndicator(color = p.text) }
-            }
-        }
+fun ScenesList(controller: CatalogController<Scene>, topPadding: androidx.compose.ui.unit.Dp = catalogTopPadding(), showsFloatingBar: Boolean = true) {
+    CatalogScaffold(
+        controller,
+        CatalogTexts("Loading scenes...", SF.film, "No scenes found", "Load Scenes"),
+        CatalogSlots(filterSort = filterSortSlot(controller)),
+        columns = { CatalogCardColumns.One.columnCount(it) },
+        itemKey = { it.id },
+        topPadding = topPadding,
+        showsFloatingBar = showsFloatingBar,
+    ) { _, scene ->
+        SceneCard(scene, Modifier.noRippleClickable { Nav.push(SceneDetailScreen(scene.id, scene)) }, aspectRatio = CatalogCardColumns.One.cardAspectRatio)
     }
+    CatalogFilterSortSheet(controller)
+}
+
+/**
+ * iOS: `DetailViewContext` + `TabManager.resolvedDetailSceneSortFallback` — a list scoped to one
+ * entity (e.g. `performers INCLUDES [id]`) whose sort persists per detail context
+ * (`performer_detail`, `studio_detail`, `tag_detail`, `gallery_detail`, `group_detail`).
+ */
+fun <T> detailCatalogController(
+    mode: FilterMode,
+    scope: CoroutineScope,
+    scopeFilter: JsonObject,
+    detailContext: String,
+): CatalogController<T> {
+    val initial = SortCatalog.option(mode, CatalogPrefs.detailSortOption(detailContext)) ?: CatalogPrefs.resolvedSort(mode)
+    return CatalogController(
+        mode, scope, tabId = null, scope = scopeFilter, initialSort = initial,
+        persistSort = { CatalogPrefs.setDetailSortOption(detailContext, it.raw) },
+    )
 }
