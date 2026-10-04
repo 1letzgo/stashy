@@ -394,7 +394,7 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
     }
 
     private fun autoSelectSubtitleIfNeeded() {
-        if (!autoSelectsPreferredSubtitleTrack || didAutoSelectSubtitle || activeSubtitleTrackId != null) return
+        if (!autoSelectsPreferredSubtitleTrack || didAutoSelectSubtitle || activeSubtitleTrackId != null || isLiveCaptionsActive) return
         if (!PlayerSettings.subtitlesAutoEnabled || subtitleTracks.isEmpty()) return
         val preferred = PlayerSettings.subtitlePreferredLanguage
         val pick = if (preferred == "any") subtitleTracks.first()
@@ -422,6 +422,33 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
             id.startsWith("ext:") -> WebVtt.cueText(externalCues, currentTime)
             else -> embeddedCueText
         }
+    }
+
+    // MARK: AI captions (iOS: the live channel of `SubtitleController`)
+
+    /** On-device captions own the subtitle overlay — one subtitle at a time. */
+    var isLiveCaptionsActive by mutableStateOf(false); private set
+    var liveCaptionText by mutableStateOf<String?>(null); private set
+
+    /** What the subtitle overlay draws: the AI line while live captions run, else the track's cue. */
+    val displayedSubtitleText: String? get() = if (isLiveCaptionsActive) liveCaptionText else currentSubtitleText
+
+    /** iOS: `beginLiveCaptions` + `engine.clearSubtitle()`. */
+    fun beginLiveCaptions() {
+        if (activeSubtitleTrackId != null) clearSubtitle()
+        isLiveCaptionsActive = true
+        liveCaptionText = null
+    }
+
+    /** iOS: `pushLiveCaption` (timeline-synced: "" clears). */
+    fun pushLiveCaption(text: String) {
+        if (!isLiveCaptionsActive) return
+        liveCaptionText = text.replace('\n', ' ').trim().ifEmpty { null }
+    }
+
+    fun endLiveCaptions() {
+        isLiveCaptionsActive = false
+        liveCaptionText = null
     }
 
     // MARK: Clock

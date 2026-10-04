@@ -121,6 +121,8 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
     private var resumeOnReturn: Pair<Boolean, Double>? = null
     private var hasAppeared = false
     private val tracker = PlaybackActivityTracker(scope)
+    /** AI Subtitles + caption translation of the player's "…" menu (iOS `ScenePlayerExtrasController`). */
+    val aiSubtitles by lazy { SceneAiSubtitles(this) }
 
     // MARK: Lifecycle
 

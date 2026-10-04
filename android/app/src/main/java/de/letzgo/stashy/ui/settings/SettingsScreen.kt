@@ -105,6 +105,10 @@ private fun androidx.compose.foundation.lazy.LazyListScope.stashyPlusSettings() 
         SettingsDivider()
         SettingsNavRow("Manage stashy+", SF.sparkles) { de.letzgo.stashy.ui.tools.openStashyPlusPaywall() }
     }
+    // iOS `StashyPlusAISubtitlesSettings` (+ Android: the downloaded speech / translation packs).
+    settingsSection(header = "AI Subtitles and translation", key = "plus-ai-subtitles") {
+        AiSubtitlesSettingsRows()
+    }
 }
 
 private fun androidx.compose.foundation.lazy.LazyListScope.aboutSection() {

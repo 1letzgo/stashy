@@ -78,6 +78,7 @@ private val topRounded = RoundedCornerShape(topStart = 12.dp, topEnd = 12.dp)
  */
 @Composable
 fun SceneVideoPlayerCard(model: SceneDetailModel, extraMenuItems: () -> List<PlayerMenuItem>) {
+    val ai = model.aiSubtitles
     val scene = model.scene
     Column {
         val player = model.player
@@ -96,6 +97,9 @@ fun SceneVideoPlayerCard(model: SceneDetailModel, extraMenuItems: () -> List<Pla
                             markers = scene.timeBarMarkers,
                             onAddMarker = model::beginAddMarker,
                             extraMenuItems = extraMenuItems,
+                            subtitleMenuExtras = ai::menuItems,
+                            onHostSubtitleOff = ai::turnOffAISubtitles,
+                            onOptionsMenuClosed = ai::optionsMenuClosed,
                             scrubSprites = model.scrubSprites,
                             onPictureInPicture = { PlayerWindow.enterPictureInPicture(player.videoSize) },
                         )

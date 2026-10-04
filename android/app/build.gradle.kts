@@ -94,5 +94,9 @@ dependencies {
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
     implementation("com.android.billingclient:billing-ktx:7.1.1")
     implementation("androidx.tv:tv-material:1.0.0")
+    // AI Subtitles (stashy+): Vosk on-device speech recognition (models downloaded on demand),
+    // ML Kit on-device translation (language packs downloaded on demand).
+    implementation("com.alphacephei:vosk-android:0.3.75")
+    implementation("com.google.mlkit:translate:17.0.3")
     testImplementation("junit:junit:4.13.2")
 }

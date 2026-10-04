@@ -56,7 +56,8 @@ The debug build then starts connected (`ServerConfigManager.seedDebugServer`).
 | `data/CatalogPrefs.kt`, `CatalogRepositories.kt`, `SavedFilters.kt` | catalog facade over `TabManager` (sorts, default filters, card columns), list fetches, `SavedFiltersStore` (iOS `viewModel.savedFilters`, shared by catalogs, dashboard and Settings) |
 | `ui/components/` (`SceneCard`, `EntityCards.kt`) | `SceneCardView`, `PerformerCardView`, `StudioCardView`, `TagCardView`, `GalleryCardView`, `GroupCardView`, `ImageThumbnailCard`, `MarkerCardView` |
 | `ui/home/` | `HomeView` (dashboard) |
-| `ui/scene/` | `SceneDetailView`, `SceneDetail/` |
+| `ui/scene/` | `SceneDetailView`, `SceneDetail/` (`SceneAiSubtitles` = AI half of `ScenePlayerExtrasController`) |
+| `ui/player/ai/` | `stashy/Subtitles/` (`LiveTranscriber`, `CaptionTranslator`, `TranscodeAudioSource`, pure `CaptionTimeline`), `SubtitleTargetLanguage`, `SceneTeleprompterMode` |
 | `ui/detail/` | Performer/Studio/Tag/Gallery/Group detail |
 | `ui/player/` (`StashPlayer`, `VideoSurface`, `ScenePlayerSurface`, `TimeBar`, `PreviewPlayer`/`PreviewPlayerPool`, `PlaybackService`, `PlayerWindow`) | `Playback/` (AetherEngine → Media3 ExoPlayer, see below), `SubtitleController`, `SceneScrubSprites` |
 | `data/SceneEditing.kt`, `data/SceneEvents.kt` | scene mutations of `StashDBViewModel`, scene `NotificationCenter` posts + `sceneLiveUpdates` (`SceneEvent.applyTo`, collected by `CatalogController` and `DashboardStore`) |
@@ -84,4 +85,34 @@ The debug build then starts connected (`ServerConfigManager.seedDebugServer`).
   the device can't (unrecognised container, decoder failure, no supported video/audio track, no
   first frame in 20 s), falls back like the iOS ladder to Stash's `stream.m3u8` HLS transcode,
   then `stream.mp4?start=` — the player shows a "Transcode" tag and a toast.
+- AI Subtitles (stashy+, `ui/player/ai/`, `ui/scene/SceneAiSubtitles.kt`; iOS `stashy/Subtitles/`,
+  `ScenePlayerExtras` AI half). Same menu ("AI Subtitles: …" right after the player's Subtitles,
+  Off / English / my language, "Spoken in this scene" picker saved to `custom_fields.language`,
+  download rows), same keys (`stashy_ai_cc_preferred_mode`, `stashy_subtitle_target_language`),
+  same gating (locked row → paywall). Engine choices:
+  - **Speech: Vosk** (`com.alphacephei:vosk-android`, Kaldi, Apache-2.0). Android has no system
+    recognizer that takes a PCM stream and returns word timings (`SpeechRecognizer` is mic-only on
+    most devices, no timestamps); whisper.cpp would need the NDK (not installed) and is far slower
+    on phones. Vosk is a prebuilt AAR, runs several × realtime on the small models, returns word
+    times, and has small (~40–50 MB) per-language models — downloaded only after the user taps
+    "Download" (like iOS speech assets) into `filesDir/speech-models/` (`SpeechModelCatalog`,
+    `SpeechModelStore`). No model for a language → no captions (never another language's model).
+  - **Audio: the iOS prefetcher** (`TranscodeAudioSource` + `ChunkPlanner`): Stash's 240p
+    `stream.mp4?start=…&resolution=LOW` in byte-budgeted ~45 s chunks via `Net.client`, decoded
+    with MediaExtractor/MediaCodec → 16 kHz mono (`PcmResampler`), fed to one continuous
+    recognizer up to ~1 min ahead of the playhead (`FeedScheduler`: 2 s pre-roll + 58 s lead,
+    restart when 12 s behind or on a seek outside the transcribed range). Playback itself never
+    switches source. The iOS tiers "AVAssetReader on the original" and "engine PCM tap" are not
+    ported; the transcode tier works for every container/codec.
+  - **Cues** (`CaptionTimeline.kt`): Vosk finals are cut into sentences at pauses / 110 chars /
+    7 s, timed like iOS (`flushPendingSentence` reading hold, previous cue cut at the next start,
+    selection only moves forward) and drawn by the normal `SubtitleOverlay`
+    (`StashPlayer.displayedSubtitleText`, live channel `beginLiveCaptions/pushLiveCaption`).
+  - **Translation: ML Kit on-device** (`com.google.mlkit:translate`, `CaptionTranslator`), packs
+    downloaded only after "Download XX language pack"; ML Kit reports no byte progress, so the
+    menu shows "Downloading … language pack…". Like iOS, only AI captions are translated (server
+    WebVTT tracks are shown as they are).
+  - Size: native libs add ~26 MB installed / ~10 MB download per ABI (arm64: libtranslate_jni
+    16 MB, libvosk 10 MB); the universal APK carries all four ABIs (~100 MB more). Ship an AAB
+    (or set `abiFilters`) for releases. Settings › stashy+ › "Delete downloaded language packs".
 - Not ported: AI Motion and device control (Handy, Intiface, LoveSpouse) — Play policy.

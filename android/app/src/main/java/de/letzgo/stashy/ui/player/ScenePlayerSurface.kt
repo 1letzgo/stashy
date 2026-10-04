@@ -101,6 +101,11 @@ fun ScenePlayerSurface(
     markers: List<TimeBarMarker> = emptyList(),
     onAddMarker: (() -> Unit)? = null,
     extraMenuItems: () -> List<PlayerMenuItem> = { emptyList() },
+    /** iOS `subtitleMenuExtras` — the host's AI Subtitles submenu, right after Subtitles. */
+    subtitleMenuExtras: () -> List<PlayerMenuItem> = { emptyList() },
+    /** iOS `onHostSubtitleOff` — picking one of the video's tracks ends AI captions. */
+    onHostSubtitleOff: () -> Unit = {},
+    onOptionsMenuClosed: () -> Unit = {},
     scrubSprites: SceneScrubSprites? = null,
     onRotate: (() -> Unit)? = null,
     onPictureInPicture: (() -> Unit)? = null,
@@ -255,7 +260,7 @@ fun ScenePlayerSurface(
             )
         }
 
-        SubtitleOverlay(player.currentSubtitleText, if (isFullscreen) 1.3f else 1f, Modifier.align(Alignment.BottomCenter))
+        SubtitleOverlay(player.displayedSubtitleText, if (isFullscreen) 1.3f else 1f, Modifier.align(Alignment.BottomCenter))
 
         if (isFastForwarding || isRewinding) {
             Row(
@@ -350,8 +355,8 @@ fun ScenePlayerSurface(
                             style = TextStyle(fontSize = 8.sp, fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace), color = Color.White,
                         )
                     }
-                    PlayerMenu(menuOpen, onDismiss = { menuOpen = false; reveal() }) {
-                        playerMenuItems(player, onChanged = { reveal() }) + extraMenuItems()
+                    PlayerMenu(menuOpen, onDismiss = { menuOpen = false; onOptionsMenuClosed(); reveal() }) {
+                        playerMenuItems(player, onChanged = { reveal() }, onHostSubtitleOff = onHostSubtitleOff) + subtitleMenuExtras() + extraMenuItems()
                     }
                 }
                 val showsSlider = !isCompact || isFullscreen
@@ -429,7 +434,7 @@ fun ScenePlayerSurface(
 }
 
 /** Speed · Audio · Subtitles rows of the options menu (iOS `playerMenuItems`, before the host rows). */
-fun playerMenuItems(player: StashPlayer, onChanged: () -> Unit = {}): List<PlayerMenuItem> {
+fun playerMenuItems(player: StashPlayer, onChanged: () -> Unit = {}, onHostSubtitleOff: () -> Unit = {}): List<PlayerMenuItem> {
     val items = mutableListOf<PlayerMenuItem>()
     val rate = player.rateState
     items += PlayerMenuItem.Submenu(
@@ -453,7 +458,7 @@ fun playerMenuItems(player: StashPlayer, onChanged: () -> Unit = {}): List<Playe
             "player.subtitles", "Subtitles: $current", PlayerIcons.subtitles,
             listOf(PlayerMenuItem.Action("player.subtitle.off", "Off", isChecked = player.activeSubtitleTrackId == null) { player.clearSubtitle(); onChanged() }) +
                 player.subtitleTracks.map { t ->
-                    PlayerMenuItem.Action("player.subtitle.${t.id}", t.label, isChecked = player.activeSubtitleTrackId == t.id) { player.selectSubtitleTrack(t.id); onChanged() }
+                    PlayerMenuItem.Action("player.subtitle.${t.id}", t.label, isChecked = player.activeSubtitleTrackId == t.id) { onHostSubtitleOff(); player.selectSubtitleTrack(t.id); onChanged() }
                 },
         )
     }

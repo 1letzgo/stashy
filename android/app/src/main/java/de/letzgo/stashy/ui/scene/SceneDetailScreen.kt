@@ -129,6 +129,9 @@ private fun SceneDetailContent(model: SceneDetailModel) {
         }
     }
 
+    // AI captions keep running in PiP, so their effects sit above the PiP early return.
+    SceneAiSubtitlesEffects(model.aiSubtitles, model)
+
     // Picture in Picture: only the picture.
     val player = model.player
     if (PlayerWindow.isInPictureInPicture && player != null) {
@@ -204,6 +207,9 @@ private fun SceneDetailContent(model: SceneDetailModel) {
                     markers = scene.timeBarMarkers,
                     onAddMarker = model::beginAddMarker,
                     extraMenuItems = extraMenuItems,
+                    subtitleMenuExtras = model.aiSubtitles::menuItems,
+                    onHostSubtitleOff = model.aiSubtitles::turnOffAISubtitles,
+                    onOptionsMenuClosed = model.aiSubtitles::optionsMenuClosed,
                     scrubSprites = model.scrubSprites,
                     onRotate = { PlayerWindow.toggleOrientation() },
                     onPictureInPicture = { PlayerWindow.enterPictureInPicture(player.videoSize) },
