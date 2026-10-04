@@ -2,6 +2,7 @@ package de.letzgo.stashy.ui
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.automirrored.filled.CallMerge
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
 import androidx.compose.material.icons.automirrored.outlined.VolumeOff
@@ -65,6 +66,21 @@ object SF {
     val gobackward = Icons.Filled.Replay10
     val goforward = Icons.Filled.Forward10
     val arrowClockwise = Icons.Filled.Refresh
+
+    // Tools tab + stashy+ paywall.
+    val squareGrid2x2 = Icons.Outlined.GridView
+    val chartBarFill = Icons.Filled.BarChart
+    val calendarDayTimelineLeft = Icons.Outlined.ViewTimeline
+    val listNumber = Icons.Filled.FormatListNumbered
+    val line3HorizontalDecreaseCircle = Icons.Outlined.FilterAlt
+    val arrowTriangleMerge = Icons.AutoMirrored.Filled.CallMerge
+    val flameFill = Icons.Filled.LocalFireDepartment
+    val lockFill = Icons.Filled.Lock
+    val checkmarkSealFill = Icons.Filled.Verified
+    val infinity = Icons.Filled.AllInclusive
+    val creditcard = Icons.Outlined.CreditCard
+    val calendarBadgeClock = Icons.Outlined.EventRepeat
+    val boltHeartFill = Icons.Filled.VolunteerActivism
 }
 
 /** O-counter icon presets (iOS `oCounterIconPresets`, SF names as keys). */
