@@ -27,6 +27,18 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <!-- Android TV surface (iOS: stashyTV). MainActivity forwards here on TV devices. -->
+        <activity
+            android:name=".tv.TvActivity"
+            android:exported="true"
+            android:theme="@style/Theme.Stashy.TV"
+            android:configChanges="screenSize|smallestScreenSize|screenLayout|orientation|keyboardHidden|keyboard|navigation"
+            android:windowSoftInputMode="adjustPan">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+            </intent-filter>
+        </activity>
         <service
             android:name=".ui.player.PlaybackService"
             android:exported="true"

@@ -11,6 +11,13 @@ import de.letzgo.stashy.ui.StashyTheme
 /** FragmentActivity (not ComponentActivity) because `BiometricPrompt` needs one. */
 class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
+        // TV devices get the Android TV surface (iOS: the separate stashyTV app).
+        if (de.letzgo.stashy.tv.TvActivity.isTelevision(this)) {
+            super.onCreate(savedInstanceState)
+            startActivity(android.content.Intent(this, de.letzgo.stashy.tv.TvActivity::class.java).putExtras(intent))
+            finish()
+            return
+        }
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.dark(android.graphics.Color.TRANSPARENT),
