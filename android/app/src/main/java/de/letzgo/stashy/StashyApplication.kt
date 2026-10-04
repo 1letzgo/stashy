@@ -12,6 +12,7 @@ import coil3.svg.SvgDecoder
 import de.letzgo.stashy.data.Net
 import de.letzgo.stashy.data.Prefs
 import de.letzgo.stashy.data.ServerConfigManager
+import de.letzgo.stashy.data.StashyPlus
 import okio.Path.Companion.toOkioPath
 
 /** App entry (iOS: `App.swift`). Sets up prefs, the server config and the image cache. */
@@ -20,6 +21,7 @@ class StashyApplication : Application(), SingletonImageLoader.Factory {
         super.onCreate()
         Prefs.init(this)
         ServerConfigManager.init()
+        StashyPlus.start(this)
     }
 
     // Image cache like `ImageCacheManager` (iOS): memory + disk, authenticated via the shared OkHttp client.

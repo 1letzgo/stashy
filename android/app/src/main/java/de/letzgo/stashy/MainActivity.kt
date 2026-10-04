@@ -19,6 +19,11 @@ class MainActivity : ComponentActivity() {
         setContent { StashyTheme { AppShell() } }
     }
 
+    override fun onResume() {
+        super.onResume()
+        de.letzgo.stashy.data.StashyPlus.refresh()
+    }
+
     override fun onDestroy() {
         if (current === this) current = null
         super.onDestroy()
