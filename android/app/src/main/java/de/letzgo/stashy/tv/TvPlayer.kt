@@ -354,10 +354,7 @@ private fun TvPlayerContent(
 
     BackHandler { handleExit() }
 
-    LaunchedEffect(Unit) {
-        delay(50)
-        runCatching { playerFocus.requestFocus() }
-    }
+    TvRequestFocus(playerFocus, "player", delayMs = 50)
     LaunchedEffect(player.hasFirstFrame) { if (player.hasFirstFrame && !panelOpen) { runCatching { playerFocus.requestFocus() }; reveal() } }
     LaunchedEffect(panelOpen) {
         delay(300)
@@ -603,7 +600,7 @@ fun TvPlayerError(message: String?, onDismiss: () -> Unit) {
         if (message != null) Text(message, Modifier.padding(horizontal = pt(80)), style = TvType.callout, color = TvColors.secondary, textAlign = TextAlign.Center)
         TvButton(onDismiss, Modifier.focusRequester(focus)) { Text("Close", style = TvType.title3) }
     }
-    LaunchedEffect(Unit) { delay(60); runCatching { focus.requestFocus() } }
+    TvRequestFocus(focus, "player.close")
 }
 
 // MARK: - Marker rail
@@ -700,7 +697,7 @@ class TvChannelPlayerRoute(channel: TvChannel) : TvRoute {
                         Text(error, style = TvType.title2.copy(fontWeight = FontWeight.Normal), color = TvColors.secondary)
                         TvButton(close, Modifier.focusRequester(focus)) { Text("Close", style = TvType.title3) }
                     }
-                    LaunchedEffect(Unit) { delay(60); runCatching { focus.requestFocus() } }
+                    TvRequestFocus(focus, "player.close")
                 }
                 session.player.hasPlayer -> {
                     val scene = session.currentScene

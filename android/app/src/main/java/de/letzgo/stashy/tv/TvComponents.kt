@@ -147,26 +147,88 @@ val LocalTvFocusMemory = androidx.compose.runtime.compositionLocalOf<TvFocusMemo
 /** Tracks focus for [key] and re-requests it when [memory] is restoring to that key. */
 fun Modifier.tvFocusMemory(memory: TvFocusMemory, key: String): Modifier = composed {
     val requester = remember { FocusRequester() }
+    val inputMode = androidx.compose.ui.platform.LocalInputModeManager.current
     LaunchedEffect(key) {
         if (memory.restore && memory.lastKey == key) {
             delay(30)
-            if (runCatching { requester.requestFocus() }.isSuccess) memory.restore = false
+            inputMode.requestKeyboardMode()
+            runCatching { requester.requestFocus() }
+            delay(30)
+            if (memory.lastKey == key && TvNav.contentHasFocus) {
+                memory.restore = false
+                TvFocusLog.log("restore", key)
+            }
         }
     }
     this.focusRequester(requester).onFocusChanged { if (it.hasFocus) memory.lastKey = key }
 }
 
 /**
- * Opening focus: requests [requester] while the user has not focused anything remembered on
- * this screen yet and no restore is pending. Re-runs when [requester] changes (a loading
- * anchor handing over to the real first control, like tvOS moving focus to Play after load).
+ * Opening focus of a screen: requests [requester] unless the user already focused something
+ * remembered on this screen. A pending restore (back from a pushed page) gets 400 ms to land on
+ * its card; if that card is gone, the opening focus is used instead. Re-runs when [requester]
+ * changes (a loading anchor handing over to the real first control, like tvOS moving focus to
+ * Play after load). Leaves touch mode first: a TV is never in it, but a requested focus would
+ * be refused there.
  */
 @Composable
-fun TvInitialFocus(memory: TvFocusMemory, requester: FocusRequester, enabled: Boolean = true) {
+fun TvInitialFocus(memory: TvFocusMemory, requester: FocusRequester, enabled: Boolean = true, name: String = "initial") {
+    val inputMode = androidx.compose.ui.platform.LocalInputModeManager.current
     LaunchedEffect(enabled, requester) {
-        if (!enabled || memory.lastKey != null || memory.restore || TvNav.sidebarFocused) return@LaunchedEffect
+        if (!enabled) return@LaunchedEffect
+        if (memory.restore) {
+            delay(400)
+            if (!memory.restore) return@LaunchedEffect
+            memory.restore = false
+            memory.lastKey = null
+        }
+        if (memory.lastKey != null) return@LaunchedEffect
         delay(60)
-        if (runCatching { requester.requestFocus() }.isSuccess) memory.didInitialFocus = true
+        inputMode.requestKeyboardMode()
+        // A lazy item may still be composing: retry briefly.
+        repeat(10) {
+            runCatching { requester.requestFocus() }
+            delay(50)
+            if (TvNav.contentHasFocus) {
+                memory.didInitialFocus = true
+                TvFocusLog.log("initial", name)
+                return@LaunchedEffect
+            }
+        }
+        TvFocusLog.log("initial-failed", name)
+    }
+}
+
+/**
+ * Unconditional focus request for full-screen surfaces (player, viewer, PIN pad, forms): leaves
+ * touch mode, retries while the target composes, logs under `StashyTvFocus`.
+ */
+@Composable
+fun TvRequestFocus(requester: FocusRequester, name: String, key: Any? = Unit, delayMs: Long = 60) {
+    val inputMode = androidx.compose.ui.platform.LocalInputModeManager.current
+    LaunchedEffect(key) {
+        delay(delayMs)
+        inputMode.requestKeyboardMode()
+        repeat(10) {
+            runCatching { requester.requestFocus() }
+            delay(50)
+            if (TvNav.contentHasFocus) { TvFocusLog.log("request", name); return@LaunchedEffect }
+        }
+        TvFocusLog.log("request-failed", name)
+    }
+}
+
+/** Leaves touch mode so programmatic focus is accepted (Compose refuses it in touch mode). */
+@OptIn(androidx.compose.ui.ExperimentalComposeUiApi::class)
+fun androidx.compose.ui.input.InputModeManager.requestKeyboardMode() {
+    if (inputMode != androidx.compose.ui.input.InputMode.Keyboard) requestInputMode(androidx.compose.ui.input.InputMode.Keyboard)
+}
+
+/** Debug-only focus trace, logcat tag `StashyTvFocus`. */
+object TvFocusLog {
+    var screen: String = "-"
+    fun log(event: String, element: String?) {
+        if (de.letzgo.stashy.BuildConfig.DEBUG) android.util.Log.d("StashyTvFocus", "screen=$screen $event focused=${element ?: "<none>"}")
     }
 }
 

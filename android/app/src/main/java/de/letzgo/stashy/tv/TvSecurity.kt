@@ -172,7 +172,7 @@ private fun PinScreen(title: String, count: Int, error: String?, shake: Boolean,
         }
         Spacer(Modifier.height(pt(60)))
     }
-    LaunchedEffect(Unit) { delay(80); runCatching { five.requestFocus() } }
+    TvRequestFocus(five, "pin.5", delayMs = 80)
 }
 
 @Composable

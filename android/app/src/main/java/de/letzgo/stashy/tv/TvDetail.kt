@@ -103,6 +103,7 @@ fun TvGenericDetail(
     LaunchedEffect(Unit) { if (!scenes.loadedOnce && !scenes.isLoading) scenes.refresh() }
     val headerFocus = remember { FocusRequester() }
     val emptyFocus = remember { FocusRequester() }
+    val firstCard = remember { FocusRequester() }
     val showsChannel = channel != null && StashyPlus.isUnlocked
     val sceneSpec = TvGridSpec.scenes
     BoxWithConstraints(Modifier.fillMaxSize().background(TvColors.background)) {
@@ -128,9 +129,6 @@ fun TvGenericDetail(
                                 Icon(TvIcons.playTv, null, Modifier.size(pt(30)))
                                 Text("Play as Channel", style = TvType.headline)
                             }
-                        } else {
-                            // Invisible anchor: keeps the opening focus (and scroll) at the top.
-                            Box(Modifier.size(1.dp).focusRequester(headerFocus).focusable())
                         }
                         if (isLoading) TvSpinner(pt(48))
                         else {
@@ -157,12 +155,19 @@ fun TvGenericDetail(
                 }
                 else -> itemsIndexed(items, key = { _, s -> s.id }) { index, scene ->
                     LaunchedEffect(index, items.size) { if (index >= items.size - columns * 2) scenes.loadMore() }
-                    TvSceneTile(scene, { TvNav.push(TvSceneDetailRoute(scene.id, scene)) }, Modifier.tvFocusMemory(memory, scene.id))
+                    val first = if (index == 0) Modifier.focusRequester(firstCard) else Modifier
+                    TvSceneTile(scene, { TvNav.push(TvSceneDetailRoute(scene.id, scene)) }, first.tvFocusMemory(memory, scene.id))
                 }
             }
         }
     }
-    TvInitialFocus(memory, headerFocus)
+    // Opening focus: "Play as Channel", else the first scene, else Back on an empty page.
+    val loaded = scenes.loadedOnce && !scenes.isLoading
+    when {
+        showsChannel -> TvInitialFocus(memory, headerFocus, name = "detail.channel")
+        scenes.items.isNotEmpty() -> TvInitialFocus(memory, firstCard, name = "detail.firstScene")
+        loaded -> TvInitialFocus(memory, emptyFocus, name = "detail.back")
+    }
 }
 
 // MARK: - Performer
@@ -374,7 +379,6 @@ class TvGalleryDetailRoute(private val id: String, private val title: String, in
                             if (images.items.isNotEmpty()) Text("Only unsupported or animated formats (e.g. GIF) were found.", style = TvType.body, color = TvColors.tertiary)
                             TvButton({ TvNav.pop() }, Modifier.focusRequester(emptyFocus)) { Text("Back", style = TvType.title3) }
                         }
-                        LaunchedEffect(Unit) { delay(60); runCatching { emptyFocus.requestFocus() } }
                     }
                     else -> itemsIndexed(stills, key = { _, i -> i.id }) { index, image ->
                         LaunchedEffect(index, stills.size) { if (index >= stills.size - 3 && images.hasMore) images.loadMore() }
@@ -387,6 +391,6 @@ class TvGalleryDetailRoute(private val id: String, private val title: String, in
                 }
             }
         }
-        TvInitialFocus(focus, emptyFocus, enabled = stills.isNotEmpty() || images.loadedOnce)
+        TvInitialFocus(focus, emptyFocus, enabled = stills.isNotEmpty() || (images.loadedOnce && !images.isLoading), name = "gallery.first")
     }
 }

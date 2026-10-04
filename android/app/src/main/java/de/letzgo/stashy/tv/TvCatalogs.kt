@@ -193,11 +193,13 @@ fun <T> TvCatalogGrid(
             items.isEmpty() && list.error != null && !list.isLoading -> Column(Modifier.padding(horizontal = pt(60))) {
                 TvCatalogHeader(model, sortFocus = headerFocus)
                 TvConnectionError(errorTitle, list.error) { model.reload() }
+                if (autoFocusFirst) TvInitialFocus(model.focus, headerFocus, name = "catalog.sort")
             }
             items.isEmpty() && (list.isLoading || !list.loadedOnce) -> TvLoading(loadingText, Modifier.align(Alignment.Center))
             items.isEmpty() -> Column(Modifier.padding(horizontal = pt(60))) {
                 TvCatalogHeader(model, sortFocus = headerFocus)
                 TvEmpty(emptyIcon, emptyTitle) { model.reload() }
+                if (autoFocusFirst) TvInitialFocus(model.focus, headerFocus, name = "catalog.sort")
             }
             else -> BoxWithConstraints(Modifier.fillMaxSize()) {
                 val horizontal = pt(60)
@@ -232,7 +234,7 @@ fun <T> TvCatalogGrid(
                     delay(60)
                     runCatching { firstFocus.requestFocus() }
                 }
-                if (autoFocusFirst) TvInitialFocus(model.focus, firstFocus)
+                if (autoFocusFirst) TvInitialFocus(model.focus, firstFocus, name = "catalog.firstCard")
             }
         }
     }

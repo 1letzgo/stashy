@@ -159,11 +159,14 @@ fun TvSearch(model: TvSearchModel) {
             }
         }
     }
+    val inputMode = androidx.compose.ui.platform.LocalInputModeManager.current
     // Only on the first visit: returning from a result keeps focus on that result.
     LaunchedEffect(Unit) {
         if (model.didAutoFocus) return@LaunchedEffect
         delay(200)
+        inputMode.requestKeyboardMode()
         runCatching { fieldFocus.requestFocus() }
+        TvFocusLog.log("initial", "search.field")
         model.didAutoFocus = true
     }
 }

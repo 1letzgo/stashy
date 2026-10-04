@@ -212,7 +212,7 @@ fun TvServerSetup() {
             }
         }
     }
-    LaunchedEffect(Unit) { delay(100); runCatching { first.requestFocus() } }
+    TvRequestFocus(first, "setup.name", delayMs = 100)
 }
 
 /** iOS: `TVServerFormView` — Add / Edit server from Settings (saved without a test). */
@@ -256,6 +256,6 @@ class TvServerFormRoute(private val server: ServerConfig?) : TvRoute {
                 }
             }
         }
-        TvInitialFocus(focus, first)
+        TvInitialFocus(focus, first, name = "serverForm.name")
     }
 }

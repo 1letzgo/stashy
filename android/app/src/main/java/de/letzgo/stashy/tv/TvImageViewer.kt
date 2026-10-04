@@ -97,6 +97,6 @@ class TvImageViewerRoute(
                 }
             }
         }
-        LaunchedEffect(Unit) { delay(50); runCatching { requester.requestFocus() } }
+        TvRequestFocus(requester, "imageViewer")
     }
 }

@@ -162,7 +162,7 @@ class TvSceneDetailRoute(private val sceneId: String, initial: Scene? = null) : 
                 }
             }
         }
-        TvInitialFocus(focus, if (scene != null) playFocus else anchor, enabled = !isLoading || scene != null)
+        TvInitialFocus(focus, if (scene != null) playFocus else anchor, enabled = !isLoading || scene != null, name = if (scene != null) "scene.play" else "scene.loading")
     }
 
     @Composable

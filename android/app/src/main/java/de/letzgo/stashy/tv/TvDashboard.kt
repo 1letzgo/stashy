@@ -214,7 +214,7 @@ fun TvDashboard(model: TvDashboardModel) {
         }
     }
     // Opening focus on the first card of the first row (tvOS starts in the content).
-    TvInitialFocus(model.focus, firstFocus, enabled = firstRow != null)
+    TvInitialFocus(model.focus, firstFocus, enabled = firstRow != null, name = "dashboard.firstCard")
 }
 
 @Composable

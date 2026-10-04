@@ -31,8 +31,24 @@ object TvNav {
     var selected by mutableStateOf(TvRootTab.Home); private set
     /** Bumped on every stack change (the stacks themselves are not snapshot state). */
     var version by mutableIntStateOf(0); private set
-    /** True while the sidebar holds focus (screens then leave their opening focus alone). */
+    /** True while an element of the shown screen (not the sidebar) holds focus. */
+    var contentHasFocus = false
+        get() = field || (appHasFocus && !sidebarFocused && !shellShown)
+
+    /** Focus anywhere in the activity (setup and PIN screens have no shell). */
+    var appHasFocus = false
+    /** The sidebar shell is on screen (then [contentHasFocus] is tracked by it). */
+    var shellShown = false
+
+    /** True while the sidebar holds focus. */
     var sidebarFocused = false
+
+    /**
+     * The sidebar only takes focus on purpose: Back on a tab root ([focusSidebar]) or Left from the
+     * leftmost element ([openSidebarFromContent]). Otherwise its items are not focusable, so focus
+     * that drops out of a replaced screen can never land there (it used to, on every push).
+     */
+    var sidebarEnabled by mutableStateOf(false)
 
     /** Bumped to move focus into the sidebar (Back on a tab root). */
     var sidebarFocusRequest by mutableIntStateOf(0); private set
@@ -77,7 +93,10 @@ object TvNav {
         version++
     }
 
-    fun focusSidebar() { sidebarFocusRequest++ }
+    fun focusSidebar() { sidebarEnabled = true; sidebarFocusRequest++ }
+
+    /** D-pad Left found nothing further left in the content: hand focus to the sidebar. */
+    fun openSidebarFromContent() = focusSidebar()
 
     /** iOS: `dismissOnAppLock` — covers close when the app locks. */
     fun dismissFullScreen() {

@@ -172,7 +172,7 @@ fun TvSettingsPage(title: String, description: String?, detail: (@Composable () 
             }
         }
     }
-    if (firstFocus != null) TvInitialFocus(LocalTvFocusMemory.current ?: remember { TvFocusMemory() }, firstFocus)
+    if (firstFocus != null) TvInitialFocus(LocalTvFocusMemory.current ?: remember { TvFocusMemory() }, firstFocus, name = "settings.$title")
 }
 
 /** A pushed Settings sub-page (iOS: `navigationDestination(for: TVSettingsEntry.self)`). */
@@ -317,7 +317,7 @@ class TvServerDetailRoute : TvRoute {
                 }
             }
         }
-        LaunchedEffect(Unit) { delay(80); runCatching { button.requestFocus() } }
+        TvRequestFocus(button, "server.test")
     }
 
     @Composable

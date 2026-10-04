@@ -28,7 +28,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
@@ -119,7 +124,8 @@ fun TvApp() {
     }
     TvRoots.ensure(serverId)
     TvNav.rootMemoryProvider = { TvRoots.memory(it) }
-    Box(Modifier.fillMaxSize().background(TvColors.background)) {
+    Box(Modifier.fillMaxSize().background(TvColors.background).onFocusChanged { TvNav.appHasFocus = it.hasFocus }) {
+        TvNav.shellShown = !TvSecurity.isAppLocked && config?.hasValidConfig == true
         when {
             TvSecurity.isAppLocked -> TvPasscodeEntry()
             config?.hasValidConfig != true -> TvServerSetup()
@@ -143,10 +149,20 @@ private fun TvMainShell() {
     var sidebarFocused by remember { mutableStateOf(false) }
     val visibleLibrary = sidebarLibrary.filter { item -> item.appTab == null || TabManager.isVisible(item.appTab) }
     val requesters = remember { TvRootTab.entries.associateWith { FocusRequester() } }
+    val inputModeManager = androidx.compose.ui.platform.LocalInputModeManager.current
 
     LaunchedEffect(TabManager.tabs) { TvNav.validate(TvRootTab.fixed + visibleLibrary.map { it.tab }) }
     LaunchedEffect(TvNav.sidebarFocusRequest) {
-        if (TvNav.sidebarFocusRequest > 0) { delay(30); runCatching { requesters.getValue(TvNav.selected).requestFocus() } }
+        if (TvNav.sidebarFocusRequest > 0) {
+            // The items become focusable on the next frame: retry until the selected one has focus.
+            val inputMode = inputModeManager
+            repeat(8) {
+                delay(30)
+                inputMode.requestKeyboardMode()
+                runCatching { requesters.getValue(TvNav.selected).requestFocus() }
+                if (TvNav.sidebarFocused) return@LaunchedEffect
+            }
+        }
     }
     BackHandler(enabled = !sidebarFocused) {
         if (!TvNav.pop()) TvNav.focusSidebar()
@@ -158,16 +174,40 @@ private fun TvMainShell() {
     val collapsed = pt(120)
 
     Box(Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize().padding(start = if (fullScreen) pt(0) else collapsed)) {
-            val stateKey = top?.key ?: "root.${selected.name}.${ServerConfigManager.activeConfig?.id}"
+        val focusManager = LocalFocusManager.current
+        val stateKey = top?.key ?: "root.${selected.name}.${ServerConfigManager.activeConfig?.id}"
+        val screenMemory = top?.focus ?: TvNav.rootMemory(selected)
+        LaunchedEffect(stateKey) {
+            TvFocusLog.screen = stateKey
+            delay(1200)
+            TvFocusLog.log("settled", if (TvNav.sidebarFocused) "sidebar" else if (TvNav.contentHasFocus) (screenMemory.lastKey ?: "content(unnamed)") else null)
+        }
+        Box(
+            Modifier.fillMaxSize().padding(start = if (fullScreen) pt(0) else collapsed)
+                .onFocusChanged { TvNav.contentHasFocus = it.hasFocus }
+                .onKeyEvent { e ->
+                    // Left from the leftmost element (nothing else to the left) opens the sidebar;
+                    // the sidebar is not focusable otherwise.
+                    if (fullScreen || e.type != KeyEventType.KeyDown || e.nativeKeyEvent.keyCode != android.view.KeyEvent.KEYCODE_DPAD_LEFT) return@onKeyEvent false
+                    if (!focusManager.moveFocus(FocusDirection.Left)) TvNav.openSidebarFromContent()
+                    true
+                },
+        ) {
             holder.SaveableStateProvider(stateKey) {
-                androidx.compose.runtime.CompositionLocalProvider(LocalTvFocusMemory provides (top?.focus ?: TvNav.rootMemory(selected))) {
+                androidx.compose.runtime.CompositionLocalProvider(LocalTvFocusMemory provides screenMemory) {
                     if (top != null) top.Content() else RootContent(selected)
                 }
             }
         }
         if (!fullScreen) {
-            Sidebar(selected, visibleLibrary, sidebarFocused, requesters) { sidebarFocused = it; TvNav.sidebarFocused = it }
+            Sidebar(selected, visibleLibrary, sidebarFocused, TvNav.sidebarEnabled, requesters) { focused ->
+                if (focused == sidebarFocused) return@Sidebar
+                sidebarFocused = focused
+                TvNav.sidebarFocused = focused
+                if (focused) TvFocusLog.log("sidebar", TvNav.selected.title)
+                // Leaving the sidebar makes it unfocusable again until the next explicit request.
+                else TvNav.sidebarEnabled = false
+            }
         }
     }
 }
@@ -194,6 +234,7 @@ private fun Sidebar(
     selected: TvRootTab,
     library: List<SidebarItem>,
     expanded: Boolean,
+    focusable: Boolean,
     requesters: Map<TvRootTab, FocusRequester>,
     onFocusChange: (Boolean) -> Unit,
 ) {
@@ -208,30 +249,29 @@ private fun Sidebar(
         Column(
             Modifier.width(width).fillMaxHeight().animateContentSize()
                 .onFocusChanged { onFocusChange(it.hasFocus) }
-                .focusProperties { enter = { requesters.getValue(TvNav.selected) } }
                 .focusGroup()
                 .padding(horizontal = pt(16), vertical = pt(40)),
             verticalArrangement = Arrangement.spacedBy(pt(8)),
         ) {
-            SidebarRow(TvRootTab.Search, TvIcons.search, selected, expanded, requesters)
-            SidebarRow(TvRootTab.Home, TvIcons.home, selected, expanded, requesters)
+            SidebarRow(TvRootTab.Search, TvIcons.search, selected, expanded, focusable, requesters)
+            SidebarRow(TvRootTab.Home, TvIcons.home, selected, expanded, focusable, requesters)
             if (library.isNotEmpty()) {
                 if (expanded) Text("Library", Modifier.padding(start = pt(20), top = pt(24), bottom = pt(6)), style = TvType.caption.copy(fontWeight = FontWeight.SemiBold), color = TvColors.secondary)
                 else Spacer(Modifier.height(pt(24)))
-                library.forEach { SidebarRow(it.tab, it.icon, selected, expanded, requesters) }
+                library.forEach { SidebarRow(it.tab, it.icon, selected, expanded, focusable, requesters) }
             }
             Spacer(Modifier.weight(1f))
-            SidebarRow(TvRootTab.Settings, TvIcons.gear, selected, expanded, requesters)
+            SidebarRow(TvRootTab.Settings, TvIcons.gear, selected, expanded, focusable, requesters)
         }
     }
 }
 
 @Composable
-private fun SidebarRow(tab: TvRootTab, icon: ImageVector, selected: TvRootTab, expanded: Boolean, requesters: Map<TvRootTab, FocusRequester>) {
+private fun SidebarRow(tab: TvRootTab, icon: ImageVector, selected: TvRootTab, expanded: Boolean, focusable: Boolean, requesters: Map<TvRootTab, FocusRequester>) {
     val isSelected = tab == selected
     Surface(
         onClick = { TvNav.select(tab) },
-        modifier = Modifier.fillMaxWidth().focusRequester(requesters.getValue(tab)),
+        modifier = Modifier.fillMaxWidth().focusProperties { canFocus = focusable }.focusRequester(requesters.getValue(tab)),
         shape = ClickableSurfaceDefaults.shape(RoundedCornerShape(pt(40))),
         colors = ClickableSurfaceDefaults.colors(
             containerColor = if (isSelected && expanded) Color.White.copy(alpha = 0.15f) else Color.Transparent,
