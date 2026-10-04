@@ -65,6 +65,19 @@ fun AppShell() {
     val stack = Nav.stack()
     val top = stack.lastOrNull()
     BackHandler(enabled = top != null) { Nav.pop() }
+    // Android back at a tab root: tool → Tools landing, other tab → Home, catalog → Dashboard,
+    // then leave the app (iOS has no back button there; this is the Android convention).
+    val toolsSubTab = de.letzgo.stashy.ui.tools.ToolsNav.subTab
+    val rootBack = top == null && (
+        (Nav.tab == MainTab.Tools && toolsSubTab.isNotEmpty()) || Nav.tab != MainTab.Home || Nav.catalogTab != CatalogTab.Dashboard
+    )
+    BackHandler(enabled = rootBack) {
+        when {
+            Nav.tab == MainTab.Tools && toolsSubTab.isNotEmpty() -> de.letzgo.stashy.ui.tools.ToolsNav.subTab = ""
+            Nav.tab != MainTab.Home -> Nav.tab = MainTab.Home
+            else -> Nav.catalogTab = CatalogTab.Dashboard
+        }
+    }
 
     Box(Modifier.fillMaxSize().background(p.background)) {
         AnimatedContent(
