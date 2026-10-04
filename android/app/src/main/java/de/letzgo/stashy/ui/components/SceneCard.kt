@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
+import de.letzgo.stashy.ui.player.ScenePreviewOnHold
 import de.letzgo.stashy.data.Downloads
 import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.Studio
@@ -40,7 +41,9 @@ import de.letzgo.stashy.ui.cardShadow
 /**
  * iOS: `SceneCardView` — thumbnail filling the card, studio badge top-left, date top-right,
  * gradient with title, duration and performer count at the bottom, resume bar.
- * (Long-press preview is added by the player feature.)
+ * Holding the card for 0.15 s plays `paths.preview` muted and looping on top of the
+ * thumbnail (iOS `AetherPreviewPlayer`, shared pool of 2 — see `ui/player/PreviewPlayer.kt`);
+ * releasing stops it. The press is observed without consuming, so the caller's tap still works.
  */
 @Composable
 fun SceneCard(scene: Scene, modifier: Modifier = Modifier, aspectRatio: Float = 16f / 9f, showDate: Boolean = true) {
@@ -56,6 +59,7 @@ fun SceneCard(scene: Scene, modifier: Modifier = Modifier, aspectRatio: Float = 
     ) {
         Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.2f)))
         AsyncImage(scene.thumbnailURL, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        ScenePreviewOnHold(scene.previewURL)
 
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.Top) {
             scene.studio?.let { StudioBadge(it) }

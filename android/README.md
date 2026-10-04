@@ -55,6 +55,8 @@ The debug build then starts connected (`ServerConfigManager.seedDebugServer`).
 | `ui/home/` | `HomeView` (dashboard) |
 | `ui/scene/` | `SceneDetailView`, `SceneDetail/` |
 | `ui/detail/` | Performer/Studio/Tag/Gallery/Group detail |
+| `ui/player/` (`StashPlayer`, `VideoSurface`, `ScenePlayerSurface`, `TimeBar`, `PreviewPlayer`/`PreviewPlayerPool`, `PlaybackService`, `PlayerWindow`) | `Playback/` (AetherEngine → Media3 ExoPlayer, see below), `SubtitleController`, `SceneScrubSprites` |
+| `data/SceneEditing.kt`, `data/SceneEvents.kt` | scene mutations of `StashDBViewModel`, scene `NotificationCenter` posts |
 | `ui/feeds/` | `ReelsView` |
 | `ui/tools/` | `ToolsView` + tools, stashy+ paywall |
 | `ui/settings/`, `ui/setup/`, `ui/search/` | `Settings/`, setup wizard, `UniversalSearchView` |
@@ -69,4 +71,9 @@ The debug build then starts connected (`ServerConfigManager.seedDebugServer`).
 - Colours only from `Theme.palette`, `Appearance.tint`, `StashyColors` — no ad-hoc colours.
 - Network only through `GraphQL` / `Net.client` (auth headers, LAN self-signed TLS); media URLs
   through `Net.signed()` (adds `apikey=` like iOS).
+- Playback: iOS plays the original file of any codec with its FFmpeg engine (AetherEngine).
+  Android's `StashPlayer` plays the original with Media3 ExoPlayer over `Net.client` and, when
+  the device can't (unrecognised container, decoder failure, no supported video/audio track, no
+  first frame in 20 s), falls back like the iOS ladder to Stash's `stream.m3u8` HLS transcode,
+  then `stream.mp4?start=` — the player shows a "Transcode" tag and a toast.
 - Not ported: AI Motion and device control (Handy, Intiface, LoveSpouse) — Play policy.
