@@ -22,6 +22,8 @@ class StashyApplication : Application(), SingletonImageLoader.Factory {
         Prefs.init(this)
         ServerConfigManager.init()
         StashyPlus.start(this)
+        de.letzgo.stashy.data.SecurityManager.init()
+        de.letzgo.stashy.data.TabManager.ensureLoaded()
     }
 
     // Image cache like `ImageCacheManager` (iOS): memory + disk, authenticated via the shared OkHttp client.

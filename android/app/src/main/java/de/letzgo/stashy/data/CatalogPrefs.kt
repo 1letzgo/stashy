@@ -12,9 +12,9 @@ import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 import kotlin.math.roundToInt
 
-/** iOS: `TabConfig` — one entry of `AppTabsConfig_<serverId>` (same JSON keys). */
+/** iOS: `CatalogTabConfig` — one entry of `AppTabsConfig_<serverId>` (same JSON keys). */
 @Serializable
-data class TabConfig(
+data class CatalogTabConfig(
     val id: String,
     val isVisible: Boolean = true,
     val sortOrder: Int = 0,
@@ -48,7 +48,16 @@ enum class CatalogCardColumns(val raw: Int) {
 }
 
 /** iOS: `CatalogCardColumnScope` — independent persistence of the 1/2 toggle. */
-enum class CatalogCardColumnScope(val raw: String) { Galleries("galleries"), Images("images"), OpenedGallery("openedGallery") }
+enum class CatalogCardColumnScope(val raw: String) {
+    Galleries("galleries"), Images("images"), OpenedGallery("openedGallery");
+    companion object {
+        fun from(tab: AppTab): CatalogCardColumnScope? = when (tab) {
+            AppTab.Galleries -> Galleries
+            AppTab.Images -> Images
+            else -> null
+        }
+    }
+}
 
 /**
  * Catalog part of iOS `TabManager`: per-server tab config (`AppTabsConfig_<serverId>` — default
@@ -69,48 +78,48 @@ object CatalogPrefs {
     private val sessionDetailSorts = mutableStateMapOf<String, String>()
 
     /** iOS default tab list (`TabManager.loadConfig` fallback). */
-    val defaultTabs: List<TabConfig> = listOf(
-        TabConfig("dashboard", true, 0, null),
-        TabConfig("studios", true, 1, "sceneCountDesc"),
-        TabConfig("performers", true, 2, "sceneCountDesc"),
-        TabConfig("scenes", true, 3, "dateDesc"),
-        TabConfig("galleries", true, 4, "dateDesc"),
-        TabConfig("images", true, 5, "dateDesc"),
-        TabConfig("tags", true, 6, "sceneCountDesc"),
-        TabConfig("media", true, 6, null),
-        TabConfig("catalogue", true, 7, null),
-        TabConfig("downloads", false, 100, null),
-        TabConfig("tools", true, 8, null),
-        TabConfig("reels", true, 10, "random"),
-        TabConfig("settings", true, 9, null),
-        TabConfig("groups", true, 11, "nameAsc"),
-        TabConfig("markers", true, 12, "createdAtDesc"),
-        TabConfig("stashline", true, 13, "dateDesc"),
+    val defaultTabs: List<CatalogTabConfig> = listOf(
+        CatalogTabConfig("dashboard", true, 0, null),
+        CatalogTabConfig("studios", true, 1, "sceneCountDesc"),
+        CatalogTabConfig("performers", true, 2, "sceneCountDesc"),
+        CatalogTabConfig("scenes", true, 3, "dateDesc"),
+        CatalogTabConfig("galleries", true, 4, "dateDesc"),
+        CatalogTabConfig("images", true, 5, "dateDesc"),
+        CatalogTabConfig("tags", true, 6, "sceneCountDesc"),
+        CatalogTabConfig("media", true, 6, null),
+        CatalogTabConfig("catalogue", true, 7, null),
+        CatalogTabConfig("downloads", false, 100, null),
+        CatalogTabConfig("tools", true, 8, null),
+        CatalogTabConfig("reels", true, 10, "random"),
+        CatalogTabConfig("settings", true, 9, null),
+        CatalogTabConfig("groups", true, 11, "nameAsc"),
+        CatalogTabConfig("markers", true, 12, "createdAtDesc"),
+        CatalogTabConfig("stashline", true, 13, "dateDesc"),
     )
 
     private val sortMigrations = mapOf("scenes_count" to "sceneCountDesc", "name" to "nameAsc", "date" to "dateDesc")
 
-    fun tabs(): List<TabConfig> {
+    fun tabs(): List<CatalogTabConfig> {
         if (defaultsVersion < 0) return defaultTabs // read for recomposition
         val raw = Prefs.string(Prefs.serverKey(TABS_KEY)) ?: Prefs.string(TABS_KEY)
         val decoded = raw?.let { decodeTabs(it) } ?: return defaultTabs
         return decoded.map { t -> t.defaultSortOption?.let { sortMigrations[it] }?.let { t.copy(defaultSortOption = it) } ?: t }
     }
 
-    fun decodeTabs(raw: String): List<TabConfig>? =
-        runCatching { Json.decodeFromString(ListSerializer(TabConfig.serializer()), raw) }.getOrNull()
+    fun decodeTabs(raw: String): List<CatalogTabConfig>? =
+        runCatching { Json.decodeFromString(ListSerializer(CatalogTabConfig.serializer()), raw) }.getOrNull()
 
-    fun encodeTabs(tabs: List<TabConfig>): String = Json.encodeToString(ListSerializer(TabConfig.serializer()), tabs)
+    fun encodeTabs(tabs: List<CatalogTabConfig>): String = Json.encodeToString(ListSerializer(CatalogTabConfig.serializer()), tabs)
 
-    private fun saveTabs(tabs: List<TabConfig>) {
+    private fun saveTabs(tabs: List<CatalogTabConfig>) {
         Prefs.setString(Prefs.serverKey(TABS_KEY), encodeTabs(tabs))
         defaultsVersion++
     }
 
-    private fun update(tabId: String, change: (TabConfig) -> TabConfig) {
+    private fun update(tabId: String, change: (CatalogTabConfig) -> CatalogTabConfig) {
         val list = tabs().toMutableList()
         val idx = list.indexOfFirst { it.id == tabId }
-        if (idx >= 0) list[idx] = change(list[idx]) else list.add(change(TabConfig(tabId)))
+        if (idx >= 0) list[idx] = change(list[idx]) else list.add(change(CatalogTabConfig(tabId)))
         saveTabs(list)
     }
 
