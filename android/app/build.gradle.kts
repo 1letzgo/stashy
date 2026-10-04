@@ -16,6 +16,10 @@ val localProps = Properties().apply {
 }
 fun localString(key: String) = "\"" + (localProps.getProperty(key) ?: "").replace("\"", "\\\"") + "\""
 
+fun gitCommitCount(): Int = runCatching {
+    providers.exec { commandLine("git", "rev-list", "--count", "HEAD") }.standardOutput.asText.get().trim().toInt()
+}.getOrDefault(1)
+
 android {
     namespace = "de.letzgo.stashy"
     compileSdk = 36
@@ -23,14 +27,26 @@ android {
         applicationId = "de.letzgo.stashy"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
+        // Monotonic without manual bumps: number of commits on the checked-out branch.
+        versionCode = gitCommitCount()
         versionName = "3.3.5"
         buildConfigField("String", "DEBUG_SERVER", "\"\"")
         buildConfigField("String", "DEBUG_API_KEY", "\"\"")
-        // stashy+ always unlocked in our own (sideloaded) builds. A Google Play build passes
-        // -PstashyPlusIncluded=false and unlocks through Play Billing instead.
-        val plusIncluded = (project.findProperty("stashyPlusIncluded") as String?)?.toBoolean() ?: true
-        buildConfigField("boolean", "PLUS_INCLUDED", plusIncluded.toString())
+    }
+    // Distribution: `sideload` = our own APK (stashy+ included, self-update from buntes.am),
+    // `play` = Google Play (Play Billing, no self-update — Play forbids both other ways).
+    flavorDimensions += "distribution"
+    productFlavors {
+        create("sideload") {
+            dimension = "distribution"
+            buildConfigField("boolean", "PLUS_INCLUDED", "true")
+            buildConfigField("String", "UPDATE_URL", "\"https://buntes.am/app/stashy.apk\"")
+        }
+        create("play") {
+            dimension = "distribution"
+            buildConfigField("boolean", "PLUS_INCLUDED", "false")
+            buildConfigField("String", "UPDATE_URL", "\"\"")
+        }
     }
     sourceSets {
         // The .graphql documents are shared 1:1 with the iOS app (loaded at runtime like there).

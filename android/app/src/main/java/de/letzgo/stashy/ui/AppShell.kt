@@ -58,6 +58,7 @@ fun AppShell() {
     val p = Theme.palette
     if (ServerConfigManager.activeConfig == null) {
         Box(Modifier.fillMaxSize().background(p.background)) { ServerSetupScreen(onDone = {}) }
+        AppUpdateDialog()
         return
     }
     val holder = rememberSaveableStateHolder()
@@ -88,6 +89,7 @@ fun AppShell() {
             FloatingTabBar()
         }
     }
+    AppUpdateDialog()
 }
 
 @Composable

@@ -5,6 +5,8 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
 import de.letzgo.stashy.ui.AppShell
 import de.letzgo.stashy.ui.StashyTheme
 
@@ -33,6 +35,8 @@ class MainActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         de.letzgo.stashy.data.StashyPlus.refresh()
+        // Sideload builds: look for a newer APK on the update server (throttled, see AppUpdate).
+        lifecycleScope.launch { de.letzgo.stashy.data.AppUpdate.autoCheck(this@MainActivity) }
     }
 
     /** iOS `sceneDidEnterBackground` → auto-lock (SecurityManager rules). */

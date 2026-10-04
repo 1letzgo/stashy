@@ -129,3 +129,17 @@ Sizes are tvOS points halved (`pt()`: 1920 pt ≙ 960 dp). Pure logic lives in `
     16 MB, libvosk 10 MB); the universal APK carries all four ABIs (~100 MB more). Ship an AAB
     (or set `abiFilters`) for releases. Settings › stashy+ › "Delete downloaded language packs".
 - Not ported: AI Motion and device control (Handy, Intiface, LoveSpouse) — Play policy.
+
+## Distribution flavors & self-update
+
+| Flavor | stashy+ | Updates | Build |
+|---|---|---|---|
+| `sideload` | included (`PLUS_INCLUDED`) | self-update from `https://buntes.am/app/stashy.apk` (`data/AppUpdate.kt`) | `./gradlew assembleSideloadRelease` |
+| `play` | Google Play Billing | Play Store (no install permission, no self-update — Play policy) | `./gradlew bundlePlayRelease` |
+
+`versionCode` = number of git commits (`git rev-list --count HEAD`), so every build from a newer
+commit is higher. The self-update needs only the APK on the server: a HEAD request compares
+`ETag`/`Last-Modified` with the install time; after the download the APK's own `versionCode`
+decides whether it is offered for installation. Checked on resume (every 6 h at most) and via
+Settings → App → Check for Updates. Upload a new build simply by replacing `stashy.apk` on the
+server — always signed with the same key (`~/Library/Application Support/stashy-signing/`).

@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.settings
 
+import kotlinx.coroutines.launch
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -122,6 +123,22 @@ private fun androidx.compose.foundation.lazy.LazyListScope.aboutSection() {
         LinkRow("Discord", SFS.bubbles, "https://discord.gg/DMxEFaVzUM")
         SettingsDivider()
         SettingsNavRow("Acknowledgements", SFS.docText) { Nav.push(AcknowledgementsScreen()) }
+    }
+    settingsSection(header = "App", key = "app-version") { AppVersionRow() }
+}
+
+/** Version of this build; sideload builds can check buntes.am for a newer APK (Android only). */
+@Composable
+private fun AppVersionRow() {
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val version = "${de.letzgo.stashy.data.AppUpdate.currentVersionName(context)} (${de.letzgo.stashy.data.AppUpdate.currentVersionCode(context)})"
+    if (de.letzgo.stashy.data.AppUpdate.isEnabled) {
+        SettingsNavRow("Check for Updates", SFS.docText, trailing = version) {
+            scope.launch { de.letzgo.stashy.data.AppUpdate.check(context, manual = true) }
+        }
+    } else {
+        SettingsNavRow("Version", SFS.docText, trailing = version) {}
     }
 }
 
