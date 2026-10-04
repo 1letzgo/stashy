@@ -1,7 +1,448 @@
 package de.letzgo.stashy.ui.feeds
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.navigationBars
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.pager.VerticalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
-import de.letzgo.stashy.ui.catalog.Pending
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableDoubleStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import de.letzgo.stashy.data.FeedsConfig
+import de.letzgo.stashy.data.IdName
+import de.letzgo.stashy.data.Performer
+import de.letzgo.stashy.data.ReelsModeType
+import de.letzgo.stashy.ui.EmptyState
+import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.MainTab
+import de.letzgo.stashy.ui.Nav
+import de.letzgo.stashy.ui.SF
+import de.letzgo.stashy.ui.detail.PerformerDetailScreen
+import de.letzgo.stashy.ui.scene.SceneDetailScreen
+import de.letzgo.stashy.ui.stashyGlass
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
-/** iOS: `ReelsView` (StashTok). */
-@Composable fun FeedsScreen() = Pending("Feeds")
+/**
+ * iOS: `ReelsView` / `ReelsViewBody` (StashTok) — the Feeds tab.
+ *
+ * Edge-to-edge vertical pager (one row per screen) with autoplay of the settled row and
+ * preloading of its neighbours ([FeedPlayerPool]); the section chrome (mode dock + Filter &
+ * Sort) floats on top, the info overlay and scrubber sit right above the floating tab bar.
+ * Tapping the media hides all chrome including the tab bar, like iOS.
+ */
+@Composable
+fun FeedsScreen() {
+    val model = FeedsModel
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val pool = remember { FeedPlayerPool(context) }
+
+    // Mute state follows the audio route (headphones) like iOS `ScenePlayerMute`.
+    remember { if (model.isMuted == null) model.isMuted = FeedAudio.initialMuted(context) }
+    val muted = model.isMuted ?: true
+    HeadphoneMuteEffect(muted) { model.isMuted = it }
+    LaunchedEffect(muted) { pool.updateMuted(muted) }
+
+    var isUIVisible by remember { mutableStateOf(true) }
+    var showSheet by remember { mutableStateOf(false) }
+    var isZoomed by remember { mutableStateOf(false) }
+    var deleteTarget by remember { mutableStateOf<FeedItem?>(null) }
+    var lifecycleActive by remember { mutableStateOf(true) }
+
+    // Deep link (channel, performer …) or a plain appear.
+    LaunchedEffect(FeedsNav.token) {
+        val link = FeedsNav.consume()
+        if (link != null) {
+            pool.teardown()
+            model.apply(link)
+            isUIVisible = true
+        } else model.onAppear()
+    }
+    // Tab icon tapped again while on Feeds: restart from the top (iOS `reelsWillRemount`).
+    val reselects = Nav.reselects[MainTab.Feeds] ?: 0
+    val initialReselects = remember { reselects }
+    LaunchedEffect(reselects) {
+        if (reselects != initialReselects) {
+            pool.teardown()
+            model.restartFromTop()
+        }
+    }
+
+    // iOS: `isIdleTimerDisabled = true` while Feeds is up; background pauses, foreground resumes.
+    val view = LocalView.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    DisposableEffect(lifecycle) {
+        view.keepScreenOn = true
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_PAUSE -> { lifecycleActive = false; pool.pauseAll() }
+                Lifecycle.Event.ON_RESUME -> { lifecycleActive = true; model.isPlaying = true }
+                else -> {}
+            }
+        }
+        lifecycle.addObserver(observer)
+        onDispose {
+            lifecycle.removeObserver(observer)
+            view.keepScreenOn = false
+            Nav.rootHidesTabBar = false
+            pool.release()
+        }
+    }
+    LaunchedEffect(isUIVisible) { Nav.rootHidesTabBar = !isUIVisible }
+
+    // Toast-like messages (iOS `ToastManager`).
+    var toast by remember { mutableStateOf<String?>(null) }
+    LaunchedEffect(model.message) {
+        model.message?.let { toast = it; model.message = null; delay(2_000); toast = null }
+    }
+
+    val mode = model.mode
+    val list = model.list(mode)
+    val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+    // Height the floating tab bar covers (AppShell: 64 pt bar + 2×8 pt margins above the nav bar).
+    val tabBarOverlap = if (isUIVisible) navBottom + 80.dp else navBottom
+
+    Box(Modifier.fillMaxSize().background(Color.Black)) {
+        val items = model.visibleItems(mode)
+        when {
+            mode == ReelsModeType.Pics -> PicsFeed(model, topPadding = 64.dp, bottomPadding = tabBarOverlap)
+            items.isEmpty() && list.isLoading -> LoadingState()
+            items.isEmpty() && list.error != null -> RetryState(SF.server, "Server not reachable", "Retry Connection") { model.refetch(mode) }
+            items.isEmpty() && list.loadedOnce -> RetryState(emptyIcon(mode), emptyTitle(mode), "Reload") { model.refetch(mode) }
+            items.isEmpty() -> LoadingState()
+            else -> androidx.compose.runtime.key(mode) {
+                FeedPager(
+                    model = model, mode = mode, items = items, pool = pool,
+                    isUIVisible = isUIVisible, isZoomed = isZoomed, lifecycleActive = lifecycleActive,
+                    tabBarOverlap = tabBarOverlap,
+                    onToggleUI = { isUIVisible = !isUIVisible },
+                    onZoom = { isZoomed = it },
+                    onDelete = { deleteTarget = it },
+                )
+            }
+        }
+
+        // Top chrome: mode dock + Filter & Sort, criterion chips below (iOS `reelsNavBar`).
+        val chromeAlpha by animateFloatAsState(if (isUIVisible) 1f else 0f, tween(200), label = "chrome")
+        Column(Modifier.fillMaxWidth().alpha(chromeAlpha).align(Alignment.TopCenter)) {
+            if (chromeAlpha > 0.01f) {
+                FeedsTopBar(
+                    modes = FeedsConfig.enabledModes,
+                    selected = mode,
+                    onSelect = { m -> pool.teardown(); isZoomed = false; model.selectMode(m) },
+                    onFilterSort = { showSheet = true },
+                )
+                val c = model.criteria
+                if (!c.isEmpty) FeedsCriterionChips(
+                    performer = c.performer, studio = c.studio, tags = c.tags,
+                    onClearPerformer = { model.clearPerformer() },
+                    onClearStudio = { model.clearStudio() },
+                    onRemoveTag = { model.toggleTag(it) },
+                )
+            }
+        }
+
+        AnimatedVisibility(toast != null, Modifier.align(Alignment.TopCenter).statusBarsPadding().padding(top = 64.dp), enter = fadeIn(), exit = fadeOut()) {
+            Text(
+                toast.orEmpty(), color = Color.White, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold),
+                modifier = Modifier.stashyGlass(RoundedCornerShape(50)).padding(horizontal = 16.dp, vertical = 10.dp),
+            )
+        }
+    }
+
+    if (showSheet) {
+        FeedsFilterSortSheet(
+            mode = mode,
+            filters = model.filtersFor(mode),
+            selectedFilter = model.filters[mode],
+            sort = model.sort(mode),
+            sortOptions = model.sortOptions(mode),
+            criteria = model.advanced[mode],
+            onFilter = { pool.teardown(); model.setFilter(mode, it) },
+            onSort = { pool.teardown(); model.setSort(mode, it) },
+            onCriteria = { pool.teardown(); model.setAdvancedCriteria(mode, it) },
+            onReset = { pool.teardown(); model.reset(mode) },
+            onDismiss = { showSheet = false },
+        )
+    }
+
+    deleteTarget?.let { item ->
+        val isImage = item is FeedItem.ClipItem
+        AlertDialog(
+            onDismissRequest = { deleteTarget = null },
+            title = { Text(if (isImage) "Delete image?" else "Delete scene?") },
+            text = { Text(if (isImage) "The image is removed from the server. This cannot be undone." else "The scene and its files are removed from the server. This cannot be undone.") },
+            confirmButton = { TextButton({ deleteTarget = null; model.delete(item) {} }) { Text("Delete", color = Color(0xFFFF453A)) } },
+            dismissButton = { TextButton({ deleteTarget = null }) { Text("Cancel") } },
+        )
+    }
+}
+
+@Composable
+private fun FeedPager(
+    model: FeedsModel,
+    mode: ReelsModeType,
+    items: List<FeedItem>,
+    pool: FeedPlayerPool,
+    isUIVisible: Boolean,
+    isZoomed: Boolean,
+    lifecycleActive: Boolean,
+    tabBarOverlap: androidx.compose.ui.unit.Dp,
+    onToggleUI: () -> Unit,
+    onZoom: (Boolean) -> Unit,
+    onDelete: (FeedItem) -> Unit,
+) {
+    val scope = rememberCoroutineScope()
+    val list = model.list(mode)
+    val startIndex = remember(mode) { model.currentIds[mode]?.let { id -> items.indexOfFirst { it.id == id } }?.coerceAtLeast(0) ?: 0 }
+    val pagerState = rememberPagerState(initialPage = startIndex) { items.size }
+    val currentItems by rememberUpdatedState(items)
+
+    // Settled page → session position (iOS `scrollPosition(id:)`).
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.settledPage }.collect { idx ->
+            currentItems.getOrNull(idx)?.let { model.currentIds[mode] = it.id }
+        }
+    }
+    val activeId = model.currentIds[mode]
+    // New timeline / dropped rows / restore: follow the session id, else start at the top.
+    LaunchedEffect(list.generation, activeId, items.size) {
+        val idx = items.indexOfFirst { it.id == activeId }
+        if (idx >= 0) {
+            if (idx != pagerState.currentPage && !pagerState.isScrollInProgress) pagerState.scrollToPage(idx)
+        } else if (items.isNotEmpty()) {
+            pagerState.scrollToPage(0)
+            model.currentIds[mode] = items[0].id
+        }
+    }
+
+    val activeIndex = items.indexOfFirst { it.id == activeId }
+    val activeItem = items.getOrNull(activeIndex)
+    val scrolling = pagerState.isScrollInProgress
+    val continuous = FeedsConfig.continuousPlay
+    val isPlaying = model.isPlaying
+    val playingNow = isPlaying && !scrolling && lifecycleActive
+
+    // Bind the preload window to the player pool.
+    LaunchedEffect(activeId, items.size, playingNow, continuous) {
+        val window = PreloadWindow.indices(activeIndex, items.size, pool.size) { !items[it].isVideo }
+            .map { i -> items[i].let { FeedMediaRequest(it.id, it.videoSources, loop = !continuous) } }
+        pool.sync(window, activeId, playingNow)
+    }
+    // Continuous play: the next row when a video ends (iOS `onVideoEnded` → `advanceToNextItem`).
+    val currentActive by rememberUpdatedState(activeId)
+    DisposableEffect(pool) {
+        pool.onEnded = { id ->
+            if (id == currentActive) {
+                val idx = currentItems.indexOfFirst { it.id == id }
+                if (idx >= 0 && idx + 1 < currentItems.size) scope.launch { pagerState.animateScrollToPage(idx + 1) }
+            }
+        }
+        // Markers / previews whose file never got generated are dropped; the next row takes over.
+        pool.onUnplayable = { id -> model.dropUnplayable(id) }
+        onDispose { pool.onEnded = null; pool.onUnplayable = null }
+    }
+    // Animated clips advance on a timer with continuous play (iOS `startAnimationAdvanceTimer`).
+    LaunchedEffect(activeId, isPlaying, continuous, scrolling) {
+        val item = activeItem ?: return@LaunchedEffect
+        if (item.isAnimated && continuous && isPlaying && !scrolling) {
+            delay(((item.duration ?: 5.0) * 1000).toLong())
+            if (activeIndex + 1 < items.size) pagerState.animateScrollToPage(activeIndex + 1)
+        }
+    }
+    // Paging + dead-row probing (iOS `reelItemRow.onAppear`, `probeUpcomingMedia`).
+    LaunchedEffect(activeIndex, items.size) {
+        if (PreloadWindow.shouldLoadMore(activeIndex, items.size)) model.loadMore(mode)
+        model.probeUpcomingMedia()
+    }
+
+    // Scrubber state of the active row (iOS `ScrubberState`), play-count credit and checkpoint.
+    var time by remember { mutableDoubleStateOf(0.0) }
+    var duration by remember { mutableDoubleStateOf(activeItem?.duration ?: 1.0) }
+    var seeking by remember { mutableStateOf(false) }
+    LaunchedEffect(activeId) {
+        time = 0.0
+        duration = activeItem?.duration?.takeIf { it > 0 } ?: 1.0
+        var watched = 0.0
+        var credited = false
+        var restored = false
+        while (true) {
+            val player = pool.player(activeId)
+            if (player != null) {
+                // iOS `applySavedPlaybackCheckpointIfMatching`.
+                if (!restored && player.playbackState == androidx.media3.common.Player.STATE_READY) {
+                    restored = true
+                    model.checkpoint?.takeIf { it.first == activeId }?.let { pool.seek(activeId, it.second); model.checkpoint = null }
+                }
+                if (!seeking) time = player.currentPosition / 1000.0
+                pool.durations[activeId]?.let { duration = it }
+                if (player.isPlaying) {
+                    watched += 0.1
+                    // iOS `noteReelsWatchProgress`: credit once after "Count as played — Feeds".
+                    if (!credited && activeItem?.countsPlays == true && watched >= FeedsConfig.playCountFeedsSeconds) {
+                        credited = true
+                        activeItem.let { model.creditPlay(it) }
+                    }
+                }
+            }
+            delay(100)
+        }
+    }
+    DisposableEffect(Unit) {
+        onDispose {
+            // iOS `savePlaybackCheckpoint` — resumes mid-clip after a tab switch or push.
+            val id = model.currentIds[mode]
+            model.checkpoint = if (id != null && time > 0.25) id to time else null
+        }
+    }
+
+    Box(Modifier.fillMaxSize()) {
+        VerticalPager(
+            state = pagerState,
+            beyondViewportPageCount = 1,
+            key = { i -> items.getOrNull(i)?.id ?: i },
+            userScrollEnabled = !isZoomed,
+            modifier = Modifier.fillMaxSize(),
+        ) { page ->
+            val item = items[page]
+            FeedRow(
+                item = item,
+                player = pool.assignments[item.id],
+                isActive = item.id == activeId,
+                videoSize = pool.videoSizes[item.id],
+                bottomInset = tabBarOverlap,
+                isUIVisible = isUIVisible,
+                isPlaying = isPlaying,
+                isScrolling = scrolling,
+                errorMessage = if (pool.failed[item.id] == true || (item.isVideo.not() && !item.isAnimated)) "No playable source" else null,
+                onToggleUI = onToggleUI,
+                onSkip = { delta ->
+                    pool.player(item.id)?.let { p ->
+                        val target = (p.currentPosition / 1000.0 + delta).coerceAtLeast(0.0)
+                        pool.seek(item.id, if (duration > 0) target.coerceAtMost(duration) else target)
+                    }
+                },
+                onFastForward = { on -> pool.setRate(item.id, if (on) FeedsConfig.holdSpeedFeeds else 1f) },
+                onZoomChanged = onZoom,
+                onPlay = { model.isPlaying = true },
+            )
+        }
+
+        // Bottom chrome: info overlay + scrubber right above the tab bar (iOS safeAreaInset bottom).
+        val overlayAlpha by animateFloatAsState(if (isUIVisible) 1f else 0f, tween(200), label = "overlay")
+        if (activeItem != null && overlayAlpha > 0.01f) {
+            Column(Modifier.align(Alignment.BottomCenter).fillMaxWidth().alpha(overlayAlpha)) {
+                FeedsInfoOverlay(
+                    item = activeItem,
+                    mode = mode,
+                    isMuted = pool.muted,
+                    isPlaying = isPlaying,
+                    showsDelete = FeedsConfig.showsDeleteButton,
+                    onPerformerFilter = { p -> model.filterByPerformer(IdName(p.id, p.name)) },
+                    onPerformerOpen = { p -> Nav.push(PerformerDetailScreen(p.id, Performer(id = p.id, name = p.name))) },
+                    onTitle = {
+                        activeItem.titleLinkScene?.let { s -> Nav.push(SceneDetailScreen(s.id, s)) }
+                    },
+                    onTag = { t -> model.toggleTag(t) },
+                    onOCounter = { m -> model.changeOCounter(activeItem, m) },
+                    onRating = { r -> model.setRating(activeItem, r) },
+                    onDelete = { onDelete(activeItem) },
+                    onToggleMute = {
+                        val new = !pool.muted
+                        model.isMuted = new
+                        FeedAudio.persist(new)
+                    },
+                    onTogglePlay = { model.isPlaying = !model.isPlaying },
+                    pausesAdvance = activeItem.isAnimated && continuous,
+                )
+                if (!activeItem.isAnimated) {
+                    FeedsScrubber(
+                        time = time, duration = duration,
+                        onScrub = { s -> seeking = true; time = s; pool.player(activeId)?.playWhenReady = false; pool.seek(activeId, s) },
+                        onScrubEnd = { s ->
+                            time = s; pool.seek(activeId, s); seeking = false
+                            pool.setPlaying(activeId, playingNow)
+                        },
+                    )
+                }
+                Spacer(Modifier.height(tabBarOverlap))
+            }
+        }
+    }
+}
+
+@Composable
+private fun LoadingState() {
+    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)) {
+        CircularProgressIndicator(color = Color.White)
+        Text("Loading feeds...", color = Color.White.copy(alpha = 0.7f), style = IosTypography.subheadline)
+    }
+}
+
+/** iOS: `SharedEmptyStateView` / `ConnectionErrorView` with their buttons. */
+@Composable
+private fun RetryState(icon: androidx.compose.ui.graphics.vector.ImageVector, title: String, button: String, onRetry: () -> Unit) {
+    Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+        EmptyState(icon, title)
+        Text(
+            button, color = Color.White, style = IosTypography.headline,
+            modifier = Modifier.stashyGlass(RoundedCornerShape(50)).noIndicationClick(onRetry).padding(horizontal = 20.dp, vertical = 12.dp),
+        )
+    }
+}
+
+private fun emptyIcon(mode: ReelsModeType) = when (mode) {
+    ReelsModeType.Scenes -> SF.film
+    ReelsModeType.Markers -> SF.bookmarkFill
+    ReelsModeType.Clips -> SF.photoOnRectangleAngled
+    ReelsModeType.Previews -> SF.playRectangle
+    ReelsModeType.Pics -> SF.cameraFill
+}
+
+private fun emptyTitle(mode: ReelsModeType) = when (mode) {
+    ReelsModeType.Scenes -> "No scenes found"
+    ReelsModeType.Markers -> "No markers found"
+    ReelsModeType.Clips -> "No clips found"
+    ReelsModeType.Previews -> "No previews found"
+    ReelsModeType.Pics -> "No images found"
+}

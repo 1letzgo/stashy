@@ -132,6 +132,15 @@ enum class ReelsModeType(val defaultTitle: String) {
     @SerialName("clips") Clips("Clips"),
     @SerialName("previews") Previews("Previews"),
     @SerialName("pics") Pics("Pics");
+
+    val title: String get() = defaultTitle
+    /** iOS: `ReelsMode.rawValue` ("Scenes", "Markers" …) — the deep-link / session spelling. */
+    val modeRaw: String get() = defaultTitle
+
+    companion object {
+        fun fromModeRaw(raw: String?): ReelsModeType? =
+            entries.firstOrNull { it.defaultTitle == raw || it.defaultTitle.equals(raw, ignoreCase = true) }
+    }
 }
 
 /** iOS: `ReelsModeConfig`. */
@@ -139,8 +148,8 @@ enum class ReelsModeType(val defaultTitle: String) {
 data class ReelsModeConfig(
     val id: String = UUID.randomUUID().toString().uppercase(),
     val type: ReelsModeType,
-    val isEnabled: Boolean,
-    val sortOrder: Int,
+    val isEnabled: Boolean = true,
+    val sortOrder: Int = 0,
     val defaultSortOption: String? = null,
 )
 

@@ -4,6 +4,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material.icons.outlined.*
+import androidx.compose.material.icons.automirrored.filled.VolumeOff
+import androidx.compose.material.icons.automirrored.filled.VolumeUp
 import androidx.compose.material.icons.automirrored.outlined.VolumeOff
 import androidx.compose.material.icons.automirrored.outlined.VolumeUp
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -86,6 +88,14 @@ object SF {
     val rectangleStack = Icons.Outlined.ViewCarousel
     val bookmark = Icons.Outlined.BookmarkBorder
     val photoFill = Icons.Filled.Image
+    // Feeds (ReelsView)
+    val photoOnRectangleAngled = Icons.Filled.Collections
+    val playRectangleOnRectangleFill = Icons.Filled.VideoLibrary
+    val cameraFill = Icons.Filled.PhotoCamera
+    val chevronRight2 = Icons.Filled.FastForward
+    val speakerWave2Fill = Icons.AutoMirrored.Filled.VolumeUp
+    val speakerSlashFill = Icons.AutoMirrored.Filled.VolumeOff
+    val playRectangle = Icons.Outlined.SmartDisplay
 }
 
 /** O-counter icon presets (iOS `oCounterIconPresets`, SF names as keys). */
