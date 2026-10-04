@@ -32,7 +32,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
 import de.letzgo.stashy.data.Downloads
-import de.letzgo.stashy.data.Gallery
 import de.letzgo.stashy.data.Performer
 import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.Studio
@@ -45,6 +44,7 @@ import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.cardShadow
 import de.letzgo.stashy.ui.components.formatDuration
 import de.letzgo.stashy.ui.oCounterIcon
+import de.letzgo.stashy.ui.player.ScenePreviewOnHold
 import de.letzgo.stashy.ui.stashyGlass
 
 private val titleShadow = Shadow(Color.Black.copy(alpha = 0.8f), androidx.compose.ui.geometry.Offset(0f, 2f), 4f)
@@ -58,6 +58,8 @@ fun DashboardSceneCard(scene: Scene, isLarge: Boolean, width: Dp, height: Dp, mo
             Icon(SF.film, null, tint = Theme.palette.secondaryText, modifier = Modifier.size(24.dp))
         }
         AsyncImage(scene.thumbnailURL, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        // iOS: hold 0.15 s → muted looping `paths.preview` (shared preview player pool).
+        ScenePreviewOnHold(scene.previewURL)
         Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(60.dp).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)))))
         Column(Modifier.fillMaxSize().padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 12.dp)) {
             Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -160,33 +162,5 @@ fun DashboardStudioCard(studio: Studio, isLarge: Boolean, width: Dp, height: Dp,
                 }
             }
         }
-    }
-}
-
-/** iOS: `GalleryCardView` in a dashboard row — cover, studio + image-count badges, title. */
-@Composable
-fun DashboardGalleryCard(gallery: Gallery, width: Dp, height: Dp, modifier: Modifier = Modifier) {
-    val shape = RoundedCornerShape(Tokens.Radius.card)
-    Box(modifier.size(width, height).cardShadow(shape).clip(shape).background(Theme.palette.secondaryBackground)) {
-        Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
-            Icon(SF.photoStack, null, tint = Theme.palette.secondaryText, modifier = Modifier.size(32.dp))
-        }
-        AsyncImage(gallery.coverURL, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
-        Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(height * 0.4f).background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)))))
-        Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.Top) {
-            gallery.studio?.name?.let {
-                Text(it, style = IosTypography.caption.copy(fontWeight = FontWeight.Medium), color = Color.White, maxLines = 1,
-                    modifier = Modifier.weight(1f, fill = false).stashyGlass(RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 4.dp))
-            }
-            Spacer(Modifier.weight(1f))
-            gallery.imageCount?.takeIf { it > 0 }?.let {
-                Row(Modifier.stashyGlass(RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Icon(SF.photoStack, null, tint = Color.White, modifier = Modifier.size(12.dp))
-                    Text("$it", style = IosTypography.caption.copy(fontWeight = FontWeight.Medium), color = Color.White)
-                }
-            }
-        }
-        Text(gallery.displayTitle, style = IosTypography.headline.copy(fontWeight = FontWeight.Medium), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.align(Alignment.BottomStart).padding(12.dp))
     }
 }

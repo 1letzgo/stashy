@@ -146,7 +146,7 @@ fun MarkersCatalog() {
         CatalogSlots(filterSort = filterSortSlot(c)), posterColumns, { it.id },
     ) { _, marker ->
         MarkerCard(marker, Modifier.noRippleClickable {
-            marker.scene?.let { scene -> Nav.push(SceneDetailScreen(scene.id, scene.copy(resumeTime = marker.seconds))) }
+            marker.scene?.let { scene -> Nav.push(SceneDetailScreen(scene.id, scene.copy(resumeTime = marker.seconds), autoPlay = true)) }
         })
     }
     CatalogFilterSortSheet(c)

@@ -6,25 +6,26 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import de.letzgo.stashy.data.AppTab
 import de.letzgo.stashy.data.DashboardRepository
+import de.letzgo.stashy.data.FilterMapper
+import de.letzgo.stashy.data.filterDict
 import de.letzgo.stashy.data.Gallery
 import de.letzgo.stashy.data.HomeRowConfig
 import de.letzgo.stashy.data.HomeRowType
 import de.letzgo.stashy.data.Performer
 import de.letzgo.stashy.data.SavedFilter
-import de.letzgo.stashy.data.SavedFiltersCache
+import de.letzgo.stashy.data.SavedFiltersStore
 import de.letzgo.stashy.data.Scene
+import de.letzgo.stashy.data.SceneEvents
+import de.letzgo.stashy.data.applying
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.StashStatistics
 import de.letzgo.stashy.data.Studio
 import de.letzgo.stashy.data.TabManager
-import de.letzgo.stashy.data.obj
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.contentOrNull
 
 /** iOS: `HomeRowStore` — one dashboard row's items and load state. */
 data class HomeRowState(
@@ -54,6 +55,17 @@ object DashboardStore {
     private val fetching = mutableSetOf<HomeRowType>()
     private var serverId: String? = null
     private var lastStatsFetch = 0L
+
+    init {
+        // iOS `HomeView.sceneLiveUpdates(using:)` — patch the scene rows while a detail covers them.
+        scope.launch {
+            SceneEvents.events.collect { event ->
+                for ((type, state) in rows.toMap()) {
+                    state.scenes.applying(event)?.let { rows[type] = state.copy(scenes = it) }
+                }
+            }
+        }
+    }
 
     fun row(type: HomeRowType): HomeRowState = rows[type] ?: HomeRowState()
 
@@ -89,18 +101,16 @@ object DashboardStore {
     fun refreshAll() {
         rows.clear(); fetching.clear()
         loadStatistics(force = true)
-        scope.launch { SavedFiltersCache.load(force = true) }
+        scope.launch { SavedFiltersStore.load(force = true) }
     }
 
     /** The default dashboard filter, sanitised for `scene_filter` (iOS `fetchScenesForHomeRow`). */
     private fun dashboardSceneFilter(): JsonObject? {
         val id = TabManager.getDefaultFilterId(AppTab.Dashboard) ?: return null
-        val saved = SavedFiltersCache.filters[id] ?: return null
+        val saved = SavedFiltersStore.byId[id] ?: return null
         // iOS `filterDict`: `object_filter`, else the legacy UI filter string.
-        val raw = saved.objectFilter.obj?.takeIf { it.isNotEmpty() }
-            ?: saved.filter?.let { runCatching { de.letzgo.stashy.data.Json.parseToJsonElement(it).obj }.getOrNull() }
-            ?: return null
-        return JsonObject(DashboardFilterMapper.sanitize(raw).filterKeys { it != "sort" && it != "direction" })
+        val raw = saved.filterDict ?: return null
+        return JsonObject(FilterMapper.sanitize(raw).filterKeys { it != "sort" && it != "direction" })
     }
 
     /**
@@ -111,8 +121,8 @@ object DashboardStore {
         val type = config.type
         if (type == HomeRowType.Statistics || type == HomeRowType.Channels) return
         val filterId = TabManager.getDefaultFilterId(AppTab.Dashboard)
-        if (filterId != null && SavedFiltersCache.filters[filterId] == null && (SavedFiltersCache.isLoading || !SavedFiltersCache.loadedOnce)) {
-            if (!SavedFiltersCache.isLoading) scope.launch { SavedFiltersCache.load() }
+        if (filterId != null && SavedFiltersStore.byId[filterId] == null && (SavedFiltersStore.isLoading || !SavedFiltersStore.loadedOnce)) {
+            if (!SavedFiltersStore.isLoading) scope.launch { SavedFiltersStore.load() }
             return
         }
         val state = row(type)
@@ -138,34 +148,17 @@ object DashboardStore {
         }
     }
 
+    private var handledFilterChange: Long? = null
+
+    /** iOS `DefaultFilterChanged` — reloads the scene rows once per change of the dashboard filter. */
+    fun onDefaultFilterChanged(change: Pair<AppTab, Long>?) {
+        if (change == null || change.second == handledFilterChange) return
+        handledFilterChange = change.second
+        if (change.first == AppTab.Dashboard) clearSceneRows()
+    }
+
     /** Drops the scene rows (iOS `DefaultFilterChanged` for the dashboard). */
     fun clearSceneRows() {
         rows.keys.filter { it.isSceneRow }.forEach { rows.remove(it) }
     }
-}
-
-/** iOS `SavedFilter.resolvedSceneSort` → `SceneSortOption(graphqlField:direction:)` raw value. */
-fun SavedFilter.sceneSortRaw(): String? {
-    val field = (findFilter?.get("sort") as? JsonPrimitive)?.contentOrNull?.lowercase() ?: return null
-    if (field.startsWith("random")) return "random"
-    val asc = (findFilter["direction"] as? JsonPrimitive)?.contentOrNull?.uppercase() == "ASC"
-    val base = when (field) {
-        "date" -> "date"; "created_at" -> "createdAt"; "title" -> "title"; "duration" -> "duration"
-        "last_played_at" -> "lastPlayedAt"; "play_count" -> "playCount"; "play_duration" -> "playDuration"
-        "o_counter" -> "oCounter"; "rating", "rating100" -> "rating"
-        else -> return null
-    }
-    return base + if (asc) "Asc" else "Desc"
-}
-
-/** iOS `SavedFilter.resolvedImageSort` → `ImageSortOption` raw value. */
-fun SavedFilter.imageSortRaw(): String? {
-    val field = (findFilter?.get("sort") as? JsonPrimitive)?.contentOrNull?.lowercase() ?: return null
-    if (field.startsWith("random")) return "random"
-    val asc = (findFilter["direction"] as? JsonPrimitive)?.contentOrNull?.uppercase() == "ASC"
-    val base = when (field) {
-        "title" -> "title"; "date" -> "date"; "rating", "rating100" -> "rating"; "created_at" -> "createdAt"; "updated_at" -> "updatedAt"
-        else -> return null
-    }
-    return base + if (asc) "Asc" else "Desc"
 }

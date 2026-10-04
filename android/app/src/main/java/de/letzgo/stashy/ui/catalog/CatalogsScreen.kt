@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import de.letzgo.stashy.data.TabManager
 import de.letzgo.stashy.ui.CatalogTab
 import de.letzgo.stashy.ui.ChromeChip
 import de.letzgo.stashy.ui.Nav
@@ -33,6 +34,17 @@ val CatalogChromeHeight: Dp = 72.dp
 /** Top padding for content under the floating chrome strip (status bar + strip + gap). */
 @Composable
 fun catalogTopPadding(): Dp = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + CatalogChromeHeight + 8.dp
+
+/**
+ * iOS: `CatalogsView.sortedVisibleTabs` — dashboard + the visible catalogs in the user's order
+ * (Settings › Dashboard › Home Tabs); a deep link may target a hidden catalog, which is then
+ * appended so its chip shows.
+ */
+private fun sortedVisibleTabs(current: CatalogTab): List<CatalogTab> {
+    val tabs = TabManager.visibleCatalogTabs.mapNotNull { CatalogTab.from(it) }.toMutableList()
+    if (current !in tabs) tabs.add(current)
+    return tabs
+}
 
 /**
  * iOS: `CatalogsView` — Home tab. Floating chip strip on top (`StashyTopNavStrip`): the
@@ -53,14 +65,15 @@ fun CatalogsScreen() {
             CatalogTab.Groups -> GroupsCatalog()
             CatalogTab.Markers -> MarkersCatalog()
         }
-        TopNavStrip()
+        val tabs = sortedVisibleTabs(Nav.catalogTab)
+        // iOS `showTabSwitcher`: only with more than one catalog.
+        if (tabs.size > 1) TopNavStrip(tabs)
     }
 }
 
 @Composable
-private fun TopNavStrip() {
+private fun TopNavStrip(tabs: List<CatalogTab>) {
     val state = rememberLazyListState()
-    val tabs = CatalogTab.entries
     LaunchedEffect(Nav.catalogTab) { state.animateScrollToItem(tabs.indexOf(Nav.catalogTab).coerceAtLeast(0)) }
     Box(
         Modifier.fillMaxWidth()

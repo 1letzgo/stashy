@@ -5,6 +5,8 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import de.letzgo.stashy.data.Page
+import de.letzgo.stashy.data.Scene
+import de.letzgo.stashy.data.SceneEvent
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
@@ -40,6 +42,23 @@ class PagedList<T>(
         load(reset = false)
     }
 
+    /**
+     * Patches loaded items in place (live updates); [transform] returns null to drop an item,
+     * which also lowers [totalCount].
+     */
+    fun patch(transform: (T) -> T?) {
+        var removed = 0
+        for (i in items.indices.reversed()) {
+            val old = items[i]
+            val new = transform(old)
+            when {
+                new == null -> { items.removeAt(i); removed++ }
+                new != old -> items[i] = new
+            }
+        }
+        if (removed > 0) totalCount = maxOf(0, totalCount - removed)
+    }
+
     /** Call from the list when item [index] becomes visible. */
     fun onItemShown(index: Int) { if (index >= items.size - 8) loadMore() }
 
@@ -65,3 +84,6 @@ class PagedList<T>(
         }
     }
 }
+
+/** iOS `sceneLiveUpdates(using:)` for one scene list. */
+fun PagedList<Scene>.applySceneEvent(event: SceneEvent) = patch { event.applyTo(it) }

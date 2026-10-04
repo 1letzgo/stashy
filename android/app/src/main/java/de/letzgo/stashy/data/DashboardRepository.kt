@@ -1,7 +1,5 @@
 package de.letzgo.stashy.data
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
@@ -31,7 +29,6 @@ data class StashStatistics(
 object DashboardRepository {
     private const val STATS_QUERY = "{ stats { scene_count image_count gallery_count performer_count studio_count group_count tag_count total_o_count total_play_count scenes_played } }"
     private const val MARKER_COUNT_QUERY = "{ findSceneMarkers(filter: { per_page: 1 }) { count } }"
-    private const val SAVED_FILTERS_QUERY = "query GetAllFilterDefinitions { findSavedFilters { id name mode filter object_filter ui_options find_filter { sort direction } } }"
     private const val CACHED_MARKER_COUNT_KEY = "cachedMarkerCount"
 
     /** Per-kind random seed like iOS (`random_<seed>`), stable for the session. */
@@ -44,8 +41,6 @@ object DashboardRepository {
         return stats.copy(sceneMarkerCount = markers ?: Prefs.int(Prefs.serverKey(CACHED_MARKER_COUNT_KEY)).takeIf { it > 0 })
     }
 
-    suspend fun savedFilters(): List<SavedFilter> =
-        GraphQL.decode(ListSerializer(SavedFilter.serializer()), GraphQL.data(SAVED_FILTERS_QUERY)["findSavedFilters"] ?: kotlinx.serialization.json.JsonArray(emptyList()))
 
     private fun filter(perPage: Int, sort: String, direction: String) = FindFilter(1, perPage, if (sort == "random") "random_$seed" else sort, direction)
 
@@ -284,34 +279,4 @@ object ServerTasksRepository {
         if (ids.isEmpty()) return true
         return GraphQL.named(mutation, vars("ids" to ids))[mutation].stringOrNull == "true"
     }
-}
-
-/**
- * The server's saved filters, shared by Dashboard and Settings (iOS `viewModel.savedFilters` /
- * `isLoadingSavedFilters`). Cleared on a server switch.
- */
-object SavedFiltersCache {
-    var filters by androidx.compose.runtime.mutableStateOf<Map<String, SavedFilter>>(emptyMap()); private set
-    var isLoading by androidx.compose.runtime.mutableStateOf(false); private set
-    var loadedOnce by androidx.compose.runtime.mutableStateOf(false); private set
-    private var loadedFor: String? = null
-
-    suspend fun load(force: Boolean = false) {
-        val server = ServerConfigManager.activeConfig?.id
-        if (server != loadedFor) { filters = emptyMap(); loadedOnce = false }
-        if (isLoading || (!force && loadedOnce && server == loadedFor)) return
-        isLoading = true
-        try {
-            filters = DashboardRepository.savedFilters().associateBy { it.id }
-            loadedFor = server
-            loadedOnce = true
-        } catch (e: kotlinx.coroutines.CancellationException) {
-            throw e
-        } catch (e: Exception) {
-            loadedOnce = true
-        } finally { isLoading = false }
-    }
-
-    /** Filters of one mode (`SCENES`, `IMAGES`, `SCENE_MARKERS` …), by name. */
-    fun ofMode(mode: String): List<SavedFilter> = filters.values.filter { it.mode.equals(mode, true) }.sortedBy { it.name }
 }
