@@ -49,6 +49,8 @@ android {
             buildConfigField("String", "DEBUG_API_KEY", localString("stashy.debug.apiKey"))
         }
         release {
+            // Sideloaded APKs: ship only ARM (phones, TVs); x86 emulators use debug builds.
+            ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
@@ -61,6 +63,8 @@ android {
     }
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true; buildConfig = true }
+    // Compress native libs (Vosk, ML Kit) inside the APK — smaller download for sideloading.
+    packaging { jniLibs { useLegacyPackaging = true } }
     testOptions { unitTests.isReturnDefaultValues = true }
 }
 
