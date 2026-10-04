@@ -27,6 +27,10 @@ android {
         versionName = "3.3.5"
         buildConfigField("String", "DEBUG_SERVER", "\"\"")
         buildConfigField("String", "DEBUG_API_KEY", "\"\"")
+        // stashy+ always unlocked in our own (sideloaded) builds. A Google Play build passes
+        // -PstashyPlusIncluded=false and unlocks through Play Billing instead.
+        val plusIncluded = (project.findProperty("stashyPlusIncluded") as String?)?.toBoolean() ?: true
+        buildConfigField("boolean", "PLUS_INCLUDED", plusIncluded.toString())
     }
     sourceSets {
         // The .graphql documents are shared 1:1 with the iOS app (loaded at runtime like there).
