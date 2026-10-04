@@ -6,6 +6,8 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import de.letzgo.stashy.data.AppTab
+import de.letzgo.stashy.data.FilterMode
 
 /**
  * A pushed screen (iOS: a `NavigationLink` destination). Features declare their own
@@ -31,6 +33,21 @@ enum class CatalogTab(val title: String) {
         Dashboard -> SF.houseFill; Scenes -> SF.film; Images -> SF.photo; Galleries -> SF.photoStack
         Performers -> SF.personFill; Studios -> SF.building2; Tags -> SF.tag
         Groups -> SF.rectangleStackFill; Markers -> SF.bookmarkFill
+    }
+
+    /** iOS `TabManager` `AppTab` of this catalog (order / visibility / defaults). */
+    val appTab: AppTab get() = when (this) {
+        Dashboard -> AppTab.Dashboard; Scenes -> AppTab.Scenes; Images -> AppTab.Images; Galleries -> AppTab.Galleries
+        Performers -> AppTab.Performers; Studios -> AppTab.Studios; Tags -> AppTab.Tags
+        Groups -> AppTab.Groups; Markers -> AppTab.Markers
+    }
+
+    /** List mode of the catalog (null for the dashboard). */
+    val filterMode: FilterMode? get() = appTab.filterMode
+
+    companion object {
+        fun from(tab: AppTab): CatalogTab? = entries.firstOrNull { it.appTab == tab }
+        fun forMode(mode: FilterMode): CatalogTab? = entries.firstOrNull { it.filterMode == mode }
     }
 }
 
@@ -75,9 +92,14 @@ object Nav {
     fun consumeCatalogRequest(tab: CatalogTab): CatalogRequest? =
         catalogRequest?.takeIf { it.tab == tab }?.also { catalogRequest = null }
 
-    /** Opens a catalog sub-tab on Home (used by dashboard "›" headers, stats tiles, Search "Show All"). */
+    /**
+     * Opens a catalog sub-tab on Home (dashboard "›" headers, stats tiles, Search "Show All") —
+     * iOS `navigateToScenes(sort:search:noDefaultFilter:)` …; Images with a search term skip the
+     * default filter like iOS `navigateToImages(search:)`.
+     */
     fun openCatalog(tab: CatalogTab, sort: String? = null, search: String? = null, noDefaultFilter: Boolean = false) {
-        catalogRequest = if (sort != null || search != null || noDefaultFilter) CatalogRequest(tab, sort, search, noDefaultFilter) else null
+        val skipDefault = noDefaultFilter || (tab == CatalogTab.Images && !search.isNullOrEmpty())
+        catalogRequest = if (sort != null || search != null || skipDefault) CatalogRequest(tab, sort, search, skipDefault) else null
         this.tab = MainTab.Home
         popToRoot(MainTab.Home)
         catalogTab = tab

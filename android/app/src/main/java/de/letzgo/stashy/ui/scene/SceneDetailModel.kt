@@ -14,6 +14,7 @@ import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.SceneEditing
 import de.letzgo.stashy.data.SceneEvent
 import de.letzgo.stashy.data.SceneEvents
+import de.letzgo.stashy.data.SceneStamps
 import de.letzgo.stashy.data.ScenesRepository
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.VideoCaption
@@ -454,19 +455,8 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
     }
 
     companion object {
-        /** iOS: `Scene.newerUpdatedAt` — the later of two stamps (ISO 8601 or a local millisecond bust). */
-        fun newerUpdatedAt(a: String?, b: String?): String? {
-            if (a == null) return b
-            if (b == null) return a
-            val da = parseUpdatedAt(a); val db = parseUpdatedAt(b)
-            if (da != null && db != null) return if (da >= db) a else b
-            return if (a > b) a else b
-        }
-
-        /** Epoch millis of a 12–14 digit millisecond stamp or an ISO 8601 date, else null. */
-        fun parseUpdatedAt(raw: String): Long? {
-            if (raw.length in 12..14) raw.toLongOrNull()?.let { return it }
-            return runCatching { java.time.OffsetDateTime.parse(raw).toInstant().toEpochMilli() }.getOrNull()
-        }
+        /** iOS: `Scene.newerUpdatedAt` — see [SceneStamps]. */
+        fun newerUpdatedAt(a: String?, b: String?): String? = SceneStamps.newerUpdatedAt(a, b)
+        fun parseUpdatedAt(raw: String): Long? = SceneStamps.parseUpdatedAt(raw)
     }
 }

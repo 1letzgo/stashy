@@ -35,8 +35,18 @@ enum class AppTab(val title: String) {
     /** Raw value as stored by iOS. */
     val raw: String get() = name.replaceFirstChar { it.lowercase() }.let { if (this == StashyPlus) "stashyPlus" else it }
 
+    /** Catalog list mode of a catalog tab (iOS `CatalogDefaultFilterMenu.filterMode`, sort enums). */
+    val filterMode: FilterMode? get() = when (this) {
+        Scenes -> FilterMode.Scenes; Performers -> FilterMode.Performers; Studios -> FilterMode.Studios
+        Galleries -> FilterMode.Galleries; Images -> FilterMode.Images; Tags -> FilterMode.Tags
+        Groups -> FilterMode.Groups; Markers -> FilterMode.SceneMarkers
+        else -> null
+    }
+
     companion object {
         fun fromRaw(raw: String?): AppTab? = entries.firstOrNull { it.raw == raw }
+
+        fun forMode(mode: FilterMode): AppTab? = entries.firstOrNull { it.filterMode == mode }
     }
 }
 
@@ -145,6 +155,8 @@ enum class DetailViewContext(val raw: String, val title: String) {
     val settingsRowTitle: String get() = if (this == Gallery) "Images Sort" else "Scenes Sort"
 
     companion object {
+        fun fromRaw(raw: String?): DetailViewContext? = entries.firstOrNull { it.raw == raw }
+
         fun forTab(tab: AppTab): DetailViewContext? = when (tab) {
             AppTab.Performers -> Performer
             AppTab.Studios -> Studio

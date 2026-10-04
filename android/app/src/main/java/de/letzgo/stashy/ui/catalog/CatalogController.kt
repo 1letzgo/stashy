@@ -22,7 +22,10 @@ import de.letzgo.stashy.data.LocalFilterPresetStore
 import de.letzgo.stashy.data.Prefs
 import de.letzgo.stashy.data.RandomSeeds
 import de.letzgo.stashy.data.SavedFilter
+import de.letzgo.stashy.data.Scene
+import de.letzgo.stashy.data.SceneEvents
 import de.letzgo.stashy.data.SavedFiltersRepository
+import de.letzgo.stashy.data.SavedFiltersStore
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.SortCatalog
 import de.letzgo.stashy.data.SortOption
@@ -30,7 +33,10 @@ import de.letzgo.stashy.data.criteriaObjectFilter
 import de.letzgo.stashy.data.filterMode
 import de.letzgo.stashy.data.mergedObjectFilterForSave
 import de.letzgo.stashy.data.stashyMetadata
+import de.letzgo.stashy.ui.CatalogTab
+import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.PagedList
+import de.letzgo.stashy.ui.applySceneEvent
 import de.letzgo.stashy.ui.filter.FilterPickerOptionsStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.FlowPreview
@@ -42,39 +48,6 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
-
-/** iOS: `StashDBViewModel.savedFilters` + `fetchSavedFilters()` — one cache for every list. */
-object SavedFiltersStore {
-    val byId = mutableStateMapOf<String, SavedFilter>()
-    var isLoading by mutableStateOf(false)
-        private set
-    var loadedOnce by mutableStateOf(false)
-        private set
-    private var job: Job? = null
-
-    fun fetch(scope: CoroutineScope) {
-        if (isLoading) return
-        isLoading = true
-        job = scope.launch {
-            try {
-                val list = SavedFiltersRepository.all()
-                byId.clear()
-                list.forEach { byId[it.id] = it }
-            } catch (e: kotlinx.coroutines.CancellationException) {
-                throw e
-            } catch (_: Exception) {
-            } finally {
-                isLoading = false
-                loadedOnce = true
-            }
-        }
-    }
-
-    fun forMode(mode: FilterMode): List<SavedFilter> =
-        byId.values.filter { it.filterMode == mode }.sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.name })
-
-    fun reset() { byId.clear(); loadedOnce = false }
-}
 
 /** iOS: `ToastManager.shared.show(…)` for save/rename/delete failures. */
 internal fun showToast(text: String) {
@@ -116,10 +89,34 @@ class CatalogController<T>(
         CatalogRepository.find(query(), page, per)
     }
 
+    /** Search term of the last query — the debounced search only refetches when it differs. */
+    internal var lastQueriedSearch: String = ""
+        private set
+
+    /** A catalog root (not a detail list): Settings defaults and catalog requests apply. */
+    val isCatalogRoot: Boolean get() = tabId != null && scope == null
+
+    /** Settings defaults this controller has already reacted to (see [syncDefaults]). */
+    private var seenPersistentSort: String? = tabId?.let { CatalogPrefs.persistentSortOption(it) }
+    private var seenDefaultFilterId: String? = tabId?.let { CatalogPrefs.defaultFilterId(it) }
+
+    init {
+        // iOS `sceneLiveUpdates(using:)`: resume time, play count, O-count, edits, cover, delete.
+        // Collected in the controller's own scope so a retained catalog keeps up while a scene
+        // detail covers it (only the top screen is composed).
+        if (mode == FilterMode.Scenes) coroutineScope.launch {
+            SceneEvents.events.collect { event ->
+                @Suppress("UNCHECKED_CAST")
+                (list as PagedList<Scene>).applySceneEvent(event)
+            }
+        }
+    }
+
     /** Passed as `filter:` only while the editor holds no copy of it (iOS `fetchBaseFilter`). */
     private val fetchBaseFilter: SavedFilter? get() = if (criteria.isEmpty) selectedFilter else null
 
     fun query(): CatalogQuery {
+        lastQueriedSearch = search
         val extra = extraLive()
         return CatalogQuery(mode, sort, search, fetchBaseFilter, criteria.merged(extra), scope)
     }
@@ -170,16 +167,69 @@ class CatalogController<T>(
         return true
     }
 
-    /** Settings changed the default sort / filter (iOS `DefaultSortChanged` / `DefaultFilterChanged`). */
-    fun onDefaultsChanged() {
+    /**
+     * Settings changed this catalog's default sort (iOS `DefaultSortChanged` → `changeSortOption`)
+     * or default filter (iOS `DefaultFilterChanged`: select the new default, or none). Runs on
+     * every [CatalogPrefs.defaultsVersion] bump and when the catalog reappears, because Settings
+     * is another tab and only the top screen is composed.
+     */
+    fun syncDefaults() {
         val id = tabId ?: return
-        val persistent = SortCatalog.option(mode, CatalogPrefs.persistentSortOption(id))
-        if (persistent != null && persistent != sort) { sort = persistent }
-        val defId = CatalogPrefs.defaultFilterId(id)
-        if (defId != null && defId != selectedFilter?.id) {
-            SavedFiltersStore.byId[defId]?.let { selectedFilter = it; presetRow = ListLivePresetTag.serverRow(it.id); criteria.clear() }
+        if (!isCatalogRoot) return
+        val persistentRaw = CatalogPrefs.persistentSortOption(id)
+        if (persistentRaw != seenPersistentSort) {
+            seenPersistentSort = persistentRaw
+            SortCatalog.option(mode, persistentRaw)?.let { if (it != sort || it.isRandom) changeSort(it) }
         }
-        refresh()
+        val defId = CatalogPrefs.defaultFilterId(id)
+        if (defId != seenDefaultFilterId) {
+            seenDefaultFilterId = defId
+            val filter = defId?.let { SavedFiltersStore.byId[it] }
+            if (filter != null) {
+                didApplyDefaultFilter = true
+                criteria.clear()
+                applyServerFilter(filter)
+                presetRow = ListLivePresetTag.serverRow(filter.id)
+            } else {
+                // No default any more (or not loaded yet — then `onSavedFiltersLoaded` applies it).
+                didApplyDefaultFilter = false
+                selectedFilter = null
+                presetRow = ""
+                criteria.clear()
+                applyLive()
+            }
+        }
+    }
+
+    /**
+     * iOS `NavigationCoordinator.activeSortOption` / `activeSearchText` / `noDefaultFilter` —
+     * what a dashboard header, a stats tile or Search "Show All" asked this catalog for.
+     * Returns whether the list must be refetched.
+     */
+    fun applyRequest(request: Nav.CatalogRequest): Boolean {
+        var changed = false
+        request.sort?.let { SortCatalog.option(mode, it) }?.let { s ->
+            if (s != sort || s.isRandom) {
+                if (s.isRandom && sort.isRandom) RandomSeeds.refresh(mode)
+                sort = s
+                persistSort(s)
+                changed = true
+            }
+        }
+        if (request.noDefaultFilter) {
+            didApplyDefaultFilter = true
+            val defId = tabId?.let { CatalogPrefs.defaultFilterId(it) }
+            if (defId != null && selectedFilter?.id == defId) {
+                selectedFilter = null
+                presetRow = ""
+                criteria.clear()
+                changed = true
+            }
+        }
+        request.search?.let { text ->
+            if (text != search) { search = text; changed = true }
+        }
+        return changed
     }
 
     /** Sheet opened: re-apply the selected row so the editor shows its criteria (iOS sheet `onAppear`). */
@@ -393,8 +443,20 @@ fun <T> rememberCatalogController(
         if (retain) RetainedCatalogs.get(mode, serverId) { factory(RetainedCatalogs.scope) } else factory(localScope)
     }
     LaunchedEffect(controller) {
-        CatalogSearchDeepLink.consume(mode)?.let { controller.search = it }
+        val catalogTab = CatalogTab.forMode(mode)
+        // A pending request (dashboard header, Search "Show All") goes in before the first load.
+        val pending = if (controller.isCatalogRoot && catalogTab != null) Nav.consumeCatalogRequest(catalogTab) else null
+        val changed = pending?.let { controller.applyRequest(it) } ?: false
+        controller.syncDefaults()
+        val wasLoaded = controller.list.loadedOnce
         controller.onAppear()
+        if (changed && wasLoaded) controller.refresh()
+        // Requests arriving while this catalog is on screen.
+        if (controller.isCatalogRoot && catalogTab != null) {
+            snapshotFlow { Nav.catalogRequest }.collect { req ->
+                if (req?.tab == catalogTab) Nav.consumeCatalogRequest(catalogTab)?.let { if (controller.applyRequest(it)) controller.refresh() }
+            }
+        }
     }
     LaunchedEffect(controller) {
         snapshotFlow { SavedFiltersStore.loadedOnce to SavedFiltersStore.byId.size }
@@ -402,10 +464,12 @@ fun <T> rememberCatalogController(
             .collect { controller.onSavedFiltersLoaded() }
     }
     LaunchedEffect(controller) {
-        snapshotFlow { CatalogPrefs.defaultsVersion }.distinctUntilChanged().drop(1).collect { controller.onDefaultsChanged() }
+        snapshotFlow { CatalogPrefs.defaultsVersion }.distinctUntilChanged().drop(1).collect { controller.syncDefaults() }
     }
     LaunchedEffect(controller) {
-        snapshotFlow { controller.search }.distinctUntilChanged().drop(1).debounce(500).collect { controller.refresh() }
+        snapshotFlow { controller.search }.distinctUntilChanged().drop(1).debounce(500).collect {
+            if (it != controller.lastQueriedSearch) controller.refresh()
+        }
     }
     LaunchedEffect(serverId) {
         // A different server invalidates the shared saved-filter cache and picker options.
@@ -431,30 +495,3 @@ object RetainedCatalogs {
 }
 
 private var lastServerId: String? = null
-
-/**
- * iOS: `NavigationCoordinator.activeSearchText` — Search › "Show all" opens a catalog with a
- * search term. Call [open] from the search screen; the catalog consumes it on appear.
- */
-object CatalogSearchDeepLink {
-    private val pending = HashMap<FilterMode, String>()
-
-    fun open(tab: de.letzgo.stashy.ui.CatalogTab, text: String) {
-        modeFor(tab)?.let { pending[it] = text }
-        de.letzgo.stashy.ui.Nav.openCatalog(tab)
-    }
-
-    fun consume(mode: FilterMode): String? = pending.remove(mode)
-
-    fun modeFor(tab: de.letzgo.stashy.ui.CatalogTab): FilterMode? = when (tab) {
-        de.letzgo.stashy.ui.CatalogTab.Scenes -> FilterMode.Scenes
-        de.letzgo.stashy.ui.CatalogTab.Images -> FilterMode.Images
-        de.letzgo.stashy.ui.CatalogTab.Galleries -> FilterMode.Galleries
-        de.letzgo.stashy.ui.CatalogTab.Performers -> FilterMode.Performers
-        de.letzgo.stashy.ui.CatalogTab.Studios -> FilterMode.Studios
-        de.letzgo.stashy.ui.CatalogTab.Tags -> FilterMode.Tags
-        de.letzgo.stashy.ui.CatalogTab.Groups -> FilterMode.Groups
-        de.letzgo.stashy.ui.CatalogTab.Markers -> FilterMode.SceneMarkers
-        de.letzgo.stashy.ui.CatalogTab.Dashboard -> null
-    }
-}

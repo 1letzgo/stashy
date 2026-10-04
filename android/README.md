@@ -53,16 +53,16 @@ The debug build then starts connected (`ServerConfigManager.seedDebugServer`).
 | `ui/catalog/` (`CatalogController`, `CatalogScaffold`, `CatalogFloatingBar`) | `CatalogsView`, `ScenesView`, `PerformersView` …, `CatalogChrome`, `FloatingCatalogBar` |
 | `ui/filter/` (`CatalogFilterSortSheet`, `FilterCriteriaEditor`, `FilterPickerOptionsStore`) | `ListCatalogFilterSortSheets`, `Filters/FilterCriteriaEditorView`, `FilterPickerOptionsStore` |
 | `data/FilterMapper.kt`, `FilterFields.kt`, `Filters.kt`, `Sorting.kt` | `FilterMapper`, `FilterFieldCatalog`, `FilterCriteriaDocument`, `*SortOption`, presets |
-| `data/CatalogPrefs.kt`, `CatalogRepositories.kt` | catalog part of `TabManager` (`AppTabsConfig`, card columns), list fetches, saved filters |
+| `data/CatalogPrefs.kt`, `CatalogRepositories.kt`, `SavedFilters.kt` | catalog facade over `TabManager` (sorts, default filters, card columns), list fetches, `SavedFiltersStore` (iOS `viewModel.savedFilters`, shared by catalogs, dashboard and Settings) |
 | `ui/components/` (`SceneCard`, `EntityCards.kt`) | `SceneCardView`, `PerformerCardView`, `StudioCardView`, `TagCardView`, `GalleryCardView`, `GroupCardView`, `ImageThumbnailCard`, `MarkerCardView` |
 | `ui/home/` | `HomeView` (dashboard) |
 | `ui/scene/` | `SceneDetailView`, `SceneDetail/` |
 | `ui/detail/` | Performer/Studio/Tag/Gallery/Group detail |
 | `ui/player/` (`StashPlayer`, `VideoSurface`, `ScenePlayerSurface`, `TimeBar`, `PreviewPlayer`/`PreviewPlayerPool`, `PlaybackService`, `PlayerWindow`) | `Playback/` (AetherEngine → Media3 ExoPlayer, see below), `SubtitleController`, `SceneScrubSprites` |
-| `data/SceneEditing.kt`, `data/SceneEvents.kt` | scene mutations of `StashDBViewModel`, scene `NotificationCenter` posts |
+| `data/SceneEditing.kt`, `data/SceneEvents.kt` | scene mutations of `StashDBViewModel`, scene `NotificationCenter` posts + `sceneLiveUpdates` (`SceneEvent.applyTo`, collected by `CatalogController` and `DashboardStore`) |
 | `ui/feeds/` | `ReelsView` |
 | `ui/tools/` | `ToolsView` + tools, stashy+ paywall |
-| `data/TabConfigs.kt`, `data/TabManager.kt` | `TabManager` (tabs, `HomeRowsConfig`, channels, Feeds modes, default sorts/filters, playback/subtitle keys) |
+| `data/TabConfigs.kt`, `data/TabManager.kt` | `TabManager` — the one store of tabs (order/visibility → Home chip strip), session/default/detail sorts, default filters, card columns, `HomeRowsConfig`, channels, Feeds modes, playback/subtitle keys; `defaultsVersion` + `lastDefaultsChange` = iOS `DefaultSortChanged` / `DefaultFilterChanged` |
 | `data/Security.kt` (`PasscodeVault`, `SecurityManager`) | `SecurityManager`, Keychain PIN (`app_passcode_v1`) |
 | `data/DashboardRepository.kt` | dashboard/search/server-task fetches of `StashDBViewModel`, `SavedFiltersCache` |
 | `ui/settings/`, `ui/setup/`, `ui/search/` | `Settings/`, `ToolsServerView`, `PasscodeEntryView`, setup wizard, `UniversalSearchView` |
@@ -70,6 +70,8 @@ The debug build then starts connected (`ServerConfigManager.seedDebugServer`).
 
 ## Conventions
 
+- Catalog deep links (dashboard "›" headers, stats tiles, Search "Show All"): `Nav.openCatalog(tab, sort, search, noDefaultFilter)`;
+  the catalog root consumes the request (`CatalogController.applyRequest`).
 - Navigation: push a `Screen` implementation (`Nav.push(SceneDetailScreen(id))`); each tab has
   its own back stack; `hidesTabBar = true` for full-screen content.
 - Content under the floating chrome: top padding `catalogTopPadding()` on catalog roots,

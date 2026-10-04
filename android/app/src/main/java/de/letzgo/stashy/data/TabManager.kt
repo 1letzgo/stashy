@@ -1,6 +1,7 @@
 package de.letzgo.stashy.data
 
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -36,6 +37,8 @@ enum class SubtitleBackgroundChoice(val raw: String, val label: String, val argb
 /**
  * iOS: `TabManager` — tab visibility/order, dashboard rows, channels, Feeds modes, default
  * sorts/filters (per server, `<key>_<serverID>`) plus the global playback/feeds settings.
+ * The single store of `AppTabsConfig_<serverId>`, session sorts, `DetailViewsSortConfig_*` and
+ * `CatalogCardColumns`; [CatalogPrefs] is the catalogs' facade over it.
  * All keys are the iOS UserDefaults keys. JSON configs are stored as strings (iOS: `Data`).
  *
  * Player/feeds read the global settings from here (or from [Prefs] with the same keys:
@@ -64,6 +67,17 @@ object TabManager {
     private val cardColumns = mutableStateMapOf<CatalogCardColumnScope, CatalogCardColumns>()
     /** Session-only sorts (iOS `sessionSortOptions`). */
     private val sessionSorts = mutableStateMapOf<AppTab, String>()
+    /** Session-only detail sorts (iOS `sessionDetailSortOptions`), keyed by context raw value. */
+    private val sessionDetailSorts = mutableStateMapOf<String, String>()
+
+    /**
+     * Bumped whenever a persistent default (sort, filter, detail sort) changes or the session is
+     * reset (iOS `DefaultSortChanged` / `DefaultFilterChanged`). Catalogs re-check their defaults
+     * on a bump and whenever they reappear (`CatalogController.syncDefaults`).
+     */
+    var defaultsVersion by mutableIntStateOf(0); private set
+
+    private fun notifyDefaults() { defaultsVersion++ }
 
     /** Bumped when a default filter changes (iOS `DefaultFilterChanged` notification); value = tab. */
     var defaultFilterChanged by mutableStateOf<Pair<AppTab, Long>?>(null); private set
@@ -153,7 +167,7 @@ object TabManager {
     fun reload() {
         loadedFor = ServerConfigManager.activeConfig?.id
         loadTabs(); loadDetailSorts(); loadHomeRows(); loadChannelItems(); loadReelsModes(); loadCardColumns()
-        sessionSorts.clear()
+        sessionSorts.clear(); sessionDetailSorts.clear()
     }
 
     private fun key(base: String) = Prefs.serverKey(base)
@@ -268,14 +282,19 @@ object TabManager {
     fun getPersistentSortOption(tab: AppTab): String? = tab(tab)?.defaultSortOption
     fun setSortOption(tab: AppTab, option: String) { sessionSorts[tab] = option }
 
+    /** iOS `setPersistentSortOption(for:option:)` — posts `DefaultSortChanged`. */
     fun setPersistentSortOption(tab: AppTab, option: String) {
         ensureLoaded()
+        if (tabs.none { it.id == tab }) return
         tabs = tabs.map { if (it.id == tab) it.copy(defaultSortOption = option) else it }
         sessionSorts[tab] = option
         saveTabs()
+        notifyDefaults()
     }
 
     fun getDefaultFilterId(tab: AppTab) = tab(tab)?.defaultFilterId
+    fun getDefaultFilterName(tab: AppTab) = tab(tab)?.defaultFilterName
+    fun getDefaultMarkerFilterName(tab: AppTab) = tab(tab)?.defaultMarkerFilterName
     fun getDefaultMarkerFilterId(tab: AppTab) = tab(tab)?.defaultMarkerFilterId
     fun getDefaultClipFilterId(tab: AppTab) = tab(tab)?.defaultClipFilterId
     fun getDefaultPreviewFilterId(tab: AppTab) = tab(tab)?.defaultPreviewFilterId
@@ -285,6 +304,7 @@ object TabManager {
         tabs = tabs.map { if (it.id == tab) change(it) else it }
         saveTabs()
         defaultFilterChanged = tab to System.nanoTime()
+        notifyDefaults()
     }
 
     fun setDefaultFilter(tab: AppTab, id: String?, name: String?) = updateTab(tab) { it.copy(defaultFilterId = id, defaultFilterName = name) }
@@ -296,13 +316,39 @@ object TabManager {
     fun setPersistentDetailSortOption(ctx: DetailViewContext, option: String) {
         ensureLoaded()
         detailSorts[ctx] = option
+        sessionDetailSorts[ctx.raw] = option
         Prefs.setString(key("${DETAIL_SORT_KEY}_${ctx.raw}"), option)
+        notifyDefaults()
+    }
+
+    /** iOS `getDetailSortOption(for:)` — session first, then the persistent detail default. */
+    fun getDetailSortOption(context: String): String? =
+        sessionDetailSorts[context] ?: DetailViewContext.fromRaw(context)?.let { getPersistentDetailSortOption(it) }
+
+    /** iOS `setDetailSortOption(for:option:)` — session only. */
+    fun setDetailSortOption(context: String, option: String) { sessionDetailSorts[context] = option }
+
+    /** Server switch: session sorts belong to the old server. */
+    fun resetSession() {
+        sessionSorts.clear(); sessionDetailSorts.clear()
+        notifyDefaults()
     }
 
     fun catalogCardColumns(scope: CatalogCardColumnScope): CatalogCardColumns { ensureLoaded(); return cardColumns[scope] ?: CatalogCardColumns.Two }
     fun setCatalogCardColumns(columns: CatalogCardColumns, scope: CatalogCardColumnScope) {
         cardColumns[scope] = columns
         Prefs.setString(CARD_COLUMNS_KEY, Json.encodeToString(MapSerializer(String.serializer(), Int.serializer()), cardColumns.entries.associate { it.key.raw to it.value.raw }))
+    }
+    fun toggleCatalogCardColumns(scope: CatalogCardColumnScope) = setCatalogCardColumns(catalogCardColumns(scope).next, scope)
+
+    /**
+     * iOS `CatalogsView.sortedVisibleTabs` — Home chip strip: dashboard + catalogs that are
+     * visible, in the user's order.
+     */
+    val visibleCatalogTabs: List<AppTab> get() {
+        ensureLoaded()
+        val ids = setOf(AppTab.Dashboard, AppTab.Scenes, AppTab.Galleries, AppTab.Performers, AppTab.Studios, AppTab.Tags, AppTab.Images, AppTab.Groups, AppTab.Markers)
+        return tabs.filter { it.id in ids && it.isVisible }.sortedBy { it.sortOrder }.map { it.id }
     }
 
     // MARK: home rows

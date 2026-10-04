@@ -28,7 +28,7 @@ import de.letzgo.stashy.ui.scene.SceneDetailScreen
 object DetailLinks {
     fun scene(s: Scene) = Nav.push(SceneDetailScreen(s.id, s))
     /** iOS: marker → `SceneDetailView(scene, autoPlay: true)` at the marker's start. */
-    fun marker(m: SceneMarker) { m.scene?.let { Nav.push(SceneDetailScreen(it.id, it.copy(resumeTime = m.seconds))) } }
+    fun marker(m: SceneMarker) { m.scene?.let { Nav.push(SceneDetailScreen(it.id, it.copy(resumeTime = m.seconds), autoPlay = true)) } }
     fun performer(p: Performer) = Nav.push(PerformerDetailScreen(p.id, p))
     fun studio(s: Studio) = Nav.push(StudioDetailScreen(s.id, s))
     fun tag(t: Tag) = Nav.push(TagDetailScreen(t.id, t))

@@ -54,10 +54,12 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import de.letzgo.stashy.data.AppTab
+import de.letzgo.stashy.data.FilterMode
+import de.letzgo.stashy.data.resolvedSort
 import de.letzgo.stashy.data.HomeChannelSourceKind
 import de.letzgo.stashy.data.HomeRowConfig
 import de.letzgo.stashy.data.HomeRowType
-import de.letzgo.stashy.data.SavedFiltersCache
+import de.letzgo.stashy.data.SavedFiltersStore
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.StashStatistics
 import de.letzgo.stashy.data.StashyPlus
@@ -74,6 +76,7 @@ import de.letzgo.stashy.ui.TabBarClearance
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.catalog.catalogTopPadding
+import de.letzgo.stashy.ui.components.GalleryCard
 import de.letzgo.stashy.ui.cardShadow
 import de.letzgo.stashy.ui.noRippleClickable
 import java.text.NumberFormat
@@ -133,13 +136,13 @@ fun DashboardScreen() {
         TabManager.ensureLoaded()
         if (server != null) {
             if (DashboardStore.statistics == null) DashboardStore.loadStatistics(force = true) else DashboardStore.loadStatistics()
-            SavedFiltersCache.load()
+            SavedFiltersStore.load()
         }
     }
     // iOS "DefaultFilterChanged" for the dashboard → reload the scene rows.
-    LaunchedEffect(TabManager.defaultFilterChanged) {
-        if (TabManager.defaultFilterChanged?.first == AppTab.Dashboard) DashboardStore.clearSceneRows()
-    }
+    // Runs again whenever the dashboard reappears (Settings is another tab), so the store
+    // remembers which change it already handled.
+    LaunchedEffect(TabManager.defaultFilterChanged) { DashboardStore.onDefaultFilterChanged(TabManager.defaultFilterChanged) }
     when {
         server == null -> ConnectionErrorView { Nav.select(MainTab.Settings) }
         DashboardStore.statistics == null && DashboardStore.errorMessage != null -> ConnectionErrorView { DashboardStore.loadStatistics(force = true) }
@@ -193,7 +196,7 @@ private fun DashboardContent() {
 private fun HomeRow(config: HomeRowConfig, isLarge: Boolean, isFirst: Boolean) {
     val p = Theme.palette
     val state = DashboardStore.row(config.type)
-    LaunchedEffect(config.type, ServerConfigManager.activeConfig?.id, SavedFiltersCache.loadedOnce) { DashboardStore.loadRowIfNeeded(config) }
+    LaunchedEffect(config.type, ServerConfigManager.activeConfig?.id, SavedFiltersStore.loadedOnce) { DashboardStore.loadRowIfNeeded(config) }
     val listState = rememberLazyListState()
     val focusedIndex by remember { derivedStateOf { listState.firstVisibleItemIndex + if (listState.firstVisibleItemScrollOffset > 200) 1 else 0 } }
     val w = homeCardWidth(config.type, isLarge)
@@ -238,7 +241,7 @@ private fun HomeRow(config: HomeRowConfig, isLarge: Boolean, isFirst: Boolean) {
                             items(list, key = { it.id }) { DashboardPerformerCard(it, badge, w, h, Modifier.noRippleClickable { DetailLinks.performer(it) }) }
                         }
                         config.type.isStudioRow -> items(state.studios, key = { it.id }) { DashboardStudioCard(it, isLarge, w, h, Modifier.noRippleClickable { DetailLinks.studio(it) }) }
-                        config.type.isGalleryRow -> items(state.galleries, key = { it.id }) { DashboardGalleryCard(it, if (isLarge) w else 125.dp, 125.dp, Modifier.noRippleClickable { DetailLinks.gallery(it) }) }
+                        config.type.isGalleryRow -> items(state.galleries, key = { it.id }) { (if (isLarge) w else 125.dp).let { gw -> GalleryCard(it, Modifier.size(gw, 125.dp).noRippleClickable { DetailLinks.gallery(it) }, aspectRatio = gw / 125.dp) } }
                         else -> items(state.scenes, key = { it.id }) { DashboardSceneCard(it, isLarge, w, h, Modifier.noRippleClickable { DetailLinks.scene(it) }) }
                     }
                 }
@@ -393,20 +396,20 @@ private fun CompactStatRow(item: StatItem, modifier: Modifier) {
 @Composable
 private fun ChannelsRow(config: HomeRowConfig, isFirst: Boolean) {
     val p = Theme.palette
-    LaunchedEffect(Unit) { SavedFiltersCache.load() }
-    LaunchedEffect(SavedFiltersCache.filters) { TabManager.syncHomeChannelItems(SavedFiltersCache.filters.values.toList()) }
+    LaunchedEffect(Unit) { SavedFiltersStore.load() }
+    LaunchedEffect(SavedFiltersStore.version) { TabManager.syncHomeChannelItems(SavedFiltersStore.byId.values.toList()) }
     val channels = TabManager.homeChannelItems.filter { it.isEnabled }.sortedBy { it.sortOrder }.mapNotNull { item ->
-        val filter = SavedFiltersCache.filters[item.filterId] ?: return@mapNotNull null
+        val filter = SavedFiltersStore.byId[item.filterId] ?: return@mapNotNull null
         when (item.destination) {
-            HomeChannelSourceKind.Scenes -> FeedsChannelRequest(filter, HomeChannelDestination.Scenes, filter.sceneSortRaw() ?: "dateDesc")
-            HomeChannelSourceKind.Clips -> FeedsChannelRequest(filter, HomeChannelDestination.Clips, filter.imageSortRaw() ?: "dateDesc")
+            HomeChannelSourceKind.Scenes -> FeedsChannelRequest(filter, HomeChannelDestination.Scenes, filter.resolvedSort(FilterMode.Scenes)?.raw ?: "dateDesc")
+            HomeChannelSourceKind.Clips -> FeedsChannelRequest(filter, HomeChannelDestination.Clips, filter.resolvedSort(FilterMode.Images)?.raw ?: "dateDesc")
         }
     }
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
         Text(config.title, style = IosTypography.headline, color = p.text, modifier = Modifier.padding(horizontal = 12.dp).padding(top = if (isFirst) 16.dp else 0.dp))
         if (channels.isEmpty()) {
             val msg = when {
-                SavedFiltersCache.isLoading -> "Loading channels…"
+                SavedFiltersStore.isLoading -> "Loading channels…"
                 TabManager.homeChannelItems.isEmpty() -> "No saved scene or image filters"
                 else -> "No channels enabled"
             }

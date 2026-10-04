@@ -22,9 +22,12 @@ import de.letzgo.stashy.data.AppTab
 import de.letzgo.stashy.data.CatalogCardColumnScope
 import de.letzgo.stashy.data.CatalogCardColumns
 import de.letzgo.stashy.data.DetailViewContext
+import de.letzgo.stashy.data.FilterMode
+import de.letzgo.stashy.data.SortCatalog
+import de.letzgo.stashy.data.TabConfigLogic
 import de.letzgo.stashy.data.ReelsModeConfig
 import de.letzgo.stashy.data.ReelsModeType
-import de.letzgo.stashy.data.SavedFiltersCache
+import de.letzgo.stashy.data.SavedFiltersStore
 import de.letzgo.stashy.data.TabConfig
 import de.letzgo.stashy.data.TabManager
 import de.letzgo.stashy.ui.Appearance
@@ -49,6 +52,13 @@ fun AppTab.settingsIcon(): ImageVector = when (this) {
     AppTab.Tools -> SF.cubeBox
     else -> SF.squareGrid2x2Fill
 }
+
+/** (raw, label) of the iOS sort enum of [mode] in `allCases` order — what the default-sort menus offer. */
+private fun sortNames(mode: FilterMode): List<Pair<String, String>> = SortCatalog.choices(mode).map { it.raw to it.label }
+
+/** iOS `CatalogDefaultSortMenu` fallback: the tab's default from `loadConfig()`. */
+private fun defaultSortFallback(tab: AppTab, mode: FilterMode): String =
+    TabConfigLogic.defaultTabs().firstOrNull { it.id == tab }?.defaultSortOption ?: SortCatalog.defaultRaw(mode)
 
 /** iOS `ReelsModeType.icon`. */
 private fun ReelsModeType.icon(): ImageVector = when (this) {
@@ -80,16 +90,16 @@ fun DefaultFilterMenu(tab: AppTab, kind: FilterKind = FilterKind.Standard) {
         FilterKind.Marker -> "SCENE_MARKERS"
         FilterKind.Clip -> "IMAGES"
         FilterKind.Preview -> "SCENES"
-        FilterKind.Standard -> SortOptionNames.filterMode(tab) ?: return
+        FilterKind.Standard -> (if (tab == AppTab.Reels || tab == AppTab.Dashboard) FilterMode.Scenes.raw else tab.filterMode?.raw) ?: return
     }
-    val filters = SavedFiltersCache.ofMode(mode)
+    val filters = SavedFiltersStore.ofMode(mode)
     val current = when (kind) {
         FilterKind.Marker -> TabManager.getDefaultMarkerFilterId(tab)
         FilterKind.Clip -> TabManager.getDefaultClipFilterId(tab)
         FilterKind.Preview -> TabManager.getDefaultPreviewFilterId(tab)
         FilterKind.Standard -> if (tab == AppTab.Markers) TabManager.getDefaultMarkerFilterId(tab) else TabManager.getDefaultFilterId(tab)
     }
-    if (filters.isEmpty() && !SavedFiltersCache.isLoading) {
+    if (filters.isEmpty() && !SavedFiltersStore.isLoading) {
         Text("No filters found", style = IosTypography.subheadline, color = Theme.palette.secondaryText)
         return
     }
@@ -113,7 +123,7 @@ class DashboardSettingsScreen : Screen {
     override val key = "settings-dashboard"
 
     @Composable override fun Content() {
-        LaunchedEffect(Unit) { SavedFiltersCache.load(force = true); TabManager.syncHomeChannelItems(SavedFiltersCache.filters.values.toList()) }
+        LaunchedEffect(Unit) { SavedFiltersStore.load(force = true); TabManager.syncHomeChannelItems(SavedFiltersStore.byId.values.toList()) }
         SettingsDetailScaffold("Dashboard") { top ->
             SettingsList(top) {
                 item(key = "dash") {
@@ -160,12 +170,12 @@ class DashboardSettingsScreen : Screen {
                         val items = TabManager.homeChannelItems.sortedBy { it.sortOrder }
                         SettingsGroup {
                             if (items.isEmpty()) SettingsRow {
-                                Text(if (SavedFiltersCache.isLoading) "Loading filters…" else "No saved scene or image filters", style = IosTypography.body, color = Theme.palette.secondaryText)
+                                Text(if (SavedFiltersStore.isLoading) "Loading filters…" else "No saved scene or image filters", style = IosTypography.body, color = Theme.palette.secondaryText)
                             } else ReorderableColumn(items, { it.id }, { from, to -> TabManager.moveHomeChannelItem(from, to) }) { item, i, handle ->
                                 Column {
                                     SettingsRow(verticalPadding = 6.dp) {
                                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                            Text(SavedFiltersCache.filters[item.filterId]?.name ?: "Filter", style = IosTypography.body, color = Theme.palette.text)
+                                            Text(SavedFiltersStore.byId[item.filterId]?.name ?: "Filter", style = IosTypography.body, color = Theme.palette.text)
                                             Text(item.destination.title, style = IosTypography.caption, color = Theme.palette.secondaryText)
                                         }
                                         SettingsSwitch(item.isEnabled) { TabManager.toggleHomeChannelItem(item.id) }
@@ -196,7 +206,7 @@ private fun CatalogTabCard(tab: TabConfig, handle: Modifier) {
         CatalogCardColumnScope.from(tab.id)?.let { scope -> CardSettingRow("Display") { ColumnsMenu(scope) } }
         if (tab.id == AppTab.Images) CardSettingRow("Autoplay") { SettingsSwitch(TabManager.imagesFeedVideoAutoplay) { TabManager.imagesFeedVideoAutoplay = it } }
         if (tab.id == AppTab.Scenes) CardSettingRow("Studio Logos") { SettingsSwitch(TabManager.sceneCardsShowStudioLogo) { TabManager.sceneCardsShowStudioLogo = it } }
-        SortOptionNames.forTab(tab.id)?.let { (options, fallback) ->
+        tab.id.filterMode?.let { m -> sortNames(m) to defaultSortFallback(tab.id, m) }?.let { (options, fallback) ->
             CardSettingRow("Default Sort") {
                 MenuValue(options, TabManager.getPersistentSortOption(tab.id) ?: fallback) { TabManager.setPersistentSortOption(tab.id, it) }
             }
@@ -204,7 +214,7 @@ private fun CatalogTabCard(tab: TabConfig, handle: Modifier) {
         CardSettingRow("Default Filter") { DefaultFilterMenu(tab.id) }
         DetailViewContext.forTab(tab.id)?.let { ctx ->
             CardSettingRow(ctx.settingsRowTitle) {
-                val options = if (ctx == DetailViewContext.Gallery) SortOptionNames.image else SortOptionNames.scene
+                val options = if (ctx == DetailViewContext.Gallery) sortNames(FilterMode.Images) else sortNames(FilterMode.Scenes)
                 MenuValue(options, TabManager.getPersistentDetailSortOption(ctx) ?: "dateDesc") { TabManager.setPersistentDetailSortOption(ctx, it) }
             }
         }
@@ -225,7 +235,7 @@ class FeedsSettingsScreen : Screen {
     override val key = "settings-feeds"
 
     @Composable override fun Content() {
-        LaunchedEffect(Unit) { SavedFiltersCache.load(force = true) }
+        LaunchedEffect(Unit) { SavedFiltersStore.load(force = true) }
         SettingsDetailScaffold("Feeds") { top ->
             SettingsList(top) {
                 settingsSection(header = "Tab", key = "tab") {
@@ -255,10 +265,10 @@ private fun FeedsModeCard(mode: ReelsModeConfig, handle: Modifier) {
         if (!mode.isEnabled) return@SettingsCard
         CardDivider()
         val (options, fallback) = when (mode.type) {
-            ReelsModeType.Scenes, ReelsModeType.Previews -> SortOptionNames.scene to "random"
-            ReelsModeType.Markers -> SortOptionNames.marker to "random"
-            ReelsModeType.Clips -> SortOptionNames.image to "random"
-            ReelsModeType.Pics -> SortOptionNames.image to "dateDesc"
+            ReelsModeType.Scenes, ReelsModeType.Previews -> sortNames(FilterMode.Scenes) to "random"
+            ReelsModeType.Markers -> sortNames(FilterMode.SceneMarkers) to "random"
+            ReelsModeType.Clips -> sortNames(FilterMode.Images) to "random"
+            ReelsModeType.Pics -> sortNames(FilterMode.Images) to "dateDesc"
         }
         CardSettingRow("Default Sort") {
             val current = TabManager.getReelsDefaultSort(mode.type)?.takeIf { c -> options.any { it.first == c } } ?: fallback

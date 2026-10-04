@@ -1,6 +1,5 @@
 package de.letzgo.stashy.data
 
-import de.letzgo.stashy.ui.home.DashboardFilterMapper
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonArray
@@ -109,7 +108,7 @@ class TabConfigLogicTest {
              "rating100":{"value":{"value":"60"},"modifier":"GREATER_THAN"},
              "sort":"date"}
         """).jsonObject
-        val out: JsonObject = DashboardFilterMapper.sanitize(raw)
+        val out: JsonObject = FilterMapper.sanitize(raw)
         val tags = out["tags"]!!.jsonObject
         assertEquals(listOf("5"), tags["value"]!!.jsonArray.map { it.jsonPrimitive.content })
         assertEquals(listOf("7"), tags["excludes"]!!.jsonArray.map { it.jsonPrimitive.content })
