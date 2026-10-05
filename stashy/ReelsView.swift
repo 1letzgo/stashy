@@ -6047,6 +6047,7 @@ extension ReelItemView {
     }
 
     func incrementPlayCount() {
+        guard TabManager.isPlaybackActivityTracked else { return }
         switch item {
         case .scene, .marker:
             onPlayCountChanged((item.playCount ?? 0) + 1)

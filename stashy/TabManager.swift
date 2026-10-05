@@ -448,6 +448,19 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(playerAutoZoom, forKey: playerAutoZoomKey)
         }
     }
+    /// Settings › Playback › "Track activity" (Stash web `trackActivity`). Off: no play count,
+    /// play history, resume time or play duration is sent to the server.
+    @Published var tracksPlaybackActivity: Bool = true {
+        didSet {
+            UserDefaults.standard.set(tracksPlaybackActivity, forKey: Self.tracksPlaybackActivityKey)
+        }
+    }
+    static let tracksPlaybackActivityKey = "playbackTrackActivity"
+    /// Readable off the main actor (network helpers).
+    nonisolated static var isPlaybackActivityTracked: Bool {
+        UserDefaults.standard.object(forKey: tracksPlaybackActivityKey) as? Bool ?? true
+    }
+
     /// Share of the picture the fill may cut off before Autozoom leaves it letterboxed.
     static let autoZoomMaximumCrop: Double = 0.15
 
@@ -660,6 +673,7 @@ class TabManager: ObservableObject {
         self.playerSkipSeconds = Self.playerSkipOptions.contains(storedSkip) ? storedSkip : 10
         self.showsPlayerSkipButtons = UserDefaults.standard.object(forKey: showsPlayerSkipButtonsKey) as? Bool ?? true
         self.playerAutoZoom = UserDefaults.standard.object(forKey: playerAutoZoomKey) as? Bool ?? false
+        self.tracksPlaybackActivity = Self.isPlaybackActivityTracked
         self.playerDolbyVisionEnabled = UserDefaults.standard.object(forKey: playerDolbyVisionEnabledKey) as? Bool ?? true
         let storedBatch = UserDefaults.standard.object(forKey: downloadBatchSizeKey) as? Int ?? 50
         self.downloadBatchSize = Self.downloadBatchSizeOptions.contains(storedBatch) ? storedBatch : 50
