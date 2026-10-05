@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.settings
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.History
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -51,6 +53,9 @@ fun LazyListScope.playbackSections() {
         SettingsPickerRow("Hold to speed up — Player", TabManager.holdSpeedOptions, TabManager.holdSpeedPlayer, TabConfigLogic::holdSpeedLabel, SFS.forwardFill) { TabManager.holdSpeedPlayer = it }
         SettingsDivider()
         SettingsPickerRow("Hold to speed up — Feeds", TabManager.holdSpeedOptions, TabManager.holdSpeedFeeds, TabConfigLogic::holdSpeedLabel, SFS.forwardFrameFill) { TabManager.holdSpeedFeeds = it }
+        SettingsDivider()
+        // Stash web "Track activity": play count, history, resume point, watch time.
+        SettingsToggleRow("Track activity", TabManager.tracksPlaybackActivity, Icons.Outlined.History) { TabManager.tracksPlaybackActivity = it }
     }
     settingsSection(header = "Downloads", key = "downloads") {
         SettingsPickerRow("Newest batch — Images", TabManager.downloadBatchSizeOptions, TabManager.downloadBatchSize, { "$it" }, SF.photoStack) { TabManager.downloadBatchSize = it }

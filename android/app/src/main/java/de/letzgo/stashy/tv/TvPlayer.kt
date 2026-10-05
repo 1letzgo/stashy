@@ -175,6 +175,7 @@ class TvPlaybackModel {
     /** Credits the play once the playhead passed the threshold (seeking ahead counts too). */
     private fun credit(sceneId: String) {
         if (!credited.add(sceneId)) return
+        if (!de.letzgo.stashy.data.TabManager.tracksPlaybackActivity) return
         scope.launch {
             runCatching { SceneEditing.addPlay(sceneId) }
             SceneEvents.post(SceneEvent.PlayAdded(sceneId))

@@ -56,6 +56,7 @@ object SceneEditing {
 
     /** iOS: `updateSceneResumeTime(sceneId:resumeTime:playDuration:)` — `sceneSaveActivity`. */
     suspend fun saveActivity(sceneId: String, resumeTime: Double?, playDuration: Double) {
+        if (!TabManager.tracksPlaybackActivity) return
         val v = buildJsonObject {
             put("id", JsonPrimitive(sceneId))
             resumeTime?.let { put("resume_time", JsonPrimitive(round2(it))) }
@@ -68,6 +69,7 @@ object SceneEditing {
 
     /** iOS: `addScenePlay` — returns the new count. */
     suspend fun addPlay(sceneId: String): Int? {
+        if (!TabManager.tracksPlaybackActivity) return null
         val data = GraphQL.named("sceneAddPlay", vars("id" to sceneId, "times" to emptyList<String>()))
         return data["sceneAddPlay"].obj?.get("count")?.jsonPrimitive?.content?.toDoubleOrNull()?.toInt()
     }

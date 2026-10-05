@@ -101,6 +101,10 @@ object TabManager {
     var showsPlayerSkipButtons: Boolean get() = _showsPlayerSkipButtons.value; set(v) { _showsPlayerSkipButtons.value = v; Prefs.setBool("showsPlayerSkipButtons", v) }
     private val _playerAutoZoom = bool("playerAutoZoom", false)
     var playerAutoZoom: Boolean get() = _playerAutoZoom.value; set(v) { _playerAutoZoom.value = v; Prefs.setBool("playerAutoZoom", v) }
+    /** iOS: Settings › Playback › "Track activity" (Stash web `trackActivity`). Off: no play count,
+     *  history, resume time or play duration goes to the server. */
+    private val _tracksPlaybackActivity = bool("playbackTrackActivity", true)
+    var tracksPlaybackActivity: Boolean get() = _tracksPlaybackActivity.value; set(v) { _tracksPlaybackActivity.value = v; Prefs.setBool("playbackTrackActivity", v) }
     private val _playerDolbyVision = bool("player_dolby_vision_enabled", true)
     var playerDolbyVisionEnabled: Boolean get() = _playerDolbyVision.value; set(v) { _playerDolbyVision.value = v; Prefs.setBool("player_dolby_vision_enabled", v) }
     private val _playCountPlayerSeconds = dbl("play_count_player_seconds", 1.0, playCountThresholdOptions)
