@@ -34,7 +34,8 @@ fun AppUpdateDialog() {
         AppUpdate.State.Checking -> Quad("Checking for Updates…", null, null, action("Cancel") { AppUpdate.dismiss() })
         is AppUpdate.State.Available -> Quad(
             "Update Available",
-            "A new version of stashy is available" + (state.bytes?.let { " (%.1f MB)".format(it / 1_048_576f) } ?: "") + ".",
+            "stashy " + listOfNotNull(state.versionName, state.versionCode?.let { "($it)" }).joinToString(" ").ifEmpty { "" } +
+                " is available" + (state.bytes?.let { " (%.1f MB)".format(it / 1_048_576f) } ?: "") + ".",
             action("Download") { scope.launch { AppUpdate.download(context) } },
             action("Later") { AppUpdate.dismiss() },
         )

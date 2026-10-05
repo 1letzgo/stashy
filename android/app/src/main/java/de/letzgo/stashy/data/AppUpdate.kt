@@ -20,26 +20,22 @@ import java.util.Locale
 
 /**
  * Self-update of the sideloaded APK (Android only — iOS updates through the App Store).
- * Only the APK itself lives on the server (`BuildConfig.UPDATE_URL`), so the check is:
- * 1. HEAD → `Content-Length` equal to the installed APK = same build (up to date). Otherwise
- *    `ETag` / `Last-Modified`: a file newer than this install and not seen before counts as
- *    "update available" (a manual check offers any different file).
- * 2. After the download the APK's own `versionCode` (git commit count) decides: only a
- *    higher one is offered for installation; otherwise the ETag is remembered as seen.
+ * The check reads the latest GitHub release (`BuildConfig.UPDATE_API`): its tag
+ * `android-v<name>-<versionCode>` gives the version without downloading, so only a higher
+ * versionCode is offered. After the download the APK's own versionCode is checked again.
  * The `play` flavor has no `UPDATE_URL` and never checks (Play forbids self-updates).
  */
 object AppUpdate {
     sealed interface State {
         data object Idle : State
         data object Checking : State
-        data class Available(val bytes: Long?) : State
+        data class Available(val bytes: Long?, val versionName: String? = null, val versionCode: Long? = null) : State
         data class Downloading(val progress: Float?) : State
         data class ReadyToInstall(val file: File, val versionName: String?, val versionCode: Long) : State
         data object UpToDate : State
         data class Failed(val message: String) : State
     }
 
-    private const val SEEN_ETAG_KEY = "app_update_seen_etag"
     private const val LAST_CHECK_KEY = "app_update_last_check"
     private const val AUTO_INTERVAL_MS = 6 * 60 * 60 * 1000L
 
@@ -49,8 +45,6 @@ object AppUpdate {
         private set
     /** True while the dialog should be visible (auto checks only show "Available"). */
     var showsDialog by mutableStateOf(false)
-
-    private var pendingEtag: String? = null
 
     fun dismiss() {
         showsDialog = false
@@ -71,35 +65,47 @@ object AppUpdate {
         if (!isEnabled || state is State.Downloading) return
         if (manual) { state = State.Checking; showsDialog = true }
         try {
-            val head = withContext(Dispatchers.IO) {
-                Net.client.newCall(Request.Builder().url(BuildConfig.UPDATE_URL).head().build()).execute().use { r ->
-                    if (!r.isSuccessful) throw Exception("Update server answered HTTP ${r.code}.")
-                    val type = r.header("Content-Type").orEmpty()
-                    if (type.contains("html")) throw Exception("No update file on the server.")
-                    Triple(r.header("ETag") ?: r.header("Last-Modified"), parseHttpDate(r.header("Last-Modified")), r.header("Content-Length")?.toLongOrNull())
-                }
-            }
-            val (etag, lastModified, bytes) = head
-            pendingEtag = etag
-            // The installed base.apk is the same file the server offers when nothing changed, so an
-            // equal size means "this build" — no download needed (avoids "available" → "latest").
-            if (bytes != null && bytes == installedApkSize(context)) {
-                etag?.let { Prefs.setString(SEEN_ETAG_KEY, it) }
-                state = if (manual) State.UpToDate else State.Idle
-                return
-            }
-            val installedAt = installTime(context)
-            val seen = etag != null && etag == Prefs.string(SEEN_ETAG_KEY)
-            val newerFile = lastModified == null || lastModified > installedAt
-            if (manual || (!seen && newerFile)) {
-                state = State.Available(bytes)
+            val latest = withContext(Dispatchers.IO) { latestRelease() }
+            downloadUrl = latest.downloadUrl
+            val own = currentVersionCode(context)
+            if (latest.versionCode > own) {
+                state = State.Available(latest.bytes, latest.versionName, latest.versionCode)
                 showsDialog = true
             } else {
-                state = State.Idle
+                state = if (manual) State.UpToDate else State.Idle
             }
         } catch (e: Exception) {
             state = if (manual) State.Failed(e.message ?: "Update check failed.") else State.Idle
         }
+    }
+
+    /** Latest published build, read from the GitHub release (no APK download). */
+    internal data class Release(val versionCode: Long, val versionName: String?, val downloadUrl: String, val bytes: Long?)
+
+    private var downloadUrl: String = BuildConfig.UPDATE_URL
+
+    private fun latestRelease(): Release {
+        val request = Request.Builder().url(BuildConfig.UPDATE_API)
+            .header("Accept", "application/vnd.github+json").build()
+        Net.client.newCall(request).execute().use { r ->
+            if (!r.isSuccessful) throw Exception("Update server answered HTTP ${r.code}.")
+            val json = Json.parseToJsonElement(r.body?.string().orEmpty()).obj ?: throw Exception("Invalid update information.")
+            val tag = json["tag_name"].stringOrNull ?: throw Exception("Invalid update information.")
+            val parsed = parseTag(tag) ?: throw Exception("Unexpected release tag \"$tag\".")
+            val asset = json["assets"].arr?.mapNotNull { it.obj }?.firstOrNull { it["name"].stringOrNull == "stashy.apk" }
+            return Release(
+                versionCode = parsed.second,
+                versionName = parsed.first,
+                downloadUrl = asset?.get("browser_download_url").stringOrNull ?: BuildConfig.UPDATE_URL,
+                bytes = asset?.get("size").stringOrNull?.toLongOrNull(),
+            )
+        }
+    }
+
+    /** `android-v3.3.5-629` → ("3.3.5", 629). */
+    internal fun parseTag(tag: String): Pair<String?, Long>? {
+        val m = Regex("""^android-v(.+)-(\d+)$""").find(tag) ?: return null
+        return m.groupValues[1] to m.groupValues[2].toLong()
     }
 
     /** Downloads the APK into `cache/updates/` and checks its versionCode against this install. */
@@ -111,7 +117,7 @@ object AppUpdate {
             val dir = File(context.cacheDir, "updates").apply { mkdirs() }
             val file = File(dir, "stashy.apk")
             withContext(Dispatchers.IO) {
-                Net.client.newCall(Request.Builder().url(BuildConfig.UPDATE_URL).build()).execute().use { r ->
+                Net.client.newCall(Request.Builder().url(downloadUrl).build()).execute().use { r ->
                     if (!r.isSuccessful) throw Exception("Download failed (HTTP ${r.code}).")
                     val body = r.body ?: throw Exception("Download failed.")
                     val total = body.contentLength().takeIf { it > 0 }
@@ -140,7 +146,6 @@ object AppUpdate {
             val newCode = if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
             val ownCode = currentVersionCode(context)
             if (info.packageName != context.packageName || newCode <= ownCode) {
-                pendingEtag?.let { Prefs.setString(SEEN_ETAG_KEY, it) }
                 file.delete()
                 state = State.UpToDate
             } else {
@@ -161,7 +166,6 @@ object AppUpdate {
             )
             return
         }
-        pendingEtag?.let { Prefs.setString(SEEN_ETAG_KEY, it) }
         val uri = FileProvider.getUriForFile(context, "${context.packageName}.updates", ready.file)
         context.startActivity(
             Intent(Intent.ACTION_VIEW).setDataAndType(uri, "application/vnd.android.package-archive")
@@ -181,13 +185,6 @@ object AppUpdate {
         val info = context.packageManager.getPackageInfo(context.packageName, 0)
         if (Build.VERSION.SDK_INT >= 28) info.longVersionCode else @Suppress("DEPRECATION") info.versionCode.toLong()
     }.getOrDefault(BuildConfig.VERSION_CODE.toLong())
-
-    private fun installedApkSize(context: Context): Long? =
-        runCatching { File(context.applicationInfo.sourceDir).length() }.getOrNull()?.takeIf { it > 0 }
-
-    private fun installTime(context: Context): Long = runCatching {
-        context.packageManager.getPackageInfo(context.packageName, PackageManager.GET_META_DATA).lastUpdateTime
-    }.getOrDefault(0L)
 
     internal fun parseHttpDate(value: String?): Long? = value?.let {
         runCatching { SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz", Locale.US).parse(it)?.time }.getOrNull()

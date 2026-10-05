@@ -32,8 +32,9 @@ android {
         applicationId = "de.letzgo.stashy"
         minSdk = 26
         targetSdk = 36
-        // Monotonic without manual bumps: number of commits on the checked-out branch.
-        versionCode = gitCommitCount()
+        // Monotonic without manual bumps: number of commits on the checked-out branch
+        // (-PstashyVersionCode=… overrides it for update tests).
+        versionCode = (project.findProperty("stashyVersionCode") as String?)?.toIntOrNull() ?: gitCommitCount()
         versionName = "3.3.5"
         buildConfigField("String", "DEBUG_SERVER", "\"\"")
         buildConfigField("String", "DEBUG_API_KEY", "\"\"")
@@ -50,12 +51,16 @@ android {
             buildConfigField("long", "EXPIRES_AT", "${expires}L")
             buildConfigField("boolean", "PLUS_INCLUDED", "true")
             buildConfigField("String", "UPDATE_URL", "\"https://github.com/1letzgo/stashy/releases/latest/download/stashy.apk\"")
+            // Latest release metadata: the tag (android-v<name>-<versionCode>) tells the version
+            // before anything is downloaded.
+            buildConfigField("String", "UPDATE_API", "\"https://api.github.com/repos/1letzgo/stashy/releases/latest\"")
         }
         create("play") {
             dimension = "distribution"
             buildConfigField("long", "EXPIRES_AT", "0L")
             buildConfigField("boolean", "PLUS_INCLUDED", "false")
             buildConfigField("String", "UPDATE_URL", "\"\"")
+            buildConfigField("String", "UPDATE_API", "\"\"")
         }
     }
     sourceSets {
