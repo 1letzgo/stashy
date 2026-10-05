@@ -1,7 +1,6 @@
 package de.letzgo.stashy.ui.catalog
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -335,7 +334,9 @@ fun ImageFeedPostCard(
     val images = post.images
     val visibleIndex = images.indexOfFirst { it.id == visibleId }.coerceAtLeast(0)
     val visible = images[visibleIndex]
-    val ratio by animateFloatAsState(visible.oneColumnFeedAspectRatio, tween(200), label = "ratio")
+    // A set keeps one frame — its tallest image — so the height never jumps while swiping;
+    // wider images are letterboxed in it instead of cropped.
+    val ratio = if (images.size > 1) images.minOf { it.oneColumnFeedAspectRatio } else visible.oneColumnFeedAspectRatio
 
     Column(Modifier.fillMaxWidth().cardShadow(cardShape).clip(cardShape).background(p.secondaryBackground)) {
         Box(Modifier.fillMaxWidth().aspectRatio(ratio)) {
@@ -345,7 +346,7 @@ fun ImageFeedPostCard(
                 LaunchedEffect(visibleIndex) { if (pager.currentPage != visibleIndex && !pager.isScrollInProgress) pager.animateScrollToPage(visibleIndex) }
                 HorizontalPager(pager, Modifier.fillMaxSize(), key = { images.getOrNull(it)?.id ?: it }) { page ->
                     val img = images[page]
-                    FeedHero(img, autoplay = img.id == visible.id && autoplayImageId == img.id) { onOpen(img) }
+                    FeedHero(img, autoplay = img.id == visible.id && autoplayImageId == img.id, fit = img.oneColumnFeedAspectRatio > ratio + 0.01f) { onOpen(img) }
                 }
             } else {
                 FeedHero(visible, autoplay = autoplayImageId == visible.id) { onOpen(visible) }
@@ -384,7 +385,7 @@ fun ImageFeedPostCard(
 
 /** iOS: `ImageThumbnailCard(showsOverlayChrome: false, allowsVideoAutoplay:)` — top-cropped hero with muted autoplay. */
 @Composable
-private fun FeedHero(image: StashImage, autoplay: Boolean, onClick: () -> Unit) {
+private fun FeedHero(image: StashImage, autoplay: Boolean, fit: Boolean = false, onClick: () -> Unit) {
     val preview = rememberPreviewPlayer()
     var previewing by remember(image.id) { mutableStateOf(false) }
     val allowed by rememberUpdatedState(autoplay)
@@ -399,16 +400,16 @@ private fun FeedHero(image: StashImage, autoplay: Boolean, onClick: () -> Unit) 
         delay(500)
         if (allowed) { preview.start(url); previewing = true }
     }
-    Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.1f)).noRippleClickable(onClick), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxSize().background(if (fit) Color.Black else Color.Gray.copy(alpha = 0.1f)).noRippleClickable(onClick), contentAlignment = Alignment.Center) {
         SubcomposeAsyncImage(
             model = image.thumbnailURL, contentDescription = image.title,
-            contentScale = ContentScale.Crop, alignment = Alignment.TopCenter,
+            contentScale = if (fit) ContentScale.Fit else ContentScale.Crop, alignment = if (fit) Alignment.Center else Alignment.TopCenter,
             loading = { Box(Modifier.fillMaxSize(), Alignment.Center) { CircularProgressIndicator(color = Theme.palette.secondaryText, modifier = Modifier.size(24.dp)) } },
             error = { Box(Modifier.fillMaxSize(), Alignment.Center) { Icon(SF.photo, null, tint = Theme.palette.secondaryText) } },
             modifier = Modifier.fillMaxSize(),
         )
         AnimatedVisibility(previewing && preview.hasFirstFrame, Modifier.fillMaxSize(), enter = fadeIn(tween(200)), exit = fadeOut(tween(0))) {
-            PreviewSurface(preview, Modifier.fillMaxSize(), fill = true, topAligned = true)
+            PreviewSurface(preview, Modifier.fillMaxSize(), fill = !fit, topAligned = !fit)
         }
         if (image.isVideo && !(previewing && preview.hasFirstFrame)) {
             Box(Modifier.clip(CircleShape).background(Color.Black.copy(alpha = 0.4f)).padding(12.dp)) {
