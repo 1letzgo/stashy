@@ -9,6 +9,9 @@ import de.letzgo.stashy.data.tools.AITagTarget
 import de.letzgo.stashy.data.tools.AITagUpdateEvent
 import de.letzgo.stashy.ui.components.AITagSuggestionBar
 import de.letzgo.stashy.ui.components.AddTagsSheet
+import de.letzgo.stashy.ui.components.TagChipRow
+import de.letzgo.stashy.ui.components.TagChips
+import de.letzgo.stashy.ui.components.showsTagRow
 import de.letzgo.stashy.ui.tools.downloads.DownloadGlyph
 import de.letzgo.stashy.ui.NativeTopBar
 import de.letzgo.stashy.ui.OverflowItem
@@ -547,59 +550,27 @@ class ImageViewerScreen(
         }
     }
 
-    /** Hashtag row; long press removes a tag in edit mode (iOS context menu "Remove tag"). */
-    @OptIn(ExperimentalFoundationApi::class)
+    /**
+     * Hashtag row: the shared Material [TagChipRow] — pinned "Add tag" (edit mode), `#tag` chips
+     * (tap does nothing, long press → "Remove tag" in edit mode) and the Tag Suggestion chips
+     * inline (stashy+). iOS `showsTagRow`: it also exists for an untagged picture — and only then.
+     */
     @Composable
     private fun TagRow(image: StashImage) {
         val tags = image.tags.orEmpty()
         val scope = rememberCoroutineScope()
-        // iOS `showsTagRow`: Tag Suggestion (stashy+) and the manual "+" share the row, so it
-        // also exists for an untagged picture — and only then.
-        if (tags.isEmpty() && !Appearance.isEditModeEnabled && !AITagSuggestions.isActive) return
-        Row(
-            Modifier.fillMaxWidth().height(24.dp + 8.dp).padding(top = 8.dp).padding(horizontal = Dock.edgePadding),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        if (!showsTagRow(tags)) return
+        TagChipRow(
+            itemId = image.id,
+            tags = tags,
+            // 8 dp visual gap above the chips; the 40 dp touch row already adds 4 dp.
+            modifier = Modifier.padding(top = 8.dp - TagChips.touchInset).padding(horizontal = Dock.edgePadding),
+            onAddTag = { openTagEditor(image) },
+            onRemoveTag = { tag -> scope.launch { removeTag(image, tag) } },
         ) {
-            // iOS: "+" (edit mode) stays put at the leading edge and opens `AddTagsSheet`; only the tags scroll.
-            if (Appearance.isEditModeEnabled) {
-                Box(
-                    Modifier.height(24.dp).clip(RoundedCornerShape(50)).stashyGlass(RoundedCornerShape(50))
-                        .clickable(onClickLabel = "Add tags") { openTagEditor(image) }
-                        .padding(horizontal = 9.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(SF.plus, "Add tags", tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(14.dp))
-                }
-            }
-            // Fresh scroll position per image (iOS `.id(image.id)`).
-            androidx.compose.runtime.key(image.id) {
-                Row(
-                    Modifier.weight(1f).horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    tags.forEach { tag ->
-                        var menu by remember(tag.id) { mutableStateOf(false) }
-                        Box {
-                            Text(
-                                "#${tag.name ?: ""}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = 0.8f),
-                                modifier = Modifier.clip(RoundedCornerShape(50)).stashyGlass(RoundedCornerShape(50))
-                                    .combinedClickable(onClick = {}, onLongClick = { if (Appearance.isEditModeEnabled) menu = true })
-                                    .padding(horizontal = 9.dp, vertical = 4.dp),
-                            )
-                            DropdownMenu(menu, { menu = false }) {
-                                DropdownMenuItem({ Text("Remove tag", color = StashyColors.systemRed) }, leadingIcon = { Icon(SF.trash, null, tint = StashyColors.systemRed) }, onClick = {
-                                    menu = false; scope.launch { removeTag(image, tag) }
-                                })
-                            }
-                        }
-                    }
-                    // iOS: `AITagSuggestionBar(target: .image(image))` — chips inline after the tags (stashy+).
-                    AITagSuggestionBar(AITagTarget.image(image)) { newTags ->
-                        replace(image.id) { it.copy(tags = newTags.map { t -> IdName(t.id, t.name) }) }
-                    }
-                }
+            // iOS: `AITagSuggestionBar(target: .image(image))` — chips inline after the tags (stashy+).
+            AITagSuggestionBar(AITagTarget.image(image)) { newTags ->
+                replace(image.id) { it.copy(tags = newTags.map { t -> IdName(t.id, t.name) }) }
             }
         }
     }

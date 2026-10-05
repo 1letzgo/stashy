@@ -64,8 +64,9 @@ import de.letzgo.stashy.data.tools.AITagSuggestions
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.components.AITagSuggestionBar
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
+import de.letzgo.stashy.ui.components.TagChipRow
+import de.letzgo.stashy.ui.components.TagChips
+import de.letzgo.stashy.ui.components.showsTagRow
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.oCounterIcon
@@ -157,28 +158,38 @@ fun FeedsCriterionChips(
     onRemoveTag: (IdName) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Row(
-        modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
-            .padding(horizontal = FeedsDock.edgePadding, vertical = 6.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        performer?.let { CriterionChip(it.name ?: "") { onClearPerformer() } }
-        studio?.let { CriterionChip(it.name ?: "") { onClearStudio() } }
-        tags.forEach { t -> CriterionChip("#${t.name}") { onRemoveTag(t) } }
+    // Same metrics as the tag chips: 32 dp chips in a 40 dp touch row, 8 dp apart.
+    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalMinimumInteractiveComponentSize provides TagChips.rowHeight) {
+        Row(
+            modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
+                .padding(horizontal = FeedsDock.edgePadding, vertical = 2.dp),
+            horizontalArrangement = Arrangement.spacedBy(TagChips.spacing),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            performer?.let { CriterionChip(it.name ?: "") { onClearPerformer() } }
+            studio?.let { CriterionChip(it.name ?: "") { onClearStudio() } }
+            tags.forEach { t -> CriterionChip("#${t.name}") { onRemoveTag(t) } }
+        }
     }
 }
 
+/** Active criterion as a Material `InputChip` (tap removes), styled like the tag chips over media. */
 @Composable
 private fun CriterionChip(label: String, onClick: () -> Unit) {
-    Row(
-        Modifier.chromePill().noIndicationClick(onClick).padding(horizontal = FeedsDock.activeHorizontalPadding),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(FeedsDock.iconLabelSpacing),
-    ) {
-        val c = Color.White.copy(alpha = FeedsDock.inactiveIconOpacity)
-        Icon(SF.xmark, null, tint = c, modifier = Modifier.size(11.dp))
-        Text(label, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = c, maxLines = 1)
-    }
+    androidx.compose.material3.InputChip(
+        selected = false,
+        onClick = onClick,
+        label = { Text(label, style = androidx.compose.material3.MaterialTheme.typography.labelLarge, maxLines = 1) },
+        trailingIcon = { Icon(SF.xmark, "Remove", Modifier.size(androidx.compose.material3.InputChipDefaults.IconSize)) },
+        colors = androidx.compose.material3.InputChipDefaults.inputChipColors(
+            containerColor = Color.Black.copy(alpha = 0.45f),
+            labelColor = Color.White,
+            trailingIconColor = Color.White,
+        ),
+        border = androidx.compose.material3.InputChipDefaults.inputChipBorder(
+            enabled = true, selected = false, borderColor = Color.White.copy(alpha = 0.25f),
+        ),
+    )
 }
 
 /** iOS: `ChromePillIconButton` (48 pt glass circle). */
@@ -302,69 +313,28 @@ fun FeedsInfoOverlay(
                 ChromePillIconButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) "Pause" else "Play", enabled = item.isVideo || pausesAdvance, onClick = onTogglePlay)
             }
         }
-        // Hashtags on their own full-width row (iOS: height 24, top 8). Tag Suggestion (stashy+)
-        // shares the row, so it also exists for an untagged item; "+" (edit mode) stays put at the
-        // leading edge and opens `AddTagsSheet`, only the tags scroll — a fresh scroll state per
-        // item so the next clip does not inherit the offset.
-        val tags = item.tags
-        val editMode = Appearance.isEditModeEnabled
-        val showsTagRow = tags.isNotEmpty() || editMode || AITagSuggestions.isActive
-        Row(
-            Modifier.padding(top = 8.dp).fillMaxWidth().height(24.dp).padding(horizontal = FeedsDock.edgePadding),
-            horizontalArrangement = Arrangement.spacedBy(6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            if (showsTagRow) {
-                if (editMode) {
-                    Box(
-                        Modifier.height(24.dp).clip(Capsule).stashyGlass(Capsule)
-                            .clickable(onClickLabel = "Add tags", onClick = onAddTags)
-                            .padding(horizontal = 9.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(SF.plus, "Add tags", tint = FeedsDock.hashtagForeground, modifier = Modifier.size(14.dp))
-                    }
-                }
-                androidx.compose.runtime.key(item.id) {
-                    Row(
-                        Modifier.weight(1f).horizontalScroll(rememberScrollState()),
-                        horizontalArrangement = Arrangement.spacedBy(6.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        tags.forEach { t -> FeedHashtag(t, removable = editMode && t.id != item.primaryTagId, onTag = { onTag(t) }, onRemove = { onRemoveTag(t) }) }
-                        // iOS: `AITagSuggestionBar(target: item.aiTagTarget)` inline after the tags;
-                        // the row follows through the `TagsUpdated` patch of [FeedsModel].
-                        AITagSuggestionBar(item.aiTagTarget) { }
-                    }
+        // Hashtags on their own full-width row (iOS: top 8): the shared Material [TagChipRow] —
+        // pinned "Add tag" (edit mode, opens `AddTagsSheet`), scrolling `#tag` chips (tap toggles
+        // the tag filter, long press → "Remove tag" in edit mode) and the Tag Suggestion chips
+        // (stashy+) inline, so the row also exists for an untagged item. The 40 dp slot is kept
+        // even without a row, so the overlay does not jump between clips.
+        val showsRow = showsTagRow(item.tags)
+        Box(Modifier.padding(top = 8.dp - TagChips.touchInset).fillMaxWidth().height(TagChips.rowHeight)) {
+            if (showsRow) {
+                TagChipRow(
+                    itemId = item.id,
+                    tags = item.tags,
+                    modifier = Modifier.padding(horizontal = FeedsDock.edgePadding),
+                    onAddTag = onAddTags,
+                    onTagClick = onTag,
+                    onRemoveTag = onRemoveTag,
+                    canRemove = { it.id != item.primaryTagId },
+                ) {
+                    // iOS: `AITagSuggestionBar(target: item.aiTagTarget)` inline after the tags;
+                    // the row follows through the `TagsUpdated` patch of [FeedsModel].
+                    AITagSuggestionBar(item.aiTagTarget) { }
                 }
             }
-        }
-    }
-}
-
-/** One `#tag` chip: tap toggles the tag filter, long press offers "Remove tag" (iOS context menu, edit mode). */
-@OptIn(ExperimentalFoundationApi::class)
-@Composable
-private fun FeedHashtag(tag: IdName, removable: Boolean, onTag: () -> Unit, onRemove: () -> Unit) {
-    var menu by remember { mutableStateOf(false) }
-    val haptics = LocalHapticFeedback.current
-    Box {
-        Text(
-            "#${tag.name}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = FeedsDock.hashtagForeground,
-            modifier = Modifier.stashyGlass(Capsule)
-                .combinedClickable(
-                    interactionSource = remember { MutableInteractionSource() }, indication = null,
-                    onClick = onTag,
-                    onLongClick = if (removable) ({ haptics.performHapticFeedback(HapticFeedbackType.LongPress); menu = true }) else null,
-                )
-                .padding(horizontal = 9.dp, vertical = 4.dp),
-        )
-        DropdownMenu(menu, { menu = false }) {
-            DropdownMenuItem(
-                { Text("Remove tag", color = StashyColors.systemRed) },
-                leadingIcon = { Icon(SF.trash, null, tint = StashyColors.systemRed) },
-                onClick = { menu = false; onRemove() },
-            )
         }
     }
 }

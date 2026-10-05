@@ -97,6 +97,10 @@ import de.letzgo.stashy.ui.oCounterIcon
 import de.letzgo.stashy.ui.player.PreviewSurface
 import de.letzgo.stashy.ui.player.rememberPreviewPlayer
 import de.letzgo.stashy.ui.stashyGlass
+import de.letzgo.stashy.ui.components.TagChipRow
+import de.letzgo.stashy.ui.components.TagChipStyle
+import de.letzgo.stashy.ui.components.TagChips
+import de.letzgo.stashy.ui.components.showsTagRow
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlin.math.abs
@@ -476,70 +480,39 @@ private fun Avatar(performer: IdName?, url: String?, onClick: (() -> Unit)?) {
 }
 
 /**
- * iOS: `ImageGroupCatalogCell.tagRow` — same row as Feeds: pinned "+" (edit mode, opens
- * `AddTagsSheet`), scrolling `#tag` chips (long press → "Remove tag" in edit mode) and the
- * stashy+ Tag Suggestion chips inline after the tags. Shown when there are tags, edit mode is
- * on or Tag Suggestion is active (iOS `showsTagRow`).
+ * iOS: `ImageGroupCatalogCell.tagRow` — the shared Material [TagChipRow] as in Feeds: pinned
+ * "Add tag" (edit mode, opens `AddTagsSheet`), scrolling `#tag` chips (long press → "Remove tag"
+ * in edit mode) and the stashy+ Tag Suggestion chips inline after the tags. Shown when there are
+ * tags, edit mode is on or Tag Suggestion is active (iOS `showsTagRow`). The row sits on the
+ * themed post card (not on the picture), so it uses [TagChipStyle.Surface].
  */
-@OptIn(androidx.compose.foundation.ExperimentalFoundationApi::class)
 @Composable
 private fun TagRow(image: StashImage, bottomPadding: androidx.compose.ui.unit.Dp, onImageUpdated: (StashImage) -> Unit) {
     val tags = image.tags.orEmpty()
-    val canEdit = Appearance.isEditModeEnabled
-    if (tags.isEmpty() && !canEdit && !de.letzgo.stashy.data.tools.AITagSuggestions.isActive) return
+    if (!showsTagRow(tags)) return
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     var editor by androidx.compose.runtime.remember(image.id) { androidx.compose.runtime.mutableStateOf(false) }
-    Row(
-        Modifier.fillMaxWidth().padding(top = 8.dp, bottom = bottomPadding).height(24.dp).padding(horizontal = 12.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        if (canEdit) {
-            Box(
-                Modifier.height(24.dp).clip(RoundedCornerShape(50)).stashyGlass(RoundedCornerShape(50))
-                    .clickable(onClickLabel = "Add tags") { editor = true }
-                    .padding(horizontal = 9.dp),
-                contentAlignment = Alignment.Center,
-            ) { Icon(SF.plus, "Add tags", tint = Color.White.copy(alpha = 0.8f), modifier = Modifier.size(14.dp)) }
-        }
-        // Fresh scroll position per image (iOS `.id(image.id)`).
-        androidx.compose.runtime.key(image.id) {
-            Row(
-                Modifier.weight(1f).horizontalScroll(androidx.compose.foundation.rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                tags.forEach { tag ->
-                    var menu by androidx.compose.runtime.remember(tag.id) { androidx.compose.runtime.mutableStateOf(false) }
-                    Box {
-                        Text(
-                            "#${tag.name ?: ""}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = Color.White.copy(alpha = 0.8f), maxLines = 1,
-                            modifier = Modifier.clip(RoundedCornerShape(50)).stashyGlass(RoundedCornerShape(50))
-                                .combinedClickable(onClick = {}, onLongClick = { if (canEdit) menu = true })
-                                .padding(horizontal = 9.dp, vertical = 4.dp),
-                        )
-                        androidx.compose.material3.DropdownMenu(menu, { menu = false }) {
-                            androidx.compose.material3.DropdownMenuItem(
-                                { Text("Remove tag", color = StashyColors.systemRed) },
-                                leadingIcon = { Icon(SF.trash, null, tint = StashyColors.systemRed) },
-                                onClick = {
-                                    menu = false
-                                    scope.launch {
-                                        val remaining = tags.filter { it.id != tag.id }
-                                        if (de.letzgo.stashy.data.DetailRepository.setImageTags(image.id, remaining.map { it.id })) {
-                                            onImageUpdated(image.copy(tags = remaining))
-                                        }
-                                    }
-                                },
-                            )
-                        }
-                    }
-                }
-                // iOS: `AITagSuggestionBar(target: .image(image))` — chips inline after the tags (stashy+).
-                de.letzgo.stashy.ui.components.AITagSuggestionBar(de.letzgo.stashy.data.tools.AITagTarget.image(image)) { newTags ->
-                    onImageUpdated(image.copy(tags = newTags.map { t -> de.letzgo.stashy.data.IdName(t.id, t.name) }))
+    // 8 dp visual gaps around the 32 dp chips; the 40 dp touch row already adds 4 dp per side.
+    TagChipRow(
+        itemId = image.id,
+        tags = tags,
+        style = TagChipStyle.Surface,
+        modifier = Modifier
+            .padding(top = 8.dp - TagChips.touchInset, bottom = (bottomPadding - TagChips.touchInset).coerceAtLeast(0.dp))
+            .padding(horizontal = 12.dp),
+        onAddTag = { editor = true },
+        onRemoveTag = { tag ->
+            scope.launch {
+                val remaining = tags.filter { it.id != tag.id }
+                if (de.letzgo.stashy.data.DetailRepository.setImageTags(image.id, remaining.map { it.id })) {
+                    onImageUpdated(image.copy(tags = remaining))
                 }
             }
+        },
+    ) {
+        // iOS: `AITagSuggestionBar(target: .image(image))` — chips inline after the tags (stashy+).
+        de.letzgo.stashy.ui.components.AITagSuggestionBar(de.letzgo.stashy.data.tools.AITagTarget.image(image), style = TagChipStyle.Surface) { newTags ->
+            onImageUpdated(image.copy(tags = newTags.map { t -> de.letzgo.stashy.data.IdName(t.id, t.name) }))
         }
     }
     if (editor) {

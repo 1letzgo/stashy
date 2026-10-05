@@ -1,18 +1,10 @@
 package de.letzgo.stashy.ui.components
 
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AssignmentInd
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
@@ -20,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,22 +20,16 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import de.letzgo.stashy.data.Tag
 import de.letzgo.stashy.data.tools.AITagBulkPlan
 import de.letzgo.stashy.data.tools.AITagBulkScope
 import de.letzgo.stashy.data.tools.AITagSuggestion
 import de.letzgo.stashy.data.tools.AITagSuggestions
 import de.letzgo.stashy.data.tools.AITagTarget
-import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
@@ -58,18 +45,17 @@ import kotlinx.coroutines.launch
  * [onTagsChanged] then receives the item's new tag list. Long press: Ignore Tag, Set on all of
  * gallery / performer (with a confirmation that names the real count).
  *
- * [textColor] defaults to white like iOS (the bar sits on Reels / viewer chrome).
+ * The chips are the shared Material ones of [TagChipRow] ([TagSuggestionChip]); [style] follows
+ * the row ([TagChipStyle.OverMedia] on Feeds / viewer chrome, [TagChipStyle.Surface] on cards).
  */
-@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun AITagSuggestionBar(
     target: AITagTarget,
     modifier: Modifier = Modifier,
-    textColor: Color = Color.White,
+    style: TagChipStyle = TagChipStyle.OverMedia,
     onTagsChanged: (List<Tag>) -> Unit,
 ) {
     if (!AITagSuggestions.isActive) return
-    val tint = Appearance.tint
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
 
@@ -139,51 +125,32 @@ fun AITagSuggestionBar(
         }
     }
 
-    Row(modifier, horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+    Row(modifier, horizontalArrangement = Arrangement.spacedBy(TagChips.spacing), verticalAlignment = Alignment.CenterVertically) {
         if (suggestions.isEmpty()) {
             // Only worth saying on an untagged item.
             if (didRun && target.tags.isEmpty()) {
-                Text(
+                TagRowHint(
                     if (AITagSuggestions.hasModel) "No tag suggestions" else "Tag Suggestion needs statistics first",
-                    fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = textColor.copy(alpha = 0.45f),
+                    style,
                 )
             }
         } else {
             suggestions.forEach { suggestion ->
                 val tagId = suggestion.tag.id
-                run {
-                    Box {
-                        Row(
-                            Modifier
-                                .clip(RoundedCornerShape(50))
-                                .background(tint.copy(alpha = 0.22f))
-                                .border(0.5.dp, tint.copy(alpha = 0.55f), RoundedCornerShape(50))
-                                .combinedClickable(
-                                    enabled = acceptingTagId == null,
-                                    onClick = { accept(suggestion) },
-                                    onLongClick = {
-                                        haptics.performHapticFeedback(HapticFeedbackType.LongPress)
-                                        menuFor = tagId
-                                    },
-                                )
-                                .semantics { contentDescription = "Add tag ${suggestion.tag.name}" }
-                                .padding(horizontal = 8.dp, vertical = 3.dp),
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            val fg = textColor.copy(alpha = 0.9f)
-                            if (acceptingTagId == tagId) {
-                                CircularProgressIndicator(Modifier.size(9.dp), color = textColor, strokeWidth = 1.5.dp)
-                            } else {
-                                // The sparkles mark each chip as a suggestion.
-                                Icon(SF.sparkles, null, tint = fg, modifier = Modifier.size(10.dp))
-                            }
-                            Text("#${suggestion.tag.name}", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = fg, maxLines = 1)
-                            Text(
-                                "${Math.round(suggestion.confidence * 100)}%",
-                                fontSize = 9.sp, fontWeight = FontWeight.Bold, color = textColor.copy(alpha = 0.5f),
-                            )
-                        }
+                key(tagId) {
+                    Box(Modifier.semantics { contentDescription = "Add tag ${suggestion.tag.name}" }) {
+                        TagSuggestionChip(
+                            name = suggestion.tag.name,
+                            detail = "${Math.round(suggestion.confidence * 100)}%",
+                            style = style,
+                            accepting = acceptingTagId == tagId,
+                            enabled = acceptingTagId == null,
+                            onClick = { accept(suggestion) },
+                            onLongPress = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                menuFor = tagId
+                            },
+                        )
                         // iOS: `.contextMenu`.
                         val p = Theme.palette
                         DropdownMenu(
