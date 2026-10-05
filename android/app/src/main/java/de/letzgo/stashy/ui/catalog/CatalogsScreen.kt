@@ -66,13 +66,21 @@ fun CatalogsScreen() {
             CatalogTab.Markers -> MarkersCatalog()
         }
         val tabs = sortedVisibleTabs(Nav.catalogTab)
-        // iOS `showTabSwitcher`: only with more than one catalog.
-        if (tabs.size > 1) TopNavStrip(tabs)
+        // iOS `showTabSwitcher`: only with more than one catalog — on Android the strip also
+        // carries the catalog's top actions (columns, quick menu), so it stays for those.
+        if (tabs.size > 1 || CatalogTopActions.hasActions) TopNavStrip(tabs)
     }
 }
 
-/** Catalog switcher (iOS: `StashyTopNavStrip`) as native Material tabs. */
+/**
+ * Catalog switcher (iOS: `StashyTopNavStrip`) as native Material tabs; the trailing slot holds
+ * the visible catalog's top actions ([CatalogTopActions], see [CatalogTopActionIcons]).
+ */
 @Composable
 private fun TopNavStrip(tabs: List<CatalogTab>) {
-    de.letzgo.stashy.ui.NativeTabStrip(tabs, Nav.catalogTab, { it.title }, { Nav.catalogTab = it })
+    val actions = CatalogTopActions.slots
+    de.letzgo.stashy.ui.NativeTabStrip(
+        tabs, Nav.catalogTab, { it.title }, { Nav.catalogTab = it },
+        trailing = if (actions != null && CatalogTopActions.hasActions) ({ androidx.compose.foundation.layout.Row { CatalogTopActionIcons(actions) } }) else null,
+    )
 }

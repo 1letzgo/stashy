@@ -43,6 +43,9 @@ import de.letzgo.stashy.data.Studio
 import de.letzgo.stashy.data.Tag
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.GlassBadge
+import de.letzgo.stashy.ui.NativeCard
+import de.letzgo.stashy.ui.NativeMediaLabel
+import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Theme
@@ -68,11 +71,8 @@ internal fun groupThumbnailURL(g: StashGroup): String? {
 private val cardShape = RoundedCornerShape(Tokens.Radius.card)
 
 @Composable
-private fun CardBox(modifier: Modifier, aspect: Float, content: @Composable BoxScope.() -> Unit) {
-    Box(
-        modifier.fillMaxWidth().cardShadow(cardShape).clip(cardShape).background(Theme.palette.secondaryBackground).aspectRatio(aspect),
-        content = content,
-    )
+private fun CardBox(modifier: Modifier, aspect: Float, onClick: (() -> Unit)?, content: @Composable BoxScope.() -> Unit) {
+    NativeCard(modifier.fillMaxWidth().aspectRatio(aspect), onClick = onClick, content = content)
 }
 
 @Composable
@@ -97,23 +97,14 @@ private fun BoxScope.BottomGradient(height: Float = 0.45f) {
     )
 }
 
-/** Glass pill with icon + bold count (iOS `cardPill`). */
+/** iOS `cardPill` — Android look: Material label. */
 @Composable
-private fun CardPill(icon: ImageVector, text: String) {
-    Row(
-        Modifier.clip(RoundedCornerShape(50)).stashyGlass(RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        Icon(icon, null, tint = Color.White, modifier = Modifier.size(11.dp))
-        Text(text, fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Color.White)
-    }
-}
+private fun CardPill(icon: ImageVector, text: String) = NativeMediaLabel(text, icon = icon)
 
 /** iOS: `PerformerCardView` (9:12, top-anchored portrait, age + scene-count pills, name). */
 @Composable
-internal fun DetailPerformerCard(performer: Performer, modifier: Modifier = Modifier) {
-    CardBox(modifier, 9f / 12f) {
+internal fun DetailPerformerCard(performer: Performer, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    CardBox(modifier, 9f / 12f, onClick) {
         CardImage(performerThumbnailURL(performer.id, performer.imagePath), SF.personFill, Alignment.TopCenter)
         BottomGradient(0.55f)
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.Top) {
@@ -123,7 +114,7 @@ internal fun DetailPerformerCard(performer: Performer, modifier: Modifier = Modi
         }
         Text(
             performer.name, Modifier.align(Alignment.BottomStart).padding(12.dp),
-            style = IosTypography.headline, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            style = NativeType.titleMedium, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -150,30 +141,30 @@ internal fun StudioLogo(studio: Studio, modifier: Modifier = Modifier) {
 private fun CountLabel(icon: ImageVector, count: Int) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
         Icon(icon, null, tint = Theme.palette.secondaryText, modifier = Modifier.size(11.dp))
-        Text("$count", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = Theme.palette.secondaryText)
+        Text("$count", style = NativeType.labelMedium, color = Theme.palette.secondaryText)
     }
 }
 
 /** Logo block (2.2:1, studio header grey) + name/count row (iOS `StudioCardView` / `TagCardView`). */
 @Composable
-private fun LogoCard(modifier: Modifier, name: String, scenes: Int?, galleries: Int?, alwaysShowScenes: Boolean, logo: @Composable BoxScope.() -> Unit) {
+private fun LogoCard(modifier: Modifier, onClick: (() -> Unit)?, name: String, scenes: Int?, galleries: Int?, alwaysShowScenes: Boolean, logo: @Composable BoxScope.() -> Unit) {
     val p = Theme.palette
-    Column(modifier.fillMaxWidth().cardShadow(cardShape).clip(cardShape).background(p.secondaryBackground)) {
+    NativeCard(modifier.fillMaxWidth(), onClick = onClick) { Column(Modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().aspectRatio(2.2f).background(p.studioHeader).clip(RoundedCornerShape(0.dp)), content = logo)
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(name, Modifier.weight(1f), style = IosTypography.subheadline.copy(fontWeight = FontWeight.Bold), color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (alwaysShowScenes || (scenes ?: 0) > 0) CountLabel(SF.film, scenes ?: 0)
                 if ((galleries ?: 0) > 0) CountLabel(SF.photoStack, galleries ?: 0)
             }
         }
-    }
+    } }
 }
 
 /** iOS: `StudioCardView`. */
 @Composable
-internal fun DetailStudioCard(studio: Studio, modifier: Modifier = Modifier) {
-    LogoCard(modifier, studio.name, studio.sceneCount, studio.galleryCount, true) {
+internal fun DetailStudioCard(studio: Studio, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    LogoCard(modifier, onClick, studio.name, studio.sceneCount, studio.galleryCount, true) {
         StudioLogo(studio, Modifier.fillMaxSize().padding(start = 14.dp, end = 14.dp, top = 12.dp))
     }
 }
@@ -196,8 +187,8 @@ internal fun TagImage(tag: Tag, modifier: Modifier = Modifier) {
 
 /** iOS: `TagCardView`. */
 @Composable
-internal fun DetailTagCard(tag: Tag, modifier: Modifier = Modifier) {
-    LogoCard(modifier, tag.name, tag.sceneCount, tag.galleryCount, false) {
+internal fun DetailTagCard(tag: Tag, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    LogoCard(modifier, onClick, tag.name, tag.sceneCount, tag.galleryCount, false) {
         if (tag.hasImage) TagImage(tag, Modifier.fillMaxSize())
         else Icon(SF.number, null, tint = Appearance.tint, modifier = Modifier.align(Alignment.Center).size(32.dp))
     }
@@ -205,8 +196,8 @@ internal fun DetailTagCard(tag: Tag, modifier: Modifier = Modifier) {
 
 /** iOS: `GalleryCardView` (1:1, studio badge, image count, title). */
 @Composable
-internal fun DetailGalleryCard(gallery: Gallery, modifier: Modifier = Modifier) {
-    CardBox(modifier, 1f) {
+internal fun DetailGalleryCard(gallery: Gallery, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    CardBox(modifier, 1f, onClick) {
         CardImage(gallery.coverURL, SF.photoOnRectangle)
         BottomGradient(0.4f)
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.Top) {
@@ -216,15 +207,15 @@ internal fun DetailGalleryCard(gallery: Gallery, modifier: Modifier = Modifier) 
         }
         Text(
             gallery.displayTitle, Modifier.align(Alignment.BottomStart).padding(12.dp),
-            style = IosTypography.headline.copy(fontWeight = FontWeight.Medium), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            style = NativeType.titleMedium, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
 /** iOS: `GroupCardView` (9:12 front cover, scene count badge, name). */
 @Composable
-internal fun DetailGroupCard(group: StashGroup, modifier: Modifier = Modifier) {
-    CardBox(modifier, 9f / 12f) {
+internal fun DetailGroupCard(group: StashGroup, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
+    CardBox(modifier, 9f / 12f, onClick) {
         CardImage(groupThumbnailURL(group), SF.rectangleStack, Alignment.TopCenter)
         BottomGradient(0.45f)
         Row(Modifier.fillMaxWidth().padding(8.dp)) {
@@ -233,15 +224,15 @@ internal fun DetailGroupCard(group: StashGroup, modifier: Modifier = Modifier) {
         }
         Text(
             group.name, Modifier.align(Alignment.BottomStart).padding(12.dp),
-            style = IosTypography.headline, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            style = NativeType.titleMedium, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
         )
     }
 }
 
 /** iOS: `ImageThumbnailCard` — thumbnail, play badge for clips, studio/date, name + extension. */
 @Composable
-internal fun DetailImageCard(image: StashImage, modifier: Modifier = Modifier, aspect: Float = 1f) {
-    CardBox(modifier, aspect) {
+internal fun DetailImageCard(image: StashImage, modifier: Modifier = Modifier, aspect: Float = 1f, onClick: (() -> Unit)? = null) {
+    CardBox(modifier, aspect, onClick) {
         CardImage(image.thumbnailURL, SF.photo)
         if (image.isVideo) {
             Box(Modifier.align(Alignment.Center).size(48.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.4f)), Alignment.Center) {
@@ -257,7 +248,7 @@ internal fun DetailImageCard(image: StashImage, modifier: Modifier = Modifier, a
         Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 image.performers?.firstOrNull()?.name ?: image.title ?: "Image", Modifier.weight(1f),
-                style = IosTypography.headline.copy(fontWeight = FontWeight.Medium), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                style = NativeType.titleMedium, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
             DetailFormatting.fileExtension(image)?.let { GlassBadge(it) }
         }

@@ -50,11 +50,11 @@ The debug build then starts connected (`ServerConfigManager.seedDebugServer`).
 | `ui/Nav.kt` (`Nav`, `Screen`, `MainTab`, `CatalogTab`) | `TabManager`, `NavigationCoordinator` |
 | `ui/AppShell.kt` | `MainTabView` (floating glass tab bar + search circle) |
 | `ui/Paging.kt` (`PagedList`) | infinite-scroll pattern of the list views |
-| `ui/catalog/` (`CatalogController`, `CatalogScaffold`, `CatalogFloatingBar`) | `CatalogsView`, `ScenesView`, `PerformersView` …, `CatalogChrome`, `FloatingCatalogBar` |
+| `ui/catalog/` (`CatalogController`, `CatalogScaffold`, `CatalogTopActions`, `CatalogFilterFab`) | `CatalogsView`, `ScenesView`, `PerformersView` …, `CatalogChrome`, `FloatingCatalogBar` |
 | `ui/filter/` (`CatalogFilterSortSheet`, `FilterCriteriaEditor`, `FilterPickerOptionsStore`) | `ListCatalogFilterSortSheets`, `Filters/FilterCriteriaEditorView`, `FilterPickerOptionsStore` |
 | `data/FilterMapper.kt`, `FilterFields.kt`, `Filters.kt`, `Sorting.kt` | `FilterMapper`, `FilterFieldCatalog`, `FilterCriteriaDocument`, `*SortOption`, presets |
 | `data/CatalogPrefs.kt`, `CatalogRepositories.kt`, `SavedFilters.kt` | catalog facade over `TabManager` (sorts, default filters, card columns), list fetches, `SavedFiltersStore` (iOS `viewModel.savedFilters`, shared by catalogs, dashboard and Settings) |
-| `ui/components/` (`SceneCard`, `EntityCards.kt`) | `SceneCardView`, `PerformerCardView`, `StudioCardView`, `TagCardView`, `GalleryCardView`, `GroupCardView`, `ImageThumbnailCard`, `MarkerCardView` |
+| `ui/NativeCards.kt` (`NativeCard`, `NativeMediaLabel`), `ui/components/` (`SceneCard`, `EntityCards.kt`) | `SceneCardView`, `PerformerCardView`, `StudioCardView`, `TagCardView`, `GalleryCardView`, `GroupCardView`, `ImageThumbnailCard`, `MarkerCardView` |
 | `ui/home/` | `HomeView` (dashboard) |
 | `ui/scene/` | `SceneDetailView`, `SceneDetail/` (`SceneAiSubtitles` = AI half of `ScenePlayerExtrasController`) |
 | `ui/player/ai/` | `stashy/Subtitles/` (`LiveTranscriber`, `CaptionTranslator`, `TranscodeAudioSource`, pure `CaptionTimeline`), `SubtitleTargetLanguage`, `SceneTeleprompterMode` |
@@ -98,7 +98,30 @@ Sizes are tvOS points halved (`pt()`: 1920 pt ≙ 960 dp). Pure logic lives in `
   build all of it through `DetailTopBar` (sections → tab strip, `ChromeSlot`s → icons or
   overflow via `inOverflow`); no floating bottom slot bars. Media viewers use a transparent
   `NativeTopBar`; their on-image controls (O-counter, rating, mute/play) stay overlay buttons.
-- Content under the floating chrome: top padding `catalogTopPadding()` on catalog roots,
+- Catalog roots (Home tab, Android look): the iOS floating glass slot bar is gone. "Filter &
+  sort" is a Material `ExtendedFloatingActionButton` (`CatalogFilterFab`) bottom-end, 16 dp above
+  the NavigationBar (collapses to the icon while scrolling down, badge dot = active filter); the
+  other slots (columns toggle, quick sort menu, contextual) are app-bar icons in the trailing
+  slot of the Home `NativeTabStrip` (`CatalogScaffold` publishes them via `CatalogTopActions`;
+  menus are anchored `DropdownMenu`s like `TopBarMenuAction`, active = `Appearance.tint`) — the
+  same icon/menu vocabulary as `ui/NativeActions.kt` on pushed screens. With a single visible
+  catalog the strip stays when the catalog has such icons. Active search = Material `InputChip`
+  (tap clears). Grids: 16 dp margins, 12 dp gutters (`CatalogGridGutter`); bottom padding
+  `TabBarClearance + FloatingBarClearance`.
+- Cards (Android look, `ui/NativeCards.kt`): every card is a Material `ElevatedCard`
+  (`NativeCard`, 12 dp corners, 1 dp elevation on `Theme.palette.secondaryBackground`) and takes
+  an `onClick` (ripple) — don't wrap cards in `noRippleClickable`. Labels over images are
+  `NativeMediaLabel` (translucent surface container, `labelSmall`/`labelMedium`, 8 dp corners;
+  studio logos on a dark scrim); `GlassBadge`/`CardPill`/`CaptionPill` delegate to it. Titles use
+  `NativeType` (titleMedium on media, titleSmall under logos). Long-press previews
+  (`ScenePreviewOnHold`) observe the pointer inside the card and keep working with the ripple.
+- Dashboard: Material section headers (titleLarge + "See all" `TextButton` for rows that open a
+  catalog), rows as `LazyRow`s styled like the Material uncontained carousel (16 dp margins, 8 dp
+  gaps; the hero row snaps and uses 28 dp `NativeHeroShape` items). Not `material3.carousel`:
+  in material3 1.3.1 `CarouselState` exposes no current item (the hero backdrop follows the
+  focused card) and carousels take no item keys (live scene updates). Statistics are tonal
+  Material cards (stat colour at 14–22 % over the surface, icon in the full colour).
+- Content under the chrome: top padding `catalogTopPadding()` on catalog roots,
   bottom padding `TabBarClearance` on every scrolling root.
 - Colours only from `Theme.palette`, `Appearance.tint`, `StashyColors` — no ad-hoc colours.
 - Network only through `GraphQL` / `Net.client` (auth headers, LAN self-signed TLS); media URLs

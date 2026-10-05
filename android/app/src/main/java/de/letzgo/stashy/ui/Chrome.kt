@@ -147,22 +147,10 @@ fun GlassCapsule(
     )
 }
 
-/** Small glass badge used on cards (date, duration, counts) — iOS `.stashyGlass(shape: Capsule())`. */
+/** Small label used on cards (date, duration, counts) — Android look: [NativeMediaLabel]. */
 @Composable
-fun GlassBadge(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null) {
-    Row(
-        modifier
-            .clip(RoundedCornerShape(50))
-            .background(Color.Black.copy(alpha = 0.45f))
-            .border(0.5.dp, Color.White.copy(alpha = 0.2f), RoundedCornerShape(50))
-            .padding(horizontal = 7.dp, vertical = 3.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        if (icon != null) Icon(icon, null, tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(12.dp))
-        Text(text, style = IosTypography.caption.copy(fontWeight = FontWeight.Medium), color = Color.White, maxLines = 1)
-    }
-}
+fun GlassBadge(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null) =
+    NativeMediaLabel(text, modifier, icon)
 
 /** Back pill used by detail screens (iOS hides the nav bar and shows a glass back button). */
 @Composable

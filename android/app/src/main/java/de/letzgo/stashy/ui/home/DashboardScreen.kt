@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -66,7 +67,14 @@ import de.letzgo.stashy.data.StashyPlus
 import de.letzgo.stashy.data.TabManager
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.CatalogTab
-import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeButton
+import de.letzgo.stashy.ui.NativeCard
+import de.letzgo.stashy.ui.NativeCardShape
+import de.letzgo.stashy.ui.NativeType
+import de.letzgo.stashy.ui.nativeAccent
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.TextButton
+import androidx.compose.ui.graphics.compositeOver
 import de.letzgo.stashy.ui.MainTab
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
@@ -156,11 +164,8 @@ private fun ConnectionErrorView(onRetry: () -> Unit) {
     val p = Theme.palette
     Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)) {
         Icon(SFS.serverRack, null, tint = p.secondaryText, modifier = Modifier.size(56.dp))
-        Text("Server not reachable", style = IosTypography.title3, color = p.text, textAlign = TextAlign.Center)
-        Text(
-            "Retry Connection", style = IosTypography.headline, color = Color.White,
-            modifier = Modifier.background(Appearance.tint, RoundedCornerShape(Tokens.Radius.button)).clickable(onClick = onRetry).padding(horizontal = 20.dp, vertical = 12.dp),
-        )
+        Text("Server not reachable", style = NativeType.titleLarge, color = p.text, textAlign = TextAlign.Center)
+        NativeButton("Retry Connection", onClick = onRetry)
     }
 }
 
@@ -177,7 +182,7 @@ private fun DashboardContent() {
         LazyColumn(
             Modifier.fillMaxSize(),
             contentPadding = PaddingValues(top = catalogTopPadding() - 16.dp, bottom = TabBarClearance + 16.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
+            verticalArrangement = Arrangement.spacedBy(20.dp),
         ) {
             items(activeRows, key = { it.id }) { row ->
                 val isFirst = row.id == firstRowId
@@ -191,7 +196,14 @@ private fun DashboardContent() {
     }
 }
 
-/** iOS: `HomeRowView` — header "Title ›" opening the catalog, horizontal row of cards. */
+/**
+ * iOS: `HomeRowView` — header opening the catalog, horizontal row of cards.
+ * Android look: Material section header (titleLarge + "See all" text button) and a horizontally
+ * scrolling row with 16 dp margins and 8 dp gaps; the hero row (first scene row) snaps and uses
+ * the large 28 dp carousel item shape. (The `material3.carousel` composables of material3 1.3.1
+ * expose neither the current item — needed for the hero backdrop — nor item keys, so the row
+ * stays a `LazyRow` styled like the Material uncontained carousel.)
+ */
 @Composable
 private fun HomeRow(config: HomeRowConfig, isLarge: Boolean, isFirst: Boolean) {
     val p = Theme.palette
@@ -208,27 +220,23 @@ private fun HomeRow(config: HomeRowConfig, isLarge: Boolean, isFirst: Boolean) {
             val focused = state.scenes.getOrNull(focusedIndex) ?: state.scenes.firstOrNull()
             HeroBackdrop(focused?.thumbnailURL ?: state.performers.getOrNull(focusedIndex)?.imageURL, Modifier.matchParentSize())
         }
-        Column(verticalArrangement = Arrangement.spacedBy(if (isLarge) 8.dp else 12.dp)) {
-            Row(
-                Modifier.fillMaxWidth().padding(top = if (isFirst) 16.dp else 0.dp).noRippleClickable { openCatalogCategory(config.type) }.padding(horizontal = 12.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                val onHero = showsHero
-                Text(config.title, style = IosTypography.headline, color = if (onHero) Color.White else p.text)
-                Icon(SFS.chevronRight, null, tint = if (onHero) Color.White.copy(alpha = 0.7f) else p.secondaryText, modifier = Modifier.size(12.dp))
-            }
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            DashboardSectionHeader(
+                config.title, Modifier.padding(top = if (isFirst) 12.dp else 0.dp),
+                onHero = showsHero, onSeeAll = { openCatalogCategory(config.type) },
+            )
             when {
-                state.isEmpty && state.isLoading -> LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                state.isEmpty && state.isLoading -> LazyRow(contentPadding = PaddingValues(horizontal = RowMargin), horizontalArrangement = Arrangement.spacedBy(RowGap)) {
                     items(5) {
-                        Box(Modifier.size(w, h).background(Color.Gray.copy(alpha = 0.2f), RoundedCornerShape(Tokens.Radius.card)), contentAlignment = Alignment.Center) {
+                        Box(Modifier.size(w, h).background(p.secondaryBackground, dashboardCardShape(isLarge)), contentAlignment = Alignment.Center) {
                             CircularProgressIndicator(Modifier.size(20.dp), color = p.secondaryText, strokeWidth = 2.dp)
                         }
                     }
                 }
-                state.isEmpty -> Text("No content found", style = IosTypography.caption, color = p.secondaryText, modifier = Modifier.padding(horizontal = 12.dp))
+                state.isEmpty -> Text("No content found", style = NativeType.bodyMedium, color = p.secondaryText, modifier = Modifier.padding(horizontal = RowMargin))
                 else -> LazyRow(
                     state = listState, flingBehavior = rememberSnapFlingBehavior(listState),
-                    contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp),
+                    contentPadding = PaddingValues(horizontal = RowMargin), horizontalArrangement = Arrangement.spacedBy(RowGap),
                 ) {
                     when {
                         config.type.isPerformerRow -> {
@@ -238,14 +246,39 @@ private fun HomeRow(config: HomeRowConfig, isLarge: Boolean, isFirst: Boolean) {
                                 HomeRowType.PerformersHighestRating -> PerformerBadge.Rating
                                 else -> PerformerBadge.SceneCount
                             }
-                            items(list, key = { it.id }) { DashboardPerformerCard(it, badge, w, h, Modifier.noRippleClickable { DetailLinks.performer(it) }) }
+                            items(list, key = { it.id }) { DashboardPerformerCard(it, badge, w, h, isLarge = isLarge, onClick = { DetailLinks.performer(it) }) }
                         }
-                        config.type.isStudioRow -> items(state.studios, key = { it.id }) { DashboardStudioCard(it, isLarge, w, h, Modifier.noRippleClickable { DetailLinks.studio(it) }) }
-                        config.type.isGalleryRow -> items(state.galleries, key = { it.id }) { (if (isLarge) w else 125.dp).let { gw -> GalleryCard(it, Modifier.size(gw, 125.dp).noRippleClickable { DetailLinks.gallery(it) }, aspectRatio = gw / 125.dp) } }
-                        else -> items(state.scenes, key = { it.id }) { DashboardSceneCard(it, isLarge, w, h, Modifier.noRippleClickable { DetailLinks.scene(it) }) }
+                        config.type.isStudioRow -> items(state.studios, key = { it.id }) { DashboardStudioCard(it, isLarge, w, h, onClick = { DetailLinks.studio(it) }) }
+                        config.type.isGalleryRow -> items(state.galleries, key = { it.id }) { (if (isLarge) w else 125.dp).let { gw -> GalleryCard(it, Modifier.size(gw, 125.dp), aspectRatio = gw / 125.dp, shape = dashboardCardShape(isLarge), onClick = { DetailLinks.gallery(it) }) } }
+                        else -> items(state.scenes, key = { it.id }) { DashboardSceneCard(it, isLarge, w, h, onClick = { DetailLinks.scene(it) }) }
                     }
                 }
             }
+        }
+    }
+}
+
+/** Outer margin and gap of the dashboard rows (Material carousel spacing). */
+private val RowMargin = 16.dp
+private val RowGap = 8.dp
+
+/**
+ * Material section header of a dashboard row: titleLarge, trailing "See all" text button when the
+ * row links to a catalog (iOS: tappable "Title ›"). [onHero] = white over the hero backdrop.
+ */
+@Composable
+private fun DashboardSectionHeader(title: String, modifier: Modifier = Modifier, onHero: Boolean = false, onSeeAll: (() -> Unit)? = null) {
+    val p = Theme.palette
+    Row(
+        modifier.fillMaxWidth().heightIn(min = 48.dp).padding(start = RowMargin, end = if (onSeeAll != null) 4.dp else RowMargin),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            title, Modifier.weight(1f), style = NativeType.titleLarge, color = if (onHero) Color.White else p.text,
+            maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+        )
+        if (onSeeAll != null) TextButton(onClick = onSeeAll) {
+            Text("See all", style = NativeType.labelLarge, color = if (onHero) Color.White else nativeAccent())
         }
     }
 }
@@ -330,64 +363,79 @@ private fun formatStat(n: Int): String = NumberFormat.getIntegerInstance().forma
 private fun StatisticsRow(isFirst: Boolean) {
     val p = Theme.palette
     val stats = DashboardStore.statistics
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text("Statistics", style = IosTypography.headline, color = p.text, modifier = Modifier.padding(horizontal = 12.dp).padding(top = if (isFirst) 16.dp else 0.dp))
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        DashboardSectionHeader("Statistics", Modifier.padding(top = if (isFirst) 12.dp else 0.dp))
         when {
             stats != null -> {
                 val items = statItems(stats)
                 if (TabManager.useCompactStatistics) {
-                    Column(Modifier.padding(horizontal = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Column(Modifier.padding(horizontal = RowMargin), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         items.chunked(2).forEach { pair ->
-                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 pair.forEach { CompactStatRow(it, Modifier.weight(1f)) }
                                 if (pair.size == 1) Spacer(Modifier.weight(1f))
                             }
                         }
                     }
-                } else LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                } else LazyRow(contentPadding = PaddingValues(horizontal = RowMargin), horizontalArrangement = Arrangement.spacedBy(RowGap)) {
                     items(items, key = { it.tab }) { StatCard(it) }
                 }
             }
-            DashboardStore.isLoadingStatistics || DashboardStore.errorMessage == null -> LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                items(6) { Box(Modifier.size(HomeSquareCardSide).background(Color.Gray.copy(alpha = 0.2f), RoundedCornerShape(Tokens.Radius.card))) }
+            DashboardStore.isLoadingStatistics || DashboardStore.errorMessage == null -> LazyRow(contentPadding = PaddingValues(horizontal = RowMargin), horizontalArrangement = Arrangement.spacedBy(RowGap)) {
+                items(6) { Box(Modifier.size(HomeSquareCardSide).background(p.secondaryBackground, NativeCardShape)) }
             }
-            else -> Row(Modifier.padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            else -> Row(Modifier.padding(horizontal = RowMargin), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(SF.exclamationTriangle, null, tint = p.secondaryText, modifier = Modifier.size(16.dp))
-                Text("Stats unavailable", style = IosTypography.caption, color = p.secondaryText)
+                Text("Stats unavailable", style = NativeType.bodyMedium, color = p.secondaryText)
             }
         }
     }
 }
 
-/** iOS `StatCard` — 125 pt square, diagonal gradient, icon / value / uppercase title. */
+/** Tonal container of a statistics tile: the stat colour, subtle, over the card surface. */
+@Composable
+private fun statContainer(color: Color): Color = color.copy(alpha = if (Theme.palette.isDark) 0.22f else 0.14f).compositeOver(Theme.palette.secondaryBackground)
+
+/**
+ * iOS `StatCard` — 125 pt square with icon / value / title. Android look: Material filled card in a
+ * tonal version of the stat colour (icon in the full colour), ripple, opens the catalog.
+ */
 @Composable
 private fun StatCard(item: StatItem) {
-    Column(
-        Modifier.size(HomeSquareCardSide).clip(RoundedCornerShape(Tokens.Radius.card))
-            .background(Brush.linearGradient(listOf(item.color, item.color.copy(alpha = 0.6f))))
-            .noRippleClickable { item.tab.catalogTab()?.let { Nav.openCatalog(it) } }
-            .padding(horizontal = 10.dp, vertical = 12.dp),
-        horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterVertically),
+    val p = Theme.palette
+    NativeCard(
+        Modifier.size(HomeSquareCardSide), container = statContainer(item.color), elevation = 0.dp,
+        onClick = { item.tab.catalogTab()?.let { Nav.openCatalog(it) } },
     ) {
-        Icon(item.icon, null, tint = Color.White, modifier = Modifier.size(30.dp))
-        Text(formatStat(item.value), style = IosTypography.title3.copy(fontWeight = FontWeight.Bold), color = Color.White, maxLines = 1)
-        Text(item.title.uppercase(), style = IosTypography.caption2.copy(fontWeight = FontWeight.Bold), color = Color.White.copy(alpha = 0.8f), textAlign = TextAlign.Center)
+        Column(
+            Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Icon(item.icon, null, tint = item.color, modifier = Modifier.size(28.dp))
+            Column {
+                Text(formatStat(item.value), style = NativeType.titleLarge, color = p.text, maxLines = 1)
+                Text(item.title, style = NativeType.labelMedium, color = p.secondaryText, maxLines = 1)
+            }
+        }
     }
 }
 
-/** iOS `compactStatRow` — 36 pt row in a 2-column grid. */
+/** iOS `compactStatRow` — row in a 2-column grid (48 dp Material touch height, tonal fill). */
 @Composable
 private fun CompactStatRow(item: StatItem, modifier: Modifier) {
-    Row(
-        modifier.height(36.dp).cardShadow(RoundedCornerShape(Tokens.Radius.small)).clip(RoundedCornerShape(Tokens.Radius.small))
-            .background(Brush.linearGradient(listOf(item.color, item.color.copy(alpha = 0.7f))))
-            .noRippleClickable { item.tab.catalogTab()?.let { Nav.openCatalog(it) } }
-            .padding(horizontal = 10.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
+    val p = Theme.palette
+    NativeCard(
+        modifier.height(48.dp), container = statContainer(item.color), elevation = 0.dp,
+        onClick = { item.tab.catalogTab()?.let { Nav.openCatalog(it) } },
     ) {
-        Icon(item.icon, null, tint = Color.White, modifier = Modifier.width(20.dp).size(16.dp))
-        Text(item.title, style = IosTypography.caption, color = Color.White.copy(alpha = 0.9f), maxLines = 1, modifier = Modifier.weight(1f))
-        Text(formatStat(item.value), style = IosTypography.subheadline.copy(fontWeight = FontWeight.Bold), color = Color.White, maxLines = 1)
+        Row(
+            Modifier.fillMaxSize().padding(horizontal = 12.dp),
+            verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Icon(item.icon, null, tint = item.color, modifier = Modifier.size(20.dp))
+            Text(item.title, style = NativeType.labelLarge, color = p.text, maxLines = 1, modifier = Modifier.weight(1f))
+            Text(formatStat(item.value), style = NativeType.titleSmall, color = p.text, maxLines = 1)
+        }
     }
 }
 
@@ -405,41 +453,41 @@ private fun ChannelsRow(config: HomeRowConfig, isFirst: Boolean) {
             HomeChannelSourceKind.Clips -> FeedsChannelRequest(filter, HomeChannelDestination.Clips, filter.resolvedSort(FilterMode.Images)?.raw ?: "dateDesc")
         }
     }
-    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(config.title, style = IosTypography.headline, color = p.text, modifier = Modifier.padding(horizontal = 12.dp).padding(top = if (isFirst) 16.dp else 0.dp))
+    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        DashboardSectionHeader(config.title, Modifier.padding(top = if (isFirst) 12.dp else 0.dp))
         if (channels.isEmpty()) {
             val msg = when {
                 SavedFiltersStore.isLoading -> "Loading channels…"
                 TabManager.homeChannelItems.isEmpty() -> "No saved scene or image filters"
                 else -> "No channels enabled"
             }
-            Text(msg, style = IosTypography.caption, color = p.secondaryText, modifier = Modifier.padding(horizontal = 12.dp))
-        } else LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            Text(msg, style = NativeType.bodyMedium, color = p.secondaryText, modifier = Modifier.padding(horizontal = RowMargin))
+        } else LazyRow(contentPadding = PaddingValues(horizontal = RowMargin), horizontalArrangement = Arrangement.spacedBy(RowGap)) {
             items(channels, key = { "${it.destination}.${it.filter.id}" }) { ch ->
-                ChannelCard(ch, Modifier.noRippleClickable { FeedsChannelLink.open(ch) })
+                ChannelCard(ch) { FeedsChannelLink.open(ch) }
             }
         }
     }
 }
 
-/** iOS `HomeChannelCardView` — category logo on the card surface, badge, title. */
+/** iOS `HomeChannelCardView` — category logo on the card surface, badge, title (Material card). */
 @Composable
-private fun ChannelCard(channel: FeedsChannelRequest, modifier: Modifier) {
+private fun ChannelCard(channel: FeedsChannelRequest, onClick: () -> Unit) {
     val p = Theme.palette
     val side = HomeSquareCardSide
     val icon = if (channel.destination == HomeChannelDestination.Scenes) SF.film else SFS.playRectOnRectFill
-    Box(modifier.size(side).clip(RoundedCornerShape(Tokens.Radius.card)).background(p.secondaryBackground)) {
-        Icon(icon, null, tint = Appearance.tint, modifier = Modifier.align(Alignment.Center).padding(bottom = side * 0.12f).size(side * 0.34f))
+    NativeCard(Modifier.size(side), onClick = onClick) {
+        Icon(icon, null, tint = nativeAccent(), modifier = Modifier.align(Alignment.Center).padding(bottom = side * 0.12f).size(side * 0.34f))
         Row(
-            Modifier.align(Alignment.TopEnd).padding(8.dp).background(p.background, RoundedCornerShape(50)).padding(horizontal = 6.dp, vertical = 3.dp),
+            Modifier.align(Alignment.TopEnd).padding(8.dp).background(p.background, de.letzgo.stashy.ui.NativeLabelShape).padding(horizontal = 6.dp, vertical = 2.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            Icon(icon, null, tint = Appearance.tint, modifier = Modifier.size(10.dp))
-            Text(channel.destination.label.uppercase(), style = IosTypography.caption2.copy(fontWeight = FontWeight.Bold, fontSize = androidx.compose.ui.unit.TextUnit(8f, androidx.compose.ui.unit.TextUnitType.Sp)), color = p.secondaryText)
+            Icon(icon, null, tint = nativeAccent(), modifier = Modifier.size(12.dp))
+            Text(channel.destination.label, style = NativeType.labelSmall, color = p.secondaryText)
         }
         Text(
-            channel.filter.name, style = IosTypography.caption.copy(fontWeight = FontWeight.Bold), color = p.text, maxLines = 2,
-            modifier = Modifier.align(Alignment.BottomStart).padding(8.dp),
+            channel.filter.name, style = NativeType.labelLarge, color = p.text, maxLines = 2,
+            modifier = Modifier.align(Alignment.BottomStart).padding(10.dp),
         )
     }
 }

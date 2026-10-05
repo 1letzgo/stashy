@@ -228,25 +228,25 @@ internal fun LazyGridScope.linkedSection(catalog: LinkedCatalog, tab: DetailTab,
     when (tab) {
         DetailTab.Scenes -> catalog.scenes?.let { l ->
             pagedSection(l, { it.id }, null, SF.film, "No scenes found") { _, s ->
-                SceneCard(s, Modifier.noRippleClickable { Nav.push(SceneDetailScreen(s.id, s)) })
+                SceneCard(s, onClick = { Nav.push(SceneDetailScreen(s.id, s)) })
             }
         }
         DetailTab.Galleries -> catalog.galleries?.let { l ->
             pagedSection(l, { it.id }, "Loading galleries...", SF.photoOnRectangle, "No galleries found") { _, g ->
-                DetailGalleryCard(g, Modifier.noRippleClickable { Nav.push(GalleryDetailScreen(g.id, g)) })
+                DetailGalleryCard(g, onClick = { Nav.push(GalleryDetailScreen(g.id, g)) })
             }
         }
         DetailTab.Studios -> catalog.studios?.let { l ->
-            pagedSection(l, { it.id }) { _, s -> DetailStudioCard(s, Modifier.noRippleClickable { Nav.push(StudioDetailScreen(s.id, s)) }) }
+            pagedSection(l, { it.id }) { _, s -> DetailStudioCard(s, onClick = { Nav.push(StudioDetailScreen(s.id, s)) }) }
         }
         DetailTab.Performers -> catalog.performers?.let { l ->
-            pagedSection(l, { it.id }, "Loading performers...") { _, p -> DetailPerformerCard(p, Modifier.noRippleClickable { Nav.push(PerformerDetailScreen(p.id, p)) }) }
+            pagedSection(l, { it.id }, "Loading performers...") { _, p -> DetailPerformerCard(p, onClick = { Nav.push(PerformerDetailScreen(p.id, p)) }) }
         }
         DetailTab.Tags -> catalog.tags?.let { l ->
-            pagedSection(l, { it.id }) { _, t -> DetailTagCard(t, Modifier.noRippleClickable { Nav.push(TagDetailScreen(t.id, t)) }) }
+            pagedSection(l, { it.id }) { _, t -> DetailTagCard(t, onClick = { Nav.push(TagDetailScreen(t.id, t)) }) }
         }
         DetailTab.Groups -> catalog.groups?.let { l ->
-            pagedSection(l, { it.id }) { _, g -> DetailGroupCard(g, Modifier.noRippleClickable { Nav.push(GroupDetailScreen(g.id, g)) }) }
+            pagedSection(l, { it.id }) { _, g -> DetailGroupCard(g, onClick = { Nav.push(GroupDetailScreen(g.id, g)) }) }
         }
         DetailTab.Images -> imageSection(catalog, gridState)
     }
@@ -261,7 +261,7 @@ internal fun LazyGridScope.imageSection(catalog: LinkedCatalog, gridState: LazyG
     val list = catalog.images ?: return
     if (catalog.imageColumns != 1 || !catalog.usesImageFeed) {
         pagedSection(list, { it.id }, "Loading images...", SF.cameraFill, "No images found") { index, image ->
-            DetailImageCard(image, Modifier.noRippleClickable { Nav.push(ImageViewerScreen(list.items, index, onLoadMore = { list.loadMore() })) })
+            DetailImageCard(image, onClick = { Nav.push(ImageViewerScreen(list.items, index, onLoadMore = { list.loadMore() })) })
         }
         return
     }

@@ -55,6 +55,20 @@ import androidx.compose.ui.unit.sp
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeType
+import de.letzgo.stashy.ui.nativeAccent
+import androidx.compose.material3.Badge
+import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.ExtendedFloatingActionButton
+import androidx.compose.material3.InputChip
+import androidx.compose.material3.InputChipDefaults
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.compositeOver
+import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
+import androidx.compose.ui.input.nestedscroll.NestedScrollSource
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.TabBarClearance
 import de.letzgo.stashy.ui.Theme
@@ -87,81 +101,96 @@ data class CatalogSlots(
     val filterSort: CatalogChromeSlot? = null,
 )
 
-/** Space the floating action bar reserves above the tab bar. */
-val FloatingBarClearance: Dp = 36.dp + 6.dp + 12.dp
+/** Space the "Filter & sort" FAB reserves above the navigation bar (56 dp FAB + 16 dp gap). */
+val FloatingBarClearance: Dp = 56.dp + 16.dp
 
-/** Bottom offset of the floating action bar: just above the floating tab bar (iOS safe-area inset). */
+/** Bottom offset of the FAB: 16 dp above the Material navigation bar (80 dp + system insets). */
 @Composable
-fun floatingBarBottomPadding(): Dp = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 80.dp + 6.dp
+fun floatingBarBottomPadding(): Dp = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 80.dp + 16.dp
 
-/** iOS: `FloatingActionBar` + `CatalogSlotBar` — 36pt glass capsule with equally weighted slots. */
+/**
+ * Catalog actions of the visible catalog root, shown in the trailing slot of the Home
+ * [de.letzgo.stashy.ui.NativeTabStrip] (`CatalogsScreen`). Published by [CatalogScaffold].
+ */
+object CatalogTopActions {
+    var slots by mutableStateOf<CatalogSlots?>(null)
+    internal var owner: Any? = null
+
+    val hasActions: Boolean get() = slots?.let { it.columns != null || it.quickFilter != null || it.contextual != null } == true
+}
+
+/**
+ * Android pattern for catalog roots (replaces the iOS `FloatingActionBar` / `CatalogSlotBar`):
+ * columns toggle, quick menu and contextual slot as app-bar icons in the tab strip (active =
+ * `Appearance.tint`, menus as anchored `DropdownMenu`s like [de.letzgo.stashy.ui.TopBarMenuAction]).
+ */
 @Composable
-fun CatalogFloatingBar(slots: CatalogSlots, modifier: Modifier = Modifier) {
-    Row(
-        modifier
-            .padding(horizontal = 24.dp)
-            .fillMaxWidth()
-            .height(36.dp)
-            .floatingShadow(RoundedCornerShape(50))
-            .stashyGlass(RoundedCornerShape(50))
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        slots.columns?.let { SlotButton(it, Modifier.weight(1f)) }
-        slots.quickFilter?.let { QuickFilterSlot(it, Modifier.weight(1f)) }
-        slots.contextual?.let { SlotButton(it, Modifier.weight(1f)) }
-        slots.filterSort?.let { SlotButton(it, Modifier.weight(1f)) }
-    }
+fun CatalogTopActionIcons(slots: CatalogSlots) {
+    slots.columns?.let { TopBarSlot(it) }
+    slots.quickFilter?.let { QuickFilterAction(it) }
+    slots.contextual?.let { TopBarSlot(it) }
 }
 
 @Composable
-private fun SlotGlyph(icon: ImageVector, isActive: Boolean, contentDescription: String) {
-    Box {
-        Icon(icon, contentDescription, tint = if (isActive) Appearance.tint else Color.White, modifier = Modifier.size(20.dp))
-        if (isActive) Box(Modifier.align(Alignment.TopEnd).offset(x = 3.dp, y = (-3).dp).size(7.dp).clip(CircleShape).background(Appearance.tint))
-    }
+private fun TopBarSlot(slot: CatalogChromeSlot) {
+    de.letzgo.stashy.ui.TopBarAction(slot.icon, slot.contentDescription, tint = if (slot.isActive) Appearance.tint else Theme.palette.text, onClick = slot.action)
 }
 
 @Composable
-private fun SlotButton(slot: CatalogChromeSlot, modifier: Modifier) {
-    Box(modifier.fillMaxHeight().clickable(onClick = slot.action), contentAlignment = Alignment.Center) {
-        SlotGlyph(slot.icon, slot.isActive, slot.contentDescription)
-    }
-}
-
-@Composable
-private fun QuickFilterSlot(menu: CatalogQuickFilterMenu, modifier: Modifier) {
-    var open by remember { mutableStateOf(false) }
+private fun QuickFilterAction(menu: CatalogQuickFilterMenu) {
     val p = Theme.palette
-    Box(modifier.fillMaxHeight().clickable { open = true }, contentAlignment = Alignment.Center) {
-        Icon(SF.line3HorizontalDecrease, menu.contentDescription, tint = if (menu.isActive) Appearance.tint else Color.White, modifier = Modifier.size(20.dp))
-        DropdownMenu(open, { open = false }, containerColor = p.secondaryBackground) {
-            menu.items.forEach { item ->
-                when {
-                    item.divider -> HorizontalDivider(color = p.separator)
-                    item.header -> Text(item.title, Modifier.padding(horizontal = 16.dp, vertical = 6.dp), style = IosTypography.footnote.copy(fontWeight = FontWeight.SemiBold), color = p.secondaryText)
-                    else -> DropdownMenuItem(
-                        text = { Text(item.title, color = p.text) },
-                        trailingIcon = if (item.checked) ({ Icon(SF.checkmark, null, tint = p.text) }) else null,
-                        onClick = { open = false; item.action() },
-                    )
-                }
+    de.letzgo.stashy.ui.TopBarMenuAction(SF.line3HorizontalDecrease, menu.contentDescription, tint = if (menu.isActive) Appearance.tint else p.text) { dismiss ->
+        menu.items.forEach { item ->
+            when {
+                item.divider -> HorizontalDivider(color = p.separator)
+                item.header -> Text(item.title, Modifier.padding(horizontal = 16.dp, vertical = 6.dp), style = NativeType.labelMedium, color = p.secondaryText)
+                else -> DropdownMenuItem(
+                    text = { Text(item.title, color = p.text) },
+                    trailingIcon = if (item.checked) ({ Icon(SF.checkmark, null, tint = p.text) }) else null,
+                    onClick = { dismiss(); item.action() },
+                )
             }
         }
     }
 }
 
-/** iOS: `SearchClearChip` — shows the active search term and clears it on tap. */
+/**
+ * "Filter & sort" Material extended FAB (iOS: the filter & sort slot, always far right of the
+ * floating bar). Collapses to the icon while scrolling down; a dot marks an active filter.
+ */
+@Composable
+fun CatalogFilterFab(slot: CatalogChromeSlot, expanded: Boolean, modifier: Modifier = Modifier) {
+    val p = Theme.palette
+    val accent = nativeAccent()
+    ExtendedFloatingActionButton(
+        onClick = slot.action,
+        expanded = expanded,
+        modifier = modifier,
+        icon = {
+            BadgedBox(badge = { if (slot.isActive) Badge(containerColor = Appearance.tint.takeIf { it != de.letzgo.stashy.ui.StashyColors.defaultTint } ?: accent) }) {
+                Icon(slot.icon, slot.contentDescription)
+            }
+        },
+        text = { Text("Filter & sort", style = NativeType.labelLarge) },
+        containerColor = accent.copy(alpha = if (p.isDark) 0.28f else 0.16f).compositeOver(p.secondaryBackground),
+        contentColor = p.text,
+    )
+}
+
+/** iOS: `SearchClearChip` — Material input chip with the active search term; tap clears it. */
 @Composable
 fun SearchClearChip(text: String, onClear: () -> Unit, modifier: Modifier = Modifier) {
-    Row(
-        modifier.clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.6f)).clickable(onClick = onClear)
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Icon(SF.xmark, "Clear search", tint = Color.White.copy(alpha = 0.9f), modifier = Modifier.size(12.dp))
-        Text(text, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White.copy(alpha = 0.9f), maxLines = 1)
-    }
+    val p = Theme.palette
+    InputChip(
+        selected = true, onClick = onClear, modifier = modifier,
+        label = { Text(text, style = NativeType.labelLarge, maxLines = 1) },
+        leadingIcon = { Icon(SF.magnifyingglass, null, Modifier.size(18.dp)) },
+        trailingIcon = { Icon(SF.xmark, "Clear search", Modifier.size(18.dp)) },
+        colors = InputChipDefaults.inputChipColors(
+            selectedContainerColor = p.secondaryBackground, selectedLabelColor = p.text,
+            selectedLeadingIconColor = p.secondaryText, selectedTrailingIconColor = p.text,
+        ),
+    )
 }
 
 /** iOS: `StatusPlaceholderView` (ConnectionErrorView / SharedEmptyStateView). */
@@ -172,13 +201,9 @@ fun StatusPlaceholder(icon: ImageVector, title: String, buttonText: String? = nu
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(20.dp, Alignment.CenterVertically),
     ) {
-        Icon(icon, null, tint = Appearance.tint, modifier = Modifier.size(64.dp))
-        Text(title, style = IosTypography.title3.copy(fontWeight = FontWeight.Bold), color = Theme.palette.text, textAlign = TextAlign.Center)
-        if (buttonText != null && onAction != null) {
-            Button(onAction, colors = ButtonDefaults.buttonColors(containerColor = Appearance.tint, contentColor = Color.White)) {
-                Text(buttonText, fontWeight = FontWeight.SemiBold)
-            }
-        }
+        Icon(icon, null, tint = nativeAccent(), modifier = Modifier.size(64.dp))
+        Text(title, style = NativeType.titleLarge, color = Theme.palette.text, textAlign = TextAlign.Center)
+        if (buttonText != null && onAction != null) de.letzgo.stashy.ui.NativeButton(buttonText, onClick = onAction)
     }
 }
 
@@ -187,9 +212,12 @@ fun StatusPlaceholder(icon: ImageVector, title: String, buttonText: String? = nu
 fun StandardLoading(message: String) {
     Column(Modifier.fillMaxSize(), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically)) {
         CircularProgressIndicator(color = Theme.palette.secondaryText)
-        Text(message, style = IosTypography.subheadline, color = Theme.palette.secondaryText)
+        Text(message, style = NativeType.bodyMedium, color = Theme.palette.secondaryText)
     }
 }
+
+/** Gutter of the catalog grids (Material: 16 dp margins, 8–12 dp gutters). */
+val CatalogGridGutter: Dp = 12.dp
 
 /** Texts of a catalog's empty / loading states (iOS per view). */
 data class CatalogTexts(val loading: String, val emptyIcon: ImageVector, val emptyTitle: String, val emptyButton: String)
@@ -218,7 +246,22 @@ fun <T> CatalogScaffold(
     val list = controller.list
     val p = Theme.palette
     val hasServer = ServerConfigManager.activeConfig != null
-    Box(Modifier.fillMaxSize().background(p.background)) {
+    val showBar = showsFloatingBar && hasServer && !(list.items.isEmpty() && list.error != null)
+    // Columns / quick menu / contextual slots → tab strip icons; filter & sort → FAB.
+    val token = remember { Any() }
+    val published = if (showBar) slots.copy(filterSort = null) else null
+    SideEffect { CatalogTopActions.owner = token; CatalogTopActions.slots = published }
+    DisposableEffect(token) { onDispose { if (CatalogTopActions.owner === token) { CatalogTopActions.owner = null; CatalogTopActions.slots = null } } }
+    var fabExpanded by remember { mutableStateOf(true) }
+    val scrollWatcher = remember {
+        object : NestedScrollConnection {
+            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
+                if (available.y < -4f) fabExpanded = false else if (available.y > 4f) fabExpanded = true
+                return Offset.Zero
+            }
+        }
+    }
+    Box(Modifier.fillMaxSize().background(p.background).nestedScroll(scrollWatcher)) {
         when {
             !hasServer -> StatusPlaceholder(SF.server, "Server not reachable", "Retry Connection", { controller.refresh() })
             list.items.isEmpty() && (list.isLoading || !list.loadedOnce) -> StandardLoading(texts.loading)
@@ -231,8 +274,8 @@ fun <T> CatalogScaffold(
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(count),
                             contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding, bottom = TabBarClearance + FloatingBarClearance + 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalArrangement = Arrangement.spacedBy(CatalogGridGutter),
+                            horizontalArrangement = Arrangement.spacedBy(CatalogGridGutter),
                             modifier = Modifier.fillMaxSize(),
                         ) {
                             if (controller.search.isNotEmpty()) item(span = { GridItemSpan(maxLineSpan) }) {
@@ -250,8 +293,8 @@ fun <T> CatalogScaffold(
                 }
             }
         }
-        val showBar = showsFloatingBar && hasServer && !(list.items.isEmpty() && list.error != null)
-        if (showBar) CatalogFloatingBar(slots, Modifier.align(Alignment.BottomCenter).padding(bottom = floatingBarBottomPadding()))
+        val fab = slots.filterSort
+        if (showBar && fab != null) CatalogFilterFab(fab, fabExpanded, Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = floatingBarBottomPadding()))
     }
 }
 

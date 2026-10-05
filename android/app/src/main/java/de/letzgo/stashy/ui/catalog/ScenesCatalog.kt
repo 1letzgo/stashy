@@ -41,7 +41,7 @@ fun ScenesList(controller: CatalogController<Scene>, topPadding: androidx.compos
         topPadding = topPadding,
         showsFloatingBar = showsFloatingBar,
     ) { _, scene ->
-        SceneCard(scene, Modifier.noRippleClickable { Nav.push(SceneDetailScreen(scene.id, scene)) }, aspectRatio = CatalogCardColumns.One.cardAspectRatio)
+        SceneCard(scene, aspectRatio = CatalogCardColumns.One.cardAspectRatio, onClick = { Nav.push(SceneDetailScreen(scene.id, scene)) })
     }
     CatalogFilterSortSheet(controller)
 }

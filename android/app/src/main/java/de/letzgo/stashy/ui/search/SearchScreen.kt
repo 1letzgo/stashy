@@ -232,7 +232,7 @@ private fun Results(query: String, searching: Boolean) {
                 AppTab.Scenes -> if (r.scenes.isNotEmpty()) item("scenes") {
                     Section("Scenes", r.scenes.size, SCENES_LIMIT, { Nav.openCatalog(CatalogTab.Scenes, search = query, noDefaultFilter = true) }) {
                         LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            items(r.scenes, key = { it.id }) { DashboardSceneCard(it, false, 125.dp * 16 / 9, 125.dp, Modifier.noRippleClickable { DetailLinks.scene(it) }) }
+                            items(r.scenes, key = { it.id }) { DashboardSceneCard(it, false, 125.dp * 16 / 9, 125.dp, onClick = { DetailLinks.scene(it) }) }
                         }
                     }
                 }

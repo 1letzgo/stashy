@@ -65,7 +65,7 @@ fun PerformersList(c: CatalogController<Performer>, topPadding: androidx.compose
         c, CatalogTexts("Loading performers...", SF.person3, "No performers found", "Load Performers"),
         CatalogSlots(filterSort = filterSortSlot(c)), posterColumns, { it.id }, topPadding,
     ) { _, performer ->
-        PerformerCard(performer, Modifier.noRippleClickable { Nav.push(PerformerDetailScreen(performer.id, performer)) }, PerformerBadgeType.forSort(c.sort))
+        PerformerCard(performer, badgeType = PerformerBadgeType.forSort(c.sort), onClick = { Nav.push(PerformerDetailScreen(performer.id, performer)) })
     }
     CatalogFilterSortSheet(c)
 }
@@ -83,7 +83,7 @@ fun StudiosList(c: CatalogController<Studio>, topPadding: androidx.compose.ui.un
         c, CatalogTexts("Loading studios...", SF.building2, "No studios found", "Load Studios"),
         CatalogSlots(filterSort = filterSortSlot(c)), posterColumns, { it.id }, topPadding,
     ) { _, studio ->
-        StudioCard(studio, Modifier.noRippleClickable { Nav.push(StudioDetailScreen(studio.id, studio)) })
+        StudioCard(studio, onClick = { Nav.push(StudioDetailScreen(studio.id, studio)) })
     }
     CatalogFilterSortSheet(c)
 }
@@ -101,7 +101,7 @@ fun TagsList(c: CatalogController<Tag>, topPadding: androidx.compose.ui.unit.Dp 
         c, CatalogTexts("Loading tags...", SF.tag, "No tags found", "Load Tags"),
         CatalogSlots(filterSort = filterSortSlot(c)), posterColumns, { it.id }, topPadding,
     ) { _, tag ->
-        TagCard(tag, Modifier.noRippleClickable { Nav.push(TagDetailScreen(tag.id, tag)) })
+        TagCard(tag, onClick = { Nav.push(TagDetailScreen(tag.id, tag)) })
     }
     CatalogFilterSortSheet(c)
 }
@@ -136,7 +136,7 @@ fun GroupsCatalog() {
         c, CatalogTexts("Loading groups...", SF.rectangleStackFill, "No groups found", "Load Groups"),
         CatalogSlots(quickFilter = quick, filterSort = filterSortSlot(c)), posterColumns, { it.id },
     ) { _, group ->
-        GroupCard(group, Modifier.noRippleClickable { Nav.push(GroupDetailScreen(group.id, group)) })
+        GroupCard(group, onClick = { Nav.push(GroupDetailScreen(group.id, group)) })
     }
     CatalogFilterSortSheet(c)
 }
@@ -149,7 +149,7 @@ fun MarkersCatalog() {
         c, CatalogTexts("Loading markers...", SF.bookmarkFill, "No markers found", "Load Markers"),
         CatalogSlots(filterSort = filterSortSlot(c)), posterColumns, { it.id },
     ) { _, marker ->
-        MarkerCard(marker, Modifier.noRippleClickable {
+        MarkerCard(marker, onClick = {
             marker.scene?.let { scene -> Nav.push(SceneDetailScreen(scene.id, scene.copy(resumeTime = marker.seconds), autoPlay = true)) }
         })
     }
@@ -176,7 +176,7 @@ fun GalleriesList(c: CatalogController<Gallery>, columnScope: CatalogCardColumnS
         ),
         columns = { cols.columnCount(it) }, itemKey = { it.id }, topPadding = topPadding, gridKey = cols,
     ) { _, gallery ->
-        GalleryCard(gallery, Modifier.noRippleClickable { Nav.push(GalleryDetailScreen(gallery.id, gallery)) }, cols.cardAspectRatio)
+        GalleryCard(gallery, aspectRatio = cols.cardAspectRatio, onClick = { Nav.push(GalleryDetailScreen(gallery.id, gallery)) })
     }
     CatalogFilterSortSheet(c)
 }
@@ -228,7 +228,7 @@ fun ImagesList(c: CatalogController<StashImage>, holder: ImageMediaKindHolder, c
             )
         } else null,
     ) { index, image ->
-        ImageCard(image, Modifier.noRippleClickable { Nav.push(ImageViewerScreen(c.list.items.toList(), index)) }, 1f)
+        ImageCard(image, aspectRatio = 1f, onClick = { Nav.push(ImageViewerScreen(c.list.items.toList(), index)) })
     }
     CatalogFilterSortSheet(c) {
         ImageMediaTypeCard(holder.kind) { holder.kind = it; c.applyLive() }

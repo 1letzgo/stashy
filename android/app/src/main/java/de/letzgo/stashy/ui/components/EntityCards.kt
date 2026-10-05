@@ -25,7 +25,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -46,45 +45,25 @@ import de.letzgo.stashy.data.StashImage
 import de.letzgo.stashy.data.Studio
 import de.letzgo.stashy.data.Tag
 import de.letzgo.stashy.ui.Appearance
-import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeCard
+import de.letzgo.stashy.ui.NativeMediaLabel
+import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Theme
-import de.letzgo.stashy.ui.Tokens
-import de.letzgo.stashy.ui.cardShadow
 import de.letzgo.stashy.ui.oCounterIcon
-import de.letzgo.stashy.ui.stashyGlass
 import java.time.LocalDate
 import java.time.Period
-
-private val cardShape = RoundedCornerShape(Tokens.Radius.card)
 
 /** Bottom gradient used by the poster cards (`.clear → .black 0.8`). */
 private val bottomGradient = Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)))
 
-/** iOS card pill: 10pt bold icon + 11pt bold text on a glass capsule. */
+/** iOS card pill (icon + count) — Android look: Material label ([NativeMediaLabel]). */
 @Composable
-fun CardPill(icon: ImageVector?, text: String, modifier: Modifier = Modifier, iconSize: Int = 10, textSize: Int = 11) {
-    Row(
-        modifier.shadow(2.dp, RoundedCornerShape(50), ambientColor = Color.Black.copy(0.2f), spotColor = Color.Black.copy(0.2f))
-            .stashyGlass(RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(3.dp),
-    ) {
-        if (icon != null) Icon(icon, null, tint = Color.White, modifier = Modifier.size(iconSize.dp + 2.dp))
-        Text(text, fontSize = textSize.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1)
-    }
-}
+fun CardPill(icon: ImageVector?, text: String, modifier: Modifier = Modifier) = NativeMediaLabel(text, modifier, icon)
 
-/** Glass caption badge (studio name / date / file extension on media cards). */
+/** Caption label (studio name / date / file extension on media cards). */
 @Composable
-fun CaptionPill(text: String, modifier: Modifier = Modifier, small: Boolean = false) {
-    Text(
-        text,
-        modifier.stashyGlass(RoundedCornerShape(50)).padding(horizontal = if (small) 6.dp else 8.dp, vertical = if (small) 3.dp else 4.dp),
-        style = IosTypography.caption.copy(fontWeight = if (small) FontWeight.Normal else FontWeight.Medium),
-        color = if (small) Color.White.copy(alpha = 0.9f) else Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
-    )
-}
+fun CaptionPill(text: String, modifier: Modifier = Modifier, small: Boolean = false) = NativeMediaLabel(text, modifier, small = small)
 
 @Composable
 private fun PlaceholderIcon(icon: ImageVector, tint: Color = Theme.palette.secondaryText, size: Int = 34) =
@@ -102,7 +81,7 @@ fun performerAge(birthdate: String?): Int? {
  * top-right (depends on the sort), bottom gradient with the name.
  */
 @Composable
-fun PerformerCard(performer: Performer, modifier: Modifier = Modifier, badgeType: PerformerBadgeType = PerformerBadgeType.SceneCount) {
+fun PerformerCard(performer: Performer, modifier: Modifier = Modifier, badgeType: PerformerBadgeType = PerformerBadgeType.SceneCount, onClick: (() -> Unit)? = null) {
     val p = Theme.palette
     val (icon, text) = when (badgeType) {
         PerformerBadgeType.SceneCount -> SF.film to "${performer.sceneCount ?: 0}"
@@ -111,7 +90,7 @@ fun PerformerCard(performer: Performer, modifier: Modifier = Modifier, badgeType
         PerformerBadgeType.OCount -> oCounterIcon(Appearance.oCounterIcon) to "${performer.oCounter ?: 0}"
         PerformerBadgeType.Rating -> SF.starFill to "${performer.rating100 ?: 0}"
     }
-    BoxWithConstraints(modifier.fillMaxWidth().aspectRatio(9f / 12f).cardShadow(cardShape).clip(cardShape).background(p.secondaryBackground)) {
+    NativeCard(modifier.fillMaxWidth().aspectRatio(9f / 12f), onClick = onClick) { BoxWithConstraints(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
             var failed by remember(performer.id) { mutableStateOf(performer.imageURL == null) }
             if (failed) PlaceholderIcon(SF.personFill)
@@ -125,9 +104,9 @@ fun PerformerCard(performer: Performer, modifier: Modifier = Modifier, badgeType
         }
         Text(
             performer.name, Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(12.dp),
-            style = IosTypography.headline, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            style = NativeType.titleMedium, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
         )
-    }
+    } }
 }
 
 /**
@@ -135,18 +114,18 @@ fun PerformerCard(performer: Performer, modifier: Modifier = Modifier, badgeType
  * name row with scene and gallery counts.
  */
 @Composable
-fun StudioCard(studio: Studio, modifier: Modifier = Modifier) {
+fun StudioCard(studio: Studio, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     val p = Theme.palette
-    Column(modifier.fillMaxWidth().cardShadow(cardShape).clip(cardShape).background(p.secondaryBackground)) {
+    NativeCard(modifier.fillMaxWidth(), onClick = onClick) { Column(Modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().aspectRatio(2.2f).background(p.studioHeader), contentAlignment = Alignment.Center) {
             StudioLogo(studio, Modifier.fillMaxSize().padding(start = 14.dp, end = 14.dp, top = 12.dp))
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(studio.name, Modifier.weight(1f), style = IosTypography.subheadline.copy(fontWeight = FontWeight.Bold), color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(studio.name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             CountLabel(SF.film, studio.sceneCount ?: 0)
             studio.galleryCount?.takeIf { it > 0 }?.let { CountLabel(SF.photoStack, it) }
         }
-    }
+    } }
 }
 
 /** iOS: `StudioImageView` — logo (PNG/JPG/SVG) fitted, else building icon + name. */
@@ -158,7 +137,7 @@ fun StudioLogo(studio: Studio, modifier: Modifier = Modifier) {
         if (failed) {
             Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 PlaceholderIcon(SF.building2)
-                Text(studio.name, Modifier.padding(horizontal = 4.dp), style = IosTypography.caption, color = p.secondaryText, maxLines = 1)
+                Text(studio.name, Modifier.padding(horizontal = 4.dp), style = NativeType.labelMedium, color = p.secondaryText, maxLines = 1)
             }
         } else {
             val url = studio.imageURL?.let { u -> studio.updatedAt?.let { "$u${if (u.contains("?")) "&" else "?"}t=${android.net.Uri.encode(it)}" } ?: u }
@@ -171,8 +150,8 @@ fun StudioLogo(studio: Studio, modifier: Modifier = Modifier) {
 private fun CountLabel(icon: ImageVector, count: Int) {
     val p = Theme.palette
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        Icon(icon, null, tint = p.secondaryText, modifier = Modifier.size(12.dp))
-        Text("$count", fontSize = 11.sp, fontWeight = FontWeight.Medium, color = p.secondaryText)
+        Icon(icon, null, tint = p.secondaryText, modifier = Modifier.size(14.dp))
+        Text("$count", style = NativeType.labelMedium, color = p.secondaryText)
     }
 }
 
@@ -184,9 +163,9 @@ val Tag.hasCustomImage: Boolean get() = imagePath != null && !imagePath.contains
  * name with scene / gallery counts.
  */
 @Composable
-fun TagCard(tag: Tag, modifier: Modifier = Modifier) {
+fun TagCard(tag: Tag, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     val p = Theme.palette
-    Column(modifier.fillMaxWidth().cardShadow(cardShape).clip(cardShape).background(p.secondaryBackground)) {
+    NativeCard(modifier.fillMaxWidth(), onClick = onClick) { Column(Modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().aspectRatio(2.2f).background(p.studioHeader), contentAlignment = Alignment.Center) {
             if (tag.hasCustomImage) {
                 var failed by remember(tag.id) { mutableStateOf(false) }
@@ -200,11 +179,11 @@ fun TagCard(tag: Tag, modifier: Modifier = Modifier) {
             }
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(tag.name, Modifier.weight(1f), style = IosTypography.subheadline.copy(fontWeight = FontWeight.Bold), color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(tag.name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
             tag.sceneCount?.takeIf { it > 0 }?.let { CountLabel(SF.film, it) }
             tag.galleryCount?.takeIf { it > 0 }?.let { CountLabel(SF.photoStack, it) }
         }
-    }
+    } }
 }
 
 /**
@@ -212,9 +191,9 @@ fun TagCard(tag: Tag, modifier: Modifier = Modifier) {
  * studio pill top-left, image count top-right, gradient (40 %) with the title.
  */
 @Composable
-fun GalleryCard(gallery: Gallery, modifier: Modifier = Modifier, aspectRatio: Float = 1f) {
+fun GalleryCard(gallery: Gallery, modifier: Modifier = Modifier, aspectRatio: Float = 1f, shape: androidx.compose.ui.graphics.Shape = de.letzgo.stashy.ui.NativeCardShape, onClick: (() -> Unit)? = null) {
     val p = Theme.palette
-    BoxWithConstraints(modifier.fillMaxWidth().aspectRatio(aspectRatio).cardShadow(cardShape).clip(cardShape).background(p.secondaryBackground)) {
+    NativeCard(modifier.fillMaxWidth().aspectRatio(aspectRatio), shape = shape, onClick = onClick) { BoxWithConstraints(Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
             var failed by remember(gallery.id) { mutableStateOf(gallery.coverURL == null) }
             if (failed) PlaceholderIcon(SF.photoOnRectangle, size = 40)
@@ -224,21 +203,13 @@ fun GalleryCard(gallery: Gallery, modifier: Modifier = Modifier, aspectRatio: Fl
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.Top) {
             gallery.studio?.name?.let { CaptionPill(it, Modifier.weight(1f, fill = false)) }
             Spacer(Modifier.weight(1f))
-            gallery.imageCount?.takeIf { it > 0 }?.let {
-                Row(
-                    Modifier.stashyGlass(RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    Icon(SF.photoStack, null, tint = Color.White, modifier = Modifier.size(13.dp))
-                    Text("$it", style = IosTypography.caption.copy(fontWeight = FontWeight.Medium), color = Color.White)
-                }
-            }
+            gallery.imageCount?.takeIf { it > 0 }?.let { NativeMediaLabel("$it", icon = SF.photoStack) }
         }
         Text(
             gallery.displayTitle, Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(12.dp),
-            style = IosTypography.headline.copy(fontWeight = FontWeight.Medium), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            style = NativeType.titleMedium, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
         )
-    }
+    } }
 }
 
 /**
@@ -246,9 +217,9 @@ fun GalleryCard(gallery: Gallery, modifier: Modifier = Modifier, aspectRatio: Fl
  * (100 pt) with the name.
  */
 @Composable
-fun GroupCard(group: StashGroup, modifier: Modifier = Modifier) {
+fun GroupCard(group: StashGroup, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     val p = Theme.palette
-    Box(modifier.fillMaxWidth().aspectRatio(9f / 12f).cardShadow(cardShape).clip(cardShape).background(p.secondaryBackground)) {
+    NativeCard(modifier.fillMaxWidth().aspectRatio(9f / 12f), onClick = onClick) {
         Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {
             var failed by remember(group.id) { mutableStateOf(group.frontImageURL == null) }
             if (failed) PlaceholderIcon(SF.rectangleStack)
@@ -260,7 +231,7 @@ fun GroupCard(group: StashGroup, modifier: Modifier = Modifier) {
         }
         Text(
             group.name, Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(12.dp),
-            style = IosTypography.headline, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            style = NativeType.titleMedium, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
         )
     }
 }
@@ -280,9 +251,9 @@ val StashImage.oneColumnAspectRatio: Float get() = (aspectRatio ?: 1f).coerceIn(
  * pills on top, gradient with performer (or title) and the file extension.
  */
 @Composable
-fun ImageCard(image: StashImage, modifier: Modifier = Modifier, aspectRatio: Float = 1f) {
+fun ImageCard(image: StashImage, modifier: Modifier = Modifier, aspectRatio: Float = 1f, onClick: (() -> Unit)? = null) {
     val p = Theme.palette
-    Box(modifier.fillMaxWidth().aspectRatio(aspectRatio).cardShadow(cardShape).clip(cardShape).background(p.secondaryBackground)) {
+    NativeCard(modifier.fillMaxWidth().aspectRatio(aspectRatio), onClick = onClick) {
         Box(Modifier.fillMaxSize().background(Color.Gray.copy(alpha = 0.1f)), contentAlignment = Alignment.Center) {
             var failed by remember(image.id) { mutableStateOf(image.thumbnailURL == null) }
             if (failed) PlaceholderIcon(SF.photo, size = 24)
@@ -300,7 +271,7 @@ fun ImageCard(image: StashImage, modifier: Modifier = Modifier, aspectRatio: Flo
         Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 image.performers?.firstOrNull()?.name ?: image.title ?: "Image", Modifier.weight(1f),
-                style = IosTypography.headline.copy(fontWeight = FontWeight.Medium), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                style = NativeType.titleMedium, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
             image.fileExtension?.let { CaptionPill(it, small = true) }
         }
@@ -315,9 +286,9 @@ val SceneMarker.thumbnailURL: String? get() = Net.signed(screenshot)
  * bottom-left over a 60 pt gradient.
  */
 @Composable
-fun MarkerCard(marker: SceneMarker, modifier: Modifier = Modifier) {
+fun MarkerCard(marker: SceneMarker, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
     val p = Theme.palette
-    Box(modifier.fillMaxWidth().aspectRatio(16f / 9f).cardShadow(cardShape).clip(cardShape).background(p.secondaryBackground)) {
+    NativeCard(modifier.fillMaxWidth().aspectRatio(16f / 9f), onClick = onClick) {
         Box(Modifier.fillMaxSize().background(p.studioHeader), contentAlignment = Alignment.Center) {
             var failed by remember(marker.id) { mutableStateOf(marker.thumbnailURL == null) }
             if (failed) PlaceholderIcon(SF.bookmarkFill, Appearance.tint)
@@ -326,16 +297,12 @@ fun MarkerCard(marker: SceneMarker, modifier: Modifier = Modifier) {
         Box(Modifier.align(Alignment.BottomCenter).fillMaxWidth().height(60.dp).background(bottomGradient))
         Column(Modifier.fillMaxSize().padding(8.dp)) {
             Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.Top) {
-                Text(
-                    marker.title ?: "Marker",
-                    Modifier.weight(1f, fill = false).stashyGlass(RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 4.dp),
-                    fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                )
+                NativeMediaLabel(marker.title ?: "Marker", Modifier.weight(1f, fill = false), small = true)
             }
             Spacer(Modifier.weight(1f))
             Text(
                 marker.scene?.title ?: "Unknown Scene", Modifier.fillMaxWidth(),
-                style = IosTypography.caption.copy(fontWeight = FontWeight.Bold), color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                style = NativeType.titleSmall, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
         }
     }
