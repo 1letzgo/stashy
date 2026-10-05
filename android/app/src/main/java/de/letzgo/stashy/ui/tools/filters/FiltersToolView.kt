@@ -20,17 +20,13 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -44,7 +40,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -58,6 +53,8 @@ import de.letzgo.stashy.data.tools.FiltersToolEntry
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.Chevron
 import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeSearchField
+import de.letzgo.stashy.ui.NativeTextField
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
@@ -284,38 +281,10 @@ private fun FilterRow(
     }
 }
 
-/** iOS: `ToolsSearchField`. */
+/** iOS: `ToolsSearchField` — the shared Material search pill. */
 @Composable
-private fun FiltersSearchField(prompt: String, text: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
-    val p = Theme.palette
-    Row(
-        modifier
-            .clip(RoundedCornerShape(Tokens.Radius.card))
-            .background(p.secondaryBackground)
-            .padding(horizontal = Tokens.Spacing.sm, vertical = Tokens.Spacing.xs + 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs),
-    ) {
-        Icon(SF.magnifyingglass, null, tint = p.secondaryText, modifier = Modifier.size(18.dp))
-        Box(Modifier.weight(1f)) {
-            if (text.isEmpty()) Text(prompt, style = IosTypography.body, color = p.secondaryText, maxLines = 1)
-            BasicTextField(
-                value = text,
-                onValueChange = onChange,
-                singleLine = true,
-                textStyle = IosTypography.body.copy(color = p.text),
-                cursorBrush = SolidColor(Appearance.tint),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        if (text.isNotEmpty()) {
-            Icon(
-                Icons.Filled.Cancel, "Clear search", tint = p.secondaryText,
-                modifier = Modifier.size(18.dp).clip(CircleShape).clickable { onChange("") },
-            )
-        }
-    }
-}
+private fun FiltersSearchField(prompt: String, text: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) =
+    NativeSearchField(text, onChange, prompt, modifier)
 
 /** iOS: `Menu { addMenuItems } label: { ToolsAddButtonLabel() }` — one entry per filter mode. */
 @Composable
@@ -352,17 +321,7 @@ private fun RenameFilterDialog(text: String, onTextChange: (String) -> Unit, onD
         textContentColor = p.text,
         title = { Text("Rename filter", style = IosTypography.headline) },
         text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = onTextChange,
-                singleLine = true,
-                placeholder = { Text("Name", color = p.secondaryText) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = p.text, unfocusedTextColor = p.text,
-                    focusedBorderColor = tint, unfocusedBorderColor = p.separator, cursorColor = tint,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            NativeTextField(text, onTextChange, label = null, placeholder = "Name", autoCorrect = true)
         },
         confirmButton = {
             TextButton(onClick = onSave) { Text("Save", color = tint, fontWeight = FontWeight.SemiBold) }

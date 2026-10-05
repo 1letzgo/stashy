@@ -14,12 +14,10 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -43,6 +41,7 @@ import de.letzgo.stashy.data.SortOption
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.StashyColors
+import de.letzgo.stashy.ui.NativeTextField
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.catalog.CatalogController
 import de.letzgo.stashy.ui.stashyGlass
@@ -250,7 +249,7 @@ private fun NameInputDialog(title: String, message: String, initial: String, onS
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(message, style = IosTypography.footnote, color = p.secondaryText)
-                OutlinedTextField(text, { text = it }, singleLine = true, placeholder = { Text("Name") }, keyboardOptions = KeyboardOptions.Default)
+                NativeTextField(text, { text = it }, label = null, placeholder = "Name", autoCorrect = true)
             }
         },
         confirmButton = { TextButton({ onSave(text) }, enabled = text.isNotBlank()) { Text("Save") } },

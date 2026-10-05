@@ -33,15 +33,12 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -80,6 +77,7 @@ import de.letzgo.stashy.ui.nativeTopBarPadding
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.TabBarClearance
+import de.letzgo.stashy.ui.NativeTextField
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.cardShadow
@@ -428,20 +426,16 @@ internal fun EditEntitySheet(
             Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(top = nativeTopBarPadding()).navigationBarsPadding().padding(16.dp)) {
                 sections.forEach { section ->
                     Text(section.title.uppercase(), style = IosTypography.footnote, color = p.secondaryText, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 6.dp))
-                    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(Tokens.Radius.small)).background(p.secondaryBackground).padding(horizontal = 12.dp, vertical = 4.dp)) {
+                    Column(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(Tokens.Radius.small)).background(p.secondaryBackground).padding(horizontal = 12.dp, vertical = 12.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
                         section.fields.forEach { f ->
-                            OutlinedTextField(
-                                value = f.value, onValueChange = { f.value = it },
-                                label = { Text(f.label) },
-                                singleLine = !f.multiline,
-                                minLines = if (f.multiline) 5 else 1,
-                                keyboardOptions = KeyboardOptions(keyboardType = f.keyboard),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = Color.Transparent, unfocusedBorderColor = Color.Transparent,
-                                    focusedTextColor = p.text, unfocusedTextColor = p.text, cursorColor = Appearance.tint,
-                                    focusedLabelColor = Appearance.tint, unfocusedLabelColor = p.secondaryText,
-                                ),
-                                modifier = Modifier.fillMaxWidth(),
+                            NativeTextField(
+                                f.value, { f.value = it }, f.label,
+                                keyboard = f.keyboard,
+                                singleLine = !f.multiline, minLines = 5,
+                                autoCorrect = true,
                             )
                         }
                     }

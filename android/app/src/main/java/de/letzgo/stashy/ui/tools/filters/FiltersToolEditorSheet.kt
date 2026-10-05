@@ -18,7 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
@@ -29,8 +28,6 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -44,7 +41,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
@@ -63,6 +59,7 @@ import de.letzgo.stashy.data.tools.FiltersLogic
 import de.letzgo.stashy.data.tools.FiltersToolEntry
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeTextField
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
@@ -160,22 +157,7 @@ fun FiltersToolEditorSheet(
                 Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(top = 16.dp + Tokens.Spacing.xs, bottom = Tokens.Spacing.xl),
                 verticalArrangement = Arrangement.spacedBy(Tokens.Spacing.md),
             ) {
-                ControlCard {
-                    ControlLabel("Name")
-                    Box(Modifier.weight(1f)) {
-                        if (name.isEmpty()) {
-                            Text("Filter name", Modifier.fillMaxWidth(), style = IosTypography.body, color = p.tertiaryText, textAlign = TextAlign.End)
-                        }
-                        BasicTextField(
-                            value = name,
-                            onValueChange = { name = it },
-                            singleLine = true,
-                            textStyle = IosTypography.body.copy(color = p.text, textAlign = TextAlign.End),
-                            cursorBrush = SolidColor(Appearance.tint),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
-                    }
-                }
+                NativeTextField(name, { name = it }, "Name", Modifier.padding(horizontal = 16.dp), placeholder = "Filter name", autoCorrect = true)
                 if (sortChoices.isNotEmpty()) {
                     ControlCard {
                         ControlLabel("Sort")
@@ -349,17 +331,7 @@ private fun SaveAsDialog(initial: String, onSave: (String) -> Unit, onCancel: ()
         onDismissRequest = onCancel,
         title = { Text("Save as new", style = IosTypography.headline) },
         text = {
-            OutlinedTextField(
-                value = text,
-                onValueChange = { text = it },
-                singleLine = true,
-                placeholder = { Text("Name", color = p.secondaryText) },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = p.text, unfocusedTextColor = p.text,
-                    focusedBorderColor = tint, unfocusedBorderColor = p.separator, cursorColor = tint,
-                ),
-                modifier = Modifier.fillMaxWidth(),
-            )
+            NativeTextField(text, { text = it }, label = null, placeholder = "Name", autoCorrect = true)
         },
         confirmButton = { TextButton({ onSave(text) }) { Text("Save", color = tint, fontWeight = FontWeight.SemiBold) } },
         dismissButton = { TextButton(onCancel) { Text("Cancel", color = tint) } },

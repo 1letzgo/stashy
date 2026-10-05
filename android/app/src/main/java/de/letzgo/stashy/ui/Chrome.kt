@@ -35,6 +35,16 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.TextField
+import androidx.compose.material3.TextFieldDefaults
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Switch
@@ -698,7 +708,11 @@ fun NativeConfirmDialog(
     )
 }
 
-/** Material outlined text field in the app colours (secret fields get a show/hide toggle). */
+/**
+ * The app's one text input: Material 3 outlined field in the app colours (accent focus ring,
+ * label and cursor). Secret fields get a show/hide toggle. Every form / dialog field goes
+ * through here so inputs look identical across the app.
+ */
 @Composable
 fun NativeTextField(
     value: String,
@@ -713,16 +727,25 @@ fun NativeTextField(
     isError: Boolean = false,
     leadingIcon: ImageVector? = null,
     trailing: (@Composable () -> Unit)? = null,
+    singleLine: Boolean = true,
+    minLines: Int = 1,
+    imeAction: ImeAction = ImeAction.Default,
+    keyboardActions: KeyboardActions = KeyboardActions.Default,
+    autoCorrect: Boolean = false,
+    capitalization: KeyboardCapitalization = KeyboardCapitalization.None,
+    textAlign: TextAlign = TextAlign.Start,
+    textStyle: TextStyle = NativeType.bodyLarge,
 ) {
     val p = Theme.palette
     val accent = nativeAccent()
     var revealed by remember { mutableStateOf(false) }
     OutlinedTextField(
         value, onValueChange, modifier.fillMaxWidth(),
-        singleLine = true,
-        textStyle = NativeType.bodyLarge.copy(fontFamily = if (monospaced) FontFamily.Monospace else null),
+        singleLine = singleLine,
+        minLines = if (singleLine) 1 else minLines,
+        textStyle = textStyle.copy(fontFamily = if (monospaced) FontFamily.Monospace else textStyle.fontFamily, textAlign = textAlign),
         label = label?.let { { Text(it) } },
-        placeholder = placeholder?.let { { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
+        placeholder = placeholder?.let { { Text(it, Modifier.fillMaxWidth(), maxLines = 1, overflow = TextOverflow.Ellipsis, textAlign = textAlign) } },
         leadingIcon = leadingIcon?.let { { Icon(it, null) } },
         trailingIcon = when {
             trailing != null -> trailing
@@ -738,7 +761,13 @@ fun NativeTextField(
         supportingText = supportingText?.let { { Text(it) } },
         isError = isError,
         visualTransformation = if (secret && !revealed) PasswordVisualTransformation() else VisualTransformation.None,
-        keyboardOptions = KeyboardOptions(keyboardType = if (secret) KeyboardType.Password else keyboard, autoCorrectEnabled = false),
+        keyboardOptions = KeyboardOptions(
+            capitalization = capitalization,
+            autoCorrectEnabled = autoCorrect && !secret,
+            keyboardType = if (secret) KeyboardType.Password else keyboard,
+            imeAction = imeAction,
+        ),
+        keyboardActions = keyboardActions,
         shape = RoundedCornerShape(12.dp),
         colors = OutlinedTextFieldDefaults.colors(
             focusedTextColor = p.text, unfocusedTextColor = p.text,
@@ -749,6 +778,51 @@ fun NativeTextField(
             focusedTrailingIconColor = p.secondaryText, unfocusedTrailingIconColor = p.secondaryText,
             focusedSupportingTextColor = p.secondaryText, unfocusedSupportingTextColor = p.secondaryText,
             focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
+        ),
+    )
+}
+
+/**
+ * The app's one search input: Material 3 search-bar look — full-width 56dp pill filled with
+ * [containerColor] (secondary background on the page; pass `Theme.palette.background` when the
+ * field sits inside a card), leading search icon, trailing clear button (or a spinner while
+ * [loading]). The IME shows "Search"; pressing it calls [onSearch] and hides the keyboard.
+ */
+@Composable
+fun NativeSearchField(
+    query: String,
+    onQueryChange: (String) -> Unit,
+    placeholder: String = "Search",
+    modifier: Modifier = Modifier,
+    onSearch: ((String) -> Unit)? = null,
+    loading: Boolean = false,
+    containerColor: Color = Theme.palette.secondaryBackground,
+) {
+    val p = Theme.palette
+    val accent = nativeAccent()
+    val focus = LocalFocusManager.current
+    TextField(
+        query, onQueryChange, modifier.fillMaxWidth().heightIn(min = 56.dp),
+        singleLine = true,
+        textStyle = NativeType.bodyLarge,
+        placeholder = { Text(placeholder, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        leadingIcon = { Icon(Icons.Filled.Search, null) },
+        trailingIcon = when {
+            loading -> { { CircularProgressIndicator(Modifier.size(20.dp), color = p.secondaryText, strokeWidth = 2.dp) } }
+            query.isNotEmpty() -> { { IconButton({ onQueryChange("") }) { Icon(Icons.Filled.Close, "Clear search") } } }
+            else -> null
+        },
+        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false, imeAction = ImeAction.Search),
+        keyboardActions = KeyboardActions(onSearch = { onSearch?.invoke(query); focus.clearFocus() }),
+        shape = CircleShape,
+        colors = TextFieldDefaults.colors(
+            focusedTextColor = p.text, unfocusedTextColor = p.text,
+            focusedContainerColor = containerColor, unfocusedContainerColor = containerColor,
+            focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent, disabledIndicatorColor = Color.Transparent,
+            cursorColor = accent,
+            focusedPlaceholderColor = p.tertiaryText, unfocusedPlaceholderColor = p.tertiaryText,
+            focusedLeadingIconColor = p.secondaryText, unfocusedLeadingIconColor = p.secondaryText,
+            focusedTrailingIconColor = p.secondaryText, unfocusedTrailingIconColor = p.secondaryText,
         ),
     )
 }

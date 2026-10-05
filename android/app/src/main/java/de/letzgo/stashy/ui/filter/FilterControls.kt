@@ -13,9 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
@@ -31,7 +29,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -41,6 +38,7 @@ import androidx.compose.ui.unit.sp
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.SF
+import de.letzgo.stashy.ui.NativeTextField
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens
 
@@ -133,7 +131,7 @@ fun <T> MenuPicker(
     }
 }
 
-/** iOS: `filterEditorTextFieldChrome()` — plain field on the page colour, small radius. */
+/** Criterion text field — the shared Material field ([NativeTextField]); commits on Done / focus loss. */
 @Composable
 fun FilterTextField(
     value: String,
@@ -143,27 +141,15 @@ fun FilterTextField(
     keyboardType: KeyboardType = KeyboardType.Text,
     onCommit: () -> Unit = {},
 ) {
-    val p = Theme.palette
     var focused by remember { mutableStateOf(false) }
-    BasicTextField(
-        value, onValueChange,
-        modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(Tokens.Radius.small - 2.dp))
-            .background(p.background)
-            .onFocusChanged { if (focused && !it.isFocused) onCommit(); focused = it.isFocused }
-            .padding(horizontal = 10.dp, vertical = 8.dp),
-        textStyle = IosTypography.body.copy(color = p.text),
-        singleLine = true,
-        cursorBrush = SolidColor(Appearance.tint),
-        keyboardOptions = KeyboardOptions(keyboardType = keyboardType, imeAction = ImeAction.Done),
+    NativeTextField(
+        value, onValueChange, label = null,
+        modifier = modifier.onFocusChanged { if (focused && !it.isFocused) onCommit(); focused = it.isFocused },
+        placeholder = placeholder,
+        keyboard = keyboardType,
+        imeAction = ImeAction.Done,
         keyboardActions = KeyboardActions(onDone = { onCommit() }),
-        decorationBox = { inner ->
-            Box {
-                if (value.isEmpty()) Text(placeholder, style = IosTypography.body, color = p.tertiaryText)
-                inner()
-            }
-        },
+        autoCorrect = true,
     )
 }
 

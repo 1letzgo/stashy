@@ -31,8 +31,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
 import androidx.compose.material.icons.filled.Business
@@ -67,14 +65,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -95,6 +91,7 @@ import de.letzgo.stashy.data.tools.RateMeThemePickerKind
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.Nav
+import de.letzgo.stashy.ui.NativeSearchField
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
@@ -713,18 +710,9 @@ private fun ThemePickerSheet(
                         Modifier
                             .fillMaxWidth()
                             .background(p.secondaryBackground, RoundedCornerShape(topStart = Tokens.Radius.small, topEnd = Tokens.Radius.small))
-                            .padding(horizontal = 16.dp, vertical = 12.dp),
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
                     ) {
-                        if (query.isEmpty()) Text("Search...", style = IosTypography.body, color = p.tertiaryText)
-                        BasicTextField(
-                            value = query,
-                            onValueChange = { query = it },
-                            singleLine = true,
-                            textStyle = IosTypography.body.copy(color = p.text),
-                            cursorBrush = SolidColor(Appearance.tint),
-                            keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
-                            modifier = Modifier.fillMaxWidth(),
-                        )
+                        NativeSearchField(query, { query = it }, "Search...", containerColor = p.background)
                     }
                 }
                 val rowBg = Modifier.fillMaxWidth().background(p.secondaryBackground)

@@ -31,7 +31,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
 import androidx.compose.material.icons.filled.Business
@@ -67,7 +66,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
@@ -95,6 +93,7 @@ import de.letzgo.stashy.data.tools.DownloadSyncJobStore
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.Nav
+import de.letzgo.stashy.ui.NativeSearchField
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
@@ -336,37 +335,10 @@ private fun LazyListScope.downloadSection(
 
 // MARK: - Search field
 
-/** iOS: `ToolsSearchField` — magnifier, field, clear button on the secondary background. */
+/** iOS: `ToolsSearchField` — the shared Material search pill. */
 @Composable
-internal fun DownloadsSearchField(prompt: String, text: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
-    val p = Theme.palette
-    Row(
-        modifier
-            .background(p.secondaryBackground, RoundedCornerShape(Tokens.Radius.card))
-            .padding(horizontal = Tokens.Spacing.sm, vertical = Tokens.Spacing.xs + 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs),
-    ) {
-        Icon(SF.magnifyingglass, null, tint = p.secondaryText, modifier = Modifier.size(18.dp))
-        Box(Modifier.weight(1f)) {
-            if (text.isEmpty()) Text(prompt, style = IosTypography.body, color = p.tertiaryText, maxLines = 1)
-            BasicTextField(
-                value = text,
-                onValueChange = onChange,
-                singleLine = true,
-                textStyle = IosTypography.body.copy(color = p.text),
-                cursorBrush = SolidColor(Appearance.tint),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        if (text.isNotEmpty()) {
-            Icon(
-                Icons.Filled.Cancel, "Clear search", tint = p.secondaryText,
-                modifier = Modifier.size(18.dp).clip(CircleShape).clickable { onChange("") },
-            )
-        }
-    }
-}
+internal fun DownloadsSearchField(prompt: String, text: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) =
+    NativeSearchField(text, onChange, prompt, modifier)
 
 // MARK: - Sync jobs
 

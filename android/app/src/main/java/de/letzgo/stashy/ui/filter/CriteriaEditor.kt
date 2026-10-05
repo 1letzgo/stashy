@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -45,7 +44,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
@@ -73,6 +71,9 @@ import de.letzgo.stashy.data.with
 import de.letzgo.stashy.data.without
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeSearchField
+import de.letzgo.stashy.ui.NativeTextField
+import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
@@ -578,20 +579,23 @@ private fun CustomFieldsRow(value: List<JsonObject>, set: (List<JsonObject>) -> 
 
 @Composable
 private fun RawJsonRow(value: JsonObject, set: (JsonObject) -> Unit, onChange: () -> Unit) {
-    val p = Theme.palette
     var text by remember { mutableStateOf(prettyJson(value)) }
     var error by remember { mutableStateOf<String?>(null) }
-    BasicTextField(
+    NativeTextField(
         text, { new ->
             text = new
             val obj = runCatching { Json.parseToJsonElement(new) as? JsonObject }.getOrNull()
             if (obj == null) error = "Not a valid JSON object" else { error = null; set(obj) }
         },
-        Modifier.fillMaxWidth().heightIn(min = 80.dp).clip(RoundedCornerShape(8.dp)).background(p.background).padding(8.dp),
-        textStyle = IosTypography.footnote.copy(color = p.text),
-        cursorBrush = SolidColor(Appearance.tint),
+        label = null,
+        modifier = Modifier.heightIn(min = 80.dp),
+        monospaced = true,
+        singleLine = false,
+        minLines = 3,
+        textStyle = NativeType.bodyMedium,
+        supportingText = error,
+        isError = error != null,
     )
-    error?.let { Text(it, style = IosTypography.caption, color = StashyColors.systemOrange) }
     DisposableEffect(Unit) { onDispose { onChange() } }
 }
 
@@ -680,19 +684,12 @@ fun MultiEntityPicker(
         }
         if (expanded) Column(Modifier.padding(bottom = 8.dp)) {
             if (kind != null && !isNone) {
-                Row(
-                    Modifier.padding(vertical = 4.dp).fillMaxWidth().clip(RoundedCornerShape(50)).background(p.background).padding(horizontal = 12.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(SF.magnifyingglass, null, tint = p.secondaryText, modifier = Modifier.size(14.dp))
-                    BasicTextField(
-                        searchText, { searchText = it; FilterPickerOptionsStore.search(kind, it) }, Modifier.weight(1f),
-                        textStyle = IosTypography.body.copy(color = p.text), singleLine = true, cursorBrush = SolidColor(Appearance.tint),
-                        decorationBox = { inner -> Box { if (searchText.isEmpty()) Text("Search", style = IosTypography.body, color = p.tertiaryText); inner() } },
-                    )
-                    if (FilterPickerOptionsStore.isSearching(kind)) CircularProgressIndicator(Modifier.size(14.dp), strokeWidth = 2.dp, color = p.secondaryText)
-                    else if (searchText.isNotEmpty()) Icon(SF.xmarkCircleFill, null, tint = p.secondaryText, modifier = Modifier.size(16.dp).clickable { searchText = ""; FilterPickerOptionsStore.search(kind, "") })
-                }
+                NativeSearchField(
+                    searchText, { searchText = it; FilterPickerOptionsStore.search(kind, it) }, "Search",
+                    Modifier.padding(vertical = 4.dp),
+                    loading = FilterPickerOptionsStore.isSearching(kind),
+                    containerColor = p.background,
+                )
             }
             if (!isNone) Row(Modifier.padding(horizontal = 4.dp).padding(bottom = 6.dp), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                 Icon(SF.checkmarkCircleFill, null, tint = Appearance.tint, modifier = Modifier.size(12.dp))

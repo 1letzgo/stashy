@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -37,7 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -58,27 +55,30 @@ import de.letzgo.stashy.data.Studio
 import de.letzgo.stashy.data.Tag
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeSearchField
+import de.letzgo.stashy.ui.NativeTextField
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.player.PlaybackFormat
 import de.letzgo.stashy.ui.player.PlayerIcons
 import kotlinx.coroutines.launch
 
-/** iOS `Form` text field row. */
+/** Text field row of a form section — the shared Material field ([NativeTextField]). */
 @Composable
 fun FormTextField(value: String, onChange: (String) -> Unit, placeholder: String, modifier: Modifier = Modifier, singleLine: Boolean = true, keyboardType: KeyboardType = KeyboardType.Text, textAlign: TextAlign = TextAlign.Start) {
-    val p = Theme.palette
-    BasicTextField(
-        value, onChange, modifier.padding(horizontal = 16.dp, vertical = 12.dp),
-        singleLine = singleLine, textStyle = IosTypography.body.copy(color = p.text, textAlign = textAlign),
-        cursorBrush = SolidColor(Appearance.tint), keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        decorationBox = { inner ->
-            Box {
-                if (value.isEmpty()) Text(placeholder, Modifier.fillMaxWidth(), style = IosTypography.body.copy(textAlign = textAlign), color = p.tertiaryText)
-                inner()
-            }
-        },
+    NativeTextField(
+        value, onChange, label = null, modifier = modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        placeholder = placeholder.ifEmpty { null },
+        keyboard = keyboardType,
+        singleLine = singleLine, minLines = 5,
+        autoCorrect = true,
+        textAlign = textAlign,
     )
 }
+
+/** Search row of a form section — the shared Material search pill on the card. */
+@Composable
+private fun FormSearchField(value: String, onChange: (String) -> Unit, placeholder: String) =
+    NativeSearchField(value, onChange, placeholder, Modifier.padding(horizontal = 12.dp, vertical = 8.dp), containerColor = Theme.palette.background)
 
 @Composable
 private fun FormRow(onClick: (() -> Unit)? = null, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {
@@ -160,7 +160,7 @@ fun EntityPickerSheet(
     }) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
             FormSection(searchHeader) {
-                FormTextField(search, { search = it }, "Search...", Modifier.fillMaxWidth())
+                FormSearchField(search, { search = it }, "Search...")
                 if (loading) LoadingRow()
                 else {
                     filtered.take(30).forEach { e ->
@@ -313,7 +313,7 @@ fun EditGalleriesSheet(scene: Scene, onDismiss: () -> Unit, onSaved: (List<Scene
         }
     }) {
         Column(Modifier.verticalScroll(rememberScrollState())) {
-            FormSection("Search Galleries") { FormTextField(search, { search = it }, "Search...", Modifier.fillMaxWidth()) }
+            FormSection("Search Galleries") { FormSearchField(search, { search = it }, "Search...") }
             if (loading && performerGalleries.isEmpty() && allGalleries.isEmpty()) FormSection(null) { LoadingRow() }
             else {
                 if (performerIds.isNotEmpty()) FormSection(if (searching) "From Scene Performers" else "Galleries from Scene Performers") {
@@ -400,7 +400,7 @@ fun AddMarkerSheet(scene: Scene, seconds: Double, onDismiss: () -> Unit, onCompl
                 }
             }
             FormSection("Primary Tag") {
-                FormTextField(search, { search = it }, "Search Tags...", Modifier.fillMaxWidth())
+                FormSearchField(search, { search = it }, "Search Tags...")
                 when {
                     loading -> LoadingRow("Loading tags...")
                     tags.isEmpty() -> Text("No tags found on server", Modifier.padding(16.dp), color = p.secondaryText)
@@ -472,7 +472,7 @@ fun SetTagImageFromFrameSheet(imageDataURL: String, sceneTags: List<Tag>, onDism
         Column(Modifier.verticalScroll(rememberScrollState())) {
             preview?.let { Image(it, null, Modifier.fillMaxWidth().height(160.dp).padding(top = 4.dp, bottom = 8.dp).clip(RoundedCornerShape(12.dp)), contentScale = ContentScale.Fit) }
             FormSection(if (search.isEmpty() && sceneTags.isNotEmpty()) "Scene Tags" else "Tags", footer = "The selected tag’s image will be replaced with this video frame.") {
-                FormTextField(search, { search = it }, "Search Tags...", Modifier.fillMaxWidth())
+                FormSearchField(search, { search = it }, "Search Tags...")
                 when {
                     loading && allTags.isEmpty() -> LoadingRow("Loading tags...")
                     selectable.isEmpty() -> Text(if (search.isEmpty()) "No tags available" else "No tags match '$search'", Modifier.padding(16.dp), color = p.secondaryText)

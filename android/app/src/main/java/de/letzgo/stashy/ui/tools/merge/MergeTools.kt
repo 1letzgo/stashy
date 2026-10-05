@@ -22,19 +22,14 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.PlaylistPlay
-import androidx.compose.material.icons.filled.Cancel
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.MergeType
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -52,11 +47,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
@@ -73,6 +66,8 @@ import de.letzgo.stashy.data.tools.MergeableItem
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.Chevron
 import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeSearchField
+import de.letzgo.stashy.ui.NativeTextField
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens
@@ -688,27 +683,10 @@ private fun MergeItemRow(name: String, summary: String, checked: Boolean, onClic
     }
 }
 
-/** iOS: the search row of the card / `ToolsSearchField` — magnifier, field, clear button. */
+/** iOS: the search row of the card / `ToolsSearchField` — the shared Material search pill on the card. */
 @Composable
-private fun MergeSearchField(prompt: String, text: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) {
-    val p = Theme.palette
-    Row(modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs)) {
-        Icon(SF.magnifyingglass, null, tint = p.secondaryText, modifier = Modifier.size(18.dp))
-        Box(Modifier.weight(1f)) {
-            if (text.isEmpty()) Text(prompt, style = IosTypography.body, color = p.tertiaryText)
-            BasicTextField(
-                value = text, onValueChange = onChange, singleLine = true,
-                textStyle = IosTypography.body.copy(color = p.text),
-                cursorBrush = SolidColor(Appearance.tint),
-                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
-                modifier = Modifier.fillMaxWidth(),
-            )
-        }
-        if (text.isNotEmpty()) {
-            Icon(Icons.Filled.Cancel, "Clear search", tint = p.secondaryText, modifier = Modifier.size(18.dp).clickable { onChange("") })
-        }
-    }
-}
+private fun MergeSearchField(prompt: String, text: String, onChange: (String) -> Unit, modifier: Modifier = Modifier) =
+    NativeSearchField(text, onChange, prompt, modifier, containerColor = Theme.palette.background)
 
 @Composable
 private fun MergeSecondaryButton(title: String, enabled: Boolean, onClick: () -> Unit) {
@@ -736,14 +714,7 @@ private fun MergeSavePrompt(name: String, onNameChange: (String) -> Unit, onSave
         titleContentColor = p.text,
         title = { Text("Save template", style = IosTypography.headline) },
         text = {
-            OutlinedTextField(
-                value = name, onValueChange = onNameChange, singleLine = true,
-                placeholder = { Text("Name") },
-                colors = OutlinedTextFieldDefaults.colors(
-                    focusedTextColor = p.text, unfocusedTextColor = p.text,
-                    focusedBorderColor = tint, unfocusedBorderColor = p.separator, cursorColor = tint,
-                ),
-            )
+            NativeTextField(name, onNameChange, label = null, placeholder = "Name", autoCorrect = true)
         },
         confirmButton = { TextButton(onClick = onSave) { Text("Save", color = tint, fontWeight = FontWeight.SemiBold) } },
         dismissButton = { TextButton(onClick = onCancel) { Text("Cancel", color = tint) } },
