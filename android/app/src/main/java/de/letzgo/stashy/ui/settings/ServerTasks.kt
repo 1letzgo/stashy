@@ -33,10 +33,18 @@ import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.ServerTasksRepository
 import de.letzgo.stashy.data.StashQueuedJob
 import de.letzgo.stashy.ui.Appearance
-import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.SFS
 import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.ui.NativeListItem
+import de.letzgo.stashy.ui.nativeAccent
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -86,8 +94,8 @@ fun ServerTasksContent(topPadding: Dp) {
     if (server == null) {
         Column(Modifier.fillMaxSize().padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(16.dp, Alignment.CenterVertically)) {
             Icon(SFS.serverRack, null, tint = Appearance.tint, modifier = Modifier.size(64.dp))
-            Text("No active server", style = IosTypography.title3.copy(fontWeight = FontWeight.Bold), color = p.text)
-            Text("Select a server under Main first.", style = IosTypography.body, color = p.secondaryText, textAlign = TextAlign.Center)
+            Text("No active server", style = NativeType.titleLarge.copy(fontWeight = FontWeight.Bold), color = p.text)
+            Text("Select a server under Main first.", style = NativeType.bodyLarge, color = p.secondaryText, textAlign = TextAlign.Center)
         }
         return
     }
@@ -113,23 +121,20 @@ fun ServerTasksContent(topPadding: Dp) {
 
     @Composable
     fun TaskRow(label: String, icon: ImageVector, taskId: String, action: suspend () -> Pair<String, String>?) {
-        SettingsRow {
-            Icon(icon, null, tint = Appearance.tint, modifier = Modifier.size(24.dp))
-            Text(label, style = IosTypography.body, color = p.text, modifier = Modifier.weight(1f))
-            if (runningTask == taskId) RowProgress()
-            else Icon(
-                SFS.playCircleFill, label, tint = Appearance.tint.copy(alpha = if (runningTask != null) 0.4f else 1f),
-                modifier = Modifier.size(28.dp).clickable(enabled = runningTask == null) { run(taskId, action) },
-            )
-        }
+        // Material list item; the whole row and the tonal play button start the task.
+        NativeListItem(label, icon = icon, onClick = { if (runningTask == null) run(taskId, action) }, trailing = {
+            if (runningTask == taskId) Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) { RowProgress() }
+            else FilledTonalIconButton(
+                { run(taskId, action) }, enabled = runningTask == null,
+                colors = IconButtonDefaults.filledTonalIconButtonColors(containerColor = nativeAccent().copy(alpha = 0.16f), contentColor = p.text),
+            ) { Icon(Icons.Filled.PlayArrow, "Run $label") }
+        })
     }
 
     SettingsList(topPadding) {
         settingsSection(header = "Jobs", key = "jobs") {
-            if (jobs.isEmpty()) SettingsRow {
-                Icon(SFS.tray, null, tint = p.secondaryText, modifier = Modifier.size(24.dp))
-                Text(if (jobsLoaded) "No jobs running" else "Loading jobs…", style = IosTypography.body, color = p.secondaryText)
-            } else jobs.forEachIndexed { i, job ->
+            if (jobs.isEmpty()) NativeListItem(if (jobsLoaded) "No jobs running" else "Loading jobs…", icon = SFS.tray, iconTint = p.secondaryText, headlineColor = p.secondaryText)
+            else jobs.forEachIndexed { i, job ->
                 JobRow(job, job.id in stopping) {
                     stopping = stopping + job.id
                     scope.launch {
@@ -216,14 +221,14 @@ private fun JobRow(job: StashQueuedJob, isStopping: Boolean, onStop: () -> Unit)
             }
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(job.description ?: "Job ${job.id}", style = IosTypography.body, color = p.text, maxLines = 2)
-            jobDetailLine(job)?.let { Text(it, style = IosTypography.caption, color = p.secondaryText, maxLines = 1) }
-            if (progress != null) LinearProgressIndicator({ progress.toFloat() }, Modifier.fillMaxWidth(), color = Appearance.tint, trackColor = p.separator)
+            Text(job.description ?: "Job ${job.id}", style = NativeType.bodyLarge, color = p.text, maxLines = 2)
+            jobDetailLine(job)?.let { Text(it, style = NativeType.bodySmall, color = p.secondaryText, maxLines = 1) }
+            if (progress != null) LinearProgressIndicator({ progress.toFloat() }, Modifier.fillMaxWidth(), color = nativeAccent(), trackColor = p.separator)
         }
-        if (progress != null) Text("${Math.round(progress * 100)}%", style = IosTypography.caption, color = p.secondaryText)
+        if (progress != null) Text("${Math.round(progress * 100)}%", style = NativeType.bodySmall, color = p.secondaryText)
         if (job.isActive) {
             if (isStopping || job.status == "STOPPING") RowProgress()
-            else Icon(SFS.xmarkCircleFill, "Cancel ${job.description ?: "job"}", tint = p.secondaryText, modifier = Modifier.size(28.dp).clickable(onClick = onStop))
+            else IconButton(onStop) { Icon(Icons.Filled.Close, "Cancel ${job.description ?: "job"}", tint = p.secondaryText) }
         }
     }
 }

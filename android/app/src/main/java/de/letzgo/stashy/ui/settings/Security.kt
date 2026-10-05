@@ -50,11 +50,13 @@ import de.letzgo.stashy.data.SecurityManager
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.TabManager
 import de.letzgo.stashy.ui.Appearance
-import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SFS
 import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.ui.NativeListItem
+import de.letzgo.stashy.ui.StashyColors
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -127,9 +129,9 @@ fun PasscodeEntryView() {
         Spacer(Modifier.height(80.dp))
         Icon(SFS.lockFill, null, tint = Appearance.tint, modifier = Modifier.size(40.dp))
         Spacer(Modifier.height(12.dp))
-        Text("Enter Passcode", style = IosTypography.title2, color = p.text)
+        Text("Enter Passcode", style = NativeType.headlineSmall, color = p.text)
         val message = if (lockedOut) "Too many attempts. Try again in ${SecurityManager.lockoutRemainingSeconds}s" else error
-        if (message != null) Text(message, style = IosTypography.caption, color = Color(0xFFFF453A), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp))
+        if (message != null) Text(message, style = NativeType.bodySmall, color = Color(0xFFFF453A), textAlign = TextAlign.Center, modifier = Modifier.padding(top = 12.dp))
         PasscodeDots(passcode.length, shake, Modifier.padding(top = 20.dp))
         Spacer(Modifier.weight(1f))
         Keypad(
@@ -167,7 +169,7 @@ private fun Keypad(enabled: Boolean, onDigit: (String) -> Unit, onDelete: () -> 
         Box(
             Modifier.size(70.dp).background(p.secondaryText.copy(alpha = 0.1f), CircleShape).clickable(enabled = enabled) { onDigit(label) },
             contentAlignment = Alignment.Center,
-        ) { Text(label, style = IosTypography.title.copy(fontWeight = FontWeight.Medium), color = p.text) }
+        ) { Text(label, style = NativeType.headlineMedium.copy(fontWeight = FontWeight.Medium), color = p.text) }
     }
     Column(modifier.widthIn(max = 320.dp).fillMaxWidth().let { if (enabled) it else it.then(Modifier) }, verticalArrangement = Arrangement.spacedBy(12.dp)) {
         for (row in 0 until 3) Row(Modifier.fillMaxWidth()) { for (col in 1..3) key("${row * 3 + col}", Modifier.weight(1f)) }
@@ -192,9 +194,9 @@ class SecuritySettingsScreen : Screen {
             SettingsList(top) {
                 settingsSection(header = "App Lock", key = "lock") {
                     if (SecurityManager.isPasscodeSet) {
-                        SettingsRow(onClick = { Nav.push(PasscodeSetupScreen()) }) { Text("Change Passcode", style = IosTypography.body, color = Appearance.tint) }
+                        NativeListItem("Change Passcode", icon = SFS.lockShield, onClick = { Nav.push(PasscodeSetupScreen()) })
                         SettingsDivider()
-                        SettingsRow(onClick = { SecurityManager.removePasscode() }) { Text("Remove Passcode", style = IosTypography.body, color = Color(0xFFFF453A)) }
+                        NativeListItem("Remove Passcode", icon = SFS.lockFill, iconTint = StashyColors.systemRed, headlineColor = StashyColors.systemRed, onClick = { SecurityManager.removePasscode() })
                         SettingsDivider()
                         SettingsToggleRow(
                             bioLabel, SecurityManager.isBiometricsEnabled,
@@ -202,7 +204,7 @@ class SecuritySettingsScreen : Screen {
                             enabled = SecurityManager.isPasscodeSet,
                         ) { SecurityManager.updateBiometrics(it) }
                     } else {
-                        SettingsRow(onClick = { Nav.push(PasscodeSetupScreen()) }) { Text("Enable Passcode Lock", style = IosTypography.body, color = Appearance.tint) }
+                        NativeListItem("Enable Passcode Lock", icon = SFS.lockShield, onClick = { Nav.push(PasscodeSetupScreen()) })
                     }
                 }
                 if (SecurityManager.isPasscodeSet) settingsSection(header = "Options", footer = "The app will automatically lock whenever it is moved to the background.", key = "options") {
@@ -239,8 +241,8 @@ class PasscodeSetupScreen : Screen {
         }
         SettingsDetailScaffold("Passcode") { top ->
             Column(Modifier.fillMaxSize().padding(top = top + 16.dp, bottom = 16.dp).navigationBarsPadding(), horizontalAlignment = Alignment.CenterHorizontally) {
-                Text(if (step == 1) "Set a Passcode" else "Confirm Passcode", style = IosTypography.title2, color = p.text)
-                error?.let { Text(it, style = IosTypography.caption, color = Color(0xFFFF453A), modifier = Modifier.padding(top = 12.dp)) }
+                Text(if (step == 1) "Set a Passcode" else "Confirm Passcode", style = NativeType.headlineSmall, color = p.text)
+                error?.let { Text(it, style = NativeType.bodySmall, color = Color(0xFFFF453A), modifier = Modifier.padding(top = 12.dp)) }
                 PasscodeDots(if (step == 1) passcode.length else confirm.length, shake, Modifier.padding(top = 40.dp))
                 Spacer(Modifier.height(40.dp))
                 Keypad(

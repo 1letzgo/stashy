@@ -49,13 +49,20 @@ import de.letzgo.stashy.data.ServerProtocol
 import de.letzgo.stashy.data.Json
 import de.letzgo.stashy.data.Secrets
 import de.letzgo.stashy.ui.Appearance
-import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.MainTab
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.SFS
 import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.ui.StashyColors
+import de.letzgo.stashy.ui.NativeListItem
+import de.letzgo.stashy.ui.NativeTextField
+import de.letzgo.stashy.ui.NativeTonalButton
+import de.letzgo.stashy.ui.nativeAccent
+import androidx.compose.material3.IconButton
+import androidx.compose.material.icons.outlined.Settings
 import de.letzgo.stashy.ui.setup.AuthMethod
 import kotlinx.coroutines.launch
 import kotlinx.serialization.builtins.ListSerializer
@@ -95,7 +102,7 @@ fun androidx.compose.foundation.lazy.LazyListScope.serverListSection() {
             ServerListRow(server)
             SettingsDivider()
         }
-        SettingsRow(onClick = { Nav.push(ServerFormScreen(null)) }) { SettingsLabel("Add New Server", SF.plus, color = Appearance.tint) }
+        NativeListItem("Add New Server", icon = SF.plus, headlineColor = nativeAccent(), onClick = { Nav.push(ServerFormScreen(null)) })
     }
 }
 
@@ -108,22 +115,17 @@ private fun ServerListRow(server: ServerConfig) {
         ActiveServerStatus.isConnected == true -> Color(0xFF30D158)
         else -> Color(0xFFFFD60A)
     }
-    Row(Modifier.fillMaxWidth().padding(start = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-        Row(
-            Modifier.weight(1f).clickable { if (!active) connectServer(server) }.padding(vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.size(9.dp).background(dot, CircleShape))
-            Spacer(Modifier.width(12.dp))
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text(server.name, style = IosTypography.headline, color = p.text)
-                Text(server.baseURL, style = IosTypography.caption, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    // Material list item like the Wi-Fi list: tap connects, the gear opens the server details.
+    NativeListItem(
+        server.name, supporting = server.baseURL,
+        onClick = { if (!active) connectServer(server) },
+        leading = { Box(Modifier.size(24.dp), contentAlignment = Alignment.Center) { Box(Modifier.size(10.dp).background(dot, CircleShape)) } },
+        trailing = {
+            IconButton({ Nav.push(ServerDetailScreen(server.id)) }) {
+                Icon(androidx.compose.material.icons.Icons.Outlined.Settings, "Server details", tint = p.secondaryText)
             }
-        }
-        Box(Modifier.clickable { Nav.push(ServerDetailScreen(server.id)) }.padding(horizontal = 16.dp, vertical = 18.dp)) {
-            Icon(androidx.compose.material.icons.Icons.Chevron, null, tint = p.tertiaryText, modifier = Modifier.size(20.dp))
-        }
-    }
+        },
+    )
 }
 
 /** iOS: `ServerDetailView`. */
@@ -149,27 +151,26 @@ class ServerDetailScreen(private val serverId: String) : Screen {
                     ValueRow("Protocol", server.serverProtocol.name)
                     if (active) {
                         SettingsDivider()
-                        SettingsRow {
-                            Text("Status", style = IosTypography.body, color = Theme.palette.text, modifier = Modifier.weight(1f))
-                            Text(ActiveServerStatus.statusText, style = IosTypography.body, color = if (ActiveServerStatus.isConnected == true) Color(0xFF30D158) else Color(0xFFFF453A), maxLines = 2)
-                        }
-                    }
-                }
-                if (!active) settingsSection(key = "connect") {
-                    SettingsRow {
-                        SettingsLabel("Connect to Server", SFS.power, iconTint = Theme.palette.text)
-                        if (connecting) RowProgress()
-                        else Icon(SFS.playCircleFill, null, tint = Appearance.tint, modifier = Modifier.size(28.dp).clickable {
-                            connecting = true
-                            connectServer(server)
-                            scope.launch { ActiveServerStatus.test(force = true); connecting = false }
+                        NativeListItem("Status", trailing = {
+                            Text(ActiveServerStatus.statusText, style = NativeType.bodyMedium, color = if (ActiveServerStatus.isConnected == true) Color(0xFF30D158) else Color(0xFFFF453A), maxLines = 2)
                         })
                     }
                 }
+                if (!active) settingsSection(key = "connect") {
+                    val connect = {
+                        connecting = true
+                        connectServer(server)
+                        scope.launch { ActiveServerStatus.test(force = true); connecting = false }
+                        Unit
+                    }
+                    NativeListItem("Connect to Server", icon = SFS.power, onClick = { if (!connecting) connect() }, trailing = {
+                        if (connecting) RowProgress() else NativeTonalButton("Connect") { connect() }
+                    })
+                }
                 settingsSection(header = "Server Configuration", key = "config") {
-                    SettingsRow(onClick = { Nav.push(ServerFormScreen(server.id)) }) { SettingsLabel("Edit Configuration", SF.pencil, iconTint = Theme.palette.text) }
+                    NativeListItem("Edit Configuration", icon = SF.pencil, onClick = { Nav.push(ServerFormScreen(server.id)) })
                     SettingsDivider()
-                    SettingsRow(onClick = { confirmDelete = true }) { SettingsLabel("Delete Server", SF.trash, color = Appearance.tint) }
+                    NativeListItem("Delete Server", icon = SF.trash, iconTint = StashyColors.systemRed, headlineColor = StashyColors.systemRed, onClick = { confirmDelete = true })
                 }
             }
         }
@@ -181,12 +182,12 @@ class ServerDetailScreen(private val serverId: String) : Screen {
 }
 
 @Composable
-private fun ValueRow(title: String, value: String) = SettingsRow {
-    Text(title, style = IosTypography.body, color = Theme.palette.text)
-    Text(value, style = IosTypography.body, color = Theme.palette.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.End)
-}
+private fun ValueRow(title: String, value: String) = NativeListItem(title, supporting = value)
 
-/** iOS-like plain text field for grouped rows (placeholder in tertiary text). */
+/**
+ * Text field of the server forms — Material outlined field ([NativeTextField]). [placeholder]
+ * becomes the floating label unless a separate [label] is given.
+ */
 @Composable
 fun PlainTextField(
     value: String,
@@ -196,24 +197,14 @@ fun PlainTextField(
     secret: Boolean = false,
     keyboard: KeyboardType = KeyboardType.Text,
     monospaced: Boolean = false,
-) {
-    val p = Theme.palette
-    BasicTextField(
-        value, onChange, modifier.fillMaxWidth(), singleLine = true,
-        textStyle = IosTypography.body.copy(color = p.text, fontFamily = if (monospaced) FontFamily.Monospace else null),
-        cursorBrush = SolidColor(Appearance.tint),
-        keyboardOptions = KeyboardOptions(keyboardType = if (secret) KeyboardType.Password else keyboard, autoCorrectEnabled = false),
-        visualTransformation = if (secret) PasswordVisualTransformation() else VisualTransformation.None,
-        decorationBox = { inner ->
-            Box {
-                if (value.isEmpty()) Text(placeholder, style = IosTypography.body, color = p.tertiaryText, maxLines = 1)
-                inner()
-            }
-        },
-    )
-}
+    label: String? = null,
+) = NativeTextField(
+    value, onChange, label ?: placeholder, modifier,
+    placeholder = if (label != null) placeholder else null,
+    secret = secret, keyboard = keyboard, monospaced = monospaced,
+)
 
-/** iOS segmented `Picker`. */
+/** iOS segmented `Picker` — Material 3 single-choice segmented buttons. */
 @Composable
 fun <T> Segmented(options: List<T>, selected: T, label: (T) -> String, modifier: Modifier = Modifier, onSelect: (T) -> Unit) {
     val p = Theme.palette
@@ -221,13 +212,12 @@ fun <T> Segmented(options: List<T>, selected: T, label: (T) -> String, modifier:
         options.forEachIndexed { i, o ->
             SegmentedButton(
                 selected = o == selected, onClick = { onSelect(o) }, shape = SegmentedButtonDefaults.itemShape(i, options.size),
-                icon = {},
                 colors = SegmentedButtonDefaults.colors(
-                    activeContainerColor = p.separator.copy(alpha = 0.6f), activeContentColor = p.text,
+                    activeContainerColor = nativeAccent().copy(alpha = 0.22f), activeContentColor = p.text,
                     inactiveContainerColor = Color.Transparent, inactiveContentColor = p.text,
-                    activeBorderColor = p.separator, inactiveBorderColor = p.separator,
+                    activeBorderColor = p.secondaryText.copy(alpha = 0.5f), inactiveBorderColor = p.secondaryText.copy(alpha = 0.5f),
                 ),
-            ) { Text(label(o), style = IosTypography.footnote.copy(fontWeight = FontWeight.SemiBold), maxLines = 1) }
+            ) { Text(label(o), style = NativeType.labelLarge, maxLines = 1) }
         }
     }
 }
@@ -260,14 +250,14 @@ fun HeadersEditorRows(headers: SnapshotStateList<HeaderDraft>) {
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 PlainTextField(h.name, { headers[index] = h.copy(name = it) }, "Header name", Modifier.weight(1f), monospaced = true)
-                Icon(SFS.minusCircleFill, "Remove header", tint = Color(0xFFFF453A), modifier = Modifier.size(22.dp).clickable { headers.removeAt(index) })
+                IconButton({ headers.removeAt(index) }) { Icon(SFS.minusCircleFill, "Remove header", tint = StashyColors.systemRed) }
             }
             PlainTextField(h.value, { headers[index] = h.copy(value = it) }, "Value", secret = true)
-            headerProblem(h)?.let { Text(it, style = IosTypography.caption, color = Color(0xFFFF9F0A)) }
+            headerProblem(h)?.let { Text(it, style = NativeType.bodySmall, color = Color(0xFFFF9F0A)) }
         }
         SettingsDivider()
     }
-    SettingsRow(onClick = { headers.add(HeaderDraft()) }) { SettingsLabel("Add Header", SFS.plusCircleFill, color = Appearance.tint) }
+    NativeListItem("Add Header", icon = SFS.plusCircleFill, headlineColor = nativeAccent(), onClick = { headers.add(HeaderDraft()) })
 }
 
 /**
@@ -346,9 +336,8 @@ class ServerFormScreen(private val serverId: String?) : Screen {
                     SettingsDivider()
                     SettingsRow { Segmented(ServerProtocol.entries, proto, { it.name }) { proto = it; resetTest() } }
                     SettingsDivider()
-                    Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text("Server Address", style = IosTypography.caption, color = Theme.palette.secondaryText)
-                        PlainTextField(address, ::onAddress, "192.168.1.100:9999 or stash.example.com", keyboard = KeyboardType.Uri)
+                    SettingsRow {
+                        PlainTextField(address, ::onAddress, "192.168.1.100:9999 or stash.example.com", keyboard = KeyboardType.Uri, label = "Server Address")
                     }
                 }
                 val authFooter = when (auth) {
@@ -363,17 +352,14 @@ class ServerFormScreen(private val serverId: String?) : Screen {
                             SettingsDivider(); SettingsRow { PlainTextField(username, { username = it }, "Username") }
                             SettingsDivider(); SettingsRow { PlainTextField(password, { password = it }, "Password", secret = true) }
                             SettingsDivider()
-                            Box(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                            Box(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                                 PrimaryButton("Fetch API Key", enabled = username.isNotEmpty() && password.isNotEmpty() && !fetchingKey, busy = fetchingKey) { fetchKey() }
                             }
-                            loginError?.let { SettingsDivider(); SettingsRow { Text(it, style = IosTypography.caption, color = Color(0xFFFF453A)) } }
+                            loginError?.let { SettingsDivider(); SettingsRow { Text(it, style = NativeType.bodySmall, color = Color(0xFFFF453A)) } }
                         }
                         AuthMethod.ApiKey -> {
                             SettingsDivider()
-                            SettingsRow {
-                                Icon(SFS.key, null, tint = Theme.palette.secondaryText, modifier = Modifier.size(18.dp))
-                                PlainTextField(apiKey, { apiKey = it }, "API Key", Modifier.weight(1f), secret = true)
-                            }
+                            SettingsRow { NativeTextField(apiKey, { apiKey = it }, "API Key", Modifier.weight(1f), secret = true, leadingIcon = SFS.key) }
                         }
                         AuthMethod.None -> {}
                     }
@@ -390,24 +376,19 @@ class ServerFormScreen(private val serverId: String?) : Screen {
                             null, tint = when (testResult) { true -> Color(0xFF30D158); false -> Color(0xFFFF453A); null -> Theme.palette.secondaryText },
                             modifier = Modifier.size(22.dp),
                         )
-                        Text(if (testing) "Testing..." else "Test Connection", style = IosTypography.body, color = Theme.palette.text, modifier = Modifier.weight(1f))
-                        if (testResult == true) Text(testMessage, style = IosTypography.caption, color = Color(0xFF30D158))
+                        Text(if (testing) "Testing..." else "Test Connection", style = NativeType.bodyLarge, color = Theme.palette.text, modifier = Modifier.weight(1f))
+                        if (testResult == true) Text(testMessage, style = NativeType.bodySmall, color = Color(0xFF30D158))
                     }
                     if (testResult == false && testMessage.isNotEmpty()) {
                         SettingsDivider()
                         SettingsRow {
                             Icon(SFS.exclamationTriangleFill, null, tint = Color(0xFFFF9F0A), modifier = Modifier.size(18.dp))
-                            Text(testMessage, style = IosTypography.caption, color = Theme.palette.secondaryText, modifier = Modifier.weight(1f))
+                            Text(testMessage, style = NativeType.bodySmall, color = Theme.palette.secondaryText, modifier = Modifier.weight(1f))
                         }
                     }
                 }
                 if (existing != null) settingsSection(key = "delete") {
-                    SettingsRow(onClick = { confirmDelete = true }) {
-                        Spacer(Modifier.weight(1f))
-                        Icon(SF.trash, null, tint = Appearance.tint, modifier = Modifier.size(20.dp))
-                        Text("Delete Server", style = IosTypography.body, color = Appearance.tint)
-                        Spacer(Modifier.weight(1f))
-                    }
+                    NativeListItem("Delete Server", icon = SF.trash, iconTint = StashyColors.systemRed, headlineColor = StashyColors.systemRed, onClick = { confirmDelete = true })
                 }
             }
         }

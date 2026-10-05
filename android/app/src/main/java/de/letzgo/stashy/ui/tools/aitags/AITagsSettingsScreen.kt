@@ -44,8 +44,13 @@ import de.letzgo.stashy.data.tools.AITagModelState
 import de.letzgo.stashy.data.tools.AITagSuggestions
 import de.letzgo.stashy.data.tools.SimilarScenes
 import de.letzgo.stashy.ui.Appearance
-import de.letzgo.stashy.ui.BackPill
-import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeSwitch
+import de.letzgo.stashy.ui.NativeTopBar
+import de.letzgo.stashy.ui.nativeAccent
+import de.letzgo.stashy.ui.nativeTopBarPadding
+import androidx.compose.material3.FilledTonalIconButton
+import androidx.compose.material3.IconButtonDefaults
+import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Screen
@@ -86,7 +91,7 @@ fun AITagsSettingsView() {
 
     LaunchedEffect(Unit) { manager.loadIfNeeded() }
 
-    val topBar = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 16.dp + 44.dp
+    val topBar = nativeTopBarPadding()
     Box(Modifier.fillMaxSize().background(p.background)) {
         SettingsList(topPadding = topBar) {
             if (!isUnlocked) {
@@ -119,7 +124,7 @@ fun AITagsSettingsView() {
                 SettingsSectionHeader("Statistics")
                 GroupedCard {
                     SettingsRow("Status", icon = SF.chartBar) {
-                        Text(statusText(state, manager.lastBuiltAt), style = IosTypography.body, color = p.secondaryText, textAlign = TextAlign.End)
+                        Text(statusText(state, manager.lastBuiltAt), style = NativeType.bodyMedium, color = p.secondaryText, textAlign = TextAlign.End)
                     }
                     RowDivider()
                     if (state is AITagModelState.Building) {
@@ -127,9 +132,9 @@ fun AITagsSettingsView() {
                             LinearProgressIndicator(
                                 progress = { manager.buildProgress.toFloat() },
                                 modifier = Modifier.fillMaxWidth(),
-                                color = tint, trackColor = p.separator,
+                                color = nativeAccent(), trackColor = p.separator,
                             )
-                            Text("${state.processed} of ${state.total} items", style = IosTypography.caption, color = p.secondaryText)
+                            Text("${state.processed} of ${state.total} items", style = NativeType.bodySmall, color = p.secondaryText)
                         }
                         RowDivider()
                         SettingsRow("Stop", icon = Icons.Outlined.StopCircle, iconTint = StashyColors.systemRed, titleColor = StashyColors.systemRed, onClick = { manager.cancelWork() })
@@ -159,22 +164,15 @@ fun AITagsSettingsView() {
                             "Ignored tags", icon = Icons.Outlined.ThumbDown, titleColor = tint,
                             enabled = isUnlocked && count > 0, onClick = { manager.resetDismissals() },
                         ) {
-                            Text(if (count == 0) "None" else "$count · reset", style = IosTypography.body, color = p.secondaryText)
+                            Text(if (count == 0) "None" else "$count · reset", style = NativeType.bodyMedium, color = p.secondaryText)
                         }
                     }
                 }
             }
         }
 
-        // iOS: `stashySettingsDetailChrome(title)` — back button and title.
-        Row(
-            Modifier.fillMaxWidth().background(p.background).statusBarsPadding().padding(16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
-        ) {
-            BackPill({ Nav.pop() })
-            Text(TITLE, style = IosTypography.headline, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
+        // iOS: `stashySettingsDetailChrome(title)` — Material top app bar.
+        NativeTopBar(TITLE)
     }
 }
 
@@ -188,38 +186,25 @@ private fun statusText(state: AITagModelState, lastBuiltAt: Long?): String = whe
     is AITagModelState.Failed -> state.message
 }
 
-/** iOS: `Toggle(isOn:) { Label(…) }` tinted with the app tint. */
+/** iOS: `Toggle(isOn:) { Label(…) }` — Material switch row. */
 @Composable
 private fun ToggleRow(title: String, icon: androidx.compose.ui.graphics.vector.ImageVector, checked: Boolean, enabled: Boolean, onChange: (Boolean) -> Unit) {
     SettingsRow(title, icon = icon, enabled = enabled, onClick = { onChange(!checked) }) {
-        Switch(
-            checked = checked, onCheckedChange = onChange, enabled = enabled,
-            colors = SwitchDefaults.colors(checkedTrackColor = Appearance.tint, checkedThumbColor = Color.White, checkedBorderColor = Color.Transparent),
-        )
+        NativeSwitch(checked, onChange, enabled)
     }
 }
 
-/** iOS: `Stepper(value:in:) { HStack { Text; Spacer; Text(value) } }`. */
+/** iOS: `Stepper(value:in:)` — value plus Material tonal −/+ icon buttons. */
 @Composable
 private fun StepperRow(title: String, value: Int, range: IntRange, enabled: Boolean, onChange: (Int) -> Unit) {
     val p = Theme.palette
+    val colors = IconButtonDefaults.filledTonalIconButtonColors(
+        containerColor = nativeAccent().copy(alpha = 0.16f), contentColor = p.text,
+        disabledContainerColor = p.text.copy(alpha = 0.06f), disabledContentColor = p.text.copy(alpha = 0.38f),
+    )
     SettingsRow(title, enabled = enabled) {
-        Text("$value", style = IosTypography.body, color = p.secondaryText)
-        Row(
-            Modifier.clip(RoundedCornerShape(8.dp)).background(p.text.copy(alpha = 0.08f)),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            val canDec = enabled && value > range.first
-            val canInc = enabled && value < range.last
-            Box(
-                Modifier.size(width = 46.dp, height = 32.dp).clickable(enabled = canDec) { onChange(value - 1) },
-                contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Filled.Remove, "Decrement", tint = if (canDec) p.text else p.tertiaryText, modifier = Modifier.size(18.dp)) }
-            Box(Modifier.width(0.5.dp).height(18.dp).background(p.separator))
-            Box(
-                Modifier.size(width = 46.dp, height = 32.dp).clickable(enabled = canInc) { onChange(value + 1) },
-                contentAlignment = Alignment.Center,
-            ) { Icon(Icons.Filled.Add, "Increment", tint = if (canInc) p.text else p.tertiaryText, modifier = Modifier.size(18.dp)) }
-        }
+        FilledTonalIconButton({ onChange(value - 1) }, enabled = enabled && value > range.first, colors = colors) { Icon(Icons.Filled.Remove, "Decrement") }
+        Text("$value", style = NativeType.titleMedium, color = p.text, textAlign = TextAlign.Center, modifier = Modifier.width(28.dp))
+        FilledTonalIconButton({ onChange(value + 1) }, enabled = enabled && value < range.last, colors = colors) { Icon(Icons.Filled.Add, "Increment") }
     }
 }

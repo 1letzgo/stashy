@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.StashyPlus
 import de.letzgo.stashy.ui.Appearance
-import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.MainTab
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
@@ -89,7 +89,7 @@ private fun androidx.compose.foundation.lazy.LazyListScope.designSettings() {
         }
     } else {
         settingsSection(key = "content") {
-            SettingsRow { Text("Content settings require an active server.", color = Theme.palette.secondaryText, style = IosTypography.body) }
+            SettingsRow { Text("Content settings require an active server.", color = Theme.palette.secondaryText, style = NativeType.bodyLarge) }
         }
     }
 }
@@ -135,7 +135,7 @@ private fun AppUpdateRow() {
 @Composable
 private fun LinkRow(title: String, icon: ImageVector, url: String) {
     val context = LocalContext.current
-    SettingsRow(onClick = { runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) } }) {
-        SettingsLabel(title, icon, color = Appearance.tint)
-    }
+    de.letzgo.stashy.ui.NativeListItem(title, supporting = url.removePrefix("https://"), icon = icon, onClick = {
+        runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url))) }
+    })
 }

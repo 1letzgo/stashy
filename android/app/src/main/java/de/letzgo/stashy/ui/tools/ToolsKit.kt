@@ -83,7 +83,7 @@ fun SettingsList(
     LazyColumn(
         modifier.fillMaxSize(),
         state = state,
-        contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = topPadding + 12.dp, bottom = TabBarClearance + 28.dp),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding + 12.dp, bottom = TabBarClearance + 28.dp),
         content = content,
     )
 }
@@ -92,20 +92,14 @@ fun SettingsList(
 @Composable
 fun SectionSpacer() = Spacer(Modifier.height(24.dp))
 
-/** iOS: `stashyScrollingSectionHeader(_:isBeta:)` — footnote, secondary, uppercase. */
+/** iOS: `stashyScrollingSectionHeader(_:isBeta:)` — Material section header (titleSmall, accent). */
 @Composable
-fun SettingsSectionHeader(title: String, isBeta: Boolean = false, modifier: Modifier = Modifier) {
-    Row(modifier.fillMaxWidth().padding(bottom = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(title.uppercase(), style = IosTypography.footnote, color = Theme.palette.secondaryText)
-        if (isBeta) BetaBadge()
-    }
-}
+fun SettingsSectionHeader(title: String, isBeta: Boolean = false, modifier: Modifier = Modifier) =
+    de.letzgo.stashy.ui.NativeSectionHeader(title, modifier, badge = if (isBeta) ({ BetaBadge() }) else null)
 
-/** iOS: `stashyScrollingSectionFooter(_:)`. */
+/** iOS: `stashyScrollingSectionFooter(_:)` — Material supporting text. */
 @Composable
-fun SettingsSectionFooter(text: String, modifier: Modifier = Modifier) {
-    Text(text, style = IosTypography.footnote, color = Theme.palette.secondaryText, modifier = modifier.fillMaxWidth().padding(top = 8.dp))
-}
+fun SettingsSectionFooter(text: String, modifier: Modifier = Modifier) = de.letzgo.stashy.ui.NativeSectionFooter(text, modifier)
 
 /** iOS: `StashyBetaBadge`. */
 @Composable
@@ -119,23 +113,16 @@ fun BetaBadge() {
 }
 
 /**
- * iOS: rows with `stashyGroupedBlockRow(index:count:)` — one rounded card (radius `small`) in the
+ * iOS: rows with `stashyGroupedBlockRow(index:count:)` — one rounded Material group (16 dp) in the
  * secondary background. Put rows inside and separate them with [RowDivider].
  */
 @Composable
-fun GroupedCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        modifier.fillMaxWidth()
-            .background(Theme.palette.secondaryBackground, RoundedCornerShape(Tokens.Radius.small)),
-        content = content,
-    )
-}
+fun GroupedCard(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) =
+    de.letzgo.stashy.ui.NativeGroup(modifier, content)
 
-/** Inset hairline between grouped rows (iOS list separator, inset past the icon). */
+/** Divider between grouped rows, inset past the icon. */
 @Composable
-fun RowDivider(startInset: Dp = 52.dp) {
-    Box(Modifier.fillMaxWidth().padding(start = startInset).height(0.5.dp).background(Theme.palette.separator))
-}
+fun RowDivider(startInset: Dp = 56.dp) = de.letzgo.stashy.ui.NativeDivider(startInset)
 
 /**
  * iOS: `Label(title, systemImage:)` row in a grouped list — tinted icon in a 24 pt column,
@@ -154,21 +141,22 @@ fun SettingsRow(
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     val p = Theme.palette
+    // Material list item: 56 dp, 24 dp leading icon, bodyLarge / bodyMedium.
     Row(
         modifier
             .fillMaxWidth()
-            .heightIn(min = 44.dp)
+            .heightIn(min = if (subtitle != null) 72.dp else 56.dp)
             .let { if (onClick != null && enabled) it.clickable(onClick = onClick) else it }
-            .padding(horizontal = 16.dp, vertical = 10.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         if (icon != null) Box(Modifier.width(24.dp), contentAlignment = Alignment.Center) {
-            Icon(icon, null, tint = if (enabled) iconTint else p.secondaryText, modifier = Modifier.size(20.dp))
+            Icon(icon, null, tint = if (enabled) iconTint else p.secondaryText, modifier = Modifier.size(24.dp))
         }
-        Column(Modifier.weight(1f)) {
-            Text(title, style = IosTypography.body, color = if (enabled) titleColor else p.secondaryText)
-            if (subtitle != null) Text(subtitle, style = IosTypography.caption, color = p.secondaryText)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(title, style = de.letzgo.stashy.ui.NativeType.bodyLarge, color = if (enabled) titleColor else p.secondaryText)
+            if (subtitle != null) Text(subtitle, style = de.letzgo.stashy.ui.NativeType.bodyMedium, color = p.secondaryText)
         }
         trailing()
     }
@@ -194,7 +182,7 @@ fun NoServerPlaceholder(icon: ImageVector, message: String) {
     }
 }
 
-/** iOS `.alert` with OK/Cancel or a destructive confirm button. */
+/** iOS `.alert` with OK/Cancel or a destructive confirm button — Material 3 AlertDialog. */
 @Composable
 fun StashyAlert(
     title: String,
@@ -204,23 +192,9 @@ fun StashyAlert(
     destructive: Boolean = false,
     dismissLabel: String? = null,
     onConfirm: () -> Unit = onDismiss,
-) {
-    val p = Theme.palette
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        containerColor = p.secondaryBackground,
-        titleContentColor = p.text,
-        textContentColor = p.secondaryText,
-        title = { Text(title, style = IosTypography.headline) },
-        text = message?.let { { Text(it, style = IosTypography.subheadline) } },
-        confirmButton = {
-            TextButton(onClick = { onConfirm(); }) {
-                Text(confirmLabel, color = if (destructive) StashyColors.systemRed else Appearance.tint, fontWeight = FontWeight.SemiBold)
-            }
-        },
-        dismissButton = dismissLabel?.let { { TextButton(onClick = onDismiss) { Text(it, color = Appearance.tint) } } },
-    )
-}
+) = de.letzgo.stashy.ui.NativeConfirmDialog(
+    title, message, onDismiss, confirmLabel = confirmLabel, destructive = destructive, dismissLabel = dismissLabel, onConfirm = onConfirm,
+)
 
 /** iOS: `ToastManager.shared.show(...)` — Android shows a system toast. */
 fun showToast(message: String, long: Boolean = false) {

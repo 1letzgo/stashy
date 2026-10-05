@@ -144,10 +144,10 @@ fun AppIconPicker(modifier: Modifier = Modifier) {
                 Image(
                     painterResource(icon.preview), icon.label,
                     Modifier.size(60.dp).clip(shape)
-                        .border(if (selected) 2.5.dp else 1.dp, if (selected) Appearance.tint else p.text.copy(alpha = 0.2f), shape),
+                        .border(if (selected) 3.dp else 1.dp, if (selected) de.letzgo.stashy.ui.nativeAccent() else p.text.copy(alpha = 0.2f), shape),
                     contentScale = ContentScale.Fit,
                 )
-                Text(icon.label, fontSize = 11.sp, color = p.secondaryText)
+                Text(icon.label, style = de.letzgo.stashy.ui.NativeType.labelMedium, color = if (selected) p.text else p.secondaryText)
             }
         }
     }
