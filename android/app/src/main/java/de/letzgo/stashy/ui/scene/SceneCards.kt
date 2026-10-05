@@ -1,5 +1,9 @@
 package de.letzgo.stashy.ui.scene
 
+import de.letzgo.stashy.ui.cappedFontScale
+import de.letzgo.stashy.ui.scaledIconSize
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.sizeIn
 import de.letzgo.stashy.ui.uniqueItems
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
@@ -97,9 +101,11 @@ fun ScenePerformersCard(sceneDate: String?, performers: List<Performer>, directo
                         }
                         ageAt(performer.birthdate, sceneDate)?.let { age ->
                             Box(
-                                Modifier.align(Alignment.TopEnd).size(22.dp).clip(CircleShape).background(tint).border(1.5.dp, p.secondaryBackground, CircleShape),
+                                // Min 22 dp circle that widens into a capsule when the font scale grows the number.
+                                Modifier.align(Alignment.TopEnd).sizeIn(minWidth = 22.dp, minHeight = 22.dp).clip(RoundedCornerShape(50)).background(tint)
+                                    .border(1.5.dp, p.secondaryBackground, RoundedCornerShape(50)).padding(horizontal = 4.dp, vertical = 2.dp),
                                 contentAlignment = Alignment.Center,
-                            ) { Text("$age", style = pillTextStyle, color = Color.White) }
+                            ) { Text("$age", style = pillTextStyle, color = Color.White, maxLines = 1) }
                         }
                         NamePill(performer.name, Modifier.offset(y = 8.dp))
                     }
@@ -128,7 +134,7 @@ fun SceneStudioCard(studio: Studio?, onEdit: () -> Unit, modifier: Modifier = Mo
             Box(Modifier.plainClick { DetailLinks.studio(studio) }, contentAlignment = Alignment.BottomCenter) {
                 Box(Modifier.size(110.dp, 105.dp).clip(RoundedCornerShape(Tokens.Radius.card)).background(tint).padding(8.dp), contentAlignment = Alignment.Center) {
                     if (studio.hasImage) AsyncImage(studio.imageURL, studio.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
-                    else Text(studio.name, style = IosTypography.headline, color = Color.White, maxLines = 3)
+                    else Text(studio.name, style = IosTypography.headline, color = Color.White, maxLines = 3, overflow = TextOverflow.Ellipsis)
                 }
                 NamePill(studio.name, Modifier.offset(y = 8.dp))
             }
@@ -165,7 +171,8 @@ fun SceneTagsCard(tags: List<Tag>?, expanded: Boolean, onToggleExpanded: () -> U
     val p = Theme.palette
     val density = LocalDensity.current
     var totalHeight by remember { mutableIntStateOf(0) }
-    val collapsed = 68.dp
+    // Collapsed height ≈ 1½ chip rows; grows with the font scale like the chips themselves.
+    val collapsed = 68.dp * cappedFontScale()
     SceneCardContainer(modifier.fillMaxWidth()) {
         SceneCardHeader("Tags", onEdit)
         if (tags.isNullOrEmpty()) Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No tags assigned") }
@@ -181,7 +188,7 @@ fun SceneTagsCard(tags: List<Tag>?, expanded: Boolean, onToggleExpanded: () -> U
                                 .padding(horizontal = 10.dp, vertical = 6.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
                         ) {
-                            Icon(PlayerIcons.tag, null, tint = p.pillAccent, modifier = Modifier.size(10.dp))
+                            Icon(PlayerIcons.tag, null, tint = p.pillAccent, modifier = Modifier.size(scaledIconSize(10.dp)))
                             Text(tag.name, style = pillTextStyle, color = p.pillAccent)
                         }
                     }
@@ -221,7 +228,7 @@ private fun GalleryImageStrip(gallery: SceneGalleryStub) {
                 Modifier.size(thumb).clip(shape).background(tint.copy(alpha = 0.1f)).border(1.dp, tint.copy(alpha = 0.35f), shape).plainClick { DetailLinks.gallery(gallery) },
                 horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp, Alignment.CenterVertically),
             ) {
-                Icon(PlayerIcons.gallery, null, tint = tint, modifier = Modifier.size(22.dp))
+                Icon(PlayerIcons.gallery, null, tint = tint, modifier = Modifier.size(scaledIconSize(22.dp, maxScale = 1.4f)))
                 Text(gallery.imageCount?.toString() ?: "—", style = IosTypography.caption.copy(fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace), color = tint)
             }
         }
@@ -252,7 +259,8 @@ fun SceneHeatmapCard(heatmapURL: String?, duration: Double, currentTime: Double,
     SceneCardContainer(Modifier.fillMaxWidth()) {
         SceneCardHeader("Interactive", null, trailing = { Icon(PlayerIcons.waveform, null, tint = p.pillAccent, modifier = Modifier.size(18.dp)) })
         Box(
-            Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 8.dp).height(heatmapHeight + 30.dp)
+            // No fixed height: the time-label row below the heatmap sizes the box at any font scale.
+            Modifier.fillMaxWidth().padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 8.dp)
                 .pointerInput(duration) {
                     var lastSent = 0L
                     awaitEachGesture {
@@ -283,11 +291,6 @@ fun SceneHeatmapCard(heatmapURL: String?, duration: Double, currentTime: Double,
                 val w = maxWidth
                 listOf(0f, 0.25f, 0.5f, 0.75f, 1f).forEach { pos ->
                     Box(Modifier.offset(x = w * pos).size(1.dp, heatmapHeight).background(Color.Gray.copy(alpha = 0.2f)))
-                    Text(
-                        PlaybackFormat.time(duration * pos),
-                        Modifier.offset(x = w * pos + when (pos) { 1f -> (-25).dp; 0f -> 0.dp; else -> (-10).dp }, y = heatmapHeight + 12.dp),
-                        style = IosTypography.caption2.copy(fontSize = 9.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace), color = p.text.copy(alpha = 0.8f),
-                    )
                 }
                 if (heatmapURL != null) {
                     AsyncImage(heatmapURL, null, Modifier.fillMaxWidth().height(heatmapHeight).alpha(0.15f), contentScale = ContentScale.FillBounds)
@@ -304,6 +307,17 @@ fun SceneHeatmapCard(heatmapURL: String?, duration: Double, currentTime: Double,
                 // Playhead.
                 Box(Modifier.offset(x = w * progress - 1.dp, y = (-2).dp).size(2.dp, heatmapHeight + 4.dp).background(tint))
                 Box(Modifier.offset(x = w * progress - 5.dp, y = (-7).dp).size(10.dp).clip(CircleShape).background(tint))
+            }
+            // Time labels at 0 / 25 / 50 / 75 / 100 % (equal-width monospace, SpaceBetween keeps
+            // the outer ones inside the card even when the font scale widens them).
+            Row(Modifier.fillMaxWidth().padding(top = heatmapHeight + 10.dp, bottom = 6.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+                listOf(0f, 0.25f, 0.5f, 0.75f, 1f).forEach { pos ->
+                    Text(
+                        PlaybackFormat.time(duration * pos),
+                        style = IosTypography.caption2.copy(fontSize = 9.sp, fontWeight = FontWeight.Medium, fontFamily = FontFamily.Monospace), color = p.text.copy(alpha = 0.8f),
+                        maxLines = 1,
+                    )
+                }
             }
         }
     }

@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.ui.scaledMaxLines
+import de.letzgo.stashy.ui.scaledIconSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -139,7 +141,7 @@ internal fun StudioLogo(studio: Studio, modifier: Modifier = Modifier) {
 @Composable
 private fun CountLabel(icon: ImageVector, count: Int) {
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        Icon(icon, null, tint = Theme.palette.secondaryText, modifier = Modifier.size(11.dp))
+        Icon(icon, null, tint = Theme.palette.secondaryText, modifier = Modifier.size(scaledIconSize(11.dp)))
         Text("$count", style = NativeType.labelMedium, color = Theme.palette.secondaryText)
     }
 }
@@ -151,7 +153,7 @@ private fun LogoCard(modifier: Modifier, onClick: (() -> Unit)?, name: String, s
     NativeCard(modifier.fillMaxWidth(), onClick = onClick) { Column(Modifier.fillMaxWidth()) {
         Box(Modifier.fillMaxWidth().aspectRatio(2.2f).background(p.studioHeader).clip(RoundedCornerShape(0.dp)), content = logo)
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = scaledMaxLines(), overflow = TextOverflow.Ellipsis)
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (alwaysShowScenes || (scenes ?: 0) > 0) CountLabel(SF.film, scenes ?: 0)
                 if ((galleries ?: 0) > 0) CountLabel(SF.photoStack, galleries ?: 0)

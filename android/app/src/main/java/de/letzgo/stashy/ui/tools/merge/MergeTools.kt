@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools.merge
 
+import de.letzgo.stashy.ui.scaledIconSize
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -422,7 +423,7 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                             val missing = resolveSources(preset).second.size
                             val fg = if (active) Color.White else p.text
                             Column(
-                                Modifier.height(MergeToolsLayout.presetPillHeight)
+                                Modifier.heightIn(min = MergeToolsLayout.presetPillHeight)
                                     .clip(RoundedCornerShape(50))
                                     .background(if (active) tint else p.secondaryBackground)
                                     // Long press → delete (with confirmation).
@@ -433,11 +434,11 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
                                             presetToDelete = preset
                                         },
                                     )
-                                    .padding(horizontal = Tokens.Spacing.sm),
+                                    .padding(horizontal = Tokens.Spacing.sm, vertical = 4.dp),
                                 verticalArrangement = Arrangement.spacedBy(1.dp, Alignment.CenterVertically),
                             ) {
                                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                    Icon(SF.bookmarkFill, null, tint = fg, modifier = Modifier.size(11.dp))
+                                    Icon(SF.bookmarkFill, null, tint = fg, modifier = Modifier.size(scaledIconSize(11.dp)))
                                     Text(preset.name, style = IosTypography.footnote.copy(fontWeight = FontWeight.Medium), color = fg, maxLines = 1)
                                 }
                                 Text(

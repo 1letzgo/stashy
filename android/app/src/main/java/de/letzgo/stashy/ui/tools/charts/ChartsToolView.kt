@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.charts
 
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -321,12 +323,12 @@ private fun CapsuleChip(
     val shape = RoundedCornerShape(50)
     Box(
         modifier
-            .height(height)
+            .heightIn(min = height)
             .let { if (selected) it.shadow(shadowRadius, shape, ambientColor = tint.copy(alpha = 0.35f), spotColor = tint.copy(alpha = 0.35f)) else it }
             .clip(shape)
             .background(if (selected) tint else p.secondaryBackground, shape)
             .noRippleClickable(onClick)
-            .padding(horizontal = 4.dp),
+            .padding(horizontal = 4.dp, vertical = 4.dp),
         contentAlignment = Alignment.Center,
     ) {
         ShrinkingText(title, style, if (selected) Color.White else p.text.copy(alpha = 0.85f), minScale = 0.65f)
@@ -423,7 +425,7 @@ private fun PlaceholderIcon(icon: ImageVector, modifier: Modifier = Modifier) {
 private fun RowScope.StatColumn(title: String, value: String, emphasized: Boolean) {
     val p = Theme.palette
     Column(Modifier.weight(1f), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(1.dp)) {
-        Text(title.uppercase(), fontSize = 8.sp, lineHeight = 10.sp, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Clip)
+        Text(title.uppercase(), fontSize = 8.sp, lineHeight = 10.sp, color = p.secondaryText, maxLines = 2, overflow = TextOverflow.Ellipsis, textAlign = TextAlign.Center)
         ShrinkingText(
             value,
             IosTypography.title2.copy(fontWeight = FontWeight.Bold, fontFeatureSettings = "tnum", textAlign = TextAlign.Center),
@@ -436,6 +438,9 @@ private fun RowScope.StatColumn(title: String, value: String, emphasized: Boolea
 /** One-line text that shrinks down to [minScale] to fit (iOS `minimumScaleFactor`). */
 @Composable
 private fun ShrinkingText(text: String, style: TextStyle, color: Color, minScale: Float) {
+    // Shrink-to-fit never goes below the size the text has at the default (1×) font scale, so a
+    // large system font is honoured at least up to the normal size.
+    val floor = maxOf(minScale, 1f / LocalDensity.current.fontScale.coerceAtLeast(1f))
     var scale by remember(text) { mutableFloatStateOf(1f) }
     var ready by remember(text) { mutableStateOf(false) }
     Text(
@@ -449,8 +454,8 @@ private fun ShrinkingText(text: String, style: TextStyle, color: Color, minScale
         softWrap = false,
         modifier = Modifier.drawWithContent { if (ready) drawContent() },
         onTextLayout = { result ->
-            if (result.hasVisualOverflow && scale > minScale) {
-                scale = (scale * 0.9f).coerceAtLeast(minScale)
+            if (result.hasVisualOverflow && scale > floor) {
+                scale = (scale * 0.9f).coerceAtLeast(floor)
             } else {
                 ready = true
             }

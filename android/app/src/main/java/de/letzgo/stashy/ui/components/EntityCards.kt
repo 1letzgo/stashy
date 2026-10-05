@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.components
 
+import de.letzgo.stashy.ui.scaledMaxLines
+import de.letzgo.stashy.ui.scaledIconSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -121,7 +123,7 @@ fun StudioCard(studio: Studio, modifier: Modifier = Modifier, onClick: (() -> Un
             StudioLogo(studio, Modifier.fillMaxSize().padding(start = 14.dp, end = 14.dp, top = 12.dp))
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(studio.name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(studio.name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = scaledMaxLines(), overflow = TextOverflow.Ellipsis)
             CountLabel(SF.film, studio.sceneCount ?: 0)
             studio.galleryCount?.takeIf { it > 0 }?.let { CountLabel(SF.photoStack, it) }
         }
@@ -150,7 +152,7 @@ fun StudioLogo(studio: Studio, modifier: Modifier = Modifier) {
 private fun CountLabel(icon: ImageVector, count: Int) {
     val p = Theme.palette
     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(3.dp)) {
-        Icon(icon, null, tint = p.secondaryText, modifier = Modifier.size(14.dp))
+        Icon(icon, null, tint = p.secondaryText, modifier = Modifier.size(scaledIconSize(14.dp)))
         Text("$count", style = NativeType.labelMedium, color = p.secondaryText)
     }
 }
@@ -179,7 +181,7 @@ fun TagCard(tag: Tag, modifier: Modifier = Modifier, onClick: (() -> Unit)? = nu
             }
         }
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(tag.name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(tag.name, Modifier.weight(1f), style = NativeType.titleSmall, color = p.text, maxLines = scaledMaxLines(), overflow = TextOverflow.Ellipsis)
             tag.sceneCount?.takeIf { it > 0 }?.let { CountLabel(SF.film, it) }
             tag.galleryCount?.takeIf { it > 0 }?.let { CountLabel(SF.photoStack, it) }
         }

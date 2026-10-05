@@ -254,13 +254,14 @@ private fun <T> CompactIconTabs(
     val scrollIndex = index?.let { it - offset }?.takeIf { it >= 0 }
     val state = androidx.compose.foundation.lazy.rememberLazyListState()
     androidx.compose.runtime.LaunchedEffect(scrollIndex) { scrollIndex?.let { state.animateScrollToItem((it - 1).coerceAtLeast(0)) } }
-    Row(modifier.height(48.dp), verticalAlignment = Alignment.CenterVertically) {
+    // Min 48 dp (Material tab height); grows when the font scale makes the selected label taller.
+    Row(modifier.heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
         if (pinFirst) {
             Spacer(Modifier.width(8.dp))
             CompactIconTab(items[0], index == 0, title, icon, onSelect, colors)
         }
         androidx.compose.foundation.lazy.LazyRow(
-            Modifier.weight(1f).height(48.dp),
+            Modifier.weight(1f).heightIn(min = 48.dp),
             state = state,
             contentPadding = PaddingValues(horizontal = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -285,13 +286,13 @@ private fun <T> CompactIconTab(
 ) {
     val color = if (isSelected) colors.selected else colors.unselected
     Box(
-        Modifier.height(48.dp).clip(RoundedCornerShape(12.dp))
+        Modifier.heightIn(min = 48.dp).clip(RoundedCornerShape(12.dp))
             .clickable(role = androidx.compose.ui.semantics.Role.Tab) { onSelect(item) }
             .padding(horizontal = 14.dp),
         contentAlignment = Alignment.Center,
     ) {
         Row(
-            Modifier.animateContentSize(),
+            Modifier.padding(vertical = 6.dp).animateContentSize(),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -614,7 +615,8 @@ fun <T> NativeSelectionDialog(title: String?, options: List<T>, selected: T?, la
 fun NativeValueLabel(text: String, enabled: Boolean = true) {
     val c = Theme.palette.secondaryText.let { if (enabled) it else it.copy(alpha = it.alpha * 0.38f) }
     Row(verticalAlignment = Alignment.CenterVertically) {
-        Text(text, style = NativeType.bodyMedium, color = c, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 180.dp))
+        // Max width follows the font scale (capped) so a large font shows more than a few letters.
+        Text(text, style = NativeType.bodyMedium, color = c, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 180.dp * cappedFontScale(1.5f)))
         Icon(Icons.Filled.ArrowDropDown, null, tint = c, modifier = Modifier.size(24.dp))
     }
 }

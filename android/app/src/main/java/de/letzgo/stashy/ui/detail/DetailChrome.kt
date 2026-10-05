@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.ui.scaledIconSize
 import android.widget.Toast
 import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.animation.animateContentSize
@@ -239,7 +240,8 @@ internal fun DetailItemsGrid(items: List<DetailItem>) {
                 row.forEach { d ->
                     Column(Modifier.weight(1f)) {
                         Text(d.label.uppercase(), fontSize = 8.sp, lineHeight = 10.sp, color = p.secondaryText)
-                        Text(d.value, fontSize = 11.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        // 2 lines: half-width column, so a large font scale wraps instead of cutting the value.
+                        Text(d.value, fontSize = 11.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
                     }
                 }
                 if (row.size == 1) Spacer(Modifier.weight(1f))
@@ -252,11 +254,11 @@ internal fun DetailItemsGrid(items: List<DetailItem>) {
 @Composable
 internal fun BoxScope.HeaderExpandButton(expanded: Boolean, onToggle: () -> Unit) {
     Box(
-        Modifier.align(Alignment.BottomEnd).padding(8.dp).size(22.dp).clip(CircleShape)
+        Modifier.align(Alignment.BottomEnd).padding(8.dp).size(scaledIconSize(22.dp)).clip(CircleShape)
             .background(Appearance.tint.copy(alpha = 0.15f)).clickable(onClick = onToggle),
         contentAlignment = Alignment.Center,
     ) {
-        Icon(if (expanded) SF.chevronUp else SF.chevronDown, if (expanded) "Collapse" else "Expand", tint = Theme.palette.pillAccent, modifier = Modifier.size(14.dp))
+        Icon(if (expanded) SF.chevronUp else SF.chevronDown, if (expanded) "Collapse" else "Expand", tint = Theme.palette.pillAccent, modifier = Modifier.size(scaledIconSize(14.dp)))
     }
 }
 
@@ -326,7 +328,7 @@ internal fun DetailHeaderCard(
                 val visible = if (expanded) items else items.take(4)
                 if (visible.isNotEmpty()) DetailItemsGrid(visible)
                 if (expanded && expandedContent != null) expandedContent()
-                if (expandable) Spacer(Modifier.height(18.dp))
+                if (expandable) Spacer(Modifier.height(scaledIconSize(18.dp)))
             }
         }
         if (expandable) HeaderExpandButton(expanded, onToggle)

@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools.rateme
 
+import de.letzgo.stashy.ui.scaledIconSize
 import android.os.Build
 import android.view.HapticFeedbackConstants
 import android.view.View
@@ -489,14 +490,15 @@ private fun RateMeMediaView(item: RateMeItem, modifier: Modifier) {
 private fun StarRating(rating100: Int?, interactive: Boolean, size: Dp, spacing: Dp, onChange: (Int?) -> Unit) {
     val view = LocalView.current
     val stars = RateMeLogic.stars(rating100)
-    Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
+    // Stars follow the font scale (capped 1.5×); each is a gap-less cell ≥ 48 dp tall.
+    val star = scaledIconSize(size, maxScale = 1.5f)
+    Row {
         for (index in 1..5) {
             val filled = index <= stars
-            Icon(
-                if (filled) SF.starFill else SF.star, "$index stars",
-                tint = if (filled) Appearance.tint else Color.Gray.copy(alpha = 0.5f),
-                modifier = Modifier
-                    .size(size)
+            Box(
+                Modifier
+                    .heightIn(min = 48.dp)
+                    .width(star + spacing)
                     .clickable(
                         interactionSource = remember { MutableInteractionSource() },
                         indication = null,
@@ -505,7 +507,14 @@ private fun StarRating(rating100: Int?, interactive: Boolean, size: Dp, spacing:
                         view.performRateMeHaptic(RateMeHaptic.Selection)
                         onChange(RateMeLogic.ratingAfterTap(rating100, index))
                     },
-            )
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (filled) SF.starFill else SF.star, "$index stars",
+                    tint = if (filled) Appearance.tint else Color.Gray.copy(alpha = 0.5f),
+                    modifier = Modifier.size(star),
+                )
+            }
         }
     }
 }
@@ -534,7 +543,7 @@ private fun RatingRow(model: RateMeViewModel, item: RateMeItem, onDelete: () -> 
         val oEnabled = !model.isSubmitting && !model.isIncrementingO && !model.isDeleting
         Row(
             Modifier
-                .height(44.dp)
+                .heightIn(min = 44.dp)
                 .clip(inner)
                 .background(p.background, inner)
                 .clickable(enabled = oEnabled) { model.incrementOCounterAsync() }
@@ -613,7 +622,7 @@ private fun ActionButton(
 ) {
     Row(
         modifier
-            .height(46.dp)
+            .heightIn(min = 46.dp)
             .clip(shape)
             .background(bg, shape)
             .clickable(enabled = enabled, onClick = onClick)
@@ -621,9 +630,9 @@ private fun ActionButton(
         horizontalArrangement = Arrangement.Center,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Icon(icon, null, tint = fg, modifier = Modifier.size(17.dp))
+        Icon(icon, null, tint = fg, modifier = Modifier.size(scaledIconSize(17.dp, maxScale = 1.5f)))
         Spacer(Modifier.width(6.dp))
-        Text(title, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = fg)
+        Text(title, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = fg, modifier = Modifier.padding(vertical = 6.dp))
     }
 }
 

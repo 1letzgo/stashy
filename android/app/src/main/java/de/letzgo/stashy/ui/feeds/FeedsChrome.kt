@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.feeds
 
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.spring
@@ -117,15 +118,16 @@ fun FeedsTopBar(
     onFilterSort: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Native Material tabs over the video (Android look), filter button at the end.
-    de.letzgo.stashy.ui.NativeTabStrip(
+    // Native Material tabs over the video (Android look), filter button at the end. Over video
+    // the font scale is capped (OverlayMaxFontScale) so the bar does not eat the picture.
+    de.letzgo.stashy.ui.CappedFontScale { de.letzgo.stashy.ui.NativeTabStrip(
         modes, selected, { it.title }, { if (it != selected) onSelect(it) }, modifier, transparent = true, icon = { it.icon },
         trailing = {
             androidx.compose.material3.IconButton(onClick = onFilterSort) {
                 Icon(SF.sliderHorizontal3, "Filter and sort", tint = Color.White)
             }
         },
-    )
+    ) }
 }
 
 @Composable
@@ -158,8 +160,8 @@ fun FeedsCriterionChips(
     onRemoveTag: (IdName) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    // Same metrics as the tag chips: 32 dp chips in a 40 dp touch row, 8 dp apart.
-    androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalMinimumInteractiveComponentSize provides TagChips.rowHeight) {
+    // Same metrics as the tag chips: 32 dp chips in a 40 dp touch row, 8 dp apart (font scale capped over video).
+    de.letzgo.stashy.ui.CappedFontScale { androidx.compose.runtime.CompositionLocalProvider(androidx.compose.material3.LocalMinimumInteractiveComponentSize provides TagChips.rowHeight) {
         Row(
             modifier.fillMaxWidth().horizontalScroll(rememberScrollState())
                 .padding(horizontal = FeedsDock.edgePadding, vertical = 2.dp),
@@ -170,7 +172,7 @@ fun FeedsCriterionChips(
             studio?.let { CriterionChip(it.name ?: "") { onClearStudio() } }
             tags.forEach { t -> CriterionChip("#${t.name}") { onRemoveTag(t) } }
         }
-    }
+    } }
 }
 
 /** Active criterion as a Material `InputChip` (tap removes), styled like the tag chips over media. */
@@ -252,7 +254,8 @@ fun FeedsRateChrome(item: FeedItem, onOCounter: (FeedsRepository.OMutation) -> U
 @Composable
 private fun StackedPill(icon: ImageVector, value: String, active: Boolean, modifier: Modifier = Modifier) {
     Column(
-        Modifier.size(FeedsDock.stackedButtonSize).stashyGlass(CircleShape).then(modifier),
+        // Min 48 dp circle; grows (to a rounded capsule) if the capped font scale needs more room.
+        Modifier.sizeIn(minWidth = FeedsDock.stackedButtonSize, minHeight = FeedsDock.stackedButtonSize).stashyGlass(RoundedCornerShape(50)).then(modifier).padding(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.Center,
     ) {
@@ -267,6 +270,34 @@ private fun StackedPill(icon: ImageVector, value: String, active: Boolean, modif
  */
 @Composable
 fun FeedsInfoOverlay(
+    item: FeedItem,
+    mode: ReelsModeType,
+    isMuted: Boolean,
+    isPlaying: Boolean,
+    showsDelete: Boolean,
+    onPerformerFilter: (FeedPerformer) -> Unit,
+    onPerformerOpen: (FeedPerformer) -> Unit,
+    onTitle: () -> Unit,
+    onTag: (IdName) -> Unit,
+    onAddTags: () -> Unit,
+    onRemoveTag: (IdName) -> Unit,
+    onOCounter: (FeedsRepository.OMutation) -> Unit,
+    onRating: (Int?) -> Unit,
+    onDelete: () -> Unit,
+    onToggleMute: () -> Unit,
+    onTogglePlay: () -> Unit,
+    pausesAdvance: Boolean,
+) {
+    // Over video: text follows the system font scale up to OverlayMaxFontScale (1.3×) so the
+    // overlay never covers most of the clip; containers below wrap their content.
+    de.letzgo.stashy.ui.CappedFontScale { FeedsInfoOverlayContent(
+        item, mode, isMuted, isPlaying, showsDelete, onPerformerFilter, onPerformerOpen, onTitle, onTag, onAddTags,
+        onRemoveTag, onOCounter, onRating, onDelete, onToggleMute, onTogglePlay, pausesAdvance,
+    ) }
+}
+
+@Composable
+private fun FeedsInfoOverlayContent(
     item: FeedItem,
     mode: ReelsModeType,
     isMuted: Boolean,
@@ -319,7 +350,7 @@ fun FeedsInfoOverlay(
         // (stashy+) inline, so the row also exists for an untagged item. The 40 dp slot is kept
         // even without a row, so the overlay does not jump between clips.
         val showsRow = showsTagRow(item.tags)
-        Box(Modifier.padding(top = 8.dp - TagChips.touchInset).fillMaxWidth().height(TagChips.rowHeight)) {
+        Box(Modifier.padding(top = 8.dp - TagChips.touchInset).fillMaxWidth().heightIn(min = TagChips.rowHeight)) {
             if (showsRow) {
                 TagChipRow(
                     itemId = item.id,
@@ -373,7 +404,8 @@ fun FeedsScrubber(
 ) {
     var scrubbing by remember { mutableStateOf(false) }
     var previewImage by remember(previewImageAt) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
-    de.letzgo.stashy.ui.player.TimeBar(
+    // Over video: capped font scale (the 44 dp capsule keeps its height up to 1.3×).
+    de.letzgo.stashy.ui.CappedFontScale { de.letzgo.stashy.ui.player.TimeBar(
         currentTime = time,
         duration = duration,
         isScrubbing = scrubbing,
@@ -388,7 +420,7 @@ fun FeedsScrubber(
             onScrub(s)
         },
         onScrubEnded = { s -> scrubbing = false; previewImage = null; onScrubEnd(s) },
-    )
+    ) }
 }
 
 /** `m:ss` / `h:mm:ss`. */

@@ -9,6 +9,9 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -29,6 +32,7 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.material3.ripple
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -41,6 +45,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.graphics.drawOutline
+import androidx.compose.ui.graphics.drawscope.translate
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -68,8 +77,9 @@ import de.letzgo.stashy.ui.player.PreviewSurface
 import de.letzgo.stashy.ui.player.ScenePlayerSurface
 import de.letzgo.stashy.ui.player.rememberPreviewPlayer
 import de.letzgo.stashy.ui.stashyGlass
+import de.letzgo.stashy.ui.CappedFontScale
+import de.letzgo.stashy.ui.scaledIconSize
 import de.letzgo.stashy.ui.components.InfoLabel
-import de.letzgo.stashy.ui.components.InfoLabelSurface
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -155,7 +165,8 @@ private fun CoverWithOverlay(model: SceneDetailModel) {
             Icon(PlayerIcons.film, null, tint = Color.Gray.copy(alpha = 0.5f), modifier = Modifier.size(50.dp))
         }
         if (model.isPreviewing) PreviewSurface(preview, Modifier.fillMaxSize())
-        if (!model.isPreviewing) {
+        // Over the cover picture: text follows the font scale, capped so it stays inside the 16:9 frame.
+        if (!model.isPreviewing) CappedFontScale { Box(Modifier.fillMaxSize()) {
             val resume = scene.resumeTime ?: 0.0
             Box(Modifier.align(Alignment.Center)) {
                 if (resume > 0) {
@@ -165,7 +176,7 @@ private fun CoverWithOverlay(model: SceneDetailModel) {
                                 .clickable { model.startPlayback(true) }.padding(horizontal = 20.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            Icon(PlayerIcons.resume, null, tint = Color.White, modifier = Modifier.size(20.dp))
+                            Icon(PlayerIcons.resume, null, tint = Color.White, modifier = Modifier.size(scaledIconSize(20.dp)))
                             Text("Resume from ${PlaybackFormat.time(resume)}", color = Color.White, style = IosTypography.body.copy(fontWeight = FontWeight.Bold))
                         }
                         Text(
@@ -185,10 +196,10 @@ private fun CoverWithOverlay(model: SceneDetailModel) {
             }
             PlaybackFormat.resolutionLabel(scene.files?.firstOrNull()?.height)?.let { label ->
                 Row(
-                    Modifier.align(Alignment.TopEnd).padding(10.dp).height(24.dp).stashyGlass(RoundedCornerShape(50)).padding(horizontal = 9.dp),
+                    Modifier.align(Alignment.TopEnd).padding(10.dp).heightIn(min = 24.dp).stashyGlass(RoundedCornerShape(50)).padding(horizontal = 9.dp, vertical = 3.dp),
                     verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
                 ) {
-                    Icon(PlayerIcons.video, null, tint = Color.White, modifier = Modifier.size(11.dp))
+                    Icon(PlayerIcons.video, null, tint = Color.White, modifier = Modifier.size(scaledIconSize(11.dp)))
                     Text(label, color = Color.White, style = IosTypography.caption2.copy(fontWeight = FontWeight.Bold))
                 }
             }
@@ -197,7 +208,7 @@ private fun CoverWithOverlay(model: SceneDetailModel) {
                 Box(Modifier.align(Alignment.BottomStart).fillMaxWidth().height(4.dp).background(Color.White.copy(alpha = 0.25f)))
                 Box(Modifier.align(Alignment.BottomStart).fillMaxWidth((resume / duration).toFloat().coerceIn(0f, 1f)).height(4.dp).background(tint))
             }
-        }
+        } }
     }
 }
 
@@ -220,13 +231,13 @@ private fun MarkerStrip(markers: List<SceneMarker>, playing: Boolean, onSeek: (D
                     Text(
                         PlaybackFormat.time(marker.seconds),
                         Modifier.align(Alignment.BottomEnd).padding(2.dp).clip(RoundedCornerShape(50)).background(Color.Black.copy(alpha = 0.6f)).padding(horizontal = 4.dp, vertical = 1.dp),
-                        style = IosTypography.caption2.copy(fontSize = 8.sp, fontWeight = FontWeight.Bold), color = Color.White,
+                        style = IosTypography.caption2.copy(fontSize = 10.sp, fontWeight = FontWeight.Bold), color = Color.White, maxLines = 1,
                     )
                 }
                 Text(
                     marker.title?.takeIf { it.isNotEmpty() } ?: "Marker at ${PlaybackFormat.time(marker.seconds)}",
-                    style = IosTypography.caption2.copy(fontSize = 10.sp, fontWeight = FontWeight.Medium), color = p.text,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    style = IosTypography.caption2.copy(fontWeight = FontWeight.Medium), color = p.text,
+                    maxLines = 2, overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -237,7 +248,7 @@ private fun MarkerStrip(markers: List<SceneMarker>, playing: Boolean, onSeek: (D
  * iOS: `SceneDetailMetadataCard` — title (+ edit pencil), collapsible details, and the pill row:
  * date · duration · play count · O-counter (tap +1, long-press "Remove one O" / reset) · rating.
  */
-@OptIn(ExperimentalFoundationApi::class)
+@OptIn(ExperimentalFoundationApi::class, ExperimentalLayoutApi::class)
 @Composable
 fun SceneMetadataCard(model: SceneDetailModel, onEditTitle: () -> Unit) {
     val scene = model.scene
@@ -259,17 +270,25 @@ fun SceneMetadataCard(model: SceneDetailModel, onEditTitle: () -> Unit) {
                 ExpandChevron(model.isHeaderExpanded, Modifier.align(Alignment.BottomEnd)) { model.isHeaderExpanded = !model.isHeaderExpanded }
             }
         }
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            scene.date?.let { InfoPill(PlayerIcons.calendar, it) }
-            scene.sceneDuration?.let { InfoPill(PlayerIcons.clock, PlaybackFormat.time(it)) }
-            InfoPill(PlayerIcons.playCircle, "${scene.playCount ?: 0}")
+        // FlowRow: at large font scales the pills wrap onto a second line instead of squeezing
+        // the last ones (rating / O) until their text clips.
+        FlowRow(
+            Modifier.fillMaxWidth(),
+            horizontalArrangement = SpaceBetweenMin8,
+            verticalArrangement = Arrangement.spacedBy(4.dp),
+        ) {
+            val center = Modifier.align(Alignment.CenterVertically)
+            scene.date?.let { InfoPill(PlayerIcons.calendar, it, center) }
+            scene.sceneDuration?.let { InfoPill(PlayerIcons.clock, PlaybackFormat.time(it), center) }
+            InfoPill(PlayerIcons.playCircle, "${scene.playCount ?: 0}", center)
             var menu by remember { mutableStateOf(false) }
             var confirmReset by remember { mutableStateOf(false) }
             val count = scene.oCounter ?: 0
-            Box {
+            // ≥ 48 dp touch target around the compact pill (Material minimum interactive size).
+            Box(center.minimumInteractiveComponentSize(), contentAlignment = Alignment.Center) {
                 InfoPill(
                     oCounterIcon(Appearance.oCounterIcon, filled = true), "$count",
-                    Modifier.combinedClickable(
+                    Modifier.semantics { contentDescription = "O-Counter $count, tap to add one, long-press for options" }.combinedClickable(
                         interactionSource = remember { MutableInteractionSource() }, indication = ripple(),
                         onClick = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); model.incrementO() },
                         onLongClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); menu = true },
@@ -293,9 +312,7 @@ fun SceneMetadataCard(model: SceneDetailModel, onEditTitle: () -> Unit) {
                 confirmButton = { TextButton({ confirmReset = false; model.removeO(OCounterMutation.Reset) }) { Text("Remove all $count", color = StashyColors.systemRed) } },
                 dismissButton = { TextButton({ confirmReset = false }) { Text("Cancel") } },
             )
-            InfoLabelSurface(container = p.pillAccent.copy(alpha = 0.1f)) {
-                StarRating(scene.rating100, size = 14.dp, spacing = 2.dp) { model.setRating(it) }
-            }
+            StarRating(scene.rating100, size = 14.dp, spacing = 4.dp, modifier = center, container = p.pillAccent.copy(alpha = 0.1f)) { model.setRating(it) }
         }
     }
 }
@@ -306,23 +323,70 @@ fun InfoPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String
     InfoLabel(text, Modifier.clip(MaterialTheme.shapes.small).then(modifier), icon = icon, content = color)
 }
 
-/** iOS: `StarRatingView` — 5 stars, tap the current star again to clear. */
+/**
+ * iOS: `StarRatingView` — 5 stars, tap the current star again to clear. The stars grow with the
+ * font scale; every star is a gap-less cell at least 48 dp tall (tap anywhere in the row hits the
+ * nearest star). [container] draws the compact pill behind the stars (as tall as an [InfoPill]),
+ * while the touch area keeps its 48 dp height.
+ */
 @Composable
-fun StarRating(rating100: Int?, size: androidx.compose.ui.unit.Dp, spacing: androidx.compose.ui.unit.Dp, onChange: (Int?) -> Unit) {
+fun StarRating(
+    rating100: Int?,
+    size: androidx.compose.ui.unit.Dp,
+    spacing: androidx.compose.ui.unit.Dp,
+    modifier: Modifier = Modifier,
+    container: Color? = null,
+    onChange: (Int?) -> Unit,
+) {
     val stars = rating100?.let { Math.round(it / 20.0).toInt().coerceIn(0, 5) } ?: 0
     val haptics = LocalHapticFeedback.current
-    Row(horizontalArrangement = Arrangement.spacedBy(spacing)) {
-        for (i in 1..5) {
-            Icon(
-                if (i <= stars) de.letzgo.stashy.ui.SF.starFill else de.letzgo.stashy.ui.SF.star, null,
-                tint = if (i <= stars) Appearance.tint else Color.Gray.copy(alpha = 0.5f),
-                modifier = Modifier.size(size).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
-                    haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                    onChange(if (i == stars) null else i * 20)
+    val star = scaledIconSize(size)
+    val edge = if (container != null) 6.dp else 0.dp
+    val pillShape = MaterialTheme.shapes.small
+    Row(
+        modifier
+            .then(
+                if (container == null) Modifier
+                else Modifier.drawBehind {
+                    // Pill as tall as an InfoPill (icon/line + 2 × 5 dp), centered in the 48 dp touch row.
+                    val pillH = minOf(this.size.height, (star + 12.dp).toPx())
+                    val outline = pillShape.createOutline(androidx.compose.ui.geometry.Size(this.size.width, pillH), layoutDirection, this)
+                    translate(top = (this.size.height - pillH) / 2f) { drawOutline(outline, container) }
                 },
             )
+            .padding(horizontal = edge)
+            .semantics(mergeDescendants = false) { contentDescription = "Rating: $stars of 5 stars" },
+    ) {
+        for (i in 1..5) {
+            Box(
+                Modifier
+                    .heightIn(min = 48.dp)
+                    .width(star + spacing)
+                    .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClickLabel = "Rate $i stars") {
+                        haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                        onChange(if (i == stars) null else i * 20)
+                    },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    if (i <= stars) de.letzgo.stashy.ui.SF.starFill else de.letzgo.stashy.ui.SF.star, null,
+                    tint = if (i <= stars) Appearance.tint else Color.Gray.copy(alpha = 0.5f),
+                    modifier = Modifier.size(star),
+                )
+            }
         }
     }
+}
+
+/** FlowRow arrangement: SpaceBetween within a line, but lines break with at least 8 dp between items. */
+private object SpaceBetweenMin8 : Arrangement.Horizontal {
+    override val spacing = 8.dp
+    override fun androidx.compose.ui.unit.Density.arrange(
+        totalSize: Int,
+        sizes: IntArray,
+        layoutDirection: androidx.compose.ui.unit.LayoutDirection,
+        outPositions: IntArray,
+    ) = with(Arrangement.SpaceBetween) { arrange(totalSize, sizes, layoutDirection, outPositions) }
 }
 
 /** Small tinted chevron circle (expand / collapse). */
@@ -330,9 +394,9 @@ fun StarRating(rating100: Int?, size: androidx.compose.ui.unit.Dp, spacing: andr
 fun ExpandChevron(expanded: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     val tint = Appearance.tint
     Box(
-        modifier.size(22.dp).clip(CircleShape).background(tint.copy(alpha = 0.1f))
+        modifier.size(scaledIconSize(22.dp)).clip(CircleShape).background(tint.copy(alpha = 0.1f))
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClick),
         contentAlignment = Alignment.Center,
-    ) { Icon(if (expanded) PlayerIcons.chevronUp else PlayerIcons.chevronDown, null, tint = tint, modifier = Modifier.size(14.dp)) }
+    ) { Icon(if (expanded) PlayerIcons.chevronUp else PlayerIcons.chevronDown, if (expanded) "Collapse" else "Expand", tint = tint, modifier = Modifier.size(scaledIconSize(14.dp))) }
 }
 

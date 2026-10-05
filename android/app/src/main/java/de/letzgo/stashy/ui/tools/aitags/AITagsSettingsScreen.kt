@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools.aitags
 
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -204,7 +205,7 @@ private fun StepperRow(title: String, value: Int, range: IntRange, enabled: Bool
     )
     SettingsRow(title, enabled = enabled) {
         FilledTonalIconButton({ onChange(value - 1) }, enabled = enabled && value > range.first, colors = colors) { Icon(Icons.Filled.Remove, "Decrement") }
-        Text("$value", style = NativeType.titleMedium, color = p.text, textAlign = TextAlign.Center, modifier = Modifier.width(28.dp))
+        Text("$value", style = NativeType.titleMedium, color = p.text, textAlign = TextAlign.Center, maxLines = 1, modifier = Modifier.widthIn(min = 28.dp))
         FilledTonalIconButton({ onChange(value + 1) }, enabled = enabled && value < range.last, colors = colors) { Icon(Icons.Filled.Add, "Increment") }
     }
 }

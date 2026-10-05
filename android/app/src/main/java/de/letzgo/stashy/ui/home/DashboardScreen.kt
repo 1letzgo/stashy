@@ -1,5 +1,8 @@
 package de.letzgo.stashy.ui.home
 
+import de.letzgo.stashy.ui.cappedFontScale
+import de.letzgo.stashy.ui.scaledIconSize
+import androidx.compose.ui.text.style.TextOverflow
 import android.os.Build
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
@@ -382,7 +385,7 @@ private fun StatisticsRow(isFirst: Boolean) {
                 }
             }
             DashboardStore.isLoadingStatistics || DashboardStore.errorMessage == null -> LazyRow(contentPadding = PaddingValues(horizontal = RowMargin), horizontalArrangement = Arrangement.spacedBy(RowGap)) {
-                items(6) { Box(Modifier.size(HomeSquareCardSide).background(p.secondaryBackground, NativeCardShape)) }
+                items(6) { Box(Modifier.size(HomeSquareCardSide * cappedFontScale(1.6f)).background(p.secondaryBackground, NativeCardShape)) }
             }
             else -> Row(Modifier.padding(horizontal = RowMargin), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 Icon(SF.exclamationTriangle, null, tint = p.secondaryText, modifier = Modifier.size(16.dp))
@@ -403,18 +406,19 @@ private fun statContainer(color: Color): Color = color.copy(alpha = if (Theme.pa
 @Composable
 private fun StatCard(item: StatItem) {
     val p = Theme.palette
+    // Square grows with the font scale (capped 1.6×) so value + title keep fitting on one line each.
     NativeCard(
-        Modifier.size(HomeSquareCardSide), container = statContainer(item.color), elevation = 0.dp,
+        Modifier.size(HomeSquareCardSide * cappedFontScale(1.6f)), container = statContainer(item.color), elevation = 0.dp,
         onClick = { item.tab.catalogTab()?.let { Nav.openCatalog(it) } },
     ) {
         Column(
             Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.SpaceBetween,
         ) {
-            Icon(item.icon, null, tint = item.color, modifier = Modifier.size(28.dp))
+            Icon(item.icon, null, tint = item.color, modifier = Modifier.size(scaledIconSize(28.dp, maxScale = 1.4f)))
             Column {
-                Text(formatStat(item.value), style = NativeType.titleLarge, color = p.text, maxLines = 1)
-                Text(item.title, style = NativeType.labelMedium, color = p.secondaryText, maxLines = 1)
+                Text(formatStat(item.value), style = NativeType.titleLarge, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(item.title, style = NativeType.labelMedium, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
     }
@@ -424,16 +428,17 @@ private fun StatCard(item: StatItem) {
 @Composable
 private fun CompactStatRow(item: StatItem, modifier: Modifier) {
     val p = Theme.palette
+    // Min 48 dp (not fixed): the row grows with the font scale instead of clipping its text.
     NativeCard(
-        modifier.height(48.dp), container = statContainer(item.color), elevation = 0.dp,
+        modifier, container = statContainer(item.color), elevation = 0.dp,
         onClick = { item.tab.catalogTab()?.let { Nav.openCatalog(it) } },
     ) {
         Row(
-            Modifier.fillMaxSize().padding(horizontal = 12.dp),
+            Modifier.fillMaxWidth().heightIn(min = 48.dp).padding(horizontal = 12.dp, vertical = 6.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Icon(item.icon, null, tint = item.color, modifier = Modifier.size(20.dp))
-            Text(item.title, style = NativeType.labelLarge, color = p.text, maxLines = 1, modifier = Modifier.weight(1f))
+            Icon(item.icon, null, tint = item.color, modifier = Modifier.size(scaledIconSize(20.dp, maxScale = 1.4f)))
+            Text(item.title, style = NativeType.labelLarge, color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
             Text(formatStat(item.value), style = NativeType.titleSmall, color = p.text, maxLines = 1)
         }
     }

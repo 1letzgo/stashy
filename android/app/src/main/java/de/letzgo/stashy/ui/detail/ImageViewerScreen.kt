@@ -234,7 +234,8 @@ class ImageViewerScreen(
 
             AnimatedVisibility(showUI, Modifier.align(Alignment.TopCenter), enter = fadeIn(), exit = fadeOut()) { TopBar(context) }
             AnimatedVisibility(showUI, Modifier.align(Alignment.BottomCenter), enter = fadeIn(), exit = fadeOut()) {
-                current?.let { BottomOverlay(it) }
+                // Over the media: font scale capped at OverlayMaxFontScale (like Feeds).
+                current?.let { de.letzgo.stashy.ui.CappedFontScale { BottomOverlay(it) } }
             }
         }
 

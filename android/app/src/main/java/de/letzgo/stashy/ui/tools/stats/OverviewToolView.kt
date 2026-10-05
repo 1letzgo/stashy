@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.stats
 
+import de.letzgo.stashy.ui.scaledMaxLines
+import de.letzgo.stashy.ui.scaledIconSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -150,13 +152,13 @@ private fun HeroCard(stats: OverviewStatistics) {
 private fun HeroStat(icon: ImageVector, value: String, label: String, modifier: Modifier = Modifier) {
     val p = Theme.palette
     Column(modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-        Icon(icon, null, tint = Appearance.tint, modifier = Modifier.size(24.dp))
+        Icon(icon, null, tint = Appearance.tint, modifier = Modifier.size(scaledIconSize(24.dp, maxScale = 1.4f)))
         Text(
             value,
             style = NativeType.headlineSmall.monoDigits(),
             color = p.text, maxLines = 1, softWrap = false, overflow = TextOverflow.Ellipsis,
         )
-        Text(label, style = NativeType.bodyMedium, color = p.secondaryText, maxLines = 1)
+        Text(label, style = NativeType.bodyMedium, color = p.secondaryText, maxLines = scaledMaxLines(), overflow = TextOverflow.Ellipsis)
     }
 }
 

@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.settings
 
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.History
 import androidx.compose.foundation.background
@@ -112,15 +113,16 @@ private fun SubtitlePreview() {
     val family = when (TabManager.subtitleFontFamily) { SubtitleFontFamily.Serif -> FontFamily.Serif; SubtitleFontFamily.Monospaced -> FontFamily.Monospace; else -> FontFamily.Default }
     val box = if (TabManager.subtitleBoxEnabled) TabManager.subtitleBackgroundColor.argb?.let { Color(it) } else null
     Box(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).height(96.dp).clip(RoundedCornerShape(10.dp))
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).heightIn(min = 96.dp).clip(RoundedCornerShape(10.dp))
             .background(Brush.linearGradient(listOf(Color(0xFF383838), Color(0xFF0F0F0F)))),
         contentAlignment = Alignment.BottomCenter,
     ) {
-        Text(
+        // Same capped font scale as the player draws its subtitles with (CappedFontScale on the surface).
+        de.letzgo.stashy.ui.CappedFontScale { Text(
             "Sample subtitle",
             color = Color(TabManager.subtitleTextColor.argb), fontSize = size.sp, fontFamily = family, fontWeight = FontWeight.SemiBold,
             style = if (box == null) androidx.compose.ui.text.TextStyle(shadow = Shadow(Color.Black, blurRadius = 4f)) else androidx.compose.ui.text.TextStyle.Default,
-            modifier = Modifier.padding(bottom = 10.dp).let { if (box != null) it.background(box, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp) else it },
-        )
+            modifier = Modifier.padding(top = 10.dp, bottom = 10.dp).let { if (box != null) it.background(box, RoundedCornerShape(4.dp)).padding(horizontal = 6.dp, vertical = 2.dp) else it },
+        ) }
     }
 }

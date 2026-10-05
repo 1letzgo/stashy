@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.scene
 
+import de.letzgo.stashy.ui.scaledIconSize
+import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -79,7 +81,7 @@ fun SceneToastHost(modifier: Modifier = Modifier) {
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            m.icon?.let { Icon(it, null, tint = color, modifier = Modifier.size(18.dp)) }
+            m.icon?.let { Icon(it, null, tint = color, modifier = Modifier.size(scaledIconSize(18.dp))) }
             Text(m.text, style = IosTypography.subheadline.copy(fontWeight = FontWeight.Medium), color = Color.White, maxLines = 3)
         }
     }
@@ -106,8 +108,9 @@ fun SceneCardHeader(title: String, onEdit: (() -> Unit)?, trailing: (@Composable
 /** iOS `pencil.circle.fill` in the tint colour, 20 pt. */
 @Composable
 fun EditCircleButton(onClick: () -> Unit) {
-    Box(Modifier.size(22.dp).clip(CircleShape).background(Appearance.tint).noRippleClickable(onClick), contentAlignment = Alignment.Center) {
-        Icon(PlayerIcons.edit, "Edit", tint = Color.White, modifier = Modifier.size(12.dp))
+    // Visual circle grows with the font scale; the touch target is the Material 48 dp minimum.
+    Box(Modifier.minimumInteractiveComponentSize().size(scaledIconSize(22.dp)).clip(CircleShape).background(Appearance.tint).noRippleClickable(onClick), contentAlignment = Alignment.Center) {
+        Icon(PlayerIcons.edit, "Edit", tint = Color.White, modifier = Modifier.size(scaledIconSize(12.dp)))
     }
 }
 

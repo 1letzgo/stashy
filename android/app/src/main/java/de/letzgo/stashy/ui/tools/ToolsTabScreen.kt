@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools
 
+import de.letzgo.stashy.ui.scaledMaxLines
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -206,7 +207,7 @@ private fun ToolTile(tool: ToolsTab, modifier: Modifier, onClick: () -> Unit) {
         Row(Modifier.fillMaxWidth().padding(horizontal = 10.dp, vertical = 8.dp)) {
             Text(
                 tool.title, style = IosTypography.subheadline.copy(fontWeight = FontWeight.Bold), color = p.text,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
+                maxLines = scaledMaxLines(), overflow = TextOverflow.Ellipsis,
             )
         }
     }
