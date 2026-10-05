@@ -2236,6 +2236,8 @@ struct ReelsViewBody: View {
         // A fresh fetch may well bring items whose files exist now.
         unplayableItemIds.removeAll()
         mediaProbedItemIds.removeAll()
+        // New feed session: scene rows get their start position (Random) drawn afresh.
+        if currentMode == .scenes { ReelsSceneStartPositions.reset() }
 
         switch currentMode {
         case .scenes:
@@ -5272,7 +5274,15 @@ struct ReelItemView: View {
     /// Engine-level loop at end of file: only for rows that play a whole file. A segment row
     /// loops (or advances) at its segment end itself — the engine's loop would restart at 0.
     private var engineLoopsAtEnd: Bool {
-        item.playbackSegment == nil && !TabManager.shared.reelsContinuousPlay
+        item.playbackSegment == nil && rowStartTime <= 0 && !TabManager.shared.reelsContinuousPlay
+    }
+
+    /// File time the row starts at and loops back to: a marker's segment start, a scene's
+    /// Feeds start position (Settings › Playback), 0 for everything else.
+    private var rowStartTime: Double {
+        if let segment = item.playbackSegment { return segment.start }
+        if case .scene(let scene) = item { return ReelsSceneStartPositions.start(for: scene) }
+        return 0
     }
 
     /// Settings › Playback › "Count as played — Feeds".
@@ -6109,8 +6119,10 @@ extension ReelItemView {
         ReelsPlayerRegistry.register(aether)
 
         let autoplay = !isRotating && isActive && (forcePlay || isPlaying)
-        // Marker rows open the original right at the marker (the engine seeks accurately).
-        let startAt = item.playbackSegment.map { $0.start > 0.05 ? $0.start : 0 }
+        // Marker rows open the original right at the marker, scene rows at their Feeds start
+        // position — part of the load itself, so no seek races the first frame / autoplay.
+        let start = rowStartTime
+        let startAt: Double? = start > 0.05 ? start : nil
         Task { await aether.load(url: url, startAt: startAt, autoplay: autoplay) }
 
         // Initial duration guess from model.
@@ -6272,31 +6284,45 @@ extension ReelItemView {
     }
 
     func aetherSetLoops(continuousPlay: Bool) {
-        // Segment rows loop at their segment end themselves, never at the file end.
-        aetherEngine?.loopsAtEnd = item.playbackSegment == nil && !continuousPlay
+        // Segment rows loop at their segment end themselves, rows with a start position back
+        // to that start — the engine's own loop would restart at 0.
+        aetherEngine?.loopsAtEnd = item.playbackSegment == nil && rowStartTime <= 0 && !continuousPlay
+    }
+
+    /// Back to the row's start position (marker segment start / scene Feeds start) and on.
+    private func loopToRowStart(on aether: AetherSceneEngine) {
+        let start = rowStartTime
+        Task { @MainActor in
+            await aether.seek(to: start)
+            self.playbackActivityTracker.noteSeek(to: start)
+            if self.isPlaying && self.isPlaybackActive && !self.isRotating {
+                ReelsPlayerRegistry.playIfAllowed(aether)
+            }
+        }
+    }
+
+    /// Scene rows with a start position: the file end loops back to that start (unless
+    /// continuous play hands over to the next row, which `onReachedEnd` does as before).
+    func handleSceneLoopPoint(force: Bool = false) {
+        guard item.playbackSegment == nil, rowStartTime > 0, let aether = aetherEngine else { return }
+        guard !TabManager.shared.reelsContinuousPlay else { return }
+        guard force || !segmentEndHandled else { return }
+        guard !ReelsPlayerRegistry.isPlaybackSuspended, isPlaybackActive, !scrubberState.seeking else { return }
+        segmentEndHandled = true
+        loopToRowStart(on: aether)
     }
 
     /// Marker rows: the playhead reached the segment end. Continuous play hands over to the
     /// next row like the end of a file does; otherwise (or on the last row) the segment loops.
     func handlePlaybackSegmentEnd(force: Bool = false) {
-        guard let segment = effectivePlaybackSegment, let aether = aetherEngine else { return }
+        guard item.playbackSegment != nil, let aether = aetherEngine else { return }
         guard force || !segmentEndHandled else { return }
         // Tab leave can race with the end; never restart audio off-Feeds.
         guard !ReelsPlayerRegistry.isPlaybackSuspended, isPlaybackActive, !scrubberState.seeking else { return }
         segmentEndHandled = true
 
-        let loopToStart = {
-            Task { @MainActor in
-                await aether.seek(to: segment.start)
-                self.playbackActivityTracker.noteSeek(to: segment.start)
-                if self.isPlaying && self.isPlaybackActive && !self.isRotating {
-                    ReelsPlayerRegistry.playIfAllowed(aether)
-                }
-            }
-        }
-
         guard TabManager.shared.reelsContinuousPlay, isPlaying else {
-            loopToStart()
+            loopToRowStart(on: aether)
             return
         }
         onVideoEnded()
@@ -6304,7 +6330,7 @@ extension ReelItemView {
         // instead of running on into the rest of the scene.
         DispatchQueue.main.async {
             guard self.isActive, self.aetherEngine === aether else { return }
-            loopToStart()
+            self.loopToRowStart(on: aether)
         }
     }
 
@@ -6350,6 +6376,11 @@ extension ReelItemView {
                 self.handlePlaybackSegmentEnd(force: true)
                 return
             }
+            // A scene with a Feeds start position loops back to it, not to 0.
+            if !TabManager.shared.reelsContinuousPlay, self.rowStartTime > 0 {
+                self.handleSceneLoopPoint(force: true)
+                return
+            }
             guard !ReelsPlayerRegistry.isPlaybackSuspended, self.isPlaying, self.isPlaybackActive else { return }
             self.onVideoEnded()
         }
@@ -6375,6 +6406,16 @@ extension ReelItemView {
 
                 if self.isActive, duration > 0, !duration.isNaN {
                     self.scrubberState.duration = duration
+                }
+
+                // Near-end loop back to the start position, like the engine's own loop does
+                // to 0 — avoids passing through the terminal `.ended` state.
+                if duration > 1, !duration.isNaN, self.rowStartTime > 0, !TabManager.shared.reelsContinuousPlay {
+                    if time < duration - 1 {
+                        self.segmentEndHandled = false
+                    } else if time >= duration - 0.25 {
+                        self.handleSceneLoopPoint()
+                    }
                 }
             }
 
@@ -6549,6 +6590,53 @@ class ScrubberState: ObservableObject {
     /// Shown in the preview box while no still is there (marker rows: the marker's screenshot,
     /// for scenes without scrubber sprites).
     @Published var previewPlaceholderURL: URL? = nil
+}
+
+/// Settings › Playback › "Feeds start position": where a Feeds › Scenes row starts (and loops
+/// back to), so the feed does not open on studio intros. Worked out once per scene and feed
+/// session and then kept, so a Random start stays put while the row stays and for its loop,
+/// and an engine rebuild by the watchdog lands on the same spot.
+@MainActor
+enum ReelsSceneStartPositions {
+    private static var cache: [String: Double] = [:]
+
+    /// Videos shorter than this always start at 0.
+    private static let minimumDuration: Double = 120
+    /// A start this close to the end starts at 0 instead.
+    private static let endMargin: Double = 5
+    private static let skipSeconds: Double = 30
+
+    static func reset() { cache.removeAll() }
+
+    static func start(for scene: Scene) -> Double {
+        let setting = TabManager.shared.feedsSceneStartPosition
+        let key = "\(setting.rawValue)|\(scene.id)"
+        if let cached = cache[key] { return cached }
+        let value = compute(for: scene, setting: setting)
+        cache[key] = value
+        return value
+    }
+
+    private static func compute(for scene: Scene, setting: TabManager.FeedsSceneStartPosition) -> Double {
+        guard let duration = scene.sceneDuration, duration.isFinite, duration >= minimumDuration else { return 0 }
+        // Square and vertical videos are mostly short-form content that starts right away.
+        if let file = scene.files?.first, let width = file.width, let height = file.height,
+           width > 0, height > 0, width <= height {
+            return 0
+        }
+        let start: Double
+        switch setting {
+        case .firstMarker:
+            let detailMarkers = scene.sceneMarkers?.map(\.seconds).filter { $0.isFinite && $0 >= 0 }.min()
+            start = [scene.earliestMarkerSeconds, detailMarkers].compactMap { $0 }.min() ?? skipSeconds
+        case .skip30:
+            start = skipSeconds
+        case .random:
+            start = Double.random(in: 0..<(duration * 0.5))
+        }
+        guard start > 0, start < duration - endMargin else { return 0 }
+        return start
+    }
 }
 
 /// The stretch of a source file a Feeds row plays (marker rows: their part of the scene).

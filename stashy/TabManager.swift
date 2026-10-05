@@ -492,6 +492,27 @@ class TabManager: ObservableObject {
     }
     static let holdSpeedOptions: [Double] = [1.25, 1.5, 2, 2.5, 3, 4]
 
+    /// Settings › Playback › "Feeds start position": where a Feeds › Scenes row starts, so the
+    /// feed does not open on studio intros.
+    enum FeedsSceneStartPosition: String, CaseIterable, Identifiable {
+        case firstMarker
+        case skip30
+        case random
+
+        var id: String { rawValue }
+
+        var label: String {
+            switch self {
+            case .firstMarker: return "First Marker"
+            case .skip30: return "Skip 30s"
+            case .random: return "Random"
+            }
+        }
+    }
+    @Published var feedsSceneStartPosition: FeedsSceneStartPosition = .firstMarker {
+        didSet { UserDefaults.standard.set(feedsSceneStartPosition.rawValue, forKey: feedsSceneStartPositionKey) }
+    }
+
     /// Settings › Downloads: how many items a "newest" download grabs. Images (a gallery or a
     /// tag) and scenes (a performer / studio / tag / group) have their own size — a scene is a
     /// whole video file, so its sensible batch is far smaller than an image batch.
@@ -620,6 +641,7 @@ class TabManager: ObservableObject {
     private let sceneDownloadBatchSizeKey = "scene_download_batch_size"
     private let holdSpeedPlayerKey = "hold_speed_player"
     private let holdSpeedFeedsKey = "hold_speed_feeds"
+    private let feedsSceneStartPositionKey = "feedsSceneStartPosition"
     private let playCountPlayerSecondsKey = "play_count_player_seconds"
     private let playCountFeedsSecondsKey = "play_count_feeds_seconds"
     private let subtitlesAutoEnabledKey = "subtitle_auto_enabled"
@@ -683,6 +705,8 @@ class TabManager: ObservableObject {
         self.holdSpeedPlayer = Self.holdSpeedOptions.contains(storedHoldPlayer) ? storedHoldPlayer : 2
         let storedHoldFeeds = UserDefaults.standard.object(forKey: holdSpeedFeedsKey) as? Double ?? 2
         self.holdSpeedFeeds = Self.holdSpeedOptions.contains(storedHoldFeeds) ? storedHoldFeeds : 2
+        self.feedsSceneStartPosition = UserDefaults.standard.string(forKey: feedsSceneStartPositionKey)
+            .flatMap(FeedsSceneStartPosition.init(rawValue:)) ?? .firstMarker
         let storedPlayerThreshold = UserDefaults.standard.object(forKey: playCountPlayerSecondsKey) as? Double ?? 1
         self.playCountPlayerSeconds = Self.playCountThresholdOptions.contains(storedPlayerThreshold) ? storedPlayerThreshold : 1
         let storedFeedsThreshold = UserDefaults.standard.object(forKey: playCountFeedsSecondsKey) as? Double ?? 30
