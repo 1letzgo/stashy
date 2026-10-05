@@ -101,7 +101,7 @@ object TabManager {
     var showsPlayerSkipButtons: Boolean get() = _showsPlayerSkipButtons.value; set(v) { _showsPlayerSkipButtons.value = v; Prefs.setBool("showsPlayerSkipButtons", v) }
     private val _playerAutoZoom = bool("playerAutoZoom", false)
     var playerAutoZoom: Boolean get() = _playerAutoZoom.value; set(v) { _playerAutoZoom.value = v; Prefs.setBool("playerAutoZoom", v) }
-    /** iOS: Settings › Playback › "Track activity" (Stash web `trackActivity`). Off: no play count,
+    /** iOS: Settings › Playback › "Playback activity" (Stash web `trackActivity`). Off: no play count,
      *  history, resume time or play duration goes to the server. */
     private val _tracksPlaybackActivity = bool("playbackTrackActivity", true)
     var tracksPlaybackActivity: Boolean get() = _tracksPlaybackActivity.value; set(v) { _tracksPlaybackActivity.value = v; Prefs.setBool("playbackTrackActivity", v) }

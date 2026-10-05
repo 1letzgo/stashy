@@ -88,7 +88,7 @@ struct PlaybackSettingsSection: View {
 
                 // Stash web "Track activity": play count, history, resume point, watch time.
                 Toggle(isOn: $tabManager.tracksPlaybackActivity) {
-                    Label("Track activity", systemImage: "clock.arrow.circlepath")
+                    Label("Playback activity", systemImage: "clock.arrow.circlepath")
                 }
                 .tint(appearanceManager.tintColor)
                 .stashyGroupedBlockRow(index: 9, count: 10)

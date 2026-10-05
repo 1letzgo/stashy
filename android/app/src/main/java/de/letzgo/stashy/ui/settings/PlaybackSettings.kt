@@ -55,7 +55,7 @@ fun LazyListScope.playbackSections() {
         SettingsPickerRow("Hold to speed up — Feeds", TabManager.holdSpeedOptions, TabManager.holdSpeedFeeds, TabConfigLogic::holdSpeedLabel, SFS.forwardFrameFill) { TabManager.holdSpeedFeeds = it }
         SettingsDivider()
         // Stash web "Track activity": play count, history, resume point, watch time.
-        SettingsToggleRow("Track activity", TabManager.tracksPlaybackActivity, Icons.Outlined.History) { TabManager.tracksPlaybackActivity = it }
+        SettingsToggleRow("Playback activity", TabManager.tracksPlaybackActivity, Icons.Outlined.History) { TabManager.tracksPlaybackActivity = it }
     }
     settingsSection(header = "Downloads", key = "downloads") {
         SettingsPickerRow("Newest batch — Images", TabManager.downloadBatchSizeOptions, TabManager.downloadBatchSize, { "$it" }, SF.photoStack) { TabManager.downloadBatchSize = it }

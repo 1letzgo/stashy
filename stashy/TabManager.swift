@@ -448,7 +448,7 @@ class TabManager: ObservableObject {
             UserDefaults.standard.set(playerAutoZoom, forKey: playerAutoZoomKey)
         }
     }
-    /// Settings › Playback › "Track activity" (Stash web `trackActivity`). Off: no play count,
+    /// Settings › Playback › "Playback activity" (Stash web `trackActivity`). Off: no play count,
     /// play history, resume time or play duration is sent to the server.
     @Published var tracksPlaybackActivity: Bool = true {
         didSet {
