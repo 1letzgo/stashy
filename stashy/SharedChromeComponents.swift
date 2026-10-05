@@ -873,27 +873,12 @@ struct InlineEmptyStateView: View {
 // MARK: - Keyboard dismissal
 
 extension View {
-    /// Adds a "Done" bar above the keyboard.
-    ///
-    /// `numberPad` / `decimalPad` have no Return key, and SwiftUI does not resign the first
-    /// responder when the user taps elsewhere — without this the keyboard simply stays up and
-    /// covers the view. Attach it to the text field itself; the bar is hosted by the field's
-    /// input accessory, so it works inside sheets that have no navigation container.
+    /// Kept for the existing call sites. The Done bar is now provided app-wide by
+    /// `KeyboardDoneAccessory` (UIKit input accessory on every text field / text view):
+    /// SwiftUI's `.toolbar(placement: .keyboard)` showed up only some of the time — inside
+    /// sheets, lists and with several fields on one screen it regularly went missing.
     func numericKeyboardDoneBar() -> some View {
-        toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("Done") {
-                    UIApplication.shared.sendAction(
-                        #selector(UIResponder.resignFirstResponder),
-                        to: nil,
-                        from: nil,
-                        for: nil
-                    )
-                }
-                .fontWeight(.semibold)
-            }
-        }
+        self
     }
 
     /// Closes the keyboard when the user taps anywhere in this subtree. Uses a *simultaneous*
@@ -1024,4 +1009,63 @@ private struct OCounterRemovalMenu: ViewModifier {
             }
     }
 }
+// MARK: - App-wide keyboard Done bar
+
+/// Puts a "Done" bar above the keyboard for every `UITextField` / `UITextView` the moment it
+/// starts editing (SwiftUI `TextField`, `SecureField`, `TextEditor` are backed by these).
+/// Search fields are left alone — they have their own Search key and native look.
+/// Installed once at launch from `AppDelegate`.
+@MainActor
+final class KeyboardDoneAccessory: NSObject {
+    static let shared = KeyboardDoneAccessory()
+    private var installed = false
+
+    func install() {
+        guard !installed else { return }
+        installed = true
+        let center = NotificationCenter.default
+        center.addObserver(self, selector: #selector(didBeginEditing(_:)),
+                           name: UITextField.textDidBeginEditingNotification, object: nil)
+        center.addObserver(self, selector: #selector(didBeginEditing(_:)),
+                           name: UITextView.textDidBeginEditingNotification, object: nil)
+    }
+
+    @objc private func didBeginEditing(_ note: Notification) {
+        if let field = note.object as? UITextField {
+            guard !(field is UISearchTextField), needsBar(field.inputAccessoryView) else { return }
+            field.inputAccessoryView = makeBar()
+            field.reloadInputViews()
+        } else if let textView = note.object as? UITextView {
+            guard textView.isEditable, needsBar(textView.inputAccessoryView) else { return }
+            textView.inputAccessoryView = makeBar()
+            textView.reloadInputViews()
+        }
+    }
+
+    /// SwiftUI gives every text field an accessory host of its own (`InputAccessoryGenerator`,
+    /// zero height unless a `.keyboard` toolbar fills it) — so "is nil" never matched. Replace
+    /// that empty host; leave our own bar and any real accessory with content alone.
+    private func needsBar(_ current: UIView?) -> Bool {
+        guard let current else { return true }
+        if current.tag == Self.barTag { return false }
+        return current.bounds.height < 1 && current.subviews.allSatisfy { $0.bounds.height < 1 }
+    }
+
+    private static let barTag = 0x6B6264 // "kbd"
+
+    /// One bar per field: an input accessory can only live in one view hierarchy at a time.
+    private func makeBar() -> UIToolbar {
+        let bar = UIToolbar(frame: CGRect(x: 0, y: 0, width: 320, height: 44))
+        let done = UIBarButtonItem(title: "Done", style: .done, target: self, action: #selector(done))
+        bar.items = [UIBarButtonItem(systemItem: .flexibleSpace), done]
+        bar.tag = Self.barTag
+        bar.sizeToFit()
+        return bar
+    }
+
+    @objc private func done() {
+        UIApplication.shared.sendAction(#selector(UIResponder.resignFirstResponder), to: nil, from: nil, for: nil)
+    }
+}
+
 #endif

@@ -676,6 +676,9 @@ private struct ScenesViewContent: View {
     private func applyLiveFilterPresetFromSelectionIfNeeded() {
         let newId = liveSheetPresetSelection
         guard !newId.isEmpty else { return }
+        // The sheet calls this on open and again once the saved filters arrive. Reloading then
+        // would overwrite criteria the user already added, so only fill an empty document.
+        guard criteriaDocument.isEmpty else { return }
         if let sid = SceneLivePresetTag.parseServerId(newId), let f = viewModel.savedFilters[sid] {
             applyServerSceneSavedFilter(f)
             return

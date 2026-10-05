@@ -15,6 +15,8 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         _ = AppIconManager.shared
+        // "Done" above every keyboard (SwiftUI's keyboard toolbar was unreliable).
+        KeyboardDoneAccessory.shared.install()
         // Entitlements (lifetime IAP, paid-app grandfathering) must sync at launch,
         // not only when Settings is opened.
         _ = StoreManager.shared

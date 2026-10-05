@@ -477,7 +477,7 @@ class TabManager: ObservableObject {
     @Published var holdSpeedFeeds: Double = 2 {
         didSet { UserDefaults.standard.set(holdSpeedFeeds, forKey: holdSpeedFeedsKey) }
     }
-    static let holdSpeedOptions: [Double] = [1.5, 2, 2.5, 3, 4]
+    static let holdSpeedOptions: [Double] = [1.25, 1.5, 2, 2.5, 3, 4]
 
     /// Settings › Downloads: how many items a "newest" download grabs. Images (a gallery or a
     /// tag) and scenes (a performer / studio / tag / group) have their own size — a scene is a
@@ -491,7 +491,7 @@ class TabManager: ObservableObject {
     static let downloadBatchSizeOptions: [Int] = [5, 10, 25, 50, 100, 200]
 
     static func holdSpeedLabel(_ rate: Double) -> String {
-        rate == rate.rounded() ? "\(Int(rate))×" : String(format: "%.1f×", rate)
+        rate == rate.rounded() ? "\(Int(rate))×" : String(format: "%g×", rate)
     }
 
     static func playCountThresholdLabel(_ seconds: Double) -> String {

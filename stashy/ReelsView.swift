@@ -952,14 +952,14 @@ struct ReelsViewBody: View {
         let sel = reelsActiveSheetPresetIdForRead
         if let sid = SceneLivePresetTag.parseServerId(sel),
            let f = viewModel.savedFilters[sid] {
-            return "„\(f.name)“ in Stash entfernen? Andere Clients verlieren diesen gespeicherten Filter."
+            return "Remove “\(f.name)” from Stash? Other devices will lose this saved filter."
         }
         if let ls = SceneLivePresetTag.parseLocalUUIDString(sel),
            let uuid = UUID(uuidString: ls),
            let p = reelsSceneLivePresets.first(where: { $0.id == uuid }) {
-            return "„\(p.name)“ von diesem Gerät entfernen? Das kann nicht rückgängig gemacht werden."
+            return "Remove “\(p.name)” from this device? This cannot be undone."
         }
-        return "Diesen Filter entfernen? Das kann nicht rückgängig gemacht werden."
+        return "Remove this filter? This cannot be undone."
     }
 
     private func reelsSetPrimarySceneishSavedFilter(_ f: StashDBViewModel.SavedFilter?) {
@@ -2817,30 +2817,30 @@ struct ReelsViewBody: View {
 
     private func applyPremiumClipAlerts<V: View>(_ content: V) -> some View {
         content
-            .alert("Speichern unter", isPresented: $reelsClipImageFilters.showSaveAsCatalogPresetAlert) {
+            .alert("Save as new", isPresented: $reelsClipImageFilters.showSaveAsCatalogPresetAlert) {
                 TextField("Name", text: $reelsClipImageFilters.catalogPresetNameInput)
-                Button("Speichern") {
+                Button("Save") {
                     reelsClipImageFilters.savePresetAs(name: reelsClipImageFilters.catalogPresetNameInput, viewModel: viewModel)
                 }
-                Button("Abbrechen", role: .cancel) {}
+                Button("Cancel", role: .cancel) {}
             } message: {
-                Text("Sortierung, Filter und Live-Kriterien als neuen Stash-Bildfilter speichern.")
+                Text("Saves sort, filters and live criteria as a new image filter on your Stash server.")
             }
-            .alert("Umbenennen", isPresented: $reelsClipImageFilters.showRenameCatalogPresetAlert) {
+            .alert("Rename Filter", isPresented: $reelsClipImageFilters.showRenameCatalogPresetAlert) {
                 TextField("Name", text: $reelsClipImageFilters.renameCatalogPresetInput)
-                Button("Speichern") {
+                Button("Save") {
                     reelsClipImageFilters.renamePreset(to: reelsClipImageFilters.renameCatalogPresetInput, viewModel: viewModel)
                 }
-                Button("Abbrechen", role: .cancel) {}
+                Button("Cancel", role: .cancel) {}
             } message: {
-                Text("Preset oder gespeicherten Filter umbenennen.")
+                Text("Renames the selected Stash saved filter or on-device filter.")
             }
-            .alert("Filter löschen?", isPresented: $reelsClipImageFilters.showDeleteCatalogPresetAlert) {
-                Button("Löschen", role: .destructive) {
+            .alert("Delete Filter", isPresented: $reelsClipImageFilters.showDeleteCatalogPresetAlert) {
+                Button("Delete", role: .destructive) {
                     reelsClipImageFilters.deletePreset(viewModel: viewModel)
                     refetchReelsClipsFromModel(viewModel)
                 }
-                Button("Abbrechen", role: .cancel) {}
+                Button("Cancel", role: .cancel) {}
             } message: {
                 Text(reelsClipImageFilters.deletePresetConfirmationText(viewModel: viewModel))
             }
@@ -2848,25 +2848,25 @@ struct ReelsViewBody: View {
 
     private func applyPremiumSceneAlerts<V: View>(_ content: V) -> some View {
         content
-            .alert("Speichern unter", isPresented: $showReelsSceneSaveAsAlert) {
+            .alert("Save as new", isPresented: $showReelsSceneSaveAsAlert) {
                 TextField("Name", text: $reelsScenePresetNameInput)
-                Button("Speichern") { reelsSaveSceneLivePresetAs(name: reelsScenePresetNameInput) }
-                Button("Abbrechen", role: .cancel) {}
+                Button("Save") { reelsSaveSceneLivePresetAs(name: reelsScenePresetNameInput) }
+                Button("Cancel", role: .cancel) {}
             } message: {
                 Text(reelsMode == .markers
-                     ? "Neuen Marker-Filter auf dem Stash-Server anlegen."
-                     : "Neuen Szenen-Filter auf dem Stash-Server anlegen.")
+                     ? "Creates a new marker filter on your Stash server."
+                     : "Creates a new scene filter on your Stash server.")
             }
-            .alert("Umbenennen", isPresented: $showReelsSceneRenameAlert) {
+            .alert("Rename Filter", isPresented: $showReelsSceneRenameAlert) {
                 TextField("Name", text: $reelsScenePresetNameInput)
-                Button("Speichern") { reelsRenameSceneLivePreset(to: reelsScenePresetNameInput) }
-                Button("Abbrechen", role: .cancel) {}
+                Button("Save") { reelsRenameSceneLivePreset(to: reelsScenePresetNameInput) }
+                Button("Cancel", role: .cancel) {}
             } message: {
-                Text("Preset oder gespeicherten Filter umbenennen.")
+                Text("Renames the selected Stash saved filter or on-device filter.")
             }
-            .alert("Filter löschen?", isPresented: $showReelsSceneDeleteAlert) {
-                Button("Löschen", role: .destructive) { reelsDeleteSceneLivePreset() }
-                Button("Abbrechen", role: .cancel) {}
+            .alert("Delete Filter", isPresented: $showReelsSceneDeleteAlert) {
+                Button("Delete", role: .destructive) { reelsDeleteSceneLivePreset() }
+                Button("Cancel", role: .cancel) {}
             } message: {
                 Text(reelsSceneDeletePresetConfirmationText)
             }
