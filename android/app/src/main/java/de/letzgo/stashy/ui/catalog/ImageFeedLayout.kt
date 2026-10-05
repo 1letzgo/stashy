@@ -71,7 +71,7 @@ import coil3.compose.SubcomposeAsyncImage
 import de.letzgo.stashy.data.FeedsRepository
 import de.letzgo.stashy.data.IdName
 import de.letzgo.stashy.data.ImageFeedPost
-import de.letzgo.stashy.data.ImageSessionPrecision
+import de.letzgo.stashy.data.ImageGroupMode
 import de.letzgo.stashy.data.ImageSetGrouping
 import de.letzgo.stashy.data.Net
 import de.letzgo.stashy.data.Performer
@@ -128,7 +128,7 @@ object ImageFeedAutoplay {
  * iOS: the 1/row layout of `ImagesViewBody` (`oneColumnFeedPosts` + `ImageGroupCatalogCell`), shared
  * by Feeds › Pics and the Images catalog: one post per row, images of one import set grouped
  * into a swipeable post with a thumb strip (Settings › Content › "Group into sets" /
- * "Created within", keys `stashline_group_sets` / `stashline_group_session_precision`), muted
+ * "Session gap", keys `stashline_group_mode` / `stashline_group_gap_minutes`), muted
  * autoplay of the most centred video while the list is idle (`images_feed_video_autoplay`),
  * rating + O-counter on every post, tap opens [ImageViewerScreen] over the posts' flattened
  * order. [onImageUpdated] writes optimistic edits back to the caller's list.
@@ -148,11 +148,10 @@ fun ImageFeedList(
     /** Optional first row (e.g. the catalog's search chip). */
     header: (@Composable () -> Unit)? = null,
 ) {
-    val groupSets = TabManager.stashlineGroupSets
-    val precision = ImageSessionPrecision.from(TabManager.stashlineSessionPrecision)
-    val sessionCache = remember { HashMap<String, String>() }
+    val mode = TabManager.stashlineGroupMode
+    val gap = TabManager.stashlineGroupGapMinutes
     val snapshot = images.toList()
-    val posts = remember(snapshot, sortRaw, groupSets, precision) { buildFeedPosts(snapshot, sortRaw, precision, groupSets, sessionCache) }
+    val posts = remember(snapshot, sortRaw, mode, gap) { buildFeedPosts(snapshot, sortRaw, mode, gap) }
     val flattened = remember(posts) { posts.flatMap { it.images } }
 
     // Visible image per post (iOS `visibleImageId` of each cell, hoisted for the autoplay pick).
@@ -204,11 +203,10 @@ fun ImageFeedList(
 private fun buildFeedPosts(
     images: List<StashImage>,
     sortRaw: String?,
-    precision: ImageSessionPrecision,
-    groupSets: Boolean,
-    sessionCache: MutableMap<String, String>,
+    mode: ImageGroupMode,
+    gapMinutes: Int,
 ): List<ImageFeedPost> {
-    val built = ImageSetGrouping.buildPosts(images, sortRaw, precision, groupSets, sessionCache)
+    val built = ImageSetGrouping.buildPosts(images, sortRaw, mode, gapMinutes)
     val seen = HashSet<String>()
     return built.map { p -> if (seen.add(p.id)) p else p.copy(id = "${p.id}#${p.images.first().id}") }
 }
@@ -232,7 +230,6 @@ private fun openFeedImage(images: List<StashImage>, flattened: List<StashImage>,
  */
 class ImageFeedGridModel {
     val visibleIds = mutableStateMapOf<String, String>()
-    private val sessionCache = HashMap<String, String>()
     private var memoKey: List<Any?>? = null
     private var postsById: Map<String, ImageFeedPost> = emptyMap()
     var posts: List<ImageFeedPost> = emptyList(); private set
@@ -240,16 +237,13 @@ class ImageFeedGridModel {
     private var autoplayState: Pair<LazyGridState, State<String?>>? = null
 
     fun update(images: List<StashImage>, sortRaw: String?) {
-        val groupSets = TabManager.stashlineGroupSets
-        val precision = ImageSessionPrecision.from(TabManager.stashlineSessionPrecision)
+        val mode = TabManager.stashlineGroupMode
+        val gap = TabManager.stashlineGroupGapMinutes
         val snapshot = images.toList()
-        val key = listOf(snapshot, sortRaw, groupSets, precision)
+        val key = listOf(snapshot, sortRaw, mode, gap)
         if (key == memoKey) return
-        // iOS empties the session-key cache when the sort or the grouping switch changes.
-        val old = memoKey
-        if (old != null && (old[1] != sortRaw || old[2] != groupSets)) sessionCache.clear()
         memoKey = key
-        posts = buildFeedPosts(snapshot, sortRaw, precision, groupSets, sessionCache)
+        posts = buildFeedPosts(snapshot, sortRaw, mode, gap)
         postsById = posts.associateBy { it.id }
         flattened = posts.flatMap { it.images }
     }

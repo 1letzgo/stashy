@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.settings
 
+import de.letzgo.stashy.data.ImageGroupMode
+import de.letzgo.stashy.data.ImageSetGrouping
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -284,9 +286,15 @@ private fun FeedsModeCard(mode: ReelsModeConfig, handle: Modifier) {
             }
         }
         if (mode.type == ReelsModeType.Pics) {
-            CardSettingRow("Group into sets") { SettingsSwitch(TabManager.stashlineGroupSets) { TabManager.stashlineGroupSets = it } }
-            if (TabManager.stashlineGroupSets) CardSettingRow("Created within") {
-                MenuValue(listOf("day" to "Same day", "hour" to "Same hour", "minute" to "Same minute"), TabManager.stashlineSessionPrecision) { TabManager.stashlineSessionPrecision = it }
+            CardSettingRow("Group into sets") {
+                MenuValue(ImageGroupMode.entries.map { it.raw to it.displayName }, TabManager.stashlineGroupMode.raw) {
+                    TabManager.stashlineGroupMode = ImageGroupMode.from(it)
+                }
+            }
+            if (TabManager.stashlineGroupMode == ImageGroupMode.GallerySession) CardSettingRow("Session gap") {
+                MenuValue(ImageSetGrouping.gapOptions.map { it.toString() to "$it min" }, TabManager.stashlineGroupGapMinutes.toString()) {
+                    TabManager.stashlineGroupGapMinutes = it.toInt()
+                }
             }
         }
     }

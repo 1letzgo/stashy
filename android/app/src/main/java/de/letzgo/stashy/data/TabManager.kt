@@ -149,11 +149,30 @@ object TabManager {
     // Images / Pics (other @AppStorage keys shown in Settings)
     private val _imagesFeedVideoAutoplay = bool("images_feed_video_autoplay", true)
     var imagesFeedVideoAutoplay: Boolean get() = _imagesFeedVideoAutoplay.value; set(v) { _imagesFeedVideoAutoplay.value = v; Prefs.setBool("images_feed_video_autoplay", v) }
-    private val _stashlineGroupSets = bool("stashline_group_sets", true)
-    var stashlineGroupSets: Boolean get() = _stashlineGroupSets.value; set(v) { _stashlineGroupSets.value = v; Prefs.setBool("stashline_group_sets", v) }
-    /** iOS `StashImageSessionPrecision` raw: day / hour / minute. */
-    private val _stashlineSessionPrecision = mutableStateOf(Prefs.string("stashline_group_session_precision") ?: "hour")
-    var stashlineSessionPrecision: String get() = _stashlineSessionPrecision.value; set(v) { _stashlineSessionPrecision.value = v; Prefs.setString("stashline_group_session_precision", v) }
+    /**
+     * iOS `StashImageGroupingPrefs`: `stashline_group_mode` (off / gallery / gallerySession). First
+     * read migrates the old switch `stashline_group_sets` (false → off, else gallery + session);
+     * every write keeps that old key in sync (true unless off) for older readers.
+     */
+    private val _stashlineGroupMode = mutableStateOf(
+        if (Prefs.has(ImageSetGrouping.MODE_KEY)) ImageGroupMode.from(Prefs.string(ImageSetGrouping.MODE_KEY))
+        else ImageSetGrouping.migratedMode(if (Prefs.has(ImageSetGrouping.LEGACY_SETS_KEY)) Prefs.bool(ImageSetGrouping.LEGACY_SETS_KEY) else null)
+            .also { Prefs.setString(ImageSetGrouping.MODE_KEY, it.raw) }
+    )
+    var stashlineGroupMode: ImageGroupMode
+        get() = _stashlineGroupMode.value
+        set(v) {
+            _stashlineGroupMode.value = v
+            Prefs.setString(ImageSetGrouping.MODE_KEY, v.raw)
+            Prefs.setBool(ImageSetGrouping.LEGACY_SETS_KEY, v != ImageGroupMode.Off)
+        }
+    /** Session gap in minutes (2 / 10 / 60) for [ImageGroupMode.GallerySession]. */
+    private val _stashlineGroupGapMinutes = mutableStateOf(
+        ImageSetGrouping.normalizedGap(if (Prefs.has(ImageSetGrouping.GAP_KEY)) Prefs.int(ImageSetGrouping.GAP_KEY) else null)
+    )
+    var stashlineGroupGapMinutes: Int
+        get() = _stashlineGroupGapMinutes.value
+        set(v) { val g = ImageSetGrouping.normalizedGap(v); _stashlineGroupGapMinutes.value = g; Prefs.setInt(ImageSetGrouping.GAP_KEY, g) }
 
     // MARK: loading
 
