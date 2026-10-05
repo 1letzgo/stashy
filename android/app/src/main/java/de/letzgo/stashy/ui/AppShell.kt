@@ -23,7 +23,22 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.outlined.Home
+import androidx.compose.material.icons.filled.VideoLibrary
+import androidx.compose.material.icons.outlined.VideoLibrary
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.outlined.Settings
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.outlined.Search
+import androidx.compose.material.icons.filled.Inventory2
+import androidx.compose.material.icons.outlined.Inventory2
+import androidx.compose.material.icons.filled.AutoAwesome
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -44,7 +59,7 @@ import de.letzgo.stashy.ui.setup.ServerSetupScreen
 import de.letzgo.stashy.ui.tools.ToolsTabScreen
 
 /** Height the floating tab bar occupies; screens add it as bottom content padding. */
-val TabBarClearance: Dp = 96.dp
+val TabBarClearance: Dp = 104.dp
 
 /** True while the floating tab bar is shown, so lists can pad for it. */
 val LocalTabBarVisible = compositionLocalOf { true }
@@ -116,53 +131,50 @@ private fun TabRoot(tab: MainTab) {
     }
 }
 
-private data class TabItem(val tab: MainTab, val title: String, val icon: ImageVector)
+private data class TabItem(val tab: MainTab, val title: String, val icon: ImageVector, val selectedIcon: ImageVector = icon)
 
+/**
+ * Native Material 3 navigation bar (Android look). Same destinations as the iOS tab bar,
+ * with Search as fifth destination instead of the separate search circle.
+ */
 @Composable
 private fun FloatingTabBar() {
+    val p = Theme.palette
     val items = listOf(
-        TabItem(MainTab.Home, "Home", SF.squareGrid2x2Fill),
-        TabItem(MainTab.Feeds, "Feeds", SF.playRectangleOnRectangle),
+        // Material convention: outlined when inactive, filled when selected.
+        TabItem(MainTab.Home, "Home", androidx.compose.material.icons.Icons.Outlined.Home, androidx.compose.material.icons.Icons.Filled.Home),
+        TabItem(MainTab.Feeds, "Feeds", androidx.compose.material.icons.Icons.Outlined.VideoLibrary, androidx.compose.material.icons.Icons.Filled.VideoLibrary),
         ToolsTab.item(),
-        TabItem(MainTab.Settings, "Settings", SF.gear),
+        TabItem(MainTab.Settings, "Settings", androidx.compose.material.icons.Icons.Outlined.Settings, androidx.compose.material.icons.Icons.Filled.Settings),
+        TabItem(MainTab.Search, "Search", androidx.compose.material.icons.Icons.Outlined.Search, androidx.compose.material.icons.Icons.Filled.Search),
     )
-    Row(
-        Modifier.navigationBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+    NavigationBar(
+        containerColor = p.secondaryBackground,
+        contentColor = p.text,
+        tonalElevation = 0.dp,
     ) {
-        Row(
-            Modifier.weight(1f).height(64.dp).floatingShadow(RoundedCornerShape(50)).stashyGlass(RoundedCornerShape(50)).padding(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            items.forEach { item ->
-                val selected = Nav.tab == item.tab
-                Column(
-                    Modifier
-                        .weight(1f)
-                        .fillMaxHeight()
-                        .let { if (selected) it.background(Color.White.copy(alpha = 0.16f), RoundedCornerShape(50)) else it }
-                        .clickable { Nav.select(item.tab) },
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center,
-                ) {
-                    val color = if (selected) Color.White else Color.White.copy(alpha = 0.85f)
-                    Icon(item.icon, item.title, tint = color, modifier = Modifier.size(26.dp))
-                    Text(item.title, style = IosTypography.caption2, color = color)
-                }
-            }
+        items.forEach { item ->
+            val selected = Nav.tab == item.tab
+            NavigationBarItem(
+                selected = selected,
+                onClick = { Nav.select(item.tab) },
+                icon = { Icon(if (selected) item.selectedIcon else item.icon, contentDescription = item.title) },
+                label = { Text(item.title, style = androidx.compose.material3.MaterialTheme.typography.labelMedium) },
+                colors = NavigationBarItemDefaults.colors(
+                    selectedIconColor = p.text,
+                    selectedTextColor = p.text,
+                    indicatorColor = p.text.copy(alpha = 0.14f),
+                    unselectedIconColor = p.secondaryText,
+                    unselectedTextColor = p.secondaryText,
+                ),
+            )
         }
-        val searchSelected = Nav.tab == MainTab.Search
-        GlassIconButton(
-            SF.magnifyingglass, "Search", size = 64.dp,
-            tint = if (searchSelected) Color.White.copy(alpha = 0.22f) else null,
-        ) { Nav.select(MainTab.Search) }
     }
 }
 
 /** The Tools slot shows "stashy+" while locked (iOS `TabManager.visibleTabs`). */
 private object ToolsTab {
     fun item(): TabItem =
-        if (de.letzgo.stashy.data.StashyPlus.isUnlocked) TabItem(MainTab.Tools, "Tools", SF.cubeBox)
-        else TabItem(MainTab.Tools, "stashy+", SF.sparkles)
+        if (de.letzgo.stashy.data.StashyPlus.isUnlocked) TabItem(MainTab.Tools, "Tools", androidx.compose.material.icons.Icons.Outlined.Inventory2, androidx.compose.material.icons.Icons.Filled.Inventory2)
+        else TabItem(MainTab.Tools, "stashy+", androidx.compose.material.icons.Icons.Outlined.AutoAwesome, androidx.compose.material.icons.Icons.Filled.AutoAwesome)
 }
