@@ -13,7 +13,40 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.Visibility
+import androidx.compose.material.icons.filled.VisibilityOff
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.RadioButton
+import androidx.compose.material3.RadioButtonDefaults
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.Typography
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -289,4 +322,430 @@ fun NativeTopBar(
             actionIconContentColor = content,
         ),
     )
+}
+
+// MARK: - Native Material 3 building blocks (settings-style lists, menus, dialogs)
+//
+// Shared by Settings, Server setup, stashy+ and the tools' settings pages; reusable by every
+// screen that moves to the native Android look. Colours come from `Theme.palette` and
+// `Appearance.tint` ([nativeAccent]); type sizes from the Material 3 baseline scale
+// ([NativeType]) — the app's own `MaterialTheme` typography maps the iOS Dynamic Type sizes.
+
+/** Material 3 baseline type scale (bodyLarge 16 sp, bodyMedium 14 sp, titleSmall 14 sp medium …). */
+val NativeType: Typography = Typography()
+
+/** Shape of grouped Material surfaces (settings groups, cards). */
+val NativeGroupShape: Shape = RoundedCornerShape(16.dp)
+
+/** Accent for native controls: the user's tint; the iOS default gray falls back to the text colour. */
+@Composable
+fun nativeAccent(): Color = Appearance.tint.takeIf { it != StashyColors.defaultTint } ?: Theme.palette.text
+
+/** Readable content colour on an [accent] fill (white on dark fills, dark on light ones). */
+@Composable
+fun onNativeAccent(accent: Color = nativeAccent()): Color {
+    if (accent.luminance() <= 0.5f) return Color.White
+    val bg = Theme.palette.background
+    return if (bg.luminance() < 0.3f) bg else Color.Black
+}
+
+/** Material section header above a settings group: titleSmall in the accent colour (not uppercase). */
+@Composable
+fun NativeSectionHeader(title: String, modifier: Modifier = Modifier, badge: (@Composable () -> Unit)? = null) {
+    Row(
+        modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        Text(title, style = NativeType.titleSmall, color = nativeAccent())
+        badge?.invoke()
+    }
+}
+
+/** Supporting text under a settings group (bodySmall, secondary). */
+@Composable
+fun NativeSectionFooter(text: String, modifier: Modifier = Modifier) {
+    Text(
+        text, style = NativeType.bodySmall, color = Theme.palette.secondaryText,
+        modifier = modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, top = 8.dp),
+    )
+}
+
+/** Grouped Material surface (16 dp corners, secondary background). */
+@Composable
+fun NativeGroup(modifier: Modifier = Modifier, content: @Composable ColumnScope.() -> Unit) {
+    Column(modifier.fillMaxWidth().clip(NativeGroupShape).background(Theme.palette.secondaryBackground), content = content)
+}
+
+/** Divider between rows of a [NativeGroup]. */
+@Composable
+fun NativeDivider(startInset: Dp = 16.dp) =
+    HorizontalDivider(Modifier.padding(start = startInset), thickness = 1.dp, color = Theme.palette.separator.copy(alpha = 0.5f))
+
+/**
+ * Material list item (like `ListItem`, sized for settings): optional leading icon (24 dp),
+ * headline (bodyLarge), supporting text (bodyMedium), trailing content. 56 dp high, 72 dp with
+ * supporting text. Whole row clickable when [onClick] is set.
+ */
+@Composable
+fun NativeListItem(
+    headline: String,
+    modifier: Modifier = Modifier,
+    supporting: String? = null,
+    icon: ImageVector? = null,
+    iconTint: Color = Appearance.tint,
+    headlineColor: Color = Theme.palette.text,
+    enabled: Boolean = true,
+    onClick: (() -> Unit)? = null,
+    leading: (@Composable () -> Unit)? = null,
+    trailing: (@Composable RowScope.() -> Unit)? = null,
+) {
+    val p = Theme.palette
+    val alpha = if (enabled) 1f else 0.38f
+    Row(
+        modifier.fillMaxWidth()
+            .heightIn(min = if (supporting != null) 72.dp else 56.dp)
+            .let { if (onClick != null) it.clickable(enabled = enabled, onClick = onClick) else it }
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(16.dp),
+    ) {
+        when {
+            leading != null -> leading()
+            icon != null -> Icon(icon, null, tint = iconTint.copy(alpha = iconTint.alpha * alpha), modifier = Modifier.size(24.dp))
+        }
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(headline, style = NativeType.bodyLarge, color = headlineColor.copy(alpha = headlineColor.alpha * alpha), maxLines = 2, overflow = TextOverflow.Ellipsis)
+            if (supporting != null) Text(supporting, style = NativeType.bodyMedium, color = p.secondaryText.copy(alpha = p.secondaryText.alpha * alpha), maxLines = 3, overflow = TextOverflow.Ellipsis)
+        }
+        if (trailing != null) Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp), content = trailing)
+    }
+}
+
+/** Material 3 switch in the app colours. */
+@Composable
+fun NativeSwitch(checked: Boolean, onCheckedChange: ((Boolean) -> Unit)?, enabled: Boolean = true) {
+    val p = Theme.palette
+    val accent = nativeAccent()
+    val onAccent = onNativeAccent(accent)
+    Switch(
+        checked, onCheckedChange, enabled = enabled,
+        colors = SwitchDefaults.colors(
+            checkedTrackColor = accent, checkedThumbColor = onAccent, checkedBorderColor = accent,
+            uncheckedTrackColor = p.background, uncheckedThumbColor = p.secondaryText, uncheckedBorderColor = p.secondaryText,
+            disabledCheckedTrackColor = accent.copy(alpha = 0.38f), disabledCheckedThumbColor = onAccent.copy(alpha = 0.6f),
+            disabledCheckedBorderColor = Color.Transparent,
+            disabledUncheckedTrackColor = p.background.copy(alpha = 0.5f), disabledUncheckedThumbColor = p.secondaryText.copy(alpha = 0.38f),
+            disabledUncheckedBorderColor = p.secondaryText.copy(alpha = 0.2f),
+        ),
+    )
+}
+
+/** List item with a trailing [NativeSwitch]; tapping the row toggles. */
+@Composable
+fun NativeSwitchItem(
+    headline: String,
+    checked: Boolean,
+    modifier: Modifier = Modifier,
+    supporting: String? = null,
+    icon: ImageVector? = null,
+    enabled: Boolean = true,
+    onCheckedChange: (Boolean) -> Unit,
+) = NativeListItem(
+    headline, modifier, supporting = supporting, icon = icon, enabled = enabled,
+    onClick = { onCheckedChange(!checked) },
+    trailing = { NativeSwitch(checked, onCheckedChange, enabled) },
+)
+
+/** Lists longer than this open a [NativeSelectionDialog] instead of an anchored dropdown. */
+const val NativeMenuMaxItems = 8
+
+/** Material radio button in the accent colour. */
+@Composable
+fun NativeRadio(selected: Boolean, onClick: (() -> Unit)? = null) {
+    RadioButton(
+        selected, onClick,
+        colors = RadioButtonDefaults.colors(selectedColor = nativeAccent(), unselectedColor = Theme.palette.secondaryText),
+    )
+}
+
+/** Anchored Material dropdown with radio-style items (put it in a `Box` with its anchor). */
+@Composable
+fun <T> NativeOptionsMenu(expanded: Boolean, onDismiss: () -> Unit, options: List<T>, selected: T?, label: (T) -> String, onSelect: (T) -> Unit) {
+    DropdownMenu(expanded, onDismiss, containerColor = Theme.palette.secondaryBackground, shape = RoundedCornerShape(12.dp)) {
+        options.forEach { o ->
+            DropdownMenuItem(
+                text = { Text(label(o), style = NativeType.bodyLarge, color = Theme.palette.text) },
+                leadingIcon = { NativeRadio(o == selected) },
+                onClick = { onSelect(o); onDismiss() },
+            )
+        }
+    }
+}
+
+/** Material single-choice dialog (radio list) for long option lists, e.g. languages. Picking closes it. */
+@Composable
+fun <T> NativeSelectionDialog(title: String?, options: List<T>, selected: T?, label: (T) -> String, onDismiss: () -> Unit, onSelect: (T) -> Unit) {
+    val p = Theme.palette
+    val listState = rememberLazyListState(initialFirstVisibleItemIndex = (options.indexOf(selected) - 3).coerceAtLeast(0))
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.text,
+        title = title?.let { { Text(it, style = NativeType.headlineSmall) } },
+        text = {
+            LazyColumn(Modifier.heightIn(max = 440.dp), state = listState) {
+                items(options.size) { i ->
+                    val o = options[i]
+                    Row(
+                        Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp)).clickable { onSelect(o); onDismiss() },
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        NativeRadio(o == selected)
+                        Spacer(Modifier.width(8.dp))
+                        Text(label(o), style = NativeType.bodyLarge, color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis)
+                    }
+                }
+            }
+        },
+        confirmButton = {},
+        dismissButton = { TextButton(onDismiss) { Text("Cancel", color = nativeAccent(), style = NativeType.labelLarge) } },
+    )
+}
+
+/** Trailing value of a select row: current value + Material dropdown arrow (replaces iOS ⌃⌄). */
+@Composable
+fun NativeValueLabel(text: String, enabled: Boolean = true) {
+    val c = Theme.palette.secondaryText.let { if (enabled) it else it.copy(alpha = it.alpha * 0.38f) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(text, style = NativeType.bodyMedium, color = c, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.widthIn(max = 180.dp))
+        Icon(Icons.Filled.ArrowDropDown, null, tint = c, modifier = Modifier.size(24.dp))
+    }
+}
+
+/**
+ * Value label + its picker: an anchored radio dropdown for short lists, a [NativeSelectionDialog]
+ * for lists longer than [NativeMenuMaxItems]. [open] is owned by the caller (row or label click).
+ */
+@Composable
+fun <T> NativeValuePicker(
+    open: Boolean,
+    onOpenChange: (Boolean) -> Unit,
+    title: String?,
+    options: List<T>,
+    selected: T?,
+    label: (T) -> String,
+    valueText: String = selected?.let(label) ?: "None",
+    enabled: Boolean = true,
+    onSelect: (T) -> Unit,
+) {
+    Box {
+        NativeValueLabel(valueText, enabled)
+        if (options.size <= NativeMenuMaxItems) NativeOptionsMenu(open, { onOpenChange(false) }, options, selected, label, onSelect)
+    }
+    if (open && options.size > NativeMenuMaxItems) NativeSelectionDialog(title, options, selected, label, { onOpenChange(false) }, onSelect)
+}
+
+/** Settings row with a value picker (iOS menu `Picker`): headline left, value + ▾ right. */
+@Composable
+fun <T> NativeSelectRow(
+    headline: String,
+    options: List<T>,
+    selected: T,
+    label: (T) -> String,
+    modifier: Modifier = Modifier,
+    icon: ImageVector? = null,
+    supporting: String? = null,
+    enabled: Boolean = true,
+    onSelect: (T) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    NativeListItem(
+        headline, modifier, supporting = supporting, icon = icon, enabled = enabled, onClick = { open = true },
+        trailing = { NativeValuePicker(open, { open = it }, headline, options, selected, label, enabled = enabled, onSelect = onSelect) },
+    )
+}
+
+/** Standalone trailing dropdown (value + ▾) that opens its own menu/dialog on tap. */
+@Composable
+fun <T> NativeDropdownValue(
+    options: List<T>,
+    selected: T?,
+    label: (T) -> String,
+    modifier: Modifier = Modifier,
+    title: String? = null,
+    placeholder: String = "None",
+    enabled: Boolean = true,
+    onSelect: (T) -> Unit,
+) {
+    var open by remember { mutableStateOf(false) }
+    Box(modifier.clip(RoundedCornerShape(8.dp)).clickable(enabled = enabled) { open = true }.padding(start = 8.dp, top = 4.dp, bottom = 4.dp)) {
+        NativeValuePicker(open, { open = it }, title, options, selected, label, valueText = selected?.let(label) ?: placeholder, enabled = enabled, onSelect = onSelect)
+    }
+}
+
+/**
+ * Material 3 alert / confirmation: title, text, TextButton confirm (error colour when
+ * [destructive]) and optional dismiss. [onConfirm] does not dismiss by itself.
+ */
+@Composable
+fun NativeConfirmDialog(
+    title: String,
+    text: String?,
+    onDismiss: () -> Unit,
+    confirmLabel: String = "OK",
+    destructive: Boolean = false,
+    dismissLabel: String? = "Cancel",
+    icon: ImageVector? = null,
+    onConfirm: () -> Unit = onDismiss,
+) {
+    val p = Theme.palette
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.secondaryText,
+        iconContentColor = if (destructive) StashyColors.systemRed else nativeAccent(),
+        icon = icon?.let { { Icon(it, null) } },
+        title = { Text(title, style = NativeType.headlineSmall) },
+        text = text?.let { { Text(it, style = NativeType.bodyMedium) } },
+        confirmButton = {
+            TextButton(onConfirm) {
+                Text(confirmLabel, style = NativeType.labelLarge, color = if (destructive) StashyColors.systemRed else nativeAccent())
+            }
+        },
+        dismissButton = dismissLabel?.let { { TextButton(onDismiss) { Text(it, style = NativeType.labelLarge, color = nativeAccent()) } } },
+    )
+}
+
+/** Material outlined text field in the app colours (secret fields get a show/hide toggle). */
+@Composable
+fun NativeTextField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    label: String?,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    secret: Boolean = false,
+    keyboard: KeyboardType = KeyboardType.Text,
+    monospaced: Boolean = false,
+    supportingText: String? = null,
+    isError: Boolean = false,
+    leadingIcon: ImageVector? = null,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    val p = Theme.palette
+    val accent = nativeAccent()
+    var revealed by remember { mutableStateOf(false) }
+    OutlinedTextField(
+        value, onValueChange, modifier.fillMaxWidth(),
+        singleLine = true,
+        textStyle = NativeType.bodyLarge.copy(fontFamily = if (monospaced) FontFamily.Monospace else null),
+        label = label?.let { { Text(it) } },
+        placeholder = placeholder?.let { { Text(it, maxLines = 1, overflow = TextOverflow.Ellipsis) } },
+        leadingIcon = leadingIcon?.let { { Icon(it, null) } },
+        trailingIcon = when {
+            trailing != null -> trailing
+            secret -> {
+                {
+                    IconButton({ revealed = !revealed }) {
+                        Icon(if (revealed) Icons.Filled.VisibilityOff else Icons.Filled.Visibility, if (revealed) "Hide" else "Show")
+                    }
+                }
+            }
+            else -> null
+        },
+        supportingText = supportingText?.let { { Text(it) } },
+        isError = isError,
+        visualTransformation = if (secret && !revealed) PasswordVisualTransformation() else VisualTransformation.None,
+        keyboardOptions = KeyboardOptions(keyboardType = if (secret) KeyboardType.Password else keyboard, autoCorrectEnabled = false),
+        shape = RoundedCornerShape(12.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedTextColor = p.text, unfocusedTextColor = p.text,
+            focusedBorderColor = accent, unfocusedBorderColor = p.secondaryText.copy(alpha = 0.5f),
+            focusedLabelColor = accent, unfocusedLabelColor = p.secondaryText,
+            cursorColor = accent, focusedPlaceholderColor = p.tertiaryText, unfocusedPlaceholderColor = p.tertiaryText,
+            focusedLeadingIconColor = p.secondaryText, unfocusedLeadingIconColor = p.secondaryText,
+            focusedTrailingIconColor = p.secondaryText, unfocusedTrailingIconColor = p.secondaryText,
+            focusedSupportingTextColor = p.secondaryText, unfocusedSupportingTextColor = p.secondaryText,
+            focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
+        ),
+    )
+}
+
+/** Material text-input dialog (AlertDialog + [NativeTextField]). */
+@Composable
+fun NativeTextInputDialog(
+    title: String,
+    initial: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit,
+    label: String? = null,
+    message: String? = null,
+    confirmLabel: String = "Save",
+    secret: Boolean = false,
+) {
+    val p = Theme.palette
+    var text by remember { mutableStateOf(initial) }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = p.secondaryBackground, titleContentColor = p.text, textContentColor = p.secondaryText,
+        title = { Text(title, style = NativeType.headlineSmall) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                if (message != null) Text(message, style = NativeType.bodyMedium)
+                NativeTextField(text, { text = it }, label, secret = secret)
+            }
+        },
+        confirmButton = { TextButton({ onConfirm(text) }) { Text(confirmLabel, style = NativeType.labelLarge, color = nativeAccent()) } },
+        dismissButton = { TextButton(onDismiss) { Text("Cancel", style = NativeType.labelLarge, color = nativeAccent()) } },
+    )
+}
+
+/** Material filled button in the accent colour, optional spinner / leading / trailing icon. */
+@Composable
+fun NativeButton(
+    text: String,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    busy: Boolean = false,
+    leading: ImageVector? = null,
+    trailing: ImageVector? = null,
+    onClick: () -> Unit,
+) {
+    val accent = nativeAccent()
+    val p = Theme.palette
+    Button(
+        onClick, modifier.heightIn(min = 48.dp), enabled = enabled && !busy,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = accent, contentColor = onNativeAccent(accent),
+            disabledContainerColor = p.text.copy(alpha = 0.12f), disabledContentColor = p.text.copy(alpha = 0.38f),
+        ),
+    ) {
+        if (busy) { CircularProgressIndicator(Modifier.size(18.dp), color = p.text.copy(alpha = 0.6f), strokeWidth = 2.dp); Spacer(Modifier.width(8.dp)) }
+        if (leading != null) { Icon(leading, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)) }
+        Text(text, style = NativeType.labelLarge)
+        if (trailing != null) { Spacer(Modifier.width(8.dp)); Icon(trailing, null, Modifier.size(18.dp)) }
+    }
+}
+
+/** Material filled tonal button (secondary actions). */
+@Composable
+fun NativeTonalButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, leading: ImageVector? = null, onClick: () -> Unit) {
+    val p = Theme.palette
+    FilledTonalButton(
+        onClick, modifier.heightIn(min = 48.dp), enabled = enabled,
+        colors = ButtonDefaults.filledTonalButtonColors(
+            containerColor = nativeAccent().copy(alpha = 0.16f), contentColor = p.text,
+            disabledContainerColor = p.text.copy(alpha = 0.12f), disabledContentColor = p.text.copy(alpha = 0.38f),
+        ),
+    ) {
+        if (leading != null) { Icon(leading, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)) }
+        Text(text, style = NativeType.labelLarge)
+    }
+}
+
+/** Material text button in the accent colour (top-bar "Save", inline "Retry" …). */
+@Composable
+fun NativeTextButton(text: String, modifier: Modifier = Modifier, enabled: Boolean = true, color: Color = nativeAccent(), onClick: () -> Unit) {
+    TextButton(onClick, modifier, enabled = enabled) {
+        Text(text, style = NativeType.labelLarge, color = if (enabled) color else Theme.palette.text.copy(alpha = 0.38f))
+    }
 }

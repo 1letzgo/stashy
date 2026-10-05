@@ -48,10 +48,18 @@ import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.ServerConnection
 import de.letzgo.stashy.data.ServerProtocol
 import de.letzgo.stashy.ui.Appearance
-import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.SFS
 import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.ui.NativeGroupShape
+import de.letzgo.stashy.ui.NativeTextField
+import de.letzgo.stashy.ui.NativeTonalButton
+import de.letzgo.stashy.ui.NativeTopBar
+import de.letzgo.stashy.ui.StashyColors
+import de.letzgo.stashy.ui.nativeAccent
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.settings.HeaderDraft
 import de.letzgo.stashy.ui.settings.PlainTextField
@@ -124,12 +132,15 @@ fun ServerSetupScreen(existing: ServerConfig? = null, onDone: () -> Unit) {
     }
     val canProceed = when (step) { 1 -> address.isNotEmpty() && serverName.isNotEmpty(); else -> test == TestState.Success }
 
-    Column(Modifier.fillMaxSize().background(p.background).statusBarsPadding().navigationBarsPadding().imePadding()) {
-        Text("Server Setup", style = IosTypography.headline, color = p.text, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 16.dp))
-        // Progress bar
-        Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(top = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            repeat(2) { i -> Box(Modifier.weight(1f).height(4.dp).background(if (i + 1 <= step) Appearance.tint else Color.Gray.copy(alpha = 0.3f), RoundedCornerShape(2.dp))) }
-        }
+    Column(Modifier.fillMaxSize().background(p.background).navigationBarsPadding().imePadding()) {
+        // Material top app bar; on step 2 its back arrow returns to the details.
+        NativeTopBar("Server Setup", onBack = if (step > 1) ({ step--; test = TestState.NotTested }) else null)
+        // Step progress (Material linear indicator).
+        LinearProgressIndicator(
+            progress = { step / 2f },
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(top = 4.dp),
+            color = nativeAccent(), trackColor = p.separator,
+        )
         AnimatedContent(step, Modifier.weight(1f), transitionSpec = {
             if (targetState > initialState) slideInHorizontally { it } togetherWith slideOutHorizontally { -it }
             else slideInHorizontally { -it } togetherWith slideOutHorizontally { it }
@@ -137,41 +148,40 @@ fun ServerSetupScreen(existing: ServerConfig? = null, onDone: () -> Unit) {
             if (s == 1) Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(horizontal = 24.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 Column(Modifier.fillMaxWidth().padding(top = 32.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Icon(SFS.serverRack, null, tint = Appearance.tint, modifier = Modifier.size(50.dp))
-                    Text("Server Details", style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text)
-                    Text("Enter your Stash server information", style = IosTypography.body, color = p.secondaryText, textAlign = TextAlign.Center)
+                    Text("Server Details", style = NativeType.headlineSmall.copy(fontWeight = FontWeight.Bold), color = p.text)
+                    Text("Enter your Stash server information", style = NativeType.bodyLarge, color = p.secondaryText, textAlign = TextAlign.Center)
                 }
                 Spacer(Modifier.height(8.dp))
-                Labeled("Server Name") { FieldBox { PlainTextField(serverName, { serverName = it }, "My Stash") } }
-                Labeled("Protocol") { FieldBox { Segmented(ServerProtocol.entries, proto, { it.name }) { proto = it } } }
-                Labeled("Server Address") {
-                    FieldBox {
-                        PlainTextField(address, { v ->
-                            val (detected, rest) = ServerAddress.detectProtocol(v)
-                            if (detected != null) { proto = detected; address = if (rest.isNotEmpty()) rest else v } else address = v
-                        }, "192.168.1.100:9999 or stash.example.com/stash", keyboard = KeyboardType.Uri)
-                    }
-                    Text("Enter address (e.g. timeout.com:9999 or example.com/stash)", style = IosTypography.caption2, color = p.secondaryText.copy(alpha = 0.8f))
-                }
+                PlainTextField(serverName, { serverName = it }, "My Stash", label = "Server Name")
+                Labeled("Protocol") { Segmented(ServerProtocol.entries, proto, { it.name }) { proto = it } }
+                NativeTextField(
+                    address, { v ->
+                        val (detected, rest) = ServerAddress.detectProtocol(v)
+                        if (detected != null) { proto = detected; address = if (rest.isNotEmpty()) rest else v } else address = v
+                    }, "Server Address",
+                    placeholder = "192.168.1.100:9999 or stash.example.com/stash", keyboard = KeyboardType.Uri,
+                    supportingText = "Enter address (e.g. timeout.com:9999 or example.com/stash)",
+                )
                 // Authentication card
-                Column(Modifier.fillMaxWidth().background(p.secondaryBackground, RoundedCornerShape(Tokens.Radius.card)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                Column(Modifier.fillMaxWidth().background(p.secondaryBackground, NativeGroupShape).padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                     Labeled("Authentication") { Segmented(AuthMethod.entries, auth, { it.title }) { auth = it } }
                     when (auth) {
                         AuthMethod.Login -> Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            InnerField { PlainTextField(username, { username = it }, "Username") }
-                            InnerField { PlainTextField(password, { password = it }, "Password", secret = true) }
+                            PlainTextField(username, { username = it }, "Username")
+                            PlainTextField(password, { password = it }, "Password", secret = true)
                             PrimaryButton("Fetch API Key", enabled = username.isNotEmpty() && password.isNotEmpty() && !fetchingKey, busy = fetchingKey) { fetchKey() }
-                            loginError?.let { Text(it, style = IosTypography.caption, color = Color(0xFFFF453A)) }
+                            loginError?.let { Text(it, style = NativeType.bodySmall, color = Color(0xFFFF453A)) }
                         }
-                        AuthMethod.ApiKey -> Labeled("API Key") { InnerField { PlainTextField(apiKey, { apiKey = it }, "Enter API Key", secret = true) } }
+                        AuthMethod.ApiKey -> PlainTextField(apiKey, { apiKey = it }, "Enter API Key", secret = true, label = "API Key")
                         AuthMethod.None -> {}
                     }
                 }
                 // Custom headers card (collapsed by default)
-                Column(Modifier.fillMaxWidth().background(p.secondaryBackground, RoundedCornerShape(Tokens.Radius.card)).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                Column(Modifier.fillMaxWidth().background(p.secondaryBackground, NativeGroupShape).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     Row(Modifier.fillMaxWidth().clickable { showsHeaders = !showsHeaders }, verticalAlignment = Alignment.CenterVertically) {
-                        Text("Custom Headers", style = IosTypography.caption, color = p.secondaryText)
+                        Text("Custom Headers", style = NativeType.titleSmall, color = p.text)
                         val n = usableHeaders().size
-                        if (n > 0) Text("  $n", style = IosTypography.caption2.copy(fontWeight = FontWeight.SemiBold), color = p.secondaryText)
+                        if (n > 0) Text("  $n", style = NativeType.labelSmall.copy(fontWeight = FontWeight.SemiBold), color = p.secondaryText)
                         Spacer(Modifier.weight(1f))
                         Icon(if (showsHeaders) SFS.chevronUp else SFS.chevronDown, null, tint = p.secondaryText, modifier = Modifier.size(18.dp))
                     }
@@ -179,18 +189,15 @@ fun ServerSetupScreen(existing: ServerConfig? = null, onDone: () -> Unit) {
                         headers.forEachIndexed { i, h ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                    InnerField { PlainTextField(h.name, { headers[i] = h.copy(name = it) }, "Header name", monospaced = true) }
-                                    InnerField { PlainTextField(h.value, { headers[i] = h.copy(value = it) }, "Value", secret = true) }
-                                    headerProblem(h)?.let { Text(it, style = IosTypography.caption, color = Color(0xFFFF9F0A)) }
+                                    PlainTextField(h.name, { headers[i] = h.copy(name = it) }, "Header name", monospaced = true)
+                                    PlainTextField(h.value, { headers[i] = h.copy(value = it) }, "Value", secret = true)
+                                    headerProblem(h)?.let { Text(it, style = NativeType.bodySmall, color = Color(0xFFFF9F0A)) }
                                 }
-                                Icon(SFS.minusCircleFill, "Remove header", tint = Color(0xFFFF453A), modifier = Modifier.padding(start = 8.dp).size(22.dp).clickable { headers.removeAt(i) })
+                                IconButton({ headers.removeAt(i) }) { Icon(SFS.minusCircleFill, "Remove header", tint = StashyColors.systemRed) }
                             }
                         }
-                        Row(Modifier.clickable { headers.add(HeaderDraft()) }, verticalAlignment = Alignment.CenterVertically) {
-                            Icon(SFS.plusCircleFill, null, tint = Appearance.tint, modifier = Modifier.size(20.dp))
-                            Text("  Add Header", style = IosTypography.body, color = Appearance.tint)
-                        }
-                        Text("Sent with every request to this server, e.g. for SSO or a reverse proxy that needs its own token.", style = IosTypography.caption2, color = p.secondaryText)
+                        NativeTonalButton("Add Header", leading = SFS.plusCircleFill) { headers.add(HeaderDraft()) }
+                        Text("Sent with every request to this server, e.g. for SSO or a reverse proxy that needs its own token.", style = NativeType.labelSmall, color = p.secondaryText)
                     }
                 }
                 Spacer(Modifier.height(32.dp))
@@ -201,22 +208,19 @@ fun ServerSetupScreen(existing: ServerConfig? = null, onDone: () -> Unit) {
                         TestState.NotTested, TestState.Testing -> {
                             if (t == TestState.Testing) CircularProgressIndicator(Modifier.size(48.dp), color = Appearance.tint)
                             else Icon(SFS.antenna, null, tint = Appearance.tint, modifier = Modifier.size(60.dp))
-                            Text(if (t == TestState.Testing) "Connecting..." else "Test Connection", style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text)
-                            Text("We're checking if your server is reachable", style = IosTypography.body, color = p.secondaryText, textAlign = TextAlign.Center)
+                            Text(if (t == TestState.Testing) "Connecting..." else "Test Connection", style = NativeType.headlineSmall.copy(fontWeight = FontWeight.Bold), color = p.text)
+                            Text("We're checking if your server is reachable", style = NativeType.bodyLarge, color = p.secondaryText, textAlign = TextAlign.Center)
                         }
                         TestState.Success -> {
                             Icon(SF.checkmarkCircleFill, null, tint = Color(0xFF30D158), modifier = Modifier.size(80.dp))
-                            Text("Connection successful!", style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text)
-                            Text("Your Stash server was found", style = IosTypography.body, color = p.secondaryText)
+                            Text("Connection successful!", style = NativeType.headlineSmall.copy(fontWeight = FontWeight.Bold), color = p.text)
+                            Text("Your Stash server was found", style = NativeType.bodyLarge, color = p.secondaryText)
                         }
                         is TestState.Failure -> {
                             Icon(SFS.xmarkCircleFill, null, tint = Color(0xFFFF453A), modifier = Modifier.size(80.dp))
-                            Text("Connection failed", style = IosTypography.title2.copy(fontWeight = FontWeight.Bold), color = p.text)
-                            Text(t.message, style = IosTypography.body, color = p.secondaryText, textAlign = TextAlign.Center)
-                            Text(
-                                "Test again", style = IosTypography.body, color = Appearance.tint,
-                                modifier = Modifier.background(Appearance.tint.copy(alpha = 0.15f), RoundedCornerShape(8.dp)).clickable { runTest() }.padding(horizontal = 14.dp, vertical = 8.dp),
-                            )
+                            Text("Connection failed", style = NativeType.headlineSmall.copy(fontWeight = FontWeight.Bold), color = p.text)
+                            Text(t.message, style = NativeType.bodyLarge, color = p.secondaryText, textAlign = TextAlign.Center)
+                            NativeTonalButton("Test again", leading = SF.arrowClockwise) { runTest() }
                         }
                     }
                 }
@@ -224,13 +228,7 @@ fun ServerSetupScreen(existing: ServerConfig? = null, onDone: () -> Unit) {
         }
         // Navigation buttons
         Row(Modifier.fillMaxWidth().padding(horizontal = 24.dp).padding(bottom = 32.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-            if (step > 1) Row(
-                Modifier.weight(1f).height(52.dp).background(p.secondaryBackground, RoundedCornerShape(Tokens.Radius.button)).clickable { step--; test = TestState.NotTested },
-                horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Icon(SFS.chevronLeft, null, tint = p.text, modifier = Modifier.size(18.dp))
-                Text(" Back", style = IosTypography.headline, color = p.text)
-            }
+            if (step > 1) NativeTonalButton("Back", Modifier.weight(1f), leading = SFS.chevronLeft) { step--; test = TestState.NotTested }
             PrimaryButton(
                 if (step == 2) "Finish" else "Next", Modifier.weight(1f), enabled = canProceed,
                 trailing = if (step == 2) SFS.checkmark else SFS.chevronRight,
@@ -242,17 +240,9 @@ fun ServerSetupScreen(existing: ServerConfig? = null, onDone: () -> Unit) {
 @Composable
 private fun Labeled(label: String, content: @Composable ColumnScope.() -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Text(label, style = IosTypography.caption, color = Theme.palette.secondaryText)
+        Text(label, style = NativeType.bodySmall, color = Theme.palette.secondaryText)
         content()
     }
 }
 
-@Composable
-private fun FieldBox(content: @Composable () -> Unit) {
-    Box(Modifier.fillMaxWidth().background(Theme.palette.secondaryBackground, RoundedCornerShape(Tokens.Radius.card)).padding(16.dp)) { content() }
-}
 
-@Composable
-private fun InnerField(content: @Composable () -> Unit) {
-    Box(Modifier.fillMaxWidth().background(Theme.palette.background.copy(alpha = 0.3f), RoundedCornerShape(Tokens.Radius.button)).padding(14.dp)) { content() }
-}

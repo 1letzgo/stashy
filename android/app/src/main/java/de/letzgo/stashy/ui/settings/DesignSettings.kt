@@ -40,11 +40,12 @@ import de.letzgo.stashy.ui.AppTheme
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.GlassCapsule
 import de.letzgo.stashy.ui.GlassIconButton
-import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.SFS
 import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.Theme
+import de.letzgo.stashy.ui.nativeAccent
 import de.letzgo.stashy.ui.oCounterIcon
 import kotlin.math.abs
 
@@ -56,16 +57,16 @@ class AppearanceSettingsScreen : Screen {
     @Composable override fun Content() = SettingsDetailScaffold("Appearance") { top ->
         SettingsList(top) {
             settingsSection(header = "App Theme", footer = "Choose the appearance of the app.", key = "theme") {
-                SettingsRow { Segmented(AppTheme.entries, Appearance.theme, { it.raw }) { Appearance.updateTheme(it) } }
+                SettingsPickerRow("Theme", AppTheme.entries, Appearance.theme, { it.raw }, SFS.circleLeftHalf) { Appearance.updateTheme(it) }
             }
             settingsSection(
                 header = "App Accent Color", key = "accent",
                 footer = "This color will be applied to the tab bar, navigation bar buttons, and other interactive elements throughout the app.",
             ) {
                 // iOS ColorPicker → hue slider (Android has no system colour picker).
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("Custom Color", style = IosTypography.body, color = Theme.palette.text, modifier = Modifier.weight(1f))
+                        Text("Custom Color", style = NativeType.bodyLarge, color = Theme.palette.text, modifier = Modifier.weight(1f))
                         Box(Modifier.size(28.dp).background(Appearance.tint, CircleShape).border(1.dp, Theme.palette.text.copy(alpha = 0.3f), CircleShape))
                     }
                     val hsv = FloatArray(3).also { android.graphics.Color.colorToHSV(Appearance.tint.toArgb(), it) }
@@ -89,16 +90,16 @@ class AppearanceSettingsScreen : Screen {
                 }
             }
             settingsSection(header = "Glass", footer = "How much of the content shows through buttons, pills and bars. Applies to all glass chrome.", key = "glass") {
-                Column(Modifier.padding(horizontal = 16.dp, vertical = 10.dp)) {
+                Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(SFS.circleLeftHalf, null, tint = Appearance.tint, modifier = Modifier.size(22.dp))
-                        Text("Transparency", style = IosTypography.body, color = Theme.palette.text, modifier = Modifier.padding(start = 12.dp).weight(1f))
-                        Text("${Math.round(Appearance.glassTransparency * 100)} %", style = IosTypography.body, color = Theme.palette.secondaryText)
+                        Icon(SFS.circleLeftHalf, null, tint = Appearance.tint, modifier = Modifier.size(24.dp))
+                        Text("Transparency", style = NativeType.bodyLarge, color = Theme.palette.text, modifier = Modifier.padding(start = 16.dp).weight(1f))
+                        Text("${Math.round(Appearance.glassTransparency * 100)} %", style = NativeType.bodyLarge, color = Theme.palette.secondaryText)
                     }
                     Slider(
                         Appearance.glassTransparency, { Appearance.updateGlassTransparency((Math.round(it * 20) / 20f).coerceIn(0.2f, 1f)) },
                         valueRange = 0.2f..1f, steps = 15,
-                        colors = SliderDefaults.colors(thumbColor = Color.White, activeTrackColor = Appearance.tint, inactiveTrackColor = Theme.palette.separator, activeTickColor = Color.Transparent, inactiveTickColor = Color.Transparent),
+                        colors = SliderDefaults.colors(thumbColor = nativeAccent(), activeTrackColor = nativeAccent(), inactiveTrackColor = Theme.palette.separator, activeTickColor = Color.Transparent, inactiveTickColor = Color.Transparent),
                     )
                 }
                 SettingsDivider()
@@ -151,9 +152,9 @@ private fun GlassDemo() {
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
             GlassCapsule(height = 42.dp, tint = Appearance.tint) {
                 Icon(SFS.chevronLeft, null, tint = Color.White, modifier = Modifier.size(16.dp))
-                Text("Back", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
+                Text("Back", style = NativeType.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
             }
-            GlassCapsule(height = 42.dp) { Text("Demo", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = Color.White) }
+            GlassCapsule(height = 42.dp) { Text("Demo", style = NativeType.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = Color.White) }
             GlassIconButton(SF.line3HorizontalDecrease, null, size = 42.dp) {}
         }
     }
@@ -204,10 +205,10 @@ class AcknowledgementsScreen : Screen {
             settingsSection(header = "Components", footer = "stashy uses the components above. Their licenses apply in addition to stashy's own terms.", key = "components") {
                 entries.forEachIndexed { i, e ->
                     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(e.name, style = IosTypography.headline, color = Theme.palette.text)
-                        Text(e.license, style = IosTypography.subheadline, color = Theme.palette.secondaryText)
-                        e.note?.let { Text(it, style = IosTypography.caption, color = Theme.palette.secondaryText) }
-                        Text(e.url, style = IosTypography.caption, color = Appearance.tint, modifier = Modifier.clickable {
+                        Text(e.name, style = NativeType.titleMedium, color = Theme.palette.text)
+                        Text(e.license, style = NativeType.bodyMedium, color = Theme.palette.secondaryText)
+                        e.note?.let { Text(it, style = NativeType.bodySmall, color = Theme.palette.secondaryText) }
+                        Text(e.url, style = NativeType.bodySmall, color = Appearance.tint, modifier = Modifier.clickable {
                             runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(e.url))) }
                         })
                     }

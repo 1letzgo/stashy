@@ -31,7 +31,7 @@ import de.letzgo.stashy.data.SavedFiltersStore
 import de.letzgo.stashy.data.TabConfig
 import de.letzgo.stashy.data.TabManager
 import de.letzgo.stashy.ui.Appearance
-import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.SFS
 import de.letzgo.stashy.ui.Screen
@@ -69,19 +69,19 @@ private fun ReelsModeType.icon(): ImageVector = when (this) {
     ReelsModeType.Pics -> SFS.cameraFill
 }
 
-/** Card header (iOS `Label(…).font(.subheadline.weight(.semibold)).foregroundColor(tint)`). */
+/** Card header (iOS `Label(…).font(.subheadline.weight(.semibold)).foregroundColor(tint)`) — Material titleMedium. */
 @Composable
 private fun CardHeader(title: String, icon: ImageVector, trailing: @Composable () -> Unit) {
     Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-        Icon(icon, null, tint = Appearance.tint, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.width(8.dp))
-        Text(title, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = Appearance.tint, modifier = Modifier.weight(1f))
+        Icon(icon, null, tint = Appearance.tint, modifier = Modifier.size(24.dp))
+        Spacer(Modifier.width(16.dp))
+        Text(title, style = NativeType.titleMedium, color = Theme.palette.text, modifier = Modifier.weight(1f))
         trailing()
     }
 }
 
 @Composable
-private fun CardDivider() = HorizontalDivider(Modifier.padding(vertical = 8.dp), thickness = 0.5.dp, color = Theme.palette.separator)
+private fun CardDivider() = HorizontalDivider(Modifier.padding(vertical = 8.dp), thickness = 1.dp, color = Theme.palette.separator.copy(alpha = 0.5f))
 
 /** iOS: `CatalogDefaultFilterMenu` — None + the saved filters of the tab's mode. */
 @Composable
@@ -100,7 +100,7 @@ fun DefaultFilterMenu(tab: AppTab, kind: FilterKind = FilterKind.Standard) {
         FilterKind.Standard -> if (tab == AppTab.Markers) TabManager.getDefaultMarkerFilterId(tab) else TabManager.getDefaultFilterId(tab)
     }
     if (filters.isEmpty() && !SavedFiltersStore.isLoading) {
-        Text("No filters found", style = IosTypography.subheadline, color = Theme.palette.secondaryText)
+        Text("No filters found", style = NativeType.bodyMedium, color = Theme.palette.secondaryText)
         return
     }
     MenuValue(listOf("" to "None") + filters.map { it.id to it.name }, current ?: "") { id ->
@@ -130,7 +130,7 @@ class DashboardSettingsScreen : Screen {
                     Column(Modifier.padding(bottom = 24.dp)) {
                         SectionHeaderText("Dashboard")
                         SettingsCard {
-                            CardHeader("Dashboard", SF.houseFill) { Text("Always Visible", style = IosTypography.caption, color = Theme.palette.secondaryText) }
+                            CardHeader("Dashboard", SF.houseFill) { Text("Always Visible", style = NativeType.bodySmall, color = Theme.palette.secondaryText) }
                             CardDivider()
                             CardSettingRow("Default Filter") { DefaultFilterMenu(AppTab.Dashboard) }
                             CardSettingRow("Hero Background") { SettingsSwitch(TabManager.showDashboardHeroBackground) { TabManager.showDashboardHeroBackground = it } }
@@ -154,7 +154,7 @@ class DashboardSettingsScreen : Screen {
                             ReorderableColumn(TabManager.homeRows, { it.id }, { from, to -> TabManager.moveHomeRow(from, to) }) { row, i, handle ->
                                 Column {
                                     SettingsRow(verticalPadding = 6.dp) {
-                                        Text(row.title, style = IosTypography.body, color = Theme.palette.text, modifier = Modifier.weight(1f))
+                                        Text(row.title, style = NativeType.bodyLarge, color = Theme.palette.text, modifier = Modifier.weight(1f))
                                         SettingsSwitch(row.isEnabled) { TabManager.toggleHomeRow(row.id) }
                                         DragHandle(handle)
                                     }
@@ -170,13 +170,13 @@ class DashboardSettingsScreen : Screen {
                         val items = TabManager.homeChannelItems.sortedBy { it.sortOrder }
                         SettingsGroup {
                             if (items.isEmpty()) SettingsRow {
-                                Text(if (SavedFiltersStore.isLoading) "Loading filters…" else "No saved scene or image filters", style = IosTypography.body, color = Theme.palette.secondaryText)
+                                Text(if (SavedFiltersStore.isLoading) "Loading filters…" else "No saved scene or image filters", style = NativeType.bodyLarge, color = Theme.palette.secondaryText)
                             } else ReorderableColumn(items, { it.id }, { from, to -> TabManager.moveHomeChannelItem(from, to) }) { item, i, handle ->
                                 Column {
                                     SettingsRow(verticalPadding = 6.dp) {
                                         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                                            Text(SavedFiltersStore.byId[item.filterId]?.name ?: "Filter", style = IosTypography.body, color = Theme.palette.text)
-                                            Text(item.destination.title, style = IosTypography.caption, color = Theme.palette.secondaryText)
+                                            Text(SavedFiltersStore.byId[item.filterId]?.name ?: "Filter", style = NativeType.bodyLarge, color = Theme.palette.text)
+                                            Text(item.destination.title, style = NativeType.bodyMedium, color = Theme.palette.secondaryText)
                                         }
                                         SettingsSwitch(item.isEnabled) { TabManager.toggleHomeChannelItem(item.id) }
                                         DragHandle(handle)

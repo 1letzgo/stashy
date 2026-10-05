@@ -36,8 +36,11 @@ import de.letzgo.stashy.data.StashyPlus
 import de.letzgo.stashy.data.StashyPlusProduct
 import de.letzgo.stashy.data.StashyPlusSource
 import de.letzgo.stashy.ui.Appearance
-import de.letzgo.stashy.ui.BackPill
-import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeTextButton
+import de.letzgo.stashy.ui.NativeTonalButton
+import de.letzgo.stashy.ui.NativeTopBar
+import de.letzgo.stashy.ui.nativeTopBarPadding
+import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Screen
@@ -64,14 +67,13 @@ fun openStashyPlusPaywall() {
     Nav.push(StashyPlusPaywallScreen())
 }
 
-/** The paywall as a pushed screen (back pill top-left). */
+/** The paywall as a pushed screen (Material top app bar with back arrow). */
 class StashyPlusPaywallScreen : Screen {
     override val key = "stashy-plus-paywall"
     @Composable override fun Content() {
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
-            val top = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + 60.dp
-            StashyPlusSettingsContent(topPadding = top)
-            BackPill({ Nav.pop() }, Modifier.statusBarsPadding().padding(16.dp))
+            StashyPlusSettingsContent(topPadding = nativeTopBarPadding())
+            NativeTopBar("stashy+")
         }
     }
 }
@@ -142,7 +144,7 @@ fun LazyListScope.stashyPlusSettingsItems() {
             GroupedCard {
                 SettingsRow("Tag Suggestions & Similar Scenes", SF.sparkles, onClick = {
                     Nav.push(de.letzgo.stashy.ui.tools.aitags.AITagsSettingsScreen())
-                }) { Icon(Icons.Chevron, null, tint = Theme.palette.tertiaryText) }
+                })
             }
             SectionSpacer()
         }
@@ -190,8 +192,8 @@ private fun PurchaseSection() {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(SF.checkmarkSealFill, null, tint = StashyColors.systemGreen, modifier = Modifier.size(22.dp))
                 Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(StashyPlus.source.statusTitle, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = p.text)
-                    Text(statusDetailText(), style = IosTypography.caption, color = p.secondaryText)
+                    Text(StashyPlus.source.statusTitle, style = NativeType.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = p.text)
+                    Text(statusDetailText(), style = NativeType.bodySmall, color = p.secondaryText)
                 }
             }
         }
@@ -204,12 +206,12 @@ private fun PurchaseSection() {
                 if (StashyPlus.isLoadingProducts) {
                     Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         SmallSpinner()
-                        Text("Loading stashy+ options…", style = IosTypography.body, color = p.secondaryText)
+                        Text("Loading stashy+ options…", style = NativeType.bodyLarge, color = p.secondaryText)
                     }
                 } else {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text(StashyPlus.lastProductError ?: "stashy+ products unavailable.", style = IosTypography.caption, color = p.secondaryText)
-                        Text("Retry", style = IosTypography.body, color = Appearance.tint, modifier = Modifier.clickable { retryProducts() })
+                        Text(StashyPlus.lastProductError ?: "stashy+ products unavailable.", style = NativeType.bodyMedium, color = p.secondaryText)
+                        NativeTonalButton("Retry", leading = SF.arrowClockwise) { retryProducts() }
                     }
                 }
             }
@@ -227,7 +229,7 @@ private fun PurchaseSection() {
                 }
             }
             StashyPlus.lastProductError?.takeIf { it.startsWith("Missing from Play Console") }?.let {
-                Text(it, style = IosTypography.caption2, color = p.secondaryText, modifier = Modifier.padding(top = 6.dp))
+                Text(it, style = NativeType.labelSmall, color = p.secondaryText, modifier = Modifier.padding(top = 6.dp))
             }
         }
         Spacer(Modifier.size(8.dp))
@@ -251,19 +253,16 @@ private fun PurchaseSection() {
         Column(Modifier.fillMaxWidth().padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
             Text(
                 "Subscriptions renew automatically unless canceled before the end of the current period. Manage or cancel in your Google Play account settings.",
-                style = IosTypography.caption2, color = p.secondaryText,
+                style = NativeType.labelSmall, color = p.secondaryText,
             )
-            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                LinkText("Terms of Use") { openUrl(context, StashyLegalLinks.TERMS_OF_USE) }
-                LinkText("Privacy Policy") { openUrl(context, StashyLegalLinks.PRIVACY_POLICY) }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                NativeTextButton("Terms of Use") { openUrl(context, StashyLegalLinks.TERMS_OF_USE) }
+                NativeTextButton("Privacy Policy") { openUrl(context, StashyLegalLinks.PRIVACY_POLICY) }
             }
         }
     }
 }
 
-@Composable
-private fun LinkText(title: String, onClick: () -> Unit) =
-    Text(title, style = IosTypography.caption, color = Appearance.tint, modifier = Modifier.clickable(onClick = onClick))
 
 private fun openUrl(context: android.content.Context, url: String) {
     runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
@@ -298,9 +297,9 @@ private fun iconFor(productID: String): ImageVector = when (productID) {
 /** iOS: `stashyPlusRowLabel(_:systemImage:)`. */
 @Composable
 private fun PlusRowLabel(title: String, icon: ImageVector, modifier: Modifier = Modifier) {
-    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Box(Modifier.width(22.dp), contentAlignment = Alignment.Center) { Icon(icon, null, tint = Appearance.tint, modifier = Modifier.size(20.dp)) }
-        Text(title, style = IosTypography.body, color = Theme.palette.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+    Row(modifier, verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+        Box(Modifier.width(24.dp), contentAlignment = Alignment.Center) { Icon(icon, null, tint = Appearance.tint, modifier = Modifier.size(24.dp)) }
+        Text(title, style = NativeType.bodyLarge, color = Theme.palette.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 
@@ -309,15 +308,15 @@ private fun PlusRowLabel(title: String, icon: ImageVector, modifier: Modifier = 
 private fun PurchaseButton(product: ProductDetails) {
     val purchasing = StashyPlus.purchasingProductID
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 52.dp)
+        Modifier.fillMaxWidth().heightIn(min = 56.dp)
             .clickable(enabled = purchasing == null) { purchase(product) }
-            .padding(horizontal = 16.dp, vertical = 14.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         PlusRowLabel(StashyPlusProduct.displayNames[product.productId] ?: product.name, iconFor(product.productId), Modifier.weight(1f))
         if (purchasing == product.productId) SmallSpinner()
-        else Text(StashyPlus.price(product), style = IosTypography.subheadline, color = Theme.palette.secondaryText, maxLines = 1)
+        else Text(StashyPlus.price(product), style = NativeType.bodyMedium, color = Theme.palette.secondaryText, maxLines = 1)
     }
 }
 
@@ -339,7 +338,7 @@ private fun RestoreButton() {
 @Composable
 private fun SecondaryButton(title: String, icon: ImageVector, showsProgress: Boolean, enabled: Boolean = true, onClick: () -> Unit) {
     Row(
-        Modifier.fillMaxWidth().heightIn(min = 52.dp).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 16.dp, vertical = 14.dp),
+        Modifier.fillMaxWidth().heightIn(min = 56.dp).clickable(enabled = enabled, onClick = onClick).padding(horizontal = 16.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -365,26 +364,26 @@ fun StashyTipsSection(modifier: Modifier = Modifier) {
                 if (StashyPlus.isLoadingProducts) {
                     Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         SmallSpinner()
-                        Text("Loading tips…", style = IosTypography.body, color = p.secondaryText)
+                        Text("Loading tips…", style = NativeType.bodyLarge, color = p.secondaryText)
                     }
                 } else {
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("Tips unavailable.", style = IosTypography.caption, color = p.secondaryText)
-                        Text("Retry", style = IosTypography.body, color = Appearance.tint, modifier = Modifier.clickable { retryProducts() })
+                        Text("Tips unavailable.", style = NativeType.bodyMedium, color = p.secondaryText)
+                        NativeTonalButton("Retry", leading = SF.arrowClockwise) { retryProducts() }
                     }
                 }
             } else {
                 tips.forEachIndexed { i, product ->
                     val purchasing = StashyPlus.purchasingProductID
                     Row(
-                        Modifier.fillMaxWidth().heightIn(min = 44.dp)
+                        Modifier.fillMaxWidth().heightIn(min = 56.dp)
                             .clickable(enabled = purchasing == null) { purchase(product) }
-                            .padding(horizontal = 16.dp, vertical = 10.dp),
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         PlusRowLabel(StashyPlusProduct.displayNames[product.productId] ?: product.name, iconFor(product.productId), Modifier.weight(1f))
                         if (purchasing == product.productId) SmallSpinner()
-                        else Text(StashyPlus.price(product), style = IosTypography.body, color = p.secondaryText)
+                        else Text(StashyPlus.price(product), style = NativeType.bodyLarge, color = p.secondaryText)
                     }
                     if (i < tips.lastIndex) RowDivider()
                 }

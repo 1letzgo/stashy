@@ -2,9 +2,7 @@ package de.letzgo.stashy.ui.settings
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Delete
-import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
+
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -14,7 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
-import de.letzgo.stashy.ui.StashyColors
+
 import de.letzgo.stashy.ui.player.ai.CaptionTranslator
 import de.letzgo.stashy.ui.player.ai.SpeechModelStore
 import de.letzgo.stashy.ui.player.ai.SubtitleTargetLanguage
@@ -45,20 +43,17 @@ fun AiSubtitlesSettingsRows() {
         "Delete downloaded language packs", Icons.Outlined.Delete,
         trailing = if (bytes > 0) "${bytes / 1_000_000} MB" else null,
     ) { confirm = true }
-    if (confirm) AlertDialog(
-        onDismissRequest = { confirm = false },
-        title = { Text("Delete language packs?") },
-        text = { Text("Removes the downloaded speech models and translation packs. AI subtitles download them again when needed.") },
-        confirmButton = {
-            TextButton({
-                confirm = false
-                scope.launch {
-                    withContext(Dispatchers.IO) { SpeechModelStore.deleteAll(context) }
-                    CaptionTranslator.deleteAllModels()
-                    bytes = 0
-                }
-            }) { Text("Delete", color = StashyColors.systemRed) }
-        },
-        dismissButton = { TextButton({ confirm = false }) { Text("Cancel") } },
-    )
+    if (confirm) de.letzgo.stashy.ui.NativeConfirmDialog(
+        "Delete language packs?",
+        "Removes the downloaded speech models and translation packs. AI subtitles download them again when needed.",
+        onDismiss = { confirm = false },
+        confirmLabel = "Delete", destructive = true,
+    ) {
+        confirm = false
+        scope.launch {
+            withContext(Dispatchers.IO) { SpeechModelStore.deleteAll(context) }
+            CaptionTranslator.deleteAllModels()
+            bytes = 0
+        }
+    }
 }
