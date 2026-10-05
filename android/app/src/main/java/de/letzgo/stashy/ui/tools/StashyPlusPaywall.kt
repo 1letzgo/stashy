@@ -29,12 +29,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.android.billingclient.api.ProductDetails
 import kotlinx.coroutines.launch
 import de.letzgo.stashy.MainActivity
 import de.letzgo.stashy.data.StashyPlus
 import de.letzgo.stashy.data.StashyPlusProduct
 import de.letzgo.stashy.data.StashyPlusSource
+import de.letzgo.stashy.data.StashyStoreProduct
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.NativeTextButton
 import de.letzgo.stashy.ui.NativeTonalButton
@@ -305,7 +305,7 @@ private fun PlusRowLabel(title: String, icon: ImageVector, modifier: Modifier = 
 
 /** iOS: `stashyPlusPurchaseButton(for:)`. */
 @Composable
-private fun PurchaseButton(product: ProductDetails) {
+private fun PurchaseButton(product: StashyStoreProduct) {
     val purchasing = StashyPlus.purchasingProductID
     Row(
         Modifier.fillMaxWidth().heightIn(min = 56.dp)
@@ -320,7 +320,7 @@ private fun PurchaseButton(product: ProductDetails) {
     }
 }
 
-private fun purchase(product: ProductDetails) {
+private fun purchase(product: StashyStoreProduct) {
     val activity = MainActivity.current ?: run { showToast("Google Play is not available."); return }
     StashyPlus.purchase(activity, product)
 }

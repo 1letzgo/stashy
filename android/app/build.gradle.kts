@@ -135,7 +135,7 @@ dependencies {
     implementation("androidx.biometric:biometric:1.1.0")
     implementation("androidx.fragment:fragment-ktx:1.8.5")
     implementation("androidx.security:security-crypto:1.1.0-alpha06")
-    implementation("com.android.billingclient:billing-ktx:7.1.1")
+    implementation("com.revenuecat.purchases:purchases:10.24.2")
     implementation("androidx.tv:tv-material:1.0.0")
     // AI Subtitles (stashy+): Vosk on-device speech recognition (models downloaded on demand),
     // ML Kit on-device translation (language packs downloaded on demand).
