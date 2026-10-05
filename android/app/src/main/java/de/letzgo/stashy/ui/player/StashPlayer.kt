@@ -231,9 +231,8 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
             target = Uri.parse(url).buildUpon().appendQueryParameter("start", String.format(java.util.Locale.US, "%.3f", startAt)).build().toString()
             sourceTimeOffset = startAt
         }
-        val item = MediaItem.Builder().setUri(target).setMediaMetadata(
-            androidx.media3.common.MediaMetadata.Builder().setTitle(mediaTitle).setArtworkUri(mediaArtworkURL?.let { Uri.parse(it) }).build(),
-        ).apply {
+        // Every (re)load — original, transcode rungs, `?start=` re-seeks — carries the scene metadata.
+        val item = MediaItem.Builder().setUri(target).setMediaMetadata(currentMediaMetadata()).apply {
             if (kind == SourceKind.HlsTranscode || url.substringBefore('?').endsWith(".m3u8")) setMimeType(MimeTypes.APPLICATION_M3U8)
         }.build()
         exo.setMediaItem(item, if (kind != SourceKind.Mp4Transcode && startAt != null && startAt > 0) (startAt * 1000).toLong() else 0L)
@@ -315,14 +314,37 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
     /** Exposes this player through a `MediaSession` + [PlaybackService] (background audio like iOS). */
     fun enableMediaSession() {
         if (session != null || role != Role.Main) return
-        val s = MediaSession.Builder(appContext, exo).setId("stashy-" + UUID.randomUUID()).build()
+        val s = MediaSession.Builder(appContext, exo)
+            .setId("stashy-" + UUID.randomUUID())
+            // Artwork through Coil (ApiKey, LAN TLS, image cache, download posters).
+            .setBitmapLoader(StashArtworkBitmapLoader(appContext))
+            .build()
         session = s
         PlaybackService.attach(s)
     }
 
-    /** Title / artwork shown in the media notification; applied on the next [load]. */
-    var mediaTitle: String? = null
-    var mediaArtworkURL: String? = null
+    /**
+     * Title / performers / studio / artwork for the media notification, lock screen and Bluetooth.
+     * Applied to every [load] and fallback reload; setting it while an item is loaded updates that
+     * item in place (no re-buffer), e.g. after the scene details were refreshed or edited.
+     */
+    var nowPlaying: SceneNowPlaying? = null
+        set(value) {
+            if (field == value) return
+            field = value
+            applyNowPlayingToCurrentItem()
+        }
+
+    private fun currentMediaMetadata(): androidx.media3.common.MediaMetadata =
+        nowPlaying?.toMediaMetadata() ?: androidx.media3.common.MediaMetadata.EMPTY
+
+    private fun applyNowPlayingToCurrentItem() {
+        if (released) return
+        val current = exo.currentMediaItem ?: return
+        val metadata = currentMediaMetadata()
+        if (current.mediaMetadata == metadata) return
+        runCatching { exo.replaceMediaItem(exo.currentMediaItemIndex, current.buildUpon().setMediaMetadata(metadata).build()) }
+    }
 
     // MARK: Tracks
 

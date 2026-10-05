@@ -23,6 +23,7 @@ import de.letzgo.stashy.ui.player.PlayerIcons
 import de.letzgo.stashy.ui.player.PlayerMute
 import de.letzgo.stashy.ui.player.PlayerSettings
 import de.letzgo.stashy.ui.player.PlayerWindow
+import de.letzgo.stashy.ui.player.SceneNowPlaying
 import de.letzgo.stashy.ui.player.SceneScrubSprites
 import de.letzgo.stashy.ui.player.StashPlayer
 import de.letzgo.stashy.ui.player.TimeBarMarker
@@ -196,6 +197,7 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
             if (preserved != null && preserved > 0) next = next.copy(resumeTime = preserved)
             next = next.copy(updatedAt = newerUpdatedAt(next.updatedAt, scene.updatedAt))
             scene = next
+            player?.nowPlaying = SceneNowPlaying.of(next)
             refreshScrubSprites()
         }
     }
@@ -233,8 +235,7 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
                     SceneToast.show("Original could not be played — using the server transcode", PlayerIcons.reset, SceneToast.Style.Error)
                 }
             }
-            p.mediaTitle = scene.displayTitle
-            p.mediaArtworkURL = scene.thumbnailURL
+            p.nowPlaying = SceneNowPlaying.of(scene)
             p.enableMediaSession()
             player = p
             p.load(url, resumeTarget, autoplay = true)
@@ -352,6 +353,7 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
     /** iOS: `applyLocalSceneEdit` — local state + list notification. */
     fun applyEdit(updated: Scene) {
         scene = updated
+        player?.nowPlaying = SceneNowPlaying.of(updated)
         SceneEvents.post(SceneEvent.Updated(updated))
     }
 

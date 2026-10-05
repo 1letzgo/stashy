@@ -68,6 +68,7 @@ import de.letzgo.stashy.data.SceneMarker
 import de.letzgo.stashy.data.TabManager
 import de.letzgo.stashy.ui.player.PlaybackActivityTracker
 import de.letzgo.stashy.ui.player.PlayerSettings
+import de.letzgo.stashy.ui.player.SceneNowPlaying
 import de.letzgo.stashy.ui.player.SceneScrubSprites
 import de.letzgo.stashy.ui.player.StashPlayer
 import de.letzgo.stashy.ui.player.SubtitleOverlay
@@ -155,8 +156,7 @@ class TvPlaybackModel {
         }
         p.fallbackSources = scene.transcodeFallbackURLs
         p.fallbackDeclaredDuration = scene.sceneDuration
-        p.mediaTitle = scene.displayTitle
-        p.mediaArtworkURL = scene.thumbnailURL
+        p.nowPlaying = SceneNowPlaying.of(scene)
         sprites = SceneScrubSprites.create(scene.paths?.vtt, scene.paths?.sprite)?.also { it.prepare(scope) }
         if (playThreshold <= 0) credit(sceneId)
     }
