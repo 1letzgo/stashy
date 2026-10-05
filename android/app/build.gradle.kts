@@ -49,7 +49,7 @@ android {
             val expires = if (betaDays != 0L) (gitCommitTime() + betaDays * 86_400L) * 1000L else 0L
             buildConfigField("long", "EXPIRES_AT", "${expires}L")
             buildConfigField("boolean", "PLUS_INCLUDED", "true")
-            buildConfigField("String", "UPDATE_URL", "\"https://buntes.am/app/stashy.apk\"")
+            buildConfigField("String", "UPDATE_URL", "\"https://github.com/1letzgo/stashy/releases/latest/download/stashy.apk\"")
         }
         create("play") {
             dimension = "distribution"
