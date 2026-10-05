@@ -36,7 +36,15 @@ data class FeedMediaRequest(
      * and the player's position / duration are relative to it.
      */
     val segment: FeedSegment? = null,
-)
+    /**
+     * Where playback starts and every loop restarts (Scenes: Settings "Feeds start position"),
+     * in player time. Unlike [segment] the file is not clipped, so the scrubber still spans the
+     * whole scene and the intro stays reachable.
+     */
+    val startSeconds: Double = 0.0,
+) {
+    val startMs: Long get() = (startSeconds.coerceAtLeast(0.0) * 1000).toLong()
+}
 
 /**
  * Small pool of Media3 players for the Feeds tab (iOS: one `AetherSceneEngine` per row plus
@@ -74,6 +82,12 @@ class FeedPlayerPool(context: Context, val size: Int = 3) {
                 if (d != C.TIME_UNSET && d > 0) durations[req.id] = d / 1000.0
             }
             if (state == Player.STATE_ENDED && !req.loop) onEnded?.invoke(req.id)
+        }
+
+        override fun onPositionDiscontinuity(oldPosition: Player.PositionInfo, newPosition: Player.PositionInfo, reason: Int) {
+            // REPEAT_MODE_ONE wrapped to 0: loop back to the row's start position instead.
+            val req = request ?: return
+            if (reason == Player.DISCONTINUITY_REASON_AUTO_TRANSITION && req.startMs > 0) player.seekTo(req.startMs)
         }
 
         override fun onRenderedFirstFrame() {
@@ -152,7 +166,7 @@ class FeedPlayerPool(context: Context, val size: Int = 3) {
         val req = slot.request ?: return
         val url = req.sources.getOrNull(slot.sourceIndex) ?: return
         val play = keepPlayWhenReady && slot.player.playWhenReady
-        slot.player.setMediaItem(mediaItem(url, req.segment))
+        slot.player.setMediaItem(mediaItem(url, req.segment), req.startMs)
         slot.player.repeatMode = if (req.loop) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
         slot.player.prepare()
         slot.player.playWhenReady = play
@@ -192,10 +206,12 @@ class FeedPlayerPool(context: Context, val size: Int = 3) {
             } else if (slot.request != req) {
                 // Same row, new options (continuous play toggled).
                 val newWindow = slot.request?.segment != req.segment
+                val newStart = slot.request?.startMs != req.startMs
                 slot.request = req
                 slot.player.repeatMode = if (req.loop) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
                 // A different segment (marker edited) needs a re-clipped item.
                 if (newWindow) { slot.sourceIndex = 0; load(slot, keepPlayWhenReady = true) }
+                else if (newStart && req.id != activeId) slot.player.seekTo(req.startMs)
             }
             slot.lastUsed = SystemClock.elapsedRealtime()
         }
@@ -203,7 +219,9 @@ class FeedPlayerPool(context: Context, val size: Int = 3) {
         slots.forEach { s ->
             val isActive = s.request?.id != null && s.request?.id == active
             s.player.playWhenReady = isActive && playing
-            if (!isActive && s.player.currentPosition > 0 && s.request != null) s.player.seekTo(0)
+            // Rows off screen wait at their start position (0, or the Scenes start setting).
+            val start = s.request?.startMs
+            if (!isActive && start != null && s.player.currentPosition != start) s.player.seekTo(start)
         }
         applyAudio()
     }

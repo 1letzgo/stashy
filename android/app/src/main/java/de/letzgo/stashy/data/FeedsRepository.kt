@@ -14,6 +14,8 @@ import kotlinx.serialization.json.intOrNull
  */
 object FeedsRepository {
     suspend fun scenes(variables: JsonObject): Page<Scene> = page("findScenes", "findScenes", "scenes", Scene.serializer(), variables)
+    /** Scenes mode: [scenes] plus `scene_markers { id seconds }` for the "First Marker" start position. */
+    suspend fun feedScenes(variables: JsonObject): Page<Scene> = page("findScenesFeed", "findScenes", "scenes", Scene.serializer(), variables)
     suspend fun markers(variables: JsonObject): Page<SceneMarker> = page("findSceneMarkers", "findSceneMarkers", "scene_markers", SceneMarker.serializer(), variables)
     suspend fun images(variables: JsonObject): Page<StashImage> = page("findImages", "findImages", "images", StashImage.serializer(), variables)
 

@@ -168,6 +168,19 @@ object FeedsModel {
 
     /** iOS: `currentVisibleSceneId` per mode (session position). */
     val currentIds = mutableStateMapOf<ReelsModeType, String>()
+    /**
+     * Start position per Scenes row ([FeedStartPosition]), keyed by row id and setting — computed
+     * once per feed session so a Random start stays put for the row and its loop. Never written
+     * to the server as a resume time.
+     */
+    private val startPositions = HashMap<String, Double>()
+
+    fun startPosition(item: FeedItem): Double {
+        val scene = (item as? FeedItem.SceneItem)?.scene ?: return 0.0
+        val setting = de.letzgo.stashy.data.TabManager.feedsSceneStartPosition
+        return startPositions.getOrPut("${item.id}|${setting.raw}") { FeedStartPosition.forScene(scene, setting) }
+    }
+
     /** iOS: playback checkpoint `itemId|seconds`. */
     var checkpoint: Pair<String, Double>? = null
 
@@ -261,6 +274,7 @@ object FeedsModel {
         sorts.clear(); filters.clear(); advanced.clear(); criteriaDocs.clear(); currentIds.clear(); unplayable.clear(); probed.clear(); seeds.clear()
         criteria = FeedCriteria()
         checkpoint = null
+        startPositions.clear()
         resetPics()
         mode = FeedsConfig.enabledModes.firstOrNull() ?: ReelsModeType.Scenes
     }
@@ -328,6 +342,8 @@ object FeedsModel {
         val l = list(m)
         l.job?.cancel()
         if (!keepPosition) currentIds.remove(m)
+        // A new Scenes timeline is a new feed session: start positions are drawn again.
+        if (m == ReelsModeType.Scenes && !keepPosition) startPositions.clear()
         // A fresh fetch may well bring items whose files exist now.
         if (m == mode) { unplayable.clear(); probed.clear() }
         l.isLoading = true
@@ -389,7 +405,7 @@ object FeedsModel {
         val base = if (advanced[m] != null) null else filters[m]
         val vars = FeedsQuery.variables(kind(m), page, per, sort(m), seed(m), base, advanced[m], criteria)
         return when (m) {
-            ReelsModeType.Scenes -> FeedsRepository.scenes(vars).let { p -> p.items.map { FeedItem.SceneItem(it) } to (p.items.size == per) }
+            ReelsModeType.Scenes -> FeedsRepository.feedScenes(vars).let { p -> p.items.map { FeedItem.SceneItem(it) } to (p.items.size == per) }
             ReelsModeType.Previews -> FeedsRepository.scenes(vars).let { p ->
                 // iOS: only scenes the server actually has a preview for.
                 p.items.filter { !it.paths?.preview.isNullOrEmpty() }.map { FeedItem.PreviewItem(it) } to (p.items.size == per)

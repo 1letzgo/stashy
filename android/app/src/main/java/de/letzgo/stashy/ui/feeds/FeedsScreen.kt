@@ -317,7 +317,7 @@ private fun FeedPager(
     // Bind the preload window to the player pool.
     LaunchedEffect(activeId, items.size, playingNow, continuous) {
         val window = PreloadWindow.indices(activeIndex, items.size, pool.size) { !items[it].isVideo }
-            .map { i -> items[i].let { FeedMediaRequest(it.id, it.videoSources, loop = !continuous, segment = it.segment) } }
+            .map { i -> items[i].let { FeedMediaRequest(it.id, it.videoSources, loop = !continuous, segment = it.segment, startSeconds = model.startPosition(it)) } }
         pool.sync(window, activeId, playingNow)
     }
     // Continuous play: the next row when a video ends (iOS `onVideoEnded` → `advanceToNextItem`).

@@ -9,6 +9,12 @@ import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.builtins.MapSerializer
 import kotlinx.serialization.builtins.serializer
 
+/** Settings › Playback › "Feeds start position": where a Feeds › Scenes row starts (skips studio intros). */
+enum class FeedsSceneStartPosition(val raw: String, val label: String) {
+    FirstMarker("firstMarker", "First Marker"), Skip30("skip30", "Skip 30s"), Random("random", "Random");
+    companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: FirstMarker }
+}
+
 /** iOS: `SubtitleFontSize`. */
 enum class SubtitleFontSize(val raw: String, val label: String) {
     Small("small", "Small"), Medium("medium", "Medium"), Large("large", "Large"), ExtraLarge("extraLarge", "Extra large");
@@ -113,6 +119,10 @@ object TabManager {
     var playCountFeedsSeconds: Double get() = _playCountFeedsSeconds.value; set(v) { _playCountFeedsSeconds.value = v; Prefs.setFloat("play_count_feeds_seconds", v.toFloat()) }
     private val _holdSpeedPlayer = dbl("hold_speed_player", 2.0, holdSpeedOptions)
     var holdSpeedPlayer: Double get() = _holdSpeedPlayer.value; set(v) { _holdSpeedPlayer.value = v; Prefs.setFloat("hold_speed_player", v.toFloat()) }
+    private val _feedsSceneStartPosition = mutableStateOf(FeedsSceneStartPosition.from(Prefs.string("feedsSceneStartPosition")))
+    var feedsSceneStartPosition: FeedsSceneStartPosition
+        get() = _feedsSceneStartPosition.value
+        set(v) { _feedsSceneStartPosition.value = v; Prefs.setString("feedsSceneStartPosition", v.raw) }
     private val _holdSpeedFeeds = dbl("hold_speed_feeds", 2.0, holdSpeedOptions)
     var holdSpeedFeeds: Double get() = _holdSpeedFeeds.value; set(v) { _holdSpeedFeeds.value = v; Prefs.setFloat("hold_speed_feeds", v.toFloat()) }
     private val _downloadBatchSize = mutableStateOf(Prefs.int("download_batch_size", 50).let { if (it in downloadBatchSizeOptions) it else 50 })

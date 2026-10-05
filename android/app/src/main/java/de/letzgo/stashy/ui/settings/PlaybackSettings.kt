@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import de.letzgo.stashy.data.FeedsSceneStartPosition
 import de.letzgo.stashy.data.SubtitleBackgroundChoice
 import de.letzgo.stashy.data.SubtitleFontFamily
 import de.letzgo.stashy.data.SubtitleFontSize
@@ -53,6 +54,9 @@ fun LazyListScope.playbackSections() {
         SettingsPickerRow("Hold to speed up — Player", TabManager.holdSpeedOptions, TabManager.holdSpeedPlayer, TabConfigLogic::holdSpeedLabel, SFS.forwardFill) { TabManager.holdSpeedPlayer = it }
         SettingsDivider()
         SettingsPickerRow("Hold to speed up — Feeds", TabManager.holdSpeedOptions, TabManager.holdSpeedFeeds, TabConfigLogic::holdSpeedLabel, SFS.forwardFrameFill) { TabManager.holdSpeedFeeds = it }
+        SettingsDivider()
+        // Feeds › Scenes only: skip studio intros (first marker / 30 s / random in the first half).
+        SettingsPickerRow("Feeds start position", FeedsSceneStartPosition.entries, TabManager.feedsSceneStartPosition, { it.label }, SFS.goforward) { TabManager.feedsSceneStartPosition = it }
         SettingsDivider()
         // Stash web "Track activity": play count, history, resume point, watch time.
         SettingsToggleRow("Playback activity", TabManager.tracksPlaybackActivity, Icons.Outlined.History) { TabManager.tracksPlaybackActivity = it }
