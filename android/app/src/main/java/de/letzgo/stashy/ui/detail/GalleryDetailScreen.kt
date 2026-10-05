@@ -100,7 +100,7 @@ class GalleryDetailScreen(val galleryId: String, val preview: Gallery? = null) :
             listOf(
                 EditSection("Identity", listOf(
                     EditField("Title", gallery.title ?: ""),
-                    EditField("Date (YYYY-MM-DD)", gallery.date ?: "", KeyboardType.Ascii),
+                    EditField("Date (YYYY-MM-DD)", gallery.date ?: "", KeyboardType.Ascii, isDate = true),
                 )),
                 EditSection("Details", listOf(EditField("Details", gallery.details ?: "", multiline = true))),
             )

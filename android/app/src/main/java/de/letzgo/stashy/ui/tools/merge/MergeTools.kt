@@ -197,7 +197,8 @@ private fun <T : MergeableItem> MergeToolsContent(config: MergeToolsConfig<T>, n
     // Selected first: with few visible rows the order decides what stays reachable.
     val filtered: List<T> = run {
         val base = allItems.filter { it.id != destination?.id }
-        val matches = if (searchText.isEmpty()) base else base.filter { it.name.contains(searchText, ignoreCase = true) }
+        // Chosen sources stay listed whatever the search says.
+        val matches = if (searchText.isEmpty()) base else base.filter { it.id in sources || it.name.contains(searchText, ignoreCase = true) }
         matches.sortedWith { l, r ->
             val ls = l.id in sources
             val rs = r.id in sources

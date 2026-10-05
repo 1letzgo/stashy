@@ -120,8 +120,7 @@ fun FeedsFilterSortSheet(
                     ControlToggleRow("Immersive", FeedsConfig.fillHeight) { FeedsConfig.updateFillHeight(it) }
                     de.letzgo.stashy.ui.NativeDivider()
                     ControlToggleRow("Continuous", FeedsConfig.continuousPlay) { FeedsConfig.updateContinuousPlay(it) }
-                    de.letzgo.stashy.ui.NativeDivider()
-                    ControlToggleRow("Delete button", FeedsConfig.showsDeleteButton) { FeedsConfig.updateShowsDeleteButton(it) }
+                    // "Delete button" lives in Settings › Feeds (app UI, not a per-feed filter option).
                 }
                 androidx.compose.runtime.key(mode, selectedFilter?.id) {
                     FilterCriteriaEditor(FeedsModel.criteriaDocument(mode), onChange = onCriteriaChanged)

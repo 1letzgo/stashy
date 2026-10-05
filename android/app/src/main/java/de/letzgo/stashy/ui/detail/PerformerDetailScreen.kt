@@ -142,7 +142,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
                     EditField("Disambiguation", performer.disambiguation ?: ""),
                     EditField("Aliases (comma-separated)", performer.aliasList.orEmpty().joinToString(", ")),
                     EditField("Gender", performer.gender ?: ""),
-                    EditField("Birthdate (YYYY-MM-DD)", performer.birthdate ?: ""),
+                    EditField("Birthdate (YYYY-MM-DD)", performer.birthdate ?: "", isDate = true),
                     EditField("Country", performer.country ?: ""),
                     EditField("Ethnicity", performer.ethnicity ?: ""),
                 )),
