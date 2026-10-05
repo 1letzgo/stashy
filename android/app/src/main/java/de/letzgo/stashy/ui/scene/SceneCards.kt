@@ -332,7 +332,8 @@ fun SceneSimilarScenesCard(scenes: List<de.letzgo.stashy.data.Scene>, isLoading:
                 items(scenes, key = { it.id }) { s ->
                     de.letzgo.stashy.ui.home.DashboardSceneCard(
                         s, isLarge = false, width = 125.dp * 16 / 9, height = 125.dp,
-                        modifier = Modifier.plainClick { de.letzgo.stashy.ui.Nav.push(SceneDetailScreen(s.id, s)) },
+                        // Material card click (ripple) like every other card (README "Cards").
+                        onClick = { de.letzgo.stashy.ui.Nav.push(SceneDetailScreen(s.id, s)) },
                     )
                 }
             }

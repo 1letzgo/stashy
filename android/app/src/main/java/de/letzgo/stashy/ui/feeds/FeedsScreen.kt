@@ -52,6 +52,8 @@ import de.letzgo.stashy.data.FeedsConfig
 import de.letzgo.stashy.data.IdName
 import de.letzgo.stashy.data.Performer
 import de.letzgo.stashy.data.ReelsModeType
+import de.letzgo.stashy.data.tools.AITagTarget
+import de.letzgo.stashy.ui.components.AddTagsSheet
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.ui.catalog.StandardLoading
@@ -79,8 +81,7 @@ import kotlinx.coroutines.launch
  * Pics sit on the app background like iOS (`StashyThemeFill(.app)`), video rows on black.
  *
  * Known differences to iOS: the AI Motion pill (device control) is not ported (Play policy);
- * the Feeds sheet has no Save / presets (see [FeedsFilterSortSheet]); tag editing ("+", remove
- * tag, AI tag suggestions) is missing from the overlay; the performer avatar opens the
+ * the Feeds sheet has no Save / presets (see [FeedsFilterSortSheet]); the performer avatar opens the
  * performer's default detail section (iOS jumps to Images for Clips / Pics); the scrubber shows
  * the row's poster instead of decoded scrub stills; the mode chip's label appears without
  * iOS's delayed fade.
@@ -102,6 +103,10 @@ fun FeedsScreen() {
     var showSheet by remember { mutableStateOf(false) }
     var isZoomed by remember { mutableStateOf(false) }
     var deleteTarget by remember { mutableStateOf<FeedItem?>(null) }
+    /** iOS `tagEditorTarget` — the row whose `AddTagsSheet` is open. */
+    var tagEditorTarget by remember { mutableStateOf<AITagTarget?>(null) }
+    /** iOS `wasPlayingBeforeTagEditor`. */
+    var wasPlayingBeforeTagEditor by remember { mutableStateOf(false) }
     var lifecycleActive by remember { mutableStateOf(true) }
 
     // Deep link (channel, performer …) or a plain appear.
@@ -182,6 +187,13 @@ fun FeedsScreen() {
                     onToggleUI = { isUIVisible = !isUIVisible },
                     onZoom = { isZoomed = it },
                     onDelete = { deleteTarget = it },
+                    onAddTags = { target ->
+                        // iOS `.onChange(of: tagEditorTarget?.id)`: nobody wants a clip looping
+                        // with sound behind the tag picker.
+                        wasPlayingBeforeTagEditor = model.isPlaying
+                        model.isPlaying = false
+                        tagEditorTarget = target
+                    },
                 )
             }
         }
@@ -232,6 +244,14 @@ fun FeedsScreen() {
         )
     }
 
+    tagEditorTarget?.let { target ->
+        // The rows patch themselves through `AITagSuggestions.events` (iOS *TagsUpdated broadcasts).
+        AddTagsSheet(target, onDismiss = {
+            tagEditorTarget = null
+            if (wasPlayingBeforeTagEditor) { wasPlayingBeforeTagEditor = false; model.isPlaying = true }
+        }) { }
+    }
+
     deleteTarget?.let { item ->
         val isImage = item is FeedItem.ClipItem
         AlertDialog(
@@ -257,6 +277,7 @@ private fun FeedPager(
     onToggleUI: () -> Unit,
     onZoom: (Boolean) -> Unit,
     onDelete: (FeedItem) -> Unit,
+    onAddTags: (AITagTarget) -> Unit,
 ) {
     val scope = rememberCoroutineScope()
     val list = model.list(mode)
@@ -410,6 +431,8 @@ private fun FeedPager(
                         activeItem.titleLinkScene?.let { s -> Nav.push(SceneDetailScreen(s.id, s)) }
                     },
                     onTag = { t -> model.toggleTag(t) },
+                    onAddTags = { onAddTags(activeItem.aiTagTarget) },
+                    onRemoveTag = { t -> model.removeTag(t.id, activeItem.aiTagTarget) },
                     onOCounter = { m -> model.changeOCounter(activeItem, m) },
                     onRating = { r -> model.setRating(activeItem, r) },
                     onDelete = { onDelete(activeItem) },

@@ -7,6 +7,9 @@ import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.data.SceneMarker
 import de.letzgo.stashy.data.ServerConfigManager
 import de.letzgo.stashy.data.StashImage
+import de.letzgo.stashy.data.Tag
+import de.letzgo.stashy.data.tools.AITagTarget
+import de.letzgo.stashy.data.tools.AITagUpdateEvent
 
 /** A performer as the Feeds overlay needs it (iOS: `ScenePerformer`). */
 data class FeedPerformer(val id: String, val name: String, val updatedAt: String? = null) {
@@ -65,6 +68,46 @@ sealed class FeedItem {
     }
 
     val primaryTagId: String? get() = (this as? MarkerItem)?.marker?.primaryTag?.id
+
+    /**
+     * iOS: `aiTagTarget` — what Tag Suggestion and the manual "+" act on. Markers are tagged as
+     * themselves (they carry their own tags in Stash), previews are just scenes, clips are images.
+     */
+    val aiTagTarget: AITagTarget get() = when (this) {
+        is SceneItem -> AITagTarget.scene(scene)
+        is PreviewItem -> AITagTarget.scene(scene)
+        is MarkerItem -> AITagTarget.marker(marker)
+        is ClipItem -> AITagTarget.image(image)
+    }
+
+    /**
+     * iOS: `patchSceneTagsInLists` / `patchMarkerTagsInLists` / `patchImageTagsInLists` /
+     * `patchBulkAppliedTag` for one row — the row with the tag change applied, or null when the
+     * event does not touch it (or changes nothing). A marker's primary tag is left alone; bulk
+     * applies only reach scenes, previews and clips (markers are not part of a bulk plan).
+     */
+    fun applying(event: AITagUpdateEvent): FeedItem? = when (event) {
+        is AITagUpdateEvent.TagsUpdated -> when (this) {
+            is SceneItem -> if (event.kind == AITagTarget.Kind.Scene && scene.id == event.entityId) SceneItem(scene.copy(tags = event.tags)) else null
+            is PreviewItem -> if (event.kind == AITagTarget.Kind.Scene && scene.id == event.entityId) PreviewItem(scene.copy(tags = event.tags)) else null
+            is MarkerItem -> if (event.kind == AITagTarget.Kind.Marker && marker.id == event.entityId) {
+                val primaryId = marker.primaryTag?.id
+                MarkerItem(marker.copy(tags = event.tags.filter { it.id != primaryId }.map { IdName(it.id, it.name) }))
+            } else null
+            is ClipItem -> if (event.kind == AITagTarget.Kind.Image && image.id == event.entityId) {
+                ClipItem(image.copy(tags = event.tags.map { IdName(it.id, it.name) }))
+            } else null
+        }
+        is AITagUpdateEvent.BulkTagsApplied -> {
+            val tag: Tag = event.tag
+            when (this) {
+                is SceneItem -> if (scene.id in event.sceneIds && scene.tags.orEmpty().none { it.id == tag.id }) SceneItem(scene.copy(tags = scene.tags.orEmpty() + tag)) else null
+                is PreviewItem -> if (scene.id in event.sceneIds && scene.tags.orEmpty().none { it.id == tag.id }) PreviewItem(scene.copy(tags = scene.tags.orEmpty() + tag)) else null
+                is ClipItem -> if (image.id in event.imageIds && image.tags.orEmpty().none { it.id == tag.id }) ClipItem(image.copy(tags = image.tags.orEmpty() + IdName(tag.id, tag.name))) else null
+                is MarkerItem -> null
+            }
+        }
+    }
 
     /** File extension of a clip (iOS: `StashImage.fileExtension`). */
     private val clipExtension: String? get() {

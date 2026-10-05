@@ -39,6 +39,10 @@ import de.letzgo.stashy.data.SavedFiltersStore
 import de.letzgo.stashy.data.SortCatalog
 import de.letzgo.stashy.data.criteriaObjectFilter
 import de.letzgo.stashy.data.StashImage
+import de.letzgo.stashy.data.Tag
+import de.letzgo.stashy.data.tools.AITagSuggestions
+import de.letzgo.stashy.data.tools.AITagTarget
+import de.letzgo.stashy.data.tools.AITagUpdateEvent
 import de.letzgo.stashy.ui.catalog.CatalogController
 import de.letzgo.stashy.ui.catalog.ImageMediaKindHolder
 import kotlin.random.Random
@@ -619,6 +623,35 @@ object FeedsModel {
 
     /** Toast-like message for failed writes (shown by the screen). */
     var message by mutableStateOf<String?>(null)
+
+    // MARK: - Tags (iOS `SceneTagsUpdated` / `MarkerTagsUpdated` / `ImageTagsUpdated` / `BulkTagsApplied`)
+
+    init {
+        // Tag Suggestion accepts, the "+" editor and bulk "Set on all of …" patch the rows in
+        // place (iOS `patch*TagsInLists`, `patchBulkAppliedTag`) instead of refetching the feed.
+        scope.launch { AITagSuggestions.events.collect { applyTagEvent(it) } }
+    }
+
+    private fun applyTagEvent(event: AITagUpdateEvent) {
+        lists.values.forEach { l ->
+            for (i in l.items.indices) l.items[i].applying(event)?.let { l.items[i] = it }
+        }
+        // Pics runs the Images catalog's list (iOS patches `allImages` too).
+        pics.list.patch { img -> (FeedItem.ClipItem(img).applying(event) as? FeedItem.ClipItem)?.image ?: img }
+    }
+
+    /**
+     * iOS `removeTag(_:from:)` — takes a tag off the item itself (not off the filter). A marker's
+     * primary tag is a separate field in Stash and is left alone.
+     */
+    fun removeTag(tagId: String, from: AITagTarget) {
+        if (tagId == from.primaryTagId) return
+        val name = from.tags.firstOrNull { it.id == tagId }?.name.orEmpty()
+        val remaining: List<Tag> = from.tags.filter { it.id != tagId }
+        scope.launch {
+            message = if (AITagSuggestions.write(remaining, from)) "Removed #$name" else "Could not remove tag"
+        }
+    }
 
     fun setRating(item: FeedItem, rating100: Int?) {
         val sceneId = item.sceneID

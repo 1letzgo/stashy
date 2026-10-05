@@ -553,6 +553,9 @@ class ImageViewerScreen(
     private fun TagRow(image: StashImage) {
         val tags = image.tags.orEmpty()
         val scope = rememberCoroutineScope()
+        // iOS `showsTagRow`: Tag Suggestion (stashy+) and the manual "+" share the row, so it
+        // also exists for an untagged picture — and only then.
+        if (tags.isEmpty() && !Appearance.isEditModeEnabled && !AITagSuggestions.isActive) return
         Row(
             Modifier.fillMaxWidth().height(24.dp + 8.dp).padding(top = 8.dp).padding(horizontal = Dock.edgePadding),
             horizontalArrangement = Arrangement.spacedBy(6.dp),

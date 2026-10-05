@@ -60,7 +60,12 @@ import coil3.compose.AsyncImage
 import de.letzgo.stashy.data.FeedsRepository
 import de.letzgo.stashy.data.IdName
 import de.letzgo.stashy.data.ReelsModeType
+import de.letzgo.stashy.data.tools.AITagSuggestions
 import de.letzgo.stashy.ui.Appearance
+import de.letzgo.stashy.ui.StashyColors
+import de.letzgo.stashy.ui.components.AITagSuggestionBar
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.oCounterIcon
@@ -260,6 +265,8 @@ fun FeedsInfoOverlay(
     onPerformerOpen: (FeedPerformer) -> Unit,
     onTitle: () -> Unit,
     onTag: (IdName) -> Unit,
+    onAddTags: () -> Unit,
+    onRemoveTag: (IdName) -> Unit,
     onOCounter: (FeedsRepository.OMutation) -> Unit,
     onRating: (Int?) -> Unit,
     onDelete: () -> Unit,
@@ -295,20 +302,69 @@ fun FeedsInfoOverlay(
                 ChromePillIconButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) "Pause" else "Play", enabled = item.isVideo || pausesAdvance, onClick = onTogglePlay)
             }
         }
-        // Hashtags on their own full-width row (iOS: height 24, top 8). Tags scroll; a fresh
-        // scroll state per item so the next clip does not inherit the offset.
+        // Hashtags on their own full-width row (iOS: height 24, top 8). Tag Suggestion (stashy+)
+        // shares the row, so it also exists for an untagged item; "+" (edit mode) stays put at the
+        // leading edge and opens `AddTagsSheet`, only the tags scroll — a fresh scroll state per
+        // item so the next clip does not inherit the offset.
         val tags = item.tags
-        Box(Modifier.padding(top = 8.dp).fillMaxWidth().height(24.dp).padding(horizontal = FeedsDock.edgePadding)) {
-            androidx.compose.runtime.key(item.id) {
-                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    tags.forEach { t ->
-                        Text(
-                            "#${t.name}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = FeedsDock.hashtagForeground,
-                            modifier = Modifier.stashyGlass(Capsule).noIndicationClick { onTag(t) }.padding(horizontal = 9.dp, vertical = 4.dp),
-                        )
+        val editMode = Appearance.isEditModeEnabled
+        val showsTagRow = tags.isNotEmpty() || editMode || AITagSuggestions.isActive
+        Row(
+            Modifier.padding(top = 8.dp).fillMaxWidth().height(24.dp).padding(horizontal = FeedsDock.edgePadding),
+            horizontalArrangement = Arrangement.spacedBy(6.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            if (showsTagRow) {
+                if (editMode) {
+                    Box(
+                        Modifier.height(24.dp).clip(Capsule).stashyGlass(Capsule)
+                            .clickable(onClickLabel = "Add tags", onClick = onAddTags)
+                            .padding(horizontal = 9.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(SF.plus, "Add tags", tint = FeedsDock.hashtagForeground, modifier = Modifier.size(14.dp))
+                    }
+                }
+                androidx.compose.runtime.key(item.id) {
+                    Row(
+                        Modifier.weight(1f).horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        tags.forEach { t -> FeedHashtag(t, removable = editMode && t.id != item.primaryTagId, onTag = { onTag(t) }, onRemove = { onRemoveTag(t) }) }
+                        // iOS: `AITagSuggestionBar(target: item.aiTagTarget)` inline after the tags;
+                        // the row follows through the `TagsUpdated` patch of [FeedsModel].
+                        AITagSuggestionBar(item.aiTagTarget) { }
                     }
                 }
             }
+        }
+    }
+}
+
+/** One `#tag` chip: tap toggles the tag filter, long press offers "Remove tag" (iOS context menu, edit mode). */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun FeedHashtag(tag: IdName, removable: Boolean, onTag: () -> Unit, onRemove: () -> Unit) {
+    var menu by remember { mutableStateOf(false) }
+    val haptics = LocalHapticFeedback.current
+    Box {
+        Text(
+            "#${tag.name}", fontSize = 12.sp, fontWeight = FontWeight.SemiBold, color = FeedsDock.hashtagForeground,
+            modifier = Modifier.stashyGlass(Capsule)
+                .combinedClickable(
+                    interactionSource = remember { MutableInteractionSource() }, indication = null,
+                    onClick = onTag,
+                    onLongClick = if (removable) ({ haptics.performHapticFeedback(HapticFeedbackType.LongPress); menu = true }) else null,
+                )
+                .padding(horizontal = 9.dp, vertical = 4.dp),
+        )
+        DropdownMenu(menu, { menu = false }) {
+            DropdownMenuItem(
+                { Text("Remove tag", color = StashyColors.systemRed) },
+                leadingIcon = { Icon(SF.trash, null, tint = StashyColors.systemRed) },
+                onClick = { menu = false; onRemove() },
+            )
         }
     }
 }
