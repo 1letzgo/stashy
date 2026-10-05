@@ -41,6 +41,8 @@ class StashyApplication : Application(), SingletonImageLoader.Factory {
         ImageLoader.Builder(context)
             .components {
                 add(OkHttpNetworkFetcherFactory(callFactory = { Net.client }))
+                // Per-server keys without apikey (iOS ImageCacheManager).
+                add(de.letzgo.stashy.data.ImageCacheKeys.interceptor)
                 add(SvgDecoder.Factory())
                 add(AnimatedImageDecoder.Factory())
             }
