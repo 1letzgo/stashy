@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -38,8 +39,8 @@ import de.letzgo.stashy.data.AppTab
 import de.letzgo.stashy.data.TabManager
 import de.letzgo.stashy.ui.AppTheme
 import de.letzgo.stashy.ui.Appearance
-import de.letzgo.stashy.ui.GlassCapsule
-import de.letzgo.stashy.ui.GlassIconButton
+import de.letzgo.stashy.ui.floatingShadow
+import de.letzgo.stashy.ui.stashyGlass
 import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.SFS
@@ -89,7 +90,7 @@ class AppearanceSettingsScreen : Screen {
                     }
                 }
             }
-            settingsSection(header = "Glass", footer = "How much of the content shows through buttons, pills and bars. Applies to all glass chrome.", key = "glass") {
+            settingsSection(header = "Glass", footer = "How much of the content shows through the glass buttons, pills and bars drawn over videos and images.", key = "glass") {
                 Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(SFS.circleLeftHalf, null, tint = Appearance.tint, modifier = Modifier.size(24.dp))
@@ -150,14 +151,30 @@ private fun GlassDemo() {
             }
         }
         Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-            GlassCapsule(height = 42.dp, tint = Appearance.tint) {
+            DemoGlassCapsule(tint = Appearance.tint) {
                 Icon(SFS.chevronLeft, null, tint = Color.White, modifier = Modifier.size(16.dp))
                 Text("Back", style = NativeType.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
             }
-            GlassCapsule(height = 42.dp) { Text("Demo", style = NativeType.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = Color.White) }
-            GlassIconButton(SF.line3HorizontalDecrease, null, size = 42.dp) {}
+            DemoGlassCapsule { Text("Demo", style = NativeType.bodyMedium.copy(fontWeight = FontWeight.SemiBold), color = Color.White) }
+            Box(Modifier.size(42.dp).floatingShadow().stashyGlass(CircleShape), contentAlignment = Alignment.Center) {
+                Icon(SF.line3HorizontalDecrease, null, tint = Color.White, modifier = Modifier.size(19.dp))
+            }
         }
     }
+}
+
+/**
+ * Glass capsule of the demo. Regular surfaces use Material components now; the glass look (and
+ * this setting) only remains on the overlays drawn over playback (Feeds chrome, player, viewer).
+ */
+@Composable
+private fun DemoGlassCapsule(tint: Color? = null, content: @Composable RowScope.() -> Unit) {
+    Row(
+        Modifier.height(42.dp).floatingShadow(RoundedCornerShape(50)).stashyGlass(RoundedCornerShape(50), tint).padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        content = content,
+    )
 }
 
 /** iOS: `EditModeSettingsView`. */

@@ -40,11 +40,14 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.AssistChipDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -96,7 +99,8 @@ import de.letzgo.stashy.ui.noRippleClickable
 import de.letzgo.stashy.ui.oCounterIcon
 import de.letzgo.stashy.ui.player.PreviewSurface
 import de.letzgo.stashy.ui.player.rememberPreviewPlayer
-import de.letzgo.stashy.ui.stashyGlass
+import de.letzgo.stashy.ui.NativeMediaLabel
+import de.letzgo.stashy.ui.components.onLongPress
 import de.letzgo.stashy.ui.components.TagChipRow
 import de.letzgo.stashy.ui.components.TagChipStyle
 import de.letzgo.stashy.ui.components.TagChips
@@ -353,12 +357,7 @@ fun ImageFeedPostCard(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 if (images.size > 1) {
-                    Box(
-                        Modifier.height(48.dp).widthIn(min = 40.dp).stashyGlass(RoundedCornerShape(50)).padding(horizontal = 14.dp),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Text("${visibleIndex + 1}/${images.size}", style = IosTypography.caption2.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
-                    }
+                    NativeMediaLabel("${visibleIndex + 1}/${images.size}", Modifier.padding(bottom = 8.dp))
                 }
                 Spacer(Modifier.weight(1f))
                 if (showsRate) FeedRateChrome(visible, onImageUpdated)
@@ -577,7 +576,7 @@ private fun FeedRateChrome(image: StashImage, onImageUpdated: (StashImage) -> Un
 
     Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.Bottom) {
         Box {
-            RatePill(SF.starFill, "$stars", stars > 0, Modifier.noRippleClickable { ratingMenu = true })
+            RatePill(SF.starFill, "$stars", stars > 0, onClick = { ratingMenu = true })
             DropdownMenu(ratingMenu, onDismissRequest = { ratingMenu = false }) {
                 DropdownMenuItem(text = { Text("Clear Rating") }, trailingIcon = { if (stars == 0) Icon(SF.checkmark, null) }, onClick = { ratingMenu = false; setRating(0) })
                 HorizontalDivider()
@@ -590,11 +589,8 @@ private fun FeedRateChrome(image: StashImage, onImageUpdated: (StashImage) -> Un
         Box {
             RatePill(
                 oCounterIcon(Appearance.oCounterIcon, filled = oCount > 0), "$oCount", oCount > 0,
-                Modifier.combinedClickable(
-                    interactionSource = remember { MutableInteractionSource() }, indication = null,
-                    onClick = { changeO(FeedsRepository.OMutation.Increment) },
-                    onLongClick = { if (oCount > 0) oMenu = true },
-                ),
+                onClick = { changeO(FeedsRepository.OMutation.Increment) },
+                onLongClick = { if (oCount > 0) oMenu = true },
             )
             DropdownMenu(oMenu, onDismissRequest = { oMenu = false }) {
                 DropdownMenuItem(text = { Text("Remove one") }, onClick = { oMenu = false; changeO(FeedsRepository.OMutation.Decrement) })
@@ -604,14 +600,25 @@ private fun FeedRateChrome(image: StashImage, onImageUpdated: (StashImage) -> Un
     }
 }
 
+/** Rating / O-counter of a post — Material `AssistChip` in the over-media look of the tag chips. */
 @Composable
-private fun RatePill(icon: androidx.compose.ui.graphics.vector.ImageVector, value: String, active: Boolean, modifier: Modifier) {
-    Column(
-        Modifier.size(48.dp).stashyGlass(CircleShape).then(modifier),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(2.dp, Alignment.CenterVertically),
-    ) {
-        Icon(icon, null, tint = Color.White.copy(alpha = if (active) 1f else 0.72f), modifier = Modifier.size(18.dp))
-        Text(value, style = IosTypography.caption2.copy(fontWeight = FontWeight.SemiBold), color = Color.White.copy(alpha = 0.72f))
-    }
+private fun RatePill(
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    value: String,
+    active: Boolean,
+    onClick: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
+) {
+    AssistChip(
+        onClick = onClick,
+        label = { Text(value, style = MaterialTheme.typography.labelLarge, maxLines = 1) },
+        leadingIcon = { Icon(icon, null, Modifier.size(AssistChipDefaults.IconSize)) },
+        colors = AssistChipDefaults.assistChipColors(
+            containerColor = Color.Black.copy(alpha = 0.45f),
+            labelColor = Color.White,
+            leadingIconContentColor = Color.White.copy(alpha = if (active) 1f else 0.72f),
+        ),
+        border = AssistChipDefaults.assistChipBorder(enabled = true, borderColor = Color.White.copy(alpha = 0.25f)),
+        modifier = if (onLongClick != null) Modifier.onLongPress(onLongClick) else Modifier,
+    )
 }

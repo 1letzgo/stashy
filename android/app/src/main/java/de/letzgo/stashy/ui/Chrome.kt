@@ -61,7 +61,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -107,61 +106,6 @@ fun Modifier.noRippleClickable(onClick: () -> Unit): Modifier = this.clickable(
     interactionSource = MutableInteractionSource(), indication = null, onClick = onClick,
 )
 
-/** Circular glass icon button (iOS chrome FAB, 36pt by default). */
-@Composable
-fun GlassIconButton(
-    icon: ImageVector,
-    contentDescription: String?,
-    modifier: Modifier = Modifier,
-    size: Dp = 44.dp,
-    tint: Color? = null,
-    iconTint: Color = Color.White,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier
-            .size(size)
-            .floatingShadow()
-            .stashyGlass(CircleShape, tint)
-            .clickable(onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) { Icon(icon, contentDescription, tint = iconTint, modifier = Modifier.size(size * 0.45f)) }
-}
-
-/** Glass capsule with icon + label (selected chip of the top strip, "Back" pill …). */
-@Composable
-fun GlassCapsule(
-    modifier: Modifier = Modifier,
-    tint: Color? = null,
-    height: Dp = 44.dp,
-    contentPadding: PaddingValues = PaddingValues(horizontal = 16.dp),
-    onClick: (() -> Unit)? = null,
-    content: @Composable RowScope.() -> Unit,
-) {
-    Row(
-        modifier
-            .height(height)
-            .floatingShadow(RoundedCornerShape(50))
-            .stashyGlass(RoundedCornerShape(50), tint)
-            .let { if (onClick != null) it.clickable(onClick = onClick) else it }
-            .padding(contentPadding),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        content = content,
-    )
-}
-
-/** Small label used on cards (date, duration, counts) — Android look: [NativeMediaLabel]. */
-@Composable
-fun GlassBadge(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null) =
-    NativeMediaLabel(text, modifier, icon)
-
-/** Back pill used by detail screens (iOS hides the nav bar and shows a glass back button). */
-@Composable
-fun BackPill(onClick: () -> Unit, modifier: Modifier = Modifier) {
-    GlassIconButton(Icons.AutoMirrored.Filled.ArrowBackIos, "Back", modifier, onClick = onClick)
-}
-
 /** Section header like the dashboard rows ("Scenes - Recently Added ›"). */
 @Composable
 fun SectionHeader(title: String, modifier: Modifier = Modifier, onClick: (() -> Unit)? = null) {
@@ -178,19 +122,6 @@ fun SectionHeader(title: String, modifier: Modifier = Modifier, onClick: (() -> 
             Spacer(Modifier.width(6.dp))
             Icon(Icons.Chevron, null, tint = p.secondaryText, modifier = Modifier.size(20.dp))
         }
-    }
-}
-
-/** Selectable chrome chip: selected = tinted glass capsule with label, else icon-only glass circle. */
-@Composable
-fun ChromeChip(icon: ImageVector, label: String, selected: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
-    if (selected) {
-        GlassCapsule(modifier, tint = Color.White.copy(alpha = 0.28f), onClick = onClick) {
-            Icon(icon, null, tint = Color.White, modifier = Modifier.size(22.dp))
-            Text(label, style = IosTypography.headline.copy(fontWeight = FontWeight.Medium), color = Color.White)
-        }
-    } else {
-        GlassIconButton(icon, label, modifier, onClick = onClick)
     }
 }
 

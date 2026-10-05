@@ -258,7 +258,7 @@ private fun suggestionChipColors(style: TagChipStyle): SuggestionColors {
  * the rest of the gesture so the tap does not fire too. Movement beyond touch slop (scrolling
  * the row) cancels it.
  */
-private fun Modifier.onLongPress(onLongPress: () -> Unit): Modifier = composed {
+internal fun Modifier.onLongPress(onLongPress: () -> Unit): Modifier = composed {
     val current by rememberUpdatedState(onLongPress)
     Modifier.pointerInput(Unit) {
         awaitEachGesture {

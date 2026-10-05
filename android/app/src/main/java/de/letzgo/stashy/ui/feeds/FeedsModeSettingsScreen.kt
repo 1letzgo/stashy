@@ -29,6 +29,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.IconButton
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,7 +43,6 @@ import de.letzgo.stashy.data.FeedsRepository
 import de.letzgo.stashy.data.ReelsModeType
 import de.letzgo.stashy.data.SavedFilter
 import de.letzgo.stashy.ui.Appearance
-import de.letzgo.stashy.ui.BackPill
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
@@ -65,8 +67,8 @@ fun FeedsModeSettings() {
     LaunchedEffect(Unit) { filters = runCatching { FeedsRepository.savedFilters() }.getOrDefault(emptyList()) }
     val modes = FeedsConfig.modes
     Column(Modifier.fillMaxSize().background(p.background)) {
-        Row(Modifier.statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            BackPill({ Nav.pop() })
+        Row(Modifier.statusBarsPadding().padding(start = 4.dp, end = 16.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            IconButton({ Nav.pop() }) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = p.text) }
             Text("Feeds", style = IosTypography.title3, color = p.text)
         }
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {

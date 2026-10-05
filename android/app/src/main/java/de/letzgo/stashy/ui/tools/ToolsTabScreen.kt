@@ -40,7 +40,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import de.letzgo.stashy.data.StashyPlus
-import de.letzgo.stashy.ui.ChromeChip
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.Theme

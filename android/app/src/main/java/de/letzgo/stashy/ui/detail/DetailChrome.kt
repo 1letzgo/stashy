@@ -222,18 +222,10 @@ object DetailFeedsLink {
     }
 }
 
-/** iOS: Feeds pill in the header (`AppTab.reels.icon` + "Feeds"). */
+/** iOS: Feeds pill in the header (`AppTab.reels.icon` + "Feeds") — Material `AssistChip`. */
 @Composable
 internal fun FeedsPill(onClick: () -> Unit) {
-    Row(
-        Modifier.clip(RoundedCornerShape(50)).background(Appearance.tint.copy(alpha = 0.15f)).clickable(onClick = onClick)
-            .padding(horizontal = 10.dp, vertical = 5.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Icon(SF.playRectangleOnRectangle, null, tint = Theme.palette.pillAccent, modifier = Modifier.size(13.dp))
-        Text("Feeds", fontSize = 11.sp, fontWeight = FontWeight.Bold, color = Theme.palette.pillAccent)
-    }
+    de.letzgo.stashy.ui.components.ActionChip("Feeds", onClick, icon = SF.playRectangleOnRectangle)
 }
 
 /** 2-column label/value grid of the detail headers (8pt uppercase label, 11pt medium value). */
