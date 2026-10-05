@@ -123,6 +123,8 @@ fun FilterCriteriaEditor(
     modifier: Modifier = Modifier,
     embedsInCard: Boolean = true,
     path: List<String> = emptyList(),
+    /** iOS `levelTitle` — caption above the root level (Tools › Filters shows the mode). */
+    levelTitle: String? = null,
 ) {
     val scope = rememberCoroutineScope()
     val scheduler = remember { ApplyScheduler(scope) }
@@ -153,6 +155,9 @@ fun FilterCriteriaEditor(
         modifier.padding(horizontal = if (embedsInCard) Tokens.Spacing.md else 0.dp).padding(bottom = if (embedsInCard) Tokens.Spacing.xs else 0.dp),
         verticalArrangement = Arrangement.spacedBy(Tokens.Spacing.sm),
     ) {
+        if (isRoot && !levelTitle.isNullOrEmpty()) {
+            Text(levelTitle, Modifier.fillMaxWidth().padding(horizontal = 10.dp), style = IosTypography.caption, color = p.secondaryText)
+        }
         Text(explanation, Modifier.fillMaxWidth().padding(horizontal = 10.dp), style = IosTypography.caption, color = p.secondaryText)
         if (levelKeys.isEmpty()) {
             Text(

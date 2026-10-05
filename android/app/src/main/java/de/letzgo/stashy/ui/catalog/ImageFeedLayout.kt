@@ -140,6 +140,8 @@ fun ImageFeedList(
     state: LazyListState = rememberLazyListState(),
     currentGalleryId: String? = null,
     showsRate: Boolean = true,
+    /** Optional first row (e.g. the catalog's search chip). */
+    header: (@Composable () -> Unit)? = null,
 ) {
     val groupSets = TabManager.stashlineGroupSets
     val precision = ImageSessionPrecision.from(TabManager.stashlineSessionPrecision)
@@ -184,6 +186,7 @@ fun ImageFeedList(
         contentPadding = contentPadding,
         verticalArrangement = Arrangement.spacedBy(Tokens.Grid.spacing),
     ) {
+        if (header != null) item(key = "header") { header() }
         itemsIndexed(posts, key = { _, p -> p.id }) { index, post ->
             LaunchedEffect(index, posts.size) { if (index >= posts.size - 3) onLoadMore() }
             ImageFeedPostCard(

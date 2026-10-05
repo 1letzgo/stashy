@@ -211,6 +211,8 @@ fun <T> CatalogScaffold(
     topPadding: Dp = catalogTopPadding(),
     showsFloatingBar: Boolean = true,
     gridKey: Any? = null,
+    /** Replaces the grid when set (Images 1/row feed); gets the content top padding. */
+    listBody: (@Composable (topPadding: Dp) -> Unit)? = null,
     item: @Composable (index: Int, item: T) -> Unit,
 ) {
     val list = controller.list
@@ -223,7 +225,7 @@ fun <T> CatalogScaffold(
             list.items.isEmpty() && list.error != null -> StatusPlaceholder(SF.server, "Server not reachable", "Retry Connection", { controller.refresh() })
             list.items.isEmpty() -> StatusPlaceholder(texts.emptyIcon, texts.emptyTitle, texts.emptyButton, { controller.refresh() })
             else -> PullToRefreshBox(isRefreshing = false, onRefresh = { controller.refresh() }, modifier = Modifier.fillMaxSize()) {
-                BoxWithConstraints(Modifier.fillMaxSize()) {
+                if (listBody != null) listBody(topPadding) else BoxWithConstraints(Modifier.fillMaxSize()) {
                     val count = columns((maxWidth - 32.dp).value)
                     androidx.compose.runtime.key(gridKey) {
                         LazyVerticalGrid(
