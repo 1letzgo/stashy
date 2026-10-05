@@ -10501,6 +10501,15 @@ struct StashImage: Codable, Identifiable, Equatable {
         return nil
     }
 
+    /// Title stored for a downloaded image: the title, else the file name without extension.
+    var downloadTitle: String? {
+        DownloadedGalleryImage.fileTitle(
+            title: title,
+            basename: visual_files?.first?.basename,
+            path: visual_files?.first?.path
+        )
+    }
+
     var isGifFile: Bool {
         if fileExtension?.uppercased() == "GIF" { return true }
         let candidates = [
@@ -10719,7 +10728,7 @@ struct DownloadedScene: Codable, Identifiable {
 /// `downloads_metadata.json` keeps decoding unchanged.
 struct DownloadedGallery: Codable, Identifiable {
     let id: String
-    let title: String?
+    var title: String?
     let studioName: String?
     let performerNames: [String]
     var downloadDate: Date
@@ -10761,7 +10770,10 @@ struct DownloadedGallery: Codable, Identifiable {
 struct DownloadedGalleryImage: Codable, Identifiable, Equatable {
     let id: String
     let localPath: String
-    let title: String?
+    /// Server title, or the file name without extension when the image has none
+    /// (`fileTitle`). Entries written before that fallback may still be nil until the
+    /// title backfill resolves them.
+    var title: String?
     /// Server `created_at`; the sync uses it to spot images added since the last run.
     let createdAt: String?
     let isVideo: Bool
@@ -10772,6 +10784,28 @@ struct DownloadedGalleryImage: Codable, Identifiable, Equatable {
     /// these the downloaded copy would lose them entirely. Optional so older entries still decode.
     var performerNames: [String]?
     var tagNames: [String]?
+
+    /// Trimmed title, else the file name without its extension (Stash's own UI falls back to
+    /// the file name too). Android: `DownloadsMetadataCodec.imageTitle`.
+    static func fileTitle(title: String?, basename: String?, path: String?) -> String? {
+        if let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines), !trimmed.isEmpty {
+            return trimmed
+        }
+        var name = basename?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if name.isEmpty, let path {
+            let clean = path.components(separatedBy: "?").first ?? path
+            name = (clean as NSString).lastPathComponent.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+        guard !name.isEmpty else { return nil }
+        let stem = (name as NSString).deletingPathExtension
+        return stem.isEmpty ? name : stem
+    }
+
+    /// What the downloads grid shows.
+    var displayTitle: String {
+        let trimmed = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        return trimmed.isEmpty ? "Untitled" : trimmed
+    }
 }
 
 struct ActiveDownload {
@@ -11169,6 +11203,13 @@ class DownloadManager: NSObject, ObservableObject {
     /// image batch: one scene is a whole video file.
     static var sceneNewestBatchSize: Int { TabManager.shared.sceneDownloadBatchSize }
 
+    /// True unless the set is known to hold no more than `batch` items — then "Sync newest N"
+    /// would do exactly what "Sync newest" does.
+    static func showsSyncNewestBatch(count: Int?, batch: Int) -> Bool {
+        guard let count, count > 0 else { return true }
+        return count > batch
+    }
+
     // MARK: - Bulk scene downloads (performer / studio / tag / group)
 
     /// Which library object a bulk scene download belongs to.
@@ -11364,7 +11405,8 @@ class DownloadManager: NSObject, ObservableObject {
         let entryId = "image-" + image.id
         guard !isGalleryDownloaded(id: entryId), activeDownloads[entryId] == nil else { return }
 
-        let title = image.title ?? "Image"
+        let fileTitle = image.downloadTitle
+        let title = fileTitle ?? "Image"
         activeDownloads[entryId] = ActiveDownload(id: entryId, title: title, progress: 0.05, totalSize: 0, downloadedSize: 0)
 
         let folder = downloadsFolder.appendingPathComponent(Self.galleryFolderName(for: entryId), isDirectory: true)
@@ -11381,7 +11423,7 @@ class DownloadManager: NSObject, ObservableObject {
                 }
                 let entry = DownloadedGallery(
                     id: entryId,
-                    title: image.title,
+                    title: fileTitle,
                     studioName: image.studio?.name,
                     performerNames: (image.performers ?? []).map(\.name),
                     downloadDate: Date(),
@@ -11720,6 +11762,99 @@ class DownloadManager: NSObject, ObservableObject {
         }
     }
 
+    // MARK: - Title backfill
+
+    private var titleBackfillRunning = false
+    private var titleBackfillDone = false
+
+    private struct ImageTitlesResponse: Decodable {
+        struct Payload: Decodable { let findImages: Images }
+        struct Images: Decodable { let images: [Item] }
+        struct File: Decodable { let path: String?; let basename: String? }
+        struct Item: Decodable {
+            let id: String
+            let title: String?
+            let created_at: String?
+            let visual_files: [File]?
+        }
+        let data: Payload?
+    }
+
+    private static let imageTitlesQuery = """
+    query DownloadImageTitles($ids: [ID!], $filter: FindFilterType) {
+      findImages(ids: $ids, filter: $filter) {
+        images { id title created_at visual_files { ... on BaseFile { path basename } } }
+      }
+    }
+    """
+
+    /// Images downloaded before the file-name fallback were stored with `title == nil` and showed
+    /// "Untitled". Looks them up once per launch — matched by id AND `created_at`, so another
+    /// active server can never rename them — and stores the file-name title. Offline it simply
+    /// retries the next time a downloads screen appears.
+    func backfillMissingImageTitles() {
+        guard !titleBackfillDone, !titleBackfillRunning else { return }
+        let missing = galleryDownloads.flatMap { entry in
+            entry.images.filter {
+                ($0.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "").isEmpty && $0.createdAt != nil
+            }
+        }
+        guard !missing.isEmpty else {
+            titleBackfillDone = true
+            return
+        }
+        titleBackfillRunning = true
+        var seen = Set<String>()
+        let ids = missing.map(\.id).filter { seen.insert($0).inserted }
+
+        Task { @MainActor in
+            defer { self.titleBackfillRunning = false }
+            var found: [String: (createdAt: String?, title: String)] = [:]
+            var start = 0
+            while start < ids.count {
+                let chunk = Array(ids[start..<min(start + 200, ids.count)])
+                start += 200
+                do {
+                    let response: ImageTitlesResponse = try await GraphQLClient.shared.execute(
+                        query: Self.imageTitlesQuery,
+                        variables: ["ids": chunk, "filter": ["per_page": -1]]
+                    )
+                    for item in response.data?.findImages.images ?? [] {
+                        let file = item.visual_files?.first
+                        if let title = DownloadedGalleryImage.fileTitle(title: item.title, basename: file?.basename, path: file?.path) {
+                            found[item.id] = (item.created_at, title)
+                        }
+                    }
+                } catch {
+                    AppLog.debug("📥 Download title backfill failed: \(error)")
+                    return
+                }
+            }
+            // Done once every candidate resolved; a miss (e.g. another server active) retries later.
+            self.titleBackfillDone = missing.allSatisfy { found[$0.id]?.createdAt == $0.createdAt }
+
+            var changed = false
+            for entryIndex in self.galleryDownloads.indices {
+                var entry = self.galleryDownloads[entryIndex]
+                var entryChanged = false
+                for imageIndex in entry.images.indices {
+                    let image = entry.images[imageIndex]
+                    guard (image.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "").isEmpty,
+                          let hit = found[image.id], hit.createdAt == image.createdAt else { continue }
+                    entry.images[imageIndex].title = hit.title
+                    entryChanged = true
+                }
+                guard entryChanged else { continue }
+                if entry.isSingleImage, (entry.title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? "").isEmpty {
+                    entry.title = entry.images.first?.title
+                }
+                self.galleryDownloads[entryIndex] = entry
+                changed = true
+            }
+            if changed { self.saveGalleryMetadata() }
+        }
+    }
+
     /// Toasts are an iOS-only surface; tvOS has no `ToastManager`.
     private func notifyDownload(_ message: String, icon: String, isError: Bool = false) {
         #if !os(tvOS)
@@ -11838,7 +11973,7 @@ class DownloadManager: NSObject, ObservableObject {
                         stored.append(DownloadedGalleryImage(
                             id: image.id,
                             localPath: relativePath,
-                            title: image.title,
+                            title: image.downloadTitle,
                             createdAt: image.createdAt,
                             isVideo: image.isVideo,
                             thumbnailPath: thumbRelative,

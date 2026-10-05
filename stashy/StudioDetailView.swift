@@ -509,6 +509,7 @@ struct StudioDetailView: View {
             isPresented: $showingSceneDownloadOptions,
             scope: .studio(id: studio.id),
             scopeName: studio.name,
+            sceneCount: studio.sceneCount,
         )
         .stashyDetailChrome(studioDetailChromeConfig) {
             studioDetailNavBar

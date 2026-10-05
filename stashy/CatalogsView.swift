@@ -1125,6 +1125,7 @@ struct GroupDetailView: View {
             isPresented: $showingSceneDownloadOptions,
             scope: .group(id: selectedGroup.id),
             scopeName: selectedGroup.name,
+            sceneCount: selectedGroup.scene_count,
         )
         .stashyDetailChrome(groupDetailChromeConfig) {
             groupDetailNavBar

@@ -135,6 +135,7 @@ struct DownloadsView: View {
         .onAppear {
             jobStore.load()
             if viewModel.savedFilters.isEmpty { viewModel.fetchSavedFilters() }
+            DownloadManager.shared.backfillMissingImageTitles()
         }
         .sheet(isPresented: $showingJobSheet) {
             DownloadSyncJobSheet(savedFilters: viewModel.savedFilters) { job in
@@ -1320,6 +1321,7 @@ struct DownloadedGalleryDetailView: View {
         .stashyCustomChromeInset(spacing: DesignTokens.Chrome.contentTopGap) {
             galleryDetailNavBar
         }
+        .onAppear { downloadManager.backfillMissingImageTitles() }
     }
 
     /// Custom top chrome: Back · title · Sync newest / Sync newest 50 / Delete.
@@ -1355,12 +1357,17 @@ struct DownloadedGalleryDetailView: View {
                             sync(limit: nil)
                         }
 
-                        chromeCircleButton(
-                            systemImage: "arrow.down.to.line",
-                            label: "Sync newest \(DownloadManager.galleryNewestBatchSize)"
+                        if DownloadManager.showsSyncNewestBatch(
+                            count: entry?.serverImageCount,
+                            batch: DownloadManager.galleryNewestBatchSize
                         ) {
-                            HapticManager.light()
-                            sync(limit: DownloadManager.galleryNewestBatchSize)
+                            chromeCircleButton(
+                                systemImage: "arrow.down.to.line",
+                                label: "Sync newest \(DownloadManager.galleryNewestBatchSize)"
+                            ) {
+                                HapticManager.light()
+                                sync(limit: DownloadManager.galleryNewestBatchSize)
+                            }
                         }
                     }
 
@@ -1461,8 +1468,7 @@ struct DownloadedGalleryDetailView: View {
                             Spacer()
 
                             HStack(alignment: .bottom) {
-                                Text(image.title?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
-                                     ? image.title! : "Untitled")
+                                Text(image.displayTitle)
                                     .font(.headline)
                                     .fontWeight(.medium)
                                     .foregroundColor(.white)

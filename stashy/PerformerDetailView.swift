@@ -539,6 +539,7 @@ struct PerformerDetailView: View {
             isPresented: $showingSceneDownloadOptions,
             scope: .performer(id: displayPerformer.id),
             scopeName: displayPerformer.name,
+            sceneCount: displayPerformer.sceneCount,
         )
         .sheet(isPresented: $showingEditPerformerSheet) {
             EditPerformerSheet(performer: displayPerformer, viewModel: viewModel, onDeleted: { dismiss() }) { updated in
