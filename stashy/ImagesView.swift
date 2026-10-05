@@ -43,7 +43,7 @@ struct ImagesView: View {
     }
 
     var body: some View {
-        ImagesViewBody(
+        var content = ImagesViewBody(
             initialGallery: initialGallery,
             forceOneColumnFeed: forceOneColumnFeed,
             feedsEmbedded: feedsEmbedded,
@@ -51,11 +51,15 @@ struct ImagesView: View {
             imageListFilters: sharedImageListFilters ?? ownedImageListFilters,
             initialSearch: initialSearch
         )
+        content.hostsInSectionChrome = catalogBrowserViewModel != nil && initialGallery == nil && !feedsEmbedded
+        return content
     }
 }
 
 private struct ImagesViewBody: View {
     @State private var gallery: Gallery?
+    /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
+    var hostsInSectionChrome = false
     var forceOneColumnFeed: Bool = false
     var feedsEmbedded: Bool = false
     @ObservedObject var viewModel: StashDBViewModel
@@ -75,8 +79,6 @@ private struct ImagesViewBody: View {
     @State private var didApplyDefaultFilter = false
     @State private var showingEditGallerySheet = false
     @State private var isHeaderExpanded = false
-    /// After the user hits the 1/2-column toggle, stop locking `forceOneColumnFeed`.
-    @State private var ignoreForcedOneColumnFeed = false
     /// True while the Images feed ScrollView is dragging / decelerating.
     @State private var isFeedScrolling = false
     /// Global frames of visible video cards (for picking the most centered one).
@@ -149,7 +151,7 @@ private struct ImagesViewBody: View {
     }
 
     private var effectiveCardColumns: CatalogCardColumns {
-        if forceOneColumnFeed && !ignoreForcedOneColumnFeed {
+        if forceOneColumnFeed {
             return .one
         }
         return tabManager.catalogCardColumns(for: cardColumnScope)
@@ -836,7 +838,6 @@ private struct ImagesViewBody: View {
 
     /// Single chrome call site: legacy floating bar or native toolbar, decided by the environment flag.
     private var imagesChromeConfig: CatalogChromeConfig {
-        let cardColumns = effectiveCardColumns
         let ownsNavBar = !isOpenedGallery && !feedsEmbedded
         return CatalogChromeConfig(
             title: "Images",
@@ -848,17 +849,7 @@ private struct ImagesViewBody: View {
                 imageFindListError: viewModel.imageFindListError
             ),
             isPresented: !feedsEmbedded,
-            columns: CatalogChromeSlot(
-                systemImage: cardColumns.toggleIcon,
-                accessibilityLabel: cardColumns.accessibilityLabel,
-                accessibilityHint: "Switches between one and two cards per row",
-                action: {
-                    withAnimation(DesignTokens.Animation.quick) {
-                        ignoreForcedOneColumnFeed = true
-                        tabManager.toggleCatalogCardColumns(for: cardColumnScope)
-                    }
-                }
-            ),
+            hostsInSectionChrome: hostsInSectionChrome && !isOpenedGallery,
             filterSort: CatalogChromeSlot(
                 systemImage: "slider.horizontal.3",
                 isActive: catalogFilterSortFABActive,

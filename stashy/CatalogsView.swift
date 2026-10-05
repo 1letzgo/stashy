@@ -16,6 +16,8 @@ struct CatalogsView: View {
     /// Images filter/sort session — lives on CatalogsView so it survives ImagesView remounts
     /// when pushing FullScreenImageView (especially 1/row video).
     @StateObject private var catalogImagesFilters = DetailLinkedImagesFilterModel(scope: .catalogRoot)
+    /// Settings / select actions of the active sub-tab, shown pinned right in the Home chrome.
+    @State private var sectionActions: SectionChromeActions?
     
     enum CatalogsTab: String, CaseIterable {
         case dashboard = "Dashboard"
@@ -158,8 +160,9 @@ struct CatalogsView: View {
         .animation(nil, value: coordinator.catalogueSubTab)
         // Swipe-back can desync UIKit/SwiftUI stacks; menu switches must always clear details.
         .popNavigationToRootOnChange("\(coordinator.catalogueSubTab)|\(coordinator.cataloguePopToken.uuidString)")
-        .stashySectionChrome(showsSwitcher: showTabSwitcher) {
-            CatalogCategoryRow(tabs: sortedVisibleTabs, selection: selectedTabBinding)
+        .onPreferenceChange(SectionChromeActionsKey.self) { sectionActions = $0 }
+        .stashySectionChrome(showsSwitcher: showTabSwitcher || sectionActions != nil) {
+            CatalogCategoryRow(tabs: sortedVisibleTabs, selection: selectedTabBinding, actions: sectionActions)
         }
     }
 }
@@ -179,11 +182,15 @@ struct GroupsView: View {
     }
 
     var body: some View {
-        GroupsViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel, hideTitle: hideTitle)
+        var content = GroupsViewContent(viewModel: catalogBrowserViewModel ?? ownedViewModel, hideTitle: hideTitle)
+        content.hostsInSectionChrome = catalogBrowserViewModel != nil
+        return content
     }
 }
 
 private struct GroupsViewContent: View {
+    /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
+    var hostsInSectionChrome = false
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
@@ -332,15 +339,11 @@ private struct GroupsViewContent: View {
                 errorMessage: viewModel.errorMessage
             ),
             isPresented: true,
-            quickFilter: CatalogQuickFilterMenuModel(
-                isActive: selectedSortOption != .nameAsc,
-                accessibilityLabel: "Sort",
-                menuContent: AnyView(sortMenuContent)
-            ),
+            hostsInSectionChrome: hostsInSectionChrome,
             filterSort: CatalogChromeSlot(
                 systemImage: "slider.horizontal.3",
-                isActive: selectedFilter != nil || !groupsCriteriaDocument.objectFilter.isEmpty,
-                accessibilityLabel: "Filter",
+                isActive: selectedFilter != nil || !groupsCriteriaDocument.objectFilter.isEmpty || selectedSortOption != .nameAsc,
+                accessibilityLabel: "Settings",
                 action: {
                     if let f = selectedFilter {
                         groupsPresetRowSelection = ListLivePresetTag.serverRow(f.id)
@@ -356,109 +359,6 @@ private struct GroupsViewContent: View {
                 onClear: { performSearch() }
             )
         )
-    }
-
-    @ViewBuilder
-    private var sortMenuContent: some View {
-        // Random
-        Button(action: { changeSortOption(to: .random) }) {
-            HStack {
-                Text("Random")
-                if selectedSortOption == .random { Image(systemName: "checkmark") }
-            }
-        }
-
-        Divider()
-
-        // Name
-        Menu {
-            Button(action: { changeSortOption(to: .nameAsc) }) {
-                HStack {
-                    Text("A → Z")
-                    if selectedSortOption == .nameAsc { Image(systemName: "checkmark") }
-                }
-            }
-            Button(action: { changeSortOption(to: .nameDesc) }) {
-                HStack {
-                    Text("Z → A")
-                    if selectedSortOption == .nameDesc { Image(systemName: "checkmark") }
-                }
-            }
-        } label: {
-            HStack {
-                Text("Name")
-                if selectedSortOption == .nameAsc || selectedSortOption == .nameDesc { Image(systemName: "checkmark") }
-            }
-        }
-
-        // Date
-        Menu {
-            Button(action: { changeSortOption(to: .dateDesc) }) {
-                HStack {
-                    Text("Newest First")
-                    if selectedSortOption == .dateDesc { Image(systemName: "checkmark") }
-                }
-            }
-            Button(action: { changeSortOption(to: .dateAsc) }) {
-                HStack {
-                    Text("Oldest First")
-                    if selectedSortOption == .dateAsc { Image(systemName: "checkmark") }
-                }
-            }
-        } label: {
-            HStack {
-                Text("Date")
-                if selectedSortOption == .dateAsc || selectedSortOption == .dateDesc { Image(systemName: "checkmark") }
-            }
-        }
-
-        // Rating
-        Menu {
-            Button(action: { changeSortOption(to: .ratingDesc) }) {
-                HStack {
-                    Text("High → Low")
-                    if selectedSortOption == .ratingDesc { Image(systemName: "checkmark") }
-                }
-            }
-            Button(action: { changeSortOption(to: .ratingAsc) }) {
-                HStack {
-                    Text("Low → High")
-                    if selectedSortOption == .ratingAsc { Image(systemName: "checkmark") }
-                }
-            }
-        } label: {
-            HStack {
-                Text("Rating")
-                if selectedSortOption == .ratingAsc || selectedSortOption == .ratingDesc { Image(systemName: "checkmark") }
-            }
-        }
-
-        // Counts
-        Menu {
-            Button(action: { changeSortOption(to: .sceneCountDesc) }) {
-                HStack {
-                    Text("Scenes (High → Low)")
-                    if selectedSortOption == .sceneCountDesc { Image(systemName: "checkmark") }
-                }
-            }
-            Button(action: { changeSortOption(to: .galleryCountDesc) }) {
-                HStack {
-                    Text("Galleries (High → Low)")
-                    if selectedSortOption == .galleryCountDesc { Image(systemName: "checkmark") }
-                }
-            }
-            Button(action: { changeSortOption(to: .performerCountDesc) }) {
-                HStack {
-                    Text("Performers (High → Low)")
-                    if selectedSortOption == .performerCountDesc { Image(systemName: "checkmark") }
-                }
-            }
-        } label: {
-            HStack {
-                Text("Counts")
-                if selectedSortOption == .sceneCountDesc || selectedSortOption == .galleryCountDesc || selectedSortOption == .performerCountDesc { Image(systemName: "checkmark") }
-            }
-        }
     }
 
     var body: some View {

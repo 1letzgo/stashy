@@ -70,8 +70,24 @@ extension View {
 struct CatalogCategoryRow: View {
     let tabs: [CatalogsView.CatalogsTab]
     @Binding var selection: CatalogsView.CatalogsTab
+    /// The active sub-tab's actions (settings, select, …), pinned at the right.
+    var actions: SectionChromeActions? = nil
 
     var body: some View {
+        HStack(spacing: StashyExpandingDock.itemSpacing) {
+            if tabs.count > 1 {
+                strip
+            } else {
+                Spacer(minLength: 0)
+            }
+            if let actions {
+                SectionChromeActionsPill(actions: actions)
+                    .padding(StashyChromePlacement.prefersBottom ? .top : .bottom, 4)
+            }
+        }
+    }
+
+    private var strip: some View {
         StashyTopNavNameDropdownRow(
             title: "Home",
             items: tabs.map { StashyNavMenuItem(id: $0.rawValue, title: $0.rawValue, systemImage: $0.icon) },

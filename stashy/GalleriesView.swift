@@ -9,6 +9,8 @@
 import SwiftUI
 
 private struct GalleriesViewContent: View {
+    /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
+    var hostsInSectionChrome = false
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var configManager = ServerConfigManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -502,22 +504,12 @@ private struct GalleriesViewContent: View {
 
     /// Single source for nav bar + slot chrome. The legacy/native branch lives in `stashyCatalogChrome`.
     private var catalogChromeConfig: CatalogChromeConfig {
-        let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.galleries)
-        return CatalogChromeConfig(
+        CatalogChromeConfig(
             title: "Galleries",
             ownsNavigationBar: !hideTitle,
             visibility: galleriesFloatingBarChrome,
             isPresented: true,
-            columns: CatalogChromeSlot(
-                systemImage: cardColumns.toggleIcon,
-                accessibilityLabel: cardColumns.accessibilityLabel,
-                accessibilityHint: "Switches between one and two cards per row",
-                action: {
-                    withAnimation(DesignTokens.Animation.quick) {
-                        tabManager.toggleCatalogCardColumns(for: CatalogCardColumnScope.galleries)
-                    }
-                }
-            ),
+            hostsInSectionChrome: hostsInSectionChrome,
             filterSort: CatalogChromeSlot(
                 systemImage: "slider.horizontal.3",
                 isActive: catalogFilterSortFABActive,
@@ -736,11 +728,13 @@ struct GalleriesView: View {
     }
 
     var body: some View {
-        GalleriesViewContent(
-            viewModel: catalogBrowserViewModel ?? ownedViewModel,
-            initialSort: initialSort,
-            hideTitle: hideTitle
-        )
+        var content = GalleriesViewContent(
+                viewModel: catalogBrowserViewModel ?? ownedViewModel,
+                initialSort: initialSort,
+                hideTitle: hideTitle
+            )
+        content.hostsInSectionChrome = catalogBrowserViewModel != nil
+        return content
     }
 }
 

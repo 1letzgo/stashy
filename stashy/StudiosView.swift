@@ -20,6 +20,8 @@ private enum StudiosDebug {
 }
 
 private struct StudiosViewContent: View {
+    /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
+    var hostsInSectionChrome = false
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var configManager = ServerConfigManager.shared
     @State private var selectedSortOption: StashDBViewModel.StudioSortOption
@@ -491,6 +493,7 @@ private struct StudiosViewContent: View {
                 errorMessage: viewModel.errorMessage
             ),
             isPresented: true,
+            hostsInSectionChrome: hostsInSectionChrome,
             filterSort: CatalogChromeSlot(
                 systemImage: "slider.horizontal.3",
                 isActive: catalogFilterSortFABActive,
@@ -888,11 +891,13 @@ struct StudiosView: View {
     }
 
     var body: some View {
-        StudiosViewContent(
-            viewModel: catalogBrowserViewModel ?? ownedViewModel,
-            initialSort: initialSort,
-            hideTitle: hideTitle
-        )
+        var content = StudiosViewContent(
+                viewModel: catalogBrowserViewModel ?? ownedViewModel,
+                initialSort: initialSort,
+                hideTitle: hideTitle
+            )
+        content.hostsInSectionChrome = catalogBrowserViewModel != nil
+        return content
     }
 }
 

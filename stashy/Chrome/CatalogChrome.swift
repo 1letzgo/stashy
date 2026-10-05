@@ -63,6 +63,9 @@ struct CatalogChromeConfig {
     var ownsNavigationBar: Bool = true
     var visibility: CatalogFloatingChromeState
     var isPresented: Bool = true
+    /// Home sub-tab root: no floating bar; the slots go up into the Home chrome as a pill
+    /// pinned at the right (`SectionChromeActionsKey`).
+    var hostsInSectionChrome: Bool = false
     var columns: CatalogChromeSlot? = nil              // slot 1
     var quickFilter: CatalogQuickFilterMenuModel? = nil // slot 2
     var filterSort: CatalogChromeSlot                   // slot 3
@@ -98,6 +101,79 @@ extension View {
         @ViewBuilder _ overlay: @escaping () -> V
     ) -> some View {
         self.overlay(alignment: alignment) { overlay() }
+    }
+}
+
+// MARK: - Section chrome actions (Home)
+
+/// The slots a Home sub-tab root hands up to the Home chrome. Equality only looks at what is
+/// drawn, so a re-render with fresh closures does not churn the preference.
+struct SectionChromeActions: Equatable {
+    var slots: CatalogSlotSet
+    var selection: CatalogSelectionChrome?
+
+    private var signature: String {
+        let drawn = [slots.contextual, slots.secondaryContextual, slots.filterSort].map { slot in
+            slot.map { "\($0.systemImage)|\($0.isActive)|\($0.accessibilityLabel)" } ?? "-"
+        }
+        let sel = selection.map { "\($0.isActive)|\($0.count)" } ?? "-"
+        return drawn.joined(separator: ";") + ";" + sel
+    }
+
+    static func == (lhs: SectionChromeActions, rhs: SectionChromeActions) -> Bool {
+        lhs.signature == rhs.signature
+    }
+}
+
+struct SectionChromeActionsKey: PreferenceKey {
+    static var defaultValue: SectionChromeActions? { nil }
+    static func reduce(value: inout SectionChromeActions?, nextValue: () -> SectionChromeActions?) {
+        if let next = nextValue() { value = next }
+    }
+}
+
+/// The view's actions as one glass pill, pinned at the right of the Home chrome.
+struct SectionChromeActionsPill: View {
+    let actions: SectionChromeActions
+
+    var body: some View {
+        HStack(spacing: 18) {
+            if let selection = actions.selection, selection.isActive {
+                CatalogFABIconButton(
+                    systemImage: "checkmark.circle.fill",
+                    accessibilityLabel: "Done selecting",
+                    action: selection.onDone
+                )
+            } else {
+                if let contextual = actions.slots.contextual {
+                    slotButton(contextual)
+                }
+                if let secondary = actions.slots.secondaryContextual {
+                    slotButton(secondary)
+                }
+                if let filterSort = actions.slots.filterSort {
+                    CatalogFilterFABButton(
+                        isActive: filterSort.isActive,
+                        accessibilityLabel: filterSort.accessibilityLabel,
+                        action: filterSort.action
+                    )
+                }
+            }
+        }
+        .font(.system(size: StashyExpandingDock.iconSize))
+        .padding(.horizontal, StashyExpandingDock.activeHorizontalPadding)
+        .frame(minWidth: StashyExpandingDock.circleSize, minHeight: StashyExpandingDock.activeHeight)
+        .stashyGlass(shape: Capsule())
+    }
+
+    private func slotButton(_ slot: CatalogChromeSlot) -> some View {
+        CatalogFABIconButton(
+            systemImage: slot.systemImage,
+            isActive: slot.isActive,
+            accessibilityLabel: slot.accessibilityLabel,
+            accessibilityHint: slot.accessibilityHint,
+            action: slot.action
+        )
     }
 }
 
@@ -241,10 +317,21 @@ struct CatalogChromeModifier: ViewModifier {
     let config: CatalogChromeConfig
 
     func body(content: Content) -> some View {
+        // Same structure either way (see `floatingActionBar`): only the flags differ.
         titledContent(content)
-            .floatingActionBar(isPresented: config.isPresented, catalogChrome: config.visibility) {
+            .floatingActionBar(
+                isPresented: config.isPresented && !config.hostsInSectionChrome,
+                catalogChrome: config.visibility
+            ) {
                 CatalogSlotBar(slots: config.slotSet, selection: config.selection)
             }
+            .preference(key: SectionChromeActionsKey.self, value: sectionActions)
+    }
+
+    private var sectionActions: SectionChromeActions? {
+        guard config.hostsInSectionChrome,
+              config.visibility.floatingBarVisible(isPresented: config.isPresented) else { return nil }
+        return SectionChromeActions(slots: config.slotSet, selection: config.selection)
     }
 
     @ViewBuilder

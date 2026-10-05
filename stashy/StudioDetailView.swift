@@ -575,16 +575,6 @@ struct StudioDetailView: View {
                 linkedChildStudios.showFilterSortSheet = true
             }
         case .images:
-            let cardColumns = tabManager.catalogCardColumns(for: CatalogCardColumnScope.images)
-            slots.columns = CatalogChromeSlot(
-                systemImage: cardColumns.toggleIcon,
-                accessibilityLabel: cardColumns.accessibilityLabel,
-                accessibilityHint: "Switches between one and two cards per row"
-            ) {
-                withAnimation(DesignTokens.Animation.quick) {
-                    tabManager.toggleCatalogCardColumns(for: CatalogCardColumnScope.images)
-                }
-            }
             slots.filterSort = CatalogChromeSlot(
                 systemImage: "slider.horizontal.3",
                 isActive: linkedImages.catalogFilterSortFABActive,

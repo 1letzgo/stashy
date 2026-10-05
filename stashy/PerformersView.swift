@@ -10,6 +10,8 @@ import SwiftUI
 
 
 private struct PerformersViewContent: View {
+    /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
+    var hostsInSectionChrome = false
     @ObservedObject var viewModel: StashDBViewModel
     @ObservedObject var configManager = ServerConfigManager.shared
     @State private var scrollPosition: String? = nil
@@ -555,6 +557,7 @@ private struct PerformersViewContent: View {
                 errorMessage: viewModel.errorMessage
             ),
             isPresented: true,
+            hostsInSectionChrome: hostsInSectionChrome,
             filterSort: CatalogChromeSlot(
                 systemImage: "slider.horizontal.3",
                 isActive: catalogFilterSortFABActive,
@@ -888,10 +891,12 @@ struct PerformersView: View {
     }
 
     var body: some View {
-        PerformersViewContent(
-            viewModel: catalogBrowserViewModel ?? ownedViewModel,
-            initialSort: initialSort
-        )
+        var content = PerformersViewContent(
+                viewModel: catalogBrowserViewModel ?? ownedViewModel,
+                initialSort: initialSort
+            )
+        content.hostsInSectionChrome = catalogBrowserViewModel != nil
+        return content
     }
 }
 

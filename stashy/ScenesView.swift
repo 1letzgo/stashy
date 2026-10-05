@@ -308,6 +308,8 @@ extension ScenesListScope {
 }
 
 private struct ScenesViewContent: View {
+    /// Home sub-tab root: actions go into the Home chrome instead of a floating bar.
+    var hostsInSectionChrome = false
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @ObservedObject var configManager = ServerConfigManager.shared
     @EnvironmentObject var coordinator: NavigationCoordinator
@@ -1040,6 +1042,7 @@ private struct ScenesViewContent: View {
                 errorMessage: viewModel.errorMessage
             ),
             isPresented: showsFloatingFilterButton,
+            hostsInSectionChrome: hostsInSectionChrome,
             filterSort: CatalogChromeSlot(
                 systemImage: "slider.horizontal.3",
                 isActive: liveFilterFABHasSomethingSet,
@@ -1469,7 +1472,7 @@ struct ScenesView: View {
 
     /// Katalog-Tab unter ``CatalogsView``: ein über Tab-Wechsel hinweg bleibendes ViewModel.
     static func catalogTab(viewModel: StashDBViewModel) -> some View {
-        ScenesViewContent(
+        var content = ScenesViewContent(
             viewModel: viewModel,
             sort: nil,
             filter: nil,
@@ -1478,6 +1481,8 @@ struct ScenesView: View {
             externalLiveFilterSheetBinding: nil,
             showsFloatingFilterButton: true
         )
+        content.hostsInSectionChrome = true
+        return content
     }
 }
 
