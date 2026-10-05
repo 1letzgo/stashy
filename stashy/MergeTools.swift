@@ -305,7 +305,7 @@ struct MergeToolsView<Item: MergeableItem>: View {
         let base = allItems.filter { $0.id != destination?.id }
         let matches = searchText.isEmpty
             ? base
-            : base.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+            : base.filter { sources.contains($0.id) || $0.name.localizedCaseInsensitiveContains(searchText) }
         return matches.sorted { lhs, rhs in
             let lhsSelected = sources.contains(lhs.id)
             let rhsSelected = sources.contains(rhs.id)

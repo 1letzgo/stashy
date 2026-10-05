@@ -27,6 +27,7 @@ import de.letzgo.stashy.data.DetailViewContext
 import de.letzgo.stashy.data.FilterMode
 import de.letzgo.stashy.data.SortCatalog
 import de.letzgo.stashy.data.TabConfigLogic
+import de.letzgo.stashy.data.FeedsConfig
 import de.letzgo.stashy.data.ReelsModeConfig
 import de.letzgo.stashy.data.ReelsModeType
 import de.letzgo.stashy.data.SavedFiltersStore
@@ -242,6 +243,11 @@ class FeedsSettingsScreen : Screen {
             SettingsList(top) {
                 settingsSection(header = "Tab", key = "tab") {
                     SettingsToggleRow("Show Feeds Tab", TabManager.isVisible(AppTab.Reels), SF.playRectangleOnRectangle) { TabManager.toggle(AppTab.Reels) }
+                }
+                // App UI, not a per-feed filter option — moved here from the Feeds filter sheet
+                // (same `ReelsShowsDeleteButton` key, existing choices carry over).
+                settingsSection(header = "Controls", key = "controls") {
+                    SettingsToggleRow("Show Delete Button", FeedsConfig.showsDeleteButton, SF.trash) { FeedsConfig.updateShowsDeleteButton(it) }
                 }
                 item(key = "modes") {
                     Column(Modifier.padding(bottom = 24.dp)) {

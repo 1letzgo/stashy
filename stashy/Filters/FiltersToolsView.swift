@@ -419,11 +419,12 @@ private struct FiltersToolsEditorSheet: View {
                     } label: {
                         Text("Save")
                             .font(.subheadline.weight(.semibold))
-                            .foregroundColor(trimmedName.isEmpty ? .white.opacity(0.4) : .white)
+                            .foregroundColor(trimmedName.isEmpty || document.hasInvalidInput ? .white.opacity(0.4) : .white)
                             .modifier(StashyChromePillStyle(height: StashyExpandingDock.activeHeight))
                     }
                     .buttonStyle(.plain)
-                    .disabled(trimmedName.isEmpty && !isExisting)
+                    // An invalid date / half-typed number would be dropped silently on save.
+                    .disabled((trimmedName.isEmpty && !isExisting) || document.hasInvalidInput)
                     // Gleicher Speichern-Dialog wie in den Filter-Sheets und bei Merge Tags/Studios.
                     .alert("Save filter", isPresented: $showSaveChoice) {
                         if isExisting {

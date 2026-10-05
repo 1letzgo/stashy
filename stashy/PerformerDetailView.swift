@@ -1164,7 +1164,7 @@ struct EditPerformerSheet: View {
                     TextField("Disambiguation", text: $disambiguation)
                     TextField("Aliases (comma-separated)", text: $aliasesText)
                     TextField("Gender", text: $gender)
-                    TextField("Birthdate (YYYY-MM-DD)", text: $birthdate)
+                    StashDateField(placeholder: "Birthdate (YYYY-MM-DD)", text: $birthdate)
                     TextField("Country", text: $country)
                     TextField("Ethnicity", text: $ethnicity)
                 }
@@ -1220,7 +1220,7 @@ struct EditPerformerSheet: View {
             .stashyModalSheetChrome("Edit Performer", onBack: { dismiss() }) {
                 StashyChromeTrailingTextButton(
                     title: "Save",
-                    enabled: !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                    enabled: !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && StashDateInput.isAcceptable(birthdate),
                     isBusy: isSaving
                 ) { save() }
             }

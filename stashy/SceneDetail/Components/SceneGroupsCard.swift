@@ -133,9 +133,17 @@ struct AddGroupToSceneSheet: View {
     @State private var isSaving = false
     @State private var isCreating = false
 
+    var pinned: [StashGroup] {
+        // Chosen entries always lead the list, whatever the search says.
+        allGroups.filter { selectedIds.contains($0.id) }
+    }
+
     var filtered: [StashGroup] {
-        if searchText.isEmpty { return allGroups }
-        return allGroups.filter { $0.name.lowercased().contains(searchText.lowercased()) }
+        // The search narrows only the unchosen rest, so a chosen entry never vanishes.
+        let term = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return allGroups.filter {
+            !selectedIds.contains($0.id) && (term.isEmpty || $0.name.localizedCaseInsensitiveContains(term))
+        }
     }
 
     var body: some View {
@@ -146,7 +154,7 @@ struct AddGroupToSceneSheet: View {
                     if isLoading {
                         HStack { Spacer(); ProgressView("Loading..."); Spacer() }.padding()
                     } else {
-                        ForEach(filtered.prefix(30)) { group in
+                        ForEach(pinned + Array(filtered.prefix(30))) { group in
                             HStack {
                                 Text(group.name)
                                 Spacer()
@@ -169,7 +177,8 @@ struct AddGroupToSceneSheet: View {
                         if filtered.count > 30 {
                             Text("Type more to refine...").font(.caption).foregroundColor(.secondary)
                         }
-                        if !searchText.isEmpty && filtered.isEmpty {
+                        if !searchText.isEmpty && filtered.isEmpty
+                            && !pinned.contains(where: { $0.name.localizedCaseInsensitiveContains(searchText) }) {
                             Button {
                                 createAndSelect()
                             } label: {

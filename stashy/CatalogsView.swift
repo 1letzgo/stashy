@@ -1631,10 +1631,7 @@ struct EditGroupSheet: View {
             Form {
                 Section("Identity") {
                     TextField("Name", text: $name)
-                    TextField("Date (YYYY-MM-DD)", text: $date)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.numbersAndPunctuation)
-                        .numericKeyboardDoneBar()
+                    StashDateField(placeholder: "Date (YYYY-MM-DD)", text: $date)
                     TextField("Rating (0–100)", text: $ratingText)
                         .keyboardType(.numberPad)
                         .numericKeyboardDoneBar()
@@ -1672,7 +1669,7 @@ struct EditGroupSheet: View {
             .stashyModalSheetChrome("Edit Group", onBack: { dismiss() }) {
                 StashyChromeTrailingTextButton(
                     title: "Save",
-                    enabled: !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                    enabled: !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && StashDateInput.isAcceptable(date),
                     isBusy: isSaving
                 ) { save() }
             }

@@ -62,6 +62,18 @@ class CriteriaDocument(mode: FilterMode, objectFilter: JsonObject = JsonObject(e
 
     val isMarkerMode: Boolean get() = mode == FilterMode.SceneMarkers
 
+    /**
+     * True while a criterion holds input that cannot be sent (an invalid date, a half-typed
+     * number) — kept in a `*_text` scratch key. Done / Save stay disabled until it is fixed.
+     */
+    val hasInvalidInput: Boolean get() = containsScratchKey(_objectFilter)
+
+    private fun containsScratchKey(e: kotlinx.serialization.json.JsonElement): Boolean = when (e) {
+        is JsonObject -> e.any { (k, v) -> k.endsWith("_text") || containsScratchKey(v) }
+        is kotlinx.serialization.json.JsonArray -> e.any { containsScratchKey(it) }
+        else -> false
+    }
+
     val sanitizedObjectFilter: JsonObject get() = stripIncompleteCriteria(sanitize(_objectFilter, mode), mode)
 
     fun criterionKeys(path: List<String>): List<String> {

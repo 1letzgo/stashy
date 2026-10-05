@@ -58,6 +58,7 @@ import de.letzgo.stashy.data.CriterionKind
 import de.letzgo.stashy.data.CriterionModifier
 import de.letzgo.stashy.data.FilterCriterionSummary
 import de.letzgo.stashy.data.FilterFieldCatalog
+import de.letzgo.stashy.data.FilterEntityOption
 import de.letzgo.stashy.data.FilterFieldDescriptor
 import de.letzgo.stashy.data.FilterMapper
 import de.letzgo.stashy.data.FilterMode
@@ -90,6 +91,8 @@ import de.letzgo.stashy.ui.NativeSectionHeader
 import de.letzgo.stashy.ui.NativeType
 import de.letzgo.stashy.ui.nativeAccent
 import de.letzgo.stashy.ui.Tokens
+import de.letzgo.stashy.ui.components.NativeDateField
+import de.letzgo.stashy.ui.components.StashDateInput
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -346,8 +349,9 @@ private fun CriterionEditorBody(document: CriteriaDocument, field: FilterFieldDe
         CriterionKind.string -> StringRow(dict, setDict, suggestions = FilterFieldCatalog.valueSuggestions(key, document.mode), onChange = onApply)
         CriterionKind.int, CriterionKind.hierarchicalCount -> NumericRow(dict, setDict, isFloat = false, onApply)
         CriterionKind.float -> NumericRow(dict, setDict, isFloat = true, onApply)
-        CriterionKind.date, CriterionKind.timestamp -> StringRow(
-            dict, setDict, placeholder = if (field.kind == CriterionKind.date) "YYYY-MM-DD" else "Timestamp / relative",
+        CriterionKind.date -> DateRow(dict, setDict, onApply)
+        CriterionKind.timestamp -> StringRow(
+            dict, setDict, placeholder = "Timestamp / relative",
             modifiers = field.kind.defaultModifiers, onChange = onApply,
         )
         CriterionKind.resolution -> ResolutionRow(dict, setDict, onApply)
@@ -430,6 +434,43 @@ private fun StringRow(
                 }
             }
         }
+    }
+}
+
+/**
+ * iOS: `FilterDateCriterionRow` — modifier, then one or two validated `YYYY-MM-DD` dates (text
+ * field + Material date picker). Invalid text stays in a `*_text` scratch key: the criterion is
+ * then incomplete, never sent, and no refetch fires until the date is valid.
+ */
+private class DateRowHolder(var latest: JsonObject)
+
+@Composable
+private fun DateRow(value: JsonObject, set: (JsonObject) -> Unit, onChange: () -> Unit) {
+    val modifierRaw = value["modifier"].stringValue ?: "EQUALS"
+    val mod = CriterionModifier.from(modifierRaw)
+    // The live criterion: `value` is only the snapshot of the composition that built a callback.
+    val holder = remember { DateRowHolder(value) }
+    holder.latest = value
+    fun update(next: JsonObject) { holder.latest = next; set(next) }
+    fun commitIfValid() {
+        if (holder.latest["value_text"] == null && holder.latest["value2_text"] == null) onChange()
+    }
+    fun text(key: String): String = value["${key}_text"].stringValue ?: value[key].stringValue ?: ""
+    fun setText(key: String, raw: String) {
+        val cur = holder.latest
+        val trimmed = raw.trim()
+        update(
+            if (trimmed.isEmpty() || StashDateInput.isValid(trimmed)) cur.with(key, JsonPrimitive(trimmed)).without("${key}_text")
+            else cur.without(key).with("${key}_text", JsonPrimitive(raw)),
+        )
+    }
+    ModifierPicker(modifierRaw, CriterionKind.date.defaultModifiers) {
+        update(holder.latest.patch("modifier" to JsonPrimitive(it))); commitIfValid()
+    }
+    if (mod?.needsValue != false) {
+        val two = mod?.needsSecondValue == true
+        NativeDateField(text("value"), { setText("value", it) }, label = null, placeholder = if (two) "From (YYYY-MM-DD)" else "YYYY-MM-DD", onCommit = ::commitIfValid)
+        if (two) NativeDateField(text("value2"), { setText("value2", it) }, label = null, placeholder = "To (YYYY-MM-DD)", onCommit = ::commitIfValid)
     }
 }
 
@@ -651,14 +692,28 @@ fun MultiEntityPicker(
     val p = Theme.palette
     var expanded by remember { mutableStateOf(false) }
     var searchText by remember { mutableStateOf("") }
-    var pinned by remember { mutableStateOf(emptyList<String>()) }
+    // Order of the chosen (included / excluded) ids at the top: what was chosen when the list
+    // opened, then each newly chosen id appended — include → exclude keeps the row in place.
+    var selectionOrder by remember { mutableStateOf(emptyList<String>()) }
     val isNone = matchMode == CriterionModifier.IsNull.raw
     val options = kind?.let { FilterPickerOptionsStore.availableOptions(it) } ?: emptyList()
     val isLoading = kind?.let { FilterPickerOptionsStore.isLoading(it) } ?: false
-    val rank = pinned.withIndex().associate { it.value to it.index }
-    val entries = options.withIndex().sortedWith(compareBy({ rank[it.value.id] ?: Int.MAX_VALUE }, { it.index })).map { it.value }
+    val entries = options
     val term = searchText.trim()
-    val visible = if (term.isEmpty()) entries else entries.filter { it.id in selectedIds || it.name.contains(term, ignoreCase = true) }
+    // Chosen entries always come first, whatever the search says; the search narrows only the
+    // unchosen rest (no duplicates).
+    val visible = run {
+        val chosen = selectedIds + excludedIds.filter { it !in selectedIds }
+        val chosenSet = chosen.toSet()
+        val ordered = selectionOrder.filter { it in chosenSet } + chosen.filter { it !in selectionOrder }
+        val byId = entries.associateBy { it.id }
+        val labels = if (ordered.any { it !in byId }) FilterPickerOptionsStore.knownLabels() else emptyMap()
+        val pinned = ordered.mapNotNull { id ->
+            byId[id] ?: labels[id]?.let { FilterEntityOption(id, it) } ?: if (isLoading) null else FilterEntityOption(id, "#$id")
+        }
+        pinned + entries.filter { it.id !in chosenSet && (term.isEmpty() || it.name.contains(term, ignoreCase = true)) }
+    }
+    fun trackChosen(id: String) { if (id !in selectionOrder) selectionOrder = selectionOrder + id }
 
     val summary = run {
         if (isNone) return@run "None"
@@ -681,7 +736,7 @@ fun MultiEntityPicker(
     Column {
         Row(
             Modifier.fillMaxWidth().clickable {
-                if (!expanded) pinned = selectedIds + excludedIds.filter { it !in selectedIds }
+                if (!expanded) selectionOrder = selectedIds + excludedIds.filter { it !in selectedIds }
                 expanded = !expanded
                 kind?.let { FilterPickerOptionsStore.load(it) }
             }.padding(vertical = 4.dp),
@@ -735,6 +790,7 @@ fun MultiEntityPicker(
                 val state = when (entry.id) { in selectedIds -> 1; in excludedIds -> 2; else -> 0 }
                 PickerOptionRow(entry.name, state) {
                     // none → include → exclude → none
+                    trackChosen(entry.id)
                     when (state) {
                         0 -> onChange(selectedIds + entry.id, excludedIds, matchMode)
                         1 -> onChange(selectedIds - entry.id, excludedIds + entry.id, matchMode)
@@ -770,7 +826,7 @@ private fun NestedEditorSheet(title: String, mode: FilterMode, initial: JsonObje
     ModalBottomSheet(onCancel, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = p.background) {
         Column(Modifier.fillMaxSize().navigationBarsPadding()) {
             de.letzgo.stashy.ui.NativeSheetTopBar(title, onClose = onCancel, closeDescription = "Cancel") {
-                de.letzgo.stashy.ui.NativeSheetAction("Done") { onDone(doc.sanitizedObjectFilter) }
+                de.letzgo.stashy.ui.NativeSheetAction("Done", enabled = !doc.hasInvalidInput) { onDone(doc.sanitizedObjectFilter) }
             }
             Column(Modifier.verticalScroll(rememberScrollState()).padding(top = Tokens.Spacing.xs)) {
                 FilterCriteriaEditor(doc, onChange = {})

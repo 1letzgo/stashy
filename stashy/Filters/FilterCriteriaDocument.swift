@@ -82,6 +82,26 @@ final class FilterCriteriaDocument: ObservableObject {
 
     var isMarkerMode: Bool { mode == .sceneMarkers }
 
+    /// True while a criterion holds input that cannot be sent (an invalid date, a half-typed
+    /// number) — kept in a `*_text` scratch key. Done / Save stay disabled until it is fixed.
+    var hasInvalidInput: Bool {
+        Self.containsScratchKey(objectFilter)
+    }
+
+    nonisolated private static func containsScratchKey(_ value: Any) -> Bool {
+        if let dict = stringKeyedDict(value) {
+            for (key, nested) in dict {
+                if key.hasSuffix("_text") { return true }
+                if containsScratchKey(nested) { return true }
+            }
+            return false
+        }
+        if let array = value as? [Any] {
+            return array.contains { containsScratchKey($0) }
+        }
+        return false
+    }
+
     var sanitizedObjectFilter: [String: Any] {
         Self.stripIncompleteCriteria(Self.sanitize(objectFilter, mode: mode), mode: mode)
     }

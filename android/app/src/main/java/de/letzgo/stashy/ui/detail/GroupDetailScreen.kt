@@ -115,7 +115,7 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
             listOf(
                 EditSection("Identity", listOf(
                     EditField("Name", group.name),
-                    EditField("Date (YYYY-MM-DD)", group.date ?: "", KeyboardType.Ascii),
+                    EditField("Date (YYYY-MM-DD)", group.date ?: "", KeyboardType.Ascii, isDate = true),
                     EditField("Rating (0–100)", group.rating100?.toString() ?: "", KeyboardType.Number),
                 )),
                 EditSection("Synopsis", listOf(EditField("Synopsis", group.synopsis ?: "", multiline = true))),

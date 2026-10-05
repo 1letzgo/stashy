@@ -101,7 +101,7 @@ fun ControlCard(modifier: Modifier = Modifier, content: @Composable RowScope.() 
 fun ControlLabel(text: String) {
     Text(
         text, Modifier.widthIn(min = FilterSheetLayout.labelColumnWidth),
-        style = NativeType.bodyLarge, color = Theme.palette.text, maxLines = 1,
+        style = NativeType.bodyLarge, color = Theme.palette.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
     )
 }
 
@@ -182,9 +182,13 @@ fun FilterTextField(
 /** Label + switch row in control-card chrome (iOS `CatalogFilterSortToggleRow`). */
 @Composable
 fun ControlToggleRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    // Only a switch shares the row: the label takes all the remaining width (and may wrap) so
+    // "Immersive" / "Continuous" are never cut off, whatever the font scale.
     ControlCard {
-        ControlLabel(label)
-        Spacer(Modifier.weight(1f))
+        Text(
+            label, Modifier.weight(1f).widthIn(min = FilterSheetLayout.labelColumnWidth),
+            style = NativeType.bodyLarge, color = Theme.palette.text, maxLines = 2, overflow = TextOverflow.Ellipsis,
+        )
         NativeSwitch(checked, onChange)
     }
 }

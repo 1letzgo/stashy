@@ -48,6 +48,17 @@ struct ReelsModeSettingsView: View {
                 .stashyGroupedSettingsRow()
             }
 
+            // App UI, not a per-feed filter option — moved here from the Feeds filter sheet
+            // (same `ReelsShowsDeleteButton` key, existing choices carry over).
+            Section {
+                stashyScrollingSectionHeader("Controls")
+                Toggle(isOn: $tabManager.reelsShowsDeleteButton) {
+                    Label("Show Delete Button", systemImage: "trash")
+                }
+                .tint(appearanceManager.tintColor)
+                .stashyGroupedSettingsRow()
+            }
+
             Section {
                 stashyScrollingSectionHeader("Modes")
                 ForEach(tabManager.configurableReelsModes) { modeConfig in

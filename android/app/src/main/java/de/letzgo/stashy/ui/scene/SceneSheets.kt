@@ -155,7 +155,11 @@ fun EntityPickerSheet(
     var saving by remember { mutableStateOf(false) }
     var creating by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) { entries.addAll(runCatching { load() }.getOrDefault(emptyList())); loading = false }
-    val filtered = if (search.isEmpty()) entries.toList() else entries.filter { it.name.lowercase().contains(search.lowercase()) }
+    // Chosen entries always lead the list, whatever the search says; the search narrows only the
+    // unchosen rest, so a chosen entry never vanishes.
+    val pinned = entries.filter { it.id in selected }
+    val filtered = entries.filter { it.id !in selected && (search.isEmpty() || it.name.contains(search, ignoreCase = true)) }
+    val anyMatch = filtered.isNotEmpty() || pinned.any { it.name.contains(search, ignoreCase = true) }
 
     SceneModalSheet(title, onDismiss, actionTitle = "Save", actionEnabled = !saving, actionBusy = saving, onAction = {
         saving = true
@@ -170,7 +174,7 @@ fun EntityPickerSheet(
             FormSection(null) {
                 if (loading) LoadingRow()
                 else {
-                    filtered.take(30).forEachIndexed { index, e ->
+                    (pinned + filtered.take(30)).forEachIndexed { index, e ->
                         if (index > 0) NativeDivider()
                         FormRow({ if (e.id in selected) selected.remove(e.id) else { if (!multiple) selected.clear(); selected.add(e.id) } }) {
                             Text(e.name, Modifier.weight(1f), color = p.text)
@@ -179,7 +183,7 @@ fun EntityPickerSheet(
                         }
                     }
                     if (filtered.size > 30) Text("Type more to refine...", Modifier.padding(16.dp), style = NativeType.bodyMedium, color = p.secondaryText)
-                    if (search.isNotEmpty() && filtered.isEmpty()) {
+                    if (search.isNotEmpty() && !anyMatch) {
                         FormRow(if (creating) null else ({
                             creating = true
                             val name = search

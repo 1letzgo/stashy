@@ -151,8 +151,9 @@ fun FiltersToolEditorSheet(
                 title = if (isExisting) "Edit filter" else "New filter",
                 onBack = onDismiss,
                 isSaving = isSaving,
-                saveDimmed = trimmedName.isEmpty(),
-                saveEnabled = trimmedName.isNotEmpty() || isExisting,
+                saveDimmed = trimmedName.isEmpty() || document.hasInvalidInput,
+                // An invalid date / half-typed number would be dropped silently on save.
+                saveEnabled = (trimmedName.isNotEmpty() || isExisting) && !document.hasInvalidInput,
                 onSave = { showSaveChoice = true },
             )
             Column(

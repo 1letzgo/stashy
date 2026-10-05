@@ -382,8 +382,12 @@ internal class EditField(
     initial: String,
     val keyboard: KeyboardType = KeyboardType.Text,
     val multiline: Boolean = false,
+    /** `YYYY-MM-DD` field: date picker + validation; Save stays disabled while it is invalid. */
+    val isDate: Boolean = false,
 ) {
     var value by mutableStateOf(initial)
+    /** Empty or (for a date field) a real `YYYY-MM-DD` date. */
+    val isAcceptable: Boolean get() = !isDate || de.letzgo.stashy.ui.components.StashDateInput.isAcceptable(value)
     val trimmed: String get() = value.trim()
     /** iOS `optionalTrimmed`. */
     val optional: String? get() = trimmed.ifEmpty { null }
@@ -411,7 +415,8 @@ internal fun EditEntitySheet(
     var saving by remember { mutableStateOf(false) }
     var deleting by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
-    val canSave = sections.firstOrNull()?.fields?.firstOrNull()?.trimmed?.isNotEmpty() == true
+    val canSave = sections.firstOrNull()?.fields?.firstOrNull()?.trimmed?.isNotEmpty() == true &&
+        sections.all { s -> s.fields.all { it.isAcceptable } }
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Box(Modifier.fillMaxSize().background(p.background)) {
@@ -422,7 +427,8 @@ internal fun EditEntitySheet(
                     de.letzgo.stashy.ui.NativeGroup(Modifier.padding(0.dp)) {
                         Column(Modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
                         section.fields.forEach { f ->
-                            de.letzgo.stashy.ui.NativeTextField(
+                            if (f.isDate) de.letzgo.stashy.ui.components.NativeDateField(f.value, { f.value = it }, f.label)
+                            else de.letzgo.stashy.ui.NativeTextField(
                                 f.value, { f.value = it }, f.label,
                                 keyboard = f.keyboard,
                                 singleLine = !f.multiline, minLines = if (f.multiline) 5 else 1,

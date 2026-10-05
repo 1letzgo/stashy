@@ -35,11 +35,14 @@ struct CatalogFilterSortToggleRow: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: 12) {
+            // Only a switch shares the row, so the label takes its full width instead of the
+            // 80 pt column ("Immersive" / "Continuous" were cut off at larger text sizes).
             Text(label)
                 .font(.subheadline.weight(.semibold))
                 .foregroundColor(.secondary)
-                .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-            Spacer(minLength: 0)
+                .lineLimit(2)
+                .minimumScaleFactor(0.85)
+                .frame(minWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: .infinity, alignment: .leading)
             Toggle("", isOn: $isOn)
                 .labelsHidden()
                 .tint(appearance.tintColor)
@@ -56,7 +59,7 @@ struct FeedsPlaybackSettingsCard: View {
         VStack(alignment: .leading, spacing: 16) {
             CatalogFilterSortToggleRow(label: "Immersive", isOn: $tabManager.reelsFillHeight)
             CatalogFilterSortToggleRow(label: "Continuous", isOn: $tabManager.reelsContinuousPlay)
-            CatalogFilterSortToggleRow(label: "Delete button", isOn: $tabManager.reelsShowsDeleteButton)
+            // "Delete button" lives in Settings → Feeds (app UI, not a per-feed filter option).
         }
     }
 }
@@ -85,8 +88,9 @@ struct ImagesFeedAutoplaySettingsCard: View {
                 Text("Continuous")
                     .font(.subheadline.weight(.semibold))
                     .foregroundColor(.secondary)
-                    .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-                Spacer(minLength: 0)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.85)
+                    .frame(minWidth: CatalogFilterSortSheetLayout.labelColumnWidth, maxWidth: .infinity, alignment: .leading)
                 Toggle("", isOn: $fullscreenContinuous)
                     .labelsHidden()
                     .tint(appearance.tintColor)
@@ -97,15 +101,19 @@ struct ImagesFeedAutoplaySettingsCard: View {
                     Text("Still Duration")
                         .font(.subheadline.weight(.semibold))
                         .foregroundColor(.secondary)
-                        .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
-                    Spacer(minLength: 0)
-                    HStack(spacing: 8) {
-                        ForEach(durationOptions, id: \.self) { seconds in
-                            CatalogFilterChip(
-                                title: "\(seconds)s",
-                                isActive: continuousDurationSeconds == seconds
-                            ) {
-                                continuousDurationSeconds = seconds
+                        .lineLimit(1)
+                        .fixedSize()
+                        .frame(minWidth: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+                    // The chips scroll instead of squeezing the label.
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 8) {
+                            ForEach(durationOptions, id: \.self) { seconds in
+                                CatalogFilterChip(
+                                    title: "\(seconds)s",
+                                    isActive: continuousDurationSeconds == seconds
+                                ) {
+                                    continuousDurationSeconds = seconds
+                                }
                             }
                         }
                     }
@@ -283,9 +291,10 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
     @ObservedObject private var pickerStore = FilterPickerOptionsStore.shared
     @State private var isExpanded = false
     @State private var searchText = ""
-    /// Ids that were already chosen when the list was opened. Sorting by *live* selection would
-    /// make rows jump under the finger on every tap, so the order is frozen per expansion.
-    @State private var pinnedIds: [String] = []
+    /// Order of the chosen (included or excluded) ids at the top of the list: what was chosen when
+    /// the list opened, then each newly chosen id appended. Cycling include → exclude keeps the
+    /// row in place instead of moving it between the two lists.
+    @State private var selectionOrder: [String] = []
 
     /// Flattened id/name pairs — lets server hits (`FilterEntityOption`) sit next to the caller's
     /// own `Item` type without either side knowing about the other.
@@ -303,29 +312,33 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
                 out.append(PickerEntry(id: hit.id, name: hit.name))
             }
         }
-        guard !pinnedIds.isEmpty else { return out }
-        // Anything already in the filter floats to the top, in the order it was pinned.
-        let rank = Dictionary(uniqueKeysWithValues: pinnedIds.enumerated().map { ($0.element, $0.offset) })
-        return out.enumerated().sorted { lhs, rhs in
-            let l = rank[lhs.element.id]
-            let r = rank[rhs.element.id]
-            switch (l, r) {
-            case let (l?, r?): return l < r
-            case (_?, nil): return true
-            case (nil, _?): return false
-            default: return lhs.offset < rhs.offset
-            }
-        }.map(\.element)
+        return out
     }
 
-    /// Local narrowing of the merged list. Selected entries always stay visible, otherwise ticking
-    /// one and typing on would make it vanish.
+    /// Chosen entries (included and excluded) always come first, whatever the search text says —
+    /// then the search results without them. Narrowing only applies to the unchosen rest, so
+    /// ticking an entry and typing on never makes it vanish.
     private var visibleEntries: [PickerEntry] {
-        let term = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !term.isEmpty else { return entries }
-        return entries.filter {
-            selectedIds.contains($0.id) || $0.name.localizedCaseInsensitiveContains(term)
+        let all = entries
+        let chosen = selectedIds + excluded.filter { !selectedIds.contains($0) }
+        let chosenSet = Set(chosen)
+        let ordered = selectionOrder.filter { chosenSet.contains($0) }
+            + chosen.filter { !selectionOrder.contains($0) }
+        var byId: [String: PickerEntry] = [:]
+        for entry in all where byId[entry.id] == nil { byId[entry.id] = entry }
+        let labels = pickerStore.knownLabels()
+        let pinned: [PickerEntry] = ordered.compactMap { id in
+            if let entry = byId[id] { return entry }
+            if let name = labels[id] { return PickerEntry(id: id, name: name) }
+            // Not loaded yet: keep it reachable (it can still be unticked) once loading is done.
+            return isLoading ? nil : PickerEntry(id: id, name: "#\(id)")
         }
+        let term = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        let rest = all.filter { entry in
+            !chosenSet.contains(entry.id)
+                && (term.isEmpty || entry.name.localizedCaseInsensitiveContains(term))
+        }
+        return pinned + rest
     }
 
     private var isSearching: Bool {
@@ -366,7 +379,7 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
         VStack(spacing: 0) {
             Button {
                 if !isExpanded {
-                    pinnedIds = selectedIds + excluded.filter { !selectedIds.contains($0) }
+                    selectionOrder = selectedIds + excluded.filter { !selectedIds.contains($0) }
                 }
                 withAnimation(DesignTokens.Animation.quick) {
                     isExpanded.toggle()
@@ -598,6 +611,7 @@ struct CatalogNamedEntityLiveFilterMultiPickerRow<Item: Identifiable & Equatable
 
     /// none → include → exclude → none. Without an `excludedIds` binding it stays a plain toggle.
     private func cycle(_ id: String) {
+        if !selectionOrder.contains(id) { selectionOrder.append(id) }
         guard let excludedBinding = excludedIds else {
             if selectedIds.contains(id) {
                 selectedIds.removeAll { $0 == id }

@@ -189,9 +189,17 @@ struct AddPerformerToSceneSheet: View {
     @State private var isSaving = false
     @State private var isCreating = false
 
+    var pinned: [Performer] {
+        // Chosen entries always lead the list, whatever the search says.
+        performers.filter { selectedIds.contains($0.id) }
+    }
+
     var filtered: [Performer] {
-        if searchText.isEmpty { return performers }
-        return performers.filter { $0.name.lowercased().contains(searchText.lowercased()) }
+        // The search narrows only the unchosen rest, so a chosen entry never vanishes.
+        let term = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return performers.filter {
+            !selectedIds.contains($0.id) && (term.isEmpty || $0.name.localizedCaseInsensitiveContains(term))
+        }
     }
 
     var body: some View {
@@ -202,7 +210,7 @@ struct AddPerformerToSceneSheet: View {
                     if isLoading {
                         HStack { Spacer(); ProgressView("Loading..."); Spacer() }.padding()
                     } else {
-                        ForEach(filtered.prefix(30)) { performer in
+                        ForEach(pinned + Array(filtered.prefix(30))) { performer in
                             HStack {
                                 Text(performer.name)
                                 Spacer()
@@ -223,7 +231,8 @@ struct AddPerformerToSceneSheet: View {
                         if filtered.count > 30 {
                             Text("Type more to refine...").font(.caption).foregroundColor(.secondary)
                         }
-                        if !searchText.isEmpty && filtered.isEmpty {
+                        if !searchText.isEmpty && filtered.isEmpty
+                            && !pinned.contains(where: { $0.name.localizedCaseInsensitiveContains(searchText) }) {
                             Button {
                                 createAndSelect()
                             } label: {
