@@ -95,7 +95,7 @@ struct SceneDetailView: View {
         StashyDetailChromeConfig(insetSpacing: 0)
     }
 
-    /// Custom top chrome: Back · Identify (if no Stash-ID) · Download.
+    /// Custom top chrome: Back · Identify (if no Stash-ID) · Download · Delete.
     @ViewBuilder
     private var sceneDetailNavBar: some View {
         StashySectionChromeBar {
@@ -121,6 +121,10 @@ struct SceneDetailView: View {
                     sceneIdentifyNavButton
                 }
                 sceneDownloadNavButton
+                // Rarely used, so it lives up here instead of as a big card under the scene.
+                ChromeCircleButton(systemImage: "trash", accessibilityLabel: "Delete Scene") {
+                    showDeleteWithFilesConfirmation = true
+                }
             }
             .frame(minHeight: chromePillHeight)
             .padding(.horizontal, StashyExpandingDock.edgePadding)
@@ -453,22 +457,6 @@ struct SceneDetailView: View {
                         )
                         .gridCellColumns(2)
 
-                        // Item 6: Delete Button
-                        Button {
-                            showDeleteWithFilesConfirmation = true
-                        } label: {
-                            HStack {
-                                Image(systemName: "trash")
-                                Text("Delete Scene")
-                            }
-                            .frame(maxWidth: .infinity)
-                            .padding()
-                            // Destructive, like the delete buttons in the edit sheets — never the accent.
-                            .background(Color.red.opacity(0.15))
-                            .foregroundColor(.red)
-                            .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-                        }
-                        .buttonStyle(.plain)
                     }
                 } else {
                     // Portrait Mode: Vertical Stack
@@ -530,23 +518,6 @@ struct SceneDetailView: View {
                         viewModel: viewModel
                     )
 
-                    // Delete Scene Button (Card Style)
-                    Button {
-                        showDeleteWithFilesConfirmation = true
-                    } label: {
-                        HStack {
-                            Image(systemName: "trash")
-                            Text("Delete Scene")
-                        }
-                        .frame(maxWidth: .infinity)
-                        .padding()
-                        // Destructive, like the delete buttons in the edit sheets — never the accent.
-                        .background(Color.red.opacity(0.15))
-                        .foregroundColor(.red)
-                        .clipShape(RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.card))
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.top, 10)
                 }
             }
             .padding(.horizontal, 16)
