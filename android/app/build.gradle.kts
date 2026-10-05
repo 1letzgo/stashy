@@ -75,6 +75,9 @@ android {
     }
     buildTypes {
         debug {
+            // Same key as release: debug and release install over each other without wiping
+            // app data (servers, API keys) on test devices.
+            signingConfigs.findByName("upload")?.let { signingConfig = it }
             buildConfigField("String", "DEBUG_SERVER", localString("stashy.debug.server"))
             buildConfigField("String", "DEBUG_API_KEY", localString("stashy.debug.apiKey"))
         }
