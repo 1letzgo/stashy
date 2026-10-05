@@ -1590,6 +1590,13 @@ struct ImagesCatalogFilterSortSheet: View {
     var showsFeedsPlaybackSettings: Bool = false
     /// When `true`, shows 1/row Images video autoplay toggle.
     var showsImagesFeedAutoplaySetting: Bool = false
+    /// Which stored per-row layout this list uses; `nil` hides the row (Feeds).
+    var cardColumnScope: CatalogCardColumnScope? = nil
+    /// Shown instead of the stored layout while the list forces one (gallery opened from a feed).
+    var forcedCardColumns: CatalogCardColumns? = nil
+    /// Extra hook after the layout changed (ImagesView drops its forced 1/row).
+    var onCardColumnsChange: ((CatalogCardColumns) -> Void)? = nil
+    @ObservedObject private var tabManager = TabManager.shared
 
     @ObservedObject private var appearance = AppearanceManager.shared
     private var hasSelectedPreset: Bool { !selectedPresetRowId.isEmpty }
@@ -1628,6 +1635,9 @@ struct ImagesCatalogFilterSortSheet: View {
                     imageSortCard
                     if showMediaTypeFilter {
                         imageMediaTypeCard
+                    }
+                    if let cardColumnScope {
+                        cardColumnsCard(cardColumnScope)
                     }
                     if showsFeedsPlaybackSettings {
                         FeedsPlaybackSettingsCard()
@@ -1741,6 +1751,29 @@ struct ImagesCatalogFilterSortSheet: View {
             .pickerStyle(.menu)
             .labelsHidden()
             .tint(appearance.tintColor)
+        }
+        .catalogFilterSortControlCardChrome()
+    }
+
+    /// 1 or 2 cards per row for this list (replaces the old in-view columns toggle).
+    private func cardColumnsCard(_ scope: CatalogCardColumnScope) -> some View {
+        let current = forcedCardColumns ?? tabManager.catalogCardColumns(for: scope)
+        func pick(_ columns: CatalogCardColumns) {
+            withAnimation(DesignTokens.Animation.quick) {
+                tabManager.setCatalogCardColumns(columns, for: scope)
+                onCardColumnsChange?(columns)
+            }
+        }
+        return HStack(alignment: .center, spacing: 12) {
+            Text("Per row")
+                .font(.subheadline.weight(.semibold))
+                .foregroundColor(.secondary)
+                .frame(width: CatalogFilterSortSheetLayout.labelColumnWidth, alignment: .leading)
+            HStack(spacing: 6) {
+                CatalogFilterChip(title: "1", isActive: current == .one) { pick(.one) }
+                CatalogFilterChip(title: "2", isActive: current == .two) { pick(.two) }
+            }
+            Spacer(minLength: 0)
         }
         .catalogFilterSortControlCardChrome()
     }

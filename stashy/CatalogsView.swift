@@ -1370,7 +1370,8 @@ struct GroupDetailView: View {
                 }
                 linkedImages.showRenameCatalogPresetAlert = true
             },
-            onRequestDelete: { linkedImages.showDeleteCatalogPresetAlert = true }
+            onRequestDelete: { linkedImages.showDeleteCatalogPresetAlert = true },
+            cardColumnScope: CatalogCardColumnScope.images
         )
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)

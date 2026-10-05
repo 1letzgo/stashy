@@ -79,6 +79,8 @@ private struct ImagesViewBody: View {
     @State private var didApplyDefaultFilter = false
     @State private var showingEditGallerySheet = false
     @State private var isHeaderExpanded = false
+    /// After the user picks a per-row layout in the sheet, stop locking `forceOneColumnFeed`.
+    @State private var ignoreForcedOneColumnFeed = false
     /// True while the Images feed ScrollView is dragging / decelerating.
     @State private var isFeedScrolling = false
     /// Global frames of visible video cards (for picking the most centered one).
@@ -151,7 +153,7 @@ private struct ImagesViewBody: View {
     }
 
     private var effectiveCardColumns: CatalogCardColumns {
-        if forceOneColumnFeed {
+        if forceOneColumnFeed && !ignoreForcedOneColumnFeed {
             return .one
         }
         return tabManager.catalogCardColumns(for: cardColumnScope)
@@ -923,7 +925,10 @@ private struct ImagesViewBody: View {
                 imageListFilters.showRenameCatalogPresetAlert = true
             },
             onRequestDelete: { imageListFilters.showDeleteCatalogPresetAlert = true },
-            showsImagesFeedAutoplaySetting: true
+            showsImagesFeedAutoplaySetting: true,
+            cardColumnScope: feedsEmbedded ? nil : cardColumnScope,
+            forcedCardColumns: forceOneColumnFeed && !ignoreForcedOneColumnFeed ? .one : nil,
+            onCardColumnsChange: { _ in ignoreForcedOneColumnFeed = true }
         )
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)

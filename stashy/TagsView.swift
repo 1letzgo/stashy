@@ -1462,7 +1462,8 @@ struct TagDetailView: View {
                 linkedImages.showRenameCatalogPresetAlert = true
             },
             onRequestDelete: { linkedImages.showDeleteCatalogPresetAlert = true },
-            showsImagesFeedAutoplaySetting: true
+            showsImagesFeedAutoplaySetting: true,
+            cardColumnScope: CatalogCardColumnScope.images
         )
         .presentationDragIndicator(.visible)
         .presentationBackground(Color.appBackground)
