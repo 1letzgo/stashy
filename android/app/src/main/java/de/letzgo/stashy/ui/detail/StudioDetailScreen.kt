@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.data.Downloads
+import de.letzgo.stashy.ui.tools.downloads.SceneBulkDownloadDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -50,6 +52,8 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null) : Sc
     private var favoriteBusy by mutableStateOf(false)
     private var expanded by mutableStateOf(false)
     private var editing by mutableStateOf(false)
+    /** iOS `showingSceneDownloadOptions` (`sceneBulkDownloadDialog`). */
+    private var showSceneDownloadOptions by mutableStateOf(false)
     private var started = false
     private val gridState = LazyGridState()
 
@@ -116,10 +120,18 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null) : Sc
                 onEdit = { editing = true }, editLabel = "Edit studio",
             )
             val (slots, menu) = catalog.slots(tab)
-            DetailSlotBar(slots, menu)
+            // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
+            val extra = when (tab) {
+                DetailTab.Scenes -> listOf(sceneBulkDownloadSlot { showSceneDownloadOptions = true })
+                else -> emptyList()
+            }
+            DetailSlotBar(slots + extra, menu)
         }
         val s = studio
         if (editing && s != null) EditStudioSheet(s, { editing = false }) { studio = it }
+        if (showSceneDownloadOptions) {
+            SceneBulkDownloadDialog(Downloads.SceneDownloadScope.Studio(studioId), studio?.name ?: "") { showSceneDownloadOptions = false }
+        }
     }
 
     /** iOS `headerCard`. */

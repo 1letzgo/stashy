@@ -116,7 +116,8 @@ fun SceneDownloadNavButton(scene: Scene, modifier: Modifier = Modifier, size: Dp
                 )
             }
         }
-        else -> GlassIconButton(DownloadGlyph, "Save scene", modifier, size = size) { Downloads.downloadScene(scene) }
+        // iOS: `.white.opacity(StashyExpandingDock.inactiveIconOpacity)` like the Identify button beside it.
+        else -> GlassIconButton(DownloadGlyph, "Save scene", modifier, size = size, iconTint = Color.White.copy(alpha = 0.72f)) { Downloads.downloadScene(scene) }
     }
 }
 

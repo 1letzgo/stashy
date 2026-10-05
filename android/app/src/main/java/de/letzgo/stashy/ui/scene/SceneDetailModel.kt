@@ -26,6 +26,7 @@ import de.letzgo.stashy.ui.player.PlayerWindow
 import de.letzgo.stashy.ui.player.SceneScrubSprites
 import de.letzgo.stashy.ui.player.StashPlayer
 import de.letzgo.stashy.ui.player.TimeBarMarker
+import de.letzgo.stashy.data.tools.SimilarScenes
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -105,6 +106,10 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
     var isHeaderExpanded by mutableStateOf(false)
     var isTagsExpanded by mutableStateOf(false)
 
+    /** iOS `similarScenes` / `isLoadingSimilarScenes` — this page's own result (stashy+). */
+    var similarScenes by mutableStateOf<List<Scene>>(emptyList()); private set
+    var isLoadingSimilarScenes by mutableStateOf(false); private set
+
     // Sheets / alerts
     var showDeleteConfirmation by mutableStateOf(false)
     var showAddMarker by mutableStateOf(false)
@@ -123,6 +128,26 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
     private val tracker = PlaybackActivityTracker(scope)
     /** AI Subtitles + caption translation of the player's "…" menu (iOS `ScenePlayerExtrasController`). */
     val aiSubtitles by lazy { SceneAiSubtitles(this) }
+
+    /**
+     * iOS: `loadSimilarScenes()` — only spins while nothing is on screen yet; a refresh with
+     * fuller metadata keeps the current row until the new one is in. A result for an older
+     * version of the scene is dropped.
+     */
+    suspend fun loadSimilarScenes() {
+        if (!SimilarScenes.isActive) {
+            similarScenes = emptyList()
+            isLoadingSimilarScenes = false
+            return
+        }
+        val requested = scene
+        if (similarScenes.isEmpty()) isLoadingSimilarScenes = true
+        // Cancelled (page covered): the finder caches, the effect's next run fills the row.
+        val found = SimilarScenes.find(requested)
+        if (SimilarScenes.signature(scene) != SimilarScenes.signature(requested)) return
+        similarScenes = found
+        isLoadingSimilarScenes = false
+    }
 
     // MARK: Lifecycle
 

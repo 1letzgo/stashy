@@ -42,7 +42,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import de.letzgo.stashy.data.Downloads
 import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.GlassCapsule
@@ -60,6 +59,11 @@ import de.letzgo.stashy.ui.player.PlayerWindow
 import de.letzgo.stashy.ui.player.ScenePlayerSurface
 import de.letzgo.stashy.ui.player.VideoSurface
 import de.letzgo.stashy.ui.stashyGlass
+import de.letzgo.stashy.ui.tools.downloads.SceneDownloadNavButton
+import de.letzgo.stashy.data.tools.AITagSuggestions
+import de.letzgo.stashy.data.tools.AITagTarget
+import de.letzgo.stashy.data.tools.AITagUpdateEvent
+import de.letzgo.stashy.data.tools.SimilarScenes
 import kotlinx.coroutines.delay
 
 /**
@@ -99,6 +103,24 @@ private fun SceneDetailContent(model: SceneDetailModel) {
         if (!PlayerWindow.isInPictureInPicture) {
             delay(400)
             if (!lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)) model.player?.pause()
+        }
+    }
+    // iOS: `.task(id: SimilarScenesFinder.signature(for: activeScene))` — runs again once the full
+    // scene replaces the list version. Results live in the page model, not in the finder.
+    LaunchedEffect(SimilarScenes.signature(scene), SimilarScenes.isActive) { model.loadSimilarScenes() }
+    // Tag Suggestion writes elsewhere (Reels, bulk "Set on all of performer") patch this scene's tags,
+    // like `StashDBViewModel` patches its lists on `SceneTagsUpdated` / `BulkTagsApplied`.
+    LaunchedEffect(model) {
+        AITagSuggestions.events.collect { event ->
+            val current = model.scene
+            when (event) {
+                is AITagUpdateEvent.TagsUpdated ->
+                    if (event.kind == AITagTarget.Kind.Scene && event.entityId == current.id) model.scene = current.copy(tags = event.tags)
+                is AITagUpdateEvent.BulkTagsApplied ->
+                    if (current.id in event.sceneIds && current.tags.orEmpty().none { it.id == event.tag.id }) {
+                        model.scene = current.copy(tags = current.tags.orEmpty() + event.tag)
+                    }
+            }
         }
     }
     // Plugging headphones in turns the sound on, unplugging mutes again (iOS route change).
@@ -163,7 +185,8 @@ private fun SceneDetailContent(model: SceneDetailModel) {
                         onSeek = model::seekTo, onSeekCommit = model::commitScrub, onScrubStateChange = model::updateScrubbing,
                     )
                 }
-                SceneSimilarScenesCard()
+                // stashy+ — hides itself when Similar Scenes is off or nothing is similar.
+                SceneSimilarScenesCard(model.similarScenes, model.isLoadingSimilarScenes)
                 ScenePerformersCard(scene.date, scene.performers, scene.normalizedDirector) { sheet = EditSheet.Performers }
                 if (landscape) {
                     // iOS landscape: two-column grid (Studio | Groups, Tags, Galleries full width, Delete).
@@ -266,11 +289,8 @@ private fun SceneDetailNavBar(model: SceneDetailModel) {
                 else Icon(PlayerIcons.identify, "Identify scene", tint = Color.White.copy(alpha = 0.72f), modifier = Modifier.size(18.dp))
             }
         }
-        if (Downloads.isDownloaded(model.scene.id)) {
-            Box(Modifier.size(40.dp), contentAlignment = Alignment.Center) {
-                Icon(PlayerIcons.checkCircle, "Downloaded", tint = StashyColors.systemGreen, modifier = Modifier.size(20.dp))
-            }
-        }
+        // iOS `sceneDownloadNavButton`: green check · progress ring · "Save scene" (stashy+ gate on tap).
+        SceneDownloadNavButton(model.scene, size = 40.dp)
     }
 }
 

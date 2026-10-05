@@ -1,5 +1,8 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.ui.tools.downloads.TagImagesDownloadDialog
+import de.letzgo.stashy.data.Downloads
+import de.letzgo.stashy.ui.tools.downloads.SceneBulkDownloadDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +39,10 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null) : Screen {
     private var favoriteBusy by mutableStateOf(false)
     private var expanded by mutableStateOf(false)
     private var editing by mutableStateOf(false)
+    /** iOS `showingSceneDownloadOptions` (`sceneBulkDownloadDialog`). */
+    private var showSceneDownloadOptions by mutableStateOf(false)
+    /** iOS `showingTagDownloadOptions` (the "Tag images" alert). */
+    private var showTagImagesOptions by mutableStateOf(false)
     private var started = false
     private val gridState = LazyGridState()
 
@@ -101,10 +108,23 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null) : Screen {
                 onEdit = { editing = true }, editLabel = "Edit tag",
             )
             val (slots, menu) = catalog.slots(tab)
-            DetailSlotBar(slots, menu)
+            // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
+            val extra = when (tab) {
+                DetailTab.Scenes -> listOf(sceneBulkDownloadSlot { showSceneDownloadOptions = true })
+                // iOS `tagImagesDownloadSlot`.
+                DetailTab.Images -> listOf(imageSetDownloadSlot("tag-$tagId", "Download images") { showTagImagesOptions = true })
+                else -> emptyList()
+            }
+            DetailSlotBar(slots + extra, menu)
         }
         val t = tag
         if (editing && t != null) EditTagSheet(t, { editing = false }) { tag = it }
+        if (showSceneDownloadOptions) {
+            SceneBulkDownloadDialog(Downloads.SceneDownloadScope.Tag(tagId), tag?.name ?: "") { showSceneDownloadOptions = false }
+        }
+        if (showTagImagesOptions) {
+            TagImagesDownloadDialog(tagId, tag?.name ?: "") { showTagImagesOptions = false }
+        }
     }
 
     /** iOS `tagHeaderView`. */

@@ -1,5 +1,8 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.data.tools.MatchRepository
+import de.letzgo.stashy.data.Downloads
+import de.letzgo.stashy.ui.tools.downloads.SceneBulkDownloadDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -32,8 +35,12 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
     private var performer by mutableStateOf(preview)
     private var isFavorite by mutableStateOf(preview?.favorite ?: false)
     private var favoriteBusy by mutableStateOf(false)
+    /** iOS `hotOrNotBattleLine` — "rank/total" in the Match pool, null when not listed. */
+    private var battleLine by mutableStateOf<String?>(null)
     private var expanded by mutableStateOf(false)
     private var editing by mutableStateOf(false)
+    /** iOS `showingSceneDownloadOptions` (`sceneBulkDownloadDialog`). */
+    private var showSceneDownloadOptions by mutableStateOf(false)
     private var started = false
     private val gridState = LazyGridState()
 
@@ -81,6 +88,8 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
     @Composable
     override fun Content() {
         LaunchedEffect(Unit) { if (!started) { started = true; load() } }
+        // iOS: `.task(id: displayPerformer.id)` → `HotOrNotBattleDisplay.fetchRankSlashTotal`.
+        LaunchedEffect(performerId) { battleLine = MatchRepository.fetchRankSlashTotal(performerId) }
         AutoSwitchTab(catalog, tab) { tab = it }
         val p = performer
 
@@ -94,16 +103,24 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
                 onEdit = { editing = true }, editLabel = "Edit performer",
             )
             val (slots, menu) = catalog.slots(tab)
-            DetailSlotBar(slots, menu)
+            // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
+            val extra = when (tab) {
+                DetailTab.Scenes -> listOf(sceneBulkDownloadSlot { showSceneDownloadOptions = true })
+                else -> emptyList()
+            }
+            DetailSlotBar(slots + extra, menu)
         }
 
         if (editing && p != null) EditPerformerSheet(p, onDismiss = { editing = false }, onSaved = { performer = it })
+        if (showSceneDownloadOptions) {
+            SceneBulkDownloadDialog(Downloads.SceneDownloadScope.Performer(performerId), performer?.name ?: "") { showSceneDownloadOptions = false }
+        }
     }
 
     @Composable
     private fun Header(p: Performer?) {
         val name = p?.name ?: ""
-        val items = p?.let { DetailFormatting.performer(it, catalog.galleries?.totalCount ?: 0) } ?: emptyList()
+        val items = p?.let { DetailFormatting.performer(it, catalog.galleries?.totalCount ?: 0, battleLine) } ?: emptyList()
         DetailHeaderCard(
             title = name,
             imageUrl = p?.let { performerThumbnailURL(it.id, it.imagePath) },

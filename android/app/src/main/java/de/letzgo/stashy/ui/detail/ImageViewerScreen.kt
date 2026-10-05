@@ -1,5 +1,14 @@
 package de.letzgo.stashy.ui.detail
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.outlined.ArrowCircleDown
+import de.letzgo.stashy.data.Downloads
+import de.letzgo.stashy.data.tools.AITagSuggestions
+import de.letzgo.stashy.data.tools.AITagTarget
+import de.letzgo.stashy.data.tools.AITagUpdateEvent
+import de.letzgo.stashy.ui.components.AITagSuggestionBar
+import de.letzgo.stashy.ui.tools.downloads.DownloadGlyph
 import android.content.Context
 import android.content.Intent
 import android.media.AudioDeviceInfo
@@ -157,6 +166,22 @@ class ImageViewerScreen(
         val context = LocalContext.current
         val scope = rememberCoroutineScope()
         LaunchedEffect(Unit) { isMuted = initialMute(context) }
+        // iOS `ImageTagsUpdated` / `BulkTagsApplied` → `patchImageTagsInLists` / `patchBulkAppliedTag`.
+        LaunchedEffect(Unit) {
+            AITagSuggestions.events.collect { event ->
+                when (event) {
+                    is AITagUpdateEvent.TagsUpdated -> if (event.kind == AITagTarget.Kind.Image) {
+                        replace(event.entityId) { it.copy(tags = event.tags.map { t -> IdName(t.id, t.name) }) }
+                    }
+                    is AITagUpdateEvent.BulkTagsApplied -> event.imageIds.forEach { id ->
+                        replace(id) { img ->
+                            if (img.tags.orEmpty().any { it.id == event.tag.id }) img
+                            else img.copy(tags = img.tags.orEmpty() + IdName(event.tag.id, event.tag.name))
+                        }
+                    }
+                }
+            }
+        }
         val pager = rememberPagerState(initialPage = currentIndex) { items.size }
 
         LaunchedEffect(pager) {
@@ -337,7 +362,27 @@ class ImageViewerScreen(
             Spacer(Modifier.weight(1f))
             val scope = rememberCoroutineScope()
             DockIconButton(SF.squareAndArrowUp, "Share") { image?.let { scope.launch { share(context, it) } } }
-            // TODO(downloads port): iOS shows the per-image download button here (`DownloadManager.downloadImage`).
+            // iOS: per-image download (`downloadManager.downloadImage`, entry `image-<id>`) — check in the
+            // accent when stored, arrow while downloading (both disabled), else the download glyph.
+            if (image != null) {
+                val entryId = "image-${image.id}"
+                val isDownloaded = Downloads.isGalleryDownloaded(entryId)
+                val isDownloading = Downloads.activeDownloads[entryId] != null
+                DockIconButton(
+                    when {
+                        isDownloaded -> Icons.Filled.CheckCircle
+                        isDownloading -> Icons.Outlined.ArrowCircleDown
+                        else -> DownloadGlyph
+                    },
+                    when {
+                        isDownloaded -> "Downloaded"
+                        isDownloading -> "Downloading"
+                        else -> "Download"
+                    },
+                    iconTint = if (isDownloaded) Appearance.tint else Color.White.copy(alpha = Dock.inactiveIconOpacity),
+                    enabled = !isDownloaded && !isDownloading,
+                ) { Downloads.downloadImage(image) }
+            }
             if (!image?.performers.isNullOrEmpty()) {
                 DockIconButton(SF.personCropCircleBadgePlus, "Set as performer image") { performerImageTargets = image?.performers.orEmpty() }
             }
@@ -499,7 +544,7 @@ class ImageViewerScreen(
                 .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(6.dp),
         ) {
-            // TODO(scene port): iOS shows a "+" (AddTagsSheet) in edit mode and the AI tag suggestions here.
+            // TODO(scene port): iOS shows a "+" (AddTagsSheet) in edit mode here.
             tags.forEach { tag ->
                 var menu by remember(tag.id) { mutableStateOf(false) }
                 Box {
@@ -515,6 +560,10 @@ class ImageViewerScreen(
                         })
                     }
                 }
+            }
+            // iOS: `AITagSuggestionBar(target: .image(image))` — chips inline after the tags (stashy+).
+            AITagSuggestionBar(AITagTarget.image(image)) { newTags ->
+                replace(image.id) { it.copy(tags = newTags.map { t -> IdName(t.id, t.name) }) }
             }
         }
     }
