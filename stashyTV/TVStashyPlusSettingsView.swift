@@ -7,6 +7,7 @@
 
 import SwiftUI
 import StoreKit
+import RevenueCat
 import Combine
 import UIKit
 
@@ -14,7 +15,7 @@ import UIKit
 final class TVStashyPlusStore: ObservableObject {
     static let shared = TVStashyPlusStore()
 
-    @Published private(set) var products: [Product] = []
+    @Published private(set) var products: [StashyStoreProduct] = []
     @Published private(set) var isLoadingProducts = false
     @Published private(set) var lastProductError: String?
     @Published private(set) var purchasingProductID: String?
@@ -22,10 +23,13 @@ final class TVStashyPlusStore: ObservableObject {
 
     var isPurchasing: Bool { purchasingProductID != nil }
 
-    private var transactionListener: Task<Void, Never>?
+    private var customerInfoListener: Task<Void, Never>?
 
     private init() {
-        transactionListener = listenForTransactions()
+        StashyRevenueCat.configureIfNeeded()
+        customerInfoListener = StashyRevenueCat.listenForCustomerInfo { info in
+            await TVStashyPlusStore.shared.syncUnlockFromStore(customerInfo: info)
+        }
         NotificationCenter.default.addObserver(
             forName: UIApplication.willEnterForegroundNotification,
             object: nil,
@@ -37,12 +41,13 @@ final class TVStashyPlusStore: ObservableObject {
         }
         Task {
             await syncUnlockFromStore()
+            await StashyRevenueCat.migrateExistingPurchasesIfNeeded()
             await fetchProducts()
         }
     }
 
     deinit {
-        transactionListener?.cancel()
+        customerInfoListener?.cancel()
     }
 
     func fetchProducts() async {
@@ -50,62 +55,39 @@ final class TVStashyPlusStore: ObservableObject {
         lastProductError = nil
         defer { isLoadingProducts = false }
         do {
-            let loaded = try await Product.products(for: Array(StashyPlusProduct.allIDs))
-            products = loaded.sorted {
+            let loaded = try await StashyRevenueCat.fetchProducts()
+            products = loaded.filter { StashyPlusProduct.allIDs.contains($0.id) }.sorted {
                 (StashyPlusProduct.sortOrder[$0.id] ?? 99) < (StashyPlusProduct.sortOrder[$1.id] ?? 99)
             }
             if products.isEmpty {
                 lastProductError = "No stashy+ products available."
-                AppLog.debug("💬 StoreKit returned 0 stashy+ products for \(StashyPlusProduct.allIDs.sorted())")
+                AppLog.debug("💬 RevenueCat offering has no stashy+ products for \(StashyPlusProduct.allIDs.sorted())")
             } else {
-                AppLog.debug("💬 StoreKit loaded products: \(loaded.map(\.id))")
+                AppLog.debug("💬 RevenueCat loaded products: \(loaded.map(\.id))")
             }
         } catch {
             lastProductError = error.localizedDescription
-            AppLog.debug("Failed product request from the App Store server: \(error)")
+            AppLog.debug("Failed to load RevenueCat offerings: \(error)")
         }
     }
 
     /// Result used by the Settings UI for inline messages.
     @discardableResult
-    func purchase(_ product: Product) async -> String? {
+    func purchase(_ product: StashyStoreProduct) async -> String? {
         purchasingProductID = product.id
         defer { purchasingProductID = nil }
-        do {
-            let result = try await product.purchase()
-            switch result {
-            case .success(let verification):
-                let transaction = try checkVerified(verification)
-                StashyPlusManager.shared.clearDebugForceLock()
-                if transaction.productID == StashyPlusProduct.lifetime {
-                    await MainActor.run {
-                        StashyPlusManager.shared.unlockLifetime(source: .lifetime)
-                    }
-                }
-                await transaction.finish()
-                await syncUnlockFromStore()
-                return nil
-            case .userCancelled:
-                return "Purchase cancelled"
-            case .pending:
-                return "Purchase pending approval"
-            @unknown default:
-                return "Purchase could not be completed"
-            }
-        } catch {
-            return error.localizedDescription
-        }
+        let (message, customerInfo) = await StashyRevenueCat.purchase(product)
+        if let message { return message }
+        StashyPlusManager.shared.clearDebugForceLock()
+        await syncUnlockFromStore(customerInfo: customerInfo)
+        return nil
     }
 
     func restorePurchases() async {
         isRestoringPurchases = true
         defer { isRestoringPurchases = false }
         StashyPlusManager.shared.clearDebugForceLock()
-        do {
-            try await AppStore.sync()
-        } catch {
-            AppLog.debug("AppStore.sync failed: \(error)")
-        }
+        await StashyRevenueCat.restore()
         do {
             _ = try await AppTransaction.refresh()
         } catch {
@@ -114,35 +96,8 @@ final class TVStashyPlusStore: ObservableObject {
         await syncUnlockFromStore()
     }
 
-    func syncUnlockFromStore() async {
-        for await result in Transaction.unfinished {
-            guard case .verified(let transaction) = result else { continue }
-            if StashyPlusProduct.allIDs.contains(transaction.productID),
-               transaction.productID == StashyPlusProduct.lifetime {
-                await MainActor.run {
-                    StashyPlusManager.shared.unlockLifetime(source: .lifetime)
-                }
-            }
-            await transaction.finish()
-        }
-
-        var hasLifetimePurchase = false
-        var subscriptionProductID: String?
-        var subscriptionExpiration: Date?
-
-        for await result in Transaction.currentEntitlements {
-            guard case .verified(let transaction) = result else { continue }
-            if transaction.productID == StashyPlusProduct.lifetime {
-                hasLifetimePurchase = true
-            } else if StashyPlusProduct.subscriptionIDs.contains(transaction.productID) {
-                let exp = transaction.expirationDate ?? .distantFuture
-                if exp > Date() {
-                    if let current = subscriptionExpiration, current >= exp { continue }
-                    subscriptionExpiration = exp
-                    subscriptionProductID = transaction.productID
-                }
-            }
-        }
+    func syncUnlockFromStore(customerInfo: CustomerInfo? = nil) async {
+        let snapshot = await StashyRevenueCat.entitlementSnapshot(customerInfo: customerInfo)
 
         let legacyPaidApp: Bool
         switch await Self.isLegacyPaidAppPurchaser() {
@@ -156,23 +111,14 @@ final class TVStashyPlusStore: ObservableObject {
         }
 
         StashyPlusManager.shared.applyStoreEntitlements(
-            hasLifetimePurchase: hasLifetimePurchase,
-            subscriptionProductID: subscriptionProductID,
-            subscriptionExpiration: subscriptionExpiration,
+            hasLifetimePurchase: snapshot.hasLifetimePurchase,
+            subscriptionProductID: snapshot.subscriptionProductID,
+            subscriptionExpiration: snapshot.subscriptionExpiration,
             legacyPaidApp: legacyPaidApp
         )
 
         if StashyPlusManager.shared.isUnlocked {
             AppLog.debug("✅ stashy+ entitlement synced on tvOS (\(StashyPlusManager.shared.source.rawValue))")
-        }
-    }
-
-    private func checkVerified<T>(_ result: VerificationResult<T>) throws -> T {
-        switch result {
-        case .unverified:
-            throw StoreKitError.notEntitled
-        case .verified(let safe):
-            return safe
         }
     }
 
@@ -197,30 +143,12 @@ final class TVStashyPlusStore: ObservableObject {
         }
     }
 
-    private static func checkVerifiedStatic<T>(_ result: VerificationResult<T>) throws -> T {
+    private static func checkVerifiedStatic<T>(_ result: StoreKit.VerificationResult<T>) throws -> T {
         switch result {
         case .unverified:
             throw StoreKitError.notEntitled
         case .verified(let safe):
             return safe
-        }
-    }
-
-    private func listenForTransactions() -> Task<Void, Never> {
-        Task.detached {
-            for await result in Transaction.updates {
-                guard case .verified(let transaction) = result else { continue }
-                let relevant = StashyPlusProduct.allIDs.contains(transaction.productID)
-                if relevant, transaction.productID == StashyPlusProduct.lifetime {
-                    await MainActor.run {
-                        StashyPlusManager.shared.unlockLifetime(source: .lifetime)
-                    }
-                }
-                await transaction.finish()
-                if relevant {
-                    await TVStashyPlusStore.shared.syncUnlockFromStore()
-                }
-            }
         }
     }
 }
@@ -358,11 +286,11 @@ struct TVStashyPlusSettingsView: View {
         }
     }
 
-    private func planTitle(for product: Product) -> String {
+    private func planTitle(for product: StashyStoreProduct) -> String {
         StashyPlusProduct.displayNames[product.id] ?? product.displayName
     }
 
-    private func planSubtitle(for product: Product) -> String {
+    private func planSubtitle(for product: StashyStoreProduct) -> String {
         if StashyPlusProduct.subscriptionIDs.contains(product.id) {
             return "Auto-renews · cancel anytime"
         }

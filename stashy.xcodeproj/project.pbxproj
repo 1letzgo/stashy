@@ -120,6 +120,8 @@
 		C7F3A10600000000000000E6 /* StudioLogoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10500000000000000E5 /* StudioLogoStore.swift */; };
 		C7F3A10700000000000000E7 /* StudioLogoStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10500000000000000E5 /* StudioLogoStore.swift */; };
 		C7F3A10900000000000000E9 /* MergeTools.swift in Sources */ = {isa = PBXBuildFile; fileRef = C7F3A10800000000000000E8 /* MergeTools.swift */; };
+		EC0000000000000000000003 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = EC0000000000000000000002 /* RevenueCat */; };
+		EC0000000000000000000013 /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = EC0000000000000000000012 /* RevenueCat */; };
 		C7F3A20100000000000000F1 /* SwiftDraw in Frameworks */ = {isa = PBXBuildFile; productRef = C7F3A20300000000000000F3 /* SwiftDraw */; };
 		CA7A10D12F500001 /* ListCatalogFilterSortModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7A10D02F500000 /* ListCatalogFilterSortModels.swift */; };
 		CA7A10D42F500003 /* ListCatalogFilterSortSheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA7A10D32F500002 /* ListCatalogFilterSortSheets.swift */; };
@@ -375,6 +377,7 @@
 			files = (
 				AE7E00000000000000000003 /* AetherEngine in Frameworks */,
 				C7F3A20100000000000000F1 /* SwiftDraw in Frameworks */,
+				EC0000000000000000000003 /* RevenueCat in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -384,6 +387,7 @@
 			files = (
 				F0A11E1B0B0B0B0B0B0B0B01 /* SwiftDraw in Frameworks */,
 				AE7E00000000000000000013 /* AetherEngine in Frameworks */,
+				EC0000000000000000000013 /* RevenueCat in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -644,6 +648,7 @@
 			packageProductDependencies = (
 				AE7E00000000000000000002 /* AetherEngine */,
 				C7F3A20300000000000000F3 /* SwiftDraw */,
+				EC0000000000000000000002 /* RevenueCat */,
 			);
 			productName = stashy;
 			productReference = DFE504602E8A8E6F00323FF0 /* stashy.app */;
@@ -669,6 +674,7 @@
 			packageProductDependencies = (
 				1A2B3C4D5E6F708192A3B4C5 /* SwiftDraw */,
 				AE7E00000000000000000012 /* AetherEngine */,
+				EC0000000000000000000012 /* RevenueCat */,
 			);
 			productName = stashyTV;
 			productReference = 37D3E24E2F3932C400AB8FAD /* stashyTV.app */;
@@ -701,6 +707,7 @@
 			packageReferences = (
 				0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "SwiftDraw" */,
 				AE7E00000000000000000001 /* XCRemoteSwiftPackageReference "AetherEngine" */,
+				EC0000000000000000000001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */,
 			);
 			productRefGroup = 08FB778CFE84155DC02AAC07;
 			projectDirPath = "";
@@ -1276,6 +1283,14 @@
 				minimumVersion = 7.8.1;
 			};
 		};
+		EC0000000000000000000001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RevenueCat/purchases-ios-spm";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.92.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -1298,6 +1313,16 @@
 			isa = XCSwiftPackageProductDependency;
 			package = 0F1E2D3C4B5A69788796A5B4 /* XCRemoteSwiftPackageReference "SwiftDraw" */;
 			productName = SwiftDraw;
+		};
+		EC0000000000000000000002 /* RevenueCat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EC0000000000000000000001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
+			productName = RevenueCat;
+		};
+		EC0000000000000000000012 /* RevenueCat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = EC0000000000000000000001 /* XCRemoteSwiftPackageReference "purchases-ios-spm" */;
+			productName = RevenueCat;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};

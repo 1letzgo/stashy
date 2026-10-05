@@ -10,6 +10,7 @@
 import Foundation
 import Combine
 import StoreKit
+import RevenueCat
 
 /// `nonisolated`: reine Konstanten, werden auch aus `Task.detached` gelesen.
 nonisolated enum StashyPlusProduct {
@@ -450,4 +451,168 @@ final class StashyPlusManager: ObservableObject {
 
 extension Notification.Name {
     static let stashyPlusUnlocked = Notification.Name("StashyPlusUnlocked")
+}
+
+// MARK: - RevenueCat
+
+/// One purchasable item of the current RevenueCat offering (stashy+ plan or tip).
+/// Mirrors the bits of StoreKit's `Product` the paywalls use.
+struct StashyStoreProduct: Identifiable {
+    let package: Package
+
+    var id: String { package.storeProduct.productIdentifier }
+    var displayName: String { package.storeProduct.localizedTitle }
+    var displayPrice: String { package.storeProduct.localizedPriceString }
+}
+
+/// Shared RevenueCat plumbing for the iOS `StoreManager` and the tvOS `TVStashyPlusStore`.
+///
+/// RevenueCat handles purchases, finishing transactions and restore. The entitlement
+/// snapshot additionally reads StoreKit's `currentEntitlements`, so a RevenueCat outage
+/// (or a purchase RevenueCat has not seen yet) never locks out a paying customer.
+/// Paid-app grandfathering stays on `AppTransaction` in the stores.
+@MainActor
+enum StashyRevenueCat {
+    /// Public SDK key (App Store app in the RevenueCat project "stashy").
+    static let apiKey = "appl_BBvgPSYjRtUoELlmlEJJJjZcOTy"
+    /// Entitlement identifier in the RevenueCat dashboard (display name "stashy+").
+    static let entitlementID = "stashy"
+    /// Set once existing StoreKit purchases were handed to RevenueCat.
+    nonisolated static let migrationSyncedKey = "stashy_plus_revenuecat_synced"
+
+    static var purchases: Purchases {
+        configureIfNeeded()
+        return Purchases.shared
+    }
+
+    static func configureIfNeeded() {
+        guard !Purchases.isConfigured else { return }
+        #if DEBUG
+        Purchases.logLevel = .debug
+        #else
+        Purchases.logLevel = .warn
+        #endif
+        Purchases.configure(withAPIKey: apiKey)
+    }
+
+    /// Packages of the current offering (stashy+ plans and tips).
+    static func fetchProducts() async throws -> [StashyStoreProduct] {
+        let offerings = try await purchases.offerings()
+        return (offerings.current?.availablePackages ?? []).map(StashyStoreProduct.init)
+    }
+
+    /// Error text for the UI, or `nil` on success.
+    static func purchase(_ product: StashyStoreProduct) async -> (message: String?, customerInfo: CustomerInfo?) {
+        do {
+            let result = try await purchases.purchase(package: product.package)
+            if result.userCancelled { return ("Purchase cancelled", nil) }
+            return (nil, result.customerInfo)
+        } catch let error as ErrorCode {
+            switch error {
+            case .purchaseCancelledError: return ("Purchase cancelled", nil)
+            case .paymentPendingError: return ("Purchase pending approval", nil)
+            default: return (error.localizedDescription, nil)
+            }
+        } catch {
+            return (error.localizedDescription, nil)
+        }
+    }
+
+    static func restore() async {
+        do {
+            _ = try await purchases.restorePurchases()
+        } catch {
+            AppLog.debug("RevenueCat restore failed: \(error)")
+        }
+    }
+
+    /// Hands purchases made before the RevenueCat switch to RevenueCat once, so they
+    /// show up in the dashboard. Only runs for devices that actually own stashy+.
+    static func migrateExistingPurchasesIfNeeded() async {
+        let defaults = UserDefaults.standard
+        guard !defaults.bool(forKey: migrationSyncedKey) else { return }
+        guard await storeKitSnapshot().hasAny else {
+            defaults.set(true, forKey: migrationSyncedKey)
+            return
+        }
+        do {
+            _ = try await purchases.syncPurchases()
+            defaults.set(true, forKey: migrationSyncedKey)
+            AppLog.debug("✅ Existing StoreKit purchases synced to RevenueCat")
+        } catch {
+            AppLog.debug("RevenueCat syncPurchases failed: \(error)")
+        }
+    }
+
+    struct EntitlementSnapshot {
+        var hasLifetimePurchase = false
+        var subscriptionProductID: String?
+        var subscriptionExpiration: Date?
+
+        var hasAny: Bool { hasLifetimePurchase || subscriptionProductID != nil }
+
+        mutating func addSubscription(_ productID: String, expiration: Date?) {
+            let exp = expiration ?? .distantFuture
+            guard exp > Date() else { return }
+            if let current = subscriptionExpiration, current >= exp { return }
+            subscriptionExpiration = exp
+            subscriptionProductID = productID
+        }
+
+        mutating func merge(_ other: EntitlementSnapshot) {
+            hasLifetimePurchase = hasLifetimePurchase || other.hasLifetimePurchase
+            if let id = other.subscriptionProductID {
+                addSubscription(id, expiration: other.subscriptionExpiration)
+            }
+        }
+    }
+
+    /// RevenueCat (`customerInfo`, or a fresh/cached fetch) merged with StoreKit.
+    static func entitlementSnapshot(customerInfo: CustomerInfo? = nil) async -> EntitlementSnapshot {
+        var snapshot = await storeKitSnapshot()
+        let info: CustomerInfo?
+        if let customerInfo {
+            info = customerInfo
+        } else {
+            info = try? await purchases.customerInfo()
+        }
+        if let info {
+            snapshot.merge(revenueCatSnapshot(info))
+        }
+        return snapshot
+    }
+
+    private static func revenueCatSnapshot(_ info: CustomerInfo) -> EntitlementSnapshot {
+        var snapshot = EntitlementSnapshot()
+        snapshot.hasLifetimePurchase = info.nonSubscriptions.contains {
+            $0.productIdentifier == StashyPlusProduct.lifetime
+        }
+        for id in StashyPlusProduct.subscriptionIDs where info.activeSubscriptions.contains(id) {
+            snapshot.addSubscription(id, expiration: info.expirationDate(forProductIdentifier: id))
+        }
+        return snapshot
+    }
+
+    private static func storeKitSnapshot() async -> EntitlementSnapshot {
+        var snapshot = EntitlementSnapshot()
+        for await result in Transaction.currentEntitlements {
+            guard case .verified(let transaction) = result else { continue }
+            if transaction.productID == StashyPlusProduct.lifetime {
+                snapshot.hasLifetimePurchase = true
+            } else if StashyPlusProduct.subscriptionIDs.contains(transaction.productID) {
+                snapshot.addSubscription(transaction.productID, expiration: transaction.expirationDate)
+            }
+        }
+        return snapshot
+    }
+
+    /// Calls `onChange` for every CustomerInfo update (purchases, renewals, restores).
+    static func listenForCustomerInfo(_ onChange: @escaping @MainActor (CustomerInfo) async -> Void) -> Task<Void, Never> {
+        let stream = purchases.customerInfoStream
+        return Task {
+            for await info in stream {
+                await onChange(info)
+            }
+        }
+    }
 }
