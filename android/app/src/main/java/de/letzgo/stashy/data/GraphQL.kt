@@ -118,7 +118,8 @@ object GraphQL {
             .url("${config.baseURL}/graphql")
             .post(body.toRequestBody(jsonType))
             .build()
-        val response = try { Net.client.newCall(request).await() } catch (e: IOException) { throw GraphQLError.Network(e) }
+        val call = Net.client.newCall(request).apply { timeout().timeout(Net.GRAPHQL_CALL_TIMEOUT_SECONDS, java.util.concurrent.TimeUnit.SECONDS) }
+        val response = try { call.await() } catch (e: IOException) { throw GraphQLError.Network(e) }
         response.use { r ->
             val text = r.body?.string().orEmpty()
             val root = runCatching { Json.parseToJsonElement(text).jsonObject }.getOrNull()

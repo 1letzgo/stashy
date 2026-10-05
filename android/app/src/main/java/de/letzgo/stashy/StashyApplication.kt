@@ -21,6 +21,7 @@ class StashyApplication : Application(), SingletonImageLoader.Factory {
     override fun onCreate() {
         super.onCreate()
         Prefs.init(this)
+        Net.watchNetworkChanges(this)
         ServerConfigManager.init()
         StashyPlus.start(this)
         de.letzgo.stashy.data.SecurityManager.init()
@@ -40,7 +41,7 @@ class StashyApplication : Application(), SingletonImageLoader.Factory {
     override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader.Builder(context)
             .components {
-                add(OkHttpNetworkFetcherFactory(callFactory = { Net.client }))
+                add(OkHttpNetworkFetcherFactory(callFactory = { Net.imageClient }))
                 // Per-server keys without apikey (iOS ImageCacheManager).
                 add(de.letzgo.stashy.data.ImageCacheKeys.interceptor)
                 add(SvgDecoder.Factory())
