@@ -18,8 +18,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -37,7 +35,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
@@ -58,6 +55,8 @@ import de.letzgo.stashy.data.Studio
 import de.letzgo.stashy.data.Tag
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeSearchField
+import de.letzgo.stashy.ui.NativeTextField
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.NativeDivider
 import de.letzgo.stashy.ui.NativeListItem
@@ -68,22 +67,23 @@ import de.letzgo.stashy.ui.player.PlaybackFormat
 import de.letzgo.stashy.ui.player.PlayerIcons
 import kotlinx.coroutines.launch
 
-/** iOS `Form` text field row. */
+/** Text field row of a form section — the shared Material field ([NativeTextField]). */
 @Composable
 fun FormTextField(value: String, onChange: (String) -> Unit, placeholder: String, modifier: Modifier = Modifier, singleLine: Boolean = true, keyboardType: KeyboardType = KeyboardType.Text, textAlign: TextAlign = TextAlign.Start) {
-    val p = Theme.palette
-    BasicTextField(
-        value, onChange, modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-        singleLine = singleLine, textStyle = NativeType.bodyLarge.copy(color = p.text, textAlign = textAlign),
-        cursorBrush = SolidColor(Appearance.tint), keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
-        decorationBox = { inner ->
-            Box {
-                if (value.isEmpty()) Text(placeholder, Modifier.fillMaxWidth(), style = NativeType.bodyLarge.copy(textAlign = textAlign), color = p.secondaryText)
-                inner()
-            }
-        },
+    NativeTextField(
+        value, onChange, label = null, modifier = modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+        placeholder = placeholder.ifEmpty { null },
+        keyboard = keyboardType,
+        singleLine = singleLine, minLines = 5,
+        autoCorrect = true,
+        textAlign = textAlign,
     )
 }
+
+/** Search row of a form section — the shared Material search pill on the card. */
+@Composable
+private fun FormSearchField(value: String, onChange: (String) -> Unit, placeholder: String) =
+    NativeSearchField(value, onChange, placeholder, Modifier.padding(horizontal = 12.dp, vertical = 8.dp), containerColor = Theme.palette.background)
 
 @Composable
 private fun FormRow(onClick: (() -> Unit)? = null, content: @Composable androidx.compose.foundation.layout.RowScope.() -> Unit) {

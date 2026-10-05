@@ -31,8 +31,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
 import androidx.compose.material.icons.filled.Business
@@ -70,14 +68,12 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shadow
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -98,6 +94,7 @@ import de.letzgo.stashy.data.tools.RateMeThemePickerKind
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.Nav
+import de.letzgo.stashy.ui.NativeSearchField
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
@@ -679,10 +676,7 @@ private fun ThemePickerSheet(
                     NativeSearchField(
                         query, { query = it }, "Search ${kind.title}s",
                         Modifier.padding(bottom = 12.dp),
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.None, autoCorrectEnabled = false),
-                        trailing = if (RateMePickerOptions.isSearching(storeKind)) ({
-                            CircularProgressIndicator(Modifier.size(20.dp), color = p.secondaryText, strokeWidth = 2.dp)
-                        }) else null,
+                        loading = RateMePickerOptions.isSearching(storeKind),
                     )
                 }
                 item { NativeSectionHeader("${kind.title}s") }

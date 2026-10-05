@@ -33,15 +33,12 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -80,6 +77,7 @@ import de.letzgo.stashy.ui.nativeTopBarPadding
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.TabBarClearance
+import de.letzgo.stashy.ui.NativeTextField
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.cardShadow
@@ -424,19 +422,11 @@ internal fun EditEntitySheet(
                     de.letzgo.stashy.ui.NativeGroup(Modifier.padding(0.dp)) {
                         Column(Modifier.padding(horizontal = 4.dp, vertical = 4.dp)) {
                         section.fields.forEach { f ->
-                            OutlinedTextField(
-                                value = f.value, onValueChange = { f.value = it },
-                                label = { Text(f.label) },
-                                singleLine = !f.multiline,
-                                minLines = if (f.multiline) 5 else 1,
-                                keyboardOptions = KeyboardOptions(keyboardType = f.keyboard),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = Color.Transparent, unfocusedBorderColor = Color.Transparent,
-                                    focusedTextColor = p.text, unfocusedTextColor = p.text, cursorColor = Appearance.tint,
-                                    focusedLabelColor = Appearance.tint, unfocusedLabelColor = p.secondaryText,
-                                ),
-                                textStyle = de.letzgo.stashy.ui.NativeType.bodyLarge,
-                                modifier = Modifier.fillMaxWidth(),
+                            de.letzgo.stashy.ui.NativeTextField(
+                                f.value, { f.value = it }, f.label,
+                                keyboard = f.keyboard,
+                                singleLine = !f.multiline, minLines = if (f.multiline) 5 else 1,
+                                autoCorrect = true,
                             )
                         }
                         }

@@ -26,9 +26,6 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Text
@@ -43,12 +40,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -75,6 +69,7 @@ import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.SFS
 import de.letzgo.stashy.ui.TabBarClearance
+import de.letzgo.stashy.ui.NativeSearchField
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.components.ActionChip
@@ -123,7 +118,6 @@ fun SearchScreen() {
     var text by rememberSaveable { mutableStateOf("") }
     var searching by rememberSaveable { mutableStateOf(false) }
     val query = text.trim()
-    val focus = LocalFocusManager.current
 
     LaunchedEffect(query) {
         if (query.length < 2) { SearchState.results = SearchResults(); SearchState.resultsFor = ""; searching = false; return@LaunchedEffect }
@@ -151,12 +145,7 @@ fun SearchScreen() {
         Column(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
             Text("Search", style = IosTypography.headline, color = p.text, modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 12.dp))
             // iOS `.searchable(prompt: "Search everything...")`
-            de.letzgo.stashy.ui.NativeSearchField(
-                text, { text = it }, "Search everything...",
-                Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search, autoCorrectEnabled = false),
-                keyboardActions = KeyboardActions(onSearch = { focus.clearFocus() }),
-            )
+            NativeSearchField(text, { text = it }, "Search everything...", Modifier.padding(horizontal = 16.dp, vertical = 10.dp))
             when {
                 ServerConfigManager.activeConfig == null -> Placeholder(SFS.serverRack, "Server not reachable", null) { Nav.select(MainTab.Settings) }
                 query.isEmpty() -> Placeholder(SF.magnifyingglass, "Search Your Library", "Find scenes, images, performers, studios, tags, galleries, groups and markers")
