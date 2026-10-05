@@ -27,6 +27,8 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ripple
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -65,6 +67,8 @@ import de.letzgo.stashy.ui.player.PreviewSurface
 import de.letzgo.stashy.ui.player.ScenePlayerSurface
 import de.letzgo.stashy.ui.player.rememberPreviewPlayer
 import de.letzgo.stashy.ui.stashyGlass
+import de.letzgo.stashy.ui.components.InfoLabel
+import de.letzgo.stashy.ui.components.InfoLabelSurface
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -265,7 +269,7 @@ fun SceneMetadataCard(model: SceneDetailModel, onEditTitle: () -> Unit) {
                 InfoPill(
                     oCounterIcon(Appearance.oCounterIcon, filled = true), "$count",
                     Modifier.combinedClickable(
-                        interactionSource = remember { MutableInteractionSource() }, indication = null,
+                        interactionSource = remember { MutableInteractionSource() }, indication = ripple(),
                         onClick = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); model.incrementO() },
                         onLongClick = { haptics.performHapticFeedback(HapticFeedbackType.LongPress); menu = true },
                     ),
@@ -288,24 +292,17 @@ fun SceneMetadataCard(model: SceneDetailModel, onEditTitle: () -> Unit) {
                 confirmButton = { TextButton({ confirmReset = false; model.removeO(OCounterMutation.Reset) }) { Text("Remove all $count", color = StashyColors.systemRed) } },
                 dismissButton = { TextButton({ confirmReset = false }) { Text("Cancel") } },
             )
-            Row(
-                Modifier.height(28.dp).clip(RoundedCornerShape(50)).background(p.pillAccent.copy(alpha = 0.1f)).padding(horizontal = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) { StarRating(scene.rating100, size = 14.dp, spacing = 2.dp) { model.setRating(it) } }
+            InfoLabelSurface(container = p.pillAccent.copy(alpha = 0.1f)) {
+                StarRating(scene.rating100, size = 14.dp, spacing = 2.dp) { model.setRating(it) }
+            }
         }
     }
 }
 
-/** iOS: metadata `infoPill` — 28 pt capsule, 10 pt bold, pill accent on 10 % of it. */
+/** iOS: metadata `infoPill` — Android: Material label (small-shape surface, `labelMedium`) in the pill accent. [modifier] sits inside the clip (click ripple). */
 @Composable
 fun InfoPill(icon: androidx.compose.ui.graphics.vector.ImageVector, text: String, modifier: Modifier = Modifier, color: Color = Theme.palette.pillAccent) {
-    Row(
-        Modifier.height(28.dp).clip(RoundedCornerShape(50)).background(color.copy(alpha = 0.1f)).then(modifier).padding(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        Icon(icon, null, tint = color, modifier = Modifier.size(11.dp))
-        Text(text, style = pillTextStyle, color = color, maxLines = 1)
-    }
+    InfoLabel(text, Modifier.clip(MaterialTheme.shapes.small).then(modifier), icon = icon, content = color)
 }
 
 /** iOS: `StarRatingView` — 5 stars, tap the current star again to clear. */

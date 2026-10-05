@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -43,7 +44,11 @@ import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.PersonOff
 import androidx.compose.material.icons.outlined.StopCircle
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
@@ -79,6 +84,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import coil3.compose.AsyncImage
+import de.letzgo.stashy.ui.components.SelectChip
 import coil3.compose.AsyncImagePainter
 import de.letzgo.stashy.data.Performer
 import de.letzgo.stashy.data.ServerConfigManager
@@ -103,7 +109,6 @@ import de.letzgo.stashy.ui.tools.toolsTopPadding
 // iOS: `HotOrNotToolsView` and its private views (`stashy/HotOrNotToolsView.swift`).
 
 /** iOS: `StashyExpandingDock.activeHeight` / `itemSpacing`. */
-internal val MatchPillHeight: Dp = 40.dp
 internal val MatchPillSpacing: Dp = 10.dp
 /** Space between the floating tab bar's top edge and the screen bottom (bar 64 + 2 × 8 padding). */
 private val TabBarStackHeight: Dp = 80.dp
@@ -219,31 +224,13 @@ internal fun MatchPillMenuRow(items: List<String>, selectedIndex: Int, onSelect:
     }
 }
 
-/** Capsule pill of `ToolsPillMenuRow` / `hotOrNotDuelModeChip`. */
+/** Pill of `ToolsPillMenuRow` / `hotOrNotDuelModeChip` — Material `FilterChip`, label centred for equal-width rows. */
 @Composable
 internal fun MatchPill(title: String, selected: Boolean, modifier: Modifier = Modifier, enabled: Boolean = true, onClick: () -> Unit) {
-    val p = Theme.palette
-    val tint = Appearance.tint
-    Box(
-        modifier
-            .height(MatchPillHeight)
-            .let { if (selected) it.shadow(6.dp, CircleShape, ambientColor = tint.copy(alpha = 0.35f), spotColor = tint.copy(alpha = 0.35f)) else it }
-            .clip(CircleShape)
-            .background(if (selected) tint else p.secondaryBackground)
-            .clickable(enabled = enabled, onClick = onClick),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            title,
-            style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold),
-            color = if (selected) Color.White else p.text.copy(alpha = 0.85f),
-            maxLines = 1, overflow = TextOverflow.Ellipsis,
-            modifier = Modifier.padding(horizontal = 6.dp),
-        )
-    }
+    SelectChip(title, selected, onClick, modifier, enabled = enabled, centered = true)
 }
 
-/** iOS `.buttonStyle(.bordered)` / `.borderedProminent` with a `Label`. */
+/** iOS `.buttonStyle(.bordered)` / `.borderedProminent` with a `Label` — Material filled / tonal button. */
 @Composable
 private fun MatchActionButton(
     title: String,
@@ -254,22 +241,24 @@ private fun MatchActionButton(
     onClick: () -> Unit,
 ) {
     val tint = Appearance.tint
-    val shape = RoundedCornerShape(50)
-    Row(
-        modifier
-            .height(36.dp)
-            .clip(shape)
-            .background(if (prominent) tint else tint.copy(alpha = 0.15f), shape)
-            .clickable(enabled = enabled, onClick = onClick)
-            .alpha(if (enabled) 1f else 0.4f)
-            .padding(horizontal = 10.dp),
-        horizontalArrangement = Arrangement.Center,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        val fg = if (prominent) Color.White else tint
-        Icon(icon, null, tint = fg, modifier = Modifier.size(17.dp))
-        Spacer(Modifier.width(6.dp))
-        Text(title, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = fg, maxLines = 1)
+    val padding = PaddingValues(horizontal = 10.dp)
+    val label: @Composable RowScope.() -> Unit = {
+        Icon(icon, null, modifier = Modifier.size(ButtonDefaults.IconSize))
+        Spacer(Modifier.width(ButtonDefaults.IconSpacing))
+        Text(title, style = MaterialTheme.typography.labelLarge, maxLines = 1)
+    }
+    if (prominent) {
+        Button(
+            onClick, modifier, enabled = enabled, contentPadding = padding,
+            colors = ButtonDefaults.buttonColors(containerColor = tint, contentColor = Color.White),
+            content = label,
+        )
+    } else {
+        FilledTonalButton(
+            onClick, modifier, enabled = enabled, contentPadding = padding,
+            colors = ButtonDefaults.filledTonalButtonColors(containerColor = tint.copy(alpha = 0.15f), contentColor = tint),
+            content = label,
+        )
     }
 }
 

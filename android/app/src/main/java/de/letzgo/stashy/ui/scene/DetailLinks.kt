@@ -17,7 +17,6 @@ import de.letzgo.stashy.data.StashGroup
 import de.letzgo.stashy.data.StashImage
 import de.letzgo.stashy.data.Studio
 import de.letzgo.stashy.data.Tag
-import de.letzgo.stashy.ui.BackPill
 import de.letzgo.stashy.ui.EmptyState
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF

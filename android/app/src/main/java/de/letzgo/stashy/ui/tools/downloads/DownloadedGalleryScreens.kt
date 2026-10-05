@@ -42,7 +42,9 @@ import androidx.compose.material.icons.filled.Sync
 import androidx.compose.material.icons.filled.VerticalAlignBottom
 import androidx.compose.material.icons.outlined.PhotoLibrary
 import androidx.compose.material.icons.outlined.StopCircle
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -75,9 +77,7 @@ import de.letzgo.stashy.data.DownloadedGalleryImage
 import de.letzgo.stashy.data.Downloads
 import de.letzgo.stashy.data.Prefs
 import de.letzgo.stashy.ui.Appearance
-import de.letzgo.stashy.ui.BackPill
-import de.letzgo.stashy.ui.GlassCapsule
-import de.letzgo.stashy.ui.GlassIconButton
+import de.letzgo.stashy.ui.NativeMediaLabelBox
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
@@ -87,7 +87,6 @@ import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.cardShadow
 import de.letzgo.stashy.ui.noRippleClickable
-import de.letzgo.stashy.ui.stashyGlass
 import de.letzgo.stashy.ui.NativeTopBar
 import de.letzgo.stashy.ui.OverflowItem
 import de.letzgo.stashy.ui.TopBarAction
@@ -201,9 +200,9 @@ private fun DownloadedImageCell(image: DownloadedGalleryImage, onClick: () -> Un
                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f)))),
         )
         if (image.isVideo) {
-            Box(
-                Modifier.align(Alignment.TopEnd).padding(8.dp).stashyGlass(RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 4.dp),
-            ) { Icon(Icons.Filled.PlayCircle, null, tint = Color.White, modifier = Modifier.size(14.dp)) }
+            NativeMediaLabelBox(Modifier.align(Alignment.TopEnd).padding(8.dp)) {
+                Icon(Icons.Filled.PlayCircle, "Video", tint = Theme.palette.text, modifier = Modifier.size(14.dp))
+            }
         }
         Text(
             image.title?.trim()?.takeIf { it.isNotEmpty() } ?: "Untitled",
@@ -313,14 +312,17 @@ private fun ViewerInfoOverlay(
             }
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 val enabled = image.isVideo
-                GlassIconButton(
-                    if (isMuted) SF.speakerSlash else SF.speaker, if (isMuted) "Unmute" else "Mute",
-                    size = DownloadsCircleSize, iconTint = Color.White.copy(alpha = if (enabled) 1f else 0.35f),
-                ) { if (enabled) onToggleMute() }
-                GlassIconButton(
-                    if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) "Pause" else "Play",
-                    size = DownloadsCircleSize, iconTint = Color.White.copy(alpha = if (enabled) 1f else 0.35f),
-                ) { if (enabled) onTogglePlay() }
+                // Material tonal icon buttons on a dark scrim (they sit on the picture / video).
+                val colors = IconButtonDefaults.filledTonalIconButtonColors(
+                    containerColor = Color.Black.copy(alpha = 0.45f), contentColor = Color.White,
+                    disabledContainerColor = Color.Black.copy(alpha = 0.45f), disabledContentColor = Color.White.copy(alpha = 0.35f),
+                )
+                FilledTonalIconButton(onToggleMute, Modifier.size(DownloadsCircleSize), enabled = enabled, colors = colors) {
+                    Icon(if (isMuted) SF.speakerSlash else SF.speaker, if (isMuted) "Unmute" else "Mute", Modifier.size(18.dp))
+                }
+                FilledTonalIconButton(onTogglePlay, Modifier.size(DownloadsCircleSize), enabled = enabled, colors = colors) {
+                    Icon(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) "Pause" else "Play", Modifier.size(18.dp))
+                }
             }
         }
         if (tags.isNotEmpty()) {

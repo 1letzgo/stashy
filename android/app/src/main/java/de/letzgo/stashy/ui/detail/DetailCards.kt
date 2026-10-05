@@ -42,7 +42,6 @@ import de.letzgo.stashy.data.StashImage
 import de.letzgo.stashy.data.Studio
 import de.letzgo.stashy.data.Tag
 import de.letzgo.stashy.ui.Appearance
-import de.letzgo.stashy.ui.GlassBadge
 import de.letzgo.stashy.ui.NativeCard
 import de.letzgo.stashy.ui.NativeMediaLabel
 import de.letzgo.stashy.ui.NativeType
@@ -201,9 +200,9 @@ internal fun DetailGalleryCard(gallery: Gallery, modifier: Modifier = Modifier, 
         CardImage(gallery.coverURL, SF.photoOnRectangle)
         BottomGradient(0.4f)
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.Top) {
-            gallery.studio?.name?.let { GlassBadge(it) }
+            gallery.studio?.name?.let { NativeMediaLabel(it) }
             Spacer(Modifier.weight(1f))
-            gallery.imageCount?.takeIf { it > 0 }?.let { GlassBadge("$it", icon = SF.photoStack) }
+            gallery.imageCount?.takeIf { it > 0 }?.let { NativeMediaLabel("$it", icon = SF.photoStack) }
         }
         Text(
             gallery.displayTitle, Modifier.align(Alignment.BottomStart).padding(12.dp),
@@ -240,9 +239,9 @@ internal fun DetailImageCard(image: StashImage, modifier: Modifier = Modifier, a
             }
         }
         Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.Top) {
-            image.studio?.name?.let { GlassBadge(it) }
+            image.studio?.name?.let { NativeMediaLabel(it) }
             Spacer(Modifier.weight(1f))
-            image.date?.let { GlassBadge(it) }
+            image.date?.let { NativeMediaLabel(it) }
         }
         BottomGradient(0.4f)
         Row(Modifier.align(Alignment.BottomStart).fillMaxWidth().padding(12.dp), verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -250,7 +249,7 @@ internal fun DetailImageCard(image: StashImage, modifier: Modifier = Modifier, a
                 image.performers?.firstOrNull()?.name ?: image.title ?: "Image", Modifier.weight(1f),
                 style = NativeType.titleMedium, color = Color.White, maxLines = 2, overflow = TextOverflow.Ellipsis,
             )
-            DetailFormatting.fileExtension(image)?.let { GlassBadge(it) }
+            DetailFormatting.fileExtension(image)?.let { NativeMediaLabel(it) }
         }
     }
 }

@@ -77,9 +77,12 @@ import de.letzgo.stashy.ui.SFS
 import de.letzgo.stashy.ui.TabBarClearance
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens
+import de.letzgo.stashy.ui.components.ActionChip
+import de.letzgo.stashy.ui.components.InfoLabel
 import de.letzgo.stashy.ui.components.formatDuration
 import de.letzgo.stashy.ui.home.DashboardSceneCard
 import de.letzgo.stashy.ui.home.DetailLinks
+import de.letzgo.stashy.ui.nativeAccent
 import de.letzgo.stashy.ui.noRippleClickable
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -225,7 +228,7 @@ private fun Results(query: String, searching: Boolean) {
                 AppTab.Tags -> if (r.tags.isNotEmpty()) item("tags") {
                     Section("Tags", r.tags.size, TAGS_LIMIT, { Nav.openCatalog(CatalogTab.Tags, search = query) }) {
                         FlowRow(Modifier.padding(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            r.tags.forEach { t -> InfoPill("${t.name} (${t.sceneCount ?: 0})", SFS.tagFill, filled = true, modifier = Modifier.noRippleClickable { DetailLinks.tag(t) }) }
+                            r.tags.forEach { t -> ActionChip("${t.name} (${t.sceneCount ?: 0})", { DetailLinks.tag(t) }, icon = SFS.tagFill) }
                         }
                     }
                 }
@@ -296,21 +299,12 @@ private fun Section(title: String, count: Int, limit: Int, onShowAll: () -> Unit
     }
 }
 
-/** iOS `InfoPill` — outline (tinted text on a light fill) or filled (white on tint). */
+/** iOS `InfoPill` — name label hanging off a tile: Material label on the surface, lifted by 2 dp. */
 @Composable
-private fun InfoPill(text: String, icon: ImageVector? = null, filled: Boolean = false, modifier: Modifier = Modifier) {
-    val tint = Appearance.tint
-    Row(
-        modifier.clip(RoundedCornerShape(50))
-            .background(if (filled) tint else Theme.palette.background)
-            .let { if (filled) it else it.background(tint.copy(alpha = 0.1f)).border(0.5.dp, tint, RoundedCornerShape(50)) }
-            .padding(horizontal = if (filled) 10.dp else 8.dp, vertical = if (filled) 5.dp else 4.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        if (icon != null) Icon(icon, null, tint = if (filled) Color.White else tint, modifier = Modifier.size(12.dp))
-        Text(text, style = IosTypography.caption.copy(fontWeight = FontWeight.Bold), color = if (filled) Color.White else tint, maxLines = 1, overflow = TextOverflow.Ellipsis)
-    }
-}
+private fun InfoPill(text: String, icon: ImageVector? = null, modifier: Modifier = Modifier) = InfoLabel(
+    text, modifier, icon = icon, content = Theme.palette.text, iconTint = nativeAccent(),
+    container = Theme.palette.secondaryBackground, elevation = 2.dp,
+)
 
 /** iOS `performerCard` — 80 pt circle on a tint ring, name pill overlapping the bottom. */
 @Composable
@@ -320,7 +314,7 @@ private fun PerformerBubble(performer: Performer) {
             Icon(SFS.personCircleFill, null, tint = Appearance.tint.copy(alpha = 0.4f), modifier = Modifier.size(80.dp))
             AsyncImage(performer.imageURL, null, Modifier.size(80.dp).clip(CircleShape), contentScale = ContentScale.Crop, alignment = Alignment.TopCenter)
         }
-        InfoPill(performer.name, modifier = Modifier.padding(top = 80.dp).widthIn(max = 100.dp).shadow(2.dp, RoundedCornerShape(50)))
+        InfoPill(performer.name, modifier = Modifier.padding(top = 80.dp).widthIn(max = 100.dp))
     }
 }
 
@@ -332,7 +326,7 @@ private fun StudioTile(studio: Studio) {
             if (studio.hasImage) AsyncImage(studio.imageURL, studio.name, Modifier.fillMaxSize(), contentScale = ContentScale.Fit)
             else Icon(SF.building2, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(32.dp))
         }
-        InfoPill(studio.name, modifier = Modifier.padding(top = 82.dp).widthIn(max = 120.dp).shadow(2.dp, RoundedCornerShape(50)))
+        InfoPill(studio.name, modifier = Modifier.padding(top = 82.dp).widthIn(max = 120.dp))
     }
 }
 
@@ -344,7 +338,7 @@ private fun PillTile(url: String?, w: Int, h: Int, pillIcon: ImageVector, title:
             Icon(placeholder, null, tint = Theme.palette.secondaryText)
             AsyncImage(url, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         }
-        InfoPill(title, pillIcon, modifier = Modifier.offset(y = 8.dp).zIndex(1f).widthIn(max = w.dp).shadow(2.dp, RoundedCornerShape(50)))
+        InfoPill(title, pillIcon, modifier = Modifier.offset(y = 8.dp).zIndex(1f).widthIn(max = w.dp))
     }
 }
 

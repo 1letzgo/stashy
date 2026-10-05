@@ -48,6 +48,9 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -100,6 +103,8 @@ import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.cardShadow
+import de.letzgo.stashy.ui.components.SelectChip
+import de.letzgo.stashy.ui.nativeAccent
 import de.letzgo.stashy.ui.detail.ImageViewerScreen
 import de.letzgo.stashy.ui.oCounterIcon
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
@@ -114,7 +119,6 @@ import kotlinx.coroutines.launch
 // iOS: `RateMeToolsView` (`stashy/RateMeToolsView.swift`).
 
 /** iOS: `StashyExpandingDock.activeHeight` / `itemSpacing`. */
-private val PillHeight: Dp = 40.dp
 private val PillSpacing: Dp = 10.dp
 
 private fun View.performRateMeHaptic(kind: RateMeHaptic) {
@@ -215,41 +219,36 @@ fun RateMeToolView() {
 
 // MARK: - Chrome
 
-/** iOS: `modeToggle` — Scenes / Images as one segmented capsule with icons. */
+/** iOS: `modeToggle` — Scenes / Images as a Material segmented button with icons. */
 @Composable
 private fun ModeToggle(model: RateMeViewModel, modifier: Modifier = Modifier) {
     val p = Theme.palette
-    val tint = Appearance.tint
+    val accent = nativeAccent()
     val view = LocalView.current
-    Row(
-        modifier
-            .clip(CircleShape)
-            .background(p.secondaryBackground, CircleShape)
-            .padding(2.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp),
-    ) {
-        RateMeMode.entries.forEach { mode ->
+    val modes = RateMeMode.entries
+    SingleChoiceSegmentedButtonRow(modifier) {
+        modes.forEachIndexed { index, mode ->
             val selected = model.mode == mode
-            Box(
-                Modifier
-                    .width(46.dp)
-                    .height(PillHeight - 4.dp)
-                    .clip(CircleShape)
-                    .background(if (selected) tint else Color.Transparent, CircleShape)
-                    .clickable(enabled = !model.isSubmitting) {
-                        if (!selected) {
-                            view.performRateMeHaptic(RateMeHaptic.Selection)
-                            model.selectMode(mode)
-                        }
-                    },
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(
-                    ModeIcons.getValue(mode), mode.label,
-                    tint = if (selected) Color.White else p.text.copy(alpha = 0.7f),
-                    modifier = Modifier.size(18.dp),
-                )
-            }
+            SegmentedButton(
+                selected = selected,
+                onClick = {
+                    if (!selected) {
+                        view.performRateMeHaptic(RateMeHaptic.Selection)
+                        model.selectMode(mode)
+                    }
+                },
+                shape = SegmentedButtonDefaults.itemShape(index, modes.size),
+                enabled = !model.isSubmitting,
+                modifier = Modifier.width(56.dp),
+                colors = SegmentedButtonDefaults.colors(
+                    activeContainerColor = accent.copy(alpha = 0.18f), activeContentColor = p.text,
+                    inactiveContainerColor = Color.Transparent, inactiveContentColor = p.text.copy(alpha = 0.7f),
+                    activeBorderColor = p.separator, inactiveBorderColor = p.separator,
+                    disabledActiveContainerColor = accent.copy(alpha = 0.18f), disabledActiveContentColor = p.text.copy(alpha = 0.6f),
+                    disabledActiveBorderColor = p.separator, disabledInactiveBorderColor = p.separator,
+                ),
+                icon = {},
+            ) { Icon(ModeIcons.getValue(mode), mode.label, modifier = Modifier.size(18.dp)) }
         }
     }
 }
@@ -303,24 +302,10 @@ private fun ThemeChips(model: RateMeViewModel, modifier: Modifier, onPick: (Rate
     }
 }
 
-/** iOS: `themeChip` — label with icon on the Charts / Match pill fill (no glow). */
+/** iOS: `themeChip` — Material `FilterChip` with icon. */
 @Composable
 private fun ThemeChip(title: String, icon: ImageVector, selected: Boolean, enabled: Boolean, onClick: () -> Unit) {
-    val p = Theme.palette
-    val fg = if (selected) Color.White else p.text.copy(alpha = 0.85f)
-    Row(
-        Modifier
-            .height(PillHeight)
-            .clip(CircleShape)
-            .background(if (selected) Appearance.tint else p.secondaryBackground, CircleShape)
-            .clickable(enabled = enabled, onClick = onClick)
-            .padding(horizontal = 16.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        Icon(icon, null, tint = fg, modifier = Modifier.size(16.dp))
-        Text(title, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = fg, maxLines = 1, softWrap = false)
-    }
+    SelectChip(title, selected, onClick, enabled = enabled, icon = icon)
 }
 
 /** iOS: `mediaKindMenu` — Any media / Images / Videos as a compact menu chip (images mode). */
@@ -329,21 +314,11 @@ private fun MediaKindMenu(model: RateMeViewModel) {
     val p = Theme.palette
     var expanded by remember { mutableStateOf(false) }
     val selected = model.imageMediaKind != RateMeImageMediaKind.All
-    val fg = if (selected) Color.White else p.text.copy(alpha = 0.85f)
     Box {
-        Row(
-            Modifier
-                .height(PillHeight)
-                .clip(CircleShape)
-                .background(if (selected) Appearance.tint else p.secondaryBackground, CircleShape)
-                .clickable(enabled = !model.isSubmitting) { expanded = true }
-                .padding(horizontal = 16.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(4.dp),
-        ) {
-            Text(model.imageMediaKind.title, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = fg, maxLines = 1, softWrap = false)
-            Icon(Icons.Filled.KeyboardArrowDown, null, tint = fg, modifier = Modifier.size(14.dp))
-        }
+        SelectChip(
+            model.imageMediaKind.title, selected, { expanded = true },
+            enabled = !model.isSubmitting, trailingIcon = Icons.Filled.KeyboardArrowDown,
+        )
         DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }, containerColor = p.secondaryBackground) {
             RateMeImageMediaKind.entries.forEach { kind ->
                 DropdownMenuItem(

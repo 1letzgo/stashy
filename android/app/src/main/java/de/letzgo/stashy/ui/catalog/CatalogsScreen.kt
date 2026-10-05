@@ -23,7 +23,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import de.letzgo.stashy.data.TabManager
 import de.letzgo.stashy.ui.CatalogTab
-import de.letzgo.stashy.ui.ChromeChip
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.home.DashboardScreen

@@ -117,17 +117,11 @@ fun SceneCardEmpty(text: String) {
     Text(text, Modifier.padding(start = 12.dp, end = 12.dp, bottom = 12.dp), style = IosTypography.subheadline, color = Theme.palette.secondaryText)
 }
 
-/** Name capsule hanging off the bottom of performer/studio/group tiles. */
+/** Name label hanging off the bottom of performer/studio/group tiles — Material label on the surface, lifted by 2 dp. */
 @Composable
 fun NamePill(text: String, modifier: Modifier = Modifier) {
     val p = Theme.palette
-    val tint = Appearance.tint
-    Text(
-        text,
-        modifier.shadow(2.dp, RoundedCornerShape(50)).clip(RoundedCornerShape(50)).background(p.secondaryBackground).background(tint.copy(alpha = 0.1f))
-            .border(0.5.dp, tint.copy(alpha = 0.4f), RoundedCornerShape(50)).padding(horizontal = 8.dp, vertical = 4.dp),
-        style = IosTypography.caption2.copy(fontWeight = FontWeight.Bold), color = p.pillAccent, maxLines = 1, overflow = TextOverflow.Ellipsis,
-    )
+    de.letzgo.stashy.ui.components.InfoLabel(text, modifier, content = p.text, container = p.secondaryBackground, elevation = 2.dp)
 }
 
 /**

@@ -12,6 +12,7 @@ import androidx.compose.material.icons.outlined.StopCircle
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -26,7 +27,6 @@ import de.letzgo.stashy.data.Downloads
 import de.letzgo.stashy.data.Gallery
 import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.ui.Appearance
-import de.letzgo.stashy.ui.GlassIconButton
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
@@ -84,10 +84,10 @@ fun SceneBulkDownloadDialog(scope: Downloads.SceneDownloadScope, scopeName: Stri
     )
 }
 
-/** iOS: `SceneBulkDownloadChrome.slot` — glass circle that opens [SceneBulkDownloadDialog]. */
+/** iOS: `SceneBulkDownloadChrome.slot` — Material icon button that opens [SceneBulkDownloadDialog]. */
 @Composable
 fun SceneBulkDownloadButton(onClick: () -> Unit, modifier: Modifier = Modifier, size: Dp = DownloadsCircleSize) {
-    GlassIconButton(DownloadGlyph, "Download scenes", modifier, size = size, onClick = onClick)
+    IconButton(onClick, modifier.size(size)) { Icon(DownloadGlyph, "Download scenes") }
 }
 
 /**
@@ -171,10 +171,10 @@ fun ImageSetDownloadButton(entryId: String, onShowOptions: () -> Unit, modifier:
     val downloading = Downloads.activeDownloads[entryId] != null
     val stored = Downloads.galleryDownloads.any { it.id == entryId }
     when {
-        downloading -> GlassIconButton(Icons.Outlined.StopCircle, "Cancel download", modifier, size = size, iconTint = StashyColors.systemRed) {
-            Downloads.cancelGalleryDownload(entryId)
+        downloading -> IconButton({ Downloads.cancelGalleryDownload(entryId) }, modifier.size(size)) {
+            Icon(Icons.Outlined.StopCircle, "Cancel download", tint = StashyColors.systemRed)
         }
-        stored -> GlassIconButton(Icons.Filled.CheckCircle, "Downloaded", modifier, size = size, iconTint = Appearance.tint, onClick = onShowOptions)
-        else -> GlassIconButton(DownloadGlyph, "Download", modifier, size = size, onClick = onShowOptions)
+        stored -> IconButton(onShowOptions, modifier.size(size)) { Icon(Icons.Filled.CheckCircle, "Downloaded", tint = Appearance.tint) }
+        else -> IconButton(onShowOptions, modifier.size(size)) { Icon(DownloadGlyph, "Download") }
     }
 }
