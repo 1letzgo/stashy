@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.settings
 
+import de.letzgo.stashy.ui.scaledMaxLines
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -184,7 +185,7 @@ fun MenuValue(options: List<Pair<String, String>>, currentId: String?, placehold
 @Composable
 fun CardSettingRow(title: String, trailing: @Composable () -> Unit) {
     Row(Modifier.fillMaxWidth().heightIn(min = 48.dp), verticalAlignment = Alignment.CenterVertically) {
-        Text(title, style = NativeType.bodyLarge, color = Theme.palette.text, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+        Text(title, style = NativeType.bodyLarge, color = Theme.palette.text, maxLines = scaledMaxLines(), overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
         CompositionLocalProvider(LocalCardRowTitle provides title) { trailing() }
     }
 }

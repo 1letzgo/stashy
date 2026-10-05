@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.match
 
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import android.os.Build
 import android.view.HapticFeedbackConstants
 import android.view.View
@@ -406,8 +408,8 @@ private fun VictoryCard(model: MatchViewModel, victor: Performer) {
         Text(victor.name, style = IosTypography.headline, color = p.text, textAlign = TextAlign.Center)
         Text("${model.climbWins} wins · cleared the ladder", style = IosTypography.caption, color = p.secondaryText, textAlign = TextAlign.Center)
         Box(
-            Modifier.fillMaxWidth().height(36.dp).clip(RoundedCornerShape(50)).background(tint)
-                .clickable { model.startNewClimbRun() },
+            Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(50)).background(tint)
+                .clickable { model.startNewClimbRun() }.padding(vertical = 6.dp),
             contentAlignment = Alignment.Center,
         ) {
             Text("New run", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
@@ -474,7 +476,7 @@ private fun BattleColumn(
                         Row(Modifier.fillMaxWidth()) {
                             pair.forEach { (label, value) ->
                                 Column(Modifier.weight(1f)) {
-                                    Text(label.uppercase(), fontSize = 8.sp, lineHeight = 10.sp, color = p.secondaryText, maxLines = 1)
+                                    Text(label.uppercase(), fontSize = 8.sp, lineHeight = 10.sp, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
                                     Text(
                                         value, fontSize = 11.sp, lineHeight = 13.sp, fontWeight = FontWeight.Medium, color = p.text,
                                         maxLines = 2, overflow = TextOverflow.Ellipsis,
@@ -629,6 +631,7 @@ private fun LeaderboardContent(model: MatchViewModel, hPad: Dp, isRegular: Boole
 }
 
 /** iOS: `HotOrNotLeaderboardCard` — thumbnail strip with place badge, name, stats, streaks. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun LeaderboardCard(performer: Performer, place: Int, onClick: () -> Unit) {
     val p = Theme.palette
@@ -667,7 +670,11 @@ private fun LeaderboardCard(performer: Performer, place: Int, onClick: () -> Uni
                     maxLines = 2, overflow = TextOverflow.Ellipsis,
                 )
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                    // 5 columns; at large font scales they wrap into rows of 3 instead of clipping the numbers.
+                    FlowRow(
+                        Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalArrangement = Arrangement.spacedBy(4.dp),
+                        maxItemsInEachRow = if (LocalDensity.current.fontScale > 1.3f) 3 else 5,
+                    ) {
                         StatColumn("Rating", "${performer.rating100 ?: MatchElo.DEFAULT_RATING}", Modifier.weight(1f))
                         StatColumn("Duels", "${s.totalMatches}", Modifier.weight(1f))
                         StatColumn("W", "${s.wins}", Modifier.weight(1f))
@@ -687,7 +694,7 @@ private fun LeaderboardCard(performer: Performer, place: Int, onClick: () -> Uni
 private fun StatColumn(title: String, value: String, modifier: Modifier) {
     val p = Theme.palette
     Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(1.dp)) {
-        Text(title.uppercase(), fontSize = 8.sp, lineHeight = 10.sp, color = p.secondaryText, maxLines = 1)
+        Text(title.uppercase(), fontSize = 8.sp, lineHeight = 10.sp, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
         Text(
             value,
             style = IosTypography.title2.merge(numberStyle).copy(fontWeight = FontWeight.Bold),

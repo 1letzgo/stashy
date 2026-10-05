@@ -298,7 +298,7 @@ private fun CalendarContent(heatmap: OCountMonthHeatmap, layout: HeatmapLayout, 
     ) {
         Row(Modifier.width(layout.gridWidth), horizontalArrangement = Arrangement.spacedBy(layout.columnGap)) {
             for (col in 0 until 7) {
-                Box(Modifier.width(layout.blockSize).height(HeatmapMetrics.weekdayHeaderHeight), contentAlignment = Alignment.Center) {
+                Box(Modifier.width(layout.blockSize).heightIn(min = HeatmapMetrics.weekdayHeaderHeight), contentAlignment = Alignment.Center) {
                     Text(weekdayLabels[col], style = IosTypography.caption2.copy(fontWeight = FontWeight.SemiBold), color = p.secondaryText, maxLines = 1)
                 }
             }
@@ -369,7 +369,9 @@ private fun DayCell(cell: OCountMonthHeatmap.Cell?, blockSize: Dp, isSelected: B
             .semantics { contentDescription = cell?.accessibilityLabel ?: "No data" },
         contentAlignment = Alignment.Center,
     ) {
-        if (day > 0) {
+        // Day number sized from the cell (calendar grid of fixed circles): follows the font scale
+        // only up to 1.25× so it stays inside its circle.
+        if (day > 0) de.letzgo.stashy.ui.CappedFontScale(1.25f) {
             Text(
                 "$day",
                 fontSize = dayFont.sp,

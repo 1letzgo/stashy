@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.tools.downloads
 
+import de.letzgo.stashy.ui.scaledIconSize
+import androidx.compose.foundation.layout.heightIn
 import android.Manifest
 import android.content.Context
 import android.content.Intent
@@ -383,13 +385,13 @@ private fun SyncJobRow(
             Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.xs)) {
                 jobs.forEach { job ->
                     Column(
-                        Modifier.height(44.dp).clip(RoundedCornerShape(50)).background(p.secondaryBackground)
+                        Modifier.heightIn(min = 44.dp).clip(RoundedCornerShape(50)).background(p.secondaryBackground)
                             .combinedClickable(onClick = { onRun(job) }, onLongClick = { onLongPress(job) })
-                            .padding(horizontal = Tokens.Spacing.sm),
+                            .padding(horizontal = Tokens.Spacing.sm, vertical = 4.dp),
                         verticalArrangement = Arrangement.spacedBy(1.dp, Alignment.CenterVertically),
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                            Icon(if (job.kind == DownloadSyncJob.Kind.Scenes) SF.film else SF.photo, null, tint = p.text, modifier = Modifier.size(11.dp))
+                            Icon(if (job.kind == DownloadSyncJob.Kind.Scenes) SF.film else SF.photo, null, tint = p.text, modifier = Modifier.size(scaledIconSize(11.dp)))
                             Text(job.filterName, style = IosTypography.footnote.copy(fontWeight = FontWeight.Medium), color = p.text, maxLines = 1)
                         }
                         Text(job.amountLabel, style = IosTypography.caption2, color = p.text, maxLines = 1, modifier = Modifier.alpha(0.75f))
@@ -643,7 +645,8 @@ private fun DownloadedSceneCard(downloaded: DownloadedScene, onOpen: () -> Unit,
         ),
     ) {
         Row(
-            Modifier.fillMaxWidth().height(100.dp).cardShadow(shape).clip(shape).background(p.secondaryBackground),
+            // Min height: title + chips grow with the font scale (the 130×100 thumbnail stays top-aligned).
+            Modifier.fillMaxWidth().heightIn(min = 100.dp).cardShadow(shape).clip(shape).background(p.secondaryBackground),
         ) {
             Box(Modifier.size(width = 130.dp, height = 100.dp)) {
                 val thumb = Downloads.localThumbnailFile(downloaded)
@@ -673,14 +676,13 @@ private fun DownloadedSceneCard(downloaded: DownloadedScene, onOpen: () -> Unit,
                 }
             }
             Column(
-                Modifier.weight(1f).fillMaxHeight().padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
+                Modifier.weight(1f).heightIn(min = 100.dp).padding(horizontal = 12.dp, vertical = 8.dp),
+                verticalArrangement = Arrangement.SpaceBetween,
             ) {
                 Text(
                     downloaded.title ?: "Unknown Title", style = IosTypography.subheadline.copy(fontWeight = FontWeight.Bold),
-                    color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                    color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis, modifier = Modifier.padding(bottom = 4.dp),
                 )
-                Spacer(Modifier.weight(1f))
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(4.dp), verticalAlignment = Alignment.CenterVertically) {
                     downloaded.studioName?.let { MetaChip(Icons.Filled.Business, it) }
                     downloaded.performerNames.take(3).forEach { MetaChip(Icons.Filled.Person, it) }
@@ -718,7 +720,7 @@ private fun DownloadedGalleryCard(entry: DownloadedGallery, onOpen: () -> Unit, 
         menu = if (entry.isSingleImage) emptyList() else listOf(Triple("Sync", Icons.Filled.Sync, onSync)),
     ) {
         Row(
-            Modifier.fillMaxWidth().height(72.dp).clip(shape).background(p.secondaryBackground),
+            Modifier.fillMaxWidth().heightIn(min = 72.dp).clip(shape).background(p.secondaryBackground),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(Modifier.size(width = 96.dp, height = 72.dp).background(Color.Gray.copy(alpha = 0.2f)), contentAlignment = Alignment.Center) {

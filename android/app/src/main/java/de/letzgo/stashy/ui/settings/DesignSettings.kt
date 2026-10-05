@@ -1,5 +1,8 @@
 package de.letzgo.stashy.ui.settings
 
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.heightIn
 import android.content.Intent
 import android.net.Uri
 import androidx.compose.foundation.background
@@ -110,14 +113,14 @@ class AppearanceSettingsScreen : Screen {
                 FlowRow(Modifier.fillMaxWidth().padding(16.dp), horizontalArrangement = Arrangement.spacedBy(12.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     oCounterPresets.forEach { (icon, label) ->
                         val selected = Appearance.oCounterIcon == icon
-                        Column(Modifier.width(56.dp).clickable { Appearance.updateOCounterIcon(icon) }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Column(Modifier.widthIn(min = 56.dp).clickable { Appearance.updateOCounterIcon(icon) }, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
                             Box(
                                 Modifier.size(48.dp)
                                     .background(if (selected) Appearance.tint.copy(alpha = 0.15f) else Color.Gray.copy(alpha = 0.2f), CircleShape)
                                     .border(if (selected) 2.dp else 1.dp, if (selected) Appearance.tint else Theme.palette.text.copy(alpha = 0.2f), CircleShape),
                                 contentAlignment = Alignment.Center,
                             ) { Icon(oCounterIcon(icon, filled = true), null, tint = if (selected) Appearance.tint else Theme.palette.text.copy(alpha = 0.6f), modifier = Modifier.size(22.dp)) }
-                            Text(label, fontSize = 10.sp, color = Theme.palette.secondaryText, maxLines = 1)
+                            Text(label, fontSize = 10.sp, color = Theme.palette.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
                     }
                 }
@@ -139,11 +142,11 @@ private fun sameColor(a: Color, b: Color) = abs(a.red - b.red) < 0.01f && abs(a.
 @Composable
 private fun GlassDemo() {
     Box(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).height(96.dp).clip(RoundedCornerShape(10.dp))
+        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp).heightIn(min = 96.dp).clip(RoundedCornerShape(10.dp))
             .background(Brush.linearGradient(listOf(Color(0xFFFF9F0A), Color(0xFFFF375F), Color(0xFFBF5AF2), Color(0xFF0A84FF), Color(0xFF40C8E0), Color(0xFF30D158)))),
         contentAlignment = Alignment.Center,
     ) {
-        Column(Modifier.fillMaxSize().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        Column(Modifier.matchParentSize().padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
             repeat(4) { row ->
                 Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                     repeat(8) { col -> Box(Modifier.weight(1f).height(10.dp).background(Color.White.copy(alpha = if ((row + col) % 2 == 0) 0.55f else 0.1f), RoundedCornerShape(3.dp))) }
@@ -170,7 +173,7 @@ private fun GlassDemo() {
 @Composable
 private fun DemoGlassCapsule(tint: Color? = null, content: @Composable RowScope.() -> Unit) {
     Row(
-        Modifier.height(42.dp).floatingShadow(RoundedCornerShape(50)).stashyGlass(RoundedCornerShape(50), tint).padding(horizontal = 16.dp),
+        Modifier.heightIn(min = 42.dp).floatingShadow(RoundedCornerShape(50)).stashyGlass(RoundedCornerShape(50), tint).padding(horizontal = 16.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         content = content,

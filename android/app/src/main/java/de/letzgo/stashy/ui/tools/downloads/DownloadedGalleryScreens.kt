@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools.downloads
 
+import androidx.compose.foundation.layout.heightIn
 import de.letzgo.stashy.ui.uniqueItemsIndexed
 import android.net.Uri
 import android.view.ViewGroup
@@ -286,7 +287,8 @@ private fun ViewerInfoOverlay(
     val tags = image.tagNames.orEmpty()
     val title = image.title?.trim().orEmpty()
     val tint = Appearance.tint
-    Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 12.dp)) {
+    // Over the media: font scale capped at OverlayMaxFontScale (like Feeds).
+    de.letzgo.stashy.ui.CappedFontScale { Column(Modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 12.dp)) {
         Row(
             Modifier.fillMaxWidth().padding(horizontal = 16.dp),
             verticalAlignment = Alignment.Bottom,
@@ -329,7 +331,7 @@ private fun ViewerInfoOverlay(
         }
         if (tags.isNotEmpty()) {
             Row(
-                Modifier.fillMaxWidth().padding(top = 6.dp).height(24.dp).horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
+                Modifier.fillMaxWidth().padding(top = 6.dp).heightIn(min = 24.dp).horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
@@ -343,7 +345,7 @@ private fun ViewerInfoOverlay(
                 }
             }
         }
-    }
+    } }
 }
 
 private fun initials(name: String): String {

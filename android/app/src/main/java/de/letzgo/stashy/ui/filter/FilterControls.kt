@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.filter
 
+import de.letzgo.stashy.ui.scaledMaxLines
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -101,7 +102,7 @@ fun ControlCard(modifier: Modifier = Modifier, content: @Composable RowScope.() 
 fun ControlLabel(text: String) {
     Text(
         text, Modifier.widthIn(min = FilterSheetLayout.labelColumnWidth),
-        style = NativeType.bodyLarge, color = Theme.palette.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
+        style = NativeType.bodyLarge, color = Theme.palette.text, maxLines = scaledMaxLines(), overflow = TextOverflow.Ellipsis,
     )
 }
 
@@ -117,7 +118,7 @@ fun CatalogFilterChip(title: String, isActive: Boolean, modifier: Modifier = Mod
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp),
         fontSize = 13.sp, fontWeight = FontWeight.Medium,
-        color = if (isActive) Color.White else p.text, maxLines = 1,
+        color = if (isActive) Color.White else p.text, maxLines = 1, overflow = TextOverflow.Ellipsis,
     )
 }
 

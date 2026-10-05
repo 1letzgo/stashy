@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.filter
 
+import de.letzgo.stashy.ui.scaledMaxLines
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -314,11 +315,11 @@ private fun CriterionCard(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                Text(field.label, style = NativeType.bodyLarge, color = p.text, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(field.label, style = NativeType.bodyLarge, color = p.text, maxLines = scaledMaxLines(), overflow = TextOverflow.Ellipsis)
                 Text(
                     FilterCriterionSummary.text(field, value),
                     style = NativeType.bodyMedium, color = if (isSet) nativeAccent() else p.secondaryText,
-                    maxLines = 1, overflow = TextOverflow.Ellipsis,
+                    maxLines = scaledMaxLines(), overflow = TextOverflow.Ellipsis,
                 )
             }
             Icon(

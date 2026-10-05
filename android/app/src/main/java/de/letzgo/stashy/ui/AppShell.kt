@@ -164,7 +164,8 @@ private fun FloatingTabBar() {
                 selected = selected,
                 onClick = { Nav.select(item.tab) },
                 icon = { Icon(if (selected) item.selectedIcon else item.icon, contentDescription = item.title) },
-                label = { Text(item.title, style = androidx.compose.material3.MaterialTheme.typography.labelMedium) },
+                // Scales with the font size (sp); one line so a very large scale ellipsizes instead of wrapping mid-word.
+                label = { Text(item.title, style = androidx.compose.material3.MaterialTheme.typography.labelMedium, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis) },
                 colors = NavigationBarItemDefaults.colors(
                     selectedIconColor = p.text,
                     selectedTextColor = p.text,

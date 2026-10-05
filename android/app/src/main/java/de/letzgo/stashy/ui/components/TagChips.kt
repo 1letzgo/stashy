@@ -8,7 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material3.AssistChip
@@ -93,7 +93,8 @@ fun TagChipRow(
 ) {
     CompositionLocalProvider(LocalMinimumInteractiveComponentSize provides TagChips.rowHeight) {
         Row(
-            modifier.fillMaxWidth().height(TagChips.rowHeight),
+            // Min height, not fixed: chips grow with the font scale and must not be clipped.
+            modifier.fillMaxWidth().heightIn(min = TagChips.rowHeight),
             horizontalArrangement = Arrangement.spacedBy(TagChips.spacing),
             verticalAlignment = Alignment.CenterVertically,
         ) {

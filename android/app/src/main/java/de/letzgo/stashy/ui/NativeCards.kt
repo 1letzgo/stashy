@@ -82,7 +82,7 @@ fun nativeLabelContainer(): Color = Theme.palette.secondaryBackground.copy(alpha
 @Composable
 fun NativeMediaLabel(text: String, modifier: Modifier = Modifier, icon: ImageVector? = null, small: Boolean = false) {
     NativeMediaLabelBox(modifier, small) {
-        if (icon != null) Icon(icon, null, tint = Theme.palette.text, modifier = Modifier.size(if (small) 12.dp else 14.dp))
+        if (icon != null) Icon(icon, null, tint = Theme.palette.text, modifier = Modifier.size(scaledIconSize(if (small) 12.dp else 14.dp)))
         Text(
             text, style = if (small) NativeType.labelSmall else NativeType.labelMedium,
             color = Theme.palette.text, maxLines = 1, overflow = TextOverflow.Ellipsis,

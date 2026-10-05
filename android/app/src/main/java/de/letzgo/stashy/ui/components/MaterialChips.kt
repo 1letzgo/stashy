@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.nativeAccent
+import de.letzgo.stashy.ui.scaledIconSize
 
 /**
  * Material 3 replacements for the iOS capsules on regular app surfaces (Android look):
@@ -58,8 +59,8 @@ fun SelectChip(
                 modifier = if (centered) Modifier.fillMaxWidth() else Modifier,
             )
         },
-        leadingIcon = icon?.let { { Icon(it, null, Modifier.size(FilterChipDefaults.IconSize)) } },
-        trailingIcon = trailingIcon?.let { { Icon(it, null, Modifier.size(FilterChipDefaults.IconSize)) } },
+        leadingIcon = icon?.let { { Icon(it, null, Modifier.size(scaledIconSize(FilterChipDefaults.IconSize))) } },
+        trailingIcon = trailingIcon?.let { { Icon(it, null, Modifier.size(scaledIconSize(FilterChipDefaults.IconSize))) } },
         colors = FilterChipDefaults.filterChipColors(
             containerColor = Color.Transparent,
             labelColor = p.text,
@@ -91,7 +92,7 @@ fun ActionChip(
         enabled = enabled,
         modifier = modifier,
         label = { Text(label, style = MaterialTheme.typography.labelLarge, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-        leadingIcon = icon?.let { { Icon(it, null, Modifier.size(AssistChipDefaults.IconSize)) } },
+        leadingIcon = icon?.let { { Icon(it, null, Modifier.size(scaledIconSize(AssistChipDefaults.IconSize))) } },
         colors = AssistChipDefaults.assistChipColors(
             containerColor = Color.Transparent,
             labelColor = p.text,
@@ -116,7 +117,7 @@ fun InfoLabel(
     elevation: Dp = 0.dp,
 ) {
     InfoLabelSurface(modifier, container = container, content = content, elevation = elevation) {
-        if (icon != null) Icon(icon, null, tint = iconTint, modifier = Modifier.size(14.dp))
+        if (icon != null) Icon(icon, null, tint = iconTint, modifier = Modifier.size(scaledIconSize(14.dp)))
         Text(text, style = MaterialTheme.typography.labelMedium, color = content, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }

@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools.stats
 
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -194,7 +195,7 @@ private fun TimelineFilterChipRow(enabled: Set<TimelineKind>, onChange: (Set<Tim
             Box(
                 Modifier
                     .weight(1f)
-                    .height(ChipHeight)
+                    .heightIn(min = ChipHeight)
                     .let { if (selected) it.shadow(6.dp, shape, ambientColor = tint.copy(alpha = 0.35f), spotColor = tint.copy(alpha = 0.35f)) else it }
                     .clip(shape)
                     .background(if (selected) tint else p.secondaryBackground, shape)
@@ -211,7 +212,9 @@ private fun TimelineFilterChipRow(enabled: Set<TimelineKind>, onChange: (Set<Tim
                     kind.label,
                     style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold),
                     color = if (selected) Color.White else p.text.copy(alpha = 0.85f),
-                    maxLines = 1,
+                    // Equal-width chips: wrap to a 2nd line at large font scales instead of clipping.
+                    maxLines = 2, textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 6.dp),
                 )
             }
         }
@@ -346,27 +349,30 @@ private fun TimelineVisitCard(visit: TimelineVisit, modifier: Modifier = Modifie
     val cardHeight = thumbWidth * 9f / 16f
     val shape = RoundedCornerShape(Tokens.Radius.card)
     Box(
+        // Min height (not fixed): the text column sizes the card at large font scales; the
+        // thumbnail matches whatever height that gives.
         modifier
-            .height(cardHeight)
+            .heightIn(min = cardHeight)
             .cardShadow(shape)
             .clip(shape)
             .background(actionSurface(isOCountAction), shape)
             .border(0.5.dp, if (isOCountAction) tint.copy(alpha = 0.28f) else p.text.copy(alpha = 0.1f), shape),
     ) {
-        Row(Modifier.fillMaxSize(), verticalAlignment = Alignment.CenterVertically) {
+        Box(Modifier.matchParentSize()) {
             ThumbPlaceholder(Modifier.width(thumbWidth).fillMaxHeight()) {
                 Icon(SF.film, null, tint = p.secondaryText, modifier = Modifier.size(20.dp))
                 visit.scene.thumbnailURL()?.let { AsyncImage(it, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop) }
             }
-            Column(
-                Modifier.weight(1f).fillMaxHeight().padding(horizontal = 12.dp, vertical = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                Text(
-                    visit.scene.displayTitle, style = IosTypography.subheadline.copy(fontWeight = FontWeight.Bold),
-                    color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis,
-                )
-                Spacer(Modifier.weight(1f))
+        }
+        Column(
+            Modifier.fillMaxWidth().heightIn(min = cardHeight).padding(start = thumbWidth).padding(horizontal = 12.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                visit.scene.displayTitle, style = IosTypography.subheadline.copy(fontWeight = FontWeight.Bold),
+                color = p.text, maxLines = 2, overflow = TextOverflow.Ellipsis,
+            )
+            Column(Modifier.padding(top = 4.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                 watchedLine(visit)?.let {
                     Text(it, style = IosTypography.caption, color = p.secondaryText, maxLines = 1, overflow = TextOverflow.Ellipsis)
                 }

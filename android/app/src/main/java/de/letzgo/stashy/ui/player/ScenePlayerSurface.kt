@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.player
 
+import androidx.compose.foundation.layout.heightIn
 import android.content.Context
 import android.content.pm.PackageManager
 import android.database.ContentObserver
@@ -214,6 +215,8 @@ fun ScenePlayerSurface(
         }
     }
 
+    // Player chrome over video: text follows the font scale only up to OverlayMaxFontScale (1.3×).
+    de.letzgo.stashy.ui.CappedFontScale {
     BoxWithConstraints(modifier.background(Color.Black)) {
         val surfaceW = maxWidth
         val surfaceH = maxHeight
@@ -393,7 +396,7 @@ fun ScenePlayerSurface(
             ) {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End), verticalAlignment = Alignment.CenterVertically) {
                     if (player.isUsingTranscodeFallback) {
-                        Box(Modifier.height(chrome).stashyGlass(RoundedCornerShape(50)).padding(horizontal = 10.dp), contentAlignment = Alignment.Center) {
+                        Box(Modifier.heightIn(min = chrome).stashyGlass(RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
                             Text("Transcode", color = Color.White, style = TextStyle(fontSize = 11.sp, fontWeight = FontWeight.SemiBold))
                         }
                     }
@@ -431,6 +434,7 @@ fun ScenePlayerSurface(
                 }
             }
         }
+    }
     }
 }
 
