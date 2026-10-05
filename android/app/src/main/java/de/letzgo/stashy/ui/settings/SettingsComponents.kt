@@ -229,7 +229,7 @@ fun ChromeTextButton(title: String, enabled: Boolean = true, onClick: () -> Unit
 /** The Settings tab's top tabs (Settings · Design · Server · stashy+) — Material tab strip. */
 @Composable
 fun <T> SectionChipStrip(sections: List<T>, selected: T, icon: (T) -> ImageVector, title: (T) -> String, onSelect: (T) -> Unit) {
-    de.letzgo.stashy.ui.NativeTabStrip(sections, selected, title, onSelect)
+    de.letzgo.stashy.ui.NativeTabStrip(sections, selected, title, onSelect, icon = icon)
 }
 
 /** Primary action (iOS `PrimaryFilledButtonStyle`) — Material filled [NativeButton], full width. */

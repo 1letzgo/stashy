@@ -119,7 +119,7 @@ fun FeedsTopBar(
 ) {
     // Native Material tabs over the video (Android look), filter button at the end.
     de.letzgo.stashy.ui.NativeTabStrip(
-        modes, selected, { it.title }, { if (it != selected) onSelect(it) }, modifier, transparent = true,
+        modes, selected, { it.title }, { if (it != selected) onSelect(it) }, modifier, transparent = true, icon = { it.icon },
         trailing = {
             androidx.compose.material3.IconButton(onClick = onFilterSort) {
                 Icon(SF.sliderHorizontal3, "Filter and sort", tint = Color.White)

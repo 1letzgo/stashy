@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -203,7 +204,8 @@ fun EmptyState(icon: ImageVector, title: String, message: String? = null, modifi
 /**
  * Native Material 3 top tab strip (Android look) — replaces the iOS glass chip strips on
  * Home (catalogs), Tools, Settings and Feeds. Sits under the status bar; [transparent] for the
- * Feeds overlay on video. [selected] = null hides the indicator.
+ * Feeds overlay on video. [selected] = null hides the indicator. With [icon], tabs show only their
+ * icon and the selected one icon + label (like the iOS chip strip).
  */
 @Composable
 fun <T> NativeTabStrip(
@@ -214,6 +216,7 @@ fun <T> NativeTabStrip(
     modifier: Modifier = Modifier,
     transparent: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
+    icon: ((T) -> androidx.compose.ui.graphics.vector.ImageVector)? = null,
 ) {
     val p = Theme.palette
     val container = if (transparent) Color.Black.copy(alpha = 0.55f) else p.background
@@ -223,6 +226,9 @@ fun <T> NativeTabStrip(
             .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.statusBars),
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            if (icon != null) {
+                CompactIconTabs(items, index, title, icon, onSelect, transparent, Modifier.weight(1f))
+            } else
             androidx.compose.material3.ScrollableTabRow(
                 selectedTabIndex = index ?: 0,
                 modifier = Modifier.weight(1f),
@@ -246,11 +252,19 @@ fun <T> NativeTabStrip(
                         selected = isSelected,
                         onClick = { onSelect(item) },
                         text = {
-                            Text(
-                                title(item),
-                                style = androidx.compose.material3.MaterialTheme.typography.titleSmall,
-                                maxLines = 1,
-                            )
+                            if (icon == null) {
+                                Text(title(item), style = androidx.compose.material3.MaterialTheme.typography.titleSmall, maxLines = 1)
+                            } else {
+                                // Icon only, label only on the selected tab (iOS top strip).
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                    modifier = Modifier.animateContentSize(),
+                                ) {
+                                    Icon(icon(item), if (isSelected) null else title(item), modifier = Modifier.size(22.dp))
+                                    if (isSelected) Text(title(item), style = androidx.compose.material3.MaterialTheme.typography.titleSmall, maxLines = 1)
+                                }
+                            }
                         },
                         selectedContentColor = if (transparent) Color.White else p.text,
                         unselectedContentColor = if (transparent) Color.White.copy(alpha = 0.7f) else p.secondaryText,
@@ -263,6 +277,60 @@ fun <T> NativeTabStrip(
             }
         }
         if (!transparent) Box(Modifier.fillMaxWidth().height(0.5.dp).background(p.separator))
+    }
+}
+
+/**
+ * Icon tabs for [NativeTabStrip]: icon only, the selected tab icon + label with the Material
+ * primary indicator under it. Own row because ScrollableTabRow forces 90dp per tab, which spreads
+ * icon-only tabs far apart.
+ */
+@Composable
+private fun <T> CompactIconTabs(
+    items: List<T>,
+    index: Int?,
+    title: (T) -> String,
+    icon: (T) -> androidx.compose.ui.graphics.vector.ImageVector,
+    onSelect: (T) -> Unit,
+    transparent: Boolean,
+    modifier: Modifier,
+) {
+    val p = Theme.palette
+    val selectedColor = if (transparent) Color.White else p.text
+    val unselectedColor = if (transparent) Color.White.copy(alpha = 0.7f) else p.secondaryText
+    val indicatorColor = if (transparent) Color.White else Appearance.tint.takeIf { it != StashyColors.defaultTint } ?: p.text
+    val state = androidx.compose.foundation.lazy.rememberLazyListState()
+    androidx.compose.runtime.LaunchedEffect(index) { index?.let { state.animateScrollToItem((it - 1).coerceAtLeast(0)) } }
+    androidx.compose.foundation.lazy.LazyRow(
+        modifier.height(48.dp),
+        state = state,
+        contentPadding = PaddingValues(horizontal = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        items(items.size) { i ->
+            val item = items[i]
+            val isSelected = i == index
+            val color = if (isSelected) selectedColor else unselectedColor
+            Box(
+                Modifier.height(48.dp).clip(RoundedCornerShape(12.dp))
+                    .clickable(role = androidx.compose.ui.semantics.Role.Tab) { onSelect(item) }
+                    .padding(horizontal = 14.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Row(
+                    Modifier.animateContentSize(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Icon(icon(item), if (isSelected) null else title(item), tint = color, modifier = Modifier.size(22.dp))
+                    if (isSelected) Text(title(item), style = androidx.compose.material3.MaterialTheme.typography.titleSmall, color = color, maxLines = 1)
+                }
+                if (isSelected) Box(
+                    Modifier.align(Alignment.BottomCenter).width(32.dp).height(3.dp)
+                        .background(indicatorColor, RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)),
+                )
+            }
+        }
     }
 }
 

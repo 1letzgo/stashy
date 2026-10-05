@@ -80,7 +80,7 @@ fun CatalogsScreen() {
 private fun TopNavStrip(tabs: List<CatalogTab>) {
     val actions = CatalogTopActions.slots
     de.letzgo.stashy.ui.NativeTabStrip(
-        tabs, Nav.catalogTab, { it.title }, { Nav.catalogTab = it },
+        tabs, Nav.catalogTab, { it.title }, { Nav.catalogTab = it }, icon = { it.icon },
         trailing = if (actions != null && CatalogTopActions.hasActions) ({ androidx.compose.foundation.layout.Row { CatalogTopActionIcons(actions) } }) else null,
     )
 }

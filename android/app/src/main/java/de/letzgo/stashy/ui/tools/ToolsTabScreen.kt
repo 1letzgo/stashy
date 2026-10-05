@@ -158,7 +158,7 @@ private fun normalizeToolsSubTab() {
 private fun ToolsStrip(selected: ToolsTab?) {
     // First tab = the landing grid ("Tools"), then every enabled tool (native Material tabs).
     val items: List<ToolsTab?> = listOf<ToolsTab?>(null) + ToolsTab.sorted
-    de.letzgo.stashy.ui.NativeTabStrip(items, selected, { it?.title ?: "Tools" }, { ToolsNav.subTab = it?.title ?: "" })
+    de.letzgo.stashy.ui.NativeTabStrip(items, selected, { it?.title ?: "Tools" }, { ToolsNav.subTab = it?.title ?: "" }, icon = { it?.icon ?: de.letzgo.stashy.ui.SF.squareGrid2x2 })
 }
 
 /**

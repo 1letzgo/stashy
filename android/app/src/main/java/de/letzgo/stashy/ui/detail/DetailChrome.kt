@@ -198,7 +198,7 @@ internal fun DetailTopBar(
         if (tabs.size > 1) {
             NativeTabStrip(
                 tabs, selected, { it.title }, { if (it != selected) onSelect(it) },
-                Modifier.consumeWindowInsets(WindowInsets.statusBars),
+                Modifier.consumeWindowInsets(WindowInsets.statusBars), icon = { it.icon },
             )
         }
     }
