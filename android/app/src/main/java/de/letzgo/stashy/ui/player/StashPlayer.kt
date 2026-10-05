@@ -169,6 +169,14 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
             if (size.width > 0 && size.height > 0) videoSize = (size.width * size.pixelWidthHeightRatio).toInt() to size.height
         }
 
+        override fun onPlayWhenReadyChanged(playWhenReady: Boolean, reason: Int) {
+            // A user / controller pause (notification, remote, media keys) ends the autoplay
+            // intent too, so a later source fallback doesn't resume on its own. Audio-focus
+            // pauses keep it: ExoPlayer resumes those itself.
+            if (!playWhenReady && reason != Player.PLAY_WHEN_READY_CHANGE_REASON_AUDIO_FOCUS_LOSS) lastAutoplay = false
+            if (playWhenReady) lastAutoplay = true
+        }
+
         override fun onPlayerError(error: PlaybackException) {
             if (!escalate("player error: ${error.errorCodeName}")) {
                 errorMessage = error.localizedMessage ?: "Playback failed"
@@ -273,8 +281,13 @@ class StashPlayer(context: Context, val role: Role = Role.Main) {
 
     // MARK: Transport
 
-    fun play() { if (exo.playbackState == Player.STATE_ENDED) seek(0.0); exo.play() }
-    fun pause() = exo.pause()
+    fun play() { lastAutoplay = true; if (exo.playbackState == Player.STATE_ENDED) seek(0.0); exo.play() }
+    /**
+     * Also clears the remembered autoplay intent: a source fallback after a pause (e.g. another
+     * app — YouTube on Android TV — took the hardware decoder while we sat paused in the
+     * background) must reload paused, not start the sound again.
+     */
+    fun pause() { lastAutoplay = false; exo.pause() }
     fun togglePlayPause() = if (exo.playWhenReady && exo.playbackState != Player.STATE_ENDED) pause() else play()
     val playWhenReady: Boolean get() = exo.playWhenReady
 
