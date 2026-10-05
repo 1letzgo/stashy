@@ -42,6 +42,8 @@ import de.letzgo.stashy.data.SortCatalog
 import de.letzgo.stashy.data.SortOption
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeSheetAction
+import de.letzgo.stashy.ui.NativeSheetTopBar
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.NativeDivider
@@ -130,17 +132,12 @@ fun CatalogFilterSortSheet(
 
 private enum class NameDialog { SaveAs, Rename }
 
-/** iOS: `CatalogSettingsSheetChromeBar` — Material sheet header: "Settings" · Reset (red) · Save · Done. */
+/** iOS: `CatalogSettingsSheetChromeBar` (Reset · "Settings" · Save · Done) → Material sheet top bar. */
 @Composable
 internal fun SheetChromeBar(onReset: () -> Unit, onSave: (() -> Unit)?, onDone: () -> Unit, title: String = "Settings") {
-    Row(
-        Modifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 4.dp, bottom = 4.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(title, Modifier.weight(1f), style = NativeType.titleLarge, color = Theme.palette.text, maxLines = 1)
-        NativeTextButton("Reset", color = StashyColors.systemRed, onClick = onReset)
-        if (onSave != null) NativeTextButton("Save", onClick = onSave)
-        NativeTextButton("Done", onClick = onDone)
+    NativeSheetTopBar(title, onClose = onDone, closeDescription = "Done") {
+        NativeSheetAction("Reset", destructive = true, onClick = onReset)
+        if (onSave != null) NativeSheetAction("Save", onClick = onSave)
     }
 }
 

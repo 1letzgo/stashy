@@ -341,6 +341,67 @@ fun NativeTopBar(
     )
 }
 
+/**
+ * Native Material 3 header for modal sheets and full-screen popups — replaces the iOS
+ * `stashyModalSheetChrome` / `CatalogSettingsSheetChromeBar` rows (glass "Reset" / "Save" /
+ * "Done" pills, "Cancel" text). Close ✕ left ([onClose] = what Done/Cancel did), [title] in
+ * titleLarge, [actions] right — use [NativeSheetAction] / [NativeSheetProgress]. No window
+ * insets by default (inside a `ModalBottomSheet`); full-screen dialogs that draw under the
+ * status bar pass `WindowInsets.statusBars`.
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+fun NativeSheetTopBar(
+    title: String,
+    onClose: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+    closeDescription: String = "Close",
+    windowInsets: androidx.compose.foundation.layout.WindowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
+    actions: @Composable RowScope.() -> Unit = {},
+) {
+    val p = Theme.palette
+    androidx.compose.material3.TopAppBar(
+        title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = NativeType.titleLarge) },
+        modifier = modifier,
+        navigationIcon = {
+            if (onClose != null) IconButton(onClick = onClose) {
+                Icon(SF.xmark, closeDescription, tint = p.text)
+            }
+        },
+        actions = actions,
+        windowInsets = windowInsets,
+        colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+            containerColor = p.background,
+            scrolledContainerColor = p.background,
+            titleContentColor = p.text,
+            navigationIconContentColor = p.text,
+            actionIconContentColor = p.text,
+        ),
+    )
+}
+
+/**
+ * Text action in a [NativeSheetTopBar] ("Save", "Done", "Apply"; [destructive] = error colour
+ * for "Reset"). [dimmed] greys the label while it stays tappable (e.g. Save that asks for a name).
+ */
+@Composable
+fun NativeSheetAction(
+    text: String,
+    enabled: Boolean = true,
+    destructive: Boolean = false,
+    dimmed: Boolean = false,
+    onClick: () -> Unit,
+) {
+    val base = if (destructive) StashyColors.systemRed else nativeAccent()
+    NativeTextButton(text, enabled = enabled, color = if (dimmed) base.copy(alpha = 0.38f) else base, onClick = onClick)
+}
+
+/** Busy indicator in place of a [NativeSheetTopBar] action while it runs. */
+@Composable
+fun NativeSheetProgress() {
+    CircularProgressIndicator(Modifier.padding(horizontal = 16.dp).size(20.dp), color = nativeAccent(), strokeWidth = 2.dp)
+}
+
 // MARK: - Native Material 3 building blocks (settings-style lists, menus, dialogs)
 //
 // Shared by Settings, Server setup, stashy+ and the tools' settings pages; reusable by every

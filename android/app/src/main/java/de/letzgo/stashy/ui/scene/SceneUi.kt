@@ -126,7 +126,7 @@ fun NamePill(text: String, modifier: Modifier = Modifier) {
 
 /**
  * iOS: `stashyModalSheetChrome(title, onBack:) { StashyChromeTrailingTextButton }` inside a
- * `NavigationView` + `Form` — a large modal sheet with a close button, title and trailing action.
+ * `NavigationView` + `Form` — a large modal sheet with a Material top bar (close ✕, title, trailing action).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -144,15 +144,12 @@ fun SceneModalSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = p.background,
-        dragHandle = null,
     ) {
-        // Material sheet header: close ✕ · title · text action (like the other tool sheets).
-        Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            androidx.compose.material3.IconButton(onClick = onDismiss) { Icon(PlayerIcons.close, "Close", tint = p.text) }
-            Text(title, Modifier.weight(1f).padding(start = 4.dp), style = de.letzgo.stashy.ui.NativeType.titleLarge, color = p.text, maxLines = 1)
+        // Material sheet top bar: close ✕ · title · trailing text action.
+        de.letzgo.stashy.ui.NativeSheetTopBar(title, onClose = onDismiss) {
             if (actionTitle != null) {
-                if (actionBusy) CircularProgressIndicator(Modifier.padding(horizontal = 16.dp).size(20.dp), color = Appearance.tint, strokeWidth = 2.dp)
-                else de.letzgo.stashy.ui.NativeTextButton(actionTitle, enabled = actionEnabled, onClick = onAction)
+                if (actionBusy) de.letzgo.stashy.ui.NativeSheetProgress()
+                else de.letzgo.stashy.ui.NativeSheetAction(actionTitle, enabled = actionEnabled, onClick = onAction)
             }
         }
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), content = content)

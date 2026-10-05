@@ -747,13 +747,10 @@ private fun <T : MergeableItem> MergeDestinationSheet(
     }
     val shown = filtered.take(visibleCount)
 
-    ModalBottomSheet(onDismissRequest = onCancel, sheetState = state, containerColor = p.background, dragHandle = null) {
+    ModalBottomSheet(onDismissRequest = onCancel, sheetState = state, containerColor = p.background) {
         Column(Modifier.fillMaxSize().statusBarsPadding()) {
-            // iOS: `stashyModalSheetChrome("Merge into", onBack:)` — Material sheet header: close ✕ · title.
-            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.material3.IconButton(onClick = onCancel) { Icon(SF.xmark, "Cancel", tint = p.text) }
-                Text("Merge into", style = NativeType.titleLarge, color = p.text, modifier = Modifier.weight(1f).padding(start = 4.dp))
-            }
+            // iOS: `stashyModalSheetChrome("Merge into", onBack:)` → Material sheet top bar.
+            de.letzgo.stashy.ui.NativeSheetTopBar("Merge into", onClose = onCancel, closeDescription = "Cancel")
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)) {
                 item(key = "search") {
                     NativeSearchField(searchText, { searchText = it }, "Search...", Modifier.padding(bottom = 12.dp))

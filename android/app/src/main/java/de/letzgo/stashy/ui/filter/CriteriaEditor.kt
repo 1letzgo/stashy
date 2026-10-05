@@ -768,11 +768,8 @@ private fun NestedEditorSheet(title: String, mode: FilterMode, initial: JsonObje
     val doc = remember { CriteriaDocument(mode, initial) }
     ModalBottomSheet(onCancel, sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true), containerColor = p.background) {
         Column(Modifier.fillMaxSize().navigationBarsPadding()) {
-            // Material sheet header: close ✕ · title · Done.
-            Row(Modifier.fillMaxWidth().padding(start = 4.dp, end = 8.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.material3.IconButton(onClick = onCancel) { Icon(SF.xmark, "Cancel", tint = p.text) }
-                Text(title, Modifier.weight(1f).padding(start = 4.dp), style = NativeType.titleLarge, color = p.text, maxLines = 1)
-                de.letzgo.stashy.ui.NativeTextButton("Done", onClick = { onDone(doc.sanitizedObjectFilter) })
+            de.letzgo.stashy.ui.NativeSheetTopBar(title, onClose = onCancel, closeDescription = "Cancel") {
+                de.letzgo.stashy.ui.NativeSheetAction("Done") { onDone(doc.sanitizedObjectFilter) }
             }
             Column(Modifier.verticalScroll(rememberScrollState()).padding(top = Tokens.Spacing.xs)) {
                 FilterCriteriaEditor(doc, onChange = {})

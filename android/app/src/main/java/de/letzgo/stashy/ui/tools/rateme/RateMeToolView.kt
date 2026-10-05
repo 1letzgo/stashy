@@ -662,23 +662,15 @@ private fun ThemePickerSheet(
         onDismissRequest = onDismiss,
         sheetState = sheetState,
         containerColor = p.background,
-        dragHandle = null,
     ) {
         Column(Modifier.fillMaxWidth().heightIn(min = 400.dp).imePadding()) {
-            // iOS `stashyModalSheetChrome(title, onBack:)`.
-            // Material sheet header: close ✕ · title.
-            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                androidx.compose.material3.IconButton(onClick = {
-                    scope.launch {
-                        sheetState.hide()
-                        onDismiss()
-                    }
-                }) { Icon(de.letzgo.stashy.ui.SF.xmark, "Close", tint = p.text) }
-                Text(
-                    kind.title, style = androidx.compose.material3.MaterialTheme.typography.titleLarge, color = p.text,
-                    modifier = Modifier.weight(1f).padding(start = 4.dp),
-                )
-            }
+            // iOS `stashyModalSheetChrome(title, onBack:)` → Material sheet top bar.
+            de.letzgo.stashy.ui.NativeSheetTopBar(kind.title, onClose = {
+                scope.launch {
+                    sheetState.hide()
+                    onDismiss()
+                }
+            })
             LazyColumn(
                 Modifier.fillMaxWidth(),
                 contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 32.dp),
