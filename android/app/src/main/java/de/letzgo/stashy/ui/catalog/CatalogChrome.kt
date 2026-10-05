@@ -93,20 +93,16 @@ data class CatalogQuickFilterMenu(
 /** One entry of the quick filter menu; `header` rows are section titles (iOS sub-menus, flattened). */
 data class QuickMenuItem(val title: String, val checked: Boolean = false, val header: Boolean = false, val divider: Boolean = false, val action: () -> Unit = {})
 
-/** iOS: `CatalogSlotSet` — columns · quick filter · contextual · filter & sort (always far right). */
+/**
+ * iOS: `CatalogSlotSet` — quick filter · contextual · filter & sort (always far right). All of
+ * them sit right-pinned in the Home tab strip; there is no floating bar and no columns toggle
+ * (the 1/2 per row choice lives in Settings).
+ */
 data class CatalogSlots(
-    val columns: CatalogChromeSlot? = null,
     val quickFilter: CatalogQuickFilterMenu? = null,
     val contextual: CatalogChromeSlot? = null,
     val filterSort: CatalogChromeSlot? = null,
 )
-
-/** Space the "Filter & sort" FAB reserves above the navigation bar (56 dp FAB + 16 dp gap). */
-val FloatingBarClearance: Dp = 56.dp + 16.dp
-
-/** Bottom offset of the FAB: 16 dp above the Material navigation bar (80 dp + system insets). */
-@Composable
-fun floatingBarBottomPadding(): Dp = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding() + 80.dp + 16.dp
 
 /**
  * Catalog actions of the visible catalog root, shown in the trailing slot of the Home
@@ -116,19 +112,31 @@ object CatalogTopActions {
     var slots by mutableStateOf<CatalogSlots?>(null)
     internal var owner: Any? = null
 
-    val hasActions: Boolean get() = slots?.let { it.columns != null || it.quickFilter != null || it.contextual != null } == true
+    val hasActions: Boolean get() = slots?.let { it.quickFilter != null || it.contextual != null || it.filterSort != null } == true
 }
 
 /**
  * Android pattern for catalog roots (replaces the iOS `FloatingActionBar` / `CatalogSlotBar`):
- * columns toggle, quick menu and contextual slot as app-bar icons in the tab strip (active =
- * `Appearance.tint`, menus as anchored `DropdownMenu`s like [de.letzgo.stashy.ui.TopBarMenuAction]).
+ * quick menu, contextual slot and the filter & sort ("Settings") button as app-bar icons pinned
+ * at the right of the tab strip (active = `Appearance.tint`, menus as anchored `DropdownMenu`s
+ * like [de.letzgo.stashy.ui.TopBarMenuAction]); filter & sort always far right.
  */
 @Composable
 fun CatalogTopActionIcons(slots: CatalogSlots) {
-    slots.columns?.let { TopBarSlot(it) }
     slots.quickFilter?.let { QuickFilterAction(it) }
     slots.contextual?.let { TopBarSlot(it) }
+    slots.filterSort?.let { FilterSortAction(it) }
+}
+
+/** Filter & sort ("Settings") button: slider icon, tinted with a dot while a filter / non-default state is set. */
+@Composable
+private fun FilterSortAction(slot: CatalogChromeSlot) {
+    val accent = nativeAccent()
+    androidx.compose.material3.IconButton(onClick = slot.action) {
+        BadgedBox(badge = { if (slot.isActive) Badge(containerColor = accent) }) {
+            Icon(slot.icon, slot.contentDescription, tint = if (slot.isActive) accent else Theme.palette.text)
+        }
+    }
 }
 
 @Composable
@@ -152,29 +160,6 @@ private fun QuickFilterAction(menu: CatalogQuickFilterMenu) {
             }
         }
     }
-}
-
-/**
- * "Filter & sort" Material extended FAB (iOS: the filter & sort slot, always far right of the
- * floating bar). Collapses to the icon while scrolling down; a dot marks an active filter.
- */
-@Composable
-fun CatalogFilterFab(slot: CatalogChromeSlot, expanded: Boolean, modifier: Modifier = Modifier) {
-    val p = Theme.palette
-    val accent = nativeAccent()
-    ExtendedFloatingActionButton(
-        onClick = slot.action,
-        expanded = expanded,
-        modifier = modifier,
-        icon = {
-            BadgedBox(badge = { if (slot.isActive) Badge(containerColor = Appearance.tint.takeIf { it != de.letzgo.stashy.ui.StashyColors.defaultTint } ?: accent) }) {
-                Icon(slot.icon, slot.contentDescription)
-            }
-        },
-        text = { Text("Filter & sort", style = NativeType.labelLarge) },
-        containerColor = accent.copy(alpha = if (p.isDark) 0.28f else 0.16f).compositeOver(p.secondaryBackground),
-        contentColor = p.text,
-    )
 }
 
 /** iOS: `SearchClearChip` — Material input chip with the active search term; tap clears it. */
@@ -225,7 +210,7 @@ data class CatalogTexts(val loading: String, val emptyIcon: ImageVector, val emp
 /**
  * Shared body of every catalog root (iOS: the `ZStack` of ConnectionErrorView / StandardLoadingView /
  * empty state / grid + `stashyCatalogChrome`): grid with pull-to-refresh and infinite scroll,
- * search chip, floating action bar, filter sheet host. [columns] maps the available width (dp) to
+ * search chip, filter sheet host; the slots go to the Home tab strip ([CatalogTopActions]). [columns] maps the available width (dp) to
  * a column count; [header] / [extraSheetCards] are optional.
  */
 @OptIn(ExperimentalMaterial3Api::class)
@@ -247,21 +232,12 @@ fun <T> CatalogScaffold(
     val p = Theme.palette
     val hasServer = ServerConfigManager.activeConfig != null
     val showBar = showsFloatingBar && hasServer && !(list.items.isEmpty() && list.error != null)
-    // Columns / quick menu / contextual slots → tab strip icons; filter & sort → FAB.
+    // All slots → right-pinned icons in the Home tab strip.
     val token = remember { Any() }
-    val published = if (showBar) slots.copy(filterSort = null) else null
+    val published = if (showBar) slots else null
     SideEffect { CatalogTopActions.owner = token; CatalogTopActions.slots = published }
     DisposableEffect(token) { onDispose { if (CatalogTopActions.owner === token) { CatalogTopActions.owner = null; CatalogTopActions.slots = null } } }
-    var fabExpanded by remember { mutableStateOf(true) }
-    val scrollWatcher = remember {
-        object : NestedScrollConnection {
-            override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                if (available.y < -4f) fabExpanded = false else if (available.y > 4f) fabExpanded = true
-                return Offset.Zero
-            }
-        }
-    }
-    Box(Modifier.fillMaxSize().background(p.background).nestedScroll(scrollWatcher)) {
+    Box(Modifier.fillMaxSize().background(p.background)) {
         when {
             !hasServer -> StatusPlaceholder(SF.server, "Server not reachable", "Retry Connection", { controller.refresh() })
             list.items.isEmpty() && (list.isLoading || !list.loadedOnce) -> StandardLoading(texts.loading)
@@ -273,7 +249,7 @@ fun <T> CatalogScaffold(
                     androidx.compose.runtime.key(gridKey) {
                         LazyVerticalGrid(
                             columns = GridCells.Fixed(count),
-                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding, bottom = TabBarClearance + FloatingBarClearance + 16.dp),
+                            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = topPadding, bottom = TabBarClearance + 16.dp),
                             verticalArrangement = Arrangement.spacedBy(CatalogGridGutter),
                             horizontalArrangement = Arrangement.spacedBy(CatalogGridGutter),
                             modifier = Modifier.fillMaxSize(),
@@ -293,8 +269,6 @@ fun <T> CatalogScaffold(
                 }
             }
         }
-        val fab = slots.filterSort
-        if (showBar && fab != null) CatalogFilterFab(fab, fabExpanded, Modifier.align(Alignment.BottomEnd).padding(end = 16.dp, bottom = floatingBarBottomPadding()))
     }
 }
 

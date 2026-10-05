@@ -19,7 +19,6 @@ import de.letzgo.stashy.data.Gallery
 import de.letzgo.stashy.data.Performer
 import de.letzgo.stashy.data.PerformerBadgeType
 import de.letzgo.stashy.data.SceneMarker
-import de.letzgo.stashy.data.SortCatalog
 import de.letzgo.stashy.data.StashGroup
 import de.letzgo.stashy.data.StashImage
 import de.letzgo.stashy.data.Studio
@@ -106,35 +105,13 @@ fun TagsList(c: CatalogController<Tag>, topPadding: androidx.compose.ui.unit.Dp 
     CatalogFilterSortSheet(c)
 }
 
-/** iOS: `GroupsView` (CatalogsView.swift) — quick sort menu in slot 2, sheet without local presets. */
+/** iOS: `GroupsView` (CatalogsView.swift) — sorting via the filter & sort sheet (sort menu, no local presets). */
 @Composable
 fun GroupsCatalog() {
     val c = rememberCatalogController<StashGroup>(FilterMode.Groups)
-    val s = c.sort.raw
-    fun pick(raw: String) { SortCatalog.option(FilterMode.Groups, raw)?.let { c.changeSort(it) } }
-    val quick = CatalogQuickFilterMenu(
-        isActive = s != "nameAsc", contentDescription = "Sort",
-        items = listOf(
-            QuickMenuItem("Random", s == "random") { pick("random") },
-            QuickMenuItem("", divider = true),
-            QuickMenuItem("Name", header = true),
-            QuickMenuItem("A → Z", s == "nameAsc") { pick("nameAsc") },
-            QuickMenuItem("Z → A", s == "nameDesc") { pick("nameDesc") },
-            QuickMenuItem("Date", header = true),
-            QuickMenuItem("Newest First", s == "dateDesc") { pick("dateDesc") },
-            QuickMenuItem("Oldest First", s == "dateAsc") { pick("dateAsc") },
-            QuickMenuItem("Rating", header = true),
-            QuickMenuItem("High → Low", s == "ratingDesc") { pick("ratingDesc") },
-            QuickMenuItem("Low → High", s == "ratingAsc") { pick("ratingAsc") },
-            QuickMenuItem("Counts", header = true),
-            QuickMenuItem("Scenes (High → Low)", s == "sceneCountDesc") { pick("sceneCountDesc") },
-            QuickMenuItem("Galleries (High → Low)", s == "galleryCountDesc") { pick("galleryCountDesc") },
-            QuickMenuItem("Performers (High → Low)", s == "performerCountDesc") { pick("performerCountDesc") },
-        ),
-    )
     CatalogScaffold(
         c, CatalogTexts("Loading groups...", SF.rectangleStackFill, "No groups found", "Load Groups"),
-        CatalogSlots(quickFilter = quick, filterSort = filterSortSlot(c)), posterColumns, { it.id },
+        CatalogSlots(filterSort = filterSortSlot(c)), posterColumns, { it.id },
     ) { _, group ->
         GroupCard(group, onClick = { Nav.push(GroupDetailScreen(group.id, group)) })
     }
@@ -156,7 +133,7 @@ fun MarkersCatalog() {
     CatalogFilterSortSheet(c)
 }
 
-/** iOS: `GalleriesView` — 1/2 per row toggle (slot 1), 16:9 or square cards. */
+/** iOS: `GalleriesView` — 1/2 per row (Settings), 16:9 or square cards. */
 @Composable
 fun GalleriesCatalog() {
     val c = rememberCatalogController<Gallery>(FilterMode.Galleries)
@@ -168,12 +145,7 @@ fun GalleriesList(c: CatalogController<Gallery>, columnScope: CatalogCardColumnS
     val cols = CatalogPrefs.cardColumns(columnScope)
     CatalogScaffold(
         c, CatalogTexts("Loading galleries...", SF.photoStack, "No galleries found", "Reload"),
-        CatalogSlots(
-            columns = CatalogChromeSlot(if (cols == de.letzgo.stashy.data.CatalogCardColumns.One) SF.rectangleGrid1x2 else SF.squareGrid2x2, contentDescription = cols.accessibilityLabel) {
-                CatalogPrefs.toggleCardColumns(columnScope)
-            },
-            filterSort = filterSortSlot(c),
-        ),
+        CatalogSlots(filterSort = filterSortSlot(c)),
         columns = { cols.columnCount(it) }, itemKey = { it.id }, topPadding = topPadding, gridKey = cols,
     ) { _, gallery ->
         GalleryCard(gallery, aspectRatio = cols.cardAspectRatio, onClick = { Nav.push(GalleryDetailScreen(gallery.id, gallery)) })
@@ -185,7 +157,7 @@ fun GalleriesList(c: CatalogController<Gallery>, columnScope: CatalogCardColumnS
 class ImageMediaKindHolder { var kind by mutableStateOf(ImageListMediaKind.All) }
 
 /**
- * iOS: `ImagesView` (catalog root) — 1/2 per row toggle: square cards at 2/row, the grouped
+ * iOS: `ImagesView` (catalog root) — 1/2 per row (Settings): square cards at 2/row, the grouped
  * image feed at 1/row ([ImageFeedList]: sets, header with performers / studio / date, rating +
  * O-counter, tags, thumb strip, muted clip autoplay); "Type" (Any / Image / Video) and the feed
  * autoplay switch in the sheet; tap opens the full-screen viewer.
@@ -207,9 +179,6 @@ fun ImagesList(c: CatalogController<StashImage>, holder: ImageMediaKindHolder, c
     CatalogScaffold(
         c, CatalogTexts("Loading images...", SF.photo, "No images found", "Reload"),
         CatalogSlots(
-            columns = CatalogChromeSlot(if (cols == de.letzgo.stashy.data.CatalogCardColumns.One) SF.rectangleGrid1x2 else SF.squareGrid2x2, contentDescription = cols.accessibilityLabel) {
-                CatalogPrefs.toggleCardColumns(columnScope)
-            },
             filterSort = de.letzgo.stashy.ui.catalog.CatalogChromeSlot(SF.sliderHorizontal3, c.isFilterActive || holder.kind != ImageListMediaKind.All, "Settings") { c.isSheetPresented = true },
         ),
         columns = { cols.columnCount(it) }, itemKey = { it.id }, topPadding = topPadding, gridKey = cols,
@@ -220,7 +189,7 @@ fun ImagesList(c: CatalogController<StashImage>, holder: ImageMediaKindHolder, c
                 sortRaw = c.sort.raw,
                 isLoading = c.list.isLoading,
                 onLoadMore = { c.list.loadMore() },
-                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top, bottom = TabBarClearance + FloatingBarClearance + 16.dp),
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top, bottom = TabBarClearance + 16.dp),
                 onImageUpdated = { updated -> c.list.patch { if (it.id == updated.id) updated else it } },
                 header = if (c.search.isNotEmpty()) ({
                     Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { SearchClearChip(c.search, { c.search = "" }) }

@@ -217,6 +217,8 @@ fun <T> NativeTabStrip(
     transparent: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
     icon: ((T) -> androidx.compose.ui.graphics.vector.ImageVector)? = null,
+    /** Icon mode only: this item stays fixed at the left edge, the others scroll past it (iOS `pinnedItemID`). */
+    pinnedLeading: T? = null,
 ) {
     val p = Theme.palette
     val container = if (transparent) Color.Black.copy(alpha = 0.55f) else p.background
@@ -227,7 +229,7 @@ fun <T> NativeTabStrip(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (icon != null) {
-                CompactIconTabs(items, index, title, icon, onSelect, transparent, Modifier.weight(1f))
+                CompactIconTabs(items, index, title, icon, onSelect, transparent, pinnedLeading, Modifier.weight(1f))
             } else
             androidx.compose.material3.ScrollableTabRow(
                 selectedTabIndex = index ?: 0,
@@ -283,7 +285,7 @@ fun <T> NativeTabStrip(
 /**
  * Icon tabs for [NativeTabStrip]: icon only, the selected tab icon + label with the Material
  * primary indicator under it. Own row because ScrollableTabRow forces 90dp per tab, which spreads
- * icon-only tabs far apart.
+ * icon-only tabs far apart. [pinned] sits outside the scrolling row at the left edge.
  */
 @Composable
 private fun <T> CompactIconTabs(
@@ -293,44 +295,70 @@ private fun <T> CompactIconTabs(
     icon: (T) -> androidx.compose.ui.graphics.vector.ImageVector,
     onSelect: (T) -> Unit,
     transparent: Boolean,
+    pinned: T?,
     modifier: Modifier,
 ) {
     val p = Theme.palette
-    val selectedColor = if (transparent) Color.White else p.text
-    val unselectedColor = if (transparent) Color.White.copy(alpha = 0.7f) else p.secondaryText
-    val indicatorColor = if (transparent) Color.White else Appearance.tint.takeIf { it != StashyColors.defaultTint } ?: p.text
+    val colors = CompactTabColors(
+        selected = if (transparent) Color.White else p.text,
+        unselected = if (transparent) Color.White.copy(alpha = 0.7f) else p.secondaryText,
+        indicator = if (transparent) Color.White else Appearance.tint.takeIf { it != StashyColors.defaultTint } ?: p.text,
+    )
+    val pinnedItem = pinned?.takeIf { it in items }
+    val scrolling = if (pinnedItem != null) items.filter { it != pinnedItem } else items
+    val selectedItem = index?.let { items.getOrNull(it) }
+    val scrollIndex = selectedItem?.let { scrolling.indexOf(it) }?.takeIf { it >= 0 }
     val state = androidx.compose.foundation.lazy.rememberLazyListState()
-    androidx.compose.runtime.LaunchedEffect(index) { index?.let { state.animateScrollToItem((it - 1).coerceAtLeast(0)) } }
-    androidx.compose.foundation.lazy.LazyRow(
-        modifier.height(48.dp),
-        state = state,
-        contentPadding = PaddingValues(horizontal = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        items(items.size) { i ->
-            val item = items[i]
-            val isSelected = i == index
-            val color = if (isSelected) selectedColor else unselectedColor
-            Box(
-                Modifier.height(48.dp).clip(RoundedCornerShape(12.dp))
-                    .clickable(role = androidx.compose.ui.semantics.Role.Tab) { onSelect(item) }
-                    .padding(horizontal = 14.dp),
-                contentAlignment = Alignment.Center,
-            ) {
-                Row(
-                    Modifier.animateContentSize(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                ) {
-                    Icon(icon(item), if (isSelected) null else title(item), tint = color, modifier = Modifier.size(22.dp))
-                    if (isSelected) Text(title(item), style = androidx.compose.material3.MaterialTheme.typography.titleSmall, color = color, maxLines = 1)
-                }
-                if (isSelected) Box(
-                    Modifier.align(Alignment.BottomCenter).width(32.dp).height(3.dp)
-                        .background(indicatorColor, RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)),
-                )
+    androidx.compose.runtime.LaunchedEffect(scrollIndex) { scrollIndex?.let { state.animateScrollToItem((it - 1).coerceAtLeast(0)) } }
+    Row(modifier.height(48.dp), verticalAlignment = Alignment.CenterVertically) {
+        if (pinnedItem != null) {
+            Spacer(Modifier.width(8.dp))
+            CompactIconTab(pinnedItem, pinnedItem == selectedItem, title, icon, onSelect, colors)
+        }
+        androidx.compose.foundation.lazy.LazyRow(
+            Modifier.weight(1f).height(48.dp),
+            state = state,
+            contentPadding = PaddingValues(horizontal = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            items(scrolling.size) { i ->
+                val item = scrolling[i]
+                CompactIconTab(item, item == selectedItem, title, icon, onSelect, colors)
             }
         }
+    }
+}
+
+private data class CompactTabColors(val selected: Color, val unselected: Color, val indicator: Color)
+
+@Composable
+private fun <T> CompactIconTab(
+    item: T,
+    isSelected: Boolean,
+    title: (T) -> String,
+    icon: (T) -> androidx.compose.ui.graphics.vector.ImageVector,
+    onSelect: (T) -> Unit,
+    colors: CompactTabColors,
+) {
+    val color = if (isSelected) colors.selected else colors.unselected
+    Box(
+        Modifier.height(48.dp).clip(RoundedCornerShape(12.dp))
+            .clickable(role = androidx.compose.ui.semantics.Role.Tab) { onSelect(item) }
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(
+            Modifier.animateContentSize(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            Icon(icon(item), if (isSelected) null else title(item), tint = color, modifier = Modifier.size(22.dp))
+            if (isSelected) Text(title(item), style = androidx.compose.material3.MaterialTheme.typography.titleSmall, color = color, maxLines = 1)
+        }
+        if (isSelected) Box(
+            Modifier.align(Alignment.BottomCenter).width(32.dp).height(3.dp)
+                .background(colors.indicator, RoundedCornerShape(topStart = 3.dp, topEnd = 3.dp)),
+        )
     }
 }
 

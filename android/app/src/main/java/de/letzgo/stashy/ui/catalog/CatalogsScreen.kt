@@ -67,20 +67,23 @@ fun CatalogsScreen() {
         }
         val tabs = sortedVisibleTabs(Nav.catalogTab)
         // iOS `showTabSwitcher`: only with more than one catalog — on Android the strip also
-        // carries the catalog's top actions (columns, quick menu), so it stays for those.
+        // carries the catalog's settings button (filter & sort), so it stays for that.
         if (tabs.size > 1 || CatalogTopActions.hasActions) TopNavStrip(tabs)
     }
 }
 
 /**
- * Catalog switcher (iOS: `StashyTopNavStrip`) as native Material tabs; the trailing slot holds
- * the visible catalog's top actions ([CatalogTopActions], see [CatalogTopActionIcons]).
+ * Catalog switcher (iOS: `StashyTopNavStrip`) as native Material tabs. The first tab (Dashboard)
+ * is pinned at the left (iOS `pinnedItemID: tabs.first`); the trailing slot, pinned at the right,
+ * holds the visible catalog's actions and its settings button ([CatalogTopActions], see
+ * [CatalogTopActionIcons]). The Dashboard publishes no actions.
  */
 @Composable
 private fun TopNavStrip(tabs: List<CatalogTab>) {
     val actions = CatalogTopActions.slots
     de.letzgo.stashy.ui.NativeTabStrip(
         tabs, Nav.catalogTab, { it.title }, { Nav.catalogTab = it }, icon = { it.icon },
+        pinnedLeading = tabs.firstOrNull()?.takeIf { tabs.size > 1 },
         trailing = if (actions != null && CatalogTopActions.hasActions) ({ androidx.compose.foundation.layout.Row { CatalogTopActionIcons(actions) } }) else null,
     )
 }

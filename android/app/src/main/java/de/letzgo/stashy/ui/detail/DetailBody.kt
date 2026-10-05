@@ -138,12 +138,8 @@ internal class LinkedCatalog(
         DetailTab.Performers -> emptyList<ChromeSlot>() to { d -> SortMenuItems(DetailSort.Performer.entries, performerSort, d) { resort(tab, performerSort, it) { s -> performerSort = s } } }
         DetailTab.Tags -> emptyList<ChromeSlot>() to { d -> SortMenuItems(DetailSort.Tag.entries, tagSort, d) { resort(tab, tagSort, it) { s -> tagSort = s } } }
         DetailTab.Groups -> emptyList<ChromeSlot>() to null
-        DetailTab.Images -> listOf(
-            // Overflow entry: names the layout it switches to.
-            ChromeSlot(if (imageColumns == 1) SF.squareGrid2x2 else SF.rectangleGrid1x2, if (imageColumns == 1) "Two cards per row" else "One card per row", inOverflow = true) {
-                imageColumns = CardColumnsPrefs.toggle(imageScopeKey)
-            },
-        ) to { d -> SortMenuItems(DetailSort.Image.entries, imageSort, d) { resort(tab, imageSort, it) { s -> imageSort = s } } }
+        // No in-view 1/2 per row toggle; the stored column choice comes from Settings.
+        DetailTab.Images -> emptyList<ChromeSlot>() to { d -> SortMenuItems(DetailSort.Image.entries, imageSort, d) { resort(tab, imageSort, it) { s -> imageSort = s } } }
     }
 }
 
