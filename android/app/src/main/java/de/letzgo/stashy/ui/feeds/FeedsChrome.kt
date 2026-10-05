@@ -111,32 +111,15 @@ fun FeedsTopBar(
     onFilterSort: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(modifier.fillMaxWidth().background(Color(0xFF121212).copy(alpha = 0.72f))) {
-        Row(
-            Modifier.fillMaxWidth()
-                .windowInsetsPadding(WindowInsets.statusBars)
-                .heightIn(min = FeedsDock.activeHeight)
-                .padding(horizontal = FeedsDock.edgePadding, vertical = 6.dp)
-                .padding(bottom = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(
-                Modifier.weight(1f).horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(FeedsDock.itemSpacing),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                modes.forEach { m -> ModeChip(m, m == selected) { if (m != selected) onSelect(m) } }
+    // Native Material tabs over the video (Android look), filter button at the end.
+    de.letzgo.stashy.ui.NativeTabStrip(
+        modes, selected, { it.title }, { if (it != selected) onSelect(it) }, modifier, transparent = true,
+        trailing = {
+            androidx.compose.material3.IconButton(onClick = onFilterSort) {
+                Icon(SF.sliderHorizontal3, "Filter and sort", tint = Color.White)
             }
-            Box(
-                Modifier.size(FeedsDock.circleSize).stashyGlass(CircleShape).noIndicationClick(onFilterSort),
-                contentAlignment = Alignment.Center,
-            ) {
-                Icon(SF.sliderHorizontal3, "Filter and sort", tint = Color.White.copy(alpha = FeedsDock.inactiveIconOpacity), modifier = Modifier.size(FeedsDock.iconSize))
-            }
-        }
-        Box(Modifier.fillMaxWidth().height(0.5.dp).background(Color.White.copy(alpha = 0.15f)))
-    }
+        },
+    )
 }
 
 @Composable

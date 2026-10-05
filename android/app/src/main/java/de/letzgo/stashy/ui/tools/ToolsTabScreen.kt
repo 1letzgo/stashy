@@ -156,31 +156,9 @@ private fun normalizeToolsSubTab() {
  */
 @Composable
 private fun ToolsStrip(selected: ToolsTab?) {
-    val state = rememberLazyListState()
-    LaunchedEffect(selected) {
-        val idx = selected?.let { ToolsTab.sorted.indexOf(it) } ?: 0
-        state.animateScrollToItem(idx.coerceAtLeast(0))
-    }
-    Row(
-        Modifier.fillMaxWidth()
-            .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent)))
-            .padding(WindowInsets.statusBars.asPaddingValues())
-            .padding(vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Spacer(Modifier.width(16.dp))
-        ChromeChip(SF.squareGrid2x2, "Tools", selected == null, onClick = { ToolsNav.subTab = "" })
-        LazyRow(
-            state = state,
-            contentPadding = PaddingValues(start = 10.dp, end = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            items(ToolsTab.sorted) { tool ->
-                ChromeChip(tool.icon, tool.title, selected == tool, onClick = { ToolsNav.subTab = tool.title })
-            }
-        }
-    }
+    // First tab = the landing grid ("Tools"), then every enabled tool (native Material tabs).
+    val items: List<ToolsTab?> = listOf<ToolsTab?>(null) + ToolsTab.sorted
+    de.letzgo.stashy.ui.NativeTabStrip(items, selected, { it?.title ?: "Tools" }, { ToolsNav.subTab = it?.title ?: "" })
 }
 
 /**

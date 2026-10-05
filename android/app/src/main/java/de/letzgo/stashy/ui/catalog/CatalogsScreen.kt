@@ -29,7 +29,7 @@ import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.home.DashboardScreen
 
 /** Space the top chrome strip covers; catalog content adds it as top padding. */
-val CatalogChromeHeight: Dp = 72.dp
+val CatalogChromeHeight: Dp = 49.dp
 
 /** Top padding for content under the floating chrome strip (status bar + strip + gap). */
 @Composable
@@ -71,25 +71,8 @@ fun CatalogsScreen() {
     }
 }
 
+/** Catalog switcher (iOS: `StashyTopNavStrip`) as native Material tabs. */
 @Composable
 private fun TopNavStrip(tabs: List<CatalogTab>) {
-    val state = rememberLazyListState()
-    LaunchedEffect(Nav.catalogTab) { state.animateScrollToItem(tabs.indexOf(Nav.catalogTab).coerceAtLeast(0)) }
-    Box(
-        Modifier.fillMaxWidth()
-            .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent)))
-            .padding(WindowInsets.statusBars.asPaddingValues())
-            .padding(vertical = 10.dp),
-    ) {
-        LazyRow(
-            state = state,
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            items(tabs) { tab ->
-                ChromeChip(tab.icon, tab.title, Nav.catalogTab == tab, onClick = { Nav.catalogTab = tab })
-            }
-        }
-    }
+    de.letzgo.stashy.ui.NativeTabStrip(tabs, Nav.catalogTab, { it.title }, { Nav.catalogTab = it })
 }

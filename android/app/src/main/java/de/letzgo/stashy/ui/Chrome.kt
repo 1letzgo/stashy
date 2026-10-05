@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -174,3 +176,72 @@ fun EmptyState(icon: ImageVector, title: String, message: String? = null, modifi
         if (message != null) Text(message, style = IosTypography.subheadline, color = p.secondaryText)
     }
 }
+
+/**
+ * Native Material 3 top tab strip (Android look) — replaces the iOS glass chip strips on
+ * Home (catalogs), Tools, Settings and Feeds. Sits under the status bar; [transparent] for the
+ * Feeds overlay on video. [selected] = null hides the indicator.
+ */
+@Composable
+fun <T> NativeTabStrip(
+    items: List<T>,
+    selected: T?,
+    title: (T) -> String,
+    onSelect: (T) -> Unit,
+    modifier: Modifier = Modifier,
+    transparent: Boolean = false,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    val p = Theme.palette
+    val container = if (transparent) Color.Black.copy(alpha = 0.55f) else p.background
+    val index = items.indexOf(selected).takeIf { it >= 0 }
+    androidx.compose.foundation.layout.Column(
+        modifier.fillMaxWidth().background(container)
+            .windowInsetsPadding(androidx.compose.foundation.layout.WindowInsets.statusBars),
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            androidx.compose.material3.ScrollableTabRow(
+                selectedTabIndex = index ?: 0,
+                modifier = Modifier.weight(1f),
+                containerColor = Color.Transparent,
+                contentColor = if (transparent) Color.White else p.text,
+                edgePadding = 8.dp,
+                divider = {},
+                indicator = { positions ->
+                    if (index != null && index < positions.size) {
+                        androidx.compose.material3.TabRowDefaults.PrimaryIndicator(
+                            Modifier.tabIndicatorOffset(positions[index]),
+                            width = 32.dp,
+                            color = if (transparent) Color.White else Appearance.tint.takeIf { it != StashyColors.defaultTint } ?: p.text,
+                        )
+                    }
+                },
+            ) {
+                items.forEachIndexed { i, item ->
+                    val isSelected = i == index
+                    androidx.compose.material3.Tab(
+                        selected = isSelected,
+                        onClick = { onSelect(item) },
+                        text = {
+                            Text(
+                                title(item),
+                                style = androidx.compose.material3.MaterialTheme.typography.titleSmall,
+                                maxLines = 1,
+                            )
+                        },
+                        selectedContentColor = if (transparent) Color.White else p.text,
+                        unselectedContentColor = if (transparent) Color.White.copy(alpha = 0.7f) else p.secondaryText,
+                    )
+                }
+            }
+            if (trailing != null) {
+                trailing()
+                Spacer(Modifier.width(4.dp))
+            }
+        }
+        if (!transparent) Box(Modifier.fillMaxWidth().height(0.5.dp).background(p.separator))
+    }
+}
+
+private fun Modifier.tabIndicatorOffset(position: androidx.compose.material3.TabPosition): Modifier =
+    with(androidx.compose.material3.TabRowDefaults) { this@tabIndicatorOffset.tabIndicatorOffset(position) }

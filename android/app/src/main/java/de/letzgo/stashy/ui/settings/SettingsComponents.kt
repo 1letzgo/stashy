@@ -309,20 +309,7 @@ fun ChromeTextButton(title: String, enabled: Boolean = true, onClick: () -> Unit
  */
 @Composable
 fun <T> SectionChipStrip(sections: List<T>, selected: T, icon: (T) -> ImageVector, title: (T) -> String, onSelect: (T) -> Unit) {
-    Box(
-        Modifier.fillMaxWidth()
-            .background(Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent)))
-            .padding(WindowInsets.statusBars.asPaddingValues())
-            .padding(vertical = 10.dp),
-    ) {
-        LazyRow(
-            contentPadding = PaddingValues(horizontal = 16.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            items(sections) { s -> ChromeChip(icon(s), title(s), s == selected, onClick = { onSelect(s) }) }
-        }
-    }
+    de.letzgo.stashy.ui.NativeTabStrip(sections, selected, title, onSelect)
 }
 
 /** Primary filled button (iOS `PrimaryFilledButtonStyle`). */

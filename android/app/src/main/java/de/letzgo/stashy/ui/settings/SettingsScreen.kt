@@ -51,7 +51,7 @@ fun SettingsScreen() {
     LaunchedEffect(Unit) { de.letzgo.stashy.data.TabManager.ensureLoaded() }
 
     Box(Modifier.fillMaxSize().background(p.background)) {
-        val top = catalogTopPadding() - 20.dp
+        val top = catalogTopPadding()
         when (active) {
             SettingsSection.Main -> SettingsList(top) { mainSettings() }
             SettingsSection.Design -> SettingsList(top) { designSettings() }
