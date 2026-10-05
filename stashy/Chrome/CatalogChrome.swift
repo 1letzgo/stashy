@@ -132,48 +132,70 @@ struct SectionChromeActionsKey: PreferenceKey {
     }
 }
 
-/// The view's actions as one glass pill, pinned at the right of the Home chrome.
+/// The view's actions pinned at the right of the Home chrome: one round glass button each,
+/// same as the Feeds settings button (`StashyChromePillStyle(iconOnly:)`).
 struct SectionChromeActionsPill: View {
     let actions: SectionChromeActions
 
     var body: some View {
-        HStack(spacing: 18) {
+        HStack(spacing: StashyExpandingDock.itemSpacing) {
             if let selection = actions.selection, selection.isActive {
-                CatalogFABIconButton(
-                    systemImage: "checkmark.circle.fill",
-                    accessibilityLabel: "Done selecting",
-                    action: selection.onDone
-                )
+                circleButton("checkmark.circle.fill", label: "Done selecting", action: selection.onDone)
             } else {
                 if let contextual = actions.slots.contextual {
-                    slotButton(contextual)
+                    circleButton(contextual)
                 }
                 if let secondary = actions.slots.secondaryContextual {
-                    slotButton(secondary)
+                    circleButton(secondary)
                 }
                 if let filterSort = actions.slots.filterSort {
-                    CatalogFilterFABButton(
-                        isActive: filterSort.isActive,
-                        accessibilityLabel: filterSort.accessibilityLabel,
-                        action: filterSort.action
-                    )
+                    circleButton(filterSort)
                 }
             }
         }
-        .font(.system(size: StashyExpandingDock.iconSize))
-        .padding(.horizontal, StashyExpandingDock.activeHorizontalPadding)
-        .frame(minWidth: StashyExpandingDock.circleSize, minHeight: StashyExpandingDock.activeHeight)
-        .stashyGlass(shape: Capsule())
     }
 
-    private func slotButton(_ slot: CatalogChromeSlot) -> some View {
-        CatalogFABIconButton(
-            systemImage: slot.systemImage,
-            isActive: slot.isActive,
-            accessibilityLabel: slot.accessibilityLabel,
-            accessibilityHint: slot.accessibilityHint,
-            action: slot.action
-        )
+    private func circleButton(_ slot: CatalogChromeSlot) -> some View {
+        circleButton(slot.systemImage, isActive: slot.isActive, label: slot.accessibilityLabel,
+                     hint: slot.accessibilityHint, action: slot.action)
+    }
+
+    private func circleButton(
+        _ systemImage: String,
+        isActive: Bool = false,
+        label: String,
+        hint: String? = nil,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            SectionChromeCircleGlyph(systemImage: systemImage, isActive: isActive)
+                .frame(width: StashyExpandingDock.iconSize, height: StashyExpandingDock.iconSize)
+                .modifier(StashyChromePillStyle(iconOnly: true))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(label)
+        .accessibilityHint(hint ?? "")
+    }
+}
+
+/// Feeds-sized chrome glyph with the tint dot when the slot is active.
+private struct SectionChromeCircleGlyph: View {
+    let systemImage: String
+    var isActive: Bool
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: StashyExpandingDock.iconSize, weight: .semibold))
+            .foregroundColor(isActive ? appearance.tintColor : .white.opacity(StashyExpandingDock.inactiveIconOpacity))
+            .overlay(alignment: .topTrailing) {
+                if isActive {
+                    Circle()
+                        .fill(appearance.tintColor)
+                        .frame(width: DesignTokens.Chrome.fabActiveDot, height: DesignTokens.Chrome.fabActiveDot)
+                        .offset(x: 4, y: -4)
+                }
+            }
     }
 }
 
