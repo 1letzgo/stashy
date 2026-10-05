@@ -66,6 +66,8 @@ internal class LinkedCatalog(
     var previewScenes: Int = 0,
     var previewGalleries: Int = 0,
     var previewImages: Int = 0,
+    /** 1/row draws the grouped feed (false: always the thumbnail grid, iOS Studio detail). */
+    val usesImageFeed: Boolean = true,
 ) {
     var sceneSort by mutableStateOf(sceneContext?.let { DetailViewConfig.sceneSort(it) } ?: DetailSort.Scene.DateDesc)
     var gallerySort by mutableStateOf(DetailSort.Gallery.DateDesc)
@@ -255,7 +257,7 @@ internal fun LazyGridScope.linkedSection(catalog: LinkedCatalog, tab: DetailTab,
  */
 internal fun LazyGridScope.imageSection(catalog: LinkedCatalog, gridState: LazyGridState, currentGalleryId: String? = null) {
     val list = catalog.images ?: return
-    if (catalog.imageColumns != 1) {
+    if (catalog.imageColumns != 1 || !catalog.usesImageFeed) {
         pagedSection(list, { it.id }, "Loading images...", SF.cameraFill, "No images found") { index, image ->
             DetailImageCard(image, Modifier.noRippleClickable { Nav.push(ImageViewerScreen(list.items, index, onLoadMore = { list.loadMore() })) })
         }

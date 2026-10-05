@@ -69,6 +69,8 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null) : Sc
         groupScope = DetailRepository.scope("studios", studioId),
         imageScope = DetailRepository.scope("studios", studioId),
         sceneContext = DetailViewContext.Studio,
+        // iOS `StudioDetailView.imageGrid` stays a thumbnail grid even at 1/row.
+        usesImageFeed = false,
         previewScenes = preview?.sceneCount ?: 0,
         previewGalleries = preview?.galleryCount ?: 0,
     )
@@ -111,7 +113,7 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null) : Sc
         AutoSwitchTab(catalog, tab) { tab = it }
         // Studio performers default to Name (A-Z) (iOS `initialSort: .nameAsc`).
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
-            DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, header = { studio?.let { Header(it) } }) {
+            DetailGrid(gridState, { w -> columnsFor(tab, w, if (catalog.usesImageFeed) catalog.imageColumns else 2) }, header = { studio?.let { Header(it) } }) {
                 linkedSection(catalog, tab, gridState)
             }
             DetailNavBar(
