@@ -70,7 +70,6 @@ private struct ImagesViewBody: View {
 
     @State private var lastOpenedImageId: String?
     @State private var searchText: String
-    @State private var sessionKeyCache: [String: String] = [:]
     /// Settings default filter applies once per view lifetime (force = DefaultFilterChanged
     /// excepted); otherwise every appear re-applied it after the user reset to Any.
     @State private var didApplyDefaultFilter = false
@@ -116,8 +115,8 @@ private struct ImagesViewBody: View {
     }
 
     /// Same grouping prefs as Feeds → Pics.
-    @AppStorage("stashline_group_sets") private var groupIntoSets = true
-    @AppStorage("stashline_group_session_precision") private var groupSessionPrecisionRaw = StashImageSessionPrecision.hour.rawValue
+    @AppStorage(StashImageGroupingPrefs.modeKey) private var groupModeRaw: String = StashImageGroupingPrefs.resolvedModeRaw()
+    @AppStorage(StashImageGroupingPrefs.gapKey) private var groupGapMinutes: Int = StashImageGroupingPrefs.defaultGapMinutes
 
     private func recomputeAutoplayTarget() {
         guard feedAutoplayGateOpen else {
@@ -172,15 +171,16 @@ private struct ImagesViewBody: View {
     }
 
     private var oneColumnFeedPosts: [(id: String, images: [StashImage])] {
-        if groupIntoSets {
-            return groupedImagePosts
-        }
-        return displayedImages.map { (id: "single|\($0.id)", images: [$0]) }
+        StashImageSetGrouping.buildPosts(
+            from: displayedImages,
+            sort: imageListFilters.selectedSortOption,
+            mode: StashImageGroupingPrefs.mode(fromRaw: groupModeRaw),
+            gapMinutes: StashImageGroupingPrefs.normalizedGap(groupGapMinutes)
+        )
     }
 
     
     private func changeSortOption(to newOption: StashDBViewModel.ImageSortOption) {
-        sessionKeyCache.removeAll(keepingCapacity: true)
         if gallery == nil {
             if !feedsEmbedded {
                 TabManager.shared.setSortOption(for: .images, option: newOption.rawValue)
@@ -391,7 +391,6 @@ private struct ImagesViewBody: View {
                     .frame(width: viewport.size.width, height: viewport.size.height)
                 }
                 .refreshable {
-                    sessionKeyCache.removeAll(keepingCapacity: true)
                     imageListFilters.refetchImages(viewModel: viewModel, initial: true)
                 }
             }
@@ -519,7 +518,6 @@ private struct ImagesViewBody: View {
             }
         }
         .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("ServerConfigChanged"))) { _ in
-            sessionKeyCache.removeAll(keepingCapacity: true)
             didApplyDefaultFilter = false
             imageListFilters.catalogPresetRowSelection = ""
             imageListFilters.selectedFilter = nil
@@ -948,15 +946,6 @@ private struct ImagesViewBody: View {
         gallery != nil ? viewModel.galleryImages : viewModel.allImages
     }
 
-    private var groupedImagePosts: [(id: String, images: [StashImage])] {
-        StashImageFilenameKeys.buildPosts(
-            from: displayedImages,
-            sort: imageListFilters.selectedSortOption,
-            precision: StashImageSessionPrecision(rawValue: groupSessionPrecisionRaw) ?? .hour,
-            groupEnabled: true,
-            sessionCache: &sessionKeyCache
-        )
-    }
     
     @ViewBuilder
     private var gridContent: some View {

@@ -24,10 +24,9 @@ struct LinkedImagesCatalogGrid: View {
     var viewModel: StashDBViewModel? = nil
 
     @ObservedObject private var tabManager = TabManager.shared
-    @AppStorage("stashline_group_sets") private var groupIntoSets = true
-    @AppStorage("stashline_group_session_precision") private var groupSessionPrecisionRaw = StashImageSessionPrecision.hour.rawValue
+    @AppStorage(StashImageGroupingPrefs.modeKey) private var groupModeRaw: String = StashImageGroupingPrefs.resolvedModeRaw()
+    @AppStorage(StashImageGroupingPrefs.gapKey) private var groupGapMinutes: Int = StashImageGroupingPrefs.defaultGapMinutes
     @AppStorage("images_feed_video_autoplay") private var imagesFeedVideoAutoplay = true
-    @State private var sessionKeyCache: [String: String] = [:]
     /// Only updated while idle — avoids SwiftUI invalidation on every scroll frame.
     @State private var videoCardFrames: [String: CGRect] = [:]
     @State private var autoplayVideoImageId: String?
@@ -53,16 +52,12 @@ struct LinkedImagesCatalogGrid: View {
     }
 
     private var oneColumnPosts: [(id: String, images: [StashImage])] {
-        if groupIntoSets {
-            return StashImageFilenameKeys.buildPosts(
-                from: images,
-                sort: sortOption,
-                precision: StashImageSessionPrecision(rawValue: groupSessionPrecisionRaw) ?? .hour,
-                groupEnabled: true,
-                sessionCache: &sessionKeyCache
-            )
-        }
-        return images.map { (id: "single|\($0.id)", images: [$0]) }
+        StashImageSetGrouping.buildPosts(
+            from: images,
+            sort: sortOption,
+            mode: StashImageGroupingPrefs.mode(fromRaw: groupModeRaw),
+            gapMinutes: StashImageGroupingPrefs.normalizedGap(groupGapMinutes)
+        )
     }
 
     private var fullscreenSwipeImages: [StashImage] {
@@ -195,12 +190,6 @@ struct LinkedImagesCatalogGrid: View {
         .onChange(of: cardColumns) { _, _ in
             autoplayVideoImageId = nil
             recomputeAutoplayTarget()
-        }
-        .onChange(of: sortOption) { _, _ in
-            sessionKeyCache.removeAll(keepingCapacity: true)
-        }
-        .onChange(of: groupIntoSets) { _, _ in
-            sessionKeyCache.removeAll(keepingCapacity: true)
         }
     }
 }

@@ -12,8 +12,8 @@ struct ReelsModeSettingsView: View {
     @ObservedObject var tabManager = TabManager.shared
     @ObservedObject var appearanceManager = AppearanceManager.shared
     /// Feeds → Pics / Images 1-Spalten-Feed: Bilder einer Session bzw. gleicher Metadaten als Set.
-    @AppStorage("stashline_group_sets") private var groupIntoSets = true
-    @AppStorage("stashline_group_session_precision") private var groupSessionPrecisionRaw = StashImageSessionPrecision.hour.rawValue
+    @AppStorage(StashImageGroupingPrefs.modeKey) private var groupModeRaw: String = StashImageGroupingPrefs.resolvedModeRaw()
+    @AppStorage(StashImageGroupingPrefs.gapKey) private var groupGapMinutes: Int = StashImageGroupingPrefs.defaultGapMinutes
     @StateObject private var viewModel = StashDBViewModel()
 
     @ViewBuilder
@@ -85,26 +85,35 @@ struct ReelsModeSettingsView: View {
 
                             // Pics: Bilder zu Sets bündeln (gleiche Prefs wie die 1-Spalten-Ansicht in Images).
                             if modeConfig.type == .pics {
+                                let groupMode = StashImageGroupingPrefs.mode(fromRaw: groupModeRaw)
                                 reelsSettingRow(title: "Group into sets") {
-                                    Toggle("", isOn: $groupIntoSets)
-                                        .labelsHidden()
-                                        .tint(appearanceManager.tintColor)
+                                    Menu {
+                                        ForEach(StashImageGroupMode.allCases, id: \.self) { option in
+                                            Button(action: {
+                                                groupModeRaw = option.rawValue
+                                                StashImageGroupingPrefs.syncLegacyKey(for: option)
+                                            }) {
+                                                HStack { Text(option.displayName); if option == groupMode { Image(systemName: "checkmark") } }
+                                            }
+                                        }
+                                    } label: {
+                                        pickerLabelText(groupMode.displayName)
+                                    }
                                 }
                                 .padding(.top, 4)
 
-                                if groupIntoSets {
-                                    // How much of the created timestamp counts — a whole day,
-                                    // the hour, or down to the minute.
-                                    reelsSettingRow(title: "Created within") {
-                                        let current = StashImageSessionPrecision(rawValue: groupSessionPrecisionRaw) ?? .hour
+                                if groupMode == .gallerySession {
+                                    // Max. Abstand zum vorherigen Bild (created_at) für lose Bilder ohne Galerie.
+                                    reelsSettingRow(title: "Session gap") {
+                                        let currentGap = StashImageGroupingPrefs.normalizedGap(groupGapMinutes)
                                         Menu {
-                                            ForEach(StashImageSessionPrecision.allCases, id: \.self) { option in
-                                                Button(action: { groupSessionPrecisionRaw = option.rawValue }) {
-                                                    HStack { Text(option.displayName); if option == current { Image(systemName: "checkmark") } }
+                                            ForEach(StashImageGroupingPrefs.gapOptions, id: \.self) { minutes in
+                                                Button(action: { groupGapMinutes = minutes }) {
+                                                    HStack { Text("\(minutes) min"); if minutes == currentGap { Image(systemName: "checkmark") } }
                                                 }
                                             }
                                         } label: {
-                                            pickerLabelText(current.displayName)
+                                            pickerLabelText("\(currentGap) min")
                                         }
                                     }
                                     .padding(.top, 4)
