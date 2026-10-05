@@ -30,9 +30,17 @@ struct AddTagsSheet: View {
     /// tag id → how often this item's performers carry it (statistics model).
     @State private var performerCounts: [String: Int] = [:]
 
+    private var pinned: [Tag] {
+        // Chosen entries always lead the list, whatever the search says.
+        allTags.filter { selectedIds.contains($0.id) }
+    }
+
     private var filtered: [Tag] {
-        if searchText.isEmpty { return allTags }
-        return allTags.filter { $0.name.localizedCaseInsensitiveContains(searchText) }
+        // The search narrows only the unchosen rest, so a chosen entry never vanishes.
+        let term = searchText.trimmingCharacters(in: .whitespacesAndNewlines)
+        return allTags.filter {
+            !selectedIds.contains($0.id) && (term.isEmpty || $0.name.localizedCaseInsensitiveContains(term))
+        }
     }
 
     /// How often a tag is used on the kind of item being edited — the sort key, and
@@ -53,7 +61,7 @@ struct AddTagsSheet: View {
                     if isLoading {
                         HStack { Spacer(); ProgressView("Loading..."); Spacer() }.padding()
                     } else {
-                        ForEach(filtered.prefix(30)) { tag in
+                        ForEach(pinned + Array(filtered.prefix(30))) { tag in
                             HStack {
                                 Text(tag.name)
                                 Spacer()
@@ -78,7 +86,8 @@ struct AddTagsSheet: View {
                             Text("Type more to refine...").font(.caption).foregroundColor(.secondary)
                         }
 
-                        if !searchText.isEmpty && filtered.isEmpty {
+                        if !searchText.isEmpty && filtered.isEmpty
+                            && !pinned.contains(where: { $0.name.localizedCaseInsensitiveContains(searchText) }) {
                             Button {
                                 createAndSelect()
                             } label: {

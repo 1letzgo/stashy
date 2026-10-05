@@ -2097,10 +2097,7 @@ struct EditGallerySheet: View {
             Form {
                 Section("Identity") {
                     TextField("Title", text: $title)
-                    TextField("Date (YYYY-MM-DD)", text: $date)
-                        .textInputAutocapitalization(.never)
-                        .keyboardType(.numbersAndPunctuation)
-                        .numericKeyboardDoneBar()
+                    StashDateField(placeholder: "Date (YYYY-MM-DD)", text: $date)
                 }
                 .listRowBackground(Color.secondaryAppBackground)
 
@@ -2135,7 +2132,7 @@ struct EditGallerySheet: View {
             .stashyModalSheetChrome("Edit Gallery", onBack: { dismiss() }) {
                 StashyChromeTrailingTextButton(
                     title: "Save",
-                    enabled: !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+                    enabled: !title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && StashDateInput.isAcceptable(date),
                     isBusy: isSaving
                 ) { save() }
             }

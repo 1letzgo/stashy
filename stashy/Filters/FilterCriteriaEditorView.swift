@@ -359,10 +359,12 @@ struct FilterCriteriaEditorView: View {
             FilterNumericCriterionRow(value: dictBinding(for: field.key), isFloat: false, onChange: applyChange)
         case .float:
             FilterNumericCriterionRow(value: dictBinding(for: field.key), isFloat: true, onChange: applyChange)
-        case .date, .timestamp:
+        case .date:
+            FilterDateCriterionRow(value: dictBinding(for: field.key), onChange: applyChange)
+        case .timestamp:
             FilterStringCriterionRow(
                 value: dictBinding(for: field.key),
-                placeholder: field.kind == .date ? "YYYY-MM-DD" : "Timestamp / relative",
+                placeholder: "Timestamp / relative",
                 modifiers: FilterCriterionKind.defaultModifiers(for: field.kind),
                 onChange: applyChange
             )
@@ -501,6 +503,7 @@ struct FilterCriteriaEditorView: View {
                         onChange()
                     }
                     .fontWeight(.semibold)
+                    .disabled(nestedDocument.hasInvalidInput)
                 }
             }
         }
@@ -702,6 +705,199 @@ struct FilterStringCriterionRow: View {
         for (k, v) in updates { next[k] = v }
         value = next
         if commit { onChange() }
+    }
+}
+
+// MARK: - Dates
+
+/// Stash's `YYYY-MM-DD` date format — shared by the date criteria and every date field of the
+/// edit forms, so nothing that is not a real calendar date ever reaches the server.
+enum StashDateInput {
+    static let errorText = "Enter a valid date as YYYY-MM-DD"
+
+    private static let formatter: DateFormatter = {
+        let f = DateFormatter()
+        f.calendar = Calendar(identifier: .gregorian)
+        f.locale = Locale(identifier: "en_US_POSIX")
+        f.timeZone = TimeZone(secondsFromGMT: 0)
+        f.dateFormat = "yyyy-MM-dd"
+        f.isLenient = false
+        return f
+    }()
+
+    /// A real calendar date in exactly `YYYY-MM-DD` (no 2023-02-30, no 2023-2-3).
+    static func isValid(_ raw: String) -> Bool {
+        date(from: raw) != nil
+    }
+
+    /// Valid, or empty (the field is optional).
+    static func isAcceptable(_ raw: String) -> Bool {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty || isValid(trimmed)
+    }
+
+    static func date(from raw: String) -> Date? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.range(of: #"^\d{4}-\d{2}-\d{2}$"#, options: .regularExpression) != nil,
+              let date = formatter.date(from: trimmed),
+              formatter.string(from: date) == trimmed else { return nil }
+        return date
+    }
+
+    static func string(from date: Date) -> String {
+        formatter.string(from: date)
+    }
+}
+
+/// `YYYY-MM-DD` text field with a calendar button (inline graphical `DatePicker`) and an inline
+/// error while the text is not a real date. Callers block their commit / Save on
+/// `StashDateInput.isAcceptable`.
+struct StashDateField: View {
+    let placeholder: String
+    @Binding var text: String
+    /// Criteria-editor look (recessed field) instead of a plain `Form` row.
+    var editorChrome: Bool = false
+    /// Fires on submit, focus loss and a pick in the calendar.
+    var onCommit: () -> Void = {}
+
+    @State private var showsCalendar = false
+    @FocusState private var isFocused: Bool
+    @ObservedObject private var appearance = AppearanceManager.shared
+
+    private var isInvalid: Bool { !StashDateInput.isAcceptable(text) }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 8) {
+                field
+                Button {
+                    isFocused = false
+                    withAnimation(DesignTokens.Animation.quick) { showsCalendar.toggle() }
+                } label: {
+                    Image(systemName: showsCalendar ? "calendar.badge.checkmark" : "calendar")
+                        .foregroundColor(appearance.tintColor)
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel(showsCalendar ? "Hide calendar" : "Pick a date")
+            }
+            if showsCalendar {
+                DatePicker(
+                    "",
+                    selection: Binding(
+                        get: { StashDateInput.date(from: text) ?? Date() },
+                        set: { picked in
+                            text = StashDateInput.string(from: picked)
+                            onCommit()
+                        }
+                    ),
+                    displayedComponents: .date
+                )
+                .datePickerStyle(.graphical)
+                .labelsHidden()
+                .tint(appearance.tintColor)
+            }
+            if isInvalid {
+                Text(StashDateInput.errorText)
+                    .font(.caption)
+                    .foregroundColor(.red)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var field: some View {
+        let base = TextField(placeholder, text: $text)
+            .textInputAutocapitalization(.never)
+            .autocorrectionDisabled()
+            .keyboardType(.numbersAndPunctuation)
+            .focused($isFocused)
+            .onSubmit { onCommit() }
+            .onChange(of: isFocused) { _, focused in
+                if !focused { onCommit() }
+            }
+        if editorChrome {
+            base
+                .filterEditorTextFieldChrome()
+                .overlay(
+                    RoundedRectangle(cornerRadius: DesignTokens.CornerRadius.small - 2)
+                        .stroke(Color.red.opacity(isInvalid ? 0.8 : 0), lineWidth: 1)
+                )
+        } else {
+            base
+        }
+    }
+}
+
+/// Date criterion (`DateCriterionInput`): modifier, then one or two validated dates. Invalid text
+/// stays in a `*_text` scratch key — the criterion is then incomplete, never sent, and no refetch
+/// fires until the date is valid.
+struct FilterDateCriterionRow: View {
+    @Binding var value: [String: Any]
+    var onChange: () -> Void
+
+    private var modifierRaw: String {
+        (value["modifier"] as? String) ?? StashCriterionModifier.equals.rawValue
+    }
+
+    private var mod: StashCriterionModifier? {
+        StashCriterionModifier(rawValue: modifierRaw)
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            FilterModifierPicker(
+                modifier: Binding(
+                    get: { modifierRaw },
+                    set: { raw in
+                        var next = value
+                        next["modifier"] = raw
+                        value = next
+                        commitIfValid()
+                    }
+                ),
+                options: FilterCriterionKind.defaultModifiers(for: .date),
+                onChange: {}
+            )
+            if mod?.needsValue ?? true {
+                StashDateField(
+                    placeholder: mod?.needsSecondValue == true ? "From (YYYY-MM-DD)" : "YYYY-MM-DD",
+                    text: dateText(key: "value"),
+                    editorChrome: true,
+                    onCommit: commitIfValid
+                )
+                if mod?.needsSecondValue == true {
+                    StashDateField(
+                        placeholder: "To (YYYY-MM-DD)",
+                        text: dateText(key: "value2"),
+                        editorChrome: true,
+                        onCommit: commitIfValid
+                    )
+                }
+            }
+        }
+    }
+
+    private func dateText(key: String) -> Binding<String> {
+        Binding(
+            get: { (value["\(key)_text"] as? String) ?? (value[key] as? String) ?? "" },
+            set: { raw in
+                var next = value
+                let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty || StashDateInput.isValid(trimmed) {
+                    next[key] = trimmed
+                    next.removeValue(forKey: "\(key)_text")
+                } else {
+                    next.removeValue(forKey: key)
+                    next["\(key)_text"] = raw
+                }
+                value = next
+            }
+        )
+    }
+
+    private func commitIfValid() {
+        guard value["value_text"] == nil, value["value2_text"] == nil else { return }
+        onChange()
     }
 }
 
