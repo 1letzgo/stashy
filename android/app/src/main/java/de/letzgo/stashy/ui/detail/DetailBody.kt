@@ -36,6 +36,8 @@ import de.letzgo.stashy.ui.TabBarClearance
 import de.letzgo.stashy.ui.components.SceneCard
 import de.letzgo.stashy.ui.noRippleClickable
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
+import de.letzgo.stashy.ui.catalog.ImageFeedGridModel
+import de.letzgo.stashy.ui.catalog.imageFeedItems
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -80,6 +82,8 @@ internal class LinkedCatalog(
     val tags = tagScope?.let { s -> PagedList<Tag>(scope, 40) { page, per -> DetailRepository.tags(DetailSort.findFilter(page, per, tagSort), s) } }
     val groups = groupScope?.let { s -> PagedList<StashGroup>(scope, 20) { page, per -> DetailRepository.groups(FindFilter(page, per, "name", "ASC"), s) } }
     val images = imageScope?.let { s -> PagedList<StashImage>(scope, 40) { page, per -> DetailRepository.images(DetailSort.findFilter(page, per, imageSort), s) } }
+    /** Grouped 1/row feed of the Images section (iOS `LinkedImagesCatalogGrid` / `ImagesView(gallery:)`). */
+    val imageFeed = ImageFeedGridModel()
 
     private var started = false
 
@@ -184,7 +188,8 @@ internal fun DetailGrid(
 /** Column count per section on the current width (iOS `galleryColumns` / scene list). */
 internal fun columnsFor(tab: DetailTab, widthDp: Float, imageColumns: Int): Int = when (tab) {
     DetailTab.Scenes -> adaptiveColumnCount(widthDp, 560f, 1, 4)
-    DetailTab.Images -> if (imageColumns == 1) adaptiveColumnCount(widthDp, 560f, 1, 3) else adaptiveColumnCount(widthDp, 220f, 2, 8)
+    // 1/row is the grouped feed: one flexible column like iOS, whatever the width.
+    DetailTab.Images -> if (imageColumns == 1) 1 else adaptiveColumnCount(widthDp, 220f, 2, 8)
     else -> adaptiveColumnCount(widthDp, 220f, 2, 8)
 }
 
@@ -215,7 +220,7 @@ internal fun <T> LazyGridScope.pagedSection(
 }
 
 /** The section grid for [tab] — shared by Performer/Studio/Tag/Group details. */
-internal fun LazyGridScope.linkedSection(catalog: LinkedCatalog, tab: DetailTab) {
+internal fun LazyGridScope.linkedSection(catalog: LinkedCatalog, tab: DetailTab, gridState: LazyGridState) {
     when (tab) {
         DetailTab.Scenes -> catalog.scenes?.let { l ->
             pagedSection(l, { it.id }, null, SF.film, "No scenes found") { _, s ->
@@ -239,15 +244,37 @@ internal fun LazyGridScope.linkedSection(catalog: LinkedCatalog, tab: DetailTab)
         DetailTab.Groups -> catalog.groups?.let { l ->
             pagedSection(l, { it.id }) { _, g -> DetailGroupCard(g, Modifier.noRippleClickable { Nav.push(GroupDetailScreen(g.id, g)) }) }
         }
-        DetailTab.Images -> catalog.images?.let { l -> imageSection(l, catalog.imageColumns) }
+        DetailTab.Images -> imageSection(catalog, gridState)
     }
 }
 
-/** iOS `LinkedImagesCatalogGrid` (multi-column) / 1-per-row cards; tap opens the viewer. */
-internal fun LazyGridScope.imageSection(list: PagedList<StashImage>, columns: Int) {
-    pagedSection(list, { it.id }, "Loading images...", SF.cameraFill, "No images found") { index, image ->
-        val aspect = if (columns == 1) (image.aspectRatio ?: 1f).coerceIn(0.56f, 1.78f) else 1f
-        DetailImageCard(image, Modifier.noRippleClickable { Nav.push(ImageViewerScreen(list.items, index, onLoadMore = { list.loadMore() })) }, aspect)
+/**
+ * iOS `LinkedImagesCatalogGrid` / `ImagesView(gallery:)`: 1/row is the grouped image feed
+ * (sets as swipeable posts, rating + O-counter, muted autoplay; the viewer swipes in post
+ * order), otherwise the multi-column thumbnail grid. Tap opens [ImageViewerScreen].
+ */
+internal fun LazyGridScope.imageSection(catalog: LinkedCatalog, gridState: LazyGridState, currentGalleryId: String? = null) {
+    val list = catalog.images ?: return
+    if (catalog.imageColumns != 1) {
+        pagedSection(list, { it.id }, "Loading images...", SF.cameraFill, "No images found") { index, image ->
+            DetailImageCard(image, Modifier.noRippleClickable { Nav.push(ImageViewerScreen(list.items, index, onLoadMore = { list.loadMore() })) })
+        }
+        return
     }
+    if (list.items.isEmpty()) {
+        // Empty / first-load state exactly like the grid.
+        pagedSection(list, { it.id }, "Loading images...", SF.cameraFill, "No images found") { _, _ -> }
+        return
+    }
+    imageFeedItems(
+        model = catalog.imageFeed,
+        images = list.items,
+        sortRaw = catalog.imageSort.raw,
+        gridState = gridState,
+        onLoadMore = { list.loadMore() },
+        onImageUpdated = { updated -> list.patch { if (it.id == updated.id) updated else it } },
+        currentGalleryId = currentGalleryId,
+    )
+    if (list.isLoading) item(key = "more", span = { GridItemSpan(maxLineSpan) }) { LoadingFooter("Loading more images...") }
 }
 

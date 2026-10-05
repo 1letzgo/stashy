@@ -28,6 +28,11 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyGridScope
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.itemsIndexed as gridItemsIndexed
+import androidx.compose.runtime.State
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
@@ -147,12 +152,7 @@ fun ImageFeedList(
     val precision = ImageSessionPrecision.from(TabManager.stashlineSessionPrecision)
     val sessionCache = remember { HashMap<String, String>() }
     val snapshot = images.toList()
-    val posts = remember(snapshot, sortRaw, groupSets, precision) {
-        val built = ImageSetGrouping.buildPosts(snapshot, sortRaw, precision, groupSets, sessionCache)
-        // Lazy keys must be unique; iOS ids can collide only in degenerate data.
-        val seen = HashSet<String>()
-        built.map { p -> if (seen.add(p.id)) p else p.copy(id = "${p.id}#${p.images.first().id}") }
-    }
+    val posts = remember(snapshot, sortRaw, groupSets, precision) { buildFeedPosts(snapshot, sortRaw, precision, groupSets, sessionCache) }
     val flattened = remember(posts) { posts.flatMap { it.images } }
 
     // Visible image per post (iOS `visibleImageId` of each cell, hoisted for the autoplay pick).
@@ -172,13 +172,7 @@ fun ImageFeedList(
         }
     }
 
-    fun open(image: StashImage) {
-        // iOS `fullScreenFeedBinding`: the viewer swipes in post order. When that is the API
-        // order, the caller's list itself goes in so deletes / edits land there.
-        val source: List<StashImage> = if (images is SnapshotStateList && flattened == images.toList()) images else flattened
-        val index = source.indexOfFirst { it.id == image.id }.coerceAtLeast(0)
-        Nav.push(ImageViewerScreen(source, index, onLoadMore = onLoadMore))
-    }
+    fun open(image: StashImage) = openFeedImage(images, flattened, image, onLoadMore)
 
     LazyColumn(
         modifier.fillMaxSize(),
@@ -203,6 +197,113 @@ fun ImageFeedList(
         if (isLoading && posts.isNotEmpty()) item(key = "loading") {
             Box(Modifier.fillMaxWidth().padding(16.dp), Alignment.Center) { CircularProgressIndicator(color = Theme.palette.secondaryText) }
         }
+    }
+}
+
+/** iOS `oneColumnFeedPosts`; lazy keys must be unique (iOS ids collide only in degenerate data). */
+private fun buildFeedPosts(
+    images: List<StashImage>,
+    sortRaw: String?,
+    precision: ImageSessionPrecision,
+    groupSets: Boolean,
+    sessionCache: MutableMap<String, String>,
+): List<ImageFeedPost> {
+    val built = ImageSetGrouping.buildPosts(images, sortRaw, precision, groupSets, sessionCache)
+    val seen = HashSet<String>()
+    return built.map { p -> if (seen.add(p.id)) p else p.copy(id = "${p.id}#${p.images.first().id}") }
+}
+
+/**
+ * iOS `fullScreenFeedBinding`: the viewer swipes in post order. When that is the API order,
+ * the caller's list itself goes in so deletes / edits land there.
+ */
+private fun openFeedImage(images: List<StashImage>, flattened: List<StashImage>, image: StashImage, onLoadMore: () -> Unit) {
+    val source: List<StashImage> = if (images is SnapshotStateList && flattened == images.toList()) images else flattened
+    val index = source.indexOfFirst { it.id == image.id }.coerceAtLeast(0)
+    Nav.push(ImageViewerScreen(source, index, onLoadMore = onLoadMore))
+}
+
+/**
+ * iOS: `LinkedImagesCatalogGrid` in 1/row mode (Performer / Tag detail) and
+ * `ImagesView(gallery:)` — the same grouped feed as [ImageFeedList], emitted as items of the
+ * detail screen's `LazyVerticalGrid` (which also carries the header). The holder lives as long
+ * as the screen: memoised posts (the grid builder is not composable), the visible image per
+ * post and the autoplay pick over the grid's layout.
+ */
+class ImageFeedGridModel {
+    val visibleIds = mutableStateMapOf<String, String>()
+    private val sessionCache = HashMap<String, String>()
+    private var memoKey: List<Any?>? = null
+    private var postsById: Map<String, ImageFeedPost> = emptyMap()
+    var posts: List<ImageFeedPost> = emptyList(); private set
+    var flattened: List<StashImage> = emptyList(); private set
+    private var autoplayState: Pair<LazyGridState, State<String?>>? = null
+
+    fun update(images: List<StashImage>, sortRaw: String?) {
+        val groupSets = TabManager.stashlineGroupSets
+        val precision = ImageSessionPrecision.from(TabManager.stashlineSessionPrecision)
+        val snapshot = images.toList()
+        val key = listOf(snapshot, sortRaw, groupSets, precision)
+        if (key == memoKey) return
+        // iOS empties the session-key cache when the sort or the grouping switch changes.
+        val old = memoKey
+        if (old != null && (old[1] != sortRaw || old[2] != groupSets)) sessionCache.clear()
+        memoKey = key
+        posts = buildFeedPosts(snapshot, sortRaw, precision, groupSets, sessionCache)
+        postsById = posts.associateBy { it.id }
+        flattened = posts.flatMap { it.images }
+    }
+
+    /** iOS `recomputeAutoplayTarget`: only while idle, the video post closest to the viewport centre. */
+    fun autoplay(state: LazyGridState): State<String?> {
+        autoplayState?.takeIf { it.first === state }?.let { return it.second }
+        val derived = derivedStateOf {
+            if (!TabManager.imagesFeedVideoAutoplay || state.isScrollInProgress) return@derivedStateOf null
+            val info = state.layoutInfo
+            val frames = HashMap<String, Pair<Float, Float>>()
+            info.visibleItemsInfo.forEach { item ->
+                val post = (item.key as? String)?.let { postsById[it] } ?: return@forEach
+                val visible = post.images.firstOrNull { it.id == visibleIds[post.id] } ?: post.images.first()
+                if (visible.isVideo) frames[visible.id] = item.offset.y.toFloat() to (item.offset.y + item.size.height).toFloat()
+            }
+            ImageFeedAutoplay.target(frames, info.viewportStartOffset.toFloat(), info.viewportEndOffset.toFloat())
+        }
+        autoplayState = state to derived
+        return derived
+    }
+
+    fun open(images: List<StashImage>, image: StashImage, onLoadMore: () -> Unit) = openFeedImage(images, flattened, image, onLoadMore)
+}
+
+/**
+ * Emits the feed posts of [images] into a single-column detail grid (iOS 1/row
+ * `LazyVGrid(columns: [GridItem(.flexible())])`); [onLoadMore] fires near the end.
+ */
+fun LazyGridScope.imageFeedItems(
+    model: ImageFeedGridModel,
+    images: List<StashImage>,
+    sortRaw: String?,
+    gridState: LazyGridState,
+    onLoadMore: () -> Unit,
+    onImageUpdated: (StashImage) -> Unit,
+    currentGalleryId: String? = null,
+    showsRate: Boolean = true,
+) {
+    model.update(images, sortRaw)
+    val posts = model.posts
+    gridItemsIndexed(posts, key = { _, p -> p.id }, span = { _, _ -> GridItemSpan(maxLineSpan) }) { index, post ->
+        LaunchedEffect(index, posts.size) { if (index >= posts.size - 3) onLoadMore() }
+        val autoplayId by model.autoplay(gridState)
+        ImageFeedPostCard(
+            post = post,
+            visibleId = model.visibleIds[post.id],
+            onVisibleChange = { model.visibleIds[post.id] = it },
+            autoplayImageId = if (gridState.isScrollInProgress) null else autoplayId,
+            currentGalleryId = currentGalleryId,
+            showsRate = showsRate,
+            onOpen = { model.open(images, it, onLoadMore) },
+            onImageUpdated = onImageUpdated,
+        )
     }
 }
 

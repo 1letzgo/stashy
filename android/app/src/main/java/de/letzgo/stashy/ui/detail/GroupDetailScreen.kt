@@ -67,7 +67,7 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
         AutoSwitchTab(catalog, tab) { tab = it }
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
             DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, header = { group?.let { Header(it) } }) {
-                linkedSection(catalog, tab)
+                linkedSection(catalog, tab, gridState)
             }
             DetailNavBar(catalog.available, tab, { tab = it }, onEdit = { editing = true }, editLabel = "Edit group")
             val (slots, menu) = catalog.slots(tab)

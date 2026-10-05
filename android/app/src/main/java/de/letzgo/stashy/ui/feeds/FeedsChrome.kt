@@ -308,7 +308,7 @@ fun FeedsInfoOverlay(
             Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 if (mode != ReelsModeType.Pics) FeedsRateChrome(item, onOCounter, onRating)
                 if (showsDelete && item.supportsDelete) ChromePillIconButton(SF.trash, "Delete", onClick = onDelete)
-                ChromePillIconButton(if (isMuted) SF.speakerSlashFill else SF.speakerWave2Fill, if (isMuted) "Ton an" else "Stumm", enabled = item.isVideo, onClick = onToggleMute)
+                ChromePillIconButton(if (isMuted) SF.speakerSlashFill else SF.speakerWave2Fill, if (isMuted) "Unmute" else "Mute", enabled = item.isVideo, onClick = onToggleMute)
                 ChromePillIconButton(if (isPlaying) SF.pauseFill else SF.playFill, if (isPlaying) "Pause" else "Play", enabled = item.isVideo || pausesAdvance, onClick = onTogglePlay)
             }
         }

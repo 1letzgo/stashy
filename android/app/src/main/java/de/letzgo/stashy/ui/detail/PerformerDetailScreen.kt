@@ -95,7 +95,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
 
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
             DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, header = { Header(p) }) {
-                linkedSection(catalog, tab)
+                linkedSection(catalog, tab, gridState)
             }
             DetailNavBar(
                 catalog.available, tab, { tab = it },

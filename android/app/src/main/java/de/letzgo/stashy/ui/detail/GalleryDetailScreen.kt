@@ -59,10 +59,9 @@ class GalleryDetailScreen(val galleryId: String, val preview: Gallery? = null) :
     @Composable
     override fun Content() {
         LaunchedEffect(Unit) { if (!started) { started = true; load() } }
-        val images = catalog.images!!
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
             DetailGrid(gridState, { w -> columnsFor(DetailTab.Images, w, catalog.imageColumns) }, header = { gallery?.let { Header(it) } }) {
-                imageSection(images, catalog.imageColumns)
+                imageSection(catalog, gridState, currentGalleryId = galleryId)
             }
             DetailNavBar(emptyList(), null, {}, onEdit = { editing = true }, editLabel = "Edit gallery")
             val (slots, menu) = catalog.slots(DetailTab.Images, imageScopeKey = "openedGallery")

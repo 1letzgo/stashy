@@ -100,7 +100,7 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null) : Screen {
         AutoSwitchTab(catalog, tab) { tab = it }
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
             DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, header = { tag?.let { Header(it) } }) {
-                linkedSection(catalog, tab)
+                linkedSection(catalog, tab, gridState)
             }
             DetailNavBar(
                 catalog.available, tab, { tab = it },

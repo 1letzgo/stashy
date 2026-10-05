@@ -112,7 +112,7 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null) : Sc
         // Studio performers default to Name (A-Z) (iOS `initialSort: .nameAsc`).
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
             DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, header = { studio?.let { Header(it) } }) {
-                linkedSection(catalog, tab)
+                linkedSection(catalog, tab, gridState)
             }
             DetailNavBar(
                 catalog.available, tab, { tab = it },
