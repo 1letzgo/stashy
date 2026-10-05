@@ -19,6 +19,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.asPaddingValues
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -245,3 +247,46 @@ fun <T> NativeTabStrip(
 
 private fun Modifier.tabIndicatorOffset(position: androidx.compose.material3.TabPosition): Modifier =
     with(androidx.compose.material3.TabRowDefaults) { this@tabIndicatorOffset.tabIndicatorOffset(position) }
+
+/** Height of [NativeTopBar] below the status bar (Material small top app bar). */
+val NativeTopBarHeight: Dp = 64.dp
+
+/** Top padding for content under a [NativeTopBar] overlay (status bar + bar). */
+@Composable
+fun nativeTopBarPadding(): Dp =
+    androidx.compose.foundation.layout.WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + NativeTopBarHeight
+
+/**
+ * Native Material 3 top app bar (Android look) — replaces the iOS "Back" glass pill and the
+ * floating round chrome buttons on pushed screens. Back arrow left, [title], [actions] right
+ * (use `androidx.compose.material3.IconButton`). [transparent] for screens with a hero/backdrop
+ * (scrim instead of the solid background).
+ */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+fun NativeTopBar(
+    title: String,
+    onBack: (() -> Unit)? = { Nav.pop() },
+    modifier: Modifier = Modifier,
+    transparent: Boolean = false,
+    actions: @Composable RowScope.() -> Unit = {},
+) {
+    val p = Theme.palette
+    val content = if (transparent) Color.White else p.text
+    androidx.compose.material3.TopAppBar(
+        title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = androidx.compose.material3.MaterialTheme.typography.titleLarge) },
+        modifier = modifier,
+        navigationIcon = {
+            if (onBack != null) androidx.compose.material3.IconButton(onClick = onBack) {
+                Icon(androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack, "Back", tint = content)
+            }
+        },
+        actions = actions,
+        colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+            containerColor = if (transparent) Color.Black.copy(alpha = 0.35f) else p.background,
+            titleContentColor = content,
+            navigationIconContentColor = content,
+            actionIconContentColor = content,
+        ),
+    )
+}
