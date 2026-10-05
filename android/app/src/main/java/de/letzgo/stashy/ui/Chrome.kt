@@ -217,8 +217,8 @@ fun <T> NativeTabStrip(
     transparent: Boolean = false,
     trailing: (@Composable () -> Unit)? = null,
     icon: ((T) -> androidx.compose.ui.graphics.vector.ImageVector)? = null,
-    /** Icon mode only: this item stays fixed at the left edge, the others scroll past it (iOS `pinnedItemID`). */
-    pinnedLeading: T? = null,
+    /** Icon mode only: the first item stays fixed at the left edge, the others scroll past it (iOS `pinnedItemID`). */
+    pinFirst: Boolean = false,
 ) {
     val p = Theme.palette
     val container = if (transparent) Color.Black.copy(alpha = 0.55f) else p.background
@@ -229,7 +229,7 @@ fun <T> NativeTabStrip(
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (icon != null) {
-                CompactIconTabs(items, index, title, icon, onSelect, transparent, pinnedLeading, Modifier.weight(1f))
+                CompactIconTabs(items, index, title, icon, onSelect, transparent, pinFirst && items.size > 1, Modifier.weight(1f))
             } else
             androidx.compose.material3.ScrollableTabRow(
                 selectedTabIndex = index ?: 0,
@@ -285,7 +285,7 @@ fun <T> NativeTabStrip(
 /**
  * Icon tabs for [NativeTabStrip]: icon only, the selected tab icon + label with the Material
  * primary indicator under it. Own row because ScrollableTabRow forces 90dp per tab, which spreads
- * icon-only tabs far apart. [pinned] sits outside the scrolling row at the left edge.
+ * icon-only tabs far apart. With [pinFirst] the first item sits outside the scrolling row at the left edge.
  */
 @Composable
 private fun <T> CompactIconTabs(
@@ -295,7 +295,7 @@ private fun <T> CompactIconTabs(
     icon: (T) -> androidx.compose.ui.graphics.vector.ImageVector,
     onSelect: (T) -> Unit,
     transparent: Boolean,
-    pinned: T?,
+    pinFirst: Boolean,
     modifier: Modifier,
 ) {
     val p = Theme.palette
@@ -304,16 +304,16 @@ private fun <T> CompactIconTabs(
         unselected = if (transparent) Color.White.copy(alpha = 0.7f) else p.secondaryText,
         indicator = if (transparent) Color.White else Appearance.tint.takeIf { it != StashyColors.defaultTint } ?: p.text,
     )
-    val pinnedItem = pinned?.takeIf { it in items }
-    val scrolling = if (pinnedItem != null) items.filter { it != pinnedItem } else items
-    val selectedItem = index?.let { items.getOrNull(it) }
-    val scrollIndex = selectedItem?.let { scrolling.indexOf(it) }?.takeIf { it >= 0 }
+    // By position, not value: the Tools landing entry is `null`.
+    val scrolling = if (pinFirst) items.drop(1) else items
+    val offset = if (pinFirst) 1 else 0
+    val scrollIndex = index?.let { it - offset }?.takeIf { it >= 0 }
     val state = androidx.compose.foundation.lazy.rememberLazyListState()
     androidx.compose.runtime.LaunchedEffect(scrollIndex) { scrollIndex?.let { state.animateScrollToItem((it - 1).coerceAtLeast(0)) } }
     Row(modifier.height(48.dp), verticalAlignment = Alignment.CenterVertically) {
-        if (pinnedItem != null) {
+        if (pinFirst) {
             Spacer(Modifier.width(8.dp))
-            CompactIconTab(pinnedItem, pinnedItem == selectedItem, title, icon, onSelect, colors)
+            CompactIconTab(items[0], index == 0, title, icon, onSelect, colors)
         }
         androidx.compose.foundation.lazy.LazyRow(
             Modifier.weight(1f).height(48.dp),
@@ -322,8 +322,7 @@ private fun <T> CompactIconTabs(
             verticalAlignment = Alignment.CenterVertically,
         ) {
             items(scrolling.size) { i ->
-                val item = scrolling[i]
-                CompactIconTab(item, item == selectedItem, title, icon, onSelect, colors)
+                CompactIconTab(scrolling[i], i + offset == index, title, icon, onSelect, colors)
             }
         }
     }
