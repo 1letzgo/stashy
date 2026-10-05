@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.ui.tools.downloads.GalleryDownloadOptionsDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -36,6 +37,8 @@ class GalleryDetailScreen(val galleryId: String, val preview: Gallery? = null) :
     private var gallery by mutableStateOf(preview)
     private var expanded by mutableStateOf(false)
     private var editing by mutableStateOf(false)
+    /** iOS `showingGalleryDownloadOptions` (`GalleryDownloadOptionsAlert`). */
+    private var showDownloadOptions by mutableStateOf(false)
     private var started = false
     private val gridState = LazyGridState()
 
@@ -63,10 +66,13 @@ class GalleryDetailScreen(val galleryId: String, val preview: Gallery? = null) :
             }
             DetailNavBar(emptyList(), null, {}, onEdit = { editing = true }, editLabel = "Edit gallery")
             val (slots, menu) = catalog.slots(DetailTab.Images, imageScopeKey = "openedGallery")
-            DetailSlotBar(slots, menu)
+            // iOS `galleryDownloadSlot` (secondary contextual, before filter & sort).
+            val download = gallery?.let { imageSetDownloadSlot(it.id, "Download gallery") { showDownloadOptions = true } }
+            DetailSlotBar(slots + listOfNotNull(download), menu)
         }
         val g = gallery
         if (editing && g != null) EditGallerySheet(g, { editing = false }) { gallery = it }
+        if (showDownloadOptions && g != null) GalleryDownloadOptionsDialog(g) { showDownloadOptions = false }
     }
 
     /** iOS `openedGalleryHeader`. */

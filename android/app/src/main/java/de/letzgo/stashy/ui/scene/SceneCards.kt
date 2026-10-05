@@ -310,19 +310,31 @@ fun SceneHeatmapCard(heatmapURL: String?, duration: Double, currentTime: Double,
 
 
 /**
- * iOS: `SceneSimilarScenesCard` (stashy+). The similarity finder is a later stashy+ port; the
- * card hides itself like iOS does while the finder is inactive. Feed it [scenes] once it exists.
+ * iOS: `SceneSimilarScenesCard` (stashy+) — scenes from the library that resemble the one on
+ * screen ([de.letzgo.stashy.data.tools.SimilarScenes]). Hidden while the finder is inactive
+ * (off or locked) and when nothing similar was found. Cards are the dashboard's small
+ * `HomeSceneCardView` (222 × 125); like iOS the card has no shadow.
  */
 @Composable
-fun SceneSimilarScenesCard(scenes: List<de.letzgo.stashy.data.Scene> = emptyList(), isLoading: Boolean = false) {
+fun SceneSimilarScenesCard(scenes: List<de.letzgo.stashy.data.Scene>, isLoading: Boolean) {
+    if (!de.letzgo.stashy.data.tools.SimilarScenes.isActive) return
     if (scenes.isEmpty() && !isLoading) return
-    SceneCardContainer(Modifier.fillMaxWidth()) {
-        SceneCardHeader("Similar Scenes", null, trailing = { if (isLoading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) })
-        LazyRow(Modifier.padding(top = 8.dp, bottom = 8.dp), contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            items(scenes, key = { it.id }) { s ->
-                de.letzgo.stashy.ui.components.SceneCard(
-                    s, Modifier.size(222.dp, 125.dp).plainClick { de.letzgo.stashy.ui.Nav.push(SceneDetailScreen(s.id, s)) },
-                )
+    val shape = RoundedCornerShape(Tokens.Radius.card)
+    Column(
+        Modifier.fillMaxWidth().clip(shape).background(Theme.palette.secondaryBackground).padding(bottom = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        SceneCardHeader("Similar Scenes", null, trailing = {
+            if (isLoading) CircularProgressIndicator(Modifier.size(20.dp), color = Theme.palette.secondaryText, strokeWidth = 2.dp)
+        })
+        if (scenes.isNotEmpty()) {
+            LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                items(scenes, key = { it.id }) { s ->
+                    de.letzgo.stashy.ui.home.DashboardSceneCard(
+                        s, isLarge = false, width = 125.dp * 16 / 9, height = 125.dp,
+                        modifier = Modifier.plainClick { de.letzgo.stashy.ui.Nav.push(SceneDetailScreen(s.id, s)) },
+                    )
+                }
             }
         }
     }

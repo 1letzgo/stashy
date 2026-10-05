@@ -1,5 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.data.Downloads
+import de.letzgo.stashy.ui.tools.downloads.SceneBulkDownloadDialog
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +36,8 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
     private var group by mutableStateOf(preview)
     private var expanded by mutableStateOf(false)
     private var editing by mutableStateOf(false)
+    /** iOS `showingSceneDownloadOptions` (`sceneBulkDownloadDialog`). */
+    private var showSceneDownloadOptions by mutableStateOf(false)
     private var started = false
     private val gridState = LazyGridState()
 
@@ -67,10 +71,18 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
             }
             DetailNavBar(catalog.available, tab, { tab = it }, onEdit = { editing = true }, editLabel = "Edit group")
             val (slots, menu) = catalog.slots(tab)
-            DetailSlotBar(slots, menu)
+            // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
+            val extra = when (tab) {
+                DetailTab.Scenes -> listOf(sceneBulkDownloadSlot { showSceneDownloadOptions = true })
+                else -> emptyList()
+            }
+            DetailSlotBar(slots + extra, menu)
         }
         val g = group
         if (editing && g != null) EditGroupSheet(g, { editing = false }) { group = it }
+        if (showSceneDownloadOptions) {
+            SceneBulkDownloadDialog(Downloads.SceneDownloadScope.Group(groupId), group?.name ?: "") { showSceneDownloadOptions = false }
+        }
     }
 
     /** iOS `headerView`. */
