@@ -8984,6 +8984,11 @@ struct Scene: Codable, Identifiable, Equatable {
     let stashIds: [StashID]?
     let captions: [VideoCaption]?
     let customFields: [String: StashJSONValue]?
+    /// Earliest marker time from the list fragment's `feed_marker_seconds` alias (Feeds ›
+    /// Scenes start position). Deliberately not `scene_markers`: those would be partial
+    /// markers that detail views take for the real list. Decode-only — never encoded, and
+    /// copy-constructors drop it (Feeds caches the start per row).
+    var earliestMarkerSeconds: Double? = nil
 
     /// Title, falling back to the file name. Stash leaves `title` empty for anything that was
     /// never tagged, and the file name is then the only label a user recognises.
@@ -9115,8 +9120,22 @@ struct Scene: Codable, Identifiable, Equatable {
         stashIds = try container.decodeIfPresent([StashID].self, forKey: .stashIds)
         captions = try container.decodeIfPresent([VideoCaption].self, forKey: .captions)
         customFields = try container.decodeIfPresent([String: StashJSONValue].self, forKey: .customFields)
+
+        // `feed_marker_seconds: scene_markers { seconds }` — tolerant, it is only a start hint.
+        if let extra = try? decoder.container(keyedBy: FeedCodingKeys.self),
+           let entries = try? extra.decodeIfPresent([FeedMarkerSeconds].self, forKey: .feedMarkerSeconds) {
+            earliestMarkerSeconds = entries.map(\.seconds).filter { $0.isFinite && $0 >= 0 }.min()
+        }
     }
-    
+
+    private enum FeedCodingKeys: String, CodingKey {
+        case feedMarkerSeconds = "feed_marker_seconds"
+    }
+
+    private struct FeedMarkerSeconds: Decodable {
+        let seconds: Double
+    }
+
     
     // Compat for older views
     struct SceneTag: Codable, Identifiable {
