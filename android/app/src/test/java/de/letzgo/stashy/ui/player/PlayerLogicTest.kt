@@ -49,6 +49,33 @@ class WebVttTest {
     }
 }
 
+class ScrubPreviewTest {
+    @Test fun portraitSpriteTileKeepsItsSize() {
+        val vtt = "WEBVTT\n\n00:00:00.000 --> 00:00:05.000\nx_sprite.jpg#xywh=0,0,90,160\n\n00:00:05.000 --> 00:00:10.000\nx_sprite.jpg#xywh=90,0,90,160\n"
+        val tile = WebVtt.parseSpriteTiles(vtt)[1]
+        assertEquals(SpriteTile(5.0, 10.0, 90, 0, 90, 160), tile)
+        assertEquals(90f / 160f, scrubPreviewAspect(tile.width to tile.height, 16f / 9f), 1e-6f)
+    }
+
+    @Test fun aspectFallsBackFromTileToVideoToSixteenNine() {
+        assertEquals(4f / 3f, scrubPreviewAspect(null, 4f / 3f), 1e-6f)
+        assertEquals(4f / 3f, scrubPreviewAspect(0 to 0, 4f / 3f), 1e-6f)
+        assertEquals(16f / 9f, scrubPreviewAspect(null, null), 1e-6f)
+        assertEquals(16f / 9f, scrubPreviewAspect(null, Float.NaN), 1e-6f)
+        assertEquals(16f / 9f, scrubPreviewAspect(null, 0f), 1e-6f)
+    }
+
+    @Test fun previewSizeFollowsAspect() {
+        val (lw, lh) = scrubPreviewSize(16f / 9f)
+        assertEquals(120f, lw, 1e-4f); assertEquals(67.5f, lh, 1e-4f)
+        val (pw, ph) = scrubPreviewSize(9f / 16f)
+        assertEquals(67.5f, pw, 1e-4f); assertEquals(120f, ph, 1e-4f)
+        // Extreme ratios are clamped instead of producing a sliver.
+        val (ew, eh) = scrubPreviewSize(10f)
+        assertTrue(ew / eh <= 2.6f + 1e-4f)
+    }
+}
+
 class PlaybackFormatTest {
     @Test fun timeLikeIos() {
         assertEquals("0:00", PlaybackFormat.time(0.0))

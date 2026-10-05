@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.detail
 
+import de.letzgo.stashy.ui.uniqueItemsIndexed
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -212,7 +213,7 @@ internal fun <T> LazyGridScope.pagedSection(
         }
         return
     }
-    itemsIndexed(list.items, key = { _, it -> key(it) }) { index, value ->
+    uniqueItemsIndexed(list.items, key) { index, value ->
         LaunchedEffect(index, list.items.size) { list.onItemShown(index) }
         item(index, value)
     }

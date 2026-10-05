@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.scene
 
+import de.letzgo.stashy.ui.uniqueItems
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -87,7 +88,7 @@ fun ScenePerformersCard(sceneDate: String?, performers: List<Performer>, directo
             Box(Modifier.padding(top = 8.dp)) { SceneCardEmpty("No performers assigned") }
         } else {
             LazyRow(Modifier.padding(top = 8.dp, bottom = 12.dp), contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                items(performers.sortedBy { it.name }, key = { it.id }) { performer ->
+                uniqueItems(performers.sortedBy { it.name }, { it.id }) { performer ->
                     Box(Modifier.padding(bottom = 8.dp).plainClick { DetailLinks.performer(performer) }, contentAlignment = Alignment.BottomCenter) {
                         Box(Modifier.size(88.dp).clip(CircleShape).background(tint).padding(4.dp).clip(CircleShape)) {
                             val url = performer.imageURL
@@ -224,7 +225,7 @@ private fun GalleryImageStrip(gallery: SceneGalleryStub) {
                 Text(gallery.imageCount?.toString() ?: "—", style = IosTypography.caption.copy(fontWeight = FontWeight.Bold, fontFamily = FontFamily.Monospace), color = tint)
             }
         }
-        items(images, key = { it.id }) { image ->
+        uniqueItems(images, { it.id }) { image ->
             Box(Modifier.size(thumb).clip(shape).background(Color.Gray.copy(alpha = 0.2f)).plainClick { DetailLinks.image(images, image.id) }) {
                 AsyncImage(image.thumbnailURL, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             }
@@ -329,7 +330,7 @@ fun SceneSimilarScenesCard(scenes: List<de.letzgo.stashy.data.Scene>, isLoading:
         })
         if (scenes.isNotEmpty()) {
             LazyRow(contentPadding = PaddingValues(horizontal = 12.dp), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                items(scenes, key = { it.id }) { s ->
+                uniqueItems(scenes, { it.id }) { s ->
                     de.letzgo.stashy.ui.home.DashboardSceneCard(
                         s, isLarge = false, width = 125.dp * 16 / 9, height = 125.dp,
                         // Material card click (ripple) like every other card (README "Cards").

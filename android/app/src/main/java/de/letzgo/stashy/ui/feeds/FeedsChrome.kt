@@ -361,7 +361,7 @@ private fun PerformerThumbnail(p: FeedPerformer, onClick: () -> Unit) {
  * scrub-preview still (Android decodes no frames here; the row's poster is shown instead).
  */
 @Composable
-fun FeedsScrubber(time: Double, duration: Double, placeholderURL: String?, onScrub: (Double) -> Unit, onScrubEnd: (Double) -> Unit) {
+fun FeedsScrubber(time: Double, duration: Double, placeholderURL: String?, aspectRatio: Float? = null, onScrub: (Double) -> Unit, onScrubEnd: (Double) -> Unit) {
     var scrubbing by remember { mutableStateOf(false) }
     de.letzgo.stashy.ui.player.TimeBar(
         currentTime = time,
@@ -369,6 +369,7 @@ fun FeedsScrubber(time: Double, duration: Double, placeholderURL: String?, onScr
         isScrubbing = scrubbing,
         previewImage = null,
         previewPlaceholderURL = placeholderURL,
+        previewAspectRatio = aspectRatio,
         markers = emptyList(),
         modifier = Modifier.padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 8.dp),
         onScrubChanged = { s -> scrubbing = true; onScrub(s) },

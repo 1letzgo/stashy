@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.tools.downloads
 
+import de.letzgo.stashy.ui.uniqueItemsIndexed
 import android.net.Uri
 import android.view.ViewGroup
 import androidx.compose.animation.AnimatedVisibility
@@ -128,7 +129,7 @@ class DownloadedGalleryScreen(val entryId: String) : Screen {
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
-                    itemsIndexed(entry.images, key = { _, image -> image.id }) { index, image ->
+                    uniqueItemsIndexed(entry.images, { it.id }) { index, image ->
                         DownloadedImageCell(image) { Nav.push(DownloadedImageViewerScreen(entryId, index)) }
                     }
                 }
@@ -232,7 +233,7 @@ class DownloadedImageViewerScreen(val entryId: String, val startIndex: Int) : Sc
         LaunchedEffect(pager.currentPage) { isPlaying = true }
 
         Box(Modifier.fillMaxSize().background(Color.Black)) {
-            VerticalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { images.getOrNull(it)?.id ?: it }) { page ->
+            VerticalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { page -> "$page-" + images.getOrNull(page)?.id.orEmpty() }) { page ->
                 val image = images[page]
                 Box(Modifier.fillMaxSize().noRippleClickable { showUI = !showUI }, contentAlignment = Alignment.Center) {
                     val file = Downloads.localFile(image)

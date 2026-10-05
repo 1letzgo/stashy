@@ -317,7 +317,7 @@ private fun <T> LazyListScope.gridRows(
     keyOf: (T) -> String,
     cell: @Composable (T) -> Unit,
 ) {
-    items(rows.size, key = { "$keyPrefix-${rows[it].joinToString { e -> keyOf(e) }}" }) { index ->
+    items(rows.size, key = { "$keyPrefix-$it-${rows[it].joinToString { e -> keyOf(e) }}" }) { index ->
         Row(
             Modifier.fillMaxWidth().padding(horizontal = ToolsTokens.contentPadding).padding(bottom = 12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),

@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.catalog
 
+import de.letzgo.stashy.ui.uniqueItemsIndexed
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -259,7 +260,7 @@ fun <T> CatalogScaffold(
                                     SearchClearChip(controller.search, { controller.search = "" })
                                 }
                             }
-                            itemsIndexed(list.items, key = { _, it -> itemKey(it) }) { index, value ->
+                            uniqueItemsIndexed(list.items, { itemKey(it).toString() }) { index, value ->
                                 LaunchedEffect(index) { list.onItemShown(index) }
                                 item(index, value)
                             }

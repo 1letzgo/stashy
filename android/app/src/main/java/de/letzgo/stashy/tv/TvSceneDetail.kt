@@ -1,5 +1,6 @@
 package de.letzgo.stashy.tv
 
+import de.letzgo.stashy.ui.uniqueItems
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
@@ -256,7 +257,7 @@ class TvSceneDetailRoute(private val sceneId: String, initial: Scene? = null) : 
         Column(verticalArrangement = Arrangement.spacedBy(pt(16))) {
             TvSectionHeading(TvIcons.bookmark, "Markers", markers.size)
             LazyRow(Modifier.focusRestorer(), horizontalArrangement = Arrangement.spacedBy(pt(24)), contentPadding = PaddingValues(horizontal = pt(20), vertical = pt(30))) {
-                items(markers.sortedBy { it.seconds }, key = { it.id }) { marker ->
+                uniqueItems(markers.sortedBy { it.seconds }, { it.id }) { marker ->
                     var focused by remember { mutableStateOf(false) }
                     Column(Modifier.width(pt(260))) {
                         TvCardButton({ startPlayback(marker.seconds) }, Modifier.onFocusChanged { focused = it.isFocused }.tvFocusMemory(focus, "m.${marker.id}")) {
@@ -283,7 +284,7 @@ class TvSceneDetailRoute(private val sceneId: String, initial: Scene? = null) : 
         Column(verticalArrangement = Arrangement.spacedBy(pt(16))) {
             TvSectionHeading(TvIcons.tag, "Tags", tags.size)
             LazyRow(Modifier.focusRestorer(), horizontalArrangement = Arrangement.spacedBy(pt(30)), contentPadding = PaddingValues(horizontal = pt(20), vertical = pt(40))) {
-                items(tags, key = { it.id }) { tag ->
+                uniqueItems(tags, { it.id }) { tag ->
                     TvButton({ TvNav.push(TvTagDetailRoute(tag.id, tag.name)) }, Modifier.tvFocusMemory(focus, "t.${tag.id}"), contentPadding = PaddingValues(horizontal = pt(24), vertical = pt(12))) {
                         Text(tag.name, style = TvType.headline, maxLines = 1)
                     }
@@ -298,7 +299,7 @@ class TvSceneDetailRoute(private val sceneId: String, initial: Scene? = null) : 
         Column(verticalArrangement = Arrangement.spacedBy(pt(16))) {
             TvSectionHeading(TvIcons.person2, "Performers", performers.size)
             LazyRow(Modifier.focusRestorer(), horizontalArrangement = Arrangement.spacedBy(pt(30)), contentPadding = PaddingValues(horizontal = pt(20), vertical = pt(30))) {
-                items(performers, key = { it.id }) { p ->
+                uniqueItems(performers, { it.id }) { p ->
                     TvCardButton({ TvNav.push(TvPerformerDetailRoute(p.id, p.name)) }, Modifier.tvFocusMemory(focus, "p.${p.id}")) {
                         Column(Modifier.width(pt(180))) {
                             TvImage(p.imageURL, Modifier.width(pt(180)).height(pt(270)).clip(RoundedCornerShape(pt(10))), TvIcons.person, iconSize = pt(32))

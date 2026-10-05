@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.scene
 
+import de.letzgo.stashy.ui.uniqueItems
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -210,7 +211,7 @@ private fun MarkerStrip(markers: List<SceneMarker>, playing: Boolean, onSeek: (D
         contentPadding = PaddingValues(horizontal = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        items(markers.sortedBy { it.seconds }, key = { it.id }) { marker ->
+        uniqueItems(markers.sortedBy { it.seconds }, { it.id }) { marker ->
             Column(Modifier.width(80.dp).clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { onSeek(marker.seconds) }, verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Box(Modifier.size(80.dp, 45.dp).clip(RoundedCornerShape(4.dp)).background(Color.Gray.copy(alpha = 0.2f))) {
                     val url = Net.signed(marker.screenshot)

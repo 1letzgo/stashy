@@ -1,5 +1,6 @@
 package de.letzgo.stashy.tv
 
+import de.letzgo.stashy.ui.uniqueItemsIndexed
 import android.view.KeyEvent as AndroidKeyEvent
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
@@ -625,7 +626,7 @@ fun TvMarkerRail(markers: List<SceneMarker>, currentTime: Double, entry: FocusRe
     Column(verticalArrangement = Arrangement.spacedBy(pt(12))) {
         Text("Markers", style = TvType.caption.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold), color = Color.White.copy(alpha = 0.6f))
         LazyRow(horizontalArrangement = Arrangement.spacedBy(pt(30)), contentPadding = PaddingValues(horizontal = pt(10), vertical = pt(24))) {
-            itemsIndexed(sorted, key = { _, m -> m.id }) { i, marker ->
+            uniqueItemsIndexed(sorted, { it.id }) { i, marker ->
                 val isActive = i == active
                 Column(Modifier.width(pt(300))) {
                     TvCardButton({ onSelect(marker); close() }, if (i == 0 && entry != null) Modifier.focusRequester(entry) else Modifier, radius = pt(8)) {

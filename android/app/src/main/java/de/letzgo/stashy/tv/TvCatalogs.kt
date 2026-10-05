@@ -1,5 +1,6 @@
 package de.letzgo.stashy.tv
 
+import de.letzgo.stashy.ui.uniqueItemsIndexed
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -215,7 +216,7 @@ fun <T> TvCatalogGrid(
                     verticalArrangement = Arrangement.spacedBy(spacing),
                 ) {
                     item(span = { GridItemSpan(maxLineSpan) }, key = "header") { TvCatalogHeader(model, sortFocus = headerFocus) }
-                    itemsIndexed(items, key = { _, item -> model.key(item) }) { index, item ->
+                    uniqueItemsIndexed(items, { model.key(it) }) { index, item ->
                         LaunchedEffect(index, items.size) {
                             if (index >= items.size - columns * 2) list.loadMore()
                         }

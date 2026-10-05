@@ -244,7 +244,7 @@ fun FeedRow(
 fun holdSpeedLabel(speed: Float): String =
     if (speed % 1f == 0f) "${speed.toInt()}×" else "${String.format(java.util.Locale.US, "%.2f", speed).trimEnd('0').trimEnd('.')}×"
 
-private fun fileAspect(item: FeedItem): Float {
+internal fun fileAspect(item: FeedItem): Float {
     val files = when (item) {
         is FeedItem.SceneItem -> item.scene.files?.firstOrNull()?.let { it.width to it.height }
         is FeedItem.PreviewItem -> item.scene.files?.firstOrNull()?.let { it.width to it.height }

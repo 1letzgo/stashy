@@ -409,6 +409,7 @@ fun ScenePlayerSurface(
                         isScrubbing = isScrubbing,
                         previewImage = scrubImage,
                         previewPlaceholderURL = posterURL,
+                        previewAspectRatio = source?.let { (w, h) -> if (w > 0 && h > 0) w.toFloat() / h else null },
                         markers = markers,
                         isCompact = isCompact,
                         modifier = Modifier.weight(1f),
