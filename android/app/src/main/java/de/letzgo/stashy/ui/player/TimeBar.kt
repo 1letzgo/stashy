@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -21,9 +22,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,6 +47,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil3.compose.AsyncImage
@@ -56,11 +64,12 @@ internal fun markerAt(markers: List<TimeBarMarker>, time: Double): TimeBarMarker
 }
 
 /**
- * iOS: `AetherTimeBar` — the shared scrub bar: glass capsule with elapsed time left, track in
- * the middle (white progress, accent marker dots), remaining time right; while scrubbing a 120 pt
+ * iOS: `AetherTimeBar` — the shared scrub bar: capsule with elapsed time left, a Material 3
+ * [Slider] in the middle (accent progress, marker dots on the track), remaining time right; while scrubbing a 120 pt
  * still floats above the finger with the time and the marker it is in. Purely value driven —
  * the caller owns state and side effects (Scene Detail, Feeds and image fullscreen share it).
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TimeBar(
     currentTime: Double,
@@ -84,6 +93,8 @@ fun TimeBar(
     val tint = Appearance.tint
     val changed by rememberUpdatedState(onScrubChanged)
     val ended by rememberUpdatedState(onScrubEnded)
+    var lastScrub by remember { mutableStateOf(0.0) }
+    val interaction = remember { MutableInteractionSource() }
 
     BoxWithConstraints(modifier.height(barHeight)) {
         Row(
@@ -92,41 +103,52 @@ fun TimeBar(
             horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             FixedLabel(PlaybackFormat.time(shown), template, labelStyle)
-            BoxWithConstraints(
-                Modifier.weight(1f).fillMaxHeight().pointerInput(dur) {
-                    awaitEachGesture {
-                        val down = awaitFirstDown()
-                        val w = size.width.toFloat().coerceAtLeast(1f)
-                        fun secondsAt(x: Float) = (x.coerceIn(0f, w) / w) * dur
-                        if (dur <= 0) return@awaitEachGesture
-                        changed(secondsAt(down.position.x))
-                        var lastX = down.position.x
-                        while (true) {
-                            val event = awaitPointerEvent()
-                            val change = event.changes.firstOrNull { it.id == down.id } ?: break
-                            if (!change.pressed) { lastX = change.position.x; break }
-                            if (change.positionChange().x != 0f) { lastX = change.position.x; changed(secondsAt(lastX)) }
-                            change.consume()
+            // Material 3 slider; the marker dots ride on its track.
+            val colors = SliderDefaults.colors(
+                thumbColor = Color.White,
+                activeTrackColor = tint,
+                inactiveTrackColor = Color.White.copy(alpha = 0.28f),
+            )
+            Slider(
+                value = progress,
+                onValueChange = { f -> if (dur > 0) { lastScrub = f * dur; changed(lastScrub) } },
+                onValueChangeFinished = { if (dur > 0) ended(lastScrub) },
+                enabled = dur > 0,
+                colors = colors,
+                modifier = Modifier.weight(1f),
+                interactionSource = interaction,
+                // Stock M3 thumb is 44 dp tall — too high for a bar inside a 44 dp capsule.
+                thumb = {
+                    SliderDefaults.Thumb(
+                        interactionSource = interaction,
+                        colors = colors,
+                        enabled = dur > 0,
+                        thumbSize = DpSize(4.dp, if (isCompact) 14.dp else 18.dp),
+                    )
+                },
+                track = { state ->
+                    BoxWithConstraints(contentAlignment = Alignment.CenterStart) {
+                        SliderDefaults.Track(
+                            sliderState = state,
+                            colors = colors,
+                            enabled = dur > 0,
+                            drawStopIndicator = null,
+                            modifier = Modifier.height(if (isCompact) 4.dp else 6.dp),
+                        )
+                        if (dur > 0) {
+                            val trackW = maxWidth
+                            val dot = if (isCompact) 6.dp else 8.dp
+                            markers.filter { it.seconds in 0.0..dur }.forEach { m ->
+                                val x = (trackW * (m.seconds / dur).toFloat() - dot / 2).coerceIn(0.dp, trackW - dot)
+                                Box(
+                                    Modifier.offset(x = x).size(dot).shadow(1.dp, CircleShape).clip(CircleShape)
+                                        .background(Color.White).border(1.dp, tint, CircleShape),
+                                )
+                            }
                         }
-                        ended(secondsAt(lastX))
                     }
                 },
-                contentAlignment = Alignment.CenterStart,
-            ) {
-                val trackW = maxWidth
-                Box(Modifier.fillMaxWidth().height(4.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.28f)))
-                Box(Modifier.fillMaxWidth(progress).height(4.dp).clip(CircleShape).background(Color.White))
-                if (dur > 0) {
-                    val dot = if (isCompact) 6.dp else 8.dp
-                    markers.filter { it.seconds in 0.0..dur }.forEach { m ->
-                        val x = (trackW * (m.seconds / dur).toFloat() - dot / 2).coerceIn(0.dp, trackW - dot)
-                        Box(
-                            Modifier.offset(x = x).size(dot).shadow(1.dp, CircleShape).clip(CircleShape)
-                                .background(tint).border(1.dp, Color.White, CircleShape),
-                        )
-                    }
-                }
-            }
+            )
             FixedLabel("-" + PlaybackFormat.time(remaining), "-$template", labelStyle)
         }
         if (isScrubbing && dur > 0) {
