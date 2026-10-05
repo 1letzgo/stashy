@@ -1,6 +1,6 @@
 # stashy
 
-A native **Stash** client for **iOS** and **tvOS** built with **SwiftUI** — fast, no built-in tracking, and wired directly to your Stash server.
+A native **Stash** client for **iOS** and **tvOS** built with **SwiftUI**, plus a native **Android** / **Android TV** app built with **Jetpack Compose** — fast, no built-in tracking, and wired directly to your Stash server.
 
 ## Features (current repo)
 
@@ -19,25 +19,33 @@ A native **Stash** client for **iOS** and **tvOS** built with **SwiftUI** — fa
 ## Requirements
 
 - A running **[Stash](https://github.com/stashapp/stash)** server (GraphQL API as used by the app).
-- **Xcode** (recommended: current stable release).
-GraphQL documents live under `graphql/` and are loaded at runtime.
+- **Xcode** (recommended: current stable release) for iOS / tvOS.
+- **JDK 17** + Android SDK for Android / Android TV (min. Android 8.0, API 26) — see [`android/README.md`](android/README.md).
+
+GraphQL documents live under `graphql/`, are shared by all platforms and loaded at runtime.
 
 ## Platforms & distribution
 
-| Platform | App Store |
-|----------|-----------|
-| **iOS** | [stashy](https://apps.apple.com/us/app/stashy/id6754876029) |
-| **tvOS** | Early beta |
+| Platform | Status |
+|----------|--------|
+| **iOS** | [App Store](https://apps.apple.com/us/app/stashy/id6754876029) |
+| **tvOS** | [App Store](https://apps.apple.com/us/app/stashy/id6754876029) |
+| **Android** | In development — no public release yet |
+| **Android TV** | In development — no public release yet |
+
+### Want to test Android / Android TV?
+
+There is no public release yet. If you'd like to try the Android or Android TV build early, join us on **[Discord](https://discord.gg/DMxEFaVzUM)** and ask for a test build.
 
 
 ## Roadmap (excerpt)
 
-- Bring tvOS closer to iOS feature parity
+- First public release for Android / Android TV
 - Performance and memory for very large libraries
 
 ## Known limitations
 
-- **tvOS** does not include every iOS feature.
+- **Android / Android TV** are pre-release builds and do not yet cover every iOS feature.
 
 
 ## Third-party
