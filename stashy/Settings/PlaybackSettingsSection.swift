@@ -13,98 +13,11 @@ struct PlaybackSettingsSection: View {
 
     var body: some View {
         Group {
-            Section {
-                stashyScrollingSectionHeader("Playback")
-                #if !os(tvOS)
-                Toggle(isOn: $tabManager.isPiPEnabled) {
-                    Label("Picture-in-Picture", systemImage: "pip")
-                }
-                .tint(appearanceManager.tintColor)
-                .stashyGroupedBlockRow(index: 0, count: 11)
-
-                Picker(selection: $tabManager.playerSkipSeconds) {
-                    ForEach(TabManager.playerSkipOptions, id: \.self) { seconds in
-                        Text("\(Int(seconds)) s").tag(seconds)
-                    }
-                } label: {
-                    Label("Skip interval", systemImage: "goforward")
-                }
-                .stashyGroupedBlockRow(index: 1, count: 11)
-
-                Toggle(isOn: $tabManager.showsPlayerSkipButtons) {
-                    Label("Skip buttons", systemImage: "goforward.10")
-                }
-                .tint(appearanceManager.tintColor)
-                .stashyGroupedBlockRow(index: 2, count: 11)
-
-                // Landscape fullscreen fills by itself when little of the picture is lost.
-                Toggle(isOn: $tabManager.playerAutoZoom) {
-                    Label("Autozoom", systemImage: "arrow.up.left.and.arrow.down.right")
-                }
-                .tint(appearanceManager.tintColor)
-                .stashyGroupedBlockRow(index: 3, count: 11)
-
-                Toggle(isOn: $tabManager.playerDolbyVisionEnabled) {
-                    Label("Dolby Vision", systemImage: "sparkles.tv")
-                }
-                .tint(appearanceManager.tintColor)
-                .stashyGroupedBlockRow(index: 4, count: 11)
-
-                Picker(selection: $tabManager.playCountPlayerSeconds) {
-                    ForEach(TabManager.playCountThresholdOptions, id: \.self) { seconds in
-                        Text(TabManager.playCountThresholdLabel(seconds)).tag(seconds)
-                    }
-                } label: {
-                    Label("Count as played — Player", systemImage: "play.circle")
-                }
-                .stashyGroupedBlockRow(index: 5, count: 11)
-
-                Picker(selection: $tabManager.playCountFeedsSeconds) {
-                    ForEach(TabManager.playCountThresholdOptions, id: \.self) { seconds in
-                        Text(TabManager.playCountThresholdLabel(seconds)).tag(seconds)
-                    }
-                } label: {
-                    Label("Count as played — Feeds", systemImage: "rectangle.stack.badge.play")
-                }
-                .stashyGroupedBlockRow(index: 6, count: 11)
-
-                Picker(selection: $tabManager.holdSpeedPlayer) {
-                    ForEach(TabManager.holdSpeedOptions, id: \.self) { rate in
-                        Text(TabManager.holdSpeedLabel(rate)).tag(rate)
-                    }
-                } label: {
-                    Label("Hold to speed up — Player", systemImage: "forward.fill")
-                }
-                .stashyGroupedBlockRow(index: 7, count: 11)
-
-                Picker(selection: $tabManager.holdSpeedFeeds) {
-                    ForEach(TabManager.holdSpeedOptions, id: \.self) { rate in
-                        Text(TabManager.holdSpeedLabel(rate)).tag(rate)
-                    }
-                } label: {
-                    Label("Hold to speed up — Feeds", systemImage: "forward.frame.fill")
-                }
-                .stashyGroupedBlockRow(index: 8, count: 11)
-
-                // Feeds › Scenes: where a scene row starts, past the studio intro.
-                Picker(selection: $tabManager.feedsSceneStartPosition) {
-                    ForEach(TabManager.FeedsSceneStartPosition.allCases) { position in
-                        Text(position.label).tag(position)
-                    }
-                } label: {
-                    Label("Feeds start position", systemImage: "forward.end")
-                }
-                .stashyGroupedBlockRow(index: 9, count: 11)
-
-                // Stash web "Track activity": play count, history, resume point, watch time.
-                Toggle(isOn: $tabManager.tracksPlaybackActivity) {
-                    Label("Playback activity", systemImage: "clock.arrow.circlepath")
-                }
-                .tint(appearanceManager.tintColor)
-                .stashyGroupedBlockRow(index: 10, count: 11)
-
-                #endif
-            }
+            #if !os(tvOS)
+            playerSection
+            feedsSection
+            activitySection
+            #endif
 
             #if !os(tvOS)
             downloadsSection
@@ -114,6 +27,121 @@ struct PlaybackSettingsSection: View {
     }
 
     #if !os(tvOS)
+    /// The scene player (scene detail, fullscreen, PiP).
+    private var playerSection: some View {
+        Section {
+            stashyScrollingSectionHeader("Player")
+            Toggle(isOn: $tabManager.isPiPEnabled) {
+                Label("Picture-in-Picture", systemImage: "pip")
+            }
+            .tint(appearanceManager.tintColor)
+            .stashyGroupedBlockRow(index: 0, count: 7)
+
+            Picker(selection: $tabManager.playerSkipSeconds) {
+                ForEach(TabManager.playerSkipOptions, id: \.self) { seconds in
+                    Text("\(Int(seconds)) s").tag(seconds)
+                }
+            } label: {
+                Label("Skip interval", systemImage: "goforward")
+            }
+            .stashyGroupedBlockRow(index: 1, count: 7)
+
+            Toggle(isOn: $tabManager.showsPlayerSkipButtons) {
+                Label("Skip buttons", systemImage: "goforward.10")
+            }
+            .tint(appearanceManager.tintColor)
+            .stashyGroupedBlockRow(index: 2, count: 7)
+
+            // Landscape fullscreen fills by itself when little of the picture is lost.
+            Toggle(isOn: $tabManager.playerAutoZoom) {
+                Label("Autozoom", systemImage: "arrow.up.left.and.arrow.down.right")
+            }
+            .tint(appearanceManager.tintColor)
+            .stashyGroupedBlockRow(index: 3, count: 7)
+
+            Toggle(isOn: $tabManager.playerDolbyVisionEnabled) {
+                Label("Dolby Vision", systemImage: "sparkles.tv")
+            }
+            .tint(appearanceManager.tintColor)
+            .stashyGroupedBlockRow(index: 4, count: 7)
+
+            Picker(selection: $tabManager.holdSpeedPlayer) {
+                ForEach(TabManager.holdSpeedOptions, id: \.self) { rate in
+                    Text(TabManager.holdSpeedLabel(rate)).tag(rate)
+                }
+            } label: {
+                Label("Hold to speed up", systemImage: "forward.fill")
+            }
+            .stashyGroupedBlockRow(index: 5, count: 7)
+
+            Picker(selection: $tabManager.playCountPlayerSeconds) {
+                ForEach(TabManager.playCountThresholdOptions, id: \.self) { seconds in
+                    Text(TabManager.playCountThresholdLabel(seconds)).tag(seconds)
+                }
+            } label: {
+                Label("Count as played", systemImage: "play.circle")
+            }
+            .stashyGroupedBlockRow(index: 6, count: 7)
+        }
+    }
+
+    /// Feeds playback (Scenes / Markers rows).
+    private var feedsSection: some View {
+        Section {
+            stashyScrollingSectionHeader("Feeds")
+            // Feeds › Scenes: where a scene row starts, past the studio intro.
+            Picker(selection: $tabManager.feedsSceneStartPosition) {
+                ForEach(TabManager.FeedsSceneStartPosition.allCases) { position in
+                    Text(position.label).tag(position)
+                }
+            } label: {
+                Label("Start position", systemImage: "forward.end")
+            }
+            .stashyGroupedBlockRow(index: 0, count: 4)
+
+            // Feeds › Markers: length of a marker without an end time.
+            Picker(selection: $tabManager.feedsMarkerDefaultSeconds) {
+                ForEach(TabManager.feedsMarkerLengthOptions, id: \.self) { seconds in
+                    Text("\(Int(seconds)) s").tag(seconds)
+                }
+            } label: {
+                Label("Marker length", systemImage: "bookmark")
+            }
+            .stashyGroupedBlockRow(index: 1, count: 4)
+
+            Picker(selection: $tabManager.holdSpeedFeeds) {
+                ForEach(TabManager.holdSpeedOptions, id: \.self) { rate in
+                    Text(TabManager.holdSpeedLabel(rate)).tag(rate)
+                }
+            } label: {
+                Label("Hold to speed up", systemImage: "forward.frame.fill")
+            }
+            .stashyGroupedBlockRow(index: 2, count: 4)
+
+            Picker(selection: $tabManager.playCountFeedsSeconds) {
+                ForEach(TabManager.playCountThresholdOptions, id: \.self) { seconds in
+                    Text(TabManager.playCountThresholdLabel(seconds)).tag(seconds)
+                }
+            } label: {
+                Label("Count as played", systemImage: "rectangle.stack.badge.play")
+            }
+            .stashyGroupedBlockRow(index: 3, count: 4)
+        }
+    }
+
+    /// Stash web "Track activity": play count, history, resume point, watch time.
+    private var activitySection: some View {
+        Section {
+            stashyScrollingSectionHeader("Activity")
+            Toggle(isOn: $tabManager.tracksPlaybackActivity) {
+                Label("Playback activity", systemImage: "clock.arrow.circlepath")
+            }
+            .tint(appearanceManager.tintColor)
+            .stashyGroupedBlockRow(index: 0, count: 1)
+            stashyScrollingSectionFooter("Play count, history, resume point and watch time on the server. The player menu can pause it for one scene.")
+        }
+    }
+
     /// How much a "newest" download grabs — gallery / tag images and the scenes of a
     /// performer, studio, tag or group.
     private var downloadsSection: some View {

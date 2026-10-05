@@ -1589,7 +1589,7 @@ struct ReelsViewBody: View {
             if let explicitEnd = m.endSeconds, explicitEnd > start + 0.1 {
                 end = explicitEnd
             } else {
-                end = start + ReelPlaybackSegment.defaultMarkerLength
+                end = start + TabManager.storedFeedsMarkerDefaultSeconds
             }
             if let fileDuration = m.scene?.files?.first?.duration, fileDuration > start + 0.5 {
                 end = min(end, fileDuration)
@@ -2241,7 +2241,7 @@ struct ReelsViewBody: View {
 
         switch currentMode {
         case .scenes:
-            viewModel.fetchScenes(sortBy: selectedSortOption, filter: mergedSceneFilter, liveFilter: sceneLiveForScenes)
+            viewModel.fetchScenes(sortBy: selectedSortOption, filter: mergedSceneFilter, liveFilter: sceneLiveForScenes, forFeeds: true)
         case .markers:
             viewModel.fetchSceneMarkers(sortBy: selectedMarkerSortOption, filter: mergedMarkerFilter, liveFilter: sceneLiveForMarkers)
         case .clips:
@@ -6136,7 +6136,7 @@ extension ReelItemView {
     }
 
     func incrementPlayCount() {
-        guard TabManager.isPlaybackActivityTracked else { return }
+        guard TabManager.tracksActivity(for: item.sceneID ?? "") else { return }
         switch item {
         case .scene, .marker:
             onPlayCountChanged((item.playCount ?? 0) + 1)
@@ -6626,6 +6626,8 @@ enum ReelsSceneStartPositions {
         }
         let start: Double
         switch setting {
+        case .beginning:
+            return 0
         case .firstMarker:
             let detailMarkers = scene.sceneMarkers?.map(\.seconds).filter { $0.isFinite && $0 >= 0 }.min()
             start = [scene.earliestMarkerSeconds, detailMarkers].compactMap { $0 }.min() ?? skipSeconds
@@ -6642,8 +6644,7 @@ enum ReelsSceneStartPositions {
 /// The stretch of a source file a Feeds row plays (marker rows: their part of the scene).
 /// The scrubber shows it as 0…`length`; the engine keeps working in file time.
 struct ReelPlaybackSegment: Equatable {
-    /// Markers without an end in Stash play this long from the marker on.
-    static let defaultMarkerLength: Double = 30
+    // Markers without an end in Stash play Settings › Playback › "Marker length" (30 s default).
 
     let start: Double
     let end: Double

@@ -460,6 +460,13 @@ class TabManager: ObservableObject {
     nonisolated static var isPlaybackActivityTracked: Bool {
         UserDefaults.standard.object(forKey: tracksPlaybackActivityKey) as? Bool ?? true
     }
+    /// Scenes whose activity the player menu paused ("Count this playback" off) — in memory
+    /// only, so it lasts until the app restarts.
+    static var activityPausedSceneIds: Set<String> = []
+    /// The global switch and the per-scene pause from the player menu.
+    static func tracksActivity(for sceneId: String) -> Bool {
+        isPlaybackActivityTracked && !activityPausedSceneIds.contains(sceneId)
+    }
 
     /// Share of the picture the fill may cut off before Autozoom leaves it letterboxed.
     static let autoZoomMaximumCrop: Double = 0.15
@@ -495,6 +502,7 @@ class TabManager: ObservableObject {
     /// Settings › Playback › "Feeds start position": where a Feeds › Scenes row starts, so the
     /// feed does not open on studio intros.
     enum FeedsSceneStartPosition: String, CaseIterable, Identifiable {
+        case beginning
         case firstMarker
         case skip30
         case random
@@ -503,13 +511,27 @@ class TabManager: ObservableObject {
 
         var label: String {
             switch self {
+            case .beginning: return "Beginning"
             case .firstMarker: return "First Marker"
             case .skip30: return "Skip 30s"
             case .random: return "Random"
             }
         }
     }
-    @Published var feedsSceneStartPosition: FeedsSceneStartPosition = .firstMarker {
+    /// Settings › Playback › "Marker length": how long a Feeds › Markers row plays when the
+    /// marker has no end time.
+    static let feedsMarkerLengthOptions: [Double] = [15, 30, 45, 60, 90, 120]
+    static let feedsMarkerDefaultSecondsKey = "feedsMarkerDefaultSeconds"
+    @Published var feedsMarkerDefaultSeconds: Double = 30 {
+        didSet { UserDefaults.standard.set(feedsMarkerDefaultSeconds, forKey: Self.feedsMarkerDefaultSecondsKey) }
+    }
+    /// Readable without the main actor (feed row models).
+    nonisolated static var storedFeedsMarkerDefaultSeconds: Double {
+        let v = UserDefaults.standard.double(forKey: feedsMarkerDefaultSecondsKey)
+        return feedsMarkerLengthOptions.contains(v) ? v : 30
+    }
+
+    @Published var feedsSceneStartPosition: FeedsSceneStartPosition = .beginning {
         didSet { UserDefaults.standard.set(feedsSceneStartPosition.rawValue, forKey: feedsSceneStartPositionKey) }
     }
 
@@ -706,7 +728,8 @@ class TabManager: ObservableObject {
         let storedHoldFeeds = UserDefaults.standard.object(forKey: holdSpeedFeedsKey) as? Double ?? 2
         self.holdSpeedFeeds = Self.holdSpeedOptions.contains(storedHoldFeeds) ? storedHoldFeeds : 2
         self.feedsSceneStartPosition = UserDefaults.standard.string(forKey: feedsSceneStartPositionKey)
-            .flatMap(FeedsSceneStartPosition.init(rawValue:)) ?? .firstMarker
+            .flatMap(FeedsSceneStartPosition.init(rawValue:)) ?? .beginning
+        self.feedsMarkerDefaultSeconds = Self.storedFeedsMarkerDefaultSeconds
         let storedPlayerThreshold = UserDefaults.standard.object(forKey: playCountPlayerSecondsKey) as? Double ?? 1
         self.playCountPlayerSeconds = Self.playCountThresholdOptions.contains(storedPlayerThreshold) ? storedPlayerThreshold : 1
         let storedFeedsThreshold = UserDefaults.standard.object(forKey: playCountFeedsSecondsKey) as? Double ?? 30

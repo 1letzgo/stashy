@@ -157,6 +157,27 @@ final class ScenePlayerExtrasController: ObservableObject {
         }
         #endif
 
+        // Watch without it counting: play count, history, resume point, watch time (only while
+        // Settings › Playback activity is on; the pause lasts until the app restarts).
+        if TabManager.isPlaybackActivityTracked, let sceneId = sceneBinding?.wrappedValue.id {
+            let counts = !TabManager.activityPausedSceneIds.contains(sceneId)
+            items.append(.action(
+                id: "extras.countPlayback",
+                title: "Count this playback",
+                systemImage: "clock.arrow.circlepath",
+                isChecked: counts,
+                keepsMenuOpen: true
+            ) { [weak self] in
+                HapticManager.selection()
+                if counts {
+                    TabManager.activityPausedSceneIds.insert(sceneId)
+                } else {
+                    TabManager.activityPausedSceneIds.remove(sceneId)
+                }
+                self?.objectWillChange.send()
+            })
+        }
+
         items.append(.action(
             id: "extras.sceneCover",
             title: "Use frame as scene cover",

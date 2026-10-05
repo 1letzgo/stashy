@@ -2221,7 +2221,7 @@ class StashDBViewModel: ObservableObject {
     /// Increments playCount of a scene in place (used by SceneDetailView playback).
     func incrementScenePlayCount(id: String, by delta: Int = 1) {
         // Positive bumps are playback credit; no credit while activity tracking is off.
-        if delta > 0, !TabManager.isPlaybackActivityTracked { return }
+        if delta > 0, !TabManager.tracksActivity(for: id) { return }
         func bumped(_ current: Int?) -> Int {
             max(0, (current ?? 0) + delta)
         }
@@ -3204,8 +3204,10 @@ class StashDBViewModel: ObservableObject {
     /// Live image chips merged into Reels clips (`findImages` + video path regex).
     private var currentClipLiveFilter: [String: Any] = [:]
     
-    func fetchScenes(sortBy: SceneSortOption = .dateDesc, searchQuery: String = "", isInitialLoad: Bool = true, filter: SavedFilter? = nil, liveFilter: [String: Any]? = nil) {
+    func fetchScenes(sortBy: SceneSortOption = .dateDesc, searchQuery: String = "", isInitialLoad: Bool = true, filter: SavedFilter? = nil, liveFilter: [String: Any]? = nil, forFeeds: Bool = false) {
         if isInitialLoad {
+            // Feeds › Scenes also needs each scene's marker times (start position).
+            currentScenesForFeeds = forFeeds
             let key = feedCriteriaKey([
                 "scenes", sortBy.sortField, sortBy.direction, searchQuery,
                 filter?.id, liveFilterKey(liveFilter)
@@ -3236,6 +3238,9 @@ class StashDBViewModel: ObservableObject {
         let page = isInitialLoad ? 1 : currentScenePage + 1
         loadScenesPage(page: page, sortBy: currentSceneSortOption, searchQuery: currentSceneSearchQuery, fetchGeneration: scenesFetchGeneration)
     }
+
+    /// The scene list was fetched for Feeds (`findScenesFeed`, with marker times).
+    private var currentScenesForFeeds = false
 
     func loadMoreScenes() {
         guard !isLoadingMoreScenes, hasMoreScenes, feedAllowsLoadMore("scenes") else { return }
@@ -3541,7 +3546,7 @@ class StashDBViewModel: ObservableObject {
         // Matches user provided structure: scene_filter first
         // Query using Variables to support complex filters
         // Matches user provided structure: scene_filter first
-        let query = GraphQLQueries.queryWithFragments("findScenes")
+        let query = GraphQLQueries.queryWithFragments(currentScenesForFeeds && !previewOnly ? "findScenesFeed" : "findScenes")
         
         var filterDict: [String: Any] = [
             "page": page,
@@ -6558,7 +6563,7 @@ class StashDBViewModel: ObservableObject {
     }
     func addScenePlay(sceneId: String, completion: ((Int?) -> Void)? = nil) {
         // Settings › Playback › Track activity off: no play count / history on the server.
-        guard TabManager.isPlaybackActivityTracked else { completion?(nil); return }
+        guard TabManager.tracksActivity(for: sceneId) else { completion?(nil); return }
         let mutation = GraphQLQueries.sceneAddPlayMutation
 
         let variables: [String: Any] = [
@@ -6733,7 +6738,7 @@ class StashDBViewModel: ObservableObject {
         playDuration: Double = 0,
         completion: ((Bool) -> Void)? = nil
     ) {
-        guard TabManager.isPlaybackActivityTracked else { completion?(false); return }
+        guard TabManager.tracksActivity(for: sceneId) else { completion?(false); return }
         let formattedDuration = String(format: "%.2f", max(0, playDuration))
         let mutation: String
         if let resumeTime {
@@ -8984,7 +8989,7 @@ struct Scene: Codable, Identifiable, Equatable {
     let stashIds: [StashID]?
     let captions: [VideoCaption]?
     let customFields: [String: StashJSONValue]?
-    /// Earliest marker time from the list fragment's `feed_marker_seconds` alias (Feeds ›
+    /// Earliest marker time from `findScenesFeed`'s `feed_marker_seconds` alias (Feeds ›
     /// Scenes start position). Deliberately not `scene_markers`: those would be partial
     /// markers that detail views take for the real list. Decode-only — never encoded, and
     /// copy-constructors drop it (Feeds caches the start per row).

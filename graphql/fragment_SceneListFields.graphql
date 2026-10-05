@@ -10,5 +10,4 @@ fragment SceneListFields on Scene {
   stash_ids { endpoint stash_id }
   # Feeds › Scenes start position ("First Marker"). Aliased, so clients that read
   # scene_markers as the full list do not get a partial one.
-  feed_marker_seconds: scene_markers { seconds }
 }

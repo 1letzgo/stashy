@@ -1,11 +1,12 @@
 # findScenes for the Feeds › Scenes mode: the list fields plus each scene's marker times
-# (start position "First Marker").
+# (start position "First Marker"). Aliased so the partial list never passes for the
+# scene's real `scene_markers`.
 query FindScenesFeed($scene_filter: SceneFilterType, $filter: FindFilterType) {
   findScenes(scene_filter: $scene_filter, filter: $filter) {
     count
     scenes {
       ...SceneListFields
-      scene_markers { id seconds }
+      feed_marker_seconds: scene_markers { seconds }
     }
   }
 }
