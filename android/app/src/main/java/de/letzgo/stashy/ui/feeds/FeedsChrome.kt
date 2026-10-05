@@ -132,7 +132,7 @@ fun FeedsTopBar(
                 Modifier.size(FeedsDock.circleSize).stashyGlass(CircleShape).noIndicationClick(onFilterSort),
                 contentAlignment = Alignment.Center,
             ) {
-                Icon(SF.sliderHorizontal3, "Filter und Sortierung", tint = Color.White.copy(alpha = FeedsDock.inactiveIconOpacity), modifier = Modifier.size(FeedsDock.iconSize))
+                Icon(SF.sliderHorizontal3, "Filter and sort", tint = Color.White.copy(alpha = FeedsDock.inactiveIconOpacity), modifier = Modifier.size(FeedsDock.iconSize))
             }
         }
         Box(Modifier.fillMaxWidth().height(0.5.dp).background(Color.White.copy(alpha = 0.15f)))
