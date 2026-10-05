@@ -120,16 +120,21 @@ object AppIcons {
 fun AppIconPicker(modifier: Modifier = Modifier) {
     val haptics = LocalHapticFeedback.current
     val p = Theme.palette
+    // iOS `GridItem(.adaptive(minimum: 72), spacing: 12)`: as many columns as fit, sharing the width.
+    androidx.compose.foundation.layout.BoxWithConstraints(modifier.fillMaxWidth().padding(vertical = 8.dp)) {
+    val columns = ((maxWidth + 12.dp) / (72.dp + 12.dp)).toInt().coerceAtLeast(1)
+    val cell = (maxWidth - 12.dp * (columns - 1)) / columns
     FlowRow(
-        modifier.fillMaxWidth().padding(vertical = 8.dp),
+        Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
+        maxItemsInEachRow = columns,
     ) {
         StashyAppIcon.entries.forEach { icon ->
             val selected = AppIcons.current == icon
             val shape = RoundedCornerShape(14.dp)
             Column(
-                Modifier.width(72.dp).clickable(remember { MutableInteractionSource() }, null) {
+                Modifier.width(cell).clickable(remember { MutableInteractionSource() }, null) {
                     haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     AppIcons.select(icon)
                 },
@@ -146,4 +151,5 @@ fun AppIconPicker(modifier: Modifier = Modifier) {
             }
         }
     }
+}
 }

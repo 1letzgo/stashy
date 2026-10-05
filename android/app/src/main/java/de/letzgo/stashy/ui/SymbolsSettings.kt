@@ -2,7 +2,7 @@ package de.letzgo.stashy.ui
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Backspace
-import androidx.compose.material.icons.automirrored.filled.Chat
+import androidx.compose.material.icons.automirrored.outlined.Chat
 import androidx.compose.material.icons.automirrored.filled.ArrowBackIos
 import androidx.compose.material.icons.automirrored.filled.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.outlined.Label
@@ -23,16 +23,17 @@ object SFS {
     val serverRack = Icons.Outlined.Dns
     val uiwindowSplit = Icons.Outlined.ViewAgenda
     val pip = Icons.Outlined.PictureInPictureAlt
-    val goforward = Icons.Filled.FastForward
+    val goforward = Icons.Outlined.Refresh
     val goforward10 = Icons.Filled.Forward10
     val arrowUpLeftDownRight = Icons.Filled.OpenInFull
-    val sparklesTv = Icons.Outlined.HdrOn
+    val sparklesTv = Icons.Outlined.Tv
     val playCircle = Icons.Outlined.PlayCircle
     val playCircleFill = Icons.Filled.PlayCircle
     val rectangleStackBadgePlay = Icons.Outlined.VideoLibrary
     val forwardFill = Icons.Filled.FastForward
     val forwardFrameFill = Icons.Filled.SkipNext
-    val captionsBubble = Icons.Outlined.ClosedCaption
+    val captionsBubble = Icons.AutoMirrored.Outlined.Chat
+    val arrowDownCircle = Icons.Outlined.ArrowCircleDown
     val globe = Icons.Outlined.Language
     val textformatSize = Icons.Outlined.FormatSize
     val textformat = Icons.Outlined.TextFields
@@ -41,7 +42,7 @@ object SFS {
     val squareFillOnSquare = Icons.Filled.FilterNone
     val docText = Icons.Outlined.Description
     val code = Icons.Outlined.Code
-    val bubbles = Icons.AutoMirrored.Filled.Chat
+    val bubbles = Icons.Filled.Forum
     val heart = Icons.Outlined.FavoriteBorder
     val heartFill = Icons.Filled.Favorite
     val boltHeart = Icons.Filled.VolunteerActivism

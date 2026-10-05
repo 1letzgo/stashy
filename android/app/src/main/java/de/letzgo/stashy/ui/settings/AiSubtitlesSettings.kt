@@ -1,7 +1,6 @@
 package de.letzgo.stashy.ui.settings
 
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ClosedCaption
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -34,7 +33,7 @@ fun AiSubtitlesSettingsRows() {
     val scope = rememberCoroutineScope()
     var language by remember { mutableStateOf(SubtitleTargetLanguage.load()) }
     val options = remember { SubtitleTargetLanguage.pickerOptions() }
-    SettingsPickerRow("My subtitle language", options.map { it.first }, language, { id -> options.firstOrNull { it.first == id }?.second ?: id }, Icons.Filled.ClosedCaption) {
+    SettingsPickerRow("My subtitle language", options.map { it.first }, language, { id -> options.firstOrNull { it.first == id }?.second ?: id }, de.letzgo.stashy.ui.SFS.captionsBubble) {
         language = it
         SubtitleTargetLanguage.persist(it)
     }

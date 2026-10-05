@@ -86,21 +86,15 @@ fun StashyPlusPaywallContent() {
     StashyPlusSettingsContent(topPadding = top)
 }
 
+
 /**
- * iOS: `SettingsView.stashyPlusSettings` — the whole stashy+ section as a list. Locked: the
- * "Included with stashy+" feature list and the purchase menu (the paywall). Unlocked: custom app
- * icons, Tag Suggestions & Similar Scenes, and the subscription status / Lifetime upgrade.
- * The Settings tab can show this for its "stashy+" section.
+ * iOS: `SettingsView(stashyPlusOnly: true)` — the stashy+ section ([stashyPlusSettingsItems]) as
+ * its own list (the locked Tools tab of the `play` flavor and the pushed paywall).
  */
 @Composable
 fun StashyPlusSettingsContent(topPadding: Dp = toolsTopPadding()) {
-    PlusMessageToasts()
-    LaunchedEffect(Unit) {
-        StashyPlus.syncUnlockFromStore()
-        if (StashyPlus.products.isEmpty()) StashyPlus.fetchProducts()
-    }
     SettingsList(topPadding = topPadding) {
-        stashyPlusItems()
+        stashyPlusSettingsItems()
     }
 }
 
@@ -116,14 +110,34 @@ fun PlusMessageToasts() {
     }
 }
 
-private fun LazyListScope.stashyPlusItems() {
+/**
+ * iOS: `SettingsView.stashyPlusSettings` + `stashyPlusPurchaseSection`, in the iOS order.
+ * Unlocked: Custom App Icons · AI Subtitles and translation (Beta) · Tag Suggestions & Similar
+ * Scenes (Beta) · stashy+ status and plans. Locked: "Included with stashy+" · "Unlock stashy+".
+ * AI Motion is not ported to Android, so its section is left out. Shared by the Settings tab's
+ * "stashy+" section and the paywall.
+ */
+fun LazyListScope.stashyPlusSettingsItems() {
+    item(key = "plus-store") {
+        PlusMessageToasts()
+        LaunchedEffect(Unit) {
+            StashyPlus.syncUnlockFromStore()
+            if (StashyPlus.products.isEmpty()) StashyPlus.fetchProducts()
+        }
+    }
     if (StashyPlus.isUnlocked) {
-        item {
+        item(key = "plus-app-icons") {
             SettingsSectionHeader("Custom App Icons")
             GroupedCard { Box(Modifier.padding(horizontal = 16.dp)) { AppIconPicker() } }
             SectionSpacer()
         }
-        item {
+        item(key = "plus-ai-subtitles") {
+            SettingsSectionHeader("AI Subtitles and translation", isBeta = true)
+            // iOS: `StashyPlusAISubtitlesSettings` (Android adds the pack cleanup as last row).
+            GroupedCard { de.letzgo.stashy.ui.settings.AiSubtitlesSettingsRows() }
+            SectionSpacer()
+        }
+        item(key = "plus-ai-tags") {
             SettingsSectionHeader("Tag Suggestions & Similar Scenes", isBeta = true)
             GroupedCard {
                 SettingsRow("Tag Suggestions & Similar Scenes", SF.sparkles, onClick = {
@@ -133,32 +147,35 @@ private fun LazyListScope.stashyPlusItems() {
             SectionSpacer()
         }
     } else {
-        item {
+        item(key = "plus-included") {
             SettingsSectionHeader("Included with stashy+")
+            // (title, isBeta) — iOS `lockedPlusFeature` list without AI Motion.
             val features = listOf(
-                "Custom App Icons", "Download Scenes",
-                ToolsItem.Statistics.plusFeatureTitle, ToolsItem.OCount.plusFeatureTitle,
-                ToolsItem.Timeline.plusFeatureTitle, ToolsItem.TopLists.plusFeatureTitle,
-                ToolsItem.Filters.plusFeatureTitle, ToolsItem.HotOrNot.plusFeatureTitle,
-                ToolsItem.RateMe.title,
+                "Custom App Icons" to false,
+                "Download Scenes" to false,
+                "AI Subtitles and translation" to true,
+                ToolsItem.Statistics.plusFeatureTitle to false,
+                ToolsItem.OCount.plusFeatureTitle to false,
+                ToolsItem.Timeline.plusFeatureTitle to false,
+                ToolsItem.TopLists.plusFeatureTitle to false,
+                ToolsItem.Filters.plusFeatureTitle to false,
+                ToolsItem.HotOrNot.plusFeatureTitle to false,
+                ToolsItem.RateMe.title to false,
             )
             GroupedCard {
-                features.forEachIndexed { i, title ->
-                    SettingsRow(title, SF.lockFill, iconTint = Theme.palette.secondaryText, titleColor = Theme.palette.secondaryText)
+                features.forEachIndexed { i, (title, beta) ->
+                    SettingsRow(title, SF.lockFill, iconTint = Theme.palette.secondaryText, titleColor = Theme.palette.secondaryText) {
+                        if (beta) BetaBadge()
+                    }
                     if (i < features.lastIndex) RowDivider()
                 }
             }
             SectionSpacer()
         }
     }
-    item { PurchaseSection() }
-    // Tips (iOS: Settings › About); "Leave a Tip" in Settings opens this page. Sideload builds
-    // have no Play products, so the section only appears when Play returned tip products.
-    if (StashyPlus.tipProducts.isNotEmpty()) item {
-        SectionSpacer()
-        StashyTipsSection()
-    }
+    item(key = "plus-purchase") { PurchaseSection() }
 }
+
 
 /** iOS: `stashyPlusPurchaseSection`. */
 @Composable
