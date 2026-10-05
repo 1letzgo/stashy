@@ -1,8 +1,12 @@
 package de.letzgo.stashy.data
 
+import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
 import android.net.Uri
 import kotlinx.serialization.json.Json as KJson
 import okhttp3.ConnectionPool
+import okhttp3.Dispatcher
 import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import java.net.Socket
@@ -25,7 +29,8 @@ val Json = KJson {
 
 /**
  * HTTP stack (iOS: `StashSessionFactory` + `StashTrustDelegate`). One OkHttp client for GraphQL,
- * images (Coil), the player (Media3) and downloads. Requests to the active server get the
+ * the player (Media3) and downloads; images (Coil) use a sibling on its own dispatcher. Both
+ * share DNS, fast fallback, TLS and the connection pool. Requests to the active server get the
  * `ApiKey` and custom headers automatically.
  */
 object Net {
@@ -42,16 +47,47 @@ object Net {
         chain.proceed(builder.build())
     }
 
-    @Volatile private var pool = ConnectionPool()
+    /** Per connect attempt. Fast fallback starts the next address after 250 ms anyway. */
+    private const val CONNECT_TIMEOUT_SECONDS = 10L
+    private const val READ_TIMEOUT_SECONDS = 60L
+    /** Whole-call cap for GraphQL (connect + server work + body); streams/downloads have none. */
+    const val GRAPHQL_CALL_TIMEOUT_SECONDS = 90L
 
-    val client: OkHttpClient by lazy { build(30) }
+    private val pool = ConnectionPool()
 
-    fun build(timeoutSeconds: Long): OkHttpClient {
+    private val debugLog: ((String) -> Unit)? =
+        if (de.letzgo.stashy.BuildConfig.DEBUG) { msg -> android.util.Log.d("StashyNet", msg) } else null
+
+    /** Resolver shared by every client (IPv6-failure memory must be global, not per client). */
+    val dns = StashDns(log = debugLog)
+
+    /**
+     * The one base client: GraphQL, Media3, downloads, app update, probes. Every other client is
+     * `client.newBuilder()…` so DNS, fast fallback, TLS, auth and the pool stay identical.
+     */
+    val client: OkHttpClient by lazy { build() }
+
+    /**
+     * Images (Coil) on their own dispatcher: a dashboard enqueues dozens of thumbnails for the
+     * server host at once, and with one shared dispatcher (5 per host by default) GraphQL calls
+     * queued behind them — every one of them waiting out a slow connect.
+     */
+    val imageClient: OkHttpClient by lazy {
+        client.newBuilder().dispatcher(Dispatcher().apply { maxRequestsPerHost = 8 }).build()
+    }
+
+    private fun build(): OkHttpClient {
         val trust = LocalTrustManager(systemTrustManager())
         val ssl = SSLContext.getInstance("TLS").apply { init(null, arrayOf(trust), null) }
         return OkHttpClient.Builder()
-            .connectTimeout(timeoutSeconds, TimeUnit.SECONDS)
-            .readTimeout(timeoutSeconds * 2, TimeUnit.SECONDS)
+            .connectTimeout(CONNECT_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            .readTimeout(READ_TIMEOUT_SECONDS, TimeUnit.SECONDS)
+            // Happy Eyeballs (RFC 8305) like iOS URLSession: IPv6 and IPv4 attempts race instead of
+            // the next address waiting for the previous one's connect timeout.
+            .fastFallback(true)
+            .dns(dns)
+            .eventListenerFactory { NetEventListener(dns, debugLog) }
+            .dispatcher(Dispatcher().apply { maxRequestsPerHost = 16 })
             .connectionPool(pool)
             .sslSocketFactory(ssl.socketFactory, trust)
             .hostnameVerifier { host, session ->
@@ -66,7 +102,37 @@ object Net {
 
     /** iOS: `GraphQLClient.cancelAllRequests()` on a server switch. */
     fun resetConnections() {
-        runCatching { client.dispatcher.cancelAll(); client.connectionPool.evictAll() }
+        runCatching { client.dispatcher.cancelAll(); imageClient.dispatcher.cancelAll(); pool.evictAll() }
+        dns.forgetFailures()
+    }
+
+    @Volatile private var defaultNetwork: Network? = null
+
+    /**
+     * Drops idle pooled connections and the IPv6-failure memory when the default network changes
+     * (Wi-Fi ↔ mobile, VPN up/down): sockets from the old network would only fail on first use.
+     */
+    fun watchNetworkChanges(context: Context) {
+        val cm = context.getSystemService(ConnectivityManager::class.java) ?: return
+        runCatching {
+            cm.registerDefaultNetworkCallback(object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    val previous = defaultNetwork
+                    defaultNetwork = network
+                    if (previous != null && previous != network) onNetworkChanged("default network changed")
+                }
+
+                override fun onLost(network: Network) {
+                    if (network == defaultNetwork) onNetworkChanged("default network lost")
+                }
+            })
+        }
+    }
+
+    private fun onNetworkChanged(reason: String) {
+        debugLog?.invoke("$reason: evicting idle connections")
+        pool.evictAll()
+        dns.forgetFailures()
     }
 
     private fun systemTrustManager(): X509TrustManager {

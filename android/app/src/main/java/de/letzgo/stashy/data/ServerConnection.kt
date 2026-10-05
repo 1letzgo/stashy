@@ -9,6 +9,7 @@ import okhttp3.HttpUrl
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
+import java.util.concurrent.TimeUnit
 
 /** iOS: `StashConnectionProbe` + `LoginAuthHelper`. */
 object ServerConnection {
@@ -19,6 +20,11 @@ object ServerConnection {
 
     private const val VERSION_QUERY = """{"query":"{ version { version } }"}"""
 
+    /** Connection test / login: the shared client with a short overall cap, so a dead host fails fast. */
+    private val probeClient by lazy {
+        Net.client.newBuilder().readTimeout(30, TimeUnit.SECONDS).callTimeout(30, TimeUnit.SECONDS).build()
+    }
+
     /** Only a GraphQL answer carrying Stash's version counts as connected (same rules as iOS). */
     suspend fun probe(baseURL: String, apiKey: String?, headers: List<ServerHTTPHeader> = emptyList()): Outcome = withContext(Dispatchers.IO) {
         val request = Request.Builder().url("$baseURL/graphql")
@@ -28,7 +34,7 @@ object ServerConnection {
                 headers.filter { it.isUsable }.forEach { header(it.name.trim(), it.value.trim()) }
             }.build()
         try {
-            Net.build(15).newCall(request).execute().use { r ->
+            probeClient.newCall(request).execute().use { r ->
                 if (r.code == 401 || r.code == 403) return@withContext Outcome.Failure("Authentication failed — check the API key and custom headers.")
                 val text = r.body?.string().orEmpty()
                 val root = runCatching { Json.parseToJsonElement(text).obj }.getOrNull()
@@ -56,7 +62,7 @@ object ServerConnection {
 
     /** Logs in with username/password and reads the API key (`LoginAuthHelper.fetchAPIKey`). */
     suspend fun fetchAPIKey(baseURL: String, username: String, password: String, headers: List<ServerHTTPHeader> = emptyList()): String = withContext(Dispatchers.IO) {
-        val client = Net.build(15).newBuilder()
+        val client = probeClient.newBuilder()
             .cookieJar(MemoryCookieJar())
             .build()
         fun Request.Builder.custom() = apply { headers.filter { it.isUsable }.forEach { header(it.name.trim(), it.value.trim()) } }
