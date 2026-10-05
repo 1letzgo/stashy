@@ -1229,6 +1229,11 @@ struct ImageGroupCatalogCell: View {
         images.firstIndex(where: { $0.id == visibleImageId }) ?? 0
     }
 
+    /// One frame for the whole set: the tallest image's 1/row ratio (portrait is capped there).
+    private var setAspectRatio: CGFloat {
+        images.map(\.oneColumnFeedAspectRatio).min() ?? visibleImage.oneColumnFeedAspectRatio
+    }
+
     private var allowsVisibleVideoAutoplay: Bool {
         visibleImage.isVideo && autoplayVideoImageId == visibleImage.id
     }
@@ -1247,8 +1252,7 @@ struct ImageGroupCatalogCell: View {
                         }
                     }
                     .tabViewStyle(.page(indexDisplayMode: .never))
-                    .aspectRatio(visibleImage.oneColumnFeedAspectRatio, contentMode: .fit)
-                    .animation(.easeInOut(duration: 0.2), value: visibleImage.oneColumnFeedAspectRatio)
+                    .aspectRatio(setAspectRatio, contentMode: .fit)
                 } else {
                     heroButton(for: visibleImage)
                 }
@@ -1409,13 +1413,14 @@ extension ImageGroupCatalogCell {
         } label: {
             ImageThumbnailCard(
                 image: image,
-                // All pages share the visible image's frame so a swipe never letterboxes.
-                aspectRatio: visibleImage.oneColumnFeedAspectRatio,
+                // A set keeps one frame (its tallest image) so the height never jumps on swipe;
+                // wider images are letterboxed instead of cropped.
+                aspectRatio: setAspectRatio,
                 showsOverlayChrome: false,
                 allowsVideoAutoplay: isVisible && allowsVisibleVideoAutoplay,
-                reportsFeedVideoFrame: reportsFeedVideoFrame && isVisible
+                reportsFeedVideoFrame: reportsFeedVideoFrame && isVisible,
+                fitsMedia: images.count > 1 && image.oneColumnFeedAspectRatio > setAspectRatio + 0.01
             )
-            .animation(.easeInOut(duration: 0.2), value: visibleImage.oneColumnFeedAspectRatio)
             .id(image.id)
         }
         .buttonStyle(.plain)
@@ -1780,6 +1785,9 @@ struct ImageThumbnailCard: View {
     var allowsVideoAutoplay: Bool = false
     /// Publish this card's global frame for feed-level "most centered video" selection.
     var reportsFeedVideoFrame: Bool = false
+    /// Show the whole media letterboxed instead of cropping it to the frame (a wide image in a
+    /// set whose frame follows its tallest image).
+    var fitsMedia: Bool = false
     @ObservedObject var appearanceManager = AppearanceManager.shared
     @StateObject private var previewPlayer = AetherPreviewPlayer()
     @State private var isPreviewing = false
@@ -1801,7 +1809,11 @@ struct ImageThumbnailCard: View {
         ZStack(alignment: .bottomLeading) {
             GeometryReader { geometry in
                 ZStack {
-                    Color.gray.opacity(DesignTokens.Opacity.placeholder)
+                    if fitsMedia {
+                        Color.black
+                    } else {
+                        Color.gray.opacity(DesignTokens.Opacity.placeholder)
+                    }
 
                     if let url = image.thumbnailURL {
                         CustomAsyncImage(url: url) { loader in
@@ -1810,11 +1822,11 @@ struct ImageThumbnailCard: View {
                             } else if let uiImage = loader.image {
                                 uiImage
                                     .resizable()
-                                    .scaledToFill()
+                                    .aspectRatio(contentMode: fitsMedia ? .fit : .fill)
                                     .frame(
                                         width: geometry.size.width,
                                         height: geometry.size.height,
-                                        alignment: mediaFillAlignment
+                                        alignment: fitsMedia ? .center : mediaFillAlignment
                                     )
                                     .clipped()
                             } else {
@@ -1827,8 +1839,8 @@ struct ImageThumbnailCard: View {
                     if isPreviewing {
                         AetherPreviewSurface(
                             player: previewPlayer,
-                            fill: true,
-                            alignment: mediaFillAlignment
+                            fill: !fitsMedia,
+                            alignment: fitsMedia ? .center : mediaFillAlignment
                         )
                             .frame(
                                 width: geometry.size.width,
