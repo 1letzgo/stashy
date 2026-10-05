@@ -34,6 +34,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import de.letzgo.stashy.data.CatalogCardColumnScope
+import de.letzgo.stashy.data.CatalogCardColumns
+import de.letzgo.stashy.data.CatalogPrefs
 import de.letzgo.stashy.data.FilterMode
 import de.letzgo.stashy.data.ListLivePresetTag
 import de.letzgo.stashy.data.SortCatalog
@@ -62,6 +65,8 @@ import de.letzgo.stashy.ui.stashyGlass
 @Composable
 fun CatalogFilterSortSheet(
     controller: CatalogController<*>,
+    /** Resets chip state the controller does not own (images "Type") before the criteria reset. */
+    onReset: () -> Unit = {},
     extraCards: @Composable () -> Unit = {},
 ) {
     if (!controller.isSheetPresented) return
@@ -79,7 +84,7 @@ fun CatalogFilterSortSheet(
     ) {
         Column(Modifier.fillMaxSize().navigationBarsPadding().imePadding()) {
             SheetChromeBar(
-                onReset = { controller.reset() },
+                onReset = { onReset(); controller.reset() },
                 onSave = { showSaveChoice = true },
                 onDone = { controller.isSheetPresented = false },
             )
@@ -265,6 +270,23 @@ fun ImageMediaTypeCard(kind: ImageListMediaKind, onChange: (ImageListMediaKind) 
             CatalogFilterChip("Any", kind == ImageListMediaKind.All) { onChange(ImageListMediaKind.All) }
             CatalogFilterChip("Image", kind == ImageListMediaKind.StillImage) { onChange(ImageListMediaKind.StillImage) }
             CatalogFilterChip("Video", kind == ImageListMediaKind.Video) { onChange(ImageListMediaKind.Video) }
+        }
+        Spacer(Modifier.weight(1f))
+    }
+}
+
+/**
+ * iOS: `cardColumnsCard` — "Per row" 1 / 2 for the list's [scope] (Images catalog, opened
+ * gallery); state lives in [CatalogPrefs], so the list recomposes on change.
+ */
+@Composable
+fun CardColumnsCard(scope: CatalogCardColumnScope) {
+    val current = CatalogPrefs.cardColumns(scope)
+    ControlCard {
+        ControlLabel("Per row")
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            CatalogFilterChip("1", current == CatalogCardColumns.One) { CatalogPrefs.setCardColumns(scope, CatalogCardColumns.One) }
+            CatalogFilterChip("2", current == CatalogCardColumns.Two) { CatalogPrefs.setCardColumns(scope, CatalogCardColumns.Two) }
         }
         Spacer(Modifier.weight(1f))
     }

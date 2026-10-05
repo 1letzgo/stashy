@@ -149,7 +149,8 @@ internal fun DockIconButton(
 /**
  * iOS: the detail chrome bar (`StashySectionChromeBar`: Back · section icons · Favorite · Edit)
  * plus the floating list slots (`CatalogSlotBar`), as one native Material top app bar:
- * back arrow · [title] · slot icons (download state …) · sort `DropdownMenu` · favorite ·
+ * back arrow · [title] · slot icons (download state …) · sort `DropdownMenu` or the catalog
+ * "Settings" action ([settings], opens the filter & sort sheet) · favorite ·
  * "⋮" overflow (slots marked [ChromeSlot.inOverflow] such as card columns, and Edit). The
  * sections become a [NativeTabStrip] under the bar, shown only when more than one has content.
  */
@@ -161,6 +162,7 @@ internal fun DetailTopBar(
     onSelect: (DetailTab) -> Unit,
     slots: List<ChromeSlot> = emptyList(),
     sortMenu: (@Composable (dismiss: () -> Unit) -> Unit)? = null,
+    settings: de.letzgo.stashy.ui.catalog.CatalogChromeSlot? = null,
     isFavorite: Boolean? = null,
     favoriteBusy: Boolean = false,
     onFavorite: () -> Unit = {},
@@ -175,6 +177,7 @@ internal fun DetailTopBar(
             if (sortMenu != null) {
                 TopBarMenuAction(androidx.compose.material.icons.Icons.AutoMirrored.Filled.Sort, "Sort") { dismiss -> sortMenu(dismiss) }
             }
+            settings?.let { de.letzgo.stashy.ui.catalog.FilterSortAction(it) }
             if (isFavorite != null) {
                 TopBarAction(
                     if (isFavorite) SF.heartFill else SF.heart,

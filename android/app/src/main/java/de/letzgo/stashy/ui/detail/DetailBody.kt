@@ -151,7 +151,13 @@ internal class LinkedCatalog(
                 DropdownMenuItem(
                     text = { Text(if (n == 1) "1 per row" else "2 per row") },
                     trailingIcon = { if (imageColumns == n) Icon(SF.checkmark, null) },
-                    onClick = { d(); imageColumns = CardColumnsPrefs.set(imageScopeKey, n) },
+                    onClick = {
+                        d()
+                        // Through TabManager so Home / Settings see the same value.
+                        val scope = de.letzgo.stashy.data.CatalogCardColumnScope.entries.firstOrNull { it.raw == imageScopeKey } ?: de.letzgo.stashy.data.CatalogCardColumnScope.Images
+                        de.letzgo.stashy.data.CatalogPrefs.setCardColumns(scope, if (n == 1) de.letzgo.stashy.data.CatalogCardColumns.One else de.letzgo.stashy.data.CatalogCardColumns.Two)
+                        imageColumns = n
+                    },
                 )
             }
         }
@@ -270,7 +276,22 @@ internal fun LazyGridScope.linkedSection(catalog: LinkedCatalog, tab: DetailTab,
  */
 internal fun LazyGridScope.imageSection(catalog: LinkedCatalog, gridState: LazyGridState, currentGalleryId: String? = null) {
     val list = catalog.images ?: return
-    if (catalog.imageColumns != 1 || !catalog.usesImageFeed) {
+    imageSection(
+        list, useFeed = catalog.imageColumns == 1 && catalog.usesImageFeed, feedModel = catalog.imageFeed,
+        sortRaw = catalog.imageSort.raw, gridState = gridState, currentGalleryId = currentGalleryId,
+    )
+}
+
+/** [imageSection] over any image list (the opened gallery drives it from a catalog controller). */
+internal fun LazyGridScope.imageSection(
+    list: PagedList<StashImage>,
+    useFeed: Boolean,
+    feedModel: ImageFeedGridModel,
+    sortRaw: String,
+    gridState: LazyGridState,
+    currentGalleryId: String? = null,
+) {
+    if (!useFeed) {
         pagedSection(list, { it.id }, "Loading images...", SF.cameraFill, "No images found") { index, image ->
             DetailImageCard(image, onClick = { Nav.push(ImageViewerScreen(list.items, index, onLoadMore = { list.loadMore() })) })
         }
@@ -282,9 +303,9 @@ internal fun LazyGridScope.imageSection(catalog: LinkedCatalog, gridState: LazyG
         return
     }
     imageFeedItems(
-        model = catalog.imageFeed,
+        model = feedModel,
         images = list.items,
-        sortRaw = catalog.imageSort.raw,
+        sortRaw = sortRaw,
         gridState = gridState,
         onLoadMore = { list.loadMore() },
         onImageUpdated = { updated -> list.patch { if (it.id == updated.id) updated else it } },
@@ -292,4 +313,3 @@ internal fun LazyGridScope.imageSection(catalog: LinkedCatalog, gridState: LazyG
     )
     if (list.isLoading) item(key = "more", span = { GridItemSpan(maxLineSpan) }) { LoadingFooter("Loading more images...") }
 }
-

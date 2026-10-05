@@ -17,17 +17,37 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import de.letzgo.stashy.data.CatalogCardColumnScope
+import de.letzgo.stashy.data.CatalogPrefs
 import de.letzgo.stashy.data.DetailRepository
+import de.letzgo.stashy.data.FilterMode
 import de.letzgo.stashy.data.Gallery
+import de.letzgo.stashy.data.SortCatalog
+import de.letzgo.stashy.data.StashImage
 import de.letzgo.stashy.ui.Nav
+import de.letzgo.stashy.ui.SF
+import de.letzgo.stashy.ui.catalog.CatalogChromeSlot
+import de.letzgo.stashy.ui.catalog.CatalogController
+import de.letzgo.stashy.ui.catalog.ImageFeedGridModel
+import de.letzgo.stashy.ui.catalog.ImageMediaKindHolder
+import de.letzgo.stashy.ui.filter.CardColumnsCard
+import de.letzgo.stashy.ui.filter.CatalogFilterSortSheet
+import de.letzgo.stashy.ui.filter.ImageListMediaKind
+import de.letzgo.stashy.ui.filter.ImageMediaTypeCard
+import de.letzgo.stashy.ui.filter.ImagesFeedAutoplaySettingsCard
 import de.letzgo.stashy.ui.Screen
 import de.letzgo.stashy.ui.Theme
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonObject
 
 /**
  * iOS: `ImagesView(gallery:)` for an opened gallery — chrome bar Back · Edit, the gallery
  * header (cover strip, IMAGES / DATE / STUDIO / PERFORMERS / ORGANIZED, details when
- * expanded), then the image grid with the 1/2-per-row toggle (`openedGallery` scope) and sort.
+ * expanded), then the image grid (2/row) or the grouped feed (1/row). The top bar's "Settings"
+ * opens the images filter & sort sheet (iOS `ImagesCatalogFilterSortSheet` with
+ * `DetailLinkedImagesFilterModel(scope: .gallery(id))`): filter, sort, Type, Per row
+ * (`openedGallery` scope), autoplay toggles and the criteria editor. The `galleries` INCLUDES
+ * scope is layered last, so no saved filter or criterion can widen the list beyond this gallery.
  * Tapping an image opens [ImageViewerScreen].
  */
 class GalleryDetailScreen(val galleryId: String, val preview: Gallery? = null) : Screen {
@@ -42,16 +62,21 @@ class GalleryDetailScreen(val galleryId: String, val preview: Gallery? = null) :
     private var started = false
     private val gridState = LazyGridState()
 
-    private val catalog = LinkedCatalog(
-        scope,
-        order = listOf(DetailTab.Images),
-        imageScope = DetailRepository.scope("galleries", galleryId),
-        imageContext = DetailViewContext.Gallery,
-        previewImages = preview?.imageCount ?: 0,
+    /** iOS `liveFilterMediaKind` ("Type": Any / Image / Video). */
+    private val kind = ImageMediaKindHolder()
+    private val images = CatalogController<StashImage>(
+        FilterMode.Images, scope,
+        tabId = null,
+        scope = DetailRepository.scope("galleries", galleryId),
+        initialSort = SortCatalog.option(FilterMode.Images, DetailViewConfig.imageSort(DetailViewContext.Gallery).raw),
+        extraLive = { kind.kind.pathCriterion?.let { JsonObject(mapOf("path" to it)) } ?: JsonObject(emptyMap()) },
+        persistSort = { DetailViewConfig.setSortOption(DetailViewContext.Gallery, it.raw) },
     )
+    /** Grouped 1/row feed (iOS `ImagesView(gallery:)` one-column layout). */
+    private val imageFeed = ImageFeedGridModel()
 
     private fun load() {
-        catalog.loadAll(force = true)
+        images.onAppear()
         // iOS `hydrateOpenedGalleryIfNeeded` — stubs (no cover) get the full row.
         scope.launch { runCatching { DetailRepository.gallery(galleryId) }.getOrNull()?.let { gallery = it } }
     }
@@ -60,16 +85,27 @@ class GalleryDetailScreen(val galleryId: String, val preview: Gallery? = null) :
     override fun Content() {
         LaunchedEffect(Unit) { if (!started) { started = true; load() } }
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
-            DetailGrid(gridState, { w -> columnsFor(DetailTab.Images, w, catalog.imageColumns) }, header = { gallery?.let { Header(it) } }) {
-                imageSection(catalog, gridState, currentGalleryId = galleryId)
+            val columns = CatalogPrefs.cardColumns(CatalogCardColumnScope.OpenedGallery).raw
+            DetailGrid(gridState, { w -> columnsFor(DetailTab.Images, w, columns) }, header = { gallery?.let { Header(it) } }) {
+                imageSection(
+                    images.list, useFeed = columns == 1, feedModel = imageFeed, sortRaw = images.sort.raw,
+                    gridState = gridState, currentGalleryId = galleryId,
+                )
             }
-            val (slots, menu) = catalog.slots(DetailTab.Images, imageScopeKey = "openedGallery")
             // iOS `galleryDownloadSlot` (secondary contextual, before filter & sort).
             val download = gallery?.let { imageSetDownloadSlot(it.id, "Download gallery") { showDownloadOptions = true } }
             DetailTopBar(
-                gallery?.displayTitle ?: "", emptyList(), null, {}, slots + listOfNotNull(download), menu,
+                gallery?.displayTitle ?: "", emptyList(), null, {}, listOfNotNull(download),
+                settings = CatalogChromeSlot(SF.sliderHorizontal3, images.isFilterActive || kind.kind != ImageListMediaKind.All, "Settings") {
+                    images.isSheetPresented = true
+                },
                 onEdit = { editing = true }, editLabel = "Edit gallery",
             )
+        }
+        CatalogFilterSortSheet(images, onReset = { kind.kind = ImageListMediaKind.All }) {
+            ImageMediaTypeCard(kind.kind) { kind.kind = it; images.applyLive() }
+            CardColumnsCard(CatalogCardColumnScope.OpenedGallery)
+            ImagesFeedAutoplaySettingsCard()
         }
         val g = gallery
         if (editing && g != null) EditGallerySheet(g, { editing = false }) { gallery = it }
@@ -79,7 +115,7 @@ class GalleryDetailScreen(val galleryId: String, val preview: Gallery? = null) :
     /** iOS `openedGalleryHeader`. */
     @Composable
     private fun Header(g: Gallery) {
-        val items = DetailFormatting.gallery(g, catalog.images?.totalCount ?: 0)
+        val items = DetailFormatting.gallery(g, images.list.totalCount)
         val details = g.details?.takeIf { it.isNotEmpty() }
         DetailHeaderCard(
             title = g.displayTitle,

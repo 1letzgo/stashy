@@ -40,6 +40,7 @@ import de.letzgo.stashy.ui.detail.ImageViewerScreen
 import de.letzgo.stashy.ui.detail.PerformerDetailScreen
 import de.letzgo.stashy.ui.detail.StudioDetailScreen
 import de.letzgo.stashy.ui.detail.TagDetailScreen
+import de.letzgo.stashy.ui.filter.CardColumnsCard
 import de.letzgo.stashy.ui.filter.CatalogFilterSortSheet
 import de.letzgo.stashy.ui.filter.ImageListMediaKind
 import de.letzgo.stashy.ui.filter.ImageMediaTypeCard
@@ -199,8 +200,9 @@ fun ImagesList(c: CatalogController<StashImage>, holder: ImageMediaKindHolder, c
     ) { index, image ->
         ImageCard(image, aspectRatio = 1f, onClick = { Nav.push(ImageViewerScreen(c.list.items.toList(), index)) })
     }
-    CatalogFilterSortSheet(c) {
+    CatalogFilterSortSheet(c, onReset = { holder.kind = ImageListMediaKind.All }) {
         ImageMediaTypeCard(holder.kind) { holder.kind = it; c.applyLive() }
+        CardColumnsCard(columnScope)
         ImagesFeedAutoplaySettingsCard()
     }
 }

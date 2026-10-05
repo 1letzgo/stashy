@@ -192,7 +192,7 @@ private fun SceneDetailContent(model: SceneDetailModel) {
                 SceneSimilarScenesCard(model.similarScenes, model.isLoadingSimilarScenes)
                 ScenePerformersCard(scene.date, scene.performers, scene.normalizedDirector) { sheet = EditSheet.Performers }
                 if (landscape) {
-                    // iOS landscape: two-column grid (Studio | Groups, Tags, Galleries full width, Delete).
+                    // iOS landscape: two-column grid (Studio | Groups, Tags, Galleries full width). Delete lives in the top bar's ⋮ menu.
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         SceneStudioCard(scene.studio, { sheet = EditSheet.Studio }, Modifier.weight(1f))
                         SceneGroupsCard(scene.groups.orEmpty(), { sheet = EditSheet.Groups }, Modifier.weight(1f))
@@ -202,10 +202,6 @@ private fun SceneDetailContent(model: SceneDetailModel) {
                         Spacer(Modifier.weight(1f))
                     }
                     SceneGalleriesCard(scene.galleries) { sheet = EditSheet.Galleries }
-                    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                        DeleteSceneButton(Modifier.weight(1f)) { model.showDeleteConfirmation = true }
-                        Spacer(Modifier.weight(1f))
-                    }
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                         SceneStudioCard(scene.studio, { sheet = EditSheet.Studio }, Modifier.weight(1f))
@@ -213,7 +209,6 @@ private fun SceneDetailContent(model: SceneDetailModel) {
                     }
                     SceneTagsCard(scene.tags, model.isTagsExpanded, { model.isTagsExpanded = !model.isTagsExpanded }, { sheet = EditSheet.Tags })
                     SceneGalleriesCard(scene.galleries) { sheet = EditSheet.Galleries }
-                    DeleteSceneButton(Modifier.fillMaxWidth().padding(top = 10.dp)) { model.showDeleteConfirmation = true }
                 }
             }
         }
@@ -291,19 +286,6 @@ private fun SceneDetailNavBar(model: SceneDetailModel, onEditTitle: () -> Unit) 
             if (Appearance.isEditModeEnabled) OverflowItem("Edit title & details", de.letzgo.stashy.ui.SF.pencil, dismiss, onClick = onEditTitle)
             OverflowItem("Delete scene", PlayerIcons.trash, dismiss, color = StashyColors.systemRed) { model.showDeleteConfirmation = true }
         }
-    }
-}
-
-/** iOS: "Delete Scene" card button — destructive red, never the accent. */
-@Composable
-private fun DeleteSceneButton(modifier: Modifier, onClick: () -> Unit) {
-    Row(
-        modifier.clip(RoundedCornerShape(Tokens.Radius.card)).background(StashyColors.systemRed.copy(alpha = 0.15f)).clickable(onClick = onClick).padding(16.dp),
-        horizontalArrangement = Arrangement.Center, verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(PlayerIcons.trash, null, tint = StashyColors.systemRed, modifier = Modifier.size(18.dp))
-        Spacer(Modifier.size(6.dp))
-        Text("Delete Scene", color = StashyColors.systemRed, style = IosTypography.body)
     }
 }
 

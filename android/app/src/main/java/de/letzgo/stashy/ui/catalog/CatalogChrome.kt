@@ -131,7 +131,7 @@ fun CatalogTopActionIcons(slots: CatalogSlots) {
 
 /** Filter & sort ("Settings") button: slider icon, tinted with a dot while a filter / non-default state is set. */
 @Composable
-private fun FilterSortAction(slot: CatalogChromeSlot) {
+internal fun FilterSortAction(slot: CatalogChromeSlot) {
     val accent = nativeAccent()
     androidx.compose.material3.IconButton(onClick = slot.action) {
         BadgedBox(badge = { if (slot.isActive) Badge(containerColor = accent) }) {
