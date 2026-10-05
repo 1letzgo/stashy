@@ -172,6 +172,8 @@ data class StashImage(
     val tags: List<IdName>? = null,
 ) {
     val isVideo: Boolean get() = visualFiles?.firstOrNull()?.typename == "VideoFile"
+    /** Title for downloads: the title, else the file name without extension. */
+    val downloadTitle: String? get() = visualFiles?.firstOrNull().let { DownloadsMetadataCodec.imageTitle(title, it?.basename, it?.path) }
     val thumbnailURL: String? get() = Net.signed(paths?.thumbnail)
     val imageURL: String? get() = Net.signed(paths?.image)
     val aspectRatio: Float? get() = visualFiles?.firstOrNull()?.let { f ->

@@ -131,7 +131,7 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null) : Sc
         val s = studio
         if (editing && s != null) EditStudioSheet(s, { editing = false }) { studio = it }
         if (showSceneDownloadOptions) {
-            SceneBulkDownloadDialog(Downloads.SceneDownloadScope.Studio(studioId), studio?.name ?: "") { showSceneDownloadOptions = false }
+            SceneBulkDownloadDialog(Downloads.SceneDownloadScope.Studio(studioId), studio?.name ?: "", studio?.sceneCount) { showSceneDownloadOptions = false }
         }
     }
 

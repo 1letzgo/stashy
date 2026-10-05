@@ -112,7 +112,7 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
 
         if (editing && p != null) EditPerformerSheet(p, onDismiss = { editing = false }, onSaved = { performer = it })
         if (showSceneDownloadOptions) {
-            SceneBulkDownloadDialog(Downloads.SceneDownloadScope.Performer(performerId), performer?.name ?: "") { showSceneDownloadOptions = false }
+            SceneBulkDownloadDialog(Downloads.SceneDownloadScope.Performer(performerId), performer?.name ?: "", performer?.sceneCount) { showSceneDownloadOptions = false }
         }
     }
 
