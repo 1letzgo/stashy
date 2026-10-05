@@ -235,7 +235,7 @@ fun FiltersToolEditorSheet(
 
 /**
  * iOS: `stashyModalSheetChrome(title, onBack:) { Save }` — Android: Material top app bar of a
- * full-screen editor (close ✕ · title · "Save" text button), no status bar inset inside the sheet.
+ * full-screen editor via [de.letzgo.stashy.ui.NativeSheetTopBar] (close ✕ · title · "Save" text button).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -247,34 +247,9 @@ private fun EditorChromeBar(
     saveEnabled: Boolean,
     onSave: () -> Unit,
 ) {
-    val p = Theme.palette
-    Column(Modifier.fillMaxWidth()) {
-        androidx.compose.material3.TopAppBar(
-            title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = androidx.compose.material3.MaterialTheme.typography.titleLarge) },
-            navigationIcon = {
-                androidx.compose.material3.IconButton(onClick = onBack) { Icon(SF.xmark, "Close") }
-            },
-            actions = {
-                if (isSaving) {
-                    CircularProgressIndicator(Modifier.padding(horizontal = 16.dp).size(20.dp), color = Appearance.tint, strokeWidth = 2.dp)
-                } else {
-                    TextButton(onClick = onSave, enabled = saveEnabled) {
-                        Text(
-                            "Save", fontWeight = FontWeight.SemiBold,
-                            color = if (saveDimmed || !saveEnabled) Appearance.tint.copy(alpha = 0.38f) else Appearance.tint,
-                        )
-                    }
-                }
-            },
-            windowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
-            colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
-                containerColor = p.background,
-                titleContentColor = p.text,
-                navigationIconContentColor = p.text,
-                actionIconContentColor = p.text,
-            ),
-        )
-        Box(Modifier.fillMaxWidth().height(0.5.dp).background(p.separator))
+    de.letzgo.stashy.ui.NativeSheetTopBar(title, onClose = onBack) {
+        if (isSaving) de.letzgo.stashy.ui.NativeSheetProgress()
+        else de.letzgo.stashy.ui.NativeSheetAction("Save", enabled = saveEnabled, dimmed = saveDimmed, onClick = onSave)
     }
 }
 

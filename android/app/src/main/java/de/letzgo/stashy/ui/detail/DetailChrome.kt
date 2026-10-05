@@ -462,21 +462,21 @@ internal fun EditEntitySheet(
                 Spacer(Modifier.height(40.dp))
             }
             // iOS `stashyModalSheetChrome(title, onBack:)` + trailing "Save" → Material app bar.
-            NativeTopBar(title, onBack = onDismiss) {
+            de.letzgo.stashy.ui.NativeSheetTopBar(
+                title, onClose = onDismiss,
+                windowInsets = androidx.compose.foundation.layout.WindowInsets.statusBars,
+            ) {
                 if (saving) {
-                    CircularProgressIndicator(Modifier.padding(horizontal = 16.dp).size(20.dp), color = Appearance.tint, strokeWidth = 2.dp)
+                    de.letzgo.stashy.ui.NativeSheetProgress()
                 } else {
-                    TextButton(
-                        onClick = {
-                            saving = true
-                            scope.launch {
-                                val ok = onSave()
-                                saving = false
-                                if (ok) onDismiss()
-                            }
-                        },
-                        enabled = canSave,
-                    ) { Text("Save", color = if (canSave) Appearance.tint else Appearance.tint.copy(alpha = 0.38f), fontWeight = FontWeight.SemiBold) }
+                    de.letzgo.stashy.ui.NativeSheetAction("Save", enabled = canSave) {
+                        saving = true
+                        scope.launch {
+                            val ok = onSave()
+                            saving = false
+                            if (ok) onDismiss()
+                        }
+                    }
                 }
             }
         }

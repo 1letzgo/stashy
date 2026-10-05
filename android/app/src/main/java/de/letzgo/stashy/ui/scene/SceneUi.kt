@@ -132,7 +132,7 @@ fun NamePill(text: String, modifier: Modifier = Modifier) {
 
 /**
  * iOS: `stashyModalSheetChrome(title, onBack:) { StashyChromeTrailingTextButton }` inside a
- * `NavigationView` + `Form` — a large modal sheet with a close button, title and trailing action.
+ * `NavigationView` + `Form` — a large modal sheet with a Material top bar (close ✕, title, trailing action).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -150,22 +150,12 @@ fun SceneModalSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         containerColor = p.background,
-        dragHandle = null,
     ) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(36.dp).clip(CircleShape).background(p.secondaryBackground).clickable(onClick = onDismiss), contentAlignment = Alignment.Center) {
-                Icon(PlayerIcons.close, "Close", tint = p.text, modifier = Modifier.size(18.dp))
-            }
-            Text(title, Modifier.weight(1f).padding(horizontal = 12.dp), style = IosTypography.headline, color = p.text, maxLines = 1)
+        // Material sheet top bar: close ✕ · title · trailing text action.
+        de.letzgo.stashy.ui.NativeSheetTopBar(title, onClose = onDismiss) {
             if (actionTitle != null) {
-                if (actionBusy) CircularProgressIndicator(Modifier.size(20.dp), color = Appearance.tint, strokeWidth = 2.dp)
-                else Text(
-                    actionTitle,
-                    Modifier.clip(RoundedCornerShape(50)).background(if (actionEnabled) Appearance.tint else p.secondaryBackground)
-                        .clickable(enabled = actionEnabled, onClick = onAction).padding(horizontal = 14.dp, vertical = 8.dp),
-                    style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold),
-                    color = if (actionEnabled) Color.White else p.secondaryText,
-                )
+                if (actionBusy) de.letzgo.stashy.ui.NativeSheetProgress()
+                else de.letzgo.stashy.ui.NativeSheetAction(actionTitle, enabled = actionEnabled, onClick = onAction)
             }
         }
         Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), content = content)

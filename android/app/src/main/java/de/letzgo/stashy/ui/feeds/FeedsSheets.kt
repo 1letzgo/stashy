@@ -31,6 +31,8 @@ import de.letzgo.stashy.data.ReelsModeType
 import de.letzgo.stashy.data.SavedFilter
 import de.letzgo.stashy.data.SortFieldKind
 import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeSheetAction
+import de.letzgo.stashy.ui.NativeSheetTopBar
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.filter.CatalogFilterChip
@@ -71,17 +73,11 @@ fun FeedsFilterSortSheet(
     val state = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = state, containerColor = p.background) {
         Column(Modifier.fillMaxSize().navigationBarsPadding().imePadding()) {
-            // iOS `CatalogSettingsSheetChromeBar`.
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                SheetPill("Reset", StashyColors.systemRed, onReset)
-                Text("Settings", Modifier.weight(1f), style = IosTypography.title3, color = p.text, maxLines = 1)
-                SheetPill("Done", Color.White, onDismiss)
+            // iOS `CatalogSettingsSheetChromeBar` (Reset · "Settings" · Done) → Material sheet top bar.
+            NativeSheetTopBar("Settings", onClose = onDismiss, closeDescription = "Done") {
+                NativeSheetAction("Reset", destructive = true, onClick = onReset)
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
             Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 // Filter
                 ControlCard {
@@ -126,13 +122,4 @@ fun FeedsFilterSortSheet(
             }
         }
     }
-}
-
-@Composable
-private fun SheetPill(title: String, color: Color, onClick: () -> Unit) {
-    Text(
-        title,
-        Modifier.stashyGlass(RoundedCornerShape(50)).noIndicationClick(onClick).padding(horizontal = 14.dp, vertical = 9.dp),
-        style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = color,
-    )
 }

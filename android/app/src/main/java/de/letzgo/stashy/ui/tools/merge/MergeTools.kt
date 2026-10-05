@@ -795,16 +795,10 @@ private fun <T : MergeableItem> MergeDestinationSheet(
     val shown = filtered.take(visibleCount)
     val divider = p.text.copy(alpha = 0.15f)
 
-    ModalBottomSheet(onDismissRequest = onCancel, sheetState = state, containerColor = p.background, dragHandle = null) {
+    ModalBottomSheet(onDismissRequest = onCancel, sheetState = state, containerColor = p.background) {
         Column(Modifier.fillMaxSize()) {
-            // iOS: `stashyModalSheetChrome("Merge into", onBack:)`.
-            Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-                Text("Merge into", style = IosTypography.headline, color = p.text, modifier = Modifier.align(Alignment.Center))
-                Text(
-                    "Cancel", style = IosTypography.body, color = Appearance.tint,
-                    modifier = Modifier.align(Alignment.CenterStart).clickable(onClick = onCancel),
-                )
-            }
+            // iOS: `stashyModalSheetChrome("Merge into", onBack:)` → Material sheet top bar.
+            de.letzgo.stashy.ui.NativeSheetTopBar("Merge into", onClose = onCancel, closeDescription = "Cancel")
             LazyColumn(Modifier.weight(1f).fillMaxWidth(), contentPadding = PaddingValues(horizontal = 20.dp, vertical = 8.dp)) {
                 item(key = "header") {
                     Text(sectionTitle.uppercase(), style = IosTypography.footnote, color = p.secondaryText, modifier = Modifier.padding(start = 16.dp, bottom = 8.dp))

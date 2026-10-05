@@ -442,19 +442,9 @@ private fun DownloadSyncJobSheet(
         .filter { search.isEmpty() || it.name.contains(search, true) }
         .sortedBy { it.name.lowercase(Locale.ROOT) }
 
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = p.background, dragHandle = null) {
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = p.background) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.92f)) {
-            // Material sheet header: close ✕ · title.
-            Row(
-                Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                androidx.compose.material3.IconButton(onClick = onDismiss) { Icon(SF.xmark, "Close", tint = p.text) }
-                Text(
-                    "New sync job", style = androidx.compose.material3.MaterialTheme.typography.titleLarge, color = p.text,
-                    modifier = Modifier.weight(1f).padding(start = 4.dp),
-                )
-            }
+            de.letzgo.stashy.ui.NativeSheetTopBar("New sync job", onClose = onDismiss)
             LazyColumn(
                 Modifier.weight(1f).fillMaxWidth(),
                 contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = ToolsTokens.contentPadding, vertical = 8.dp),

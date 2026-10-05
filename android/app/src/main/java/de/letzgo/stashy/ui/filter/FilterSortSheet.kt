@@ -42,6 +42,8 @@ import de.letzgo.stashy.data.SortCatalog
 import de.letzgo.stashy.data.SortOption
 import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
+import de.letzgo.stashy.ui.NativeSheetAction
+import de.letzgo.stashy.ui.NativeSheetTopBar
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.catalog.CatalogController
@@ -78,7 +80,7 @@ fun CatalogFilterSortSheet(
                 onSave = { showSaveChoice = true },
                 onDone = { controller.isSheetPresented = false },
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(8.dp))
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(16.dp)) {
                 FilterPickerCard(controller)
                 if (controller.mode == FilterMode.Groups) GroupSortCard(controller.sort) { controller.changeSort(it) }
@@ -120,28 +122,13 @@ fun CatalogFilterSortSheet(
 
 private enum class NameDialog { SaveAs, Rename }
 
-/** iOS: `CatalogSettingsSheetChromeBar` — Reset (red) · "Settings" · Save · Done. */
+/** iOS: `CatalogSettingsSheetChromeBar` (Reset · "Settings" · Save · Done) → Material sheet top bar. */
 @Composable
 private fun SheetChromeBar(onReset: () -> Unit, onSave: () -> Unit, onDone: () -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        ChromePill("Reset", StashyColors.systemRed, onReset)
-        Text("Settings", Modifier.weight(1f), style = IosTypography.title3, color = Theme.palette.text, maxLines = 1)
-        ChromePill("Save", Color.White, onSave)
-        ChromePill("Done", Color.White, onDone)
+    NativeSheetTopBar("Settings", onClose = onDone, closeDescription = "Done") {
+        NativeSheetAction("Reset", destructive = true, onClick = onReset)
+        NativeSheetAction("Save", onClick = onSave)
     }
-}
-
-@Composable
-private fun ChromePill(title: String, color: Color, onClick: () -> Unit) {
-    Text(
-        title,
-        Modifier.stashyGlass(RoundedCornerShape(50)).clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 9.dp),
-        style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = color,
-    )
 }
 
 /** iOS: `filterPickerCard` — None, server filters (section), local presets (section). */
