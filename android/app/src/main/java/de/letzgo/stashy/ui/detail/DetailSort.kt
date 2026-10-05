@@ -2,7 +2,6 @@ package de.letzgo.stashy.ui.detail
 
 import de.letzgo.stashy.data.FindFilter
 import de.letzgo.stashy.data.Prefs
-import org.json.JSONObject
 import kotlin.math.roundToInt
 
 /**
@@ -184,27 +183,6 @@ object DetailViewConfig {
     fun sceneSort(context: DetailViewContext): DetailSort.Scene = DetailSort.Scene.from(sortOption(context)) ?: DetailSort.Scene.DateDesc
 
     fun imageSort(context: DetailViewContext): DetailSort.Image = DetailSort.Image.from(sortOption(context)) ?: DetailSort.Image.DateDesc
-}
-
-/** iOS: `CatalogCardColumns` per `CatalogCardColumnScope` (`CatalogCardColumns` JSON dict). */
-object CardColumnsPrefs {
-    private const val KEY = "CatalogCardColumns"
-
-    fun columns(scope: String): Int {
-        val raw = runCatching { JSONObject(Prefs.string(KEY) ?: "{}") }.getOrNull() ?: return 2
-        if (raw.has(scope)) return raw.optInt(scope, 2).takeIf { it == 1 || it == 2 } ?: 2
-        // iOS: opened-gallery is seeded from the shared Images preference.
-        if (scope == "openedGallery" && raw.has("images")) return raw.optInt("images", 2).takeIf { it == 1 || it == 2 } ?: 2
-        return 2
-    }
-
-    fun toggle(scope: String): Int {
-        val raw = runCatching { JSONObject(Prefs.string(KEY) ?: "{}") }.getOrNull() ?: JSONObject()
-        val next = if (columns(scope) == 1) 2 else 1
-        raw.put(scope, next)
-        Prefs.setString(KEY, raw.toString())
-        return next
-    }
 }
 
 /** iOS `DesignTokens.Grid.adaptiveColumnCount`. */

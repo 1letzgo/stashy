@@ -105,11 +105,13 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
             }
             DetailTopBar(
                 p?.name ?: "", catalog.available, tab, { tab = it }, slots + extra, menu,
+                settings = catalog.imagesSettingsSlot(tab),
                 isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
                 onEdit = { editing = true }, editLabel = "Edit performer",
             )
         }
 
+        LinkedImagesSettingsSheet(catalog)
         if (editing && p != null) EditPerformerSheet(p, onDismiss = { editing = false }, onSaved = { performer = it })
         if (showSceneDownloadOptions) {
             SceneBulkDownloadDialog(Downloads.SceneDownloadScope.Performer(performerId), performer?.name ?: "", performer?.sceneCount) { showSceneDownloadOptions = false }

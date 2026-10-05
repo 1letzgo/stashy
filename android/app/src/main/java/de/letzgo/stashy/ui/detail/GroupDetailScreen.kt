@@ -75,8 +75,10 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
                 DetailTab.Scenes -> listOf(sceneBulkDownloadSlot { showSceneDownloadOptions = true })
                 else -> emptyList()
             }
-            DetailTopBar(group?.name ?: "", catalog.available, tab, { tab = it }, slots + extra, menu, onEdit = { editing = true }, editLabel = "Edit group")
+            DetailTopBar(group?.name ?: "", catalog.available, tab, { tab = it }, slots + extra, menu,
+                settings = catalog.imagesSettingsSlot(tab), onEdit = { editing = true }, editLabel = "Edit group")
         }
+        LinkedImagesSettingsSheet(catalog)
         val g = group
         if (editing && g != null) EditGroupSheet(g, { editing = false }) { group = it }
         if (showSceneDownloadOptions) {

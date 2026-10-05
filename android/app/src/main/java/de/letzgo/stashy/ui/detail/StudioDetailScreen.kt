@@ -124,10 +124,12 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null) : Sc
             }
             DetailTopBar(
                 studio?.name ?: "", catalog.available, tab, { tab = it }, slots + extra, menu,
+                settings = catalog.imagesSettingsSlot(tab),
                 isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
                 onEdit = { editing = true }, editLabel = "Edit studio",
             )
         }
+        LinkedImagesSettingsSheet(catalog)
         val s = studio
         if (editing && s != null) EditStudioSheet(s, { editing = false }) { studio = it }
         if (showSceneDownloadOptions) {

@@ -112,10 +112,12 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null) : Screen {
             }
             DetailTopBar(
                 tag?.name ?: "", catalog.available, tab, { tab = it }, slots + extra, menu,
+                settings = catalog.imagesSettingsSlot(tab),
                 isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
                 onEdit = { editing = true }, editLabel = "Edit tag",
             )
         }
+        LinkedImagesSettingsSheet(catalog)
         val t = tag
         if (editing && t != null) EditTagSheet(t, { editing = false }) { tag = it }
         if (showSceneDownloadOptions) {

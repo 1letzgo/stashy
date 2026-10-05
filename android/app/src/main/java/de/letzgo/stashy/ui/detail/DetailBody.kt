@@ -1,9 +1,5 @@
 package de.letzgo.stashy.ui.detail
 
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.HorizontalDivider
 import de.letzgo.stashy.ui.uniqueItemsIndexed
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,13 +15,16 @@ import androidx.compose.foundation.lazy.grid.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import de.letzgo.stashy.data.CatalogCardColumnScope
+import de.letzgo.stashy.data.CatalogPrefs
 import de.letzgo.stashy.data.DetailRepository
+import de.letzgo.stashy.data.FilterMode
+import de.letzgo.stashy.data.SortCatalog
 import de.letzgo.stashy.data.Gallery
 import de.letzgo.stashy.data.Performer
 import de.letzgo.stashy.data.Scene
@@ -41,7 +40,15 @@ import de.letzgo.stashy.ui.TabBarClearance
 import de.letzgo.stashy.ui.components.SceneCard
 import de.letzgo.stashy.ui.noRippleClickable
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
+import de.letzgo.stashy.ui.catalog.CatalogChromeSlot
+import de.letzgo.stashy.ui.catalog.CatalogController
 import de.letzgo.stashy.ui.catalog.ImageFeedGridModel
+import de.letzgo.stashy.ui.catalog.ImageMediaKindHolder
+import de.letzgo.stashy.ui.filter.CardColumnsCard
+import de.letzgo.stashy.ui.filter.CatalogFilterSortSheet
+import de.letzgo.stashy.ui.filter.ImageListMediaKind
+import de.letzgo.stashy.ui.filter.ImageMediaTypeCard
+import de.letzgo.stashy.ui.filter.ImagesFeedAutoplaySettingsCard
 import de.letzgo.stashy.ui.catalog.imageFeedItems
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -66,7 +73,6 @@ internal class LinkedCatalog(
     private val groupScope: JsonObject? = null,
     private val imageScope: JsonObject? = null,
     val sceneContext: DetailViewContext? = null,
-    imageContext: DetailViewContext? = null,
     /** Scene / gallery counts known from the list item, so the first tab is right before loading. */
     var previewScenes: Int = 0,
     var previewGalleries: Int = 0,
@@ -79,8 +85,8 @@ internal class LinkedCatalog(
     var studioSort by mutableStateOf(DetailSort.Studio.NameAsc)
     var performerSort by mutableStateOf(DetailSort.Performer.NameAsc)
     var tagSort by mutableStateOf(DetailSort.Tag.SceneCountDesc)
-    var imageSort by mutableStateOf(imageContext?.let { DetailViewConfig.imageSort(it) } ?: DetailSort.Image.DateDesc)
-    var imageColumns by mutableIntStateOf(CardColumnsPrefs.columns(if (imageContext == DetailViewContext.Gallery) "openedGallery" else "images"))
+    /** Per row of the Images section (iOS `CatalogCardColumnScope.images`, set in the images sheet). */
+    val imageColumns: Int get() = CatalogPrefs.cardColumns(CatalogCardColumnScope.Images).raw
 
     val scenes = sceneScope?.let { s -> PagedList<Scene>(scope, 20) { page, per -> DetailRepository.scenes(DetailSort.findFilter(page, per, sceneSort), s) } }
     val galleries = galleryScope?.let { s -> PagedList<Gallery>(scope, 20) { page, per -> DetailRepository.galleries(DetailSort.findFilter(page, per, gallerySort), s) } }
@@ -88,7 +94,24 @@ internal class LinkedCatalog(
     val performers = performerScope?.let { s -> PagedList<Performer>(scope, 20) { page, per -> DetailRepository.performers(DetailSort.findFilter(page, per, performerSort), s) } }
     val tags = tagScope?.let { s -> PagedList<Tag>(scope, 40) { page, per -> DetailRepository.tags(DetailSort.findFilter(page, per, tagSort), s) } }
     val groups = groupScope?.let { s -> PagedList<StashGroup>(scope, 20) { page, per -> DetailRepository.groups(FindFilter(page, per, "name", "ASC"), s) } }
-    val images = imageScope?.let { s -> PagedList<StashImage>(scope, 40) { page, per -> DetailRepository.images(DetailSort.findFilter(page, per, imageSort), s) } }
+    /** iOS `liveFilterMediaKind` of the Images section ("Type": Any / Image / Video). */
+    val imageKind = ImageMediaKindHolder()
+    /**
+     * Images section (iOS `DetailLinkedImagesFilterModel`): filter, sort (`dateDesc`, session
+     * only), Type and criteria from the images sheet; [imageScope] is layered last, so nothing
+     * in the sheet can widen the list beyond this entity.
+     */
+    val imageController = imageScope?.let { s ->
+        CatalogController<StashImage>(
+            FilterMode.Images, scope,
+            tabId = null,
+            scope = s,
+            initialSort = SortCatalog.option(FilterMode.Images, DetailSort.Image.DateDesc.raw),
+            extraLive = { imageKind.kind.pathCriterion?.let { JsonObject(mapOf("path" to it)) } ?: JsonObject(emptyMap()) },
+            persistSort = {},
+        )
+    }
+    val images: PagedList<StashImage>? = imageController?.list
     /** Grouped 1/row feed of the Images section (iOS `LinkedImagesCatalogGrid` / `ImagesView(gallery:)`). */
     val imageFeed = ImageFeedGridModel()
 
@@ -97,7 +120,9 @@ internal class LinkedCatalog(
     fun loadAll(force: Boolean = false) {
         if (started && !force) return
         started = true
-        listOfNotNull(scenes, galleries, studios, performers, tags, groups, images).forEach { it.refresh() }
+        listOfNotNull(scenes, galleries, studios, performers, tags, groups).forEach { it.refresh() }
+        // First appearance also loads the saved filters the images sheet offers.
+        imageController?.let { c -> if (c.list.loadedOnce) c.refresh() else c.onAppear() }
     }
 
     fun list(tab: DetailTab): PagedList<*>? = when (tab) {
@@ -108,7 +133,14 @@ internal class LinkedCatalog(
     /** iOS `effectiveScenes` — once the first fetch is done the server count wins. */
     val effectiveScenes: Int get() = scenes?.let { if (it.loadedOnce) it.totalCount else maxOf(it.totalCount, previewScenes) } ?: 0
     val effectiveGalleries: Int get() = maxOf(galleries?.totalCount ?: 0, previewGalleries)
-    val effectiveImages: Int get() = maxOf(images?.totalCount ?: 0, previewImages)
+    val effectiveImages: Int get() {
+        val total = maxOf(images?.totalCount ?: 0, previewImages)
+        // A sheet filter / Type that matches nothing keeps the tab (empty state), no auto-switch away.
+        return if (imagesFiltered) maxOf(total, 1) else total
+    }
+
+    /** The images sheet narrows the list (filter, preset, criteria or Type). */
+    val imagesFiltered: Boolean get() = imageController?.let { it.isFilterActive || imageKind.kind != ImageListMediaKind.All } ?: false
 
     fun count(tab: DetailTab): Int = when (tab) {
         DetailTab.Scenes -> effectiveScenes
@@ -136,31 +168,37 @@ internal class LinkedCatalog(
     }
 
     /** Footer slots + sort menu for [tab] (iOS `*DetailListSlots`). */
-    fun slots(tab: DetailTab, imageScopeKey: String = "images"): Pair<List<ChromeSlot>, (@Composable (() -> Unit) -> Unit)?> = when (tab) {
+    fun slots(tab: DetailTab): Pair<List<ChromeSlot>, (@Composable (() -> Unit) -> Unit)?> = when (tab) {
         DetailTab.Scenes -> emptyList<ChromeSlot>() to { d -> SortMenuItems(DetailSort.Scene.entries, sceneSort, d) { changeSceneSort(it) } }
         DetailTab.Galleries -> emptyList<ChromeSlot>() to { d -> SortMenuItems(DetailSort.Gallery.entries, gallerySort, d) { resort(tab, gallerySort, it) { s -> gallerySort = s } } }
         DetailTab.Studios -> emptyList<ChromeSlot>() to { d -> SortMenuItems(DetailSort.Studio.entries, studioSort, d) { resort(tab, studioSort, it) { s -> studioSort = s } } }
         DetailTab.Performers -> emptyList<ChromeSlot>() to { d -> SortMenuItems(DetailSort.Performer.entries, performerSort, d) { resort(tab, performerSort, it) { s -> performerSort = s } } }
         DetailTab.Tags -> emptyList<ChromeSlot>() to { d -> SortMenuItems(DetailSort.Tag.entries, tagSort, d) { resort(tab, tagSort, it) { s -> tagSort = s } } }
-        DetailTab.Groups -> emptyList<ChromeSlot>() to null
-        // Sort, then the per-row layout of this list (iOS: "Per row" in the images settings sheet).
-        DetailTab.Images -> emptyList<ChromeSlot>() to { d ->
-            SortMenuItems(DetailSort.Image.entries, imageSort, d) { resort(tab, imageSort, it) { s -> imageSort = s } }
-            HorizontalDivider()
-            listOf(1, 2).forEach { n ->
-                DropdownMenuItem(
-                    text = { Text(if (n == 1) "1 per row" else "2 per row") },
-                    trailingIcon = { if (imageColumns == n) Icon(SF.checkmark, null) },
-                    onClick = {
-                        d()
-                        // Through TabManager so Home / Settings see the same value.
-                        val scope = de.letzgo.stashy.data.CatalogCardColumnScope.entries.firstOrNull { it.raw == imageScopeKey } ?: de.letzgo.stashy.data.CatalogCardColumnScope.Images
-                        de.letzgo.stashy.data.CatalogPrefs.setCardColumns(scope, if (n == 1) de.letzgo.stashy.data.CatalogCardColumns.One else de.letzgo.stashy.data.CatalogCardColumns.Two)
-                        imageColumns = n
-                    },
-                )
-            }
+        // Images: no sort menu — the top bar's Settings opens the images sheet ([imagesSettingsSlot]).
+        DetailTab.Groups, DetailTab.Images -> emptyList<ChromeSlot>() to null
+    }
+
+    /** Top-bar "Settings" of the Images section (iOS filter & sort FAB of `LinkedImagesCatalogGrid`). */
+    fun imagesSettingsSlot(tab: DetailTab): CatalogChromeSlot? {
+        val c = imageController ?: return null
+        if (tab != DetailTab.Images) return null
+        return CatalogChromeSlot(SF.sliderHorizontal3, imagesFiltered, "Settings") {
+            c.isSheetPresented = true
         }
+    }
+}
+
+/**
+ * iOS `ImagesCatalogFilterSortSheet` of a detail screen's Images section: filter & sort, Type,
+ * Per row (`CatalogCardColumnScope.images`), feed autoplay and the criteria editor.
+ */
+@Composable
+internal fun LinkedImagesSettingsSheet(catalog: LinkedCatalog) {
+    val c = catalog.imageController ?: return
+    CatalogFilterSortSheet(c, onReset = { catalog.imageKind.kind = ImageListMediaKind.All }) {
+        ImageMediaTypeCard(catalog.imageKind.kind) { catalog.imageKind.kind = it; c.applyLive() }
+        CardColumnsCard(CatalogCardColumnScope.Images)
+        ImagesFeedAutoplaySettingsCard()
     }
 }
 
@@ -278,7 +316,7 @@ internal fun LazyGridScope.imageSection(catalog: LinkedCatalog, gridState: LazyG
     val list = catalog.images ?: return
     imageSection(
         list, useFeed = catalog.imageColumns == 1 && catalog.usesImageFeed, feedModel = catalog.imageFeed,
-        sortRaw = catalog.imageSort.raw, gridState = gridState, currentGalleryId = currentGalleryId,
+        sortRaw = catalog.imageController?.sort?.raw ?: "", gridState = gridState, currentGalleryId = currentGalleryId,
     )
 }
 
