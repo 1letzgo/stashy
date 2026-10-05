@@ -94,21 +94,20 @@ class PerformerDetailScreen(val performerId: String, val preview: Performer? = n
         val p = performer
 
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
-            DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, header = { Header(p) }) {
+            DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, hasTabs = catalog.available.size > 1, header = { Header(p) }) {
                 linkedSection(catalog, tab, gridState)
             }
-            DetailNavBar(
-                catalog.available, tab, { tab = it },
-                isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
-                onEdit = { editing = true }, editLabel = "Edit performer",
-            )
             val (slots, menu) = catalog.slots(tab)
             // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
             val extra = when (tab) {
                 DetailTab.Scenes -> listOf(sceneBulkDownloadSlot { showSceneDownloadOptions = true })
                 else -> emptyList()
             }
-            DetailSlotBar(slots + extra, menu)
+            DetailTopBar(
+                p?.name ?: "", catalog.available, tab, { tab = it }, slots + extra, menu,
+                isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
+                onEdit = { editing = true }, editLabel = "Edit performer",
+            )
         }
 
         if (editing && p != null) EditPerformerSheet(p, onDismiss = { editing = false }, onSaved = { performer = it })

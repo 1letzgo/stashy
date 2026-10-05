@@ -234,9 +234,10 @@ fun FiltersToolEditorSheet(
 }
 
 /**
- * iOS: `stashyModalSheetChrome(title, onBack:) { Save }` → `StashyDetailChromeBar` in a dark
- * `StashySectionChromeBar`: tinted "‹ Back" pill, white subheadline title, glass "Save" pill.
+ * iOS: `stashyModalSheetChrome(title, onBack:) { Save }` — Android: Material top app bar of a
+ * full-screen editor (close ✕ · title · "Save" text button), no status bar inset inside the sheet.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun EditorChromeBar(
     title: String,
@@ -246,47 +247,34 @@ private fun EditorChromeBar(
     saveEnabled: Boolean,
     onSave: () -> Unit,
 ) {
-    Column(Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.85f))) {
-        Row(
-            Modifier.fillMaxWidth().heightIn(min = PillHeight).padding(horizontal = 16.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            Row(
-                Modifier.height(PillHeight)
-                    .floatingShadow(RoundedCornerShape(50))
-                    .stashyGlass(RoundedCornerShape(50), Appearance.tint)
-                    .clickable(onClick = onBack)
-                    .padding(horizontal = PillPadding),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBackIos, null, tint = Color.White, modifier = Modifier.size(18.dp))
-                Text("Back", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
-            }
-            Text(
-                title, Modifier.weight(1f),
-                style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = Color.White,
-                maxLines = 1, overflow = TextOverflow.Ellipsis,
-            )
-            if (isSaving) {
-                CircularProgressIndicator(Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
-            } else {
-                Box(
-                    Modifier.height(PillHeight).widthIn(min = PillHeight)
-                        .stashyGlass(RoundedCornerShape(50))
-                        .clickable(enabled = saveEnabled, onClick = onSave)
-                        .padding(horizontal = PillPadding),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Text(
-                        "Save", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold),
-                        color = if (saveDimmed) Color.White.copy(alpha = 0.4f) else Color.White,
-                    )
+    val p = Theme.palette
+    Column(Modifier.fillMaxWidth()) {
+        androidx.compose.material3.TopAppBar(
+            title = { Text(title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = androidx.compose.material3.MaterialTheme.typography.titleLarge) },
+            navigationIcon = {
+                androidx.compose.material3.IconButton(onClick = onBack) { Icon(SF.xmark, "Close") }
+            },
+            actions = {
+                if (isSaving) {
+                    CircularProgressIndicator(Modifier.padding(horizontal = 16.dp).size(20.dp), color = Appearance.tint, strokeWidth = 2.dp)
+                } else {
+                    TextButton(onClick = onSave, enabled = saveEnabled) {
+                        Text(
+                            "Save", fontWeight = FontWeight.SemiBold,
+                            color = if (saveDimmed || !saveEnabled) Appearance.tint.copy(alpha = 0.38f) else Appearance.tint,
+                        )
+                    }
                 }
-            }
-        }
-        Box(Modifier.fillMaxWidth().height(0.5.dp).background(Color.White.copy(alpha = 0.15f)))
+            },
+            windowInsets = androidx.compose.foundation.layout.WindowInsets(0, 0, 0, 0),
+            colors = androidx.compose.material3.TopAppBarDefaults.topAppBarColors(
+                containerColor = p.background,
+                titleContentColor = p.text,
+                navigationIconContentColor = p.text,
+                actionIconContentColor = p.text,
+            ),
+        )
+        Box(Modifier.fillMaxWidth().height(0.5.dp).background(p.separator))
     }
 }
 

@@ -44,7 +44,10 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import de.letzgo.stashy.data.Scene
 import de.letzgo.stashy.ui.Appearance
-import de.letzgo.stashy.ui.GlassCapsule
+import de.letzgo.stashy.ui.NativeTopBar
+import de.letzgo.stashy.ui.OverflowItem
+import de.letzgo.stashy.ui.TopBarAction
+import de.letzgo.stashy.ui.TopBarOverflowMenu
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.Screen
@@ -165,7 +168,7 @@ private fun SceneDetailContent(model: SceneDetailModel) {
         val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
         val pinned = model.isPlaybackStarted && player != null && !landscape
         Column(Modifier.fillMaxSize()) {
-            SceneDetailNavBar(model)
+            SceneDetailNavBar(model) { sheet = EditSheet.Title }
             val playerCard: @Composable () -> Unit = {
                 Column(Modifier.fillMaxWidth().cardShadow().clip(RoundedCornerShape(Tokens.Radius.card)).background(p.secondaryBackground)) {
                     SceneVideoPlayerCard(model, extraMenuItems)
@@ -271,26 +274,23 @@ private fun SceneDetailContent(model: SceneDetailModel) {
     )
 }
 
-/** iOS: `sceneDetailNavBar` — Back pill (accent) · Identify (no StashID yet) · download state. */
+/**
+ * iOS: `sceneDetailNavBar` (Back pill · Identify · download state) as a native Material top app
+ * bar: back arrow · scene title · Identify (no StashID yet) · download state · "⋮" overflow
+ * with the page's rarer actions (edit title & details, delete — same handlers as the cards).
+ */
 @Composable
-private fun SceneDetailNavBar(model: SceneDetailModel) {
-    Row(
-        Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        GlassCapsule(tint = Appearance.tint, height = 40.dp, contentPadding = androidx.compose.foundation.layout.PaddingValues(horizontal = 14.dp), onClick = { Nav.pop() }) {
-            Icon(PlayerIcons.back, "Back", tint = Color.White, modifier = Modifier.size(18.dp))
-            Text("Back", color = Color.White, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold))
-        }
-        Spacer(Modifier.weight(1f))
+private fun SceneDetailNavBar(model: SceneDetailModel, onEditTitle: () -> Unit) {
+    NativeTopBar(model.scene.displayTitle) {
         if (!model.scene.hasStashID) {
-            Box(Modifier.size(40.dp).stashyGlass(CircleShape).clickable(enabled = !model.isIdentifying) { model.identify() }, contentAlignment = Alignment.Center) {
-                if (model.isIdentifying) CircularProgressIndicator(Modifier.size(22.dp), color = Appearance.tint, strokeWidth = 2.5.dp)
-                else Icon(PlayerIcons.identify, "Identify scene", tint = Color.White.copy(alpha = 0.72f), modifier = Modifier.size(18.dp))
-            }
+            TopBarAction(PlayerIcons.identify, "Identify scene", busy = model.isIdentifying) { model.identify() }
         }
         // iOS `sceneDownloadNavButton`: green check · progress ring · "Save scene" (stashy+ gate on tap).
-        SceneDownloadNavButton(model.scene, size = 40.dp)
+        SceneDownloadNavButton(model.scene)
+        TopBarOverflowMenu { dismiss ->
+            if (Appearance.isEditModeEnabled) OverflowItem("Edit title & details", de.letzgo.stashy.ui.SF.pencil, dismiss, onClick = onEditTitle)
+            OverflowItem("Delete scene", PlayerIcons.trash, dismiss, color = StashyColors.systemRed) { model.showDeleteConfirmation = true }
+        }
     }
 }
 

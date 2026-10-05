@@ -93,31 +93,31 @@ fun SceneBulkDownloadButton(onClick: () -> Unit, modifier: Modifier = Modifier, 
 /**
  * iOS: `SceneDetailView.sceneDownloadNavButton` — green check when downloaded, progress ring
  * while downloading (indeterminate until the size is known), else the "Save scene" button.
+ * Android: a Material app bar action of the scene's `NativeTopBar` (48 dp touch target).
  */
 @Composable
-fun SceneDownloadNavButton(scene: Scene, modifier: Modifier = Modifier, size: Dp = DownloadsCircleSize) {
+fun SceneDownloadNavButton(scene: Scene, modifier: Modifier = Modifier) {
     val downloaded = Downloads.downloads.any { it.id == scene.id }
     val active = Downloads.activeDownloads[scene.id]
     when {
-        downloaded -> Box(modifier.size(size), contentAlignment = Alignment.Center) {
-            Icon(Icons.Filled.CheckCircle, "Downloaded", tint = StashyColors.systemGreen, modifier = Modifier.size(size * 0.55f))
+        downloaded -> Box(modifier.size(48.dp), contentAlignment = Alignment.Center) {
+            Icon(Icons.Filled.CheckCircle, "Downloaded", tint = StashyColors.systemGreen)
         }
-        active != null -> Box(modifier.size(size), contentAlignment = Alignment.Center) {
+        active != null -> Box(modifier.size(48.dp), contentAlignment = Alignment.Center) {
             if (active.totalSize > 0) {
                 CircularProgressIndicator(
                     progress = { active.progress.coerceIn(0.0, 1.0).toFloat() },
-                    modifier = Modifier.size(size * 0.8f), color = Appearance.tint,
-                    trackColor = Color.White.copy(alpha = 0.25f), strokeWidth = 2.5.dp,
+                    modifier = Modifier.size(22.dp), color = Appearance.tint,
+                    trackColor = Appearance.tint.copy(alpha = 0.2f), strokeWidth = 2.5.dp,
                 )
             } else {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(size * 0.8f), color = Appearance.tint,
-                    trackColor = Color.White.copy(alpha = 0.25f), strokeWidth = 2.5.dp,
+                    modifier = Modifier.size(22.dp), color = Appearance.tint,
+                    trackColor = Appearance.tint.copy(alpha = 0.2f), strokeWidth = 2.5.dp,
                 )
             }
         }
-        // iOS: `.white.opacity(StashyExpandingDock.inactiveIconOpacity)` like the Identify button beside it.
-        else -> GlassIconButton(DownloadGlyph, "Save scene", modifier, size = size, iconTint = Color.White.copy(alpha = 0.72f)) { Downloads.downloadScene(scene) }
+        else -> de.letzgo.stashy.ui.TopBarAction(DownloadGlyph, "Save scene", modifier) { Downloads.downloadScene(scene) }
     }
 }
 

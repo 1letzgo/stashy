@@ -99,14 +99,9 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null) : Screen {
         LaunchedEffect(Unit) { if (!started) { started = true; load() } }
         AutoSwitchTab(catalog, tab) { tab = it }
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
-            DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, header = { tag?.let { Header(it) } }) {
+            DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, hasTabs = catalog.available.size > 1, header = { tag?.let { Header(it) } }) {
                 linkedSection(catalog, tab, gridState)
             }
-            DetailNavBar(
-                catalog.available, tab, { tab = it },
-                isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
-                onEdit = { editing = true }, editLabel = "Edit tag",
-            )
             val (slots, menu) = catalog.slots(tab)
             // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
             val extra = when (tab) {
@@ -115,7 +110,11 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null) : Screen {
                 DetailTab.Images -> listOf(imageSetDownloadSlot("tag-$tagId", "Download images") { showTagImagesOptions = true })
                 else -> emptyList()
             }
-            DetailSlotBar(slots + extra, menu)
+            DetailTopBar(
+                tag?.name ?: "", catalog.available, tab, { tab = it }, slots + extra, menu,
+                isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
+                onEdit = { editing = true }, editLabel = "Edit tag",
+            )
         }
         val t = tag
         if (editing && t != null) EditTagSheet(t, { editing = false }) { tag = it }

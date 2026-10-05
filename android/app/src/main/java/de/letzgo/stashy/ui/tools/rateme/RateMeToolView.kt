@@ -685,24 +685,18 @@ private fun ThemePickerSheet(
     ) {
         Column(Modifier.fillMaxWidth().heightIn(min = 400.dp).imePadding()) {
             // iOS `stashyModalSheetChrome(title, onBack:)`.
-            Box(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp)) {
-                Box(
-                    Modifier
-                        .align(Alignment.CenterStart)
-                        .size(36.dp)
-                        .clip(CircleShape)
-                        .background(p.secondaryBackground, CircleShape)
-                        .clickable {
-                            scope.launch {
-                                sheetState.hide()
-                                onDismiss()
-                            }
-                        },
-                    contentAlignment = Alignment.Center,
-                ) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBackIos, "Back", tint = p.text, modifier = Modifier.size(16.dp).padding(start = 3.dp))
-                }
-                Text(kind.title, style = IosTypography.headline, color = p.text, modifier = Modifier.align(Alignment.Center))
+            // Material sheet header: close ✕ · title.
+            Row(Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.material3.IconButton(onClick = {
+                    scope.launch {
+                        sheetState.hide()
+                        onDismiss()
+                    }
+                }) { Icon(de.letzgo.stashy.ui.SF.xmark, "Close", tint = p.text) }
+                Text(
+                    kind.title, style = androidx.compose.material3.MaterialTheme.typography.titleLarge, color = p.text,
+                    modifier = Modifier.weight(1f).padding(start = 4.dp),
+                )
             }
             LazyColumn(
                 Modifier.fillMaxWidth(),

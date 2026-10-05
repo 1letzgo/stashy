@@ -66,17 +66,16 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
         LaunchedEffect(Unit) { if (!started) { started = true; load() } }
         AutoSwitchTab(catalog, tab) { tab = it }
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
-            DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, header = { group?.let { Header(it) } }) {
+            DetailGrid(gridState, { w -> columnsFor(tab, w, catalog.imageColumns) }, hasTabs = catalog.available.size > 1, header = { group?.let { Header(it) } }) {
                 linkedSection(catalog, tab, gridState)
             }
-            DetailNavBar(catalog.available, tab, { tab = it }, onEdit = { editing = true }, editLabel = "Edit group")
             val (slots, menu) = catalog.slots(tab)
             // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
             val extra = when (tab) {
                 DetailTab.Scenes -> listOf(sceneBulkDownloadSlot { showSceneDownloadOptions = true })
                 else -> emptyList()
             }
-            DetailSlotBar(slots + extra, menu)
+            DetailTopBar(group?.name ?: "", catalog.available, tab, { tab = it }, slots + extra, menu, onEdit = { editing = true }, editLabel = "Edit group")
         }
         val g = group
         if (editing && g != null) EditGroupSheet(g, { editing = false }) { group = it }
