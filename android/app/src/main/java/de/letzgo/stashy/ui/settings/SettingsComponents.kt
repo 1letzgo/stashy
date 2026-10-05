@@ -110,14 +110,9 @@ fun SectionFooterText(text: String) {
     Text(text, style = IosTypography.footnote, color = Theme.palette.secondaryText, modifier = Modifier.fillMaxWidth().padding(top = 8.dp))
 }
 
-/** iOS `StashyBetaBadge`. */
+/** iOS `StashyBetaBadge` — one implementation for Settings and Tools ("Beta", 10 pt bold). */
 @Composable
-fun BetaBadge() {
-    Text(
-        "BETA", style = IosTypography.caption2.copy(fontWeight = FontWeight.Bold), color = Appearance.tint,
-        modifier = Modifier.background(Appearance.tint.copy(alpha = 0.15f), RoundedCornerShape(50)).padding(horizontal = 6.dp, vertical = 2.dp),
-    )
-}
+fun BetaBadge() = de.letzgo.stashy.ui.tools.BetaBadge()
 
 /** Rounded block (`stashyGroupedBlockRow`) — children get separators via [SettingsDivider]. */
 @Composable

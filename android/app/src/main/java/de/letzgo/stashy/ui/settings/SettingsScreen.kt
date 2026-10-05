@@ -31,6 +31,10 @@ import de.letzgo.stashy.ui.SFS
 import de.letzgo.stashy.ui.Theme
 import de.letzgo.stashy.ui.catalog.catalogTopPadding
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.foundation.layout.padding
+import de.letzgo.stashy.BuildConfig
+import de.letzgo.stashy.ui.tools.StashyTipsSection
+import de.letzgo.stashy.ui.tools.stashyPlusSettingsItems
 
 /** iOS: `SettingsView.SettingsSection` (titles = chip labels). */
 enum class SettingsSection(val title: String, val icon: ImageVector) {
@@ -91,31 +95,19 @@ private fun androidx.compose.foundation.lazy.LazyListScope.designSettings() {
 }
 
 /**
- * iOS `stashyPlusSettings` (unlocked state). The purchase / restore UI is the billing feature's
- * paywall (`openStashyPlusPaywall()`); AI features, custom icons and AI Motion are not on Android.
+ * iOS `stashyPlusSettings` + `stashyPlusPurchaseSection` — the same items as the paywall
+ * (`ui/tools/StashyPlusPaywall.kt`), so both look like iOS's stashy+ section.
  */
 private fun androidx.compose.foundation.lazy.LazyListScope.stashyPlusSettings() {
-    settingsSection(header = "stashy+", key = "plus-status") {
-        SettingsRow {
-            Icon(SFS.checkmarkSealFill, null, tint = Color(0xFF30D158), modifier = Modifier.size(22.dp))
-            Column(Modifier.weight(1f)) {
-                Text(StashyPlus.source.statusTitle, style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = Theme.palette.text)
-                Text(StashyPlus.source.statusDetail, style = IosTypography.caption, color = Theme.palette.secondaryText)
-            }
-        }
-        SettingsDivider()
-        SettingsNavRow("Manage stashy+", SF.sparkles) { de.letzgo.stashy.ui.tools.openStashyPlusPaywall() }
-    }
-    // iOS `StashyPlusAISubtitlesSettings` (+ Android: the downloaded speech / translation packs).
-    settingsSection(header = "AI Subtitles and translation", key = "plus-ai-subtitles") {
-        AiSubtitlesSettingsRows()
-    }
+    stashyPlusSettingsItems()
 }
 
 private fun androidx.compose.foundation.lazy.LazyListScope.aboutSection() {
-    // iOS tipSection — the tip purchase buttons live in the billing feature's UI.
-    settingsSection(header = "Tips", footer = "Support stashy. Tips do not unlock stashy+.", key = "tips") {
-        SettingsNavRow("Leave a Tip", SFS.heart) { de.letzgo.stashy.ui.tools.openStashyPlusPaywall() }
+    // iOS `tipSection` — the tip products inline (header, Small / Medium / Large, footer).
+    // Sideload builds aren't installed by Play, so Play returns no tips there: the section only
+    // shows when tips were loaded instead of a permanent "Tips unavailable".
+    if (!BuildConfig.PLUS_INCLUDED || StashyPlus.tipProducts.isNotEmpty()) item(key = "tips") {
+        StashyTipsSection(Modifier.padding(bottom = 24.dp))
     }
     settingsSection(header = "Links", key = "links") {
         LinkRow("GitHub", SFS.code, "https://github.com/1letzgo/stashy")
@@ -124,21 +116,19 @@ private fun androidx.compose.foundation.lazy.LazyListScope.aboutSection() {
         SettingsDivider()
         SettingsNavRow("Acknowledgements", SFS.docText) { Nav.push(AcknowledgementsScreen()) }
     }
-    settingsSection(header = "App", key = "app-version") { AppVersionRow() }
+    // Android only: sideload builds update themselves from buntes.am (Play builds update via
+    // the Play Store and, like iOS, have no such row).
+    if (de.letzgo.stashy.data.AppUpdate.isEnabled) settingsSection(header = "App", key = "app-version") { AppUpdateRow() }
 }
 
-/** Version of this build; sideload builds can check buntes.am for a newer APK (Android only). */
+/** Version of this build + manual check for a newer sideload APK. */
 @Composable
-private fun AppVersionRow() {
+private fun AppUpdateRow() {
     val context = LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val version = "${de.letzgo.stashy.data.AppUpdate.currentVersionName(context)} (${de.letzgo.stashy.data.AppUpdate.currentVersionCode(context)})"
-    if (de.letzgo.stashy.data.AppUpdate.isEnabled) {
-        SettingsNavRow("Check for Updates", SFS.docText, trailing = version) {
-            scope.launch { de.letzgo.stashy.data.AppUpdate.check(context, manual = true) }
-        }
-    } else {
-        SettingsNavRow("Version", SFS.docText, trailing = version) {}
+    SettingsNavRow("Check for Updates", SFS.arrowDownCircle, trailing = version) {
+        scope.launch { de.letzgo.stashy.data.AppUpdate.check(context, manual = true) }
     }
 }
 
