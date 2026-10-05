@@ -1556,24 +1556,11 @@ struct ReelsViewBody: View {
                 return s.aetherVideoURL
 
             case .marker(let m):
-                let potentialURL: URL?
-                if let streamPath = m.stream, let url = URL(string: streamPath) {
-                    potentialURL = url
-                } else if let config = ServerConfigManager.shared.loadConfig() {
-                    potentialURL = URL(string: "\(config.baseURL)/scenemarker/\(m.id)/stream")
-                } else {
-                    potentialURL = nil
-                }
-                
-                guard let config = ServerConfigManager.shared.activeConfig, let key = config.secureApiKey, !key.isEmpty, let url = potentialURL else { return potentialURL }
-                var comps = URLComponents(url: url, resolvingAgainstBaseURL: false)
-                var items = comps?.queryItems ?? []
-                if !items.contains(where: { $0.name == "apikey" }) {
-                    items.append(URLQueryItem(name: "apikey", value: key.trimmingCharacters(in: .whitespacesAndNewlines)))
-                    comps?.queryItems = items
-                }
-                return comps?.url ?? url
-                
+                // The marker's stretch of the original scene, not the generated marker clip:
+                // with Stash's default generation settings those are low quality and silent.
+                // Same source (local download first) as scene playback.
+                return m.scene?.toScene().aetherVideoURL
+
             case .clip(let c):
                 // For clips (images that are videos or animations), the imagePath IS the video path
                 return c.imageURL
@@ -1585,14 +1572,37 @@ struct ReelsViewBody: View {
         var duration: Double? {
             switch self {
             case .scene(let s): return s.duration
-            case .marker(let m): 
-                if let end = m.endSeconds { return end - m.seconds }
-                return nil
+            case .marker: return playbackSegment?.length
             case .clip(let c): return c.visual_files?.first?.duration
             case .preview(let s): return s.duration
             }
         }
-        
+
+        /// The stretch of the source file a row plays; nil means "the whole file". Markers play
+        /// their segment of the original scene: `seconds` to `end_seconds` when Stash has an end
+        /// for them, otherwise a fixed window from the marker on — clamped to the file's length
+        /// when that is known.
+        var playbackSegment: ReelPlaybackSegment? {
+            guard case .marker(let m) = self else { return nil }
+            let start = max(0, m.seconds)
+            var end: Double
+            if let explicitEnd = m.endSeconds, explicitEnd > start + 0.1 {
+                end = explicitEnd
+            } else {
+                end = start + ReelPlaybackSegment.defaultMarkerLength
+            }
+            if let fileDuration = m.scene?.files?.first?.duration, fileDuration > start + 0.5 {
+                end = min(end, fileDuration)
+            }
+            return ReelPlaybackSegment(start: start, end: end)
+        }
+
+        /// Poster for the scrub preview when no sprite tile is at hand (markers only).
+        var scrubPosterURL: URL? {
+            if case .marker(let m) = self { return m.thumbnailURL }
+            return nil
+        }
+
         var isPortrait: Bool {
             switch self {
             case .scene(let s): return s.isPortrait
@@ -1704,8 +1714,10 @@ struct ReelsViewBody: View {
     private var currentReelItems: [ReelItemData] {
         switch reelsMode {
         case .scenes: return viewModel.scenes.map { ReelItemData.scene($0) }
+        // Markers play their scene's original, so a marker without a generated file of its own
+        // plays like any other; only one without a scene has nothing to play.
         case .markers: return viewModel.sceneMarkers
-            .filter { $0.stream != nil && !$0.stream!.isEmpty }
+            .filter { $0.scene != nil }
             .map { ReelItemData.marker($0) }
             .filter { !unplayableItemIds.contains($0.id) }
         case .clips: return viewModel.clips.map { ReelItemData.clip($0) }
@@ -4137,8 +4149,10 @@ struct ReelsViewBody: View {
     /// library whose markers were never generated lost twenty rows in one go: the list collapsed
     /// under the finger and the feed stalled while it refilled. A rolling window removes them
     /// one or two at a time, ahead of where the user is.
+    ///
+    /// Previews only: markers play their scene's original file, which needs no generation.
     private func probeUpcomingMedia() {
-        guard reelsMode == .markers || reelsMode == .previews else { return }
+        guard reelsMode == .previews else { return }
         let items = currentReelItems
         guard !items.isEmpty else { return }
         let start = currentVisibleSceneId
@@ -4229,9 +4243,11 @@ struct ReelsViewBody: View {
         }
     }
 
-    /// Markers and previews are files the server generates on demand; where that never
-    /// happened the URL still exists and only playback finds out. Such an item is dropped from
-    /// the feed and the next one takes over, instead of leaving a dead row in the rotation.
+    /// Previews are files the server generates on demand; where that never happened the URL
+    /// still exists and only playback finds out. Such an item is dropped from the feed and the
+    /// next one takes over, instead of leaving a dead row in the rotation. Markers play the
+    /// scene's original and only end up here when that failed for real (engine error twice,
+    /// no source at all).
     private func handleUnplayableItem(_ item: ReelItemData) {
         guard reelsMode == .markers || reelsMode == .previews else { return }
         guard !unplayableItemIds.contains(item.id) else { return }
@@ -5241,6 +5257,23 @@ struct ReelItemView: View {
     @State private var didCreditReelsWatch = false
     @State private var reelsWatchedSeconds: Double = 0
     @State private var heldReelsPlayDuration: Double = 0
+    /// Marker rows: the segment end has been acted on (loop seek / advance) and must not fire
+    /// again until the playhead is back inside the segment.
+    @State private var segmentEndHandled = false
+    /// Marker rows: the scene's scrubber sprites, looked up on the first scrub.
+    @State private var scrubSprites: SceneScrubSprites?
+    @State private var didResolveScrubSprites = false
+
+    /// The row's segment with its end pulled in to the file length the engine reports.
+    private var effectivePlaybackSegment: ReelPlaybackSegment? {
+        item.playbackSegment?.clamped(toFileDuration: aetherDuration)
+    }
+
+    /// Engine-level loop at end of file: only for rows that play a whole file. A segment row
+    /// loops (or advances) at its segment end itself — the engine's loop would restart at 0.
+    private var engineLoopsAtEnd: Bool {
+        item.playbackSegment == nil && !TabManager.shared.reelsContinuousPlay
+    }
 
     /// Settings › Playback › "Count as played — Feeds".
     private var reelsMinWatchSecondsBeforePlayCredit: Double {
@@ -5503,8 +5536,10 @@ extension ReelItemView {
                 // Scrubber lives outside the pager; allow seek whenever this row is the active item
                 // (do not require `!isUserScrolling` — that flag can briefly be true during chrome drags).
                 guard isActive, aetherEngine != nil else { return }
-                requestScrubPreviewIfDragging(at: t)
-                seek(to: t)
+                // The bar works in segment time on marker rows; the engine in file time.
+                let fileTime = effectivePlaybackSegment?.fileTime(forRelative: t) ?? t
+                requestScrubPreviewIfDragging(at: fileTime)
+                seek(to: fileTime)
                 DispatchQueue.main.async {
                     if scrubberState.seekTarget != nil {
                         scrubberState.seekTarget = nil
@@ -5531,6 +5566,22 @@ extension ReelItemView {
     /// owns playback. `seekTarget` is also set by checkpoint restore, hence the `seeking` gate.
     private func requestScrubPreviewIfDragging(at seconds: Double) {
         guard isActive, scrubberState.seeking, item.supportsScrubPreview else { return }
+        // Marker rows play the scene's original, often a big file: no frame decode for the
+        // preview. The scene's scrubber sprites when it has them, the marker's screenshot else.
+        if case .marker(let marker) = item {
+            if !didResolveScrubSprites {
+                didResolveScrubSprites = true
+                scrubSprites = SceneScrubSprites(vttPath: marker.scene?.paths?.vtt, spritePath: marker.scene?.paths?.sprite)
+            }
+            scrubSprites?.prepare()
+            if scrubberState.previewPlaceholderURL != item.scrubPosterURL {
+                scrubberState.previewPlaceholderURL = item.scrubPosterURL
+            }
+            if let tile = scrubSprites?.thumbnail(at: seconds) {
+                scrubberState.previewImage = tile
+            }
+            return
+        }
         // The bar lives outside the pager and reads the still off `ScrubberState`, so the
         // decode result is pushed there directly instead of through a view-level binding.
         let state = scrubberState
@@ -5541,11 +5592,15 @@ extension ReelItemView {
     private func endScrubPreview() {
         scrubThumbs.end()
         scrubberState.previewImage = nil
+        scrubberState.previewPlaceholderURL = nil
     }
 
     private func shutdownScrubPreview() {
         scrubThumbs.shutdown()
-        if isActive { scrubberState.previewImage = nil }
+        if isActive {
+            scrubberState.previewImage = nil
+            scrubberState.previewPlaceholderURL = nil
+        }
     }
 
 
@@ -5648,7 +5703,13 @@ extension ReelItemView {
         HapticManager.light()
         let duration = aether.duration
         let raw = aether.currentTime + delta
-        let target = duration > 0 ? min(max(0, raw), duration) : max(0, raw)
+        let target: Double
+        if let segment = effectivePlaybackSegment {
+            // Marker rows skip inside their segment only.
+            target = segment.fileTime(forRelative: raw - segment.start)
+        } else {
+            target = duration > 0 ? min(max(0, raw), duration) : max(0, raw)
+        }
         Task { await aether.seek(to: target) }
         onInteraction()
         return true
@@ -5659,12 +5720,15 @@ extension ReelItemView {
         fastForwardBoostTimer = nil
         guard extraRate > 0.01 else { return }
         let step = 0.25 * extraRate
+        // Marker rows: the boost must not run past the segment end (the row loops / advances there).
+        let segmentEnd = effectivePlaybackSegment?.end
         let timer = Timer(timeInterval: 0.25, repeats: true) { [weak aether] _ in
             Task { @MainActor in
                 guard let aether else { return }
                 let duration = aether.duration
                 var target = aether.currentTime + step
                 if duration > 0 { target = min(target, max(0, duration - 0.5)) }
+                if let segmentEnd { target = min(target, max(0, segmentEnd - 0.3)) }
                 await aether.seek(to: target)
             }
         }
@@ -5873,7 +5937,8 @@ extension ReelItemView {
     /// row, so after one second without media the server is asked whether the file is there at
     /// all — a 404 skips the row at once, anything else keeps waiting (slow link, big file).
     private func armMediaAvailabilityProbe() {
-        guard !item.isAnimated else { return }
+        // Previews only: a marker row plays the scene's original, never a generated file.
+        guard case .preview = item else { return }
         mediaProbeTask?.cancel()
         mediaProbeTask = Task { @MainActor in
             if await cancellableSleep(nanoseconds: 1_000_000_000) { return }
@@ -6019,13 +6084,23 @@ extension ReelItemView {
 
         engineErrorMessage = nil
         aether.isMuted = isMuted
-        // Only full scenes have server transcodes to fall back to; markers, clips and previews
-        // are their own clip and keep the ladder empty.
-        if case .scene(let scene) = item {
+        // Full scenes — and markers, which play their scene's original — have server
+        // transcodes to fall back to; clips and previews are their own file and keep the
+        // ladder empty.
+        switch item {
+        case .scene(let scene):
             aether.fallbackSources = scene.transcodeFallbackURLs
             aether.fallbackDeclaredDuration = scene.sceneDuration
+        case .marker(let marker):
+            if let scene = marker.scene?.toScene() {
+                aether.fallbackSources = scene.transcodeFallbackURLs
+                aether.fallbackDeclaredDuration = scene.sceneDuration
+            }
+        case .clip, .preview:
+            break
         }
-        aether.loopsAtEnd = !TabManager.shared.reelsContinuousPlay
+        aether.loopsAtEnd = engineLoopsAtEnd
+        segmentEndHandled = false
         aether.setVideoGravity(shouldFill ? .resizeAspectFill : .resizeAspect)
         bindAetherCallbacks(on: aether)
 
@@ -6034,7 +6109,9 @@ extension ReelItemView {
         ReelsPlayerRegistry.register(aether)
 
         let autoplay = !isRotating && isActive && (forcePlay || isPlaying)
-        Task { await aether.load(url: url, startAt: nil, autoplay: autoplay) }
+        // Marker rows open the original right at the marker (the engine seeks accurately).
+        let startAt = item.playbackSegment.map { $0.start > 0.05 ? $0.start : 0 }
+        Task { await aether.load(url: url, startAt: startAt, autoplay: autoplay) }
 
         // Initial duration guess from model.
         if let d = item.duration, d > 0 {
@@ -6195,7 +6272,40 @@ extension ReelItemView {
     }
 
     func aetherSetLoops(continuousPlay: Bool) {
-        aetherEngine?.loopsAtEnd = !continuousPlay
+        // Segment rows loop at their segment end themselves, never at the file end.
+        aetherEngine?.loopsAtEnd = item.playbackSegment == nil && !continuousPlay
+    }
+
+    /// Marker rows: the playhead reached the segment end. Continuous play hands over to the
+    /// next row like the end of a file does; otherwise (or on the last row) the segment loops.
+    func handlePlaybackSegmentEnd(force: Bool = false) {
+        guard let segment = effectivePlaybackSegment, let aether = aetherEngine else { return }
+        guard force || !segmentEndHandled else { return }
+        // Tab leave can race with the end; never restart audio off-Feeds.
+        guard !ReelsPlayerRegistry.isPlaybackSuspended, isPlaybackActive, !scrubberState.seeking else { return }
+        segmentEndHandled = true
+
+        let loopToStart = {
+            Task { @MainActor in
+                await aether.seek(to: segment.start)
+                self.playbackActivityTracker.noteSeek(to: segment.start)
+                if self.isPlaying && self.isPlaybackActive && !self.isRotating {
+                    ReelsPlayerRegistry.playIfAllowed(aether)
+                }
+            }
+        }
+
+        guard TabManager.shared.reelsContinuousPlay, isPlaying else {
+            loopToStart()
+            return
+        }
+        onVideoEnded()
+        // Still the active row on the next pass: there was no next row to move to — loop
+        // instead of running on into the rest of the scene.
+        DispatchQueue.main.async {
+            guard self.isActive, self.aetherEngine === aether else { return }
+            loopToStart()
+        }
     }
 
     /// Re-binds the engine callbacks so they capture the current view struct.
@@ -6216,7 +6326,7 @@ extension ReelItemView {
 
     /// The engine's time / end-of-item / first-frame callbacks, bound to the current view struct.
     private func bindAetherCallbacks(on aether: AetherSceneEngine) {
-        aether.loopsAtEnd = !TabManager.shared.reelsContinuousPlay
+        aether.loopsAtEnd = engineLoopsAtEnd
 
         // A (re)load swaps the analysis item in place; re-attach AI Motion and publish the route
         // so the chrome pill can hide itself on the software route.
@@ -6235,17 +6345,37 @@ extension ReelItemView {
 
         aether.onReachedEnd = {
             // Tab leave can race with end-of-item; never restart audio off-Feeds.
+            // A marker segment that runs to the end of the file ends here instead.
+            if self.item.playbackSegment != nil {
+                self.handlePlaybackSegmentEnd(force: true)
+                return
+            }
             guard !ReelsPlayerRegistry.isPlaybackSuspended, self.isPlaying, self.isPlaybackActive else { return }
             self.onVideoEnded()
         }
 
         aether.onTime = { time, duration in
-            if self.isActive && !self.scrubberState.seeking {
-                self.scrubberState.time = time
-            }
+            if let segment = self.item.playbackSegment?.clamped(toFileDuration: duration > 0 && !duration.isNaN ? duration : nil) {
+                // Marker rows: the bar shows the segment (0…length), the engine runs in file time.
+                if self.isActive && !self.scrubberState.seeking {
+                    self.scrubberState.time = segment.relativeTime(forFile: time)
+                }
+                if self.isActive, abs(self.scrubberState.duration - segment.length) > 0.01 {
+                    self.scrubberState.duration = segment.length
+                }
+                if time < segment.end - 0.5 {
+                    self.segmentEndHandled = false
+                } else if time >= segment.end - 0.15 {
+                    self.handlePlaybackSegmentEnd()
+                }
+            } else {
+                if self.isActive && !self.scrubberState.seeking {
+                    self.scrubberState.time = time
+                }
 
-            if self.isActive, duration > 0, !duration.isNaN {
-                self.scrubberState.duration = duration
+                if self.isActive, duration > 0, !duration.isNaN {
+                    self.scrubberState.duration = duration
+                }
             }
 
             self.syncPlaybackPresentationSize(aether)
@@ -6416,6 +6546,37 @@ class ScrubberState: ObservableObject {
     /// is the only writer (it owns the decode). Deliberately parked here rather than passed
     /// down: the bar lives outside the pager, so this object is the only channel between them.
     @Published var previewImage: UIImage? = nil
+    /// Shown in the preview box while no still is there (marker rows: the marker's screenshot,
+    /// for scenes without scrubber sprites).
+    @Published var previewPlaceholderURL: URL? = nil
+}
+
+/// The stretch of a source file a Feeds row plays (marker rows: their part of the scene).
+/// The scrubber shows it as 0…`length`; the engine keeps working in file time.
+struct ReelPlaybackSegment: Equatable {
+    /// Markers without an end in Stash play this long from the marker on.
+    static let defaultMarkerLength: Double = 30
+
+    let start: Double
+    let end: Double
+
+    var length: Double { max(0.1, end - start) }
+
+    /// Segment-relative time (the scrubber's) → file time, kept inside the segment.
+    func fileTime(forRelative relative: Double) -> Double {
+        min(max(start, start + relative), max(start, end - 0.1))
+    }
+
+    /// File time → segment-relative time for the scrubber.
+    func relativeTime(forFile time: Double) -> Double {
+        min(max(0, time - start), length)
+    }
+
+    /// The same segment with its end pulled in to a file length learnt at runtime.
+    func clamped(toFileDuration duration: Double?) -> ReelPlaybackSegment {
+        guard let duration, duration.isFinite, duration > start + 0.5, duration < end else { return self }
+        return ReelPlaybackSegment(start: start, end: duration)
+    }
 }
 
 /// Scrub preview stills for the Feeds scrubber.
@@ -6531,6 +6692,7 @@ struct IsolatedScrubberBar: View {
             duration: state.duration,
             isScrubbing: state.seeking,
             previewImage: state.previewImage,
+            previewPlaceholderURL: state.previewPlaceholderURL,
             markerSeconds: [],
             isCompact: false,
             onScrubChanged: { seconds in
