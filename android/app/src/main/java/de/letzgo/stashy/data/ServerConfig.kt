@@ -76,6 +76,9 @@ data class ServerConfig(
 object ServerConfigManager {
     private const val SAVED_KEY = "stashy_saved_servers"
     private const val ACTIVE_KEY = "stashy_server_config"
+    /** Last list that decoded fine — restored if the main entry is ever missing or unreadable. */
+    private const val SAVED_BACKUP_KEY = "stashy_saved_servers_backup"
+    private val listSerializer = ListSerializer(ServerConfig.serializer())
 
     var savedServers by mutableStateOf<List<ServerConfig>>(emptyList())
         private set
@@ -83,12 +86,24 @@ object ServerConfigManager {
         private set
 
     fun init() {
-        savedServers = Prefs.string(SAVED_KEY)?.let {
-            runCatching { Json.decodeFromString(ListSerializer(ServerConfig.serializer()), it) }.getOrNull()
-        }.orEmpty()
+        fun decode(raw: String?) = raw?.let { runCatching { Json.decodeFromString(listSerializer, it) }.getOrNull() }
+        val main = decode(Prefs.string(SAVED_KEY))
+        val backup = decode(Prefs.string(SAVED_BACKUP_KEY))
+        if (main == null && Prefs.has(SAVED_KEY)) {
+            // Never silently drop an unreadable list: keep the raw text for diagnosis.
+            Prefs.commitString("${SAVED_KEY}_unreadable", Prefs.string(SAVED_KEY))
+            android.util.Log.w("StashyServers", "saved server list unreadable, using backup (${backup?.size ?: 0})")
+        }
+        savedServers = when {
+            main != null && (main.isNotEmpty() || backup.isNullOrEmpty()) -> main
+            else -> backup.orEmpty()
+        }
         activeConfig = Prefs.string(ACTIVE_KEY)?.let {
             runCatching { Json.decodeFromString(ServerConfig.serializer(), it) }.getOrNull()
         }
+        // The active server always belongs to the list (it was missing when only the setup ran).
+        activeConfig?.let { a -> if (savedServers.none { it.id == a.id }) savedServers = savedServers + a }
+        if (savedServers.isNotEmpty()) persistList()
         if (activeConfig == null && BuildConfig.DEBUG && BuildConfig.DEBUG_SERVER.isNotBlank()) seedDebugServer()
     }
 
@@ -112,21 +127,28 @@ object ServerConfigManager {
         Secrets.set("apikey_${config.id}", apiKey)
         headers?.let { Secrets.set("headers_${config.id}", Json.encodeToString(ListSerializer(ServerHTTPHeader.serializer()), it.filter { h -> h.isUsable })) }
         savedServers = savedServers.filter { it.id != config.id } + config
-        Prefs.setString(SAVED_KEY, Json.encodeToString(ListSerializer(ServerConfig.serializer()), savedServers))
+        persistList()
         if (activeConfig?.id == config.id) activate(config)
     }
 
     fun activate(config: ServerConfig?) {
         activeConfig = config
-        Prefs.setString(ACTIVE_KEY, config?.let { Json.encodeToString(ServerConfig.serializer(), it) })
+        Prefs.commitString(ACTIVE_KEY, config?.let { Json.encodeToString(ServerConfig.serializer(), it) })
         Net.resetConnections()
     }
 
     fun delete(config: ServerConfig) {
         savedServers = savedServers.filter { it.id != config.id }
-        Prefs.setString(SAVED_KEY, Json.encodeToString(ListSerializer(ServerConfig.serializer()), savedServers))
+        persistList(allowEmpty = true)
         Secrets.set("apikey_${config.id}", null)
         Secrets.set("headers_${config.id}", null)
         if (activeConfig?.id == config.id) activate(savedServers.firstOrNull())
+    }
+
+    /** Synchronous write of the list plus its backup copy. */
+    private fun persistList(allowEmpty: Boolean = false) {
+        val json = Json.encodeToString(listSerializer, savedServers)
+        Prefs.commitString(SAVED_KEY, json)
+        if (savedServers.isNotEmpty() || allowEmpty) Prefs.commitString(SAVED_BACKUP_KEY, json)
     }
 }

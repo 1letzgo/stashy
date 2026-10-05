@@ -24,6 +24,9 @@ object Prefs {
 
     fun string(key: String): String? = prefs.getString(key, null)
     fun setString(key: String, value: String?) = prefs.edit().apply { if (value == null) remove(key) else putString(key, value) }.apply()
+    /** Synchronous write (`commit`) for data that must survive an immediate process kill. */
+    fun commitString(key: String, value: String?) =
+        prefs.edit().apply { if (value == null) remove(key) else putString(key, value) }.commit()
     fun bool(key: String, default: Boolean = false) = prefs.getBoolean(key, default)
     fun setBool(key: String, value: Boolean) = prefs.edit().putBoolean(key, value).apply()
     fun int(key: String, default: Int = 0) = prefs.getInt(key, default)
@@ -57,5 +60,5 @@ object Secrets {
     }
 
     fun get(key: String): String? = prefs.getString(key, null)
-    fun set(key: String, value: String?) = prefs.edit().apply { if (value.isNullOrEmpty()) remove(key) else putString(key, value) }.apply()
+    fun set(key: String, value: String?) { prefs.edit().apply { if (value.isNullOrEmpty()) remove(key) else putString(key, value) }.commit() }
 }
