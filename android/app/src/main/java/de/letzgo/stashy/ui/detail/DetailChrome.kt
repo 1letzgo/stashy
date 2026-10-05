@@ -1,6 +1,7 @@
 package de.letzgo.stashy.ui.detail
 
 import android.widget.Toast
+import androidx.compose.material.icons.automirrored.filled.Sort
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -14,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -68,6 +70,13 @@ import de.letzgo.stashy.ui.Appearance
 import de.letzgo.stashy.ui.IosTypography
 import de.letzgo.stashy.ui.MainTab
 import de.letzgo.stashy.ui.Nav
+import de.letzgo.stashy.ui.NativeTabStrip
+import de.letzgo.stashy.ui.NativeTopBar
+import de.letzgo.stashy.ui.OverflowItem
+import de.letzgo.stashy.ui.TopBarAction
+import de.letzgo.stashy.ui.TopBarMenuAction
+import de.letzgo.stashy.ui.TopBarOverflowMenu
+import de.letzgo.stashy.ui.nativeTopBarPadding
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.StashyColors
 import de.letzgo.stashy.ui.TabBarClearance
@@ -108,11 +117,15 @@ internal fun detailToast(message: String) {
     Toast.makeText(Prefs.appContext, message, Toast.LENGTH_SHORT).show()
 }
 
-/** Top padding for detail content under [DetailNavBar]. */
-@Composable
-internal fun detailTopPadding(): Dp = WindowInsets.statusBars.asPaddingValues().calculateTopPadding() + Dock.barHeight + Tokens.Chrome.contentTopGap
+/** Height of the section [de.letzgo.stashy.ui.NativeTabStrip] under the app bar (Material tab + hairline). */
+internal val DetailTabStripHeight: Dp = 48.5.dp
 
-/** iOS: `StashyChromePillStyle` round icon button (glass, optional tint fill). */
+/** Top padding for detail content under [DetailTopBar] (+ the section tabs when shown). */
+@Composable
+internal fun detailTopPadding(hasTabs: Boolean = false): Dp =
+    nativeTopBarPadding() + (if (hasTabs) DetailTabStripHeight else 0.dp) + Tokens.Chrome.contentTopGap
+
+/** iOS: `StashyChromePillStyle` round icon button (glass, optional tint fill) — media overlays only. */
 @Composable
 internal fun DockIconButton(
     icon: ImageVector,
@@ -135,72 +148,58 @@ internal fun DockIconButton(
     }
 }
 
-/** iOS: the tinted "‹ Back" pill (`StashyChromePillStyle(accent: true)`). */
-@Composable
-internal fun BackPillLabeled(onClick: () -> Unit) {
-    Row(
-        Modifier
-            .height(Dock.activeHeight)
-            .floatingShadow(RoundedCornerShape(50))
-            .stashyGlass(RoundedCornerShape(50), Appearance.tint)
-            .clickable(onClick = onClick)
-            .padding(horizontal = Dock.activeHorizontalPadding),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-    ) {
-        Icon(SF.chevronLeft, null, tint = Color.White, modifier = Modifier.size(Dock.iconSize))
-        Text("Back", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
-    }
-}
-
 /**
- * iOS: the custom detail chrome bar (`StashySectionChromeBar`): Back · section icons ·
- * Favorite · Edit. Section icons only show when more than one section has content.
+ * iOS: the detail chrome bar (`StashySectionChromeBar`: Back · section icons · Favorite · Edit)
+ * plus the floating list slots (`CatalogSlotBar`), as one native Material top app bar:
+ * back arrow · [title] · slot icons (download state …) · sort `DropdownMenu` · favorite ·
+ * "⋮" overflow (slots marked [ChromeSlot.inOverflow] such as card columns, and Edit). The
+ * sections become a [NativeTabStrip] under the bar, shown only when more than one has content.
  */
 @Composable
-internal fun DetailNavBar(
+internal fun DetailTopBar(
+    title: String,
     tabs: List<DetailTab>,
     selected: DetailTab?,
     onSelect: (DetailTab) -> Unit,
+    slots: List<ChromeSlot> = emptyList(),
+    sortMenu: (@Composable (dismiss: () -> Unit) -> Unit)? = null,
     isFavorite: Boolean? = null,
     favoriteBusy: Boolean = false,
     onFavorite: () -> Unit = {},
     onEdit: (() -> Unit)? = null,
     editLabel: String = "Edit",
 ) {
-    Box(
-        Modifier.fillMaxWidth()
-            .background(androidx.compose.ui.graphics.Brush.verticalGradient(listOf(Color.Black.copy(alpha = 0.45f), Color.Transparent)))
-            .statusBarsPadding()
-            .padding(horizontal = Dock.edgePadding, vertical = 8.dp),
-    ) {
-        Row(Modifier.fillMaxWidth().heightIn(min = Dock.activeHeight), verticalAlignment = Alignment.CenterVertically) {
-            BackPillLabeled { Nav.pop() }
-            Spacer(Modifier.weight(1f).widthIn(min = 8.dp))
-            val showTabs = tabs.size > 1
-            if (showTabs) {
-                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    tabs.forEach { tab ->
-                        DockIconButton(tab.icon, tab.title, selected = tab == selected) { if (tab != selected) onSelect(tab) }
-                    }
+    Column(Modifier.fillMaxWidth()) {
+        NativeTopBar(title) {
+            slots.filter { !it.inOverflow }.forEach { s ->
+                TopBarAction(s.icon, s.label, tint = if (s.isActive) Appearance.tint else null, onClick = s.onClick)
+            }
+            if (sortMenu != null) {
+                TopBarMenuAction(androidx.compose.material.icons.Icons.AutoMirrored.Filled.Sort, "Sort") { dismiss -> sortMenu(dismiss) }
+            }
+            if (isFavorite != null) {
+                TopBarAction(
+                    if (isFavorite) SF.heartFill else SF.heart,
+                    if (isFavorite) "Remove favorite" else "Add favorite",
+                    tint = if (isFavorite) StashyColors.systemRed else null,
+                    enabled = !favoriteBusy,
+                    onClick = onFavorite,
+                )
+            }
+            val overflow = slots.filter { it.inOverflow }
+            val canEdit = onEdit != null && Appearance.isEditModeEnabled
+            if (overflow.isNotEmpty() || canEdit) {
+                TopBarOverflowMenu { dismiss ->
+                    overflow.forEach { s -> OverflowItem(s.label, s.icon, dismiss, onClick = s.onClick) }
+                    if (canEdit) OverflowItem(editLabel, SF.pencil, dismiss) { onEdit?.invoke() }
                 }
             }
-            val hasActions = isFavorite != null || (onEdit != null && Appearance.isEditModeEnabled)
-            if (showTabs && hasActions) Spacer(Modifier.width(7.dp + 6.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (isFavorite != null) {
-                    DockIconButton(
-                        if (isFavorite) SF.heartFill else SF.heart,
-                        if (isFavorite) "Remove favorite" else "Add favorite",
-                        iconTint = if (isFavorite) StashyColors.systemRed else Color.White.copy(alpha = Dock.inactiveIconOpacity),
-                        enabled = !favoriteBusy,
-                        onClick = onFavorite,
-                    )
-                }
-                if (onEdit != null && Appearance.isEditModeEnabled) {
-                    DockIconButton(SF.pencil, editLabel, onClick = onEdit)
-                }
-            }
+        }
+        if (tabs.size > 1) {
+            NativeTabStrip(
+                tabs, selected, { it.title }, { if (it != selected) onSelect(it) },
+                Modifier.consumeWindowInsets(WindowInsets.statusBars),
+            )
         }
     }
 }
@@ -361,32 +360,17 @@ internal fun HeaderLink(url: String) {
     }
 }
 
-/** One slot of the floating list bar (iOS `CatalogChromeSlot`). */
-internal class ChromeSlot(val icon: ImageVector, val label: String, val isActive: Boolean = false, val onClick: () -> Unit)
-
 /**
- * iOS: `floatingActionBar` with `CatalogSlotBar` for the embedded list — glass circles at
- * the bottom trailing edge above the tab bar. [sortMenu] is anchored to the filter slot.
+ * One list action of a detail page (iOS `CatalogChromeSlot`) — an app bar icon of
+ * [DetailTopBar], or an overflow menu entry when [inOverflow].
  */
-@Composable
-internal fun BoxScope.DetailSlotBar(slots: List<ChromeSlot>, sortMenu: (@Composable (dismiss: () -> Unit) -> Unit)? = null) {
-    if (slots.isEmpty() && sortMenu == null) return
-    var menuOpen by remember { mutableStateOf(false) }
-    Row(
-        Modifier.align(Alignment.BottomEnd).navigationBarsPadding().padding(end = 16.dp, bottom = TabBarClearance - 8.dp),
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
-    ) {
-        slots.forEach { s ->
-            DockIconButton(s.icon, s.label, selected = s.isActive, iconTint = Color.White, onClick = s.onClick)
-        }
-        if (sortMenu != null) {
-            Box {
-                DockIconButton(SF.sliderHorizontal3, "Filter and sort", iconTint = Color.White) { menuOpen = true }
-                DropdownMenu(menuOpen, onDismissRequest = { menuOpen = false }) { sortMenu { menuOpen = false } }
-            }
-        }
-    }
-}
+internal class ChromeSlot(
+    val icon: ImageVector,
+    val label: String,
+    val isActive: Boolean = false,
+    val inOverflow: Boolean = false,
+    val onClick: () -> Unit,
+)
 
 /** Sort entries with a checkmark on the current one (iOS sort `Picker` in the filter sheet). */
 @Composable
@@ -441,7 +425,7 @@ internal fun EditEntitySheet(
 
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false, decorFitsSystemWindows = false)) {
         Box(Modifier.fillMaxSize().background(p.background)) {
-            Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).statusBarsPadding().padding(top = Dock.barHeight).navigationBarsPadding().padding(16.dp)) {
+            Column(Modifier.fillMaxSize().imePadding().verticalScroll(rememberScrollState()).padding(top = nativeTopBarPadding()).navigationBarsPadding().padding(16.dp)) {
                 sections.forEach { section ->
                     Text(section.title.uppercase(), style = IosTypography.footnote, color = p.secondaryText, modifier = Modifier.padding(start = 16.dp, top = 16.dp, bottom = 6.dp))
                     Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(Tokens.Radius.small)).background(p.secondaryBackground).padding(horizontal = 12.dp, vertical = 4.dp)) {
@@ -477,29 +461,22 @@ internal fun EditEntitySheet(
                 }
                 Spacer(Modifier.height(40.dp))
             }
-            // iOS `stashyModalSheetChrome(title, onBack:)` + trailing "Save".
-            Row(
-                Modifier.fillMaxWidth().background(p.background).statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp).height(Dock.activeHeight),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                DockIconButton(SF.chevronLeft, "Back", iconTint = Color.White, onClick = onDismiss)
-                Text(title, Modifier.weight(1f), style = IosTypography.headline, color = p.text, textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                Box(
-                    Modifier.height(Dock.activeHeight).clip(RoundedCornerShape(50))
-                        .background(if (canSave) Appearance.tint else Appearance.tint.copy(alpha = 0.35f))
-                        .clickable(enabled = canSave && !saving) {
+            // iOS `stashyModalSheetChrome(title, onBack:)` + trailing "Save" → Material app bar.
+            NativeTopBar(title, onBack = onDismiss) {
+                if (saving) {
+                    CircularProgressIndicator(Modifier.padding(horizontal = 16.dp).size(20.dp), color = Appearance.tint, strokeWidth = 2.dp)
+                } else {
+                    TextButton(
+                        onClick = {
                             saving = true
                             scope.launch {
                                 val ok = onSave()
                                 saving = false
                                 if (ok) onDismiss()
                             }
-                        }
-                        .padding(horizontal = 16.dp),
-                    contentAlignment = Alignment.Center,
-                ) {
-                    if (saving) CircularProgressIndicator(Modifier.size(16.dp), color = Color.White, strokeWidth = 2.dp)
-                    else Text("Save", style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold), color = Color.White)
+                        },
+                        enabled = canSave,
+                    ) { Text("Save", color = if (canSave) Appearance.tint else Appearance.tint.copy(alpha = 0.38f), fontWeight = FontWeight.SemiBold) }
                 }
             }
         }

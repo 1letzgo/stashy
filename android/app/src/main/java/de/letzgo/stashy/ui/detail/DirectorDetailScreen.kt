@@ -56,9 +56,8 @@ class DirectorDetailScreen(val director: String) : Screen {
             }) {
                 linkedSection(catalog, DetailTab.Scenes, gridState)
             }
-            DetailNavBar(emptyList(), null, {})
             val (slots, menu) = catalog.slots(DetailTab.Scenes)
-            DetailSlotBar(slots, menu)
+            DetailTopBar(director, emptyList(), null, {}, slots, menu)
         }
     }
 }

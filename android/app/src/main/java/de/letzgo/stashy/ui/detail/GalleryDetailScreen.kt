@@ -63,11 +63,13 @@ class GalleryDetailScreen(val galleryId: String, val preview: Gallery? = null) :
             DetailGrid(gridState, { w -> columnsFor(DetailTab.Images, w, catalog.imageColumns) }, header = { gallery?.let { Header(it) } }) {
                 imageSection(catalog, gridState, currentGalleryId = galleryId)
             }
-            DetailNavBar(emptyList(), null, {}, onEdit = { editing = true }, editLabel = "Edit gallery")
             val (slots, menu) = catalog.slots(DetailTab.Images, imageScopeKey = "openedGallery")
             // iOS `galleryDownloadSlot` (secondary contextual, before filter & sort).
             val download = gallery?.let { imageSetDownloadSlot(it.id, "Download gallery") { showDownloadOptions = true } }
-            DetailSlotBar(slots + listOfNotNull(download), menu)
+            DetailTopBar(
+                gallery?.displayTitle ?: "", emptyList(), null, {}, slots + listOfNotNull(download), menu,
+                onEdit = { editing = true }, editLabel = "Edit gallery",
+            )
         }
         val g = gallery
         if (editing && g != null) EditGallerySheet(g, { editing = false }) { gallery = it }

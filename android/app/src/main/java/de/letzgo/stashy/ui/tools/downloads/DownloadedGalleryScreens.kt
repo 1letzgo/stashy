@@ -88,6 +88,11 @@ import de.letzgo.stashy.ui.Tokens
 import de.letzgo.stashy.ui.cardShadow
 import de.letzgo.stashy.ui.noRippleClickable
 import de.letzgo.stashy.ui.stashyGlass
+import de.letzgo.stashy.ui.NativeTopBar
+import de.letzgo.stashy.ui.OverflowItem
+import de.letzgo.stashy.ui.TopBarAction
+import de.letzgo.stashy.ui.TopBarOverflowMenu
+import de.letzgo.stashy.ui.nativeTopBarPadding
 import de.letzgo.stashy.ui.tools.StashyAlert
 import de.letzgo.stashy.ui.tools.ToolsTokens
 import java.io.File
@@ -119,7 +124,7 @@ class DownloadedGalleryScreen(val entryId: String) : Screen {
                     modifier = Modifier.fillMaxSize(),
                     contentPadding = PaddingValues(
                         start = ToolsTokens.contentPadding, end = ToolsTokens.contentPadding,
-                        top = topInset + 16.dp + DownloadsCircleSize + 16.dp, bottom = bottomInset + 24.dp,
+                        top = nativeTopBarPadding() + 16.dp, bottom = bottomInset + 24.dp,
                     ),
                     verticalArrangement = Arrangement.spacedBy(12.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -139,33 +144,22 @@ class DownloadedGalleryScreen(val entryId: String) : Screen {
                 }
             }
 
-            // Top chrome.
-            Row(
-                Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                BackPill({ Nav.pop() })
-                Box(Modifier.weight(1f)) {
-                    GlassCapsule(height = DownloadsCircleSize, contentPadding = PaddingValues(horizontal = 14.dp)) {
-                        Text(
-                            entry?.displayTitle ?: "Download",
-                            style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold),
-                            color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                        )
-                    }
-                }
+            // Top chrome: Material app bar — back · title · Cancel (while syncing) or Sync ·
+            // "⋮" with Sync newest N and Delete.
+            NativeTopBar(entry?.displayTitle ?: "Download") {
                 if (isSyncing) {
-                    GlassIconButton(Icons.Outlined.StopCircle, "Cancel download", size = DownloadsCircleSize, iconTint = StashyColors.systemRed) {
+                    TopBarAction(Icons.Outlined.StopCircle, "Cancel download", tint = StashyColors.systemRed) {
                         Downloads.cancelGalleryDownload(entryId)
                     }
                 } else if (entry != null) {
-                    if (!entry.isSingleImage) {
-                        GlassIconButton(Icons.Filled.Sync, "Sync newest", size = DownloadsCircleSize) { sync(entry, null) }
-                        val batch = Downloads.galleryNewestBatchSize
-                        GlassIconButton(Icons.Filled.VerticalAlignBottom, "Sync newest $batch", size = DownloadsCircleSize) { sync(entry, batch) }
+                    if (!entry.isSingleImage) TopBarAction(Icons.Filled.Sync, "Sync newest") { sync(entry, null) }
+                    TopBarOverflowMenu { dismiss ->
+                        if (!entry.isSingleImage) {
+                            val batch = Downloads.galleryNewestBatchSize
+                            OverflowItem("Sync newest $batch", Icons.Filled.VerticalAlignBottom, dismiss) { sync(entry, batch) }
+                        }
+                        OverflowItem("Delete", SF.trash, dismiss, color = StashyColors.systemRed) { confirmDelete = true }
                     }
-                    GlassIconButton(SF.trash, "Delete", size = DownloadsCircleSize, iconTint = StashyColors.systemRed) { confirmDelete = true }
                 }
             }
         }
@@ -255,22 +249,7 @@ class DownloadedImageViewerScreen(val entryId: String, val startIndex: Int) : Sc
             }
 
             AnimatedVisibility(showUI, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.TopStart)) {
-                Row(
-                    Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = 16.dp, vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    BackPill({ Nav.pop() })
-                    Spacer(Modifier.weight(1f))
-                    if (images.isNotEmpty()) {
-                        GlassCapsule(height = DownloadsCircleSize) {
-                            Text(
-                                "${pager.currentPage + 1} / ${images.size}",
-                                style = IosTypography.subheadline.copy(fontWeight = FontWeight.SemiBold),
-                                color = Color.White.copy(alpha = 0.85f),
-                            )
-                        }
-                    }
-                }
+                NativeTopBar(if (images.isNotEmpty()) "${pager.currentPage + 1} / ${images.size}" else "", transparent = true)
             }
 
             images.getOrNull(pager.currentPage)?.let { current ->

@@ -62,6 +62,6 @@ internal class PendingLinkScreen(override val key: String, private val title: St
 fun PendingLinkContent(title: String) {
     Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
         EmptyState(SF.sparkles, title, "Coming soon", Modifier.align(Alignment.Center))
-        BackPill({ Nav.pop() }, Modifier.statusBarsPadding().padding(16.dp))
+        de.letzgo.stashy.ui.NativeTopBar(title)
     }
 }

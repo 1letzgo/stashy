@@ -88,6 +88,16 @@ Sizes are tvOS points halved (`pt()`: 1920 pt ≙ 960 dp). Pure logic lives in `
   the catalog root consumes the request (`CatalogController.applyRequest`).
 - Navigation: push a `Screen` implementation (`Nav.push(SceneDetailScreen(id))`); each tab has
   its own back stack; `hidesTabBar = true` for full-screen content.
+- Pushed screens (Android look, Material 3): `NativeTopBar(title)` instead of the iOS Back pill
+  and floating glass buttons; content top padding `nativeTopBarPadding()` (detail pages:
+  `detailTopPadding(hasTabs)`, which adds the section `NativeTabStrip`). Actions follow one
+  pattern (`ui/NativeActions.kt`): up to three frequent actions as `TopBarAction` icons
+  (download state, sort, favorite, share …; active = `Appearance.tint`), sort pickers as
+  `TopBarMenuAction` (`DropdownMenu` anchored to the icon), rarer actions (Edit, card columns,
+  Delete, Sync newest N, Set as performer image) in the "⋮" `TopBarOverflowMenu`. Detail pages
+  build all of it through `DetailTopBar` (sections → tab strip, `ChromeSlot`s → icons or
+  overflow via `inOverflow`); no floating bottom slot bars. Media viewers use a transparent
+  `NativeTopBar`; their on-image controls (O-counter, rating, mute/play) stay overlay buttons.
 - Content under the floating chrome: top padding `catalogTopPadding()` on catalog roots,
   bottom padding `TabBarClearance` on every scrolling root.
 - Colours only from `Theme.palette`, `Appearance.tint`, `StashyColors` — no ad-hoc colours.

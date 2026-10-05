@@ -139,7 +139,8 @@ internal class LinkedCatalog(
         DetailTab.Tags -> emptyList<ChromeSlot>() to { d -> SortMenuItems(DetailSort.Tag.entries, tagSort, d) { resort(tab, tagSort, it) { s -> tagSort = s } } }
         DetailTab.Groups -> emptyList<ChromeSlot>() to null
         DetailTab.Images -> listOf(
-            ChromeSlot(if (imageColumns == 1) SF.rectangleGrid1x2 else SF.squareGrid2x2, if (imageColumns == 1) "One card per row" else "Two cards per row") {
+            // Overflow entry: names the layout it switches to.
+            ChromeSlot(if (imageColumns == 1) SF.squareGrid2x2 else SF.rectangleGrid1x2, if (imageColumns == 1) "Two cards per row" else "One card per row", inOverflow = true) {
                 imageColumns = CardColumnsPrefs.toggle(imageScopeKey)
             },
         ) to { d -> SortMenuItems(DetailSort.Image.entries, imageSort, d) { resort(tab, imageSort, it) { s -> imageSort = s } } }
@@ -168,6 +169,7 @@ internal fun AutoSwitchTab(catalog: LinkedCatalog, selected: DetailTab, onSelect
 internal fun DetailGrid(
     state: LazyGridState,
     columnsFor: (widthDp: Float) -> Int,
+    hasTabs: Boolean = false,
     header: @Composable () -> Unit,
     content: LazyGridScope.() -> Unit,
 ) {
@@ -176,7 +178,7 @@ internal fun DetailGrid(
         LazyVerticalGrid(
             columns = GridCells.Fixed(columns),
             state = state,
-            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = detailTopPadding(), bottom = TabBarClearance + 64.dp),
+            contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = detailTopPadding(hasTabs), bottom = TabBarClearance + 16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
             horizontalArrangement = Arrangement.spacedBy(12.dp),
             modifier = Modifier.fillMaxSize(),

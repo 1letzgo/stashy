@@ -10,6 +10,10 @@ import de.letzgo.stashy.data.tools.AITagUpdateEvent
 import de.letzgo.stashy.ui.components.AITagSuggestionBar
 import de.letzgo.stashy.ui.components.AddTagsSheet
 import de.letzgo.stashy.ui.tools.downloads.DownloadGlyph
+import de.letzgo.stashy.ui.NativeTopBar
+import de.letzgo.stashy.ui.OverflowItem
+import de.letzgo.stashy.ui.TopBarAction
+import de.letzgo.stashy.ui.TopBarOverflowMenu
 import android.content.Context
 import android.content.Intent
 import android.media.AudioDeviceInfo
@@ -360,25 +364,23 @@ class ImageViewerScreen(
 
     // MARK: Chrome
 
+    /**
+     * Transparent Material top app bar over the picture: back · share · download state ·
+     * delete; "Set as performer image" in the "⋮" overflow (only with performers).
+     */
     @Composable
     private fun TopBar(context: Context) {
         val image = current
-        Row(
-            Modifier.fillMaxWidth().statusBarsPadding().padding(horizontal = Dock.edgePadding, vertical = 6.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-        ) {
-            BackPillLabeled { Nav.pop() }
-            Spacer(Modifier.weight(1f))
-            val scope = rememberCoroutineScope()
-            DockIconButton(SF.squareAndArrowUp, "Share") { image?.let { scope.launch { share(context, it) } } }
+        val scope = rememberCoroutineScope()
+        NativeTopBar("", transparent = true) {
+            TopBarAction(SF.squareAndArrowUp, "Share") { image?.let { scope.launch { share(context, it) } } }
             // iOS: per-image download (`downloadManager.downloadImage`, entry `image-<id>`) — check in the
             // accent when stored, arrow while downloading (both disabled), else the download glyph.
             if (image != null) {
                 val entryId = "image-${image.id}"
                 val isDownloaded = Downloads.isGalleryDownloaded(entryId)
                 val isDownloading = Downloads.activeDownloads[entryId] != null
-                DockIconButton(
+                TopBarAction(
                     when {
                         isDownloaded -> Icons.Filled.CheckCircle
                         isDownloading -> Icons.Outlined.ArrowCircleDown
@@ -389,14 +391,16 @@ class ImageViewerScreen(
                         isDownloading -> "Downloading"
                         else -> "Download"
                     },
-                    iconTint = if (isDownloaded) Appearance.tint else Color.White.copy(alpha = Dock.inactiveIconOpacity),
+                    tint = if (isDownloaded) Appearance.tint else null,
                     enabled = !isDownloaded && !isDownloading,
                 ) { Downloads.downloadImage(image) }
             }
+            TopBarAction(SF.trash, "Delete") { confirmDelete = true }
             if (!image?.performers.isNullOrEmpty()) {
-                DockIconButton(SF.personCropCircleBadgePlus, "Set as performer image") { performerImageTargets = image?.performers.orEmpty() }
+                TopBarOverflowMenu { dismiss ->
+                    OverflowItem("Set as performer image", SF.personCropCircleBadgePlus, dismiss) { performerImageTargets = image?.performers.orEmpty() }
+                }
             }
-            DockIconButton(SF.trash, "Delete") { confirmDelete = true }
         }
     }
 

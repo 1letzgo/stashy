@@ -444,18 +444,16 @@ private fun DownloadSyncJobSheet(
 
     ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = p.background, dragHandle = null) {
         Column(Modifier.fillMaxWidth().fillMaxHeight(0.92f)) {
+            // Material sheet header: close ✕ · title.
             Row(
-                Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+                Modifier.fillMaxWidth().padding(horizontal = 4.dp, vertical = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                Box(Modifier.size(DownloadsCircleSize).clip(CircleShape).stashyGlass(CircleShape).clickable(onClick = onDismiss), contentAlignment = Alignment.Center) {
-                    Icon(SF.xmark, "Close", tint = Color.White, modifier = Modifier.size(DownloadsIconSize))
-                }
+                androidx.compose.material3.IconButton(onClick = onDismiss) { Icon(SF.xmark, "Close", tint = p.text) }
                 Text(
-                    "New sync job", style = IosTypography.headline, color = p.text, textAlign = TextAlign.Center,
-                    modifier = Modifier.weight(1f),
+                    "New sync job", style = androidx.compose.material3.MaterialTheme.typography.titleLarge, color = p.text,
+                    modifier = Modifier.weight(1f).padding(start = 4.dp),
                 )
-                Spacer(Modifier.width(DownloadsCircleSize))
             }
             LazyColumn(
                 Modifier.weight(1f).fillMaxWidth(),

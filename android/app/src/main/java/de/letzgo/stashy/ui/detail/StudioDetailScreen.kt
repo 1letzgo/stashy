@@ -113,21 +113,20 @@ class StudioDetailScreen(val studioId: String, val preview: Studio? = null) : Sc
         AutoSwitchTab(catalog, tab) { tab = it }
         // Studio performers default to Name (A-Z) (iOS `initialSort: .nameAsc`).
         Box(Modifier.fillMaxSize().background(Theme.palette.background)) {
-            DetailGrid(gridState, { w -> columnsFor(tab, w, if (catalog.usesImageFeed) catalog.imageColumns else 2) }, header = { studio?.let { Header(it) } }) {
+            DetailGrid(gridState, { w -> columnsFor(tab, w, if (catalog.usesImageFeed) catalog.imageColumns else 2) }, hasTabs = catalog.available.size > 1, header = { studio?.let { Header(it) } }) {
                 linkedSection(catalog, tab, gridState)
             }
-            DetailNavBar(
-                catalog.available, tab, { tab = it },
-                isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
-                onEdit = { editing = true }, editLabel = "Edit studio",
-            )
             val (slots, menu) = catalog.slots(tab)
             // iOS: the scenes tab adds `SceneBulkDownloadChrome.slot` (contextual, before filter & sort).
             val extra = when (tab) {
                 DetailTab.Scenes -> listOf(sceneBulkDownloadSlot { showSceneDownloadOptions = true })
                 else -> emptyList()
             }
-            DetailSlotBar(slots + extra, menu)
+            DetailTopBar(
+                studio?.name ?: "", catalog.available, tab, { tab = it }, slots + extra, menu,
+                isFavorite = isFavorite, favoriteBusy = favoriteBusy, onFavorite = ::toggleFavorite,
+                onEdit = { editing = true }, editLabel = "Edit studio",
+            )
         }
         val s = studio
         if (editing && s != null) EditStudioSheet(s, { editing = false }) { studio = it }
