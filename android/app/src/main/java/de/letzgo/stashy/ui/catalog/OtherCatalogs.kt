@@ -1,14 +1,18 @@
 package de.letzgo.stashy.ui.catalog
 
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
 import de.letzgo.stashy.data.CatalogCardColumnScope
+import de.letzgo.stashy.data.CatalogCardColumns
 import de.letzgo.stashy.data.CatalogPrefs
 import de.letzgo.stashy.data.FilterMode
 import de.letzgo.stashy.data.Gallery
@@ -21,7 +25,7 @@ import de.letzgo.stashy.data.StashImage
 import de.letzgo.stashy.data.Studio
 import de.letzgo.stashy.data.Tag
 import de.letzgo.stashy.data.adaptiveColumnCount
-import de.letzgo.stashy.ui.EmptyState
+import de.letzgo.stashy.ui.TabBarClearance
 import de.letzgo.stashy.ui.Nav
 import de.letzgo.stashy.ui.SF
 import de.letzgo.stashy.ui.components.GalleryCard
@@ -31,7 +35,6 @@ import de.letzgo.stashy.ui.components.MarkerCard
 import de.letzgo.stashy.ui.components.PerformerCard
 import de.letzgo.stashy.ui.components.StudioCard
 import de.letzgo.stashy.ui.components.TagCard
-import de.letzgo.stashy.ui.components.oneColumnAspectRatio
 import de.letzgo.stashy.ui.detail.GalleryDetailScreen
 import de.letzgo.stashy.ui.detail.GroupDetailScreen
 import de.letzgo.stashy.ui.detail.ImageViewerScreen
@@ -41,6 +44,7 @@ import de.letzgo.stashy.ui.detail.TagDetailScreen
 import de.letzgo.stashy.ui.filter.CatalogFilterSortSheet
 import de.letzgo.stashy.ui.filter.ImageListMediaKind
 import de.letzgo.stashy.ui.filter.ImageMediaTypeCard
+import de.letzgo.stashy.ui.filter.ImagesFeedAutoplaySettingsCard
 import de.letzgo.stashy.ui.noRippleClickable
 import de.letzgo.stashy.ui.scene.SceneDetailScreen
 import kotlinx.serialization.json.JsonObject
@@ -181,8 +185,10 @@ fun GalleriesList(c: CatalogController<Gallery>, columnScope: CatalogCardColumnS
 class ImageMediaKindHolder { var kind by mutableStateOf(ImageListMediaKind.All) }
 
 /**
- * iOS: `ImagesView` (catalog root) — 1/2 per row toggle, square cards at 2/row, per-image ratio
- * at 1/row, "Type" (Any / Image / Video) in the sheet; tap opens the full-screen viewer.
+ * iOS: `ImagesView` (catalog root) — 1/2 per row toggle: square cards at 2/row, the grouped
+ * image feed at 1/row ([ImageFeedList]: sets, header with performers / studio / date, rating +
+ * O-counter, tags, thumb strip, muted clip autoplay); "Type" (Any / Image / Video) and the feed
+ * autoplay switch in the sheet; tap opens the full-screen viewer.
  */
 @Composable
 fun ImagesCatalog() {
@@ -207,15 +213,25 @@ fun ImagesList(c: CatalogController<StashImage>, holder: ImageMediaKindHolder, c
             filterSort = de.letzgo.stashy.ui.catalog.CatalogChromeSlot(SF.sliderHorizontal3, c.isFilterActive || holder.kind != ImageListMediaKind.All, "Settings") { c.isSheetPresented = true },
         ),
         columns = { cols.columnCount(it) }, itemKey = { it.id }, topPadding = topPadding, gridKey = cols,
+        // iOS `usesOneColumnFeedLayout`: 1/row is the grouped feed, not a grid of cards.
+        listBody = if (cols == CatalogCardColumns.One) { top ->
+            ImageFeedList(
+                images = c.list.items,
+                sortRaw = c.sort.raw,
+                isLoading = c.list.isLoading,
+                onLoadMore = { c.list.loadMore() },
+                contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = top, bottom = TabBarClearance + FloatingBarClearance + 16.dp),
+                onImageUpdated = { updated -> c.list.patch { if (it.id == updated.id) updated else it } },
+                header = if (c.search.isNotEmpty()) ({
+                    Box(Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) { SearchClearChip(c.search, { c.search = "" }) }
+                }) else null,
+            )
+        } else null,
     ) { index, image ->
-        val ratio = if (cols == de.letzgo.stashy.data.CatalogCardColumns.One) image.oneColumnAspectRatio else 1f
-        ImageCard(image, Modifier.noRippleClickable { Nav.push(ImageViewerScreen(c.list.items.toList(), index)) }, ratio)
+        ImageCard(image, Modifier.noRippleClickable { Nav.push(ImageViewerScreen(c.list.items.toList(), index)) }, 1f)
     }
     CatalogFilterSortSheet(c) {
         ImageMediaTypeCard(holder.kind) { holder.kind = it; c.applyLive() }
+        ImagesFeedAutoplaySettingsCard()
     }
 }
-
-/** Placeholder body used by features that are not ported yet. */
-@Composable
-internal fun Pending(title: String) = Box(Modifier.fillMaxSize(), Alignment.Center) { EmptyState(SF.cubeBox, title, "Coming soon") }

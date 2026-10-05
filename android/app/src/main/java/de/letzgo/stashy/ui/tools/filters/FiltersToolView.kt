@@ -69,8 +69,6 @@ import de.letzgo.stashy.ui.tools.ToolsTokens
 import de.letzgo.stashy.ui.tools.showToast
 import de.letzgo.stashy.ui.tools.toolsTopPadding
 
-private const val EditorUnavailable = "Filter editor not available yet"
-
 /** iOS: `StashyExpandingDock.circleSize` / `iconSize`. */
 private val AddButtonSize = 40.dp
 private val AddIconSize = 18.dp
@@ -78,7 +76,8 @@ private val AddIconSize = 18.dp
 /**
  * iOS: `FiltersToolsView` — Tools › Filters: every saved filter of the server grouped by mode,
  * with search, "+" (new filter per mode), edit (tap), rename and delete (long press; iOS also
- * offers them as swipe actions). Create/edit open the filter editor through [FiltersToolHooks].
+ * offers them as swipe actions). Create/edit open [FiltersToolEditorSheet]; a newly created
+ * filter reopens in the editor right after saving (iOS `pendingEditAfterCreate`).
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -90,6 +89,9 @@ fun FiltersToolView() {
     var renameTarget by remember { mutableStateOf<FiltersToolEntry?>(null) }
     var renameText by remember { mutableStateOf("") }
     var deleteTarget by remember { mutableStateOf<FiltersToolEntry?>(null) }
+    // iOS: `editingFilter` / `isCreating` + `createMode`.
+    var editingEntry by remember { mutableStateOf<FiltersToolEntry?>(null) }
+    var createMode by remember { mutableStateOf<String?>(null) }
     var pulled by remember { mutableStateOf(false) }
     val haptics = LocalHapticFeedback.current
 
@@ -113,10 +115,7 @@ fun FiltersToolView() {
             horizontalArrangement = Arrangement.spacedBy(Tokens.Spacing.sm),
         ) {
             FiltersSearchField("Search filters", searchText, { searchText = it }, Modifier.weight(1f))
-            FiltersAddMenu { mode ->
-                val hook = FiltersToolHooks.onCreateFilter
-                if (hook != null) hook(mode) else showToast(EditorUnavailable)
-            }
+            FiltersAddMenu { mode -> createMode = mode }
         }
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
@@ -153,10 +152,7 @@ fun FiltersToolView() {
                                         entry = entry,
                                         isFirst = index == 0,
                                         isLast = index == count - 1,
-                                        onOpen = {
-                                            val hook = FiltersToolHooks.onEditSavedFilter
-                                            if (hook != null) hook(entry.filter) else showToast(EditorUnavailable)
-                                        },
+                                        onOpen = { editingEntry = entry },
                                         onRename = { renameTarget = entry; renameText = entry.filter.name },
                                         onDelete = { deleteTarget = entry },
                                     )
@@ -167,6 +163,19 @@ fun FiltersToolView() {
                 }
             }
         }
+    }
+
+    editingEntry?.let { entry ->
+        FiltersToolEditorSheet(entry = entry, createMode = entry.filter.mode ?: "SCENES", onDismiss = { editingEntry = null })
+    }
+    createMode?.let { mode ->
+        FiltersToolEditorSheet(
+            entry = null,
+            createMode = mode,
+            onDismiss = { createMode = null },
+            // iOS: the new filter opens in the editor once the create sheet is gone.
+            onSaved = { saved -> createMode = null; editingEntry = saved },
+        )
     }
 
     renameTarget?.let { target ->
