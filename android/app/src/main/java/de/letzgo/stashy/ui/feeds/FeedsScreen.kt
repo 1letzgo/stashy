@@ -83,8 +83,12 @@ import kotlinx.coroutines.launch
  * Known differences to iOS: the AI Motion pill (device control) is not ported (Play policy);
  * the Feeds sheet has no Save / presets (see [FeedsFilterSortSheet]); the performer avatar opens the
  * performer's default detail section (iOS jumps to Images for Clips / Pics); the scrubber shows
- * the row's poster instead of decoded scrub stills; the mode chip's label appears without
- * iOS's delayed fade.
+ * the row's poster (Markers: the scene's sprite tile) instead of decoded scrub stills; the mode
+ * chip's label appears without iOS's delayed fade.
+ *
+ * Markers play their window of the original scene (`seconds … end_seconds`, else 30 s — see
+ * [FeedSegment]) with audio, not Stash's generated marker clip; the scrubber spans that window.
+ * Feeds never writes a resume time, so a marker leaves its scene's resume point alone.
  */
 @Composable
 fun FeedsScreen() {
@@ -313,7 +317,7 @@ private fun FeedPager(
     // Bind the preload window to the player pool.
     LaunchedEffect(activeId, items.size, playingNow, continuous) {
         val window = PreloadWindow.indices(activeIndex, items.size, pool.size) { !items[it].isVideo }
-            .map { i -> items[i].let { FeedMediaRequest(it.id, it.videoSources, loop = !continuous) } }
+            .map { i -> items[i].let { FeedMediaRequest(it.id, it.videoSources, loop = !continuous, segment = it.segment) } }
         pool.sync(window, activeId, playingNow)
     }
     // Continuous play: the next row when a video ends (iOS `onVideoEnded` → `advanceToNextItem`).
@@ -325,7 +329,7 @@ private fun FeedPager(
                 if (idx >= 0 && idx + 1 < currentItems.size) scope.launch { pagerState.animateScrollToPage(idx + 1) }
             }
         }
-        // Markers / previews whose file never got generated are dropped; the next row takes over.
+        // Previews whose file never got generated are dropped; the next row takes over.
         pool.onUnplayable = { id -> model.dropUnplayable(id) }
         onDispose { pool.onEnded = null; pool.onUnplayable = null }
     }
@@ -445,8 +449,20 @@ private fun FeedPager(
                     pausesAdvance = activeItem.isAnimated && continuous,
                 )
                 if (!activeItem.isAnimated) {
+                    // Markers: the bar spans the segment (the player is clipped to it), the
+                    // scrub still comes from the scene's sprite sheet at the matching scene time.
+                    val segment = activeItem.segment
+                    val sprites = remember(activeItem.id) {
+                        (activeItem as? FeedItem.MarkerItem)?.marker?.scene?.paths?.let {
+                            de.letzgo.stashy.ui.player.SceneScrubSprites.create(it.vtt, it.sprite)
+                        }
+                    }
+                    val previewAt = remember(sprites, segment) {
+                        sprites?.let { sp -> { s: Double -> sp.prepare(); sp.thumbnail(segment?.sceneTime(s) ?: s) } }
+                    }
                     FeedsScrubber(
                         time = time, duration = duration, placeholderURL = activeItem.posterURL,
+                        previewImageAt = previewAt,
                         aspectRatio = pool.videoSizes[activeItem.id]?.let { if (it.width > 0 && it.height > 0) it.width.toFloat() / it.height else null } ?: fileAspect(activeItem),
                         onScrub = { s -> seeking = true; time = s; pool.player(activeId)?.playWhenReady = false; pool.seek(activeId, s) },
                         onScrubEnd = { s ->

@@ -16,6 +16,7 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
+import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
@@ -29,6 +30,12 @@ data class FeedMediaRequest(
     val sources: List<String>,
     /** iOS: `loopsAtEnd = !reelsContinuousPlay`. */
     val loop: Boolean,
+    /**
+     * Window of the source to play (Markers: the marker's part of the original scene). Media3
+     * clips it natively, so `REPEAT_MODE_ONE` loops the segment, `STATE_ENDED` fires at its end
+     * and the player's position / duration are relative to it.
+     */
+    val segment: FeedSegment? = null,
 )
 
 /**
@@ -87,7 +94,9 @@ class FeedPlayerPool(context: Context, val size: Int = 3) {
         }
     }
 
-    private val mediaSourceFactory = DefaultMediaSourceFactory(OkHttpDataSource.Factory(Net.client))
+    // DefaultDataSource on top of OkHttp like `StashPlayer`: network through [Net.client], local
+    // downloads (`file://`, scenes and markers of a downloaded scene) from disk.
+    private val mediaSourceFactory = DefaultMediaSourceFactory(DefaultDataSource.Factory(appContext, OkHttpDataSource.Factory(Net.client)))
     private val slots = ArrayList<Slot>()
 
     /** Player per row id — observed by the rows to bind their video surface. */
@@ -123,10 +132,19 @@ class FeedPlayerPool(context: Context, val size: Int = 3) {
 
     private val attributes = AudioAttributes.Builder().setUsage(C.USAGE_MEDIA).setContentType(C.AUDIO_CONTENT_TYPE_MOVIE).build()
 
-    private fun mediaItem(url: String): MediaItem {
+    private fun mediaItem(url: String, segment: FeedSegment?): MediaItem {
         val builder = MediaItem.Builder().setUri(url)
         val path = android.net.Uri.parse(url).path.orEmpty()
         if (path.endsWith(".m3u8")) builder.setMimeType(MimeTypes.APPLICATION_M3U8)
+        if (segment != null) {
+            // ClippingMediaSource caps an end past the file's duration itself.
+            builder.setClippingConfiguration(
+                MediaItem.ClippingConfiguration.Builder()
+                    .setStartPositionMs((segment.start * 1000).toLong())
+                    .setEndPositionMs((segment.end * 1000).toLong())
+                    .build(),
+            )
+        }
         return builder.build()
     }
 
@@ -134,7 +152,7 @@ class FeedPlayerPool(context: Context, val size: Int = 3) {
         val req = slot.request ?: return
         val url = req.sources.getOrNull(slot.sourceIndex) ?: return
         val play = keepPlayWhenReady && slot.player.playWhenReady
-        slot.player.setMediaItem(mediaItem(url))
+        slot.player.setMediaItem(mediaItem(url, req.segment))
         slot.player.repeatMode = if (req.loop) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
         slot.player.prepare()
         slot.player.playWhenReady = play
@@ -173,8 +191,11 @@ class FeedPlayerPool(context: Context, val size: Int = 3) {
                 load(slot, keepPlayWhenReady = false)
             } else if (slot.request != req) {
                 // Same row, new options (continuous play toggled).
+                val newWindow = slot.request?.segment != req.segment
                 slot.request = req
                 slot.player.repeatMode = if (req.loop) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+                // A different segment (marker edited) needs a re-clipped item.
+                if (newWindow) { slot.sourceIndex = 0; load(slot, keepPlayWhenReady = true) }
             }
             slot.lastUsed = SystemClock.elapsedRealtime()
         }
@@ -197,7 +218,10 @@ class FeedPlayerPool(context: Context, val size: Int = 3) {
     fun pauseAll() = slots.forEach { it.player.playWhenReady = false }
 
     fun seek(id: String?, seconds: Double) {
-        player(id)?.seekTo((seconds * 1000).toLong().coerceAtLeast(0))
+        val p = player(id) ?: return
+        // Positions are relative to a clipped segment, so its duration bounds every seek.
+        val max = p.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: Long.MAX_VALUE
+        p.seekTo((seconds * 1000).toLong().coerceIn(0, max))
     }
 
     /** Hold-to-speed (iOS: `aether.rate`). Media3 plays any rate natively. */

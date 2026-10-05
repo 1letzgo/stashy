@@ -357,23 +357,37 @@ private fun PerformerThumbnail(p: FeedPerformer, onClick: () -> Unit) {
 
 /**
  * iOS: `IsolatedScrubberBar` — the shared `AetherTimeBar` (44 pt glass capsule: elapsed · track ·
- * remaining) with 16 pt sides and 8 pt above / below. [placeholderURL] stands in for the iOS
- * scrub-preview still (Android decodes no frames here; the row's poster is shown instead).
+ * remaining) with 16 pt sides and 8 pt above / below. The scrub preview shows
+ * [previewImageAt] (Markers: the scene's sprite tile) when it has one for the scrubbed time,
+ * else the row's poster ([placeholderURL]) — Android decodes no frames here.
  */
 @Composable
-fun FeedsScrubber(time: Double, duration: Double, placeholderURL: String?, aspectRatio: Float? = null, onScrub: (Double) -> Unit, onScrubEnd: (Double) -> Unit) {
+fun FeedsScrubber(
+    time: Double,
+    duration: Double,
+    placeholderURL: String?,
+    aspectRatio: Float? = null,
+    previewImageAt: ((Double) -> androidx.compose.ui.graphics.ImageBitmap?)? = null,
+    onScrub: (Double) -> Unit,
+    onScrubEnd: (Double) -> Unit,
+) {
     var scrubbing by remember { mutableStateOf(false) }
+    var previewImage by remember(previewImageAt) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
     de.letzgo.stashy.ui.player.TimeBar(
         currentTime = time,
         duration = duration,
         isScrubbing = scrubbing,
-        previewImage = null,
+        previewImage = previewImage,
         previewPlaceholderURL = placeholderURL,
         previewAspectRatio = aspectRatio,
         markers = emptyList(),
         modifier = Modifier.padding(horizontal = 16.dp).padding(top = 8.dp, bottom = 8.dp),
-        onScrubChanged = { s -> scrubbing = true; onScrub(s) },
-        onScrubEnded = { s -> scrubbing = false; onScrubEnd(s) },
+        onScrubChanged = { s ->
+            scrubbing = true
+            previewImageAt?.invoke(s)?.let { previewImage = it }
+            onScrub(s)
+        },
+        onScrubEnded = { s -> scrubbing = false; previewImage = null; onScrubEnd(s) },
     )
 }
 

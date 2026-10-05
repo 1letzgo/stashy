@@ -126,20 +126,33 @@ sealed class FeedItem {
      */
     val videoSources: List<String> get() {
         val base = ServerConfigManager.activeConfig?.baseURL
+        fun sceneSources(scene: Scene): List<String> {
+            val primary = scene.streamURL
+            val local = de.letzgo.stashy.data.Downloads.localVideo(scene.id)
+            return if (local != null || base == null) listOfNotNull(primary)
+            else listOfNotNull(primary, Net.signed("$base/scene/${scene.id}/stream.m3u8"), Net.signed("$base/scene/${scene.id}/stream.mp4")).distinct()
+        }
         return when (this) {
-            is SceneItem -> {
-                val primary = scene.streamURL
-                val local = de.letzgo.stashy.data.Downloads.localVideo(scene.id)
-                if (local != null || base == null) listOfNotNull(primary)
-                else listOfNotNull(primary, Net.signed("$base/scene/${scene.id}/stream.m3u8"), Net.signed("$base/scene/${scene.id}/stream.mp4")).distinct()
-            }
-            is MarkerItem -> listOfNotNull(Net.signed(marker.stream?.takeIf { it.isNotEmpty() } ?: base?.let { "$it/scenemarker/${marker.id}/stream" }))
+            is SceneItem -> sceneSources(scene)
+            // Markers play their window of the original scene (local download first), clipped by
+            // [segment] — the generated marker clips are low quality and silent. Only a marker
+            // without its scene falls back to the generated stream.
+            is MarkerItem -> marker.scene?.let { sceneSources(it) }
+                ?: listOfNotNull(Net.signed(marker.stream?.takeIf { it.isNotEmpty() } ?: base?.let { "$it/scenemarker/${marker.id}/stream" }))
             is ClipItem -> listOfNotNull(image.imageURL)
             is PreviewItem -> listOfNotNull(scene.previewURL)
         }
     }
 
     val videoURL: String? get() = videoSources.firstOrNull()
+
+    /**
+     * The part of the source the row plays: a marker's window of its scene
+     * ([FeedSegment.forMarker]); null = the whole file. Player position and duration are relative
+     * to it (0 … length).
+     */
+    val segment: FeedSegment? get() = (this as? MarkerItem)?.marker?.takeIf { it.scene != null }
+        ?.let { FeedSegment.forMarker(it.seconds, it.endSeconds, it.scene?.sceneDuration) }
 
     /** Poster shown until the first frame (Android only — the pager composes neighbours early). */
     val posterURL: String? get() = when (this) {
@@ -153,7 +166,7 @@ sealed class FeedItem {
     val duration: Double? get() = when (this) {
         is SceneItem -> scene.sceneDuration
         is PreviewItem -> scene.sceneDuration
-        is MarkerItem -> marker.endSeconds?.let { it - marker.seconds }
+        is MarkerItem -> segment?.length ?: marker.endSeconds?.let { it - marker.seconds }
         is ClipItem -> image.visualFiles?.firstOrNull()?.duration
     }
 
@@ -202,6 +215,30 @@ sealed class FeedItem {
 
     /** iOS: `reelsItemSupportsDelete`. */
     val supportsDelete: Boolean get() = this !is MarkerItem
+}
+
+/**
+ * A window of a scene in scene seconds. A marker plays `seconds … end_seconds` of the original
+ * file, or [DEFAULT_LENGTH] seconds when it has no end (or one not after its start).
+ */
+data class FeedSegment(val start: Double, val end: Double) {
+    val length: Double get() = end - start
+
+    /** Scene time of a position inside the segment (clamped to 0 … [length]). */
+    fun sceneTime(relative: Double): Double = start + relative.coerceIn(0.0, length)
+
+    companion object {
+        const val DEFAULT_LENGTH = 30.0
+
+        /** A known [sceneDuration] caps the end, unless the marker starts at or past it (bad data). */
+        fun forMarker(seconds: Double, endSeconds: Double?, sceneDuration: Double? = null): FeedSegment {
+            val start = seconds.coerceAtLeast(0.0)
+            var end = endSeconds?.takeIf { it > start } ?: (start + DEFAULT_LENGTH)
+            val total = sceneDuration?.takeIf { it > start }
+            if (total != null && end > total) end = total
+            return FeedSegment(start, end)
+        }
+    }
 }
 
 /** iOS: `expectedPrefix(for:)`. */

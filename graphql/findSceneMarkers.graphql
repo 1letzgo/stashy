@@ -21,6 +21,7 @@ query FindSceneMarkers($filter: FindFilterType, $scene_marker_filter: SceneMarke
         files {
           id
           path
+          size
           format
           width
           height

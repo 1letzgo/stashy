@@ -21,6 +21,8 @@ data class VideoCaption(@SerialName("language_code") val languageCode: String? =
 data class SceneFile(
     val id: String? = null,
     val path: String? = null,
+    /** Bytes (`BaseFile.size`); only some queries ask for it. */
+    val size: Long? = null,
     val format: String? = null,
     val width: Int? = null,
     val height: Int? = null,

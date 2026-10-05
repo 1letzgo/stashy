@@ -227,7 +227,7 @@ object FeedsModel {
         ReelsModeType.Pics -> FeedQueryKind.Pics
     }
 
-    /** Rows the pager shows (iOS `currentReelItems`: markers need a stream, dead rows dropped). */
+    /** Rows the pager shows (iOS `currentReelItems`; dead preview rows dropped). */
     fun visibleItems(m: ReelsModeType = mode): List<FeedItem> = list(m).items.filter { it.id !in unplayable }
 
     private fun signature(m: ReelsModeType): String = listOf(
@@ -395,7 +395,9 @@ object FeedsModel {
                 p.items.filter { !it.paths?.preview.isNullOrEmpty() }.map { FeedItem.PreviewItem(it) } to (p.items.size == per)
             }
             ReelsModeType.Markers -> FeedsRepository.markers(vars).let { p ->
-                p.items.filter { !it.stream.isNullOrEmpty() }.map { FeedItem.MarkerItem(it) } to (p.items.size == per)
+                // Markers play their scene's original file, so no generated marker stream is
+                // needed; only a marker without a scene still relies on it.
+                p.items.filter { it.scene != null || !it.stream.isNullOrEmpty() }.map { FeedItem.MarkerItem(it) } to (p.items.size == per)
             }
             ReelsModeType.Clips, ReelsModeType.Pics -> FeedsRepository.images(vars).let { p -> p.items.map { FeedItem.ClipItem(it) } to (p.items.size == per) }
         }
@@ -546,9 +548,16 @@ object FeedsModel {
 
     // MARK: - Dead rows (iOS `probeUpcomingMedia`, `handleUnplayableItem`)
 
+    /**
+     * Only Previews depend on generated files the server may not have. Markers play their window
+     * of the original scene (like Scenes), so a failing marker shows the row's error instead of
+     * being skipped.
+     */
+    private fun dropsDeadRows(m: ReelsModeType) = m == ReelsModeType.Previews
+
     /** Drops a row the server has no file for and returns the id that takes its place. */
     fun dropUnplayable(id: String): String? {
-        if (mode != ReelsModeType.Markers && mode != ReelsModeType.Previews) return null
+        if (!dropsDeadRows(mode)) return null
         val ids = visibleItems().map { it.id }
         val successor = PreloadWindow.successor(ids, id, unplayable.keys + id)
         unplayable[id] = true
@@ -569,7 +578,7 @@ object FeedsModel {
      */
     fun probeUpcomingMedia() {
         val m = mode
-        if (m != ReelsModeType.Markers && m != ReelsModeType.Previews) return
+        if (!dropsDeadRows(m)) return
         val items = visibleItems(m)
         val window = PreloadWindow.probeWindow(items.map { it.id }, currentIds[m], probed)
         if (window.isEmpty()) return
