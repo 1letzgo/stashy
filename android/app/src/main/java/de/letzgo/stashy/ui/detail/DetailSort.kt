@@ -198,6 +198,14 @@ object CardColumnsPrefs {
         return 2
     }
 
+    fun set(scope: String, columns: Int): Int {
+        val raw = runCatching { JSONObject(Prefs.string(KEY) ?: "{}") }.getOrNull() ?: JSONObject()
+        val value = if (columns == 1) 1 else 2
+        raw.put(scope, value)
+        Prefs.setString(KEY, raw.toString())
+        return value
+    }
+
     fun toggle(scope: String): Int {
         val raw = runCatching { JSONObject(Prefs.string(KEY) ?: "{}") }.getOrNull() ?: JSONObject()
         val next = if (columns(scope) == 1) 2 else 1

@@ -1,5 +1,9 @@
 package de.letzgo.stashy.ui.detail
 
+import androidx.compose.material3.Icon
+import androidx.compose.material3.Text
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.HorizontalDivider
 import de.letzgo.stashy.ui.uniqueItemsIndexed
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -139,8 +143,18 @@ internal class LinkedCatalog(
         DetailTab.Performers -> emptyList<ChromeSlot>() to { d -> SortMenuItems(DetailSort.Performer.entries, performerSort, d) { resort(tab, performerSort, it) { s -> performerSort = s } } }
         DetailTab.Tags -> emptyList<ChromeSlot>() to { d -> SortMenuItems(DetailSort.Tag.entries, tagSort, d) { resort(tab, tagSort, it) { s -> tagSort = s } } }
         DetailTab.Groups -> emptyList<ChromeSlot>() to null
-        // No in-view 1/2 per row toggle; the stored column choice comes from Settings.
-        DetailTab.Images -> emptyList<ChromeSlot>() to { d -> SortMenuItems(DetailSort.Image.entries, imageSort, d) { resort(tab, imageSort, it) { s -> imageSort = s } } }
+        // Sort, then the per-row layout of this list (iOS: "Per row" in the images settings sheet).
+        DetailTab.Images -> emptyList<ChromeSlot>() to { d ->
+            SortMenuItems(DetailSort.Image.entries, imageSort, d) { resort(tab, imageSort, it) { s -> imageSort = s } }
+            HorizontalDivider()
+            listOf(1, 2).forEach { n ->
+                DropdownMenuItem(
+                    text = { Text(if (n == 1) "1 per row" else "2 per row") },
+                    trailingIcon = { if (imageColumns == n) Icon(SF.checkmark, null) },
+                    onClick = { d(); imageColumns = CardColumnsPrefs.set(imageScopeKey, n) },
+                )
+            }
+        }
     }
 }
 
