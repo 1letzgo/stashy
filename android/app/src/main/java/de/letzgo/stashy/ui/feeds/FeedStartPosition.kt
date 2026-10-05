@@ -18,7 +18,7 @@ object FeedStartPosition {
     const val RANDOM_SHARE = 0.5
 
     /**
-     * Start in seconds: 0 for square / vertical files (width <= height), scenes shorter than
+     * Start in seconds: 0 for [FeedsSceneStartPosition.Beginning] (the default), square / vertical files (width <= height), scenes shorter than
      * [MIN_DURATION] (or of unknown duration) and when the computed start is within
      * [END_MARGIN] of the end. Otherwise the earliest marker (none → [SKIP_SECONDS]),
      * [SKIP_SECONDS], or a uniform pick in the first [RANDOM_SHARE] of the duration.
@@ -35,6 +35,7 @@ object FeedStartPosition {
         if (width != null && height != null && width > 0 && height > 0 && width <= height) return 0.0
         if (total < MIN_DURATION) return 0.0
         val start = when (setting) {
+            FeedsSceneStartPosition.Beginning -> 0.0
             FeedsSceneStartPosition.FirstMarker -> markerSeconds.filter { it >= 0 }.minOrNull() ?: SKIP_SECONDS
             FeedsSceneStartPosition.Skip30 -> SKIP_SECONDS
             FeedsSceneStartPosition.Random -> random.nextDouble() * total * RANDOM_SHARE
@@ -44,6 +45,6 @@ object FeedStartPosition {
 
     fun forScene(scene: Scene, setting: FeedsSceneStartPosition, random: Random = Random.Default): Double {
         val file = scene.files?.firstOrNull()
-        return compute(setting, scene.sceneDuration, file?.width, file?.height, scene.sceneMarkers.orEmpty().map { it.seconds }, random)
+        return compute(setting, scene.sceneDuration, file?.width, file?.height, (scene.feedMarkerSeconds?.map { it.seconds } ?: scene.sceneMarkers.orEmpty().map { it.seconds }), random)
     }
 }

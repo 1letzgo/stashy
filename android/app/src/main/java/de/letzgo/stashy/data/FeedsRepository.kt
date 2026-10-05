@@ -68,7 +68,7 @@ object FeedsRepository {
     }
 
     /** iOS: `addScenePlay` (`sceneAddPlay`, `SceneAddPlay.graphql`). */
-    suspend fun addScenePlay(id: String): Int? = if (!TabManager.tracksPlaybackActivity) null else runCatching {
+    suspend fun addScenePlay(id: String): Int? = if (!TabManager.tracksActivity(id)) null else runCatching {
         val data = GraphQL.named("sceneAddPlay", buildJsonObject { put("id", JsonPrimitive(id)); put("times", JsonArray(emptyList())) })
         (data["sceneAddPlay"].obj?.get("count") as? JsonPrimitive)?.intOrNull
     }.getOrNull()

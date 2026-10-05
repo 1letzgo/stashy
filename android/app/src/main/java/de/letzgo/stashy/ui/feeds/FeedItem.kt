@@ -152,7 +152,7 @@ sealed class FeedItem {
      * to it (0 … length).
      */
     val segment: FeedSegment? get() = (this as? MarkerItem)?.marker?.takeIf { it.scene != null }
-        ?.let { FeedSegment.forMarker(it.seconds, it.endSeconds, it.scene?.sceneDuration) }
+        ?.let { FeedSegment.forMarker(it.seconds, it.endSeconds, it.scene?.sceneDuration, de.letzgo.stashy.data.FeedsPlaybackPrefs.markerDefaultSeconds) }
 
     /** Poster shown until the first frame (Android only — the pager composes neighbours early). */
     val posterURL: String? get() = when (this) {
@@ -219,7 +219,8 @@ sealed class FeedItem {
 
 /**
  * A window of a scene in scene seconds. A marker plays `seconds … end_seconds` of the original
- * file, or [DEFAULT_LENGTH] seconds when it has no end (or one not after its start).
+ * file, or `defaultLength` seconds (Settings › Playback › Marker length, [DEFAULT_LENGTH] by
+ * default) when it has no end (or one not after its start).
  */
 data class FeedSegment(val start: Double, val end: Double) {
     val length: Double get() = end - start
@@ -231,9 +232,9 @@ data class FeedSegment(val start: Double, val end: Double) {
         const val DEFAULT_LENGTH = 30.0
 
         /** A known [sceneDuration] caps the end, unless the marker starts at or past it (bad data). */
-        fun forMarker(seconds: Double, endSeconds: Double?, sceneDuration: Double? = null): FeedSegment {
+        fun forMarker(seconds: Double, endSeconds: Double?, sceneDuration: Double? = null, defaultLength: Double = DEFAULT_LENGTH): FeedSegment {
             val start = seconds.coerceAtLeast(0.0)
-            var end = endSeconds?.takeIf { it > start } ?: (start + DEFAULT_LENGTH)
+            var end = endSeconds?.takeIf { it > start } ?: (start + defaultLength.coerceAtLeast(1.0))
             val total = sceneDuration?.takeIf { it > start }
             if (total != null && end > total) end = total
             return FeedSegment(start, end)

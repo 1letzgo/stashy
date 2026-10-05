@@ -272,6 +272,8 @@ data class Scene(
     val captions: List<VideoCaption>? = null,
     @SerialName("stash_ids") val stashIds: List<StashID>? = null,
     @SerialName("scene_markers") val sceneMarkers: List<SceneMarker>? = null,
+    /** `findScenesFeed` only: marker times for the Feeds › Scenes start position (aliased so it never passes for [sceneMarkers]). */
+    @SerialName("feed_marker_seconds") val feedMarkerSeconds: List<FeedMarkerSeconds>? = null,
     @SerialName("custom_fields") val customFields: JsonObject? = null,
 ) {
     /** iOS: `displayTitle` — title, else the file name without extension. */
@@ -315,3 +317,7 @@ data class SavedFilter(
     @SerialName("object_filter") val objectFilter: JsonElement? = null,
     @SerialName("ui_options") val uiOptions: JsonElement? = null,
 )
+
+/** One entry of `findScenesFeed`'s `feed_marker_seconds`. */
+@Serializable
+data class FeedMarkerSeconds(val seconds: Double = 0.0)

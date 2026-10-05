@@ -24,10 +24,11 @@ class FeedStartPositionTest {
     ) = FeedStartPosition.compute(setting, duration, width, height, markers, random)
 
     @Test fun settingRawValuesAndDefault() {
-        assertEquals(listOf("firstMarker", "skip30", "random"), FeedsSceneStartPosition.entries.map { it.raw })
-        assertEquals(listOf("First Marker", "Skip 30s", "Random"), FeedsSceneStartPosition.entries.map { it.label })
-        assertEquals(FirstMarker, FeedsSceneStartPosition.from(null))
-        assertEquals(FirstMarker, FeedsSceneStartPosition.from("bogus"))
+        assertEquals(listOf("beginning", "firstMarker", "skip30", "random"), FeedsSceneStartPosition.entries.map { it.raw })
+        assertEquals(listOf("Beginning", "First Marker", "Skip 30s", "Random"), FeedsSceneStartPosition.entries.map { it.label })
+        assertEquals(FeedsSceneStartPosition.Beginning, FeedsSceneStartPosition.from(null))
+        assertEquals(FeedsSceneStartPosition.Beginning, FeedsSceneStartPosition.from("bogus"))
+        assertEquals(FirstMarker, FeedsSceneStartPosition.from("firstMarker"))
         assertEquals(RandomStart, FeedsSceneStartPosition.from("random"))
     }
 
@@ -97,5 +98,10 @@ class FeedStartPositionTest {
         assertEquals(30.0, FeedStartPosition.forScene(scene.copy(sceneMarkers = null), FirstMarker), 1e-9)
         val vertical = scene.copy(files = listOf(SceneFile(width = 1080, height = 1920, duration = 900.0)))
         assertEquals(0.0, FeedStartPosition.forScene(vertical, FirstMarker), 1e-9)
+    }
+
+    @org.junit.Test
+    fun beginningAlwaysStartsAtZero() {
+        assertEquals(0.0, FeedStartPosition.compute(FeedsSceneStartPosition.Beginning, 3600.0, 1920, 1080, listOf(300.0)), 1e-9)
     }
 }

@@ -333,7 +333,7 @@ class SceneDetailModel(initial: Scene, private val autoPlay: Boolean) {
     /** iOS: `registerScenePlay` — `sceneAddPlay` once per page. */
     private fun registerPlay() {
         hasAddedPlay = true
-        if (!de.letzgo.stashy.data.TabManager.tracksPlaybackActivity) return
+        if (!de.letzgo.stashy.data.TabManager.tracksActivity(scene.id)) return
         val id = scene.id
         scope.launch {
             val count = runCatching { SceneEditing.addPlay(id) }.getOrNull()

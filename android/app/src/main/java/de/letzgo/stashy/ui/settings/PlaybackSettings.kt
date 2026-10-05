@@ -36,7 +36,8 @@ import java.util.Locale
  * (same keys as iOS); the player and Feeds read them from [TabManager].
  */
 fun LazyListScope.playbackSections() {
-    settingsSection(header = "Playback", key = "playback") {
+    // The scene player (scene detail, fullscreen, PiP).
+    settingsSection(header = "Player", key = "player") {
         SettingsToggleRow("Picture-in-Picture", TabManager.isPiPEnabled, SFS.pip) { TabManager.isPiPEnabled = it }
         SettingsDivider()
         SettingsPickerRow("Skip interval", TabManager.playerSkipOptions, TabManager.playerSkipSeconds, { "${it.toInt()} s" }, SFS.goforward) { TabManager.playerSkipSeconds = it }
@@ -47,18 +48,27 @@ fun LazyListScope.playbackSections() {
         SettingsDivider()
         SettingsToggleRow("Dolby Vision", TabManager.playerDolbyVisionEnabled, SFS.sparklesTv) { TabManager.playerDolbyVisionEnabled = it }
         SettingsDivider()
-        SettingsPickerRow("Count as played — Player", TabManager.playCountThresholdOptions, TabManager.playCountPlayerSeconds, TabConfigLogic::playCountThresholdLabel, SFS.playCircle) { TabManager.playCountPlayerSeconds = it }
+        SettingsPickerRow("Hold to speed up", TabManager.holdSpeedOptions, TabManager.holdSpeedPlayer, TabConfigLogic::holdSpeedLabel, SFS.forwardFill) { TabManager.holdSpeedPlayer = it }
         SettingsDivider()
-        SettingsPickerRow("Count as played — Feeds", TabManager.playCountThresholdOptions, TabManager.playCountFeedsSeconds, TabConfigLogic::playCountThresholdLabel, SFS.rectangleStackBadgePlay) { TabManager.playCountFeedsSeconds = it }
+        SettingsPickerRow("Count as played", TabManager.playCountThresholdOptions, TabManager.playCountPlayerSeconds, TabConfigLogic::playCountThresholdLabel, SFS.playCircle) { TabManager.playCountPlayerSeconds = it }
+    }
+    // Feeds playback (Scenes / Markers rows).
+    settingsSection(header = "Feeds", key = "feeds-playback") {
+        // Feeds › Scenes only: skip studio intros (beginning / first marker / 30 s / random in the first half).
+        SettingsPickerRow("Start position", FeedsSceneStartPosition.entries, TabManager.feedsSceneStartPosition, { it.label }, SFS.goforward) { TabManager.feedsSceneStartPosition = it }
         SettingsDivider()
-        SettingsPickerRow("Hold to speed up — Player", TabManager.holdSpeedOptions, TabManager.holdSpeedPlayer, TabConfigLogic::holdSpeedLabel, SFS.forwardFill) { TabManager.holdSpeedPlayer = it }
+        // Feeds › Markers: length of a marker without an end time.
+        SettingsPickerRow("Marker length", TabManager.feedsMarkerLengthOptions, TabManager.feedsMarkerDefaultSeconds, { "${it.toInt()} s" }, SFS.goforward10) { TabManager.feedsMarkerDefaultSeconds = it }
         SettingsDivider()
-        SettingsPickerRow("Hold to speed up — Feeds", TabManager.holdSpeedOptions, TabManager.holdSpeedFeeds, TabConfigLogic::holdSpeedLabel, SFS.forwardFrameFill) { TabManager.holdSpeedFeeds = it }
+        SettingsPickerRow("Hold to speed up", TabManager.holdSpeedOptions, TabManager.holdSpeedFeeds, TabConfigLogic::holdSpeedLabel, SFS.forwardFrameFill) { TabManager.holdSpeedFeeds = it }
         SettingsDivider()
-        // Feeds › Scenes only: skip studio intros (first marker / 30 s / random in the first half).
-        SettingsPickerRow("Feeds start position", FeedsSceneStartPosition.entries, TabManager.feedsSceneStartPosition, { it.label }, SFS.goforward) { TabManager.feedsSceneStartPosition = it }
-        SettingsDivider()
-        // Stash web "Track activity": play count, history, resume point, watch time.
+        SettingsPickerRow("Count as played", TabManager.playCountThresholdOptions, TabManager.playCountFeedsSeconds, TabConfigLogic::playCountThresholdLabel, SFS.rectangleStackBadgePlay) { TabManager.playCountFeedsSeconds = it }
+    }
+    // Stash web "Track activity": play count, history, resume point, watch time.
+    settingsSection(
+        header = "Activity", key = "activity",
+        footer = "Play count, history, resume point and watch time on the server. The player menu can pause it for one scene.",
+    ) {
         SettingsToggleRow("Playback activity", TabManager.tracksPlaybackActivity, Icons.Outlined.History) { TabManager.tracksPlaybackActivity = it }
     }
     settingsSection(header = "Downloads", key = "downloads") {

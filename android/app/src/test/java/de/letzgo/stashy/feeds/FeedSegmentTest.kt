@@ -60,4 +60,10 @@ class FeedSegmentTest {
         assertNull(FeedItem.MarkerItem(SceneMarker(id = "m1", seconds = 5.0)).segment)
         assertNull(FeedItem.SceneItem(Scene(id = "s1")).segment)
     }
+
+    @org.junit.Test
+    fun configuredDefaultLength() {
+        assertEquals(FeedSegment(42.0, 102.0), FeedSegment.forMarker(42.0, null, defaultLength = 60.0))
+        assertEquals(FeedSegment(42.0, 50.0), FeedSegment.forMarker(42.0, 50.0, defaultLength = 60.0))
+    }
 }

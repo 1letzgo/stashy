@@ -11,8 +11,8 @@ import kotlinx.serialization.builtins.serializer
 
 /** Settings › Playback › "Feeds start position": where a Feeds › Scenes row starts (skips studio intros). */
 enum class FeedsSceneStartPosition(val raw: String, val label: String) {
-    FirstMarker("firstMarker", "First Marker"), Skip30("skip30", "Skip 30s"), Random("random", "Random");
-    companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: FirstMarker }
+    Beginning("beginning", "Beginning"), FirstMarker("firstMarker", "First Marker"), Skip30("skip30", "Skip 30s"), Random("random", "Random");
+    companion object { fun from(raw: String?) = entries.firstOrNull { it.raw == raw } ?: Beginning }
 }
 
 /** iOS: `SubtitleFontSize`. */
@@ -50,6 +50,14 @@ enum class SubtitleBackgroundChoice(val raw: String, val label: String, val argb
  * Player/feeds read the global settings from here (or from [Prefs] with the same keys:
  * Double values are stored as Float, Int values as Int, Bool as Bool).
  */
+/**
+ * Plain mirror of [TabManager.feedsMarkerDefaultSeconds] for pure feed logic (`FeedSegment`), so
+ * it never has to touch Prefs (unit tests). [TabManager] keeps it in sync.
+ */
+object FeedsPlaybackPrefs {
+    @Volatile var markerDefaultSeconds: Double = 30.0
+}
+
 object TabManager {
     private const val TABS_KEY = "AppTabsConfig"
     private const val DETAIL_SORT_KEY = "DetailViewsSortConfig"
@@ -111,6 +119,10 @@ object TabManager {
      *  history, resume time or play duration goes to the server. */
     private val _tracksPlaybackActivity = bool("playbackTrackActivity", true)
     var tracksPlaybackActivity: Boolean get() = _tracksPlaybackActivity.value; set(v) { _tracksPlaybackActivity.value = v; Prefs.setBool("playbackTrackActivity", v) }
+    /** Scenes whose activity the player menu paused ("Count this playback" off) — in memory, until the app restarts. */
+    val activityPausedSceneIds: MutableSet<String> = java.util.concurrent.ConcurrentHashMap.newKeySet()
+    /** The global switch and the per-scene pause from the player menu. */
+    fun tracksActivity(sceneId: String): Boolean = tracksPlaybackActivity && sceneId !in activityPausedSceneIds
     private val _playerDolbyVision = bool("player_dolby_vision_enabled", true)
     var playerDolbyVisionEnabled: Boolean get() = _playerDolbyVision.value; set(v) { _playerDolbyVision.value = v; Prefs.setBool("player_dolby_vision_enabled", v) }
     private val _playCountPlayerSeconds = dbl("play_count_player_seconds", 1.0, playCountThresholdOptions)
@@ -119,6 +131,11 @@ object TabManager {
     var playCountFeedsSeconds: Double get() = _playCountFeedsSeconds.value; set(v) { _playCountFeedsSeconds.value = v; Prefs.setFloat("play_count_feeds_seconds", v.toFloat()) }
     private val _holdSpeedPlayer = dbl("hold_speed_player", 2.0, holdSpeedOptions)
     var holdSpeedPlayer: Double get() = _holdSpeedPlayer.value; set(v) { _holdSpeedPlayer.value = v; Prefs.setFloat("hold_speed_player", v.toFloat()) }
+    /** Settings › Playback › "Marker length": how long a Feeds › Markers row plays when the marker has no end time. */
+    val feedsMarkerLengthOptions = listOf(15.0, 30.0, 45.0, 60.0, 90.0, 120.0)
+    private val _feedsMarkerDefaultSeconds = dbl("feedsMarkerDefaultSeconds", 30.0, feedsMarkerLengthOptions)
+    var feedsMarkerDefaultSeconds: Double get() = _feedsMarkerDefaultSeconds.value; set(v) { _feedsMarkerDefaultSeconds.value = v; FeedsPlaybackPrefs.markerDefaultSeconds = v; Prefs.setFloat("feedsMarkerDefaultSeconds", v.toFloat()) }
+    init { FeedsPlaybackPrefs.markerDefaultSeconds = _feedsMarkerDefaultSeconds.value }
     private val _feedsSceneStartPosition = mutableStateOf(FeedsSceneStartPosition.from(Prefs.string("feedsSceneStartPosition")))
     var feedsSceneStartPosition: FeedsSceneStartPosition
         get() = _feedsSceneStartPosition.value

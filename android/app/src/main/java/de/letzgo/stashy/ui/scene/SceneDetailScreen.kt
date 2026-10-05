@@ -1,5 +1,6 @@
 package de.letzgo.stashy.ui.scene
 
+import androidx.compose.material.icons.outlined.History
 import android.content.res.Configuration
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
@@ -145,6 +146,16 @@ private fun SceneDetailContent(model: SceneDetailModel) {
     val extraMenuItems: () -> List<PlayerMenuItem> = {
         buildList {
             add(PlayerMenuItem.Separator("extras.section.scene", "Scene"))
+            // Watch without it counting (play count, history, resume point, watch time) — only
+            // while Settings › Playback activity is on; the pause lasts until the app restarts.
+            if (de.letzgo.stashy.data.TabManager.tracksPlaybackActivity) {
+                val sceneId = model.scene.id
+                val counts = sceneId !in de.letzgo.stashy.data.TabManager.activityPausedSceneIds
+                add(PlayerMenuItem.Action("extras.countPlayback", "Count this playback", androidx.compose.material.icons.Icons.Outlined.History, isChecked = counts) {
+                    if (counts) de.letzgo.stashy.data.TabManager.activityPausedSceneIds.add(sceneId)
+                    else de.letzgo.stashy.data.TabManager.activityPausedSceneIds.remove(sceneId)
+                })
+            }
             add(PlayerMenuItem.Action("extras.sceneCover", "Use frame as scene cover", PlayerIcons.photo, isDisabled = model.isCapturing) { model.showReplaceCoverConfirm = true })
             add(PlayerMenuItem.Action("extras.tagImage", "Use frame as tag image", PlayerIcons.tag, isDisabled = model.isCapturing) { model.captureTagImage() })
             de.letzgo.stashy.ui.player.PlaybackFormat.resolutionLabel(model.scene.files?.firstOrNull()?.height)?.let {
