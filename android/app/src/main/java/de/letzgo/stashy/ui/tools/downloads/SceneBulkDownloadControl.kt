@@ -66,20 +66,46 @@ fun DownloadOptionsAlert(title: String, message: String?, options: List<Download
 }
 
 /**
- * iOS: `sceneBulkDownloadDialog(isPresented:scope:scopeName:)` (SceneBulkDownloadControl.swift) —
+ * Newest-N / all buttons that never promise more than exist (iOS: `DownloadBatchOptions`).
+ * A known count of at most [batch] items gets one "Download all N" button; otherwise
+ * "Newest {batch}" plus "All N". An unknown count (null, or 0 from a not-yet-loaded model)
+ * keeps both buttons without a number.
+ */
+internal fun newestOrAllOptions(count: Int?, batch: Int, singular: String, plural: String, download: (limit: Int?) -> Unit): List<DownloadOption> {
+    val known = count?.takeIf { it > 0 }
+    return when {
+        known == 1 -> listOf(DownloadOption("Download 1 $singular") { download(null) })
+        known != null && known <= batch -> listOf(DownloadOption("Download all $known $plural") { download(null) })
+        else -> listOf(
+            DownloadOption("Newest $batch $plural") { download(batch) },
+            DownloadOption(if (known != null) "All $known $plural" else "All $plural") { download(null) },
+        )
+    }
+}
+
+/** "Sync newest" (all) plus "Sync newest {batch}" — the latter only when the set is larger than [batch]. */
+internal fun syncNewestOptions(count: Int?, batch: Int, sync: (limit: Int?) -> Unit): List<DownloadOption> = buildList {
+    add(DownloadOption("Sync newest") { sync(null) })
+    if (showsSyncNewestBatch(count, batch)) add(DownloadOption("Sync newest $batch") { sync(batch) })
+}
+
+/** True unless the set is known to hold no more than [batch] items. */
+internal fun showsSyncNewestBatch(count: Int?, batch: Int): Boolean = count == null || count <= 0 || count > batch
+
+/**
+ * iOS: `sceneBulkDownloadDialog(isPresented:scope:scopeName:sceneCount:)` (SceneBulkDownloadControl.swift) —
  * "Newest N scenes" / "All scenes" for a performer, studio, tag, group or saved filter.
+ * [sceneCount] (the object's `scene_count`) collapses the choice to "Download all N" for small sets.
  * Show it while a flag is set; [onDismiss] clears the flag.
  */
 @Composable
-fun SceneBulkDownloadDialog(scope: Downloads.SceneDownloadScope, scopeName: String, onDismiss: () -> Unit) {
-    val batch = Downloads.sceneNewestBatchSize
+fun SceneBulkDownloadDialog(scope: Downloads.SceneDownloadScope, scopeName: String, sceneCount: Int? = null, onDismiss: () -> Unit) {
     DownloadOptionsAlert(
         title = "Download scenes",
         message = "Scenes already downloaded are skipped.",
-        options = listOf(
-            DownloadOption("Newest $batch scenes") { Downloads.downloadScenes(scope, batch, scopeName) },
-            DownloadOption("All scenes") { Downloads.downloadScenes(scope, null, scopeName) },
-        ),
+        options = newestOrAllOptions(sceneCount, Downloads.sceneNewestBatchSize, "scene", "scenes") { limit ->
+            Downloads.downloadScenes(scope, limit, scopeName)
+        },
         onDismiss = onDismiss,
     )
 }
@@ -134,31 +160,31 @@ fun GalleryDownloadOptionsDialog(gallery: Gallery, onDismiss: () -> Unit) {
         gallery.imageCount != null -> "${gallery.imageCount} images in this gallery"
         else -> null
     }
-    val options = if (stored != null) listOf(
-        DownloadOption("Sync newest") { Downloads.syncGallery(gallery.id) },
-        DownloadOption("Sync newest $batch") { Downloads.syncGallery(gallery.id, batch) },
-        DownloadOption("Remove download", destructive = true) { Downloads.deleteGalleryDownload(gallery.id) },
-    ) else listOf(
-        DownloadOption("Newest $batch images") { Downloads.downloadGallery(gallery, batch) },
-        DownloadOption("All images") { Downloads.downloadGallery(gallery, null) },
-    )
+    val count = gallery.imageCount ?: stored?.serverImageCount
+    val options = if (stored != null) {
+        syncNewestOptions(count, batch) { Downloads.syncGallery(gallery.id, it) } +
+            DownloadOption("Remove download", destructive = true) { Downloads.deleteGalleryDownload(gallery.id) }
+    } else {
+        newestOrAllOptions(gallery.imageCount, batch, "image", "images") { Downloads.downloadGallery(gallery, it) }
+    }
     DownloadOptionsAlert("Gallery", message, options, onDismiss)
 }
 
-/** iOS: the "Tag images" alert of `TagDetailView`. Entry id is `tag-<tagId>`. */
+/**
+ * iOS: the "Tag images" alert of `TagDetailView`. Entry id is `tag-<tagId>`. [imageCount] is the
+ * tag's `image_count` (depth 0, like the download's criterion).
+ */
 @Composable
-fun TagImagesDownloadDialog(tagId: String, tagName: String, onDismiss: () -> Unit) {
+fun TagImagesDownloadDialog(tagId: String, tagName: String, imageCount: Int? = null, onDismiss: () -> Unit) {
     val entryId = "tag-$tagId"
-    val stored = Downloads.galleryDownloads.any { it.id == entryId }
+    val stored = Downloads.galleryDownloads.firstOrNull { it.id == entryId }
     val batch = Downloads.galleryNewestBatchSize
-    val options = if (stored) listOf(
-        DownloadOption("Sync newest") { Downloads.syncTagImages(entryId) },
-        DownloadOption("Sync newest $batch") { Downloads.syncTagImages(entryId, batch) },
-        DownloadOption("Remove download", destructive = true) { Downloads.deleteGalleryDownload(entryId) },
-    ) else listOf(
-        DownloadOption("Newest $batch images") { Downloads.downloadTagImages(tagId, tagName, batch) },
-        DownloadOption("All images") { Downloads.downloadTagImages(tagId, tagName, null) },
-    )
+    val options = if (stored != null) {
+        syncNewestOptions(imageCount ?: stored.serverImageCount, batch) { Downloads.syncTagImages(entryId, it) } +
+            DownloadOption("Remove download", destructive = true) { Downloads.deleteGalleryDownload(entryId) }
+    } else {
+        newestOrAllOptions(imageCount, batch, "image", "images") { Downloads.downloadTagImages(tagId, tagName, it) }
+    }
     DownloadOptionsAlert("Tag images", null, options, onDismiss)
 }
 

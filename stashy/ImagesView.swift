@@ -2025,24 +2025,24 @@ private struct GalleryDownloadOptionsAlert: ViewModifier {
 
     func body(content: Content) -> some View {
         let stored = gallery.flatMap { downloadManager.downloadedGallery(id: $0.id) }
+        let batch = DownloadManager.galleryNewestBatchSize
         return content.alert("Gallery", isPresented: $isPresented) {
             if let gallery {
-                if stored != nil {
+                if let stored {
                     Button("Sync newest") {
                         downloadManager.syncGallery(id: gallery.id)
                     }
-                    Button("Sync newest \(DownloadManager.galleryNewestBatchSize)") {
-                        downloadManager.syncGallery(id: gallery.id, limit: DownloadManager.galleryNewestBatchSize)
+                    if DownloadManager.showsSyncNewestBatch(count: gallery.imageCount ?? stored.serverImageCount, batch: batch) {
+                        Button("Sync newest \(batch)") {
+                            downloadManager.syncGallery(id: gallery.id, limit: batch)
+                        }
                     }
                     Button("Remove download", role: .destructive) {
                         downloadManager.deleteGalleryDownload(id: gallery.id)
                     }
                 } else {
-                    Button("Newest \(DownloadManager.galleryNewestBatchSize) images") {
-                        downloadManager.downloadGallery(gallery, limit: DownloadManager.galleryNewestBatchSize)
-                    }
-                    Button("All images") {
-                        downloadManager.downloadGallery(gallery, limit: nil)
+                    DownloadBatchOptions.buttons(count: gallery.imageCount, batch: batch, singular: "image", plural: "images") { limit in
+                        downloadManager.downloadGallery(gallery, limit: limit)
                     }
                 }
             }

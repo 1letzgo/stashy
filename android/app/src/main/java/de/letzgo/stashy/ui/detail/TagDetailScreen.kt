@@ -119,10 +119,10 @@ class TagDetailScreen(val tagId: String, val preview: Tag? = null) : Screen {
         val t = tag
         if (editing && t != null) EditTagSheet(t, { editing = false }) { tag = it }
         if (showSceneDownloadOptions) {
-            SceneBulkDownloadDialog(Downloads.SceneDownloadScope.Tag(tagId), tag?.name ?: "") { showSceneDownloadOptions = false }
+            SceneBulkDownloadDialog(Downloads.SceneDownloadScope.Tag(tagId), tag?.name ?: "", tag?.sceneCount) { showSceneDownloadOptions = false }
         }
         if (showTagImagesOptions) {
-            TagImagesDownloadDialog(tagId, tag?.name ?: "") { showTagImagesOptions = false }
+            TagImagesDownloadDialog(tagId, tag?.name ?: "", tag?.imageCount) { showTagImagesOptions = false }
         }
     }
 

@@ -1205,6 +1205,7 @@ struct TagDetailView: View {
             isPresented: $showingSceneDownloadOptions,
             scope: .tag(id: selectedTag.id),
             scopeName: selectedTag.name,
+            sceneCount: selectedTag.sceneCount,
         )
         .stashyDetailChrome(tagDetailChromeConfig) {
             tagDetailNavBar
@@ -1216,26 +1217,23 @@ struct TagDetailView: View {
         }
         .alert("Tag images", isPresented: $showingTagDownloadOptions) {
             let entryId = "tag-" + selectedTag.id
-            if downloadManager.downloadedGallery(id: entryId) != nil {
+            let batch = DownloadManager.galleryNewestBatchSize
+            // `image_count` is depth 0, like the download's tag criterion.
+            if let stored = downloadManager.downloadedGallery(id: entryId) {
                 Button("Sync newest") {
                     downloadManager.syncTagImages(entryId: entryId)
                 }
-                Button("Sync newest \(DownloadManager.galleryNewestBatchSize)") {
-                    downloadManager.syncTagImages(entryId: entryId, limit: DownloadManager.galleryNewestBatchSize)
+                if DownloadManager.showsSyncNewestBatch(count: selectedTag.imageCount ?? stored.serverImageCount, batch: batch) {
+                    Button("Sync newest \(batch)") {
+                        downloadManager.syncTagImages(entryId: entryId, limit: batch)
+                    }
                 }
                 Button("Remove download", role: .destructive) {
                     downloadManager.deleteGalleryDownload(id: entryId)
                 }
             } else {
-                Button("Newest \(DownloadManager.galleryNewestBatchSize) images") {
-                    downloadManager.downloadTagImages(
-                        tagId: selectedTag.id,
-                        tagName: selectedTag.name,
-                        limit: DownloadManager.galleryNewestBatchSize
-                    )
-                }
-                Button("All images") {
-                    downloadManager.downloadTagImages(tagId: selectedTag.id, tagName: selectedTag.name, limit: nil)
+                DownloadBatchOptions.buttons(count: selectedTag.imageCount, batch: batch, singular: "image", plural: "images") { limit in
+                    downloadManager.downloadTagImages(tagId: selectedTag.id, tagName: selectedTag.name, limit: limit)
                 }
             }
             Button("Cancel", role: .cancel) {}

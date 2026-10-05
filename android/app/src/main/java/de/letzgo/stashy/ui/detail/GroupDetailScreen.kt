@@ -80,7 +80,7 @@ class GroupDetailScreen(val groupId: String, val preview: StashGroup? = null) : 
         val g = group
         if (editing && g != null) EditGroupSheet(g, { editing = false }) { group = it }
         if (showSceneDownloadOptions) {
-            SceneBulkDownloadDialog(Downloads.SceneDownloadScope.Group(groupId), group?.name ?: "") { showSceneDownloadOptions = false }
+            SceneBulkDownloadDialog(Downloads.SceneDownloadScope.Group(groupId), group?.name ?: "", group?.sceneCount) { showSceneDownloadOptions = false }
         }
     }
 

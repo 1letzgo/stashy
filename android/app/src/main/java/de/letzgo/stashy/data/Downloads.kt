@@ -188,6 +188,19 @@ object DownloadsMetadataCodec {
         }
         return (ext(basename) ?: ext(path) ?: ext(imagePath))?.lowercase() ?: "jpg"
     }
+
+    /**
+     * Title stored for a downloaded image: the trimmed server title, else the file name without
+     * its extension (Stash's own UI falls back to the file name too). iOS: `StashImage.downloadTitle`.
+     */
+    fun imageTitle(title: String?, basename: String?, path: String?): String? {
+        title?.trim()?.takeIf { it.isNotEmpty() }?.let { return it }
+        val name = basename?.trim()?.takeIf { it.isNotEmpty() }
+            ?: path?.substringBefore('?')?.trimEnd('/', '\\')?.substringAfterLast('/')?.substringAfterLast('\\')?.trim()?.takeIf { it.isNotEmpty() }
+            ?: return null
+        val dot = name.lastIndexOf('.')
+        return if (dot > 0) name.substring(0, dot) else name
+    }
 }
 
 /**
@@ -528,11 +541,12 @@ object Downloads {
             if (!requireDownloadEntitlement()) return@onMain
             val entryId = "image-${image.id}"
             if (isGalleryDownloaded(entryId) || activeDownloads[entryId] != null) return@onMain
-            val title = image.title ?: "Image"
+            val fileTitle = image.downloadTitle
+            val title = fileTitle ?: "Image"
             activeDownloads = activeDownloads + (entryId to ActiveDownload(entryId, title, 0.05))
             enqueueImages(
                 PendingImageDownload(
-                    entryId = entryId, title = title, entryTitle = image.title, mode = PendingImageDownload.MODE_IMAGE,
+                    entryId = entryId, title = title, entryTitle = fileTitle, mode = PendingImageDownload.MODE_IMAGE,
                     images = listOf(pendingImage(image) ?: run { activeDownloads = activeDownloads - entryId; notify("Download failed"); return@onMain }),
                     studioName = image.studio?.name, performerNames = image.performers.orEmpty().mapNotNull { it.name },
                     serverImageCount = 1, sourceKind = DownloadedGallery.Kind.Image.raw,
@@ -640,6 +654,47 @@ object Downloads {
         }
     }
 
+    private var titleBackfillRunning = false
+    private var titleBackfillDone = false
+
+    /**
+     * Images downloaded before the file-name fallback were stored with `title = null` and showed
+     * "Untitled". Looks them up once per launch — matched by id AND `created_at`, so another active
+     * server can never rename them — and stores the file-name title. Offline it retries next time.
+     */
+    fun backfillMissingImageTitles() {
+        ensureLoaded()
+        onMain {
+            if (titleBackfillDone || titleBackfillRunning) return@onMain
+            val missing = galleryDownloads.flatMap { entry -> entry.images.filter { it.title.isNullOrBlank() && it.createdAt != null } }
+            if (missing.isEmpty()) { titleBackfillDone = true; return@onMain }
+            titleBackfillRunning = true
+            scope.launch {
+                val found = DownloadsFetch.imageDownloadTitles(missing.map { it.id }.distinct())
+                titleBackfillRunning = false
+                if (found == null) return@launch
+                // Done once every candidate resolved; a miss (e.g. another server active) retries later.
+                titleBackfillDone = missing.all { found[it.id]?.first == it.createdAt }
+                var changed = false
+                galleryDownloads = galleryDownloads.map { entry ->
+                    var entryChanged = false
+                    val images = entry.images.map { image ->
+                        val hit = found[image.id]
+                        if (image.title.isNullOrBlank() && hit != null && hit.first == image.createdAt) {
+                            entryChanged = true
+                            image.copy(title = hit.second)
+                        } else image
+                    }
+                    if (!entryChanged) return@map entry
+                    changed = true
+                    val title = if (entry.isSingleImage && entry.title.isNullOrBlank()) images.firstOrNull()?.title else entry.title
+                    entry.copy(images = images, title = title)
+                }
+                if (changed) saveGalleryMetadata()
+            }
+        }
+    }
+
     private fun fetchThenEnqueue(
         entryId: String,
         onEmpty: String,
@@ -677,7 +732,7 @@ object Downloads {
             id = image.id,
             url = url,
             ext = DownloadsMetadataCodec.imageFileExtension(file?.basename, file?.path, image.paths?.image),
-            title = image.title,
+            title = image.downloadTitle,
             createdAt = image.createdAt,
             isVideo = image.isVideo,
             performerNames = image.performers.orEmpty().mapNotNull { it.name },

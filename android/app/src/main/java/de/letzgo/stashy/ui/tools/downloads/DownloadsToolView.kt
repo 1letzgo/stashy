@@ -143,6 +143,7 @@ fun DownloadsToolView() {
     val serverId = ServerConfigManager.activeConfig?.id
     LaunchedEffect(serverId) {
         DownloadSyncJobStore.load()
+        Downloads.backfillMissingImageTitles()
         savedFilters = if (serverId != null) DownloadSavedFilters.fetch() else emptyMap()
     }
     DownloadsNotificationPermission()

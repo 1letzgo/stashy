@@ -115,6 +115,7 @@ class DownloadedGalleryScreen(val entryId: String) : Screen {
         var confirmDelete by remember { mutableStateOf(false) }
         val topInset = WindowInsets.statusBars.asPaddingValues().calculateTopPadding()
         val bottomInset = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
+        LaunchedEffect(Unit) { Downloads.backfillMissingImageTitles() }
 
         Box(Modifier.fillMaxSize().background(p.background)) {
             if (entry != null) {
@@ -154,8 +155,8 @@ class DownloadedGalleryScreen(val entryId: String) : Screen {
                 } else if (entry != null) {
                     if (!entry.isSingleImage) TopBarAction(Icons.Filled.Sync, "Sync newest") { sync(entry, null) }
                     TopBarOverflowMenu { dismiss ->
-                        if (!entry.isSingleImage) {
-                            val batch = Downloads.galleryNewestBatchSize
+                        val batch = Downloads.galleryNewestBatchSize
+                        if (!entry.isSingleImage && showsSyncNewestBatch(entry.serverImageCount, batch)) {
                             OverflowItem("Sync newest $batch", Icons.Filled.VerticalAlignBottom, dismiss) { sync(entry, batch) }
                         }
                         OverflowItem("Delete", SF.trash, dismiss, color = StashyColors.systemRed) { confirmDelete = true }
